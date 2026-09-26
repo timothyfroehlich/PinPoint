@@ -37,6 +37,7 @@ import type {
   PbmListingView,
   PbmSibling,
 } from "~/lib/pinballmap/listing-state";
+import type { PinballMapLinkState } from "~/lib/pinballmap/types";
 import type { Result } from "~/lib/result";
 import { cn } from "~/lib/utils";
 import {
@@ -94,12 +95,12 @@ export interface PinballmapListingControlProps {
   /** Viewer holds `machines.pinballmap.sync` (8.3) — may press Refresh. */
   canRefresh: boolean;
   /**
-   * An operator credential is provisioned. Without one the outbound writes
-   * cannot run, so the status row links out instead of showing a button that
-   * would fail (4.4, CORE-ARCH-012). Read off `pinballmap_state` columns — the
-   * token is never decrypted to answer this.
+   * The viewer's own Pinball Map account link, which pushes run as (spec 8.2).
+   * Only `linked` can push; otherwise the status row links out instead of
+   * showing a button that would fail (4.4, CORE-ARCH-012). Read off the link
+   * row — the token is never decrypted to answer this.
    */
-  writeEnabled: boolean;
+  linkStatus: PinballMapLinkState;
   /** Catalog title, so a confirm names the game rather than "this machine". */
   modelName: string | null;
 }
@@ -121,7 +122,7 @@ export function PinballmapListingControl({
   canSetIntent,
   canPush,
   canRefresh,
-  writeEnabled,
+  linkStatus,
   modelName,
 }: PinballmapListingControlProps): React.JSX.Element {
   const [pending, startTransition] = useTransition();
@@ -144,13 +145,17 @@ export function PinballmapListingControl({
       // A failure has to be visible: on success the page revalidates and the
       // rows change underneath, so a silent no-op would leave both outcomes
       // looking identical (CORE-ARCH-012).
-      if (!result.ok) setError(result.message);
+      // Except an authentication failure: the page revalidates into the
+      // standing "authentication failed" note, which says the same thing.
+      if (!result.ok && result.code !== "PBM_AUTH_FAILED")
+        setError(result.message);
     });
   }
 
   const game = modelName ?? "this machine";
-  const canWriteOut = canPush && writeEnabled && locationUrl !== null;
-  const showExternalFallback = canPush && !writeEnabled && locationUrl !== null;
+  const linked = linkStatus === "linked";
+  const canWriteOut = canPush && linked && locationUrl !== null;
+  const showExternalFallback = canPush && !linked && locationUrl !== null;
   const disabled = view.disabled !== null;
 
   return (
@@ -224,7 +229,12 @@ export function PinballmapListingControl({
                 className="text-sm text-foreground"
                 data-testid="pbm-listing-status"
               >
-                {statusSentence(view, locationUrl, showExternalFallback)}
+                {statusSentence(
+                  view,
+                  locationUrl,
+                  showExternalFallback,
+                  showExternalFallback && linkStatus === "not_linked"
+                )}
               </span>
             </div>
 
@@ -266,6 +276,28 @@ export function PinballmapListingControl({
           </div>
         </Row>
       </div>
+
+      {/* Pinball Map refused this viewer's saved token on a push (spec 8.5).
+          The status row has already fallen back to the link-out; this says
+          why, and where to fix it. */}
+      {canPush && linkStatus === "needs_relink" && locationUrl !== null ? (
+        <p
+          className="mt-2 flex items-center gap-1.5 text-xs text-warning"
+          data-testid="pbm-listing-auth-failed"
+        >
+          <TriangleAlert aria-hidden="true" className="size-3.5 shrink-0" />
+          <span>
+            Pinball Map authentication failed.{" "}
+            <Link
+              href="/settings#pinball-map"
+              className="underline underline-offset-2 hover:no-underline"
+            >
+              Reconnect your account
+            </Link>{" "}
+            to push from here.
+          </span>
+        </p>
+      ) : null}
 
       {error !== null ? (
         <p
@@ -565,15 +597,17 @@ function StatusIcon({ view }: { view: PbmListingView }): React.JSX.Element {
  * (spec 4.2, 4.8 — "listing" never appears; the object is an entry, the set is
  * the lineup).
  *
- * For a push-capable viewer without credentials, the sentence carries the
- * action as a link out to Pinball Map instead (4.4). A read-only viewer gets
+ * For a push-capable viewer without a usable linked account, the sentence
+ * carries the action as a link out to Pinball Map instead (4.4), plus a prompt
+ * to link when they have no link at all (8.6). A read-only viewer gets
  * status only (4.9), and a control that cannot perform its action is never
  * shown (CORE-ARCH-012).
  */
 function statusSentence(
   view: PbmListingView,
   locationUrl: string | null,
-  showExternalFallback: boolean
+  showExternalFallback: boolean,
+  promptToLink: boolean
 ): React.ReactNode {
   const sub = (text: string): React.JSX.Element => (
     <span className="text-muted-foreground">{text}</span>
@@ -595,6 +629,23 @@ function statusSentence(
         , then Refresh to update.
       </>
     );
+
+  // Spec 8.6: an unlinked member who can push gets the link-out AND a way to
+  // push from here next time.
+  const linkPrompt = (verb: string): React.JSX.Element | null =>
+    promptToLink ? (
+      <span className="text-muted-foreground">
+        {" "}
+        Or{" "}
+        <Link
+          href="/settings#pinball-map"
+          className="underline underline-offset-2 hover:no-underline"
+        >
+          link your Pinball Map account
+        </Link>{" "}
+        to {verb} it from here.
+      </span>
+    ) : null;
 
   switch (view.name) {
     case "not_configured":
@@ -659,6 +710,7 @@ function statusSentence(
         <>
           Not on the location&apos;s lineup.
           {showExternalFallback ? linkOut("Add it on Pinball Map") : null}
+          {linkPrompt("add")}
         </>
       );
     case "lingering":
@@ -666,6 +718,7 @@ function statusSentence(
         <>
           Still on the location&apos;s lineup.
           {showExternalFallback ? linkOut("Remove it on Pinball Map") : null}
+          {linkPrompt("remove")}
         </>
       );
   }

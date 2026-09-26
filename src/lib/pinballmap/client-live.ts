@@ -54,7 +54,8 @@ import type {
  *
  * ERROR MODEL: PBM reports logical failures with HTTP 200 and an `errors` string
  * in the JSON body (e.g. `{"errors":"Failed to find machine"}`), NOT a 4xx — the
- * sole status-based exception is a disabled account (401 + `{"error":"..."}`).
+ * status-based exceptions are 401 (our platform X-Api-Token refused) and 403 (a
+ * disabled account), both `{"error":"..."}` — see writeReasonFor.
  * So we classify success/failure from the body, never from `res.ok` alone.
  * Contract source: pinballmap/pbm spec (see docs/external/README.md).
  *
@@ -210,12 +211,24 @@ function pbmErrorMessage(body: Record<string, unknown> | null): string | null {
 /** Stand-in when PBM signals an error in a shape we cannot render. */
 const PBM_UNKNOWN_ERROR = "PinballMap reported an error";
 
-/** Map a PBM error message (+status) to a write-failure reason. */
+/**
+ * Map a PBM error message (+status) to a write-failure reason.
+ *
+ * Status meanings, from pinballmap/pbm (verified 2026-09-26):
+ * - 401 is `BaseController#require_api_token` refusing PinPoint's platform
+ *   X-Api-Token. It says nothing about the writer, so it must not read as the
+ *   writer's token being dead (which marks their link failed, spec 8.5).
+ * - 403 is `require_api_user` refusing a disabled account.
+ * - A refused user_token is HTTP 200 + AUTH_REQUIRED_MSG ("Authentication is
+ *   required…").
+ * - "You can only update/delete machine conditions that you own" is an
+ *   ownership rule, not an identity failure, so it stays a plain rejection.
+ */
 function writeReasonFor(status: number, message: string): WriteReason {
   const m = message.toLowerCase();
   if (m.includes("failed to find")) return "not_found";
-  if (status === 401 || status === 403) return "unauthorized";
-  if (m.includes("authentication is required") || m.includes("you can only")) {
+  if (status === 401 || m.includes("api_token is required")) return "api_token";
+  if (status === 403 || m.includes("authentication is required")) {
     return "unauthorized";
   }
   return "rejected";
@@ -277,9 +290,8 @@ async function writeRequest(
 
   // Defensive: a 4xx that didn't carry a PBM error body.
   if (!res.ok) {
-    if (res.status === 401 || res.status === 403) {
-      return writeFailure("unauthorized");
-    }
+    if (res.status === 401) return writeFailure("api_token");
+    if (res.status === 403) return writeFailure("unauthorized");
     if (res.status === 404) return writeFailure("not_found");
     return writeFailure("transient");
   }
@@ -572,7 +584,9 @@ export function createLiveClient(apiToken: string | null): PinballMapClient {
 
     async authDetails(login: string, password: string): Promise<PbmAuthResult> {
       assertNotInTransaction("pinballmap.authDetails");
-      // Credentials in the query string — never log this URL.
+      // Credentials in the query string — never log this URL. Pinball Map
+      // routes auth_details as GET only (pbm config/routes.rb), so the
+      // password cannot move to a request body.
       const url = buildUrl(`/users/auth_details.json`, { login, password });
       const res = await safeFetch(
         url,
@@ -586,27 +600,48 @@ export function createLiveClient(apiToken: string | null): PinballMapClient {
       }
       const body = await readBody(res);
       const message = pbmErrorMessage(body);
-      // Disabled account is the one status-based case: 401 + {"error":"..."}.
+      // Wire shape, from pinballmap/pbm `Api::V1::UsersController#auth_details`
+      // and its request spec (verified 2026-09-25 against main, last touched
+      // 2026-09-01):
+      //   - disabled account: 403 + {"error":"account_disabled"} — the one
+      //     status-based case. It is 403 (`:forbidden`), not 401.
+      //   - missing field, unknown user, wrong password, unconfirmed: 200 +
+      //     {"errors":"..."}.
+      //   - success: 200 + {"user":{"id",…,"username","email",
+      //     "authentication_token"}} — `return_response(user, "user", …)` nests
+      //     the fields under a `user` root, never at the top level.
+      // 401 is the platform X-Api-Token refused, not anything about this
+      // member's account (see writeReasonFor).
       if (res.status === 401) {
+        return message === null
+          ? { ok: false, reason: "api_token" }
+          : { ok: false, reason: "api_token", message };
+      }
+      if (res.status === 403) {
         return {
           ok: false,
           reason: "account_disabled",
           message: message ?? "account_disabled",
         };
       }
-      // Everything else PBM rejects (wrong password, unknown user, unconfirmed)
-      // comes back as HTTP 200 + {"errors":"..."}.
       if (message) {
         return { ok: false, reason: "invalid_credentials", message };
       }
-      const token =
-        typeof body?.["authentication_token"] === "string"
-          ? body["authentication_token"]
-          : null;
-      if (!token) return { ok: false, reason: "transient" };
+      const user = asRecord(body?.["user"]);
+      const token = user?.["authentication_token"];
+      const email = user?.["email"];
+      // A success body missing the token or the email cannot be written with:
+      // writes identify the author by `user_email`. Report it as a failed
+      // exchange rather than storing half a credential.
+      if (typeof token !== "string" || token.length === 0) {
+        return { ok: false, reason: "transient" };
+      }
+      if (typeof email !== "string" || email.length === 0) {
+        return { ok: false, reason: "transient" };
+      }
       const username =
-        typeof body?.["username"] === "string" ? body["username"] : login;
-      return { ok: true, token, username };
+        typeof user?.["username"] === "string" ? user["username"] : login;
+      return { ok: true, token, username, email };
     },
 
     addMachine({

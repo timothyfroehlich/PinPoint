@@ -631,6 +631,20 @@
       "when": 1790369609379,
       "tag": "0089_opdb-machines",
       "breakpoints": true
+    },
+    {
+      "idx": 90,
+      "version": "7",
+      "when": 1790395083388,
+      "tag": "0090_pinballmap-user-credentials",
+      "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "7",
+      "when": 1790438857668,
+      "tag": "0091_retire-pinballmap-operator-credentials",
+      "breakpoints": true
     }
   ]
 }

@@ -134,11 +134,33 @@ describe("mock PinballMap client", () => {
       ok: true,
       token: "mock-token-tim",
       username: "tim",
+      email: "tim@example.com",
     });
-    expect(await client.authDetails("tim", "")).toEqual({
+    expect(await client.authDetails("tim", "")).toMatchObject({
       ok: false,
       reason: "invalid_credentials",
     });
+    expect(await client.authDetails("tim", "wrong")).toEqual({
+      ok: false,
+      reason: "invalid_credentials",
+      message: "Incorrect password",
+    });
+    expect(await client.authDetails("disabled", "pw")).toMatchObject({
+      ok: false,
+      reason: "account_disabled",
+    });
+  });
+
+  it("refuses writes carrying the revoked login's token", async () => {
+    const client = createMockClient();
+    const auth = await client.authDetails("revoked", "pw");
+    if (!auth.ok) throw new Error("expected the revoked login to link");
+    const res = await client.addMachine({
+      credentials: { email: auth.email, token: auth.token },
+      locationId: 26454,
+      machineId: 10,
+    });
+    expect(res).toMatchObject({ ok: false, reason: "unauthorized" });
   });
 
   it("instances are isolated", async () => {

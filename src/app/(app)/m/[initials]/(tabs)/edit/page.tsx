@@ -21,6 +21,7 @@ import {
 } from "~/lib/pinballmap/listing-state";
 import { listSurfacingAbandonedForMachine } from "~/lib/pinballmap/abandoned-listings";
 import { getCatalogEntry } from "~/lib/pinballmap/catalog";
+import { getPinballMapLinkStatus } from "~/lib/pinballmap/user-credentials";
 import { PinballmapListingControl } from "~/components/machines/PinballmapListingControl";
 import { PinballmapAbandonedEntries } from "~/components/machines/PinballmapAbandonedEntries";
 import { getUnifiedUsers } from "~/lib/users/queries";
@@ -147,12 +148,19 @@ export default async function MachineEditPage({
   const allUsersPromise = canEdit
     ? getUnifiedUsers({ includeEmails: false })
     : Promise.resolve([]);
-  const [pbmState, allUsersRaw, sameTitle, allowance] = await Promise.all([
-    getPinballMapState(),
-    allUsersPromise,
-    sameTitlePromise,
-    getRefreshAllowance(),
-  ]);
+  const [pbmState, allUsersRaw, sameTitle, allowance, pbmLink] =
+    await Promise.all([
+      getPinballMapState(),
+      allUsersPromise,
+      sameTitlePromise,
+      getRefreshAllowance(),
+      // Only a push-capable viewer's link matters: it decides whether the
+      // status row pushes or links out (spec 8.2, 8.6). Read off the row, never
+      // by decrypting the token.
+      canPush
+        ? getPinballMapLinkStatus(user.id)
+        : Promise.resolve({ status: "not_linked" } as const),
+    ]);
 
   const allUsers = allUsersRaw.map((u) => ({
     id: u.id,
@@ -179,14 +187,10 @@ export default async function MachineEditPage({
     siblings: sameTitle,
   });
 
-  // Whether an operator credential exists at all — read off the two columns the
-  // state row already carries, never by decrypting the token. Without one the
-  // outbound writes cannot run, so Add / Remove are absent rather than present
-  // and failing (CORE-ARCH-012).
-  const writeEnabled =
-    configured &&
-    pbmState.outboundEmail != null &&
-    pbmState.outboundTokenVaultId != null;
+  // Pushes run as the viewer, with their own linked Pinball Map account
+  // (spec 8.2). Without a usable link the status row links out instead of
+  // showing Add / Remove that could only fail (4.4, CORE-ARCH-012).
+  const pbmLinkStatus = configured ? pbmLink.status : "not_linked";
 
   // Entries left on the public lineup by an earlier re-match (PP-l81u).
   //
@@ -321,7 +325,7 @@ export default async function MachineEditPage({
                 canSetIntent={canSetIntent}
                 canPush={canPush}
                 canRefresh={canRefresh}
-                writeEnabled={writeEnabled}
+                linkStatus={pbmLinkStatus}
                 modelName={pinballmapTitleName}
               />
             </PinballmapDirtyGate>
@@ -338,7 +342,7 @@ export default async function MachineEditPage({
               machineId={machine.id}
               entries={abandoned}
               canPush={canPush}
-              writeEnabled={writeEnabled}
+              accountLinked={pbmLinkStatus === "linked"}
             />
           ) : null}
         </section>

@@ -175,20 +175,31 @@ export interface PbmCredentials {
  *
  * IMPORTANT: PBM signals logical failures with HTTP 200 and an `errors` field
  * in the body (not a 4xx status) — e.g. `{"errors":"Failed to find machine"}`.
- * A disabled account is the lone exception (HTTP 401 + `{"error":"..."}`). The
+ * The status-based exceptions are 401 (PinPoint's platform X-Api-Token
+ * refused) and 403 (a disabled account), both `{"error":"..."}`. Otherwise the
  * live client classifies on the body, so these reasons are derived from PBM's
  * error message, not the status code. See the RSpec contract referenced in
  * `docs/external/README.md`.
  *
  * - `rate_limited` — hit a 429 (see vendored llms.txt rate-limit table); retry later
- * - `unauthorized` — auth required / token rejected / not the owner of the resource
+ * - `unauthorized` — the writer's own identity refused: user_token rejected (200 +
+ *   "Authentication is required") or account disabled (403). Marks their link
+ *   Authentication failed (spec 8.5).
+ * - `api_token` — PinPoint's platform X-Api-Token refused (401); says nothing
+ *   about the writer, so it never touches their link
  * - `not_found` — the target lmx/location/machine no longer exists on PBM
  * - `rejected` — PBM understood the request but refused it (e.g. machine not
- *   Insider-Connected eligible, blank condition); not retryable, surface `message`
+ *   Insider-Connected eligible, blank condition, editing a condition the writer
+ *   does not own); not retryable, surface `message`
  * - `transient` — network error or 5xx; safe to retry later
  */
 export type PbmWriteFailureReason =
-  "rate_limited" | "unauthorized" | "not_found" | "rejected" | "transient";
+  | "rate_limited"
+  | "unauthorized"
+  | "api_token"
+  | "not_found"
+  | "rejected"
+  | "transient";
 
 /** Shared failure shape; `message` carries PBM's own text when it supplied one. */
 export interface PbmWriteFailure {
@@ -211,9 +222,25 @@ export type PbmAddMachineResult = { ok: true; lmxId: number } | PbmWriteFailure;
 export type PbmToggleResult =
   { ok: true; icEnabled: boolean | null } | PbmWriteFailure;
 
-/** Result of exchanging a login+password for an API token (bead F). */
+/**
+ * A member's Pinball Map account link (spec 8.4–8.5): not linked, linked, or
+ * marked Needs relink after Pinball Map rejected its token as unauthorized.
+ */
+export type PinballMapLinkState = "not_linked" | "linked" | "needs_relink";
+
+/**
+ * Result of exchanging a login+password for an API token (spec 8.4, PP-o355.6).
+ *
+ * `email` is what later writes send as `user_email`: Pinball Map resolves the
+ * writer by email, never by username, so the login a member typed (which may be
+ * a username) is not enough to write with.
+ */
 export type PbmAuthFailureReason =
-  "invalid_credentials" | "account_disabled" | "rate_limited" | "transient";
+  | "invalid_credentials"
+  | "account_disabled"
+  | "api_token"
+  | "rate_limited"
+  | "transient";
 
 export interface PbmAuthFailure {
   ok: false;
@@ -222,7 +249,7 @@ export interface PbmAuthFailure {
 }
 
 export type PbmAuthResult =
-  { ok: true; token: string; username: string } | PbmAuthFailure;
+  { ok: true; token: string; username: string; email: string } | PbmAuthFailure;
 
 /**
  * The single seam wrapping all PBM HTTP. Live and mock implementations both

@@ -16,6 +16,7 @@ import { serverActionError } from "~/lib/observability/report-error";
 import { log } from "~/lib/logger";
 import { reportError } from "~/lib/observability/report-error";
 import { checkLoginAccountLimit } from "~/lib/rate-limit";
+import { unlinkPinballMapAccount } from "~/lib/pinballmap/user-credentials";
 import {
   anonymizeUserReferences,
   SoleAdminError,
@@ -96,6 +97,20 @@ export async function deleteAccountAction(
           userId,
         });
       }
+    }
+
+    // Delete the linked Pinball Map token (pinballmap spec 8.4). The account
+    // cascade removes the link row but not its Vault secret, so this has to run
+    // first or the token is left encrypted with nothing pointing at it.
+    // Best-effort, like the avatar: the account is still deleted if it fails.
+    try {
+      await unlinkPinballMapAccount(userId);
+    } catch (error) {
+      reportError(error, {
+        action: "deleteAccountPinballMapUnlink",
+        bestEffort: true,
+        userId,
+      });
     }
 
     // Delete auth user (cascades to user_profiles, watchers, notifications).

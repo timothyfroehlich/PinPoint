@@ -126,8 +126,8 @@ The control's states (§4) are comparisons across these: _in sync_ means intent 
 - **8.1** Setting intent (any toggle position, including the Insider Connected switch) requires the machine-linking capability: machine owner, technician, or admin.
 - **8.2** Pushing to Pinball Map requires the machine-linking capability (8.1) plus the person's own linked Pinball Map account (8.4); Pinball Map attributes each write to that person. Pinball Map itself is publicly editable, so gating writes tighter than PinPoint's own bookkeeping buys nothing. Without a linked account, push buttons are not shown.
 - **8.3** Reading status in this control and using the header Refresh require signed-in membership plus machine-page access. Anonymous visitors and guests do not see the control. Refreshes stay throttled regardless of who clicks (3.2).
-- **8.4** A member links their Pinball Map account from their own settings by signing in once with their Pinball Map username or email and password. PinPoint exchanges these for the account's token, stores only the token, and never stores the password. Unlinking deletes PinPoint's copy and says that Pinball Map offers no way to revoke the token itself; relinking replaces the stored token.
-- **8.5** PinPoint checks a token only when linking and when Pinball Map rejects a write as unauthorized. A rejected token marks the link **Needs relink** in the member's settings and on the action they attempted, which then shows the no-credential guidance (4.4). PinPoint never polls Pinball Map to test tokens.
+- **8.4** A member links their Pinball Map account from their own settings by signing in once with their Pinball Map username or email and password. PinPoint exchanges these for the account's token, stores only the token, and never stores the password. Unlinking deletes PinPoint's copy and says that Pinball Map offers no way to revoke the token itself; reconnecting replaces the stored token.
+- **8.5** PinPoint checks a token only when linking and when Pinball Map rejects a write as unauthorized. A rejected token marks the link **Authentication failed** in the member's settings, with **Reconnect** to sign in again, and on the action they attempted, which then shows the no-credential guidance (4.4). PinPoint never polls Pinball Map to test tokens.
 - **8.6** A member with the machine-linking capability but no linked account still sets intent (8.1). The resulting Out of sync state is their request: any member who can push sees it and carries it out. The status row offers the unlinked member a prompt to link their account alongside the 4.4 guidance.
 
 ## 9. Conduct toward Pinball Map
@@ -180,7 +180,6 @@ Replacing the tracked location is a rare, near-never operation — PinPoint trac
 | Spec | Code today | Resolution |
 | :-- | :-- | :-- |
 | 3.6–3.8 additional outbound actions | Client methods exist, but no app actions expose venue-lineup confirmation or Insider Connected changes; no Insider Connected intent is stored, the Insider Connected client flips the setting instead of sending a target state, and the catalog mirror does not store eligibility | PP-o355.58 (confirm lineup, needs `/fleet` base PP-o355.7.1), PP-o355.59 (Insider Connected); condition-comment posting deferred (PP-o355.57) |
-| 8.2, 8.4–8.6 per-member account linking | Writes use one admin-provisioned operator credential; no member linking, relink state, or link prompt exists | PP-o355.6 |
 
 ---
 
@@ -190,6 +189,7 @@ Changes to this document. Divergence-table rows are working state and are not lo
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-26 | §8.5: a rejected token now marks the link **Authentication failed** with **Reconnect**, the standard connected-account pattern, replacing the **Needs relink** name; §8.4 says reconnecting rather than relinking. |
 | 2026-09-26 | §3.8: Insider Connected is now an intent stored in PinPoint for every eligible title, set by anyone who can set listing intent and pushed by the same single sync as the lineup (§4.3, **Update Pinball Map** when only it differs); a mismatch is the new **Insider Connected differs** Out of sync state (§4.2, §4.10). The switch sits on the intent row, so the control is two rows again (§4.1, §4.9). §4.4 drops "…then Refresh to update". |
 | 2026-09-25 | Dropped the obsolete "no-op until comment import exists" note from §10.9 now that comments are imported and marked. |
 | 2026-09-25 | §3.8: eligibility now comes from Pinball Map's catalog flag, so an eligible entry with no recorded value shows **Not set**; the setting is a switch in a row between intent and status that every eligible title keeps, showing "—" without a setting (§4.1), read-only for a member without the machine-linking capability (§4.9); PinPoint sends the target setting instead of flipping it, replacing the re-read-before-write rule. |

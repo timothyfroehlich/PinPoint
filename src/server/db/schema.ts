@@ -1576,12 +1576,10 @@ export const discordIntegrationConfig = pgTable(
  * endpoints — reads included — once REQUIRE_API_TOKEN flips on (July 30 2026 gate,
  * CORE-PBM-001) is deliberately NOT stored here: it is a platform capability
  * issued to PinPoint-the-application, so it reads from the `PINBALLMAP_API_TOKEN`
- * env var (PP-o355.23 dropped the Vault pointer column and its read RPC). The
- * per-operator write creds below stay in Vault because they are per-user identity
- * arriving at runtime — a DISTINCT layer: the api_token gates access, the operator
- * creds identify who is writing. `outboundTokenVaultId` and `updatedBy` reference
- * other schemas (`vault.secrets.id`, `auth.users.id`) — no FK (Drizzle cannot
- * express cross-schema references).
+ * env var (PP-o355.23 dropped the Vault pointer column and its read RPC). Who is
+ * writing is a separate layer: each member's own linked token, in
+ * `pinballmap_user_credentials` (PP-o355.6). `updatedBy` references
+ * `auth.users.id` — no FK (Drizzle cannot express cross-schema references).
  */
 export const pinballmapState = pgTable(
   "pinballmap_state",
@@ -1641,6 +1639,9 @@ export const pinballmapState = pgTable(
     refreshTokensAt: timestamp("refresh_tokens_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    // Retired shared operator credential (PP-o355.6). Nothing reads or writes
+    // these; 0091 deleted the secret and nulled them, and a follow-up contract
+    // migration drops them once no deployment still selects them.
     outboundEmail: text("outbound_email"),
     outboundTokenVaultId: uuid("outbound_token_vault_id"),
     // Region alert configuration and delivery health (PP-o355.51.7)
@@ -1719,6 +1720,43 @@ export const pinballmapLocationChecks = pgTable(
       sql`expires_at > checked_at`
     ),
   })
+).enableRLS();
+
+/**
+ * A member's linked Pinball Map account (pinballmap spec 8.4–8.5, PP-o355.6).
+ *
+ * At most one per member. Pushes to Pinball Map run as the pushing member, so
+ * Pinball Map credits the edit to them (8.2). The member signs in once with
+ * their Pinball Map login and password; PinPoint exchanges those for the
+ * account's token and keeps only the token, encrypted in Supabase Vault — this
+ * row holds the Vault reference, never the token, and the password is never
+ * stored anywhere.
+ *
+ * `pbmEmail` is what writes send as `user_email`: Pinball Map resolves the
+ * writer by email, so it is kept as Pinball Map reported it at link time, not
+ * as the member typed their login.
+ *
+ * `needsRelinkAt` is set when Pinball Map rejects a write as unauthorized
+ * (8.5). PinPoint never probes the token otherwise. Relinking replaces the row.
+ *
+ * `tokenVaultId` references `vault.secrets.id` — no FK (Drizzle cannot express
+ * cross-schema references). Deleting the row does not delete the secret; the
+ * unlink and account-deletion paths delete both.
+ */
+export const pinballmapUserCredentials = pgTable(
+  "pinballmap_user_credentials",
+  {
+    userId: uuid("user_id")
+      .primaryKey()
+      .references(() => userProfiles.id, { onDelete: "cascade" }),
+    pbmUsername: text("pbm_username").notNull(),
+    pbmEmail: text("pbm_email").notNull(),
+    tokenVaultId: uuid("token_vault_id").notNull(),
+    linkedAt: timestamp("linked_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    needsRelinkAt: timestamp("needs_relink_at", { withTimezone: true }),
+  }
 ).enableRLS();
 
 /**
