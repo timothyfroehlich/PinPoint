@@ -18,7 +18,8 @@
 - **Display Mode** — the phone-only Compact list or Table presentation. Display Mode is a browser preference rather than bookmarkable URL state.
 - **Surface** — a place where Machine View appears and where Saved Views belong: Machines, Integrations, or one individual Collection. Every standard Collection and every owner Collection is its own Surface.
 - **Saved View** — a named, personal Machine View configuration owned by one account and belonging to one Surface. It holds displayed fields, search, filters, sorting, and page size.
-- **Default Saved View** — the one Saved View an account marks to open when it visits a Surface without view configuration in the URL.
+- **Default View** — the one Saved View or Built-in View an account marks to open when it visits a Surface without view configuration in the URL.
+- **Built-in View** — a named Machine View configuration PinPoint defines for a Surface, the same for every viewer. One Built-in View on each Surface is its Page Preset.
 
 ---
 
@@ -59,7 +60,7 @@
 - **4.8** Collections include every member presence state by default and sort worst playability first.
 - **4.9** Reopening or copying a canonical URL restores displayed fields, search, filters, sorting, page size, and page.
 - **4.10** Canonical URLs are always expressed relative to the Page Preset, never relative to a viewer's Saved Views, so the same URL shows every viewer the same configuration.
-- **4.11** `view` names the Saved View the configuration came from, or `preset` for the Page Preset. It never changes the configuration a URL shows, and a viewer who does not own the named Saved View ignores it.
+- **4.11** `view` names the Saved View or Built-in View the configuration came from. It never changes the configuration a URL shows, and a viewer who does not own the named Saved View ignores it.
 
 ---
 
@@ -99,7 +100,7 @@
 
 ## 8. Saved Views
 
-- **8.1** Any signed-in account can save the current Machine View configuration as a named Saved View on the Surface where it is working. Anonymous visitors have no Saved Views.
+- **8.1** Any signed-in account can save the current Machine View configuration as a named Saved View on the Surface where it is working. Anonymous visitors have no Saved Views but can apply Built-in Views (§9).
 - **8.2** A Saved View stores displayed fields, search, filters, sorting, and page size. It never stores a page number or Display Mode.
 - **8.3** Saved Views are personal: only the owning account can see, apply, change, or delete them.
 - **8.4** Saved Views sync across every device the owning account uses.
@@ -107,14 +108,25 @@
 - **8.6** Applying a Saved View opens its configuration at page 1.
 - **8.7** While a Saved View is applied and the current configuration differs from it, Machine View offers Save changes, which overwrites that Saved View, and Save as new, which creates another. With no Saved View applied, only Save as new is offered.
 - **8.8** A Saved View name is required and must be unique, ignoring case, among the account's Saved Views on that Surface. A colliding name is rejected, never silently overwritten.
-- **8.9** A Saved Views menu in the Machine View toolbar lists the account's Saved Views for the Surface and lets the account apply, rename, delete, and set or clear the Default Saved View.
-- **8.10** An account has at most one Default Saved View per Surface. Defaults on different Surfaces are independent.
-- **8.11** A Surface URL with no view configuration other than page opens the account's Default Saved View if one exists, otherwise the Page Preset. A URL carrying any view configuration opens exactly as written and ignores the Default Saved View.
-- **8.12** When the Default Saved View opens, the address bar shows its canonical URL, so copying the address shares that configuration.
-- **8.13** The Saved Views menu always offers the Page Preset's configuration, so an account with a Default Saved View can still reach it.
-- **8.14** Deleting the Default Saved View leaves the Surface without a default; it then opens to the Page Preset.
+- **8.9** A Saved Views menu in the Machine View toolbar lists the Surface's Built-in Views, then the account's Saved Views, and lets the account apply any of them, rename or delete its Saved Views, and set or clear its default.
+- **8.10** An account has at most one default per Surface, which may be one of its Saved Views or a Built-in View. Defaults on different Surfaces are independent.
+- **8.11** A Surface URL with no view configuration other than page opens the account's Default View if one exists, otherwise the Page Preset. A URL carrying any view configuration opens exactly as written and ignores the Default View.
+- **8.12** When the Default View opens, the address bar shows its canonical URL, so copying the address shares that configuration.
+- **8.13** The Saved Views menu always offers every Built-in View, so an account with a default can still reach the Page Preset.
+- **8.14** Deleting a Saved View that is the Default View leaves the Surface without a default; it then opens to the Page Preset.
 - **8.15** A stored field, filter value, or owner that no longer exists or is not permitted on the Surface is dropped when the Saved View is applied, exactly as an invalid URL value is (§4.3).
 - **8.16** Deleting a Collection deletes every Saved View belonging to that Collection's Surface.
+
+---
+
+## 9. Built-in Views
+
+- **9.1** Machines offers five Built-in Views, in order: **On the floor** (On the Floor, by name — the Page Preset); **Needs attention** (On the Floor, Playability Needs service or Unplayable, worst first); **Service due** (On the Floor, oldest Last Serviced first); **All machines** (every presence state, by name, adding the Presence field); **Recently added** (every presence state, newest Date Added first, adding the Presence and Date Added fields).
+- **9.2** Collections offer three Built-in Views, in order: **On the floor** (On the Floor, worst playability first); **Needs attention** (On the Floor, Playability Needs service or Unplayable, worst first); **All machines** (every presence state, worst playability first — the Page Preset).
+- **9.3** Unless 9.1 or 9.2 says otherwise, a Built-in View displays the Page Preset's fields at the Page Preset's page size.
+- **9.4** Built-in Views are the same for every viewer and cannot be renamed, changed, or deleted.
+- **9.5** Applying a Built-in View opens it at page 1. When the current configuration differs from it, Machine View offers Save as new, never Save changes.
+- **9.6** Built-in Views that share a name appear in the same order on every Surface.
 
 ---
 
@@ -122,7 +134,7 @@
 
 | Spec | Code today | Resolution |
 | :-- | :-- | :-- |
-| §4.11, §8 Saved Views | No saved-view storage, menu, or default resolution; URL canonicalization drops `view` | Saved-views implementation (PP-8bh6) |
+| §4.11, §8 Saved Views, §9 Built-in Views | No saved-view storage, menu, Built-in Views, or default resolution; URL canonicalization drops `view` | Saved-views implementation (PP-8bh6) |
 
 ---
 
@@ -130,6 +142,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-26 | Added Built-in Views (§9): named, shared configurations per Surface that can be an account's default; anonymous visitors can apply them (§8.1, §8.9, §8.10, §8.13, §4.11). Renamed Default Saved View to Default View (§1, §8.11, §8.12, §8.14). |
 | 2026-09-25 | Added Surfaces, Saved Views, and Default Saved Views (§8); URLs are canonical relative to the Page Preset (§4.10) and carry a `view` parameter naming their Saved View or the Page Preset (§4.1, §4.11); retired §7.1; deferred Saved View record sharing (§7.6). |
 | 2026-09-24 | Made View Scope route-supplied; machine-group membership moved to the specs that own each group. |
 | 2026-09-21 | Created. Establishes one machine-specific view for `/m` and Collections, conditional enrichment, bookmarkable URL state, shared responsive presentation, route-preservation requirements, and explicit deferred integrations/saved-view work. |
