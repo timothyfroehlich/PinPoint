@@ -62,7 +62,7 @@ registered identity.
 
 One-time install for tools the workflow scripts depend on:
 
-- **mise** — version `2026.9.5` or newer. `mise.toml` is the exact authority for project Node, Python, Ruff, and the Supabase CLI; `package.json#packageManager` is the single pnpm version and SHA-512 authority; `mise.lock` records resolved artifacts. Run `mise install --locked` rather than installing competing project copies. Keep project commands in `package.json#scripts`, not duplicated as mise tasks. In pnpm 11, dependency `overrides`, `peerDependencyRules`, and package settings live in `pnpm-workspace.yaml` (never in `package.json`).
+- **mise** — version `2026.8.11` or newer. `mise.toml` is the exact authority for project Node, Python, Ruff, and the Supabase CLI; `package.json#packageManager` is the single pnpm version and SHA-512 authority; `mise.lock` records resolved artifacts. Run `mise install --locked` rather than installing competing project copies. Keep project commands in `package.json#scripts`, not duplicated as mise tasks. In pnpm 11, dependency `overrides`, `peerDependencyRules`, and package settings live in `pnpm-workspace.yaml` (never in `package.json`).
 - **GNU parallel** (optional) — provides `sem`, which `scripts/workflow/heavy-run.sh` uses to cap heavy commands (full unit runs, build, integration, smoke) at 2 concurrent host-wide. Without it they run uncapped.
 - **pytest** — `pnpm run check:python` runs the hook/script tests with it under the mise-selected Python. Install it with `mise exec -- python3 -m pip install -r scripts/requirements.txt`; if absent from that interpreter, `check:pytest` fails with this install hint rather than using a pytest bound to another Python.
 

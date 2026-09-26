@@ -1,11 +1,11 @@
 # PinPoint project toolchain contract.
 #
 # package.json#packageManager remains the single authority for the exact pnpm
-# version and its integrity hash. Mise 2026.9.5+ reads that declaration directly
+# version and its integrity hash. Mise 2026.8.11+ reads that declaration directly
 # via idiomatic_version_file_enable_tools without duplicating the pnpm version here.
 #
-# Minimum mise version: 2026.9.5 (verifies packageManager sha512 checksums).
-min_version = "2026.9.5"
+# Minimum mise version: 2026.8.11 (verifies packageManager sha512 checksums).
+min_version = "2026.8.11"
 
 [tools]
 node = "24.20.0"
