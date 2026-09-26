@@ -11,7 +11,7 @@
  * - Public Issue (anonymous): 5 submissions per IP per 15 min
  * - Authenticated Issue: 20 submissions per user per 15 min
  * - MCP: 120 authenticated requests/minute and 20 mutations/minute per user+client
- * - Quick Search: 60 requests per IP per minute
+ * - Quick Search: 120 requests/minute (keyed by user ID when authenticated, client IP when anonymous)
  *
  * @see https://github.com/timothyfroehlich/PinPoint/issues/536
  * @see https://github.com/timothyfroehlich/PinPoint/issues/537
@@ -250,7 +250,8 @@ function createMcpWriteLimiter(): Ratelimit | null {
 
 /**
  * Quick search rate limiter
- * - IP-based: 60 requests per minute (sliding window)
+ * - 120 requests per minute (sliding window)
+ * - Keyed by user ID (hashed) for authenticated users, client IP for anonymous requests
  */
 function createQuickSearchLimiter(): Ratelimit | null {
   const redis = getRedis();
@@ -258,8 +259,8 @@ function createQuickSearchLimiter(): Ratelimit | null {
 
   return new Ratelimit({
     redis,
-    limiter: Ratelimit.slidingWindow(60, "1 m"),
-    prefix: "ratelimit:quick-search:ip",
+    limiter: Ratelimit.slidingWindow(120, "1 m"),
+    prefix: "ratelimit:quick-search",
     analytics: true,
   });
 }
@@ -465,20 +466,28 @@ export const checkMcpWriteLimit = makeLimitChecker(createMcpWriteLimiter, {
   keyType: "user",
 });
 
+const checkQuickSearchRawLimit = makeLimitChecker(createQuickSearchLimiter, {
+  label: "Quick search",
+  keyType: "ip",
+});
+
 /**
- * Check quick search rate limit (IP-based)
+ * Check quick search rate limit (120 requests/minute sliding window).
+ * Keyed by user ID (hashed per CORE-SEC-007) for authenticated requests,
+ * or client IP address for anonymous requests.
  *
- * @param key - Client IP address
+ * @param ip - Client IP address
+ * @param userId - Optional authenticated user ID
  * @returns Allow/deny result. Fails closed in production, and open in
  *   development, when rate limiting is unavailable.
  */
-export const checkQuickSearchLimit = makeLimitChecker(
-  createQuickSearchLimiter,
-  {
-    label: "Quick search",
-    keyType: "ip",
-  }
-);
+export async function checkQuickSearchLimit(
+  ip: string,
+  userId?: string | null
+): Promise<RateLimitResult> {
+  const key = userId ? `user:${hashIdentifier(userId)}` : ip;
+  return checkQuickSearchRawLimit(key);
+}
 
 /**
  * Check signup rate limit (IP-based)

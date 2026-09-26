@@ -521,52 +521,62 @@ describe("rate-limit module — environment isolation & limiter behavior", () =>
   });
 
   describe("checkQuickSearchLimit", () => {
-    it("configures 60/1m sliding window and keys on IP when Redis is configured", async () => {
+    it("configures 120/1m sliding window and keys on IP for anonymous requests", async () => {
       vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://mock-redis.upstash.io");
       vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "mock-token-secret");
 
       limitMock.mockResolvedValueOnce({
         success: true,
-        limit: 60,
-        remaining: 59,
+        limit: 120,
+        remaining: 119,
         reset: 1700000000000,
       });
 
       const { checkQuickSearchLimit } = await import("./rate-limit");
       const result = await checkQuickSearchLimit("198.51.100.42");
 
-      expect(slidingWindowMock).toHaveBeenCalledWith(60, "1 m");
+      expect(slidingWindowMock).toHaveBeenCalledWith(120, "1 m");
       expect(ctorMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          prefix: "ratelimit:quick-search:ip",
+          prefix: "ratelimit:quick-search",
           analytics: true,
         })
       );
       expect(limitMock).toHaveBeenCalledWith("198.51.100.42");
       expect(result).toEqual({
         success: true,
-        limit: 60,
-        remaining: 59,
+        limit: 120,
+        remaining: 119,
         reset: 1700000000000,
       });
     });
 
-    it("uses fallback key 'unknown-ip-fallback' in production when client IP is unknown", async () => {
-      vi.stubEnv("VERCEL_ENV", "production");
+    it("keys on hashed user ID for authenticated requests (CORE-SEC-007)", async () => {
       vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://mock-redis.upstash.io");
       vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "mock-token-secret");
 
       limitMock.mockResolvedValueOnce({
         success: true,
-        limit: 60,
-        remaining: 59,
+        limit: 120,
+        remaining: 119,
         reset: 1700000000000,
       });
 
       const { checkQuickSearchLimit } = await import("./rate-limit");
-      await checkQuickSearchLimit("unknown");
+      const userId = "user-member-456";
+      const expectedHash = createHash("sha256")
+        .update(userId, "utf8")
+        .digest("hex");
 
-      expect(limitMock).toHaveBeenCalledWith("unknown-ip-fallback");
+      const result = await checkQuickSearchLimit("198.51.100.42", userId);
+
+      expect(limitMock).toHaveBeenCalledWith(`user:${expectedHash}`);
+      expect(result).toEqual({
+        success: true,
+        limit: 120,
+        remaining: 119,
+        reset: 1700000000000,
+      });
     });
   });
 

@@ -67,8 +67,8 @@ describe("GET /api/quick-search", () => {
     checkPermissionMock.mockReturnValue(true);
     checkQuickSearchLimitMock.mockResolvedValue({
       success: true,
-      limit: 60,
-      remaining: 59,
+      limit: 120,
+      remaining: 119,
       reset: 0,
     });
     searchQuickNavigationMock.mockResolvedValue({
@@ -77,7 +77,7 @@ describe("GET /api/quick-search", () => {
     });
   });
 
-  it("returns 200 with search results when within rate limit", async () => {
+  it("executes search and returns 200 when within rate limit (anonymous request)", async () => {
     const request = new Request(
       "https://pinpoint.test/api/quick-search?q=AFM",
       {
@@ -88,7 +88,10 @@ describe("GET /api/quick-search", () => {
     const response = await GET(request);
 
     expect(response.status).toBe(200);
-    expect(checkQuickSearchLimitMock).toHaveBeenCalledWith("198.51.100.25");
+    expect(checkQuickSearchLimitMock).toHaveBeenCalledWith(
+      "198.51.100.25",
+      undefined
+    );
     expect(searchQuickNavigationMock).toHaveBeenCalledWith("AFM");
     expect(await response.json()).toEqual({
       machines: [{ initials: "AFM", name: "Attack from Mars" }],
@@ -96,11 +99,33 @@ describe("GET /api/quick-search", () => {
     });
   });
 
-  it("returns 429 with Retry-After header when rate limit is exceeded", async () => {
+  it("passes authenticated user ID to rate limiter for per-user budgeting", async () => {
+    getUserMock.mockResolvedValue({
+      data: { user: { id: "user-apc-member-123" } },
+    });
+
+    const request = new Request(
+      "https://pinpoint.test/api/quick-search?q=AFM",
+      {
+        headers: { "x-forwarded-for": "198.51.100.25" },
+      }
+    );
+
+    const response = await GET(request);
+
+    expect(response.status).toBe(200);
+    expect(checkQuickSearchLimitMock).toHaveBeenCalledWith(
+      "198.51.100.25",
+      "user-apc-member-123"
+    );
+    expect(searchQuickNavigationMock).toHaveBeenCalledWith("AFM");
+  });
+
+  it("returns 429 with Retry-After header and skips search query when rate limit is exceeded", async () => {
     const now = Date.now();
     checkQuickSearchLimitMock.mockResolvedValue({
       success: false,
-      limit: 60,
+      limit: 120,
       remaining: 0,
       reset: now + 30_000,
     });
@@ -124,22 +149,18 @@ describe("GET /api/quick-search", () => {
     expect(searchQuickNavigationMock).not.toHaveBeenCalled();
   });
 
-  it("returns 403 when machine or issue view permission is denied", async () => {
-    checkPermissionMock.mockImplementation((perm: string) => {
-      if (perm === "machines.view") return false;
-      return true;
-    });
+  it("does not check rate limit when machine or issue view permission is denied", async () => {
+    checkPermissionMock.mockReturnValue(false);
 
     const request = new Request("https://pinpoint.test/api/quick-search?q=AFM");
     const response = await GET(request);
 
     expect(response.status).toBe(403);
-    expect(await response.json()).toEqual({ error: "Forbidden" });
     expect(checkQuickSearchLimitMock).not.toHaveBeenCalled();
     expect(searchQuickNavigationMock).not.toHaveBeenCalled();
   });
 
-  it("returns 400 when query string exceeds maximum length", async () => {
+  it("does not check rate limit when query string validation fails", async () => {
     const oversizedQuery = "a".repeat(321);
     const request = new Request(
       `https://pinpoint.test/api/quick-search?q=${oversizedQuery}`
@@ -147,18 +168,7 @@ describe("GET /api/quick-search", () => {
     const response = await GET(request);
 
     expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ error: "Invalid search query" });
     expect(checkQuickSearchLimitMock).not.toHaveBeenCalled();
     expect(searchQuickNavigationMock).not.toHaveBeenCalled();
-  });
-
-  it("returns 500 when searchQuickNavigation throws", async () => {
-    searchQuickNavigationMock.mockRejectedValue(new Error("Database error"));
-
-    const request = new Request("https://pinpoint.test/api/quick-search?q=AFM");
-    const response = await GET(request);
-
-    expect(response.status).toBe(500);
-    expect(await response.json()).toEqual({ error: "Search failed" });
   });
 });

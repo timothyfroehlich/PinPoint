@@ -36,7 +36,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   }
 
   const clientIp = await getClientIp(request.headers);
-  const limitResult = await checkQuickSearchLimit(clientIp);
+  const limitResult = await checkQuickSearchLimit(clientIp, user?.id);
   if (!limitResult.success) {
     const retryAfterSeconds = Math.max(
       1,
