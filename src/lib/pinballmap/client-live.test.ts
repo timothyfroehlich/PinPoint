@@ -509,30 +509,48 @@ describe("live client — writes", () => {
     expect(url.searchParams.get("condition")).toBe("fixed flippers");
   });
 
-  it("toggleInsiderConnected PUTs ic_toggle and returns the new state", async () => {
-    const calls = installFetchMock(() =>
-      json({ location_machine: { ic_enabled: true } }, 200)
-    );
-    const res = await createLiveClient(null).toggleInsiderConnected({
-      credentials: CREDS,
-      lmxId: 7,
-    });
-    expect(res).toEqual({ ok: true, icEnabled: true });
-    const url = new URL(calls[0]?.url ?? "");
-    expect(calls[0]?.init?.method).toBe("PUT");
-    expect(url.pathname).toContain("/location_machine_xrefs/7/ic_toggle.json");
-    // It's a toggle, not a setter — we send no desired-state param.
-    expect(url.searchParams.has("ic_enabled")).toBe(false);
+  it.each([true, false])(
+    "setInsiderConnected PUTs ic_toggle with ic_enabled=%s and returns PBM's state",
+    async (enabled) => {
+      const calls = installFetchMock(() =>
+        json({ location_machine: { ic_enabled: enabled } }, 200)
+      );
+      const res = await createLiveClient(null).setInsiderConnected({
+        credentials: CREDS,
+        lmxId: 7,
+        enabled,
+      });
+      expect(res).toEqual({ ok: true, icEnabled: enabled });
+      const url = new URL(calls[0]?.url ?? "");
+      expect(calls[0]?.init?.method).toBe("PUT");
+      expect(url.pathname).toContain(
+        "/location_machine_xrefs/7/ic_toggle.json"
+      );
+      // Without this param PBM flips the setting instead of setting it.
+      expect(url.searchParams.get("ic_enabled")).toBe(String(enabled));
+    }
+  );
+
+  it("setInsiderConnected reports a response without IC state as null", async () => {
+    installFetchMock(() => json({ location_machine: {} }, 200));
+    expect(
+      await createLiveClient(null).setInsiderConnected({
+        credentials: CREDS,
+        lmxId: 7,
+        enabled: true,
+      })
+    ).toEqual({ ok: true, icEnabled: null });
   });
 
-  it("toggleInsiderConnected maps an ineligible-machine errors body to rejected", async () => {
+  it("setInsiderConnected maps an ineligible-machine errors body to rejected", async () => {
     installFetchMock(() =>
       json({ errors: "Could not update Insider Connected for this machine" })
     );
     expect(
-      await createLiveClient(null).toggleInsiderConnected({
+      await createLiveClient(null).setInsiderConnected({
         credentials: CREDS,
         lmxId: 7,
+        enabled: true,
       })
     ).toEqual({
       ok: false,

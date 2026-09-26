@@ -89,6 +89,7 @@
     "db:seed:from-prod": "bash scripts/seed-from-backup.sh",
     "discord:rollout-notice": "node --conditions=react-server --env-file=.env.local --import tsx scripts/discord-notification-rollout.ts",
     "chores:backups": "node scripts/check-prod-backups.mjs",
+    "chores:readonly-role": "node scripts/check-readonly-role.mjs",
     "clean:next": "rm -rf .next",
     "migrate:production": "tsx scripts/migrate-production.ts",
     "vercel-build": "pnpm run migrate:production && next build",
