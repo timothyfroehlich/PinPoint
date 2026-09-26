@@ -55,6 +55,8 @@ function makeMachine(
     apronDescription: null,
     apronTip: null,
     apronTipEnabled: false,
+    apronDesignEnabled: true,
+    apronArtEnabled: true,
     apronSavedAt: null,
     ownerRequirements: null,
     settingsRequests: null,
