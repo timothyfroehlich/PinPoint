@@ -172,4 +172,39 @@ describe("addCommentAction", () => {
       expect(result.code).toBe("SERVER");
     }
   });
+
+  it("should reject comments exceeding COMMENT_MAX images", async () => {
+    const commentObj = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "Test comment with too many images" },
+          ],
+        },
+      ],
+    };
+    const excessiveImages = Array.from({ length: 5 }, (_, i) => ({
+      blobUrl: `https://test-blob.public.blob.vercel-storage.com/test-${i}.jpg`,
+      blobPathname: `issue-images/test-${i}.jpg`,
+      originalFilename: `test-${i}.jpg`,
+      fileSizeBytes: 1024,
+      mimeType: "image/jpeg",
+    }));
+
+    const formData = new FormData();
+    formData.append("issueId", validUuid);
+    formData.append("comment", JSON.stringify(commentObj));
+    formData.append("imagesMetadata", JSON.stringify(excessiveImages));
+
+    const result = await addCommentAction(initialState, formData);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("VALIDATION");
+      expect(result.message).toContain("Maximum 4 images allowed per comment");
+    }
+    expect(addIssueComment).not.toHaveBeenCalled();
+  });
 });
