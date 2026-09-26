@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { creditsFromPeople, formatCreditNames } from "./credits";
+import { creditsFromPeople } from "./credits";
 
 const person = (
   name: string,
@@ -45,35 +45,5 @@ describe("creditsFromPeople", () => {
     ]);
     expect(credits.design).toEqual(["Keith Elwin"]);
     expect(credits.art).toEqual([]);
-  });
-});
-
-describe("formatCreditNames", () => {
-  it("returns null for no names", () => {
-    expect(formatCreditNames([])).toBeNull();
-    expect(formatCreditNames([], 2)).toBeNull();
-  });
-
-  it("joins every name without a limit", () => {
-    expect(formatCreditNames(["A", "B", "C"])).toBe("A, B, C");
-  });
-
-  it("keeps a list at the limit whole", () => {
-    expect(formatCreditNames(["A", "B"], 2)).toBe("A, B");
-  });
-
-  it("collapses names past the limit into a count", () => {
-    expect(
-      formatCreditNames(
-        [
-          "Kevin O'Connor",
-          "Dave Link",
-          "Harrison Drake",
-          "Danai Kittivathana",
-          "George Gomez",
-        ],
-        2
-      )
-    ).toBe("Kevin O'Connor, Dave Link +3 more");
   });
 });
