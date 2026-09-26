@@ -1,96 +1,76 @@
 # PinPoint Test-Pruning Campaign
 
-Campaign mode prunes one subsystem's whole test surface in one coordinated effort: a major feature area (such as machine management, issue reporting, or notifications) or a test layer (such as the E2E suite or PGlite integration tests). The value bar, retention bar, candidate evidence, and validation rules in [SKILL.md](SKILL.md) apply to every lane.
+A campaign prunes one subsystem's whole test surface in one coordinated effort: a feature area (machines, issues, notifications) or a test layer (the E2E suite, PGlite integration). Everything in [SKILL.md](SKILL.md) applies to every lane: the retention bar, candidate evidence, edit shape, and validation.
 
-This document defines the 8-phase execution pipeline and lessons from large-scale test refactoring. Each phase ends on a strict completion criterion; do not advance early.
+Each phase ends on a completion criterion; finish it before starting the next.
 
 ## 1. Baseline
 
-Work from a clean, dedicated worktree with isolated Supabase ports. Record the subsystem's production and test line counts (`wc -l`), and run the full relevant test suite at the starting `main` commit SHA.
+Work in a dedicated worktree. Record the subsystem's production and test line counts, and run every in-scope suite at the starting `main` SHA (offload heavy suites with the `crabbox` skill). Keep baseline failures on their own list; each one is evidence of a product bug or an unmigrated contract (CORE-TEST-010), handled in phase 7.
 
-Keep baseline failures in their own list: a baseline failure is treated as a possible product bug or unmigrated contract, never a test to silently delete.
+**Done when:** every in-scope test file has a recorded pass/fail result and line count.
 
-**Completion criterion:** Every in-scope test file has a recorded baseline pass/fail result and line count.
+## 2. Lanes
 
-## 2. Lanes and Inventory
+Split the surface into lanes by production owner, not by test directory. Typical PinPoint lanes:
 
-Split the test surface into **lanes** along production owner boundaries, not file paths or directories. In PinPoint, canonical lanes correspond to functional subsystems:
+- **Issues and comments:** lifecycle, status transitions, comment edit/delete, timeline and audit trail;
+- **Machines and roster:** machine CRUD, ownership and loaners, tags and collections, quick search;
+- **Auth and permissions:** the permission matrix, route protection in the proxy, sessions, user management;
+- **Notifications:** email via Mailpit, Discord dispatch, notification formatting;
+- **Integrations:** Pinball Map sync, OPDB, iScored, Vercel Blob storage;
+- **Journeys:** multi-page E2E flows (bug class F).
 
-- **Issues & Comments:** Lifecycle, status transitions, comment editing/deletion, audit logging;
-- **Machines & Roster:** Inventory mutations, manufacturer tags, loaner/ownership tracking, quick search;
-- **Auth & Permissions:** Role matrices, route protection, session cookies, user management;
-- **Notifications & Mail:** Mailpit delivery, Discord webhook dispatch, notification formatting;
-- **Integrations & Third-Party:** PinballMap sync, Vercel Blob storage, iScored mappings;
-- **End-to-End Journeys:** Multi-step user journeys that genuinely require full browser orchestration (Class F bugs).
+**Done when:** every in-scope test file and E2E spec belongs to exactly one lane.
 
-**Completion criterion:** Every in-scope test file and E2E spec belongs to exactly one lane.
+## 3. Ledger
 
-## 3. Read-Only Ledger per Lane
+For each lane, read every test declaration and table case against its production owner, callers, and history. Mark each in a written ledger:
 
-For each lane, perform a read-only inspection of every test declaration and table case, cross-referencing production owners, callers, and history. Mark each test in a written **ledger**:
+- **`R` Retain:** name the contract and its bug class (A–J in `pinpoint-testing`), and cite the `CORE-TEST-*` rule it enforces when one applies. A test moving to a canonical file stays `R` with the target file noted.
+- **`F` Fix:** keep the contract, repair the assertion (an assertion-free render, a presence-only check that should drive the handler).
+- **`C` Consolidate:** name the keeper that absorbs it, such as an `it.each` row in `src/lib/supabase/middleware.test.ts` or `src/test/integration/issue-detail-permissions.test.ts`.
+- **`D` Delete:** name the stronger owner that remains, or why no contract exists.
 
-- **`R` (Retain):** Name the contract and the specific bug class (`CORE-TEST-005`) it catches. If a test moves to a canonical file, keep as `R` and note the target file.
-- **`F` (Fix):** Retain the contract but repair a broken or vacuous assertion (e.g. replacing an assertion-free render or a `toBeVisible()` check with interaction verification).
-- **`C` (Consolidate):** Name the owner that absorbs the assertion (e.g. folding duplicate standalone tests into an `it.each` table case in `issue-detail-permissions.test.ts` or `middleware.test.ts`).
-- **`D` (Delete):** Name the stronger proof that remains (e.g. PGlite integration test proves the DB write and response, rendering mock unit test obsolete), or why no contract exists.
+**Done when:** every declaration in the lane has a mark and a written rationale.
 
-Judge every test by its actual assertions, not its title.
+## 4. Layer plan
 
-**Completion criterion:** Every test declaration in the lane has a ledger entry with a mark (`R`, `F`, `C`, `D`) and an evidence rationale.
+Read each lane's ledger as a whole to find redundant layers, not just redundant tests:
 
-## 4. Layer Plan per Lane
+- **Mocked DB unit tests vs. PGlite integration:** retire unit tests built on canned Drizzle mocks (CORE-TEST-004) in favor of PGlite integration tests of the same service.
+- **E2E vs. integration:** when a spec exercises a single Server Action or permission check with no page transition, move that contract to an integration test and reduce the spec. Keep Playwright coverage for behavior an async Server Component owns (CORE-TEST-002); integration tests cannot render one.
+- **Test-only seams:** list the exports, parameters, and bypasses that lose their last caller once the plan lands (CORE-TEST-008).
 
-Look at the ledger holistically to identify redundant **layers**, rather than just deleting individual assertions:
-
-- **Mocked DB unit tests vs. PGlite integration:** If a service is tested with heavily mocked Drizzle chains (`CORE-TEST-004`), retire the unit mocks in favor of worker-scoped PGlite integration tests (`src/test/integration/`).
-- **E2E vs. Integration:** If an E2E spec only tests a single Server Action or permission gate without multi-page transitions, move the contract to an integration test and retire or reduce the E2E spec to a smoke test.
-- **Identify test-only seams:** List all production exports, parameters, and bypasses (`isTest`, test-only query flags) that will become dead code once redundant tests are pruned.
-
-**Completion criterion:** The lane plan names retired files, the keeper suite for each contract, assertions to merge into keepers, and unlocked production cleanups.
+**Done when:** each lane's plan names retired files, the keeper for each contract, the assertions merging into keepers, and the production seams to delete.
 
 ## 5. Cutover
 
-Apply changes lane by lane:
+Per lane, in order:
 
-1. Move or consolidate assertions into designated keeper suites.
-2. Verify keeper suites pass using targeted test runners:
-   - Unit: `pnpm run test <path>`
-   - PGlite Integration: `pnpm run test:integration:target -- <path>`
-   - E2E: `pnpm exec playwright test <path> --project=chromium`
-3. Delete retired test files and dead test helpers.
-4. Remove unlocked production seams (unexport internal helpers, delete test-only parameters).
-5. Run `pnpm run check` after each lane.
+1. Move or consolidate assertions into the keepers.
+2. Run each keeper at its layer (commands in SKILL.md, Validation step 1).
+3. Delete retired test files and their dead helpers.
+4. Delete the production seams the plan listed.
+5. `pnpm run check`.
 
-**Completion criterion:** Every lane plan is executed, test-only seams are deleted, and all keeper suites pass.
+**Done when:** every lane plan is applied, its seams are deleted, and all keepers pass.
 
-## 6. Preservation Review & Mutation Testing
+## 6. Preservation proof
 
-Verify that deleted tests did not leave critical contracts unguarded:
+1. An independent reviewer (a subagent handed the diff and the ledger, not your conclusions) checks whether any contract lost its only test.
+2. For every consolidated or deleted contract, run the mutation check from SKILL.md Validation step 2: mutate the owner's behavior, watch the keeper go red, restore, watch it go green.
 
-1. An independent review checks whether any core behavior lost its sole verification.
-2. **Deliberate Mutation Testing:** For each core contract whose test was consolidated or pruned, introduce a deliberate 1-line syntax or logic mutation in the production owner (e.g. invert an `if (hasPermission)` condition or modify a query filter). Run the keeper test and verify it turns RED.
-3. Revert the mutation byte-for-byte and verify the keeper test turns GREEN.
+**Done when:** every consolidated contract has a recorded red result against a behavior mutation, and the production files match `HEAD`.
 
-**Completion criterion:** Every consolidated contract has verified failure against a deliberate mutation, and all production files are restored.
+## 7. Product defects
 
-## 7. Product Defects
+For each baseline failure and each defect the audit exposed: isolate the product bug, fix it in the production owner as its own commit, and record the test failing before the fix and passing after (CORE-TEST-007).
 
-Any baseline failure or defect revealed by the audit must be handled deliberately:
+**Done when:** each repaired defect has recorded pre-fix failure and post-fix pass.
 
-- Never delete a test simply because it is failing on `main`.
-- Isolate the product bug.
-- Fix it in the production owner as a separate, clearly labeled commit.
-- Provide control proof (failing on pre-fix code) and candidate proof (passing on post-fix code).
+## 8. Reconcile and hand off
 
-**Completion criterion:** Repaired product bugs have demonstrated pre-fix failure and post-fix success.
+Merge `origin/main` into the branch. When `main` added tests to a file the campaign deleted, port those contracts into the keeper. Run `pnpm run check` and the keepers again, then land per SKILL.md. Add campaign metrics to the handoff report: baseline versus final lines (production and test), retired layers, keepers, and mutation results.
 
-## 8. Reconcile and Hand Off
-
-Campaigns can touch many files. Keep git operations clean:
-
-- Sync with merge from `origin/main`, never rebase.
-- If `main` added new tests to a file the campaign deleted, port those new contracts into the canonical keeper file rather than resurrecting the dead test file.
-- Run `pnpm run check` and targeted tests.
-- Report metrics: baseline vs. final LOC (production vs. test), retired layers, keeper suites, and mutation proofs.
-
-**Completion criterion:** PR opened following [pinpoint-pr-workflow](../pinpoint-pr-workflow/SKILL.md), CI passes, and review record posted.
+**Done when:** the PR is open per `pinpoint-pr-workflow`, CI passes, and the review record is posted.

@@ -1,7 +1,7 @@
 # PinPoint Non‑Negotiables
 
-**Last Updated**: 2026-07-27
-**Version**: 2.5 (progressive-enhancement non-negotiable retired; CORE-ARCH-012 honest-failure added — PP-nw80)
+**Last Updated**: 2026-09-26
+**Version**: 2.6 (CORE-TEST-007..010 added: failure-first regressions, no test-only seams, one owner per contract, failing tests are evidence — PP-wptk)
 
 > **Canonical catalog**: this document defines the canonical `CORE-*` rules for PinPoint. Portable skills (`.agents/skills/`) and agent context (`AGENTS.md`) cite rules by ID and provide domain/task-specific procedures.
 
@@ -38,6 +38,7 @@
 21. Accessibility floor: skip link, semantic table markup, `motion-reduce:` paired with animations, no `<div role="button">`, `title` is not a tooltip (CORE-A11Y-001..006)
 22. Image priority and preconnect discipline: `priority` is for the LCP candidate only; preconnect to known image origins (CORE-PERF-003)
 23. External side effects (HTTP, email, Discord, blob, Vault RPC) never run inside a DB transaction; deliver them post-commit (CORE-ARCH-011)
+24. A bug-fix regression test fails on the pre-fix code; tests reach production through real callers' seams (CORE-TEST-007/008)
 
 ---
 
@@ -286,7 +287,7 @@
 
 - **Severity:** Required
 - **Why:** Consistent structure
-- **Do:** Reference the `pinpoint-testing` skill (`.agents/skills/pinpoint-testing/SKILL.md`) for bug-class-driven test layer selection and `pinpoint-test-audit` (`.agents/skills/pinpoint-test-audit/SKILL.md`) for authoring gates, junk-pattern defense, and test-audit workflows
+- **Do:** Reference the `pinpoint-testing` skill (`.agents/skills/pinpoint-testing/SKILL.md`) for bug-class-driven layer selection and the authoring gate every new test passes; reference `pinpoint-test-audit` (`.agents/skills/pinpoint-test-audit/SKILL.md`) when auditing or pruning existing tests
 - **Don't:** Mix test types or create per-test database instances
 
 **CORE-TEST-004:** Prefer Integration Tests for DB Logic
@@ -309,6 +310,34 @@
 - **Why:** Synthesizing a third party's internal state (raw writes to `auth.identities`, OAuth handshake fakes, email-template regex extraction) means you're testing the third party, not PinPoint. Any production third-party hostname reachable from an E2E run can also exfiltrate test data or hit real rate limits.
 - **Do:** Mock third-party SDKs at their boundary (`fetch` inside `src/lib/<sdk>/*.ts`, with a matching `*.test.ts`). Cover PinPoint's contribution with unit tests; cover "renders without 500" with smoke. Reserve integration/E2E for the contracted public API of owned services (Mailpit, PGlite, local Supabase including local Storage).
 - **Don't:** Drive live Discord webhooks, real OAuth provider redirects, vendor email templates, or any production third-party endpoint from an E2E spec. Two-layer self-check before merging: (1) `rg 'https?://' e2e/path/spec.ts` returns only `localhost`/`127.0.0.1`/owned-domain hits; (2) any production URL reached indirectly via server actions lives inside an SDK client module with a `*.test.ts` mocking `fetch`. Casework: PP-e20, PP-uc8, PP-q9r.
+
+**CORE-TEST-007:** Regression tests fail first
+
+- **Severity:** Required
+- **Why:** A regression test that never failed proves only that its mocks agree with its assertions. Watching it go red on the pre-fix code is the only evidence it guards the bug.
+- **Do:** Write the test at the owning boundary, run it against the pre-fix code, and confirm it fails for the intended reason (the assertion about the bug, not a setup error or an unrelated guard). Then apply the fix and confirm it passes. State both results in the PR.
+- **Don't:** Land a bug-fix test that was only ever observed passing.
+
+**CORE-TEST-008:** No test-only production seams
+
+- **Severity:** Required
+- **Why:** An export, flag, bypass parameter, or wrapper that exists only for a test is production surface with no production caller. It ships, it can be misused, and it keeps the test coupled to internals the real boundary already exposes.
+- **Do:** Test through the seam production callers use (the Server Action, route handler, service function, or rendered component). When a helper's branches matter, reach them through that boundary's inputs.
+- **Don't:** Export an internal helper, add an `isTest`/bypass parameter, or add an injection hook solely so a test can reach it.
+
+**CORE-TEST-009:** One primary test owner per contract
+
+- **Severity:** Required
+- **Why:** The same scenario asserted at unit, integration, and E2E layers triples maintenance and review cost without catching anything new; the 2026-05 E2E audit found most misallocated specs duplicated a cheaper layer.
+- **Do:** Give each contract one primary test at the cheapest layer that catches it (CORE-TEST-005). Add a test at a second layer only for a distinct risk the owner cannot reach (transport, hydration, a multi-page journey). Extend the canonical file for the bug class (see `pinpoint-testing`) before creating a new one.
+- **Don't:** Replay one bug's scenario across layers, or add a near-duplicate test beside an existing owner.
+
+**CORE-TEST-010:** A failing test is evidence
+
+- **Severity:** Required
+- **Why:** A test failing on `main` is the cheapest signal of a product bug or an unmigrated contract. Deleting or skipping it to get green discards that signal.
+- **Do:** Reproduce the failure, decide whether production or the test is wrong, and fix the owner. When the test is wrong, repair or retire it with the evidence recorded in the PR (what it claimed, why that claim is false, which test now owns the contract).
+- **Don't:** Delete, skip, or loosen a failing test without that evidence.
 
 ---
 
@@ -663,6 +692,6 @@ If all Yes → ship it. Perfect is the enemy of done.
 
 **Cross-References:**
 
-- Testing patterns & test authoring/audit: `pinpoint-testing` skill (`.agents/skills/pinpoint-testing/SKILL.md`) and `pinpoint-test-audit` skill (`.agents/skills/pinpoint-test-audit/SKILL.md`)
+- Testing patterns and the authoring gate: `pinpoint-testing` skill (`.agents/skills/pinpoint-testing/SKILL.md`); auditing existing tests: `pinpoint-test-audit` skill (`.agents/skills/pinpoint-test-audit/SKILL.md`)
 - Product requirements: approved documents in `docs/feature-specs/`
 - Technical architecture: the relevant `.agents/skills/` guidance and source code
