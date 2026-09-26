@@ -1021,6 +1021,10 @@ def resolve_preinstalled_toolchain(
 
     node_path = node_root / "bin" / "node"
     pnpm_candidates = [
+        # aqua:pnpm/pnpm (pnpm 12+) extracts a flat native binary directly
+        # into the install root -- no bin/ or node_modules/ wrapper.
+        pnpm_root / "pnpm",
+        # npm:pnpm (pnpm <12) layout, kept for rollback/compatibility.
         pnpm_root / "bin" / "pnpm",
         pnpm_root / "node_modules" / ".bin" / "pnpm",
     ]
