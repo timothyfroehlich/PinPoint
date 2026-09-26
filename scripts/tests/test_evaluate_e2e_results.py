@@ -481,3 +481,84 @@ def test_job_timeout_exceeds_the_sum_of_step_budgets() -> None:
         if "timeout-minutes:" in line and line.strip().startswith("timeout-minutes:")
     ][1:]
     assert job_timeout >= sum(step_budgets) + 20
+
+
+def test_ci_gate_fails_on_cancelled_or_failed_jobs() -> None:
+    """CI Gate must fail if any upstream job was cancelled (e.g. timeout) or failed.
+
+    When a Tier 2 job (like E2E full or smoke) hits its timeout-minutes, GitHub
+    Actions reports its conclusion as 'cancelled'. In PP-tdoq (observed on PR #1833),
+    CI Gate previously treated 'cancelled' as passing for path-filtered jobs,
+    allowing a green gate over an aborted/timed-out run.
+
+    CI Gate must strictly fail on both 'failure' and 'cancelled', so a timed-out
+    job turns CI Gate red instead of green (PP-tdoq).
+    """
+    ci = _ci_yml()
+    gate_block = ci.split("\n  ci-gate:\n", 1)[1]
+    # Gate must depend on the test jobs
+    assert "- test-e2e-full-chromium" in gate_block
+    assert "- test-e2e-smoke" in gate_block
+    assert "- test-integration" in gate_block
+    # Gate must run always() so it can evaluate upstream job states
+    assert "if: always()" in gate_block
+    # Gate must fail on both failure AND cancelled
+    assert "contains(needs.*.result, 'failure')" in gate_block
+    assert "contains(needs.*.result, 'cancelled')" in gate_block
+
+
+def test_ci_gate_results_jq_reports_cancelled_and_failed_jobs() -> None:
+    """Verify the jq filter used in CI Gate identifies cancelled and failed jobs."""
+    script = (
+        'to_entries[] | select(.value.result != "success" and .value.result != "skipped") '
+        '| "  \\(.key): \\(.value.result)"'
+    )
+    # 1. Clean run: all passed or skipped
+    clean_needs = json.dumps(
+        {
+            "setup": {"result": "success"},
+            "test-e2e-smoke": {"result": "success"},
+            "test-e2e-full-chromium": {"result": "skipped"},
+        }
+    )
+    res = subprocess.run(
+        ["jq", "-r", script],
+        input=clean_needs,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    assert res.stdout.strip() == ""
+
+    # 2. Timed out job (reported as cancelled): must be selected and reported
+    timed_out_needs = json.dumps(
+        {
+            "setup": {"result": "success"},
+            "test-e2e-full-chromium": {"result": "cancelled"},
+            "test-e2e-smoke": {"result": "success"},
+        }
+    )
+    res = subprocess.run(
+        ["jq", "-r", script],
+        input=timed_out_needs,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    assert "test-e2e-full-chromium: cancelled" in res.stdout
+
+    # 3. Failed job: must be selected and reported
+    failed_needs = json.dumps(
+        {
+            "setup": {"result": "success"},
+            "test-e2e-full-chromium": {"result": "failure"},
+        }
+    )
+    res = subprocess.run(
+        ["jq", "-r", script],
+        input=failed_needs,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    assert "test-e2e-full-chromium: failure" in res.stdout
