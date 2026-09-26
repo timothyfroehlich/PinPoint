@@ -286,8 +286,12 @@ describe("Insider Connected intent (PGlite)", () => {
         form(machineId, { icIntent: "on" })
       );
 
-      expect(result.ok).toBe(false);
-      if (!result.ok) expect(result.code).toBe("VALIDATION");
+      // The eligibility guard, not an earlier one, refuses it.
+      expect(result).toEqual({
+        ok: false,
+        code: "VALIDATION",
+        message: "Pinball Map doesn't offer Insider Connected for this game.",
+      });
       expect(await storedIcIntent(machineId)).toBeNull();
     });
 
@@ -370,8 +374,12 @@ describe("Insider Connected intent (PGlite)", () => {
         form(machineId)
       );
 
-      expect(result.ok).toBe(false);
-      if (!result.ok) expect(result.code).toBe("VALIDATION");
+      // The no-target guard, not the lineup or eligibility guard, refuses it.
+      expect(result).toEqual({
+        ok: false,
+        code: "VALIDATION",
+        message: "No Insider Connected setting has been chosen for this game.",
+      });
       expect(pbm.icCalls).toEqual([]);
     });
 

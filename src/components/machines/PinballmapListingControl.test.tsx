@@ -556,10 +556,14 @@ describe("the Insider Connected switch (3.8)", () => {
     }
   );
 
-  it("records the new position as intent, not a Pinball Map write", async () => {
+  it("records the new position as intent, not a Pinball Map write, without credentials", async () => {
+    // The whole point of the intent: a member without a linked account still
+    // records what they want, and someone who can push carries it out (8.6).
     const user = userEvent.setup();
     renderControl({
       view: VIEWS.on,
+      writeEnabled: false,
+      canPush: false,
       insiderConnected: ic({ intent: null, shown: "not_set" }),
     });
     await user.click(screen.getByRole("switch", { name: "Insider Connected" }));
@@ -569,20 +573,6 @@ describe("the Insider Connected switch (3.8)", () => {
     expect(formData?.get("machineId")).toBe("m-1");
     expect(formData?.get("icIntent")).toBe("on");
     expect(updateInsiderConnectedAction).not.toHaveBeenCalled();
-  });
-
-  it("can be set without Pinball Map credentials", () => {
-    // The whole point of the intent: a member without a linked account still
-    // records what they want, and someone who can push carries it out (8.6).
-    renderControl({
-      view: VIEWS.on,
-      writeEnabled: false,
-      canPush: false,
-      insiderConnected: ic(),
-    });
-    expect(
-      screen.getByRole("switch", { name: "Insider Connected" })
-    ).toBeEnabled();
   });
 
   it("is read-only without the machine-linking capability (4.9)", () => {

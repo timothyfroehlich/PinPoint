@@ -10,8 +10,8 @@
  *
  * The E2E database has no operator credential, which is the case the intent
  * exists for: the switch still records the intent, and the difference shows as
- * Out of sync with a link out instead of a push (4.4). The push path is covered
- * by `src/test/integration/pinballmap-insider-connected.test.ts`.
+ * Out of sync. How the control renders that is the unit tests' job, and the
+ * push path is `src/test/integration/pinballmap-insider-connected.test.ts`.
  *
  * Catalog rows and the lineup entry are seeded directly; nothing reaches
  * pinballmap.com (CORE-PBM-001 / CORE-TEST-006).
@@ -79,21 +79,12 @@ test.describe("Pinball Map Insider Connected switch (PP-o355.59)", () => {
           0
         );
 
-        // Recording Off needs no credential (3.8) and is now Out of sync.
+        // Recording Off needs no credential (3.8). After revalidation the
+        // loader derives the difference from the stored intent and lineup; how
+        // the control renders it is the unit tests' job.
         await toggle.click();
         await expect(toggle).not.toBeChecked();
         await expect(page.getByTestId("pbm-listing-out-of-sync")).toBeVisible();
-        await expect(
-          page.getByRole("img", { name: "Pinball Map: On" })
-        ).toBeVisible();
-        await expect(
-          page.getByTestId("pbm-insider-connected-status")
-        ).toHaveText("Insider Connected on.");
-        // Without a credential: a link out, never a push that would fail (4.4).
-        await expect(page.getByTestId("pbm-listing-update")).toHaveCount(0);
-        await expect(
-          page.getByRole("link", { name: "Set on Pinball Map" })
-        ).toBeVisible();
       } finally {
         await cleanupTestEntities(request, { machineInitials: [initials] });
         await deletePinballMapCatalogEntries([titleId]);
