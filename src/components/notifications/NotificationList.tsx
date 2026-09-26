@@ -77,12 +77,19 @@ export function NotificationList({
         return `New comment on ${issueId}`;
       case "mentioned":
         return `Mentioned in ${issueId}`;
+      case "machine_ownership_changed":
+        // The row does not record whether the owner was added or removed.
+        return n.machineInitials
+          ? `Ownership changed on ${n.machineInitials}`
+          : "Machine ownership changed";
       case "pinballmap_comment":
         return n.machineInitials
           ? `Pinball Map comment on ${n.machineInitials}`
           : "New Pinball Map comment";
-      default:
-        return "New notification";
+      default: {
+        const exhaustive: never = n.type;
+        return exhaustive;
+      }
     }
   };
 

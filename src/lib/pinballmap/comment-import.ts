@@ -16,6 +16,7 @@ import {
   timelineEvents,
 } from "~/server/db/schema";
 import { pinballmapCommenterName } from "./comment-conversion";
+import { markEndedEntries } from "./previous-listing";
 import type { PbmCondition, PbmLmx } from "./types";
 
 /**
@@ -39,6 +40,10 @@ import type { PbmCondition, PbmLmx } from "./types";
  * 7.7): one notification per copy, so someone watching two covering machines
  * hears about each. In-app rows are written with the copies; email and Discord
  * go out after the import commits.
+ *
+ * Each run also marks comments whose entry has ended for good as belonging to
+ * a previous listing (spec 7.2, 7.3); see `markEndedEntries`. The mark lives
+ * on the comment, so every covering timeline shows it.
  */
 
 /** A timeline copy this run created. */
@@ -251,6 +256,8 @@ export async function importPinballMapComments(): Promise<CommentImportResult> {
         deliveries.push(...plan.deliveries);
       }
     }
+
+    await markEndedEntries(tx, locationId, snapshot);
 
     if (backfill) {
       await tx

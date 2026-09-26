@@ -1,6 +1,6 @@
 {
-  "id": "dd9f8b2f-a42c-4876-9733-e1e6a07c85fb",
-  "prevId": "a2407e39-9c42-4658-a409-2b653fe454c1",
+  "id": "0f858be8-b627-4159-b52c-09ec915562b3",
+  "prevId": "b5a27faf-e69f-4c70-a700-d2cc61bcb296",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1533,20 +1533,6 @@
           "notNull": true,
           "default": false
         },
-        "apron_design_enabled": {
-          "name": "apron_design_enabled",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "apron_art_enabled": {
-          "name": "apron_art_enabled",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
         "apron_saved_at": {
           "name": "apron_saved_at",
           "type": "timestamp with time zone",
@@ -2476,6 +2462,24 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
+        },
+        "entry_missing_since": {
+          "name": "entry_missing_since",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "previous_listing_reason": {
+          "name": "previous_listing_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "previous_listing_at": {
+          "name": "previous_listing_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -2519,7 +2523,16 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "pinballmap_comments_previous_listing_reason_check": {
+          "name": "pinballmap_comments_previous_listing_reason_check",
+          "value": "previous_listing_reason IN ('removed', 'replaced', 'location_changed')"
+        },
+        "pinballmap_comments_previous_listing_pair": {
+          "name": "pinballmap_comments_previous_listing_pair",
+          "value": "(previous_listing_reason IS NULL) = (previous_listing_at IS NULL)"
+        }
+      },
       "isRLSEnabled": true
     },
     "public.pinballmap_location_checks": {

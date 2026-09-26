@@ -1,6 +1,6 @@
 {
-  "id": "b5a27faf-e69f-4c70-a700-d2cc61bcb296",
-  "prevId": "dbd1750b-ee1c-4435-9c78-e54e64e3ae5f",
+  "id": "3360c614-5da7-43a0-8575-9f8aef65e6e1",
+  "prevId": "0f858be8-b627-4159-b52c-09ec915562b3",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1533,6 +1533,20 @@
           "notNull": true,
           "default": false
         },
+        "apron_design_enabled": {
+          "name": "apron_design_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "apron_art_enabled": {
+          "name": "apron_art_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
         "apron_saved_at": {
           "name": "apron_saved_at",
           "type": "timestamp with time zone",
@@ -2112,6 +2126,76 @@
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
+    },
+    "public.opdb_machines": {
+      "name": "opdb_machines",
+      "schema": "",
+      "columns": {
+        "opdb_id": {
+          "name": "opdb_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "display": {
+          "name": "display",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "player_count": {
+          "name": "player_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "people": {
+          "name": "people",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "refreshed_at": {
+          "name": "refreshed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "opdb_machines_type_check": {
+          "name": "opdb_machines_type_check",
+          "value": "type IN ('em', 'ss', 'me')"
+        },
+        "opdb_machines_display_check": {
+          "name": "opdb_machines_display_check",
+          "value": "display IN ('reels', 'lights', 'alphanumeric', 'cga', 'dmd', 'lcd')"
+        },
+        "opdb_machines_player_count_check": {
+          "name": "opdb_machines_player_count_check",
+          "value": "player_count > 0"
+        }
+      },
+      "isRLSEnabled": true
     },
     "public.pinballmap_abandoned_listings": {
       "name": "pinballmap_abandoned_listings",
