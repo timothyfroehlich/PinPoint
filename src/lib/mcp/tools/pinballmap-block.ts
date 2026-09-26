@@ -134,14 +134,22 @@ export interface LineupSource {
 
 export async function loadLineupSource(): Promise<LineupSource> {
   const state = await getPinballMapState();
-  const configured = state?.locationId != null;
+  // A dormant snapshot from a since-cleared location must not be read as the
+  // current lineup — the same gate the machine page applies. Its sync health is
+  // dormant with it: clearing a location leaves both columns behind.
+  if (state?.locationId == null) {
+    return {
+      configured: false,
+      snapshot: null,
+      syncedAt: null,
+      lastSyncStatus: null,
+    };
+  }
   return {
-    configured,
-    // A dormant snapshot from a since-cleared location must not be read as the
-    // current lineup — the same gate the machine page applies.
-    snapshot: configured ? (state.snapshotJson ?? null) : null,
-    syncedAt: state?.lastSyncedAt ?? null,
-    lastSyncStatus: state?.lastSyncStatus ?? null,
+    configured: true,
+    snapshot: state.snapshotJson ?? null,
+    syncedAt: state.lastSyncedAt,
+    lastSyncStatus: state.lastSyncStatus,
   };
 }
 

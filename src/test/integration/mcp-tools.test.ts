@@ -905,6 +905,11 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       it("reports the linked catalog title, edition family, model metadata and listing intent", async () => {
         const admin = await makeUser("admin");
         await seedElviraCatalog();
+        // A location that was tracked and then cleared: clearing nulls only the
+        // location, leaving the old snapshot and its sync health behind.
+        await seedLineup([{ id: 51_000, machineId: ELVIRA_PREMIUM_ID }]);
+        const db = await getTestDb();
+        await db.update(pinballmapState).set({ locationId: null });
         const machine = await seedMachine({
           name: "Elvira's House of Horrors",
           pbm: {
@@ -939,8 +944,9 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
           opdbId: "GRBN4-MQGE5",
           ipdbId: 6587,
           intent: "on",
-          // No tracked location in this test, so there is no lineup to look in:
-          // "unknown" (null), never "not on it" (false).
+          // No tracked location, so there is no lineup to look in: "unknown"
+          // (null), never "not on it" (false) — and no sync time or status
+          // borrowed from the dormant snapshot.
           lineup: {
             state: "not_configured",
             onLineup: null,
