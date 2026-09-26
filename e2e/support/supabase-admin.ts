@@ -471,12 +471,15 @@ export async function seedPinballMapCatalogEntry(entry: {
   name: string;
   manufacturer?: string | null;
   year?: number | null;
+  /** Pinball Map's Insider Connected eligibility for the title (spec 3.8). */
+  icEligible?: boolean;
 }) {
   const { error } = await supabaseAdmin.from("pinballmap_catalog").insert({
     pinballmap_machine_id: entry.pinballmapMachineId,
     name: entry.name,
     manufacturer: entry.manufacturer ?? null,
     year: entry.year ?? null,
+    ic_eligible: entry.icEligible ?? false,
   });
   if (error) throw error;
 }
@@ -511,7 +514,11 @@ export async function deletePinballMapCatalogEntries(
  */
 export async function linkMachineToPinballMap(
   machineInitials: string,
-  link: { pinballmapMachineId: number; pinballmapLmxId: number }
+  link: {
+    pinballmapMachineId: number;
+    pinballmapLmxId: number;
+    icEnabled?: boolean | null;
+  }
 ) {
   const { error } = await supabaseAdmin
     .from("machines")
@@ -535,6 +542,7 @@ export async function linkMachineToPinballMap(
 export async function addLmxToStoredLineup(entry: {
   pinballmapMachineId: number;
   pinballmapLmxId: number;
+  icEnabled?: boolean | null;
 }) {
   const { data, error } = await supabaseAdmin
     .from("pinballmap_state")
@@ -557,7 +565,7 @@ export async function addLmxToStoredLineup(entry: {
   snapshot.lmxes.push({
     id: entry.pinballmapLmxId,
     machineId: entry.pinballmapMachineId,
-    icEnabled: null,
+    icEnabled: entry.icEnabled ?? null,
     lastUpdatedByUsername: null,
     conditions: [],
   } as never);

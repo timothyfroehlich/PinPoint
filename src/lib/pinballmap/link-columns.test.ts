@@ -38,6 +38,7 @@ const entry = {
   opdbImageHeight: null,
   machineGroupId: null,
   groupName: null,
+  icEligible: false,
   refreshedAt: new Date(),
 };
 
