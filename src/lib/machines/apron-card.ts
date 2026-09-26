@@ -3,6 +3,7 @@ import {
   getCurrentManufacturer,
   type MachineManufacturerSource,
 } from "~/lib/machines/manufacturer";
+import { formatCreditNames, type MachineCredits } from "~/lib/opdb/credits";
 
 export const APRON_CARD_SIZES = {
   stern: {
@@ -30,6 +31,9 @@ export interface ApronCardContent {
   description: string;
   tip: string;
   tipEnabled: boolean;
+  credits: MachineCredits;
+  designEnabled: boolean;
+  artEnabled: boolean;
 }
 
 interface ApronMachineSource extends MachineManufacturerSource {
@@ -40,6 +44,8 @@ interface ApronMachineSource extends MachineManufacturerSource {
   apronDescription: string | null;
   apronTip: string | null;
   apronTipEnabled: boolean;
+  apronDesignEnabled: boolean;
+  apronArtEnabled: boolean;
   owner: { name: string } | null;
   pinballmapTitle: {
     name: string;
@@ -74,7 +80,8 @@ export function groupedEdition(
 }
 
 export function apronCardContent(
-  machine: ApronMachineSource
+  machine: ApronMachineSource,
+  credits: MachineCredits
 ): ApronCardContent {
   return {
     name: machine.name,
@@ -88,7 +95,35 @@ export function apronCardContent(
       : docToPlainText(machine.description),
     tip: machine.apronTip ?? "",
     tipEnabled: machine.apronTipEnabled,
+    credits,
+    designEnabled: machine.apronDesignEnabled,
+    artEnabled: machine.apronArtEnabled,
   };
+}
+
+/** Names a credit row shows before collapsing the rest into a count (10.3). */
+export const APRON_CREDIT_MAX_NAMES = 2;
+
+export interface ApronCreditRow {
+  label: "Design" | "Art";
+  /** The names, or "Unknown" when the role has none (spec 10.4). */
+  text: string;
+}
+
+/** The identity panel's credit rows, Design then Art, for enabled roles. */
+export function apronCreditRows(
+  content: Pick<ApronCardContent, "credits" | "designEnabled" | "artEnabled">
+): ApronCreditRow[] {
+  const rows: ApronCreditRow[] = [];
+  const row = (label: ApronCreditRow["label"], names: string[]): void => {
+    rows.push({
+      label,
+      text: formatCreditNames(names, APRON_CREDIT_MAX_NAMES) ?? "Unknown",
+    });
+  };
+  if (content.designEnabled) row("Design", content.credits.design);
+  if (content.artEnabled) row("Art", content.credits.art);
+  return rows;
 }
 
 /**
@@ -96,7 +131,8 @@ export function apronCardContent(
  * prints at its physical size). Values come from the approved design canvas
  * (PP-esta, Claude Design artifact 2dbc7ba6): Stern/SPIKE is 529×283 with a
  * 206px identity panel; WPC is 576×312 with a 244px panel. The QR shrinks
- * when a tip is shown so the description region keeps its room.
+ * when a tip is shown so the description region keeps its room, and the logo
+ * shrinks while credit rows show so the identity panel keeps its room (10.6).
  */
 export interface ApronCardLayout {
   width: string;
@@ -109,6 +145,7 @@ export interface ApronCardLayout {
   titleMaxPx: number;
   titleMinPx: number;
   logoWidth: number;
+  logoWithCreditsWidth: number;
   qrPx: number;
   qrWithTipPx: number;
   bodyFontPx: number;
@@ -125,6 +162,7 @@ export const APRON_CARD_LAYOUTS: Record<ApronCardSize, ApronCardLayout> = {
     titleMaxPx: 42,
     titleMinPx: 24,
     logoWidth: 140,
+    logoWithCreditsWidth: 96,
     qrPx: 100,
     qrWithTipPx: 84,
     bodyFontPx: 12,
@@ -139,6 +177,7 @@ export const APRON_CARD_LAYOUTS: Record<ApronCardSize, ApronCardLayout> = {
     titleMaxPx: 46,
     titleMinPx: 26,
     logoWidth: 160,
+    logoWithCreditsWidth: 110,
     qrPx: 108,
     qrWithTipPx: 92,
     bodyFontPx: 12.5,
@@ -213,6 +252,29 @@ export function fitTitleSize({
     }
   }
   return minPx;
+}
+
+/**
+ * Title fit's last step (spec §1, 6.3): from the three-line fit, keep
+ * shrinking until the identity panel fits above the APC logo. `fits` measures
+ * the rendered panel at a size. Stops at the floor even if it still does not
+ * fit.
+ */
+export function shrinkUntilFits({
+  startPx,
+  minPx,
+  fits,
+}: {
+  startPx: number;
+  minPx: number;
+  fits: (px: number) => boolean;
+}): number {
+  const STEP = 0.5;
+  let size = startPx;
+  while (size > minPx && !fits(size)) {
+    size = Math.max(minPx, size - STEP);
+  }
+  return size;
 }
 
 /** Splits card text into paragraphs on blank or single line breaks. */

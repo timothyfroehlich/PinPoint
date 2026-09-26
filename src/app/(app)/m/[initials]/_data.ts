@@ -4,6 +4,12 @@ import { db } from "~/server/db";
 import { machines, issues } from "~/server/db/schema";
 import { CLOSED_STATUSES } from "~/lib/issues/status";
 import { getCurrentManufacturer } from "~/lib/machines/manufacturer";
+import {
+  creditsFromPeople,
+  NO_CREDITS,
+  type MachineCredits,
+} from "~/lib/opdb/credits";
+import { getOpdbRecords } from "~/lib/opdb/records";
 
 /**
  * Shared layout data for `/m/[initials]/*`.
@@ -61,6 +67,7 @@ export const getMachineForLayout = cache(async (initials: string) => {
             machineGroupId: true,
             groupName: true,
             manufacturer: true,
+            opdbId: true,
             opdbImageUrl: true,
             opdbImageWidth: true,
             opdbImageHeight: true,
@@ -159,6 +166,23 @@ function resolveModelTitle(machine: {
     `Pinball Map title #${String(machine.pinballmapMachineId)}`
   );
 }
+
+/**
+ * The machine's design and art credits, from the stored OPDB record of its
+ * Pinball Map catalog title (spec apron-cards 10.1). Never contacts OPDB.
+ *
+ * A separate lookup rather than part of `getMachineForLayout`: only the Info
+ * tab and the apron card read credits, and an alias ID falls back to its
+ * machine-level record, which a relation join cannot express. No catalog
+ * title, or no OPDB record for it, reads as no credits.
+ */
+export const getMachineCredits = cache(
+  async (opdbId: string | null): Promise<MachineCredits> => {
+    if (opdbId === null) return NO_CREDITS;
+    const record = (await getOpdbRecords(db, [opdbId])).get(opdbId);
+    return record ? creditsFromPeople(record.people) : NO_CREDITS;
+  }
+);
 
 export type MachineForLayout = NonNullable<
   Awaited<ReturnType<typeof getMachineForLayout>>["machine"]
