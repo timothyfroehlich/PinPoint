@@ -4,6 +4,7 @@ import type React from "react";
 import { useState, useRef, useEffect, startTransition } from "react";
 import Link from "next/link";
 import { useActionState } from "react";
+import { useHydrated } from "~/hooks/use-hydrated";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
@@ -72,6 +73,7 @@ export function CreateMachineForm({
   const [descriptionDoc, setDescriptionDoc] = useState<ProseMirrorDoc | null>(
     null
   );
+  const isHydrated = useHydrated();
 
   // Promote dialog state — populated when server returns ASSIGNEE_NOT_MEMBER
   const [promoteAssignee, setPromoteAssignee] = useState<
@@ -231,6 +233,7 @@ export function CreateMachineForm({
        */}
       <form
         ref={formRef}
+        method="post"
         onSubmit={(e) => {
           // Ignore submits that bubbled up from a DESCENDANT form. React
           // propagates events through the React tree, not the DOM tree, so the
@@ -393,6 +396,7 @@ export function CreateMachineForm({
           <Button
             type="submit"
             className="bg-primary text-on-primary hover:bg-primary/90"
+            disabled={!isHydrated || isPending}
             loading={isPending}
           >
             Create Machine

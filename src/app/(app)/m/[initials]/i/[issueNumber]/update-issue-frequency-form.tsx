@@ -150,6 +150,7 @@ export function UpdateIssueFrequencyForm({
     // not natively submittable, so don't add an `action` or a submit
     // control back onto it.
     <form
+      method="post"
       onSubmit={(event) => {
         event.preventDefault();
       }}

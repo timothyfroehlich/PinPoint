@@ -2,6 +2,7 @@
 
 import React, { useState, startTransition } from "react";
 import { useActionState } from "react";
+import { useHydrated } from "~/hooks/use-hydrated";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
@@ -48,6 +49,7 @@ export function DeleteAccountSection({
   const [confirmText, setConfirmText] = useState("");
   const [reassignTo, setReassignTo] = useState<string>("__unassigned__");
   const [isOpen, setIsOpen] = useState(false);
+  const isHydrated = useHydrated();
 
   const isConfirmed = confirmText === "DELETE";
 
@@ -112,7 +114,7 @@ export function DeleteAccountSection({
         </AlertDialogTrigger>
         <AlertDialogContent className="sm:max-w-[500px]">
           {/* No `action={formAction}` on purpose — see `handleSubmit` (PP-1ajq). */}
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form method="post" onSubmit={handleSubmit} className="space-y-6">
             {/*
               The failure banner belongs INSIDE the dialog. A failed delete
               leaves this dialog open (there is no close-on-failure path), so a
@@ -230,7 +232,9 @@ export function DeleteAccountSection({
               <Button
                 type="submit"
                 variant="destructive"
-                disabled={!isConfirmed || isPending || isSoleAdmin}
+                disabled={
+                  !isHydrated || !isConfirmed || isPending || isSoleAdmin
+                }
                 className="w-full sm:w-auto"
                 data-testid="delete-account-confirm"
               >
