@@ -171,3 +171,20 @@ describe("parseRegionLocations against the captured Austin payload", () => {
     });
   });
 });
+
+describe("parseCatalog Insider Connected eligibility", () => {
+  it("reads ic_eligible, treating anything but true as ineligible", () => {
+    const machines = parseCatalog([
+      { id: 1, name: "Eligible", ic_eligible: true },
+      { id: 2, name: "Ineligible", ic_eligible: false },
+      { id: 3, name: "Absent" },
+      { id: 4, name: "Odd", ic_eligible: "true" },
+    ]);
+    expect(machines.map((m) => m.icEligible)).toEqual([
+      true,
+      false,
+      false,
+      false,
+    ]);
+  });
+});
