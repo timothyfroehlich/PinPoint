@@ -48,8 +48,8 @@ Then work the checklist. For each item, note findings as a comment on the bead (
 
 ### Checklist
 
-1. **Stale version-pin checks** (mise tools, pnpm, Vercel CLI, bd/Dolt)
-   - **Ownership first.** Hosted Renovate may propose updates only for exact tool pins in root `mise.toml`, with the matching `mise.lock` changes and no automerge. Dependabot remains the sole owner of npm dependencies and GitHub Actions. The pnpm `packageManager` checksum, the Vercel wrapper, and the bd/Dolt compatibility manifest remain manual chores surfaces. Review open bot proposals before doing a duplicate manual bump.
+1. **Stale version-pin checks** (mise tools, pnpm, Vercel CLI, bd/Dolt, cloud gh)
+   - **Ownership first.** Hosted Renovate may propose updates only for exact tool pins in root `mise.toml`, with the matching `mise.lock` changes and no automerge. Dependabot remains the sole owner of npm dependencies and GitHub Actions. The pnpm `packageManager` checksum, the Vercel wrapper, and the bd/Dolt/gh pins in the compatibility manifest remain manual chores surfaces. Review open bot proposals before doing a duplicate manual bump.
    - **Supabase CLI pin.** `mise.toml` (`[tools].supabase`, PP-h2ui.6) is the single executable-version authority for local development, Bazzite, CI, and preview orchestration. GitHub workflows consume it through the shared mise action; there are no workflow-local version mirrors to edit. The pin does not own Supabase service images, generated worktree configuration, container lifecycle, or production migration behavior.
      - Renovate applies a 7-day release cooldown. Before accepting a proposal, validate **Bazzite rootless-Podman / SELinux compatibility** and a local stack start — the CLI version triggered the PP-9mg0 breakage, so a bump is a functional change, not a number swap (see `pinpoint-deployment`).
 
@@ -72,6 +72,14 @@ Then work the checklist. For each item, note findings as a comment on the bead (
      - If it's newer than the current pin (mind major bumps — read the pnpm release notes/migration guide first), update `packageManager` in `package.json` with the new version and its sha512 integrity hash (e.g. from `npm view pnpm@<version> dist.integrity` converted to `+sha512.<hex>`), run `mise lock` and then `mise install --locked`, then verify no unexpected `pnpm-lock.yaml` churn (`pnpm install --frozen-lockfile`), `pnpm audit --audit-level=high` still resolves, and `pnpm run check` is green. PR it through the normal workflow; file a bead if a major bump needs real migration work.
    - **Vercel CLI pin** (PP-h2ui.7). Privileged Vercel CLI invocations use one repository-owned wrapper: `scripts/workflow/preview/vercel-cli.sh`. Compare the pinned `VERCEL_CLI_VERSION` against the latest release on npm (applying a 14/30-day cooldown). Bumping is a single-site edit in `scripts/workflow/preview/vercel-cli.sh`.
    - **bd and Dolt compatibility version pins** (from the 2026-08-16 shared-DB schema incident). PinPoint declares exact versions for `bd` and `dolt` at a **single source**: `scripts/beads-compatibility.json`. Cloud routines install exactly those pins (`scripts/beads-cloud-setup.sh`) and refuse to touch the DB on a mismatch (`scripts/beads-cloud-init.sh`); the Mac's user-global mise declarations in dotfiles are checked against the same file by a dotfiles test. For an upgrade, validate the newer tools against the local embedded database and a `bd dolt push` round-trip, bump the manifest and its archive digests, then update the dotfiles mise pins to match. Exact pins are deliberate: an accidental _newer_ release migrated the shared DB and locked every client out for two days, so a loud refusal is the safe failure.
+   - **Cloud `gh` pin.** `scripts/beads-compatibility.json` also pins the GitHub CLI that `scripts/beads-cloud-setup.sh` installs in cloud sessions (the image ships none; `merge-pr.sh` needs it): `gh` plus `cloudAssets.linux-amd64.ghSha256`. Renovate does not own it, because the hosted app would bump the version without recomputing the digest, CI would pass on the setup tests' fake archives, and every new cloud session would then fail setup on the digest mismatch. Bump to the newest release at least 14 days old, taking the digest from that release's own checksum file:
+
+     ```bash
+     gh release list --repo cli/cli --exclude-pre-releases --limit 10 --json tagName,publishedAt
+     gh release download v<ver> --repo cli/cli --pattern 'gh_<ver>_checksums.txt' --output - | grep linux_amd64.tar.gz
+     ```
+
+     Update `gh` and `ghSha256` together, then run `mise exec -- python3 -m pytest scripts/tests/test_beads_compatibility.py`. `gh` never touches the shared DB, so a skipped week costs nothing.
 
 2. **TypeScript compiler maintenance**
    - TypeScript 7 is installed as `typescript`; its native `tsc` runs the app, test, E2E, and Next build type checks. Read `docs/plans/2026-06-27-typescript-7-upgrade-plan.md` only for the rollout record.
