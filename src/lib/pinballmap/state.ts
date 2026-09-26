@@ -312,7 +312,7 @@ async function recordSyncFailure(
  * milliseconds of skew against the caller's timestamp cannot matter to a
  * three-minute refill.
  */
-const ELAPSED_PERIODS = sql`floor(extract(epoch from (now() - ${pinballmapState.refreshTokensAt})) * 1000 / ${PBM_REFRESH_REFILL_MS})`;
+const ELAPSED_PERIODS = sql`greatest(0, floor(extract(epoch from (now() - ${pinballmapState.refreshTokensAt})) * 1000 / ${PBM_REFRESH_REFILL_MS}))`;
 
 /** Tokens available right now: what is banked, plus what time has refilled. */
 const AVAILABLE_TOKENS = sql`least(${PBM_REFRESH_BURST}, ${pinballmapState.refreshTokens} + ${ELAPSED_PERIODS})`;
@@ -414,8 +414,11 @@ async function stampSyncAttempt(
       )
       ON CONFLICT ("id") DO UPDATE SET
         "refresh_tokens" = ${AVAILABLE_TOKENS} - 1,
-        "refresh_tokens_at" = ${pinballmapState.refreshTokensAt}
-          + (interval '1 millisecond' * ${PBM_REFRESH_REFILL_MS} * ${ELAPSED_PERIODS})
+        "refresh_tokens_at" = CASE
+          WHEN ${AVAILABLE_TOKENS} >= ${PBM_REFRESH_BURST} THEN now()
+          ELSE ${pinballmapState.refreshTokensAt}
+            + (interval '1 millisecond' * ${PBM_REFRESH_REFILL_MS} * ${ELAPSED_PERIODS})
+        END
       WHERE ${AVAILABLE_TOKENS} >= 1
         AND ${locationGuard}
         AND "pinballmap_state"."configuration_generation" = ${expectedGeneration}
@@ -447,8 +450,11 @@ async function stampSyncAttempt(
       "last_sync_attempt_at" = EXCLUDED."last_sync_attempt_at",
       "updated_at" = EXCLUDED."updated_at",
       "refresh_tokens" = ${AVAILABLE_TOKENS} - 1,
-      "refresh_tokens_at" = ${pinballmapState.refreshTokensAt}
-        + (interval '1 millisecond' * ${PBM_REFRESH_REFILL_MS} * ${ELAPSED_PERIODS})
+      "refresh_tokens_at" = CASE
+        WHEN ${AVAILABLE_TOKENS} >= ${PBM_REFRESH_BURST} THEN now()
+        ELSE ${pinballmapState.refreshTokensAt}
+          + (interval '1 millisecond' * ${PBM_REFRESH_REFILL_MS} * ${ELAPSED_PERIODS})
+      END
     WHERE ${AVAILABLE_TOKENS} >= 1
       AND ${locationGuard}
       AND "pinballmap_state"."configuration_generation" = ${expectedGeneration}
