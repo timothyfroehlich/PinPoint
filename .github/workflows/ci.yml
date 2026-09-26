@@ -276,6 +276,9 @@ jobs:
       - name: Pytest (scripts)
         run: python3 -m pytest scripts/tests/
 
+      - name: Check E2E spec locations
+        run: python3 scripts/check_e2e_spec_locations.py
+
       - name: ShellCheck
         run: find scripts/ .claude/hooks/ -name '*.sh' -print0 | xargs -0 shellcheck
 
