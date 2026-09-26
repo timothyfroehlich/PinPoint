@@ -93,6 +93,7 @@ function compareNullable(
   if (left === null && right === null) return 0;
   if (left === null) return 1;
   if (right === null) return -1;
+  if (left === right) return 0;
   let comparison: number;
   if (typeof left === "string" && typeof right === "string") {
     comparison = COLLATOR.compare(left, right);

@@ -136,7 +136,18 @@ describe("applyMachineViewState", () => {
 
   it("sorts never-serviced machines as the oldest service", () => {
     const rows = [
-      candidate({ id: "never", initials: "N", lastServicedAt: null }),
+      candidate({
+        id: "never-z",
+        initials: "NZ",
+        title: "Zaccaria",
+        lastServicedAt: null,
+      }),
+      candidate({
+        id: "never",
+        initials: "N",
+        title: "Alpha",
+        lastServicedAt: null,
+      }),
       candidate({
         id: "recent",
         initials: "R",
@@ -157,7 +168,7 @@ describe("applyMachineViewState", () => {
         sort: "lastServiced",
         dir: "desc",
       }).rows.map((row) => row.id)
-    ).toEqual(["recent", "old", "never"]);
+    ).toEqual(["recent", "old", "never", "never-z"]);
     expect(
       applyMachineViewState(rows, {
         ...defaults,
@@ -165,7 +176,7 @@ describe("applyMachineViewState", () => {
         sort: "lastServiced",
         dir: "asc",
       }).rows.map((row) => row.id)
-    ).toEqual(["never", "old", "recent"]);
+    ).toEqual(["never", "never-z", "old", "recent"]);
   });
 });
 
