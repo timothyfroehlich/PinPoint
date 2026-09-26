@@ -1,5 +1,7 @@
 import { cache } from "react";
-import { getManufacturerTag } from "~/lib/tags/manufacturer";
+import { getTag } from "~/lib/tags/tags";
+import { isTagTypeId } from "~/lib/tags/types";
+import { db } from "~/server/db";
 
 /**
  * Next passes a dynamic segment through percent-encoded for reserved and
@@ -15,7 +17,8 @@ function decodeSlug(slug: string): string | null {
 }
 
 /** Request-deduped tag fetch shared by the (tabs) layout and tab pages. */
-export const getManufacturerTagForLayout = cache(async (slug: string) => {
+export const getTagForLayout = cache(async (type: string, slug: string) => {
   const decoded = decodeSlug(slug);
-  return decoded === null ? null : getManufacturerTag(undefined, decoded);
+  if (decoded === null || !isTagTypeId(type)) return null;
+  return getTag(db, type, decoded);
 });

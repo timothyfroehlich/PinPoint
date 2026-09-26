@@ -12,11 +12,7 @@ vi.mock("~/server/db", async () => {
 
 const { loadMachineViewFromDatabase } =
   await import("~/lib/machines/view/queries");
-const {
-  getManufacturerTag,
-  getManufacturerTagForMachine,
-  listManufacturerTags,
-} = await import("~/lib/tags/manufacturer");
+const { getTag, getTagsForMachine, listTags } = await import("~/lib/tags/tags");
 const { getMachineForLayout } = await import("~/app/(app)/m/[initials]/_data");
 
 /**
@@ -97,7 +93,7 @@ describe("manufacturer tags", () => {
 
   it("lists every tag with its machines in any presence state", async () => {
     const db = await getTestDb();
-    const tags = await listManufacturerTags(asDbOrTx(db));
+    const tags = (await listTags(asDbOrTx(db))).manufacturer;
     expect(
       tags.map((tag) => ({
         slug: tag.slug,
@@ -108,13 +104,17 @@ describe("manufacturer tags", () => {
       { slug: "stern", name: "Stern", initials: ["EXC", "GON", "LNK"] },
       { slug: "williams", name: "Williams", initials: ["WMS"] },
     ]);
-    expect(await getManufacturerTag(asDbOrTx(db), "nobody")).toBeNull();
+    expect(await getTag(asDbOrTx(db), "manufacturer", "nobody")).toBeNull();
   });
 
   it("scopes Machine View to the tag's members and lets filters only narrow", async () => {
     const db = await getTestDb();
     const tx = asDbOrTx(db);
-    const scope: MachineViewScope = { kind: "manufacturer", slug: "stern" };
+    const scope: MachineViewScope = {
+      kind: "tag",
+      tagType: "manufacturer",
+      slug: "stern",
+    };
 
     const all = await loadMachineViewFromDatabase(tx, {
       scope,
@@ -191,11 +191,14 @@ describe("manufacturer tags", () => {
       where: (machine, { eq }) => eq(machine.initials, "EXC"),
       columns: { id: true },
     });
-    const tag = await getManufacturerTagForMachine(
-      asDbOrTx(db),
-      excluded?.id ?? ""
-    );
-    expect(tag).toMatchObject({ slug: "stern", name: "Stern" });
+    const tags = await getTagsForMachine(asDbOrTx(db), excluded?.id ?? "");
+    expect(tags).toEqual([
+      expect.objectContaining({
+        type: "manufacturer",
+        slug: "stern",
+        name: "Stern",
+      }),
+    ]);
   });
 
   it("scopes a hyphenated name to its own tag", async () => {
@@ -219,7 +222,7 @@ describe("manufacturer tags", () => {
     const tx = asDbOrTx(db);
     const load = (slug: string) =>
       loadMachineViewFromDatabase(tx, {
-        scope: { kind: "manufacturer", slug },
+        scope: { kind: "tag", tagType: "manufacturer", slug },
         preset: "collection",
         searchParams: new URLSearchParams({ columns: "machine" }),
       });

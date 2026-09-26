@@ -2,19 +2,19 @@ import type React from "react";
 import { notFound } from "next/navigation";
 import { MachineGroupIssuesTab } from "~/components/collections/MachineGroupIssuesTab";
 import { getViewer } from "~/lib/collections/viewer";
-import { getManufacturerTagForLayout } from "~/app/(app)/c/tags/manufacturer/[slug]/_data";
+import { getTagForLayout } from "~/app/(app)/c/tags/[type]/[slug]/_data";
 
 interface PageProps {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ type: string; slug: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-export default async function ManufacturerTagIssuesPage({
+export default async function TagIssuesPage({
   params,
   searchParams,
 }: PageProps): Promise<React.JSX.Element> {
-  const { slug } = await params;
-  const tag = await getManufacturerTagForLayout(slug);
+  const { type, slug } = await params;
+  const tag = await getTagForLayout(type, slug);
   if (!tag) notFound();
 
   const viewer = await getViewer();
