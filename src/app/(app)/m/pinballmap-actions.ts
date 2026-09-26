@@ -416,6 +416,8 @@ function pbmWriteFailureMessage(failure: PbmWriteFailure): string {
       return "Pinball Map is rate-limiting us. Try again in a few minutes.";
     case "unauthorized":
       return "Pinball Map authentication failed. Reconnect your account in Settings.";
+    case "api_token":
+      return "Pinball Map refused PinPoint's API access. An admin needs to check the integration.";
     case "not_found":
       return "Pinball Map couldn't find that entry. It may already be gone.";
     case "rejected":
@@ -439,11 +441,15 @@ const NOT_LINKED_MESSAGE =
 async function pushRejected(
   userId: string,
   linked: LinkedPinballMapCredentials,
-  failure: PbmWriteFailure
+  failure: PbmWriteFailure,
+  machineInitials: string
 ): Promise<Result<never, "PBM_REJECTED" | "PBM_AUTH_FAILED">> {
   if (failure.reason === "unauthorized") {
     await markPinballMapLinkNeedsRelink(userId, linked.tokenVaultId);
     revalidatePath("/settings");
+    // The control hides the transient error for this code and relies on the
+    // page re-rendering into its standing note, so the page must re-render.
+    revalidatePath(`/m/${machineInitials}`);
     return err("PBM_AUTH_FAILED", pbmWriteFailureMessage(failure));
   }
   return err("PBM_REJECTED", pbmWriteFailureMessage(failure));
@@ -661,7 +667,7 @@ export async function addMachineToPinballMapAction(
         { reason: written.reason, action: "pinballmap.addMachine" },
         "PinballMap add rejected"
       );
-      return await pushRejected(userId, linked, written);
+      return await pushRejected(userId, linked, written, machine.initials);
     }
     const lmxId = written.lmxId;
     // --- transaction: local state only ---
@@ -872,7 +878,7 @@ export async function removeMachineFromPinballMapAction(
         { reason: written.reason, action: "pinballmap.removeMachine" },
         "PinballMap remove rejected"
       );
-      return await pushRejected(userId, linked, written);
+      return await pushRejected(userId, linked, written, machine.initials);
     }
 
     // `not_found` is ambiguous — already gone, or our handle was stale and the
@@ -949,7 +955,7 @@ export async function removeMachineFromPinballMapAction(
             { reason: written.reason, action: "pinballmap.removeMachine" },
             "PinballMap remove rejected on the re-resolved lmx"
           );
-          return await pushRejected(userId, linked, written);
+          return await pushRejected(userId, linked, written, machine.initials);
         }
       } else {
         // Confirmed absent from a lineup we just re-fetched. Finish the job

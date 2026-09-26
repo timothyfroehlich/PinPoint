@@ -27,6 +27,14 @@ vi.mock("~/lib/logger", () => ({
   log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 vi.mock("~/lib/observability/report-error", () => ({ reportError: vi.fn() }));
+// The decrypt RPC is service-role Postgres the PGlite schema does not carry;
+// tests set its reply directly.
+const rpcReply = vi.hoisted(() => ({ rows: [] as Record<string, unknown>[] }));
+vi.mock("~/lib/supabase/admin", () => ({
+  createAdminClient: () => ({
+    rpc: () => Promise.resolve({ data: rpcReply.rows, error: null }),
+  }),
+}));
 vi.mock("~/lib/pinballmap/client", async () => {
   const { createMockClient } = await import("~/lib/pinballmap/client-mock");
   const client = createMockClient();
@@ -62,6 +70,7 @@ vi.mock("~/server/db", async () => {
 });
 
 const {
+  getLinkedPinballMapCredentials,
   getPinballMapLinkStatus,
   linkPinballMapAccount,
   markPinballMapLinkNeedsRelink,
@@ -228,5 +237,23 @@ describe("Pinball Map account linking (spec 8.4)", () => {
     expect((await vaultSecrets()).map((s) => s.secret)).toEqual([
       "mock-token-other",
     ]);
+  });
+
+  it("marks a link whose Vault secret is gone as failed, instead of reading as linked", async () => {
+    const userId = await createMember();
+    await linkPinballMapAccount(userId, "ssw", "pw");
+    const row = await linkRow(userId);
+    if (!row) throw new Error("expected a link");
+    rpcReply.rows = [
+      {
+        pbm_email: row.pbmEmail,
+        token: null,
+        token_vault_id: row.tokenVaultId,
+        needs_relink: false,
+      },
+    ];
+
+    expect(await getLinkedPinballMapCredentials(userId)).toBeNull();
+    expect((await getPinballMapLinkStatus(userId)).status).toBe("needs_relink");
   });
 });

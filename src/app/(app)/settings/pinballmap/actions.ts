@@ -121,6 +121,11 @@ export async function linkPinballMapAccountAction(
             "ACCOUNT_DISABLED",
             "Pinball Map has disabled this account."
           );
+        case "api_token":
+          return err(
+            "PBM_UNAVAILABLE",
+            "Pinball Map refused PinPoint's API access. An admin needs to check the integration."
+          );
         case "rate_limited":
           return err(
             "PBM_UNAVAILABLE",

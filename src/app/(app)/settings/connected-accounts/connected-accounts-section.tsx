@@ -30,8 +30,43 @@ export async function ConnectedAccountsSection(): Promise<React.JSX.Element> {
     redirect(getLoginUrl("/settings"));
   }
 
-  const { data: identitiesData, error: identitiesError } =
-    await supabase.auth.getUserIdentities();
+  // Independent reads, run together. The Pinball Map link status is read for
+  // everyone and only rendered for holders of the account permission — it is
+  // one indexed row, cheaper than waiting on the role first.
+  const [
+    { data: identitiesData, error: identitiesError },
+    profile,
+    pinballMapLink,
+  ] = await Promise.all([
+    supabase.auth.getUserIdentities(),
+    // The test-DM button needs to know whether THIS user can receive DMs,
+    // which is gated on the mirror column (`user_profiles.discord_user_id`) —
+    // that's what the dispatcher actually reads at delivery time. The
+    // Connect/Disconnect UI uses `auth.identities` (the sign-in capability
+    // check); these can diverge briefly during link/unlink, and the runtime
+    // cares about delivery readiness, not sign-in.
+    db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, user.id),
+      columns: { discordUserId: true, role: true },
+    }),
+    getPinballMapLinkStatus(user.id),
+  ]);
+  const canReceiveDiscordDms = profile?.discordUserId != null;
+
+  // A member's own Pinball Map account, which their pushes run as (pinballmap
+  // spec 8.4). Read off the link row; the token is never decrypted here. It
+  // does not depend on auth identities, so it renders even when those fail.
+  const pinballMapRow = checkPermission(
+    "machines.pinballmap.account",
+    getAccessLevel(profile?.role)
+  ) ? (
+    <PinballMapAccountRow
+      status={pinballMapLink.status}
+      username={
+        pinballMapLink.status === "not_linked" ? null : pinballMapLink.username
+      }
+    />
+  ) : null;
 
   const header = (
     <>
@@ -58,6 +93,7 @@ export async function ConnectedAccountsSection(): Promise<React.JSX.Element> {
           We couldn&apos;t load your connected accounts right now. Please
           refresh the page and try again.
         </p>
+        {pinballMapRow}
       </div>
     );
   }
@@ -73,39 +109,6 @@ export async function ConnectedAccountsSection(): Promise<React.JSX.Element> {
   // Test DM is only meaningful when the bot integration is wired up. Only
   // need the boolean — skip the Vault decrypt that getDiscordConfig() does.
   const discordIntegrationEnabled = await isDiscordIntegrationConfigured();
-
-  // The test-DM button needs to know whether THIS user can receive DMs, which
-  // is gated on the mirror column (`user_profiles.discord_user_id`) — that's
-  // what the dispatcher actually reads at delivery time. The Connect/Disconnect
-  // UI uses `auth.identities` (the sign-in capability check); these can diverge
-  // briefly during link/unlink, and the runtime cares about delivery readiness,
-  // not sign-in.
-  const profile = await db.query.userProfiles.findFirst({
-    where: eq(userProfiles.id, user.id),
-    columns: { discordUserId: true, role: true },
-  });
-  const canReceiveDiscordDms = profile?.discordUserId != null;
-
-  // A member's own Pinball Map account, which their pushes run as (pinballmap
-  // spec 8.4). Read off the link row; the token is never decrypted here.
-  const canLinkPinballMap = checkPermission(
-    "machines.pinballmap.account",
-    getAccessLevel(profile?.role)
-  );
-  const pinballMapLink = canLinkPinballMap
-    ? await getPinballMapLinkStatus(user.id)
-    : null;
-  const pinballMapRow =
-    pinballMapLink === null ? null : (
-      <PinballMapAccountRow
-        status={pinballMapLink.status}
-        username={
-          pinballMapLink.status === "not_linked"
-            ? null
-            : pinballMapLink.username
-        }
-      />
-    );
 
   if (visibleKeys.length === 0 && pinballMapRow === null) {
     return (

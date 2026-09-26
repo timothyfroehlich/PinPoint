@@ -187,8 +187,18 @@ export interface PbmCredentials {
  *   Insider-Connected eligible, blank condition); not retryable, surface `message`
  * - `transient` — network error or 5xx; safe to retry later
  */
+/**
+ * `unauthorized` is the writer's own identity refused (the user_token no longer
+ * matches, or the account is disabled); `api_token` is PinPoint's platform
+ * X-Api-Token refused, which says nothing about the writer (CORE-PBM-001).
+ */
 export type PbmWriteFailureReason =
-  "rate_limited" | "unauthorized" | "not_found" | "rejected" | "transient";
+  | "rate_limited"
+  | "unauthorized"
+  | "api_token"
+  | "not_found"
+  | "rejected"
+  | "transient";
 
 /** Shared failure shape; `message` carries PBM's own text when it supplied one. */
 export interface PbmWriteFailure {
@@ -225,7 +235,11 @@ export type PinballMapLinkState = "not_linked" | "linked" | "needs_relink";
  * a username) is not enough to write with.
  */
 export type PbmAuthFailureReason =
-  "invalid_credentials" | "account_disabled" | "rate_limited" | "transient";
+  | "invalid_credentials"
+  | "account_disabled"
+  | "api_token"
+  | "rate_limited"
+  | "transient";
 
 export interface PbmAuthFailure {
   ok: false;

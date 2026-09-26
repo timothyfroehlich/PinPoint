@@ -91,8 +91,15 @@ export async function getLinkedPinballMapCredentials(
   }
 
   const row = response.data?.[0];
-  if (!row?.pbm_email || !row.token || !row.token_vault_id) return null;
+  if (!row?.pbm_email || !row.token_vault_id) return null;
   if (row.needs_relink === true) return null;
+  // A link row whose Vault secret is gone cannot push. Mark it failed so the
+  // member sees Authentication failed with Reconnect, rather than a row that
+  // reads Linked while every push answers "link your account".
+  if (!row.token) {
+    await markPinballMapLinkNeedsRelink(userId, row.token_vault_id);
+    return null;
+  }
   return {
     credentials: { email: row.pbm_email, token: row.token },
     tokenVaultId: row.token_vault_id,

@@ -1284,6 +1284,10 @@ describe("PinballMap outbound writes (PGlite)", () => {
       where: eq(pinballmapUserCredentials.userId, admin.id),
     });
     expect(link?.needsRelinkAt).not.toBeNull();
+    // The control hides the transient error for this code, so the machine
+    // page has to re-render into its standing note.
+    const { revalidatePath } = await import("next/cache");
+    expect(vi.mocked(revalidatePath)).toHaveBeenCalledWith("/m/GZ");
   });
 
   it("does not mark a link that was replaced while the push was in flight", async () => {
@@ -1315,31 +1319,34 @@ describe("PinballMap outbound writes (PGlite)", () => {
     expect(link?.needsRelinkAt).toBeNull();
   });
 
-  it("leaves the link alone when PinballMap rejects for another reason", async () => {
-    const db = await getTestDb();
-    const { addMachineToPinballMapAction } =
-      await import("~/app/(app)/m/pinballmap-actions");
-    const admin = await createUser("admin");
-    await mockAuthAs(admin.id);
-    await seedLink(admin.id);
-    await seedState([]);
-    pbm.addResult = { ok: false, reason: "rate_limited" };
+  it.each(["rate_limited", "api_token"] as const)(
+    "leaves the link alone when PinballMap rejects with %s",
+    async (reason) => {
+      const db = await getTestDb();
+      const { addMachineToPinballMapAction } =
+        await import("~/app/(app)/m/pinballmap-actions");
+      const admin = await createUser("admin");
+      await mockAuthAs(admin.id);
+      await seedLink(admin.id);
+      await seedState([]);
+      pbm.addResult = { ok: false, reason };
 
-    const [machine] = await db
-      .insert(machines)
-      .values({
-        name: "Godzilla",
-        initials: "GZ",
-        pinballmapMachineId: TITLE_ID,
-      })
-      .returning();
-    if (!machine) throw new Error("failed to seed machine");
+      const [machine] = await db
+        .insert(machines)
+        .values({
+          name: "Godzilla",
+          initials: "GZ",
+          pinballmapMachineId: TITLE_ID,
+        })
+        .returning();
+      if (!machine) throw new Error("failed to seed machine");
 
-    await addMachineToPinballMapAction(undefined, form(machine.id));
+      await addMachineToPinballMapAction(undefined, form(machine.id));
 
-    const link = await db.query.pinballmapUserCredentials.findFirst({
-      where: eq(pinballmapUserCredentials.userId, admin.id),
-    });
-    expect(link?.needsRelinkAt).toBeNull();
-  });
+      const link = await db.query.pinballmapUserCredentials.findFirst({
+        where: eq(pinballmapUserCredentials.userId, admin.id),
+      });
+      expect(link?.needsRelinkAt).toBeNull();
+    }
+  );
 });

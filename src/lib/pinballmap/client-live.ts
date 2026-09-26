@@ -210,12 +210,24 @@ function pbmErrorMessage(body: Record<string, unknown> | null): string | null {
 /** Stand-in when PBM signals an error in a shape we cannot render. */
 const PBM_UNKNOWN_ERROR = "PinballMap reported an error";
 
-/** Map a PBM error message (+status) to a write-failure reason. */
+/**
+ * Map a PBM error message (+status) to a write-failure reason.
+ *
+ * Status meanings, from pinballmap/pbm (verified 2026-09-26):
+ * - 401 is `BaseController#require_api_token` refusing PinPoint's platform
+ *   X-Api-Token. It says nothing about the writer, so it must not read as the
+ *   writer's token being dead (which marks their link failed, spec 8.5).
+ * - 403 is `require_api_user` refusing a disabled account.
+ * - A refused user_token is HTTP 200 + AUTH_REQUIRED_MSG ("Authentication is
+ *   required…").
+ * - "You can only update/delete machine conditions that you own" is an
+ *   ownership rule, not an identity failure, so it stays a plain rejection.
+ */
 function writeReasonFor(status: number, message: string): WriteReason {
   const m = message.toLowerCase();
   if (m.includes("failed to find")) return "not_found";
-  if (status === 401 || status === 403) return "unauthorized";
-  if (m.includes("authentication is required") || m.includes("you can only")) {
+  if (status === 401 || m.includes("api_token is required")) return "api_token";
+  if (status === 403 || m.includes("authentication is required")) {
     return "unauthorized";
   }
   return "rejected";
@@ -277,9 +289,8 @@ async function writeRequest(
 
   // Defensive: a 4xx that didn't carry a PBM error body.
   if (!res.ok) {
-    if (res.status === 401 || res.status === 403) {
-      return writeFailure("unauthorized");
-    }
+    if (res.status === 401) return writeFailure("api_token");
+    if (res.status === 403) return writeFailure("unauthorized");
     if (res.status === 404) return writeFailure("not_found");
     return writeFailure("transient");
   }
@@ -596,7 +607,14 @@ export function createLiveClient(apiToken: string | null): PinballMapClient {
       //   - success: 200 + {"user":{"id",…,"username","email",
       //     "authentication_token"}} — `return_response(user, "user", …)` nests
       //     the fields under a `user` root, never at the top level.
-      if (res.status === 401 || res.status === 403) {
+      // 401 is the platform X-Api-Token refused, not anything about this
+      // member's account (see writeReasonFor).
+      if (res.status === 401) {
+        return message === null
+          ? { ok: false, reason: "api_token" }
+          : { ok: false, reason: "api_token", message };
+      }
+      if (res.status === 403) {
         return {
           ok: false,
           reason: "account_disabled",

@@ -492,6 +492,18 @@ describe("live client — auth", () => {
     });
   });
 
+  it("authDetails reports a 401 as the platform API token refused, not the account", async () => {
+    installFetchMock(() =>
+      json({ error: "A valid api_token is required for this endpoint." }, 401)
+    );
+    expect(await createLiveClient(null).authDetails("ssw", "pw")).toMatchObject(
+      {
+        ok: false,
+        reason: "api_token",
+      }
+    );
+  });
+
   it("authDetails maps the 403 account_disabled body to account_disabled", async () => {
     // The one status-based case: disabled accounts return 403 + {error}.
     installFetchMock(() => json({ error: "account_disabled" }, 403));
@@ -625,6 +637,44 @@ describe("live client — writes", () => {
       reason: "unauthorized",
       message: "Authentication is required for this action.",
     });
+
+    // PinPoint's platform X-Api-Token refused (401): not the writer's fault,
+    // so it must not read as their token being dead (spec 8.5).
+    installFetchMock(() =>
+      json(
+        {
+          error:
+            "A valid api_token is required for this endpoint. Visit https://pinballmap.com/api_token to request one.",
+        },
+        401
+      )
+    );
+    expect(
+      await createLiveClient(null).removeMachine({
+        credentials: CREDS,
+        lmxId: 1,
+      })
+    ).toMatchObject({ ok: false, reason: "api_token" });
+
+    // disabled writer (403) → unauthorized
+    installFetchMock(() => json({ error: "account_disabled" }, 403));
+    expect(
+      await createLiveClient(null).removeMachine({
+        credentials: CREDS,
+        lmxId: 1,
+      })
+    ).toMatchObject({ ok: false, reason: "unauthorized" });
+
+    // an ownership rule is a rejection, not an identity failure
+    installFetchMock(() =>
+      json({ errors: "You can only delete machine conditions that you own" })
+    );
+    expect(
+      await createLiveClient(null).removeMachine({
+        credentials: CREDS,
+        lmxId: 1,
+      })
+    ).toMatchObject({ ok: false, reason: "rejected" });
 
     // network error → transient
     installFetchMock(() => {
