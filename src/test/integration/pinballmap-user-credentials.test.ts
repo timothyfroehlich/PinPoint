@@ -13,6 +13,7 @@ import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 import { randomUUID } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
+import { reportError } from "~/lib/observability/report-error";
 import {
   authUsers,
   pinballmapUserCredentials,
@@ -145,6 +146,7 @@ describe("Pinball Map account linking (spec 8.4)", () => {
 
   beforeEach(async () => {
     control.failInsideTransaction = false;
+    vi.mocked(reportError).mockClear();
     const db = await getTestDb();
     await db.execute(sql`DELETE FROM vault.secrets`);
   });
@@ -218,6 +220,40 @@ describe("Pinball Map account linking (spec 8.4)", () => {
     // The earlier link and its secret are untouched; the new secret is gone.
     expect(await vaultSecrets()).toEqual(before);
     expect((await linkRow(userId))?.pbmUsername).toBe("ssw");
+  });
+
+  it("keeps the token out of the reported error when the Vault write fails", async () => {
+    const userId = await createMember();
+    const db = await getTestDb();
+    // Drizzle's error for a failed query embeds every bound parameter, and the
+    // first parameter of create_secret is the token.
+    await db.execute(sql`
+      CREATE OR REPLACE FUNCTION vault.create_secret(
+        new_secret text,
+        new_name text DEFAULT NULL,
+        new_description text DEFAULT ''
+      ) RETURNS uuid LANGUAGE plpgsql AS $$
+      BEGIN
+        RAISE EXCEPTION 'vault unavailable';
+      END
+      $$
+    `);
+    try {
+      const result = await linkPinballMapAccount(userId, "ssw", "pw");
+
+      expect(result).toEqual({ ok: false, reason: "server" });
+      const reported = vi
+        .mocked(reportError)
+        .mock.calls.map(([error]) =>
+          error instanceof Error
+            ? `${error.message} ${String(error.cause)}`
+            : ""
+        );
+      expect(reported.join("\n")).toContain("vault unavailable");
+      expect(reported.join("\n")).not.toContain("mock-token-ssw");
+    } finally {
+      await createVaultStub();
+    }
   });
 
   it("unlinking deletes the row and its secret, and is idempotent", async () => {

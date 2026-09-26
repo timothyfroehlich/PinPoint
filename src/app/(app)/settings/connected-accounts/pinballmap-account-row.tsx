@@ -37,6 +37,11 @@ interface PinballMapAccountRowProps {
   status: PinballMapLinkState;
   /** The Pinball Map username the link was made as; null when not linked. */
   username: string | null;
+  /**
+   * Whether the viewer may link (and so reconnect). Someone without it sees
+   * only Unlink, so they can still remove a token saved before they lost it.
+   */
+  canLink: boolean;
 }
 
 /**
@@ -49,6 +54,7 @@ interface PinballMapAccountRowProps {
 export function PinballMapAccountRow({
   status,
   username,
+  canLink,
 }: PinballMapAccountRowProps): React.JSX.Element {
   const [dialogOpen, setDialogOpen] = useState(false);
   // Bumped on every open. Keying the dialog on it remounts the form, so a
@@ -97,7 +103,7 @@ export function PinballMapAccountRow({
       </div>
 
       <div className="flex items-center gap-2">
-        {status === "linked" ? null : (
+        {status === "linked" || !canLink ? null : (
           <Button
             type="button"
             onClick={() => {

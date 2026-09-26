@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { discordIntegrationConfig } from "~/server/db/schema";
+import { createVaultSecret } from "~/server/db/vault";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { saveDiscordConfigSchema, validateServerIdSchema } from "./schema";
@@ -379,17 +380,15 @@ export async function saveDiscordConfig(
     if (hasTypedNewToken) {
       const newToken = validated.newToken ?? "";
       const vaultName = `discord_bot_token_${randomUUID()}`;
-      const rows = (await db.execute(
-        sql`SELECT vault.create_secret(${newToken}, ${vaultName}, 'Discord bot token (saved via UI)') AS id`
-      )) as { id: string }[];
-      const createdId = rows[0]?.id;
-      if (!createdId) {
-        // Residual we cannot compensate: if create_secret succeeded
-        // server-side but this result read rejected/returned no id, we have no
-        // id to delete. Throwing still preserves the structured failure and
-        // Sentry signal.
-        throw new Error("Vault create_secret returned no id");
-      }
+      // Residual we cannot compensate: if create_secret succeeded server-side
+      // but its result read rejected or returned no id, we have no id to
+      // delete. The throw still preserves the structured failure and the
+      // Sentry signal, without the token (see createVaultSecret).
+      const createdId = await createVaultSecret(
+        newToken,
+        vaultName,
+        "Discord bot token (saved via UI)"
+      );
       newVaultId = createdId;
       orphanGuard.vaultId = createdId;
     }

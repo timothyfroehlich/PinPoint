@@ -6,6 +6,7 @@ import { createAdminClient } from "~/lib/supabase/admin";
 import { db } from "~/server/db";
 import { pinballmapUserCredentials } from "~/server/db/schema";
 import { assertNotInTransaction } from "~/server/db/transaction-context";
+import { createVaultSecret } from "~/server/db/vault";
 import { getPinballMapClient } from "./client";
 import type { PbmAuthFailureReason, PbmCredentials } from "./types";
 
@@ -52,6 +53,22 @@ interface UserCredentialsRow {
   needs_relink: boolean | null;
 }
 
+function nullableString(value: unknown): value is string | null {
+  return value === null || typeof value === "string";
+}
+
+/** Narrow the untyped RPC result instead of casting it (CORE-TS-007). */
+function isUserCredentialsRow(value: unknown): value is UserCredentialsRow {
+  if (typeof value !== "object" || value === null) return false;
+  const row: Record<string, unknown> = { ...value };
+  return (
+    nullableString(row["pbm_email"]) &&
+    nullableString(row["token"]) &&
+    nullableString(row["token_vault_id"]) &&
+    (row["needs_relink"] === null || typeof row["needs_relink"] === "boolean")
+  );
+}
+
 /**
  * The credential a push runs with: the member's email and decrypted token,
  * plus the Vault id they came from so a rejection marks exactly this link.
@@ -78,20 +95,25 @@ export async function getLinkedPinballMapCredentials(
   assertNotInTransaction("getLinkedPinballMapCredentials");
 
   const supabase = createAdminClient();
-  const response = (await supabase.rpc("get_pinballmap_user_credentials", {
+  const response = await supabase.rpc("get_pinballmap_user_credentials", {
     p_user_id: userId,
-  })) as {
-    data: UserCredentialsRow[] | null;
-    error: { message: string } | null;
-  };
+  });
   if (response.error) {
     throw new Error(
       `Failed to load Pinball Map credentials: ${response.error.message}`
     );
   }
 
-  const row = response.data?.[0];
-  if (!row?.pbm_email || !row.token_vault_id) return null;
+  const rows: unknown = response.data;
+  const first: unknown = Array.isArray(rows) ? rows[0] : undefined;
+  if (first === undefined) return null;
+  if (!isUserCredentialsRow(first)) {
+    throw new Error(
+      "get_pinballmap_user_credentials returned an unexpected row"
+    );
+  }
+  const row = first;
+  if (!row.pbm_email || !row.token_vault_id) return null;
   if (row.needs_relink === true) return null;
   // A link row whose Vault secret is gone cannot push. Mark it failed so the
   // member sees Authentication failed with Reconnect, rather than a row that
@@ -158,11 +180,11 @@ export async function linkPinballMapAccount(
   let replacedVaultId: string | null;
 
   try {
-    const createdRows = (await db.execute(
-      sql`SELECT vault.create_secret(${auth.token}, ${`pinballmap_user_token_${randomUUID()}`}, 'Pinball Map account token (linked by a member)') AS id`
-    )) as { id: string }[];
-    const createdId = createdRows[0]?.id;
-    if (!createdId) throw new Error("Vault create_secret returned no id");
+    const createdId = await createVaultSecret(
+      auth.token,
+      `pinballmap_user_token_${randomUUID()}`,
+      "Pinball Map account token (linked by a member)"
+    );
     orphan.vaultId = createdId;
 
     replacedVaultId = await db.transaction(async (tx) => {

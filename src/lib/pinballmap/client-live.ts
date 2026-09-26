@@ -584,7 +584,9 @@ export function createLiveClient(apiToken: string | null): PinballMapClient {
 
     async authDetails(login: string, password: string): Promise<PbmAuthResult> {
       assertNotInTransaction("pinballmap.authDetails");
-      // Credentials in the query string — never log this URL.
+      // Credentials in the query string — never log this URL. Pinball Map
+      // routes auth_details as GET only (pbm config/routes.rb), so the
+      // password cannot move to a request body.
       const url = buildUrl(`/users/auth_details.json`, { login, password });
       const res = await safeFetch(
         url,

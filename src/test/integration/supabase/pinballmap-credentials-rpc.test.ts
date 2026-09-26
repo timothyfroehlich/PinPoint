@@ -162,3 +162,65 @@ describe.each(RPCS)(
     });
   }
 );
+
+// The link table holds each member's Pinball Map email and Vault reference.
+// RLS enabled with no policies is the only thing keeping PostgREST from serving
+// it to any logged-in member, so pin that a row, even the caller's own, never
+// comes back to `anon` or `authenticated` (drizzle/0090).
+describe("pinballmap_user_credentials — not readable through PostgREST", () => {
+  let memberUser: { id: string } | undefined;
+  let memberAuthedClient: SupabaseClient;
+
+  beforeAll(async () => {
+    const memberEmail = `pbm-link-table-${Date.now()}@test.com`;
+    const { data } = await adminClient.auth.admin.createUser({
+      email: memberEmail,
+      password: "TestPassword123",
+      email_confirm: true,
+      user_metadata: {
+        first_name: "Member",
+        last_name: "Test",
+        role: "member",
+      },
+    });
+    if (!data.user) throw new Error("member user not created");
+    memberUser = { id: data.user.id };
+    await sql`
+      INSERT INTO pinballmap_user_credentials
+        (user_id, pbm_username, pbm_email, token_vault_id)
+      VALUES (${memberUser.id}, 'ssw', 'ssw@example.com', ${crypto.randomUUID()})
+    `;
+
+    memberAuthedClient = createClient(supabaseUrl, supabaseAnonKey);
+    await memberAuthedClient.auth.signInWithPassword({
+      email: memberEmail,
+      password: "TestPassword123",
+    });
+  });
+
+  afterAll(async () => {
+    if (memberUser) {
+      await sql`DELETE FROM pinballmap_user_credentials WHERE user_id = ${memberUser.id}`;
+      await adminClient.auth.admin.deleteUser(memberUser.id);
+    }
+  });
+
+  it.each([
+    ["an anonymous caller", () => anonClient],
+    ["the member who owns the row", () => memberAuthedClient],
+  ])("%s gets no rows", async (_who, client) => {
+    const { data } = await client()
+      .from("pinballmap_user_credentials")
+      .select("*");
+    expect(data ?? []).toEqual([]);
+  });
+
+  it("the service role does see it, so the refusals are not a missing row", async () => {
+    const { data, error } = await adminClient
+      .from("pinballmap_user_credentials")
+      .select("user_id")
+      .eq("user_id", memberUser?.id ?? "");
+    expect(error).toBeNull();
+    expect(data).toHaveLength(1);
+  });
+});

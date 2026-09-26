@@ -136,6 +136,15 @@ describe("unlinkPinballMapAccountAction", () => {
     expect(mocks.unlink).toHaveBeenCalledWith("user-1");
   });
 
+  it("lets someone without the link permission delete their stored token", async () => {
+    mocks.findProfile.mockResolvedValue({ role: "guest" });
+
+    const result = await unlinkPinballMapAccountAction();
+
+    expect(result).toEqual({ ok: true, value: {} });
+    expect(mocks.unlink).toHaveBeenCalledWith("user-1");
+  });
+
   it("refuses when signed out", async () => {
     mocks.getUser.mockResolvedValue({ data: { user: null } });
 

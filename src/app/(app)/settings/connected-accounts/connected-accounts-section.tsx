@@ -56,17 +56,24 @@ export async function ConnectedAccountsSection(): Promise<React.JSX.Element> {
   // A member's own Pinball Map account, which their pushes run as (pinballmap
   // spec 8.4). Read off the link row; the token is never decrypted here. It
   // does not depend on auth identities, so it renders even when those fail.
-  const pinballMapRow = checkPermission(
+  // Linking needs the account permission, but someone who lost it (demoted to
+  // guest) still sees an existing link so they can delete the stored token.
+  const canLinkPinballMap = checkPermission(
     "machines.pinballmap.account",
     getAccessLevel(profile?.role)
-  ) ? (
-    <PinballMapAccountRow
-      status={pinballMapLink.status}
-      username={
-        pinballMapLink.status === "not_linked" ? null : pinballMapLink.username
-      }
-    />
-  ) : null;
+  );
+  const pinballMapRow =
+    canLinkPinballMap || pinballMapLink.status !== "not_linked" ? (
+      <PinballMapAccountRow
+        status={pinballMapLink.status}
+        username={
+          pinballMapLink.status === "not_linked"
+            ? null
+            : pinballMapLink.username
+        }
+        canLink={canLinkPinballMap}
+      />
+    ) : null;
 
   const header = (
     <>

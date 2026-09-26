@@ -158,16 +158,22 @@ export type UnlinkPinballMapActionResult = Result<
   "UNAUTHORIZED" | "SERVER"
 >;
 
+/**
+ * Deleting your own stored token needs only a signed-in session, not the link
+ * permission: someone demoted after linking must still be able to remove it.
+ */
 export async function unlinkPinballMapAccountAction(): Promise<UnlinkPinballMapActionResult> {
-  const authed = await authorizeMember();
-  if (!authed.ok)
-    return err("UNAUTHORIZED", "Sign in as a member to unlink Pinball Map.");
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return err("UNAUTHORIZED", "Sign in to unlink Pinball Map.");
 
   try {
-    await unlinkPinballMapAccount(authed.userId);
+    await unlinkPinballMapAccount(user.id);
   } catch (error) {
     return serverActionError(error, "SERVER", "Could not unlink. Try again.", {
-      userId: authed.userId,
+      userId: user.id,
       action: "unlinkPinballMapAccountAction",
     });
   }

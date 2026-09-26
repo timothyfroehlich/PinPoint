@@ -809,8 +809,9 @@ export async function removeMachineFromPinballMapAction(
     );
 
   try {
-    // The submitted id is attacker-controlled, and the operator account it would
-    // act through can edit the WHOLE location's lineup. Push is `member: "owner"`,
+    // The submitted id is attacker-controlled, and the member's linked Pinball
+    // Map account it would act through can edit the WHOLE location's lineup
+    // (Pinball Map is publicly editable). Push is `member: "owner"`,
     // so without this an owner of any one cabinet could post any lmx on the
     // lineup and delete a game they have nothing to do with. The abandonment
     // records are the allowlist: an entry is this machine's business only if this
