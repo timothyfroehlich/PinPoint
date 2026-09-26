@@ -3,6 +3,7 @@ import {
   type MachineViewFieldId,
   type MachineViewPageSize,
   type MachineViewPresetId,
+  type MachineViewSavedState,
   type MachineViewSortDirection,
   type MachineViewState,
 } from "~/lib/types";
@@ -142,9 +143,16 @@ export function parseMachineViewState(
   };
 }
 
+/**
+ * Serializes view state relative to the Page Preset (spec §4.3, §4.10). `view`
+ * is the validated `view` reference (§4.11): an owned Saved View id or a
+ * Built-in View id; it is appended last and never changes the other
+ * parameters.
+ */
 export function serializeMachineViewState(
   state: MachineViewState,
-  presetId: MachineViewPresetId
+  presetId: MachineViewPresetId,
+  view: string | null = null
 ): URLSearchParams {
   const defaults = getMachineViewPreset(presetId).defaultState;
   const params = new URLSearchParams();
@@ -169,8 +177,77 @@ export function serializeMachineViewState(
   if (!arraysEqual(state.columns, defaults.columns)) {
     params.set("columns", state.columns.join(","));
   }
+  if (view) params.set("view", view);
 
   return params;
+}
+
+const MACHINE_VIEW_CONFIGURATION_PARAMS = [
+  "q",
+  "presence",
+  "status",
+  "owner",
+  "sort",
+  "dir",
+  "pageSize",
+  "columns",
+  "view",
+] as const;
+
+/**
+ * Whether a URL carries view configuration other than `page` (spec §8.11).
+ * A URL without any opens the account's Default View.
+ */
+export function hasMachineViewConfiguration(
+  searchParams: MachineViewSearchParams
+): boolean {
+  return MACHINE_VIEW_CONFIGURATION_PARAMS.some(
+    (name) => searchParams.get(name) !== null
+  );
+}
+
+/** The configuration a Saved View stores: everything but the page (§8.2). */
+export function toMachineViewSavedState(
+  state: MachineViewState
+): MachineViewSavedState {
+  const { page: _page, ...saved } = state;
+  return saved;
+}
+
+/**
+ * The canonical URL parameters that open a Saved View: its configuration at
+ * page 1 (spec §8.6), relative to the Page Preset (§4.10), naming the view.
+ */
+export function savedMachineViewSearchParams(
+  saved: MachineViewSavedState,
+  presetId: MachineViewPresetId,
+  viewId: string
+): URLSearchParams {
+  return serializeMachineViewState({ ...saved, page: 1 }, presetId, viewId);
+}
+
+/**
+ * Re-validates a configuration exactly as URL parameters are (spec §4.10,
+ * §8.15): fields the preset does not permit are dropped.
+ */
+export function normalizeMachineViewSavedState(
+  saved: MachineViewSavedState,
+  presetId: MachineViewPresetId
+): MachineViewSavedState {
+  const params = serializeMachineViewState({ ...saved, page: 1 }, presetId);
+  return toMachineViewSavedState(parseMachineViewState(params, presetId));
+}
+
+/** Whether two configurations are the same view, ignoring the page. */
+export function machineViewSavedStatesEqual(
+  left: MachineViewSavedState,
+  right: MachineViewSavedState,
+  presetId: MachineViewPresetId
+): boolean {
+  return (
+    serializeMachineViewState({ ...left, page: 1 }, presetId).toString() ===
+    serializeMachineViewState({ ...right, page: 1 }, presetId).toString()
+  );
 }
 
 export function nextMachineViewSort(

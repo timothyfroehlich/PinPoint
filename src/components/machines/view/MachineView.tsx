@@ -13,11 +13,16 @@ import {
 import type {
   MachineViewPresetId,
   MachineViewResult,
+  MachineViewSavedViews,
   MachineViewState,
 } from "~/lib/types";
 import { cn } from "~/lib/utils";
 import { MachineViewCompactList } from "./MachineViewCompactList";
 import { MachineViewTable } from "./MachineViewTable";
+import {
+  MachineViewSavedViewsMenu,
+  type MachineViewSelectableView,
+} from "./MachineViewSavedViewsMenu";
 import { MachineViewToolbar } from "./MachineViewToolbar";
 import type { MachineSelectionHandler } from "./field-catalog";
 
@@ -27,12 +32,15 @@ interface MachineViewProps {
   result: MachineViewResult;
   preset: MachineViewPresetId;
   onMachineSelect?: MachineSelectionHandler | undefined;
+  /** The signed-in account's Saved Views for this Surface (spec §8). */
+  savedViews?: MachineViewSavedViews | null | undefined;
 }
 
 export function MachineView({
   result,
   preset,
   onMachineSelect,
+  savedViews,
 }: MachineViewProps): React.JSX.Element {
   const router = useRouter();
   const pathname = usePathname();
@@ -44,6 +52,15 @@ export function MachineView({
   const [mobileMode, setMobileMode] = React.useState<"compact" | "table">(
     "compact"
   );
+  // The `view` URL reference (spec §4.11) carried by every navigation until
+  // another Saved View or the Page Preset is chosen.
+  const serverViewReference = savedViews?.activeViewId ?? null;
+  const viewReference = React.useRef(serverViewReference);
+  const [activeViewId, setActiveViewId] = React.useState(serverViewReference);
+  React.useEffect(() => {
+    viewReference.current = serverViewReference;
+    setActiveViewId(serverViewReference);
+  }, [serverViewReference]);
 
   React.useEffect(() => {
     const isRequestedResult = result.state.q === requestedQuery.current;
@@ -58,10 +75,15 @@ export function MachineView({
   }, []);
 
   const navigate = React.useCallback(
-    (next: MachineViewState): void => {
+    (
+      next: MachineViewState,
+      view: string | null = viewReference.current
+    ): void => {
       requestedQuery.current = next.q;
+      viewReference.current = view;
+      setActiveViewId(view);
       setState(next);
-      const query = serializeMachineViewState(next, preset).toString();
+      const query = serializeMachineViewState(next, preset, view).toString();
       startTransition(() => {
         router.replace(query ? `${pathname}?${query}` : pathname, {
           scroll: false,
@@ -82,13 +104,26 @@ export function MachineView({
   React.useEffect(() => {
     const canonical = serializeMachineViewState(
       result.state,
-      preset
+      preset,
+      serverViewReference
     ).toString();
     if (canonical === searchParams.toString()) return;
     router.replace(canonical ? `${pathname}?${canonical}` : pathname, {
       scroll: false,
     });
-  }, [pathname, preset, result.state, router, searchParams]);
+  }, [
+    pathname,
+    preset,
+    result.state,
+    router,
+    searchParams,
+    serverViewReference,
+  ]);
+
+  function applyView(view: MachineViewSelectableView): void {
+    setSearchValue(view.state.q);
+    navigate({ ...view.state, page: 1 }, view.id);
+  }
 
   function changeMobileMode(mode: "compact" | "table"): void {
     setMobileMode(mode);
@@ -121,6 +156,22 @@ export function MachineView({
         onSearchChange={setSearchValue}
         onStateChange={navigate}
         onMobileModeChange={changeMobileMode}
+        renderSavedViewsMenu={
+          savedViews
+            ? (layout) => (
+                <MachineViewSavedViewsMenu
+                  layout={layout}
+                  savedViews={savedViews}
+                  activeViewId={activeViewId}
+                  state={state}
+                  ownerIds={result.ownerOptions.map((owner) => owner.id)}
+                  preset={preset}
+                  onApply={applyView}
+                  onViewSaved={(viewId) => navigate(state, viewId)}
+                />
+              )
+            : undefined
+        }
       />
       <div className={cn("transition-opacity", isPending && "opacity-60")}>
         {result.rows.length === 0 ? (

@@ -1,8 +1,9 @@
 import type React from "react";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { MachineView } from "~/components/machines/view";
 import { loadMachineView } from "~/lib/machines/view/queries";
 import { toMachineViewSearchParams } from "~/lib/machines/view/state";
+import { loadMachineViewSurfacePageState } from "~/app/(app)/m/saved-view-surface";
 import { getOwnerCollectionForLayout } from "../_data";
 
 interface PageProps {
@@ -29,10 +30,18 @@ export default async function CollectionOverviewPage({
     );
   }
 
+  const viewSearchParams = toMachineViewSearchParams(rawSearchParams);
+  const { savedViews, redirectTo } = await loadMachineViewSurfacePageState(
+    { kind: "owner", ownerId: collection.owner.id },
+    viewSearchParams
+  );
+  if (redirectTo) redirect(redirectTo);
   const result = await loadMachineView({
     scope: { kind: "owner", ownerId: collection.owner.id },
     preset: "collection",
-    searchParams: toMachineViewSearchParams(rawSearchParams),
+    searchParams: viewSearchParams,
   });
-  return <MachineView result={result} preset="collection" />;
+  return (
+    <MachineView result={result} preset="collection" savedViews={savedViews} />
+  );
 }

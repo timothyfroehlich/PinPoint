@@ -1,18 +1,17 @@
 import type React from "react";
 import Link from "next/link";
-import { eq } from "drizzle-orm";
+import { redirect } from "next/navigation";
 import { Plus } from "lucide-react";
 import { MachineView } from "~/components/machines/view";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
 import { Button } from "~/components/ui/button";
 import { EmptyState } from "~/components/ui/empty-state";
+import { getViewer } from "~/lib/collections/viewer";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { loadMachineView } from "~/lib/machines/view/queries";
 import { toMachineViewSearchParams } from "~/lib/machines/view/state";
-import { createClient } from "~/lib/supabase/server";
-import { db } from "~/server/db";
-import { userProfiles } from "~/server/db/schema";
+import { loadMachineViewSurfacePageState } from "./saved-view-surface";
 
 interface MachinesPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -25,23 +24,22 @@ interface MachinesPageProps {
 export default async function MachinesPage({
   searchParams,
 }: MachinesPageProps): Promise<React.JSX.Element> {
-  const supabase = await createClient();
-  const [{ data }, rawSearchParams] = await Promise.all([
-    supabase.auth.getUser(),
+  const [viewer, rawSearchParams] = await Promise.all([
+    getViewer(),
     searchParams,
   ]);
-  const userProfile = data.user
-    ? await db.query.userProfiles.findFirst({
-        where: eq(userProfiles.id, data.user.id),
-        columns: { role: true },
-      })
-    : null;
-  const accessLevel = getAccessLevel(userProfile?.role);
+  const accessLevel = getAccessLevel(viewer.role);
   const canCreateMachine = checkPermission("machines.create", accessLevel);
+  const viewSearchParams = toMachineViewSearchParams(rawSearchParams);
+  const { savedViews, redirectTo } = await loadMachineViewSurfacePageState(
+    { kind: "machines" },
+    viewSearchParams
+  );
+  if (redirectTo) redirect(redirectTo);
   const result = await loadMachineView({
     scope: { kind: "all" },
     preset: "machines",
-    searchParams: toMachineViewSearchParams(rawSearchParams),
+    searchParams: viewSearchParams,
   });
   const addMachineButton = canCreateMachine ? (
     <Button
@@ -83,7 +81,11 @@ export default async function MachinesPage({
           }
         />
       ) : (
-        <MachineView result={result} preset="machines" />
+        <MachineView
+          result={result}
+          preset="machines"
+          savedViews={savedViews}
+        />
       )}
     </PageContainer>
   );

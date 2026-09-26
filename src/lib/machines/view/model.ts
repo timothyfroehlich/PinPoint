@@ -93,6 +93,7 @@ function compareNullable(
   if (left === null && right === null) return 0;
   if (left === null) return 1;
   if (right === null) return -1;
+  if (left === right) return 0;
   let comparison: number;
   if (typeof left === "string" && typeof right === "string") {
     comparison = COLLATOR.compare(left, right);
@@ -132,9 +133,11 @@ function compareRows(
         (left.health?.openIssues ?? 0) - (right.health?.openIssues ?? 0);
       break;
     case "lastServiced":
+      // A machine never serviced is the most overdue: it sorts as the oldest
+      // (first ascending, last descending), which Service due relies on.
       comparison = compareNullable(
-        dateValue(left.lastServicedAt),
-        dateValue(right.lastServicedAt),
+        dateValue(left.lastServicedAt) ?? Number.NEGATIVE_INFINITY,
+        dateValue(right.lastServicedAt) ?? Number.NEGATIVE_INFINITY,
         state.dir
       );
       return comparison !== 0 ? comparison : compareIdentity(left, right);
