@@ -37,14 +37,8 @@ jobs:
     # The Vercel secrets live in the `Preview` GitHub Environment, so the job
     # must declare it to read them. Repo-level secrets (SUPABASE_*) stay readable.
     environment: Preview
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      GITHUB_REPOSITORY: ${{ github.repository }}
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}  # zizmor: ignore[secrets-outside-env]
-      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}  # zizmor: ignore[secrets-outside-env]
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}  # zizmor: ignore[secrets-outside-env]
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}  # zizmor: ignore[secrets-outside-env]
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}  # zizmor: ignore[secrets-outside-env]
+    # No job-level secrets (PP-fmli): only the reap step receives them, so
+    # checkout and toolchain setup never run with a token in env.
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
         with:
@@ -57,4 +51,12 @@ jobs:
           cache-pnpm: "false"
 
       - name: Reap preview branches
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}  # zizmor: ignore[secrets-outside-env]
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}  # zizmor: ignore[secrets-outside-env]
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: bash scripts/workflow/preview/preview-reap.sh
