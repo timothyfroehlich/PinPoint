@@ -2,7 +2,9 @@ import "server-only";
 
 import { getViewer } from "~/lib/collections/viewer";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
+import { getMachineViewBuiltInViews } from "~/lib/machines/view/config";
 import {
+  getMachineViewDefault,
   listSavedMachineViews,
   resolveSavedMachineViewRequest,
   type SavedMachineViewSurfaceKey,
@@ -67,33 +69,69 @@ export interface MachineViewSurfacePageState {
   redirectTo: string | null;
 }
 
+function presetForRef(ref: MachineViewSurfaceRef): MachineViewPresetId {
+  return ref.kind === "machines" ? "machines" : "collection";
+}
+
 /**
- * Loads the signed-in account's Saved Views for a page's Surface and decides
- * whether a configuration-free URL opens the Default Saved View (spec §8.11).
- * Accounts without the save capability, and anonymous visitors, get none.
+ * Loads the views a page's Surface offers the viewer and decides whether a
+ * configuration-free URL opens the account's default (spec §8.11). Every
+ * viewer gets the Built-in Views (§8.1, §9); only accounts with the save
+ * capability get Saved Views and a default.
  */
 export async function loadMachineViewSurfacePageState(
   ref: MachineViewSurfaceRef,
   searchParams: MachineViewSearchParams
 ): Promise<MachineViewSurfacePageState> {
   const viewer = await getViewer();
-  if (
-    !viewer.userId ||
-    !checkPermission("machines.views.save", getAccessLevel(viewer.role))
-  ) {
-    return { savedViews: null, redirectTo: null };
+  const preset = presetForRef(ref);
+  const builtInViews = getMachineViewBuiltInViews(preset).map(
+    ({ id, name, state }) => ({ id, name, state })
+  );
+  const canSave =
+    viewer.userId !== undefined &&
+    checkPermission("machines.views.save", getAccessLevel(viewer.role));
+  const surface = canSave ? await resolveMachineViewSurface(ref) : null;
+  if (!viewer.userId || !surface) {
+    const request = resolveSavedMachineViewRequest({
+      views: [],
+      defaultViewId: null,
+      preset,
+      searchParams,
+      pathname: "",
+    });
+    return {
+      savedViews: {
+        surface: ref,
+        canSave: false,
+        builtInViews,
+        views: [],
+        defaultViewId: null,
+        activeViewId: request.activeViewId,
+      },
+      redirectTo: null,
+    };
   }
-  const surface = await resolveMachineViewSurface(ref);
-  if (!surface) return { savedViews: null, redirectTo: null };
-  const views = await listSavedMachineViews(db, viewer.userId, surface.key);
+  const [views, defaultViewId] = await Promise.all([
+    listSavedMachineViews(db, viewer.userId, surface.key),
+    getMachineViewDefault(db, viewer.userId, surface.key),
+  ]);
   const request = resolveSavedMachineViewRequest({
     views,
+    defaultViewId,
     preset: surface.preset,
     searchParams,
     pathname: surface.pathname,
   });
   return {
-    savedViews: { surface: ref, views, activeViewId: request.activeViewId },
+    savedViews: {
+      surface: ref,
+      canSave: true,
+      builtInViews,
+      views,
+      defaultViewId,
+      activeViewId: request.activeViewId,
+    },
     redirectTo: request.redirectTo,
   };
 }

@@ -1,7 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getMachineViewPreset } from "~/lib/machines/view/config";
+import {
+  getMachineViewBuiltInViews,
+  getMachineViewPreset,
+} from "~/lib/machines/view/config";
 import type {
   MachineViewSavedViews,
   MachineViewSavedViewSummary,
@@ -14,7 +17,7 @@ const actions = vi.hoisted(() => ({
   updateSavedMachineViewAction: vi.fn(),
   renameSavedMachineViewAction: vi.fn(),
   deleteSavedMachineViewAction: vi.fn(),
-  setSavedMachineViewDefaultAction: vi.fn(),
+  setMachineViewDefaultAction: vi.fn(),
 }));
 const refresh = vi.hoisted(() => vi.fn());
 
@@ -24,10 +27,10 @@ vi.mock("next/navigation", () => ({
 }));
 
 const presetState = getMachineViewPreset("machines").defaultState;
+const builtInViews = getMachineViewBuiltInViews("machines");
 const brokenView: MachineViewSavedViewSummary = {
   id: "11111111-1111-4111-8111-111111111111",
   name: "Broken machines",
-  isDefault: true,
   state: {
     q: "",
     presence: ["on_the_floor"],
@@ -43,11 +46,16 @@ const brokenView: MachineViewSavedViewSummary = {
 function renderMenu(
   state: MachineViewState,
   activeViewId: string | null,
-  onApply = vi.fn()
+  options: { canSave?: boolean; defaultViewId?: string | null } = {}
 ): { onApply: ReturnType<typeof vi.fn> } {
+  const onApply = vi.fn();
+  const canSave = options.canSave ?? true;
   const savedViews: MachineViewSavedViews = {
     surface: { kind: "machines" },
-    views: [brokenView],
+    canSave,
+    builtInViews,
+    views: canSave ? [brokenView] : [],
+    defaultViewId: options.defaultViewId ?? null,
     activeViewId,
   };
   render(
@@ -70,11 +78,29 @@ describe("MachineViewSavedViewsMenu", () => {
     vi.clearAllMocks();
   });
 
-  it("names the Page Preset when no Saved View is active", () => {
+  it("names the Page Preset's Built-in View when no view is named", () => {
     renderMenu(presetState, null);
     expect(
-      screen.getByRole("button", { name: "Saved views: Built-in view" })
+      screen.getByRole("button", { name: "Views: On the floor" })
     ).toBeInTheDocument();
+  });
+
+  it("lists Built-in Views before Saved Views and marks the default", async () => {
+    const user = userEvent.setup();
+    renderMenu(presetState, null, { defaultViewId: "needs-attention" });
+
+    await user.click(screen.getByRole("button", { name: /^Views:/ }));
+    const items = screen
+      .getAllByRole("menuitem")
+      .map((item) => item.textContent);
+    expect(items.slice(0, 6)).toEqual([
+      "On the floor",
+      "Needs attentionDefault",
+      "Service due",
+      "All machines",
+      "Recently added",
+      "Broken machines",
+    ]);
   });
 
   it("marks an applied Saved View as edited once the configuration differs", async () => {
@@ -82,20 +108,20 @@ describe("MachineViewSavedViewsMenu", () => {
     renderMenu({ ...brokenView.state, q: "stern", page: 1 }, brokenView.id);
 
     await user.click(
-      screen.getByRole("button", {
-        name: "Saved views: Broken machines, edited",
-      })
+      screen.getByRole("button", { name: "Views: Broken machines, edited" })
     );
     expect(
       screen.getByRole("menuitem", { name: "Save changes" })
     ).toBeInTheDocument();
   });
 
-  it("offers only Save as new while the Page Preset is applied", async () => {
+  it("never offers Save changes for an edited Built-in View", async () => {
     const user = userEvent.setup();
-    renderMenu({ ...presetState, q: "stern" }, "preset");
+    renderMenu({ ...presetState, q: "stern" }, "on-the-floor");
 
-    await user.click(screen.getByRole("button", { name: /Built-in view/ }));
+    await user.click(
+      screen.getByRole("button", { name: "Views: On the floor, edited" })
+    );
     expect(
       screen.queryByRole("menuitem", { name: "Save changes" })
     ).not.toBeInTheDocument();
@@ -104,14 +130,25 @@ describe("MachineViewSavedViewsMenu", () => {
     ).toBeInTheDocument();
   });
 
+  it("offers only Built-in Views to a viewer who cannot save", async () => {
+    const user = userEvent.setup();
+    const { onApply } = renderMenu(presetState, null, { canSave: false });
+
+    await user.click(screen.getByRole("button", { name: /^Views:/ }));
+    expect(screen.getAllByRole("menuitem")).toHaveLength(5);
+    await user.click(screen.getByRole("menuitem", { name: "Service due" }));
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "service-due" })
+    );
+  });
+
   it("saves changes to the applied Saved View", async () => {
     const user = userEvent.setup();
     actions.updateSavedMachineViewAction.mockResolvedValue({
       ok: true,
       value: { id: brokenView.id },
     });
-    const state = { ...brokenView.state, q: "stern", page: 3 };
-    renderMenu(state, brokenView.id);
+    renderMenu({ ...brokenView.state, q: "stern", page: 3 }, brokenView.id);
 
     await user.click(screen.getByRole("button", { name: /Broken machines/ }));
     await user.click(screen.getByRole("menuitem", { name: "Save changes" }));
@@ -123,18 +160,6 @@ describe("MachineViewSavedViewsMenu", () => {
     expect(refresh).toHaveBeenCalled();
   });
 
-  it("applies the Page Preset from the menu", async () => {
-    const user = userEvent.setup();
-    const { onApply } = renderMenu(
-      { ...brokenView.state, page: 1 },
-      brokenView.id
-    );
-
-    await user.click(screen.getByRole("button", { name: /Broken machines/ }));
-    await user.click(screen.getByRole("menuitem", { name: "Built-in view" }));
-    expect(onApply).toHaveBeenCalledWith(null);
-  });
-
   it("shows a name collision without closing the dialog", async () => {
     const user = userEvent.setup();
     actions.createSavedMachineViewAction.mockResolvedValue({
@@ -144,7 +169,7 @@ describe("MachineViewSavedViewsMenu", () => {
     });
     renderMenu(presetState, null);
 
-    await user.click(screen.getByRole("button", { name: /Built-in view/ }));
+    await user.click(screen.getByRole("button", { name: /^Views:/ }));
     await user.click(screen.getByRole("menuitem", { name: "Save as new…" }));
     await user.type(screen.getByRole("textbox", { name: /Name/ }), "Broken");
     await user.click(screen.getByRole("button", { name: "Save" }));
@@ -155,5 +180,25 @@ describe("MachineViewSavedViewsMenu", () => {
     expect(
       screen.getByRole("dialog", { name: "Save view" })
     ).toBeInTheDocument();
+  });
+
+  it("makes a Built-in View the default from Manage views", async () => {
+    const user = userEvent.setup();
+    actions.setMachineViewDefaultAction.mockResolvedValue({
+      ok: true,
+      value: { id: "service-due" },
+    });
+    renderMenu(presetState, null);
+
+    await user.click(screen.getByRole("button", { name: /^Views:/ }));
+    await user.click(screen.getByRole("menuitem", { name: "Manage views…" }));
+    await user.click(
+      screen.getByRole("button", { name: "Open Service due by default" })
+    );
+
+    expect(actions.setMachineViewDefaultAction).toHaveBeenCalledWith({
+      surface: { kind: "machines" },
+      target: { kind: "builtIn", id: "service-due" },
+    });
   });
 });

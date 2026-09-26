@@ -97,17 +97,28 @@ export type MachineViewSurfaceRef =
 export interface MachineViewSavedViewSummary {
   id: string;
   name: string;
-  isDefault: boolean;
+  state: MachineViewSavedState;
+}
+
+/** A Built-in View as the menu shows it (spec §9). */
+export interface MachineViewBuiltInView {
+  id: string;
+  name: string;
   state: MachineViewSavedState;
 }
 
 /**
- * The signed-in account's Saved Views for one Surface. `activeViewId` is the
- * validated `view` URL reference (spec §4.11): an owned Saved View id, the
- * Page Preset reference, or null.
+ * The views one Surface offers a viewer (spec §8, §9). `activeViewId` is the
+ * validated `view` URL reference (§4.11) — an owned Saved View id or a
+ * Built-in View id — or null, which means the Page Preset's baseline.
+ * `defaultViewId` is the account's default on this Surface (§8.10).
  */
 export interface MachineViewSavedViews {
   surface: MachineViewSurfaceRef;
+  /** Whether the viewer can save, change, and choose defaults (§8.1). */
+  canSave: boolean;
+  builtInViews: MachineViewBuiltInView[];
   views: MachineViewSavedViewSummary[];
+  defaultViewId: string | null;
   activeViewId: string | null;
 }

@@ -7,7 +7,6 @@ import { EmptyState } from "~/components/ui/empty-state";
 import { Button } from "~/components/ui/button";
 import { getMachineViewPreset } from "~/lib/machines/view/config";
 import {
-  MACHINE_VIEW_PRESET_REFERENCE,
   nextMachineViewSort,
   serializeMachineViewState,
 } from "~/lib/machines/view/state";
@@ -15,13 +14,15 @@ import type {
   MachineViewPresetId,
   MachineViewResult,
   MachineViewSavedViews,
-  MachineViewSavedViewSummary,
   MachineViewState,
 } from "~/lib/types";
 import { cn } from "~/lib/utils";
 import { MachineViewCompactList } from "./MachineViewCompactList";
 import { MachineViewTable } from "./MachineViewTable";
-import { MachineViewSavedViewsMenu } from "./MachineViewSavedViewsMenu";
+import {
+  MachineViewSavedViewsMenu,
+  type MachineViewSelectableView,
+} from "./MachineViewSavedViewsMenu";
 import { MachineViewToolbar } from "./MachineViewToolbar";
 import type { MachineSelectionHandler } from "./field-catalog";
 
@@ -119,12 +120,9 @@ export function MachineView({
     serverViewReference,
   ]);
 
-  function applySavedView(view: MachineViewSavedViewSummary | null): void {
-    const next = view
-      ? { ...view.state, page: 1 }
-      : getMachineViewPreset(preset).defaultState;
-    setSearchValue(next.q);
-    navigate(next, view?.id ?? MACHINE_VIEW_PRESET_REFERENCE);
+  function applyView(view: MachineViewSelectableView): void {
+    setSearchValue(view.state.q);
+    navigate({ ...view.state, page: 1 }, view.id);
   }
 
   function changeMobileMode(mode: "compact" | "table"): void {
@@ -168,7 +166,7 @@ export function MachineView({
                   state={state}
                   ownerIds={result.ownerOptions.map((owner) => owner.id)}
                   preset={preset}
-                  onApply={applySavedView}
+                  onApply={applyView}
                   onViewSaved={(viewId) => navigate(state, viewId)}
                 />
               )

@@ -37,6 +37,7 @@ export type { UnifiedUser, UserStatus, MachineOwner } from "./user";
 
 export {
   MACHINE_VIEW_FIELD_IDS,
+  type MachineViewBuiltInView,
   type MachineViewFieldId,
   type MachineViewHealth,
   type MachineViewOwnerOption,

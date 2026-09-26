@@ -35,24 +35,32 @@ import {
   createSavedMachineViewAction,
   deleteSavedMachineViewAction,
   renameSavedMachineViewAction,
-  setSavedMachineViewDefaultAction,
+  setMachineViewDefaultAction,
   updateSavedMachineViewAction,
 } from "~/app/(app)/m/saved-view-actions";
-import { getMachineViewPreset } from "~/lib/machines/view/config";
 import {
-  MACHINE_VIEW_PRESET_REFERENCE,
+  getMachineViewPreset,
+  MACHINE_VIEW_PAGE_PRESET_VIEW_ID,
+} from "~/lib/machines/view/config";
+import {
   machineViewSavedStatesEqual,
   toMachineViewSavedState,
 } from "~/lib/machines/view/state";
 import type {
   MachineViewPresetId,
+  MachineViewSavedState,
   MachineViewSavedViews,
   MachineViewSavedViewSummary,
   MachineViewState,
 } from "~/lib/types";
 import { cn } from "~/lib/utils";
 
-const PRESET_LABEL = "Built-in view";
+/** A Built-in or Saved View the menu can apply. */
+export interface MachineViewSelectableView {
+  id: string;
+  name: string;
+  state: MachineViewSavedState;
+}
 
 interface MachineViewSavedViewsMenuProps {
   /** Desktop renders the dropdown; mobile renders the bottom sheet. */
@@ -67,8 +75,8 @@ interface MachineViewSavedViewsMenuProps {
   /** Owner filter values valid in this scope (the loader drops the rest). */
   ownerIds: string[];
   preset: MachineViewPresetId;
-  /** Opens a Saved View, or the Page Preset for null (spec §8.6, §8.13). */
-  onApply: (view: MachineViewSavedViewSummary | null) => void;
+  /** Opens a Built-in or Saved View at page 1 (spec §8.6, §9.5). */
+  onApply: (view: MachineViewSelectableView) => void;
   /** Marks the current configuration as coming from `viewId` (§4.11). */
   onViewSaved: (viewId: string) => void;
 }
@@ -94,8 +102,17 @@ export function MachineViewSavedViewsMenu({
   const [isSaving, startSaving] = React.useTransition();
   const [saveError, setSaveError] = React.useState<string | null>(null);
 
-  const activeView =
+  const pagePresetView = savedViews.builtInViews.find(
+    (view) => view.id === MACHINE_VIEW_PAGE_PRESET_VIEW_ID[preset]
+  );
+  const activeSavedView =
     savedViews.views.find((view) => view.id === activeViewId) ?? null;
+  // No `view` reference means the Page Preset's configuration (spec §4.11).
+  const activeView =
+    activeSavedView ??
+    savedViews.builtInViews.find((view) => view.id === activeViewId) ??
+    pagePresetView ??
+    null;
   // A stored owner that no longer exists in this scope was dropped when the
   // view was applied (spec §8.15); it does not make the view read as edited.
   const baseline = activeView
@@ -109,14 +126,19 @@ export function MachineViewSavedViewsMenu({
     baseline,
     preset
   );
-  const label = activeView?.name ?? PRESET_LABEL;
+  const label = activeView?.name ?? "Views";
+
+  function closeSheet(after: () => void): void {
+    setSheetOpen(false);
+    after();
+  }
 
   function saveChanges(): void {
-    if (!activeView) return;
+    if (!activeSavedView) return;
     setSaveError(null);
     startSaving(async () => {
       const result = await updateSavedMachineViewAction({
-        id: activeView.id,
+        id: activeSavedView.id,
         state: toMachineViewSavedState(state),
       });
       if (!result.ok) {
@@ -127,63 +149,57 @@ export function MachineViewSavedViewsMenu({
     });
   }
 
-  const entries = (
+  const renderList = (
+    views: MachineViewSelectableView[],
     close: (after: () => void) => void,
     itemClassName: string
-  ): React.JSX.Element => (
-    <>
-      {[null, ...savedViews.views].map((view) => {
-        const isActive = view
-          ? view.id === activeView?.id
-          : activeView === null;
-        return (
-          <MenuEntry
-            key={view?.id ?? MACHINE_VIEW_PRESET_REFERENCE}
-            className={itemClassName}
-            onSelect={() => close(() => onApply(view))}
-            active={isActive}
-          >
-            <span className="truncate">{view?.name ?? PRESET_LABEL}</span>
-            {view?.isDefault ? (
-              <span className="ml-auto pl-3 text-xs text-muted-foreground">
-                Default
-              </span>
-            ) : null}
-          </MenuEntry>
-        );
-      })}
-    </>
-  );
+  ): React.JSX.Element[] =>
+    views.map((view) => (
+      <MenuEntry
+        key={view.id}
+        className={itemClassName}
+        onSelect={() => close(() => onApply(view))}
+        active={view.id === activeView?.id}
+      >
+        <span className="truncate">{view.name}</span>
+        {view.id === savedViews.defaultViewId ? (
+          <span className="ml-auto pl-3 text-xs text-muted-foreground">
+            Default
+          </span>
+        ) : null}
+      </MenuEntry>
+    ));
 
+  // Save changes applies only to Saved Views; Built-in Views never change
+  // (spec §8.7, §9.4, §9.5).
   const actions = (
     close: (after: () => void) => void,
     itemClassName: string
-  ): React.JSX.Element => (
-    <>
-      {activeView && edited ? (
+  ): React.JSX.Element | null =>
+    savedViews.canSave ? (
+      <>
+        {activeSavedView && edited ? (
+          <MenuEntry
+            className={cn(itemClassName, "font-semibold text-primary")}
+            onSelect={() => close(saveChanges)}
+          >
+            Save changes
+          </MenuEntry>
+        ) : null}
         <MenuEntry
-          className={cn(itemClassName, "font-semibold text-primary")}
-          onSelect={() => close(saveChanges)}
+          className={itemClassName}
+          onSelect={() => close(() => setSaveOpen(true))}
         >
-          Save changes
+          Save as new…
         </MenuEntry>
-      ) : null}
-      <MenuEntry
-        className={itemClassName}
-        onSelect={() => close(() => setSaveOpen(true))}
-      >
-        Save as new…
-      </MenuEntry>
-      {savedViews.views.length > 0 ? (
         <MenuEntry
           className={itemClassName}
           onSelect={() => close(() => setManageOpen(true))}
         >
           Manage views…
         </MenuEntry>
-      ) : null}
-    </>
-  );
+      </>
+    ) : null;
 
   const triggerContent = (
     <>
@@ -209,16 +225,23 @@ export function MachineViewSavedViewsMenu({
               variant="outline"
               size="sm"
               className="hidden h-8 max-w-72 gap-2 px-2.5 font-medium shadow-sm md:inline-flex"
-              aria-label={`Saved views: ${label}${edited ? ", edited" : ""}`}
+              aria-label={`Views: ${label}${edited ? ", edited" : ""}`}
               data-testid="machine-view-saved-views-trigger"
             >
               {triggerContent}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-72">
-            <DropdownMenuLabel>Saved views</DropdownMenuLabel>
-            {entries((after) => after(), "")}
-            <DropdownMenuSeparator />
+            <DropdownMenuLabel>Views</DropdownMenuLabel>
+            {renderList(savedViews.builtInViews, (after) => after(), "")}
+            {savedViews.views.length > 0 ? (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Saved views</DropdownMenuLabel>
+                {renderList(savedViews.views, (after) => after(), "")}
+              </>
+            ) : null}
+            {savedViews.canSave ? <DropdownMenuSeparator /> : null}
             {actions((after) => after(), "pl-8")}
           </DropdownMenuContent>
         </DropdownMenu>
@@ -229,7 +252,7 @@ export function MachineViewSavedViewsMenu({
               type="button"
               variant="outline"
               className="min-h-11 w-full justify-start gap-2 px-3 font-medium md:hidden"
-              aria-label={`Saved views: ${label}${edited ? ", edited" : ""}`}
+              aria-label={`Views: ${label}${edited ? ", edited" : ""}`}
               data-testid="machine-view-saved-views-mobile-trigger"
             >
               {triggerContent}
@@ -237,22 +260,35 @@ export function MachineViewSavedViewsMenu({
           </DrawerTrigger>
           <DrawerContent className="max-h-[85dvh] rounded-t-2xl">
             <DrawerHeader className="pb-1 text-left">
-              <DrawerTitle className="text-lg">Saved views</DrawerTitle>
+              <DrawerTitle className="text-lg">Views</DrawerTitle>
               <DrawerDescription className="sr-only">
                 Open, save, or manage your views of this list.
               </DrawerDescription>
             </DrawerHeader>
             <DropdownContext.Provider value={false}>
               <div className="flex flex-col gap-1 overflow-y-auto px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
-                {entries((after) => {
-                  setSheetOpen(false);
-                  after();
-                }, "min-h-12 text-base")}
-                <div className="my-1.5 h-px bg-outline-variant" />
-                {actions((after) => {
-                  setSheetOpen(false);
-                  after();
-                }, "min-h-12 pl-10 text-base")}
+                {renderList(
+                  savedViews.builtInViews,
+                  closeSheet,
+                  "min-h-12 text-base"
+                )}
+                {savedViews.views.length > 0 ? (
+                  <>
+                    <div className="my-1.5 h-px bg-outline-variant" />
+                    <p className="px-3 pt-1 text-xs font-semibold text-muted-foreground">
+                      Saved views
+                    </p>
+                    {renderList(
+                      savedViews.views,
+                      closeSheet,
+                      "min-h-12 text-base"
+                    )}
+                  </>
+                ) : null}
+                {savedViews.canSave ? (
+                  <div className="my-1.5 h-px bg-outline-variant" />
+                ) : null}
+                {actions(closeSheet, "min-h-12 pl-10 text-base")}
               </div>
             </DropdownContext.Provider>
           </DrawerContent>
@@ -280,7 +316,7 @@ export function MachineViewSavedViewsMenu({
       <ManageViewsDialog
         open={manageOpen}
         onOpenChange={setManageOpen}
-        views={savedViews.views}
+        savedViews={savedViews}
       />
     </>
   );
@@ -454,15 +490,18 @@ function SaveViewDialog({
   );
 }
 
-/** Rename, set or clear the default, and delete (spec §8.9, §8.14). */
+/**
+ * Choose the default among Built-in and Saved Views; rename or delete Saved
+ * Views (spec §8.9, §8.10, §8.14, §9.4).
+ */
 function ManageViewsDialog({
   open,
   onOpenChange,
-  views,
+  savedViews,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  views: MachineViewSavedViewSummary[];
+  savedViews: MachineViewSavedViews;
 }): React.JSX.Element {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -470,18 +509,36 @@ function ManageViewsDialog({
         <DialogHeader>
           <DialogTitle>Manage views</DialogTitle>
           <DialogDescription className="sr-only">
-            Rename, choose the default, or delete your saved views.
+            Choose the view this page opens with, and rename or delete your
+            saved views.
           </DialogDescription>
         </DialogHeader>
-        {views.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No saved views</p>
-        ) : (
+        <ul className="divide-y divide-outline-variant rounded-lg border border-outline-variant">
+          {savedViews.builtInViews.map((view) => (
+            <li key={view.id} className="flex items-center gap-2 p-2 pl-3">
+              <span className="min-w-0 flex-1 truncate text-sm text-foreground">
+                {view.name}
+              </span>
+              <DefaultToggle
+                savedViews={savedViews}
+                viewId={view.id}
+                viewName={view.name}
+                target={{ kind: "builtIn", id: view.id }}
+              />
+            </li>
+          ))}
+        </ul>
+        {savedViews.views.length > 0 ? (
           <ul className="divide-y divide-outline-variant rounded-lg border border-outline-variant">
-            {views.map((view) => (
-              <ManageViewRow key={view.id} view={view} />
+            {savedViews.views.map((view) => (
+              <ManageViewRow
+                key={view.id}
+                view={view}
+                savedViews={savedViews}
+              />
             ))}
           </ul>
-        )}
+        ) : null}
         <DialogFooter>
           <Button type="button" onClick={() => onOpenChange(false)}>
             Done
@@ -492,21 +549,17 @@ function ManageViewsDialog({
   );
 }
 
-function ManageViewRow({
-  view,
-}: {
-  view: MachineViewSavedViewSummary;
-}): React.JSX.Element {
+function useViewAction(): {
+  error: string | null;
+  setError: (error: string | null) => void;
+  isPending: boolean;
+  run: (
+    action: () => Promise<{ ok: true } | { ok: false; message: string }>
+  ) => void;
+} {
   const router = useRouter();
-  const [name, setName] = React.useState(view.name);
   const [error, setError] = React.useState<string | null>(null);
   const [isPending, startTransition] = React.useTransition();
-  const errorId = `machine-view-manage-error-${view.id}`;
-
-  React.useEffect(() => {
-    setName(view.name);
-  }, [view.name]);
-
   function run(
     action: () => Promise<{ ok: true } | { ok: false; message: string }>
   ): void {
@@ -520,6 +573,76 @@ function ManageViewRow({
       router.refresh();
     });
   }
+  return { error, setError, isPending, run };
+}
+
+/** Makes a view the Surface's default, or clears it (spec §8.10). */
+function DefaultToggle({
+  savedViews,
+  viewId,
+  viewName,
+  target,
+}: {
+  savedViews: MachineViewSavedViews;
+  viewId: string;
+  viewName: string;
+  target: { kind: "saved"; id: string } | { kind: "builtIn"; id: string };
+}): React.JSX.Element {
+  const { error, isPending, run } = useViewAction();
+  const isDefault = savedViews.defaultViewId === viewId;
+  return (
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={isPending}
+        aria-pressed={isDefault}
+        aria-label={
+          isDefault
+            ? `Stop opening ${viewName} by default`
+            : `Open ${viewName} by default`
+        }
+        onClick={() =>
+          run(() =>
+            setMachineViewDefaultAction({
+              surface: savedViews.surface,
+              target: isDefault ? null : target,
+            })
+          )
+        }
+        className={cn(
+          "h-9 shrink-0",
+          isDefault
+            ? "border-primary bg-primary/10 text-primary"
+            : "text-muted-foreground"
+        )}
+      >
+        {isDefault ? "Default" : "Make default"}
+      </Button>
+      {error ? (
+        <p role="alert" className="text-xs text-destructive-text">
+          {error}
+        </p>
+      ) : null}
+    </>
+  );
+}
+
+function ManageViewRow({
+  view,
+  savedViews,
+}: {
+  view: MachineViewSavedViewSummary;
+  savedViews: MachineViewSavedViews;
+}): React.JSX.Element {
+  const [name, setName] = React.useState(view.name);
+  const { error, setError, isPending, run } = useViewAction();
+  const errorId = `machine-view-manage-error-${view.id}`;
+
+  React.useEffect(() => {
+    setName(view.name);
+  }, [view.name]);
 
   function rename(): void {
     if (name.trim() === view.name) return;
@@ -554,33 +677,12 @@ function ManageViewRow({
           }}
           className="h-9 min-w-0 flex-1"
         />
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          aria-pressed={view.isDefault}
-          aria-label={
-            view.isDefault
-              ? `Stop opening ${view.name} by default`
-              : `Open ${view.name} by default`
-          }
-          onClick={() =>
-            run(() =>
-              setSavedMachineViewDefaultAction({
-                id: view.id,
-                isDefault: !view.isDefault,
-              })
-            )
-          }
-          className={cn(
-            "h-9 shrink-0",
-            view.isDefault
-              ? "border-primary bg-primary/10 text-primary"
-              : "text-muted-foreground"
-          )}
-        >
-          {view.isDefault ? "Default" : "Make default"}
-        </Button>
+        <DefaultToggle
+          savedViews={savedViews}
+          viewId={view.id}
+          viewName={view.name}
+          target={{ kind: "saved", id: view.id }}
+        />
         <Button
           type="button"
           variant="outline"

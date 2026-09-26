@@ -1098,7 +1098,6 @@ export const machineViewSavedViews = pgTable(
     ),
     name: text("name").notNull(),
     state: jsonb("state").$type<MachineViewSavedState>().notNull(),
-    isDefault: boolean("is_default").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -1125,20 +1124,70 @@ export const machineViewSavedViews = pgTable(
       sql`coalesce(${t.collectionId}, ${t.ownerCollectionUserId}, '00000000-0000-0000-0000-000000000000'::uuid)`,
       sql`lower(${t.name})`
     ),
-    // §8.10: at most one Default Saved View per account and Surface.
-    oneDefault: uniqueIndex("uq_machine_view_saved_views_default")
-      .on(
-        t.userId,
-        t.surface,
-        sql`coalesce(${t.collectionId}, ${t.ownerCollectionUserId}, '00000000-0000-0000-0000-000000000000'::uuid)`
-      )
-      .where(sql`${t.isDefault}`),
     collectionIdx: index("idx_machine_view_saved_views_collection").on(
       t.collectionId
     ),
     ownerCollectionIdx: index(
       "idx_machine_view_saved_views_owner_collection"
     ).on(t.ownerCollectionUserId),
+  })
+).enableRLS();
+
+/**
+ * An account's default view on one Surface (spec machine-views.md §8.10): one
+ * of its Saved Views or a Built-in View id (§9). Deleting the Saved View
+ * deletes the row, leaving the Surface without a default (§8.14).
+ */
+export const machineViewDefaults = pgTable(
+  "machine_view_defaults",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => userProfiles.id, { onDelete: "cascade" }),
+    surface: text("surface", {
+      enum: ["machines", "collection", "owner"],
+    }).notNull(),
+    collectionId: uuid("collection_id").references(() => collections.id, {
+      onDelete: "cascade",
+    }),
+    ownerCollectionUserId: uuid("owner_collection_user_id").references(
+      () => userProfiles.id,
+      { onDelete: "cascade" }
+    ),
+    savedViewId: uuid("saved_view_id").references(
+      () => machineViewSavedViews.id,
+      { onDelete: "cascade" }
+    ),
+    builtInViewId: text("built_in_view_id"),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    surfaceCheck: check(
+      "machine_view_defaults_surface_check",
+      sql`(${t.surface} = 'machines' AND ${t.collectionId} IS NULL AND ${t.ownerCollectionUserId} IS NULL)
+        OR (${t.surface} = 'collection' AND ${t.collectionId} IS NOT NULL AND ${t.ownerCollectionUserId} IS NULL)
+        OR (${t.surface} = 'owner' AND ${t.collectionId} IS NULL AND ${t.ownerCollectionUserId} IS NOT NULL)`
+    ),
+    targetCheck: check(
+      "machine_view_defaults_target_check",
+      sql`(${t.savedViewId} IS NULL) <> (${t.builtInViewId} IS NULL)`
+    ),
+    oneDefault: uniqueIndex("uq_machine_view_defaults_surface").on(
+      t.userId,
+      t.surface,
+      sql`coalesce(${t.collectionId}, ${t.ownerCollectionUserId}, '00000000-0000-0000-0000-000000000000'::uuid)`
+    ),
+    savedViewIdx: index("idx_machine_view_defaults_saved_view").on(
+      t.savedViewId
+    ),
+    collectionIdx: index("idx_machine_view_defaults_collection").on(
+      t.collectionId
+    ),
+    ownerCollectionIdx: index("idx_machine_view_defaults_owner_collection").on(
+      t.ownerCollectionUserId
+    ),
   })
 ).enableRLS();
 

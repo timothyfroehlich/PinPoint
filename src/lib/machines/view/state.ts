@@ -145,9 +145,9 @@ export function parseMachineViewState(
 
 /**
  * Serializes view state relative to the Page Preset (spec §4.3, §4.10). `view`
- * is the validated `view` reference (§4.11): an owned Saved View id or
- * {@link MACHINE_VIEW_PRESET_REFERENCE}; it is appended last and never changes
- * the other parameters.
+ * is the validated `view` reference (§4.11): an owned Saved View id or a
+ * Built-in View id; it is appended last and never changes the other
+ * parameters.
  */
 export function serializeMachineViewState(
   state: MachineViewState,
@@ -181,9 +181,6 @@ export function serializeMachineViewState(
 
   return params;
 }
-
-/** The `view` value that names the Page Preset (spec §4.11). */
-export const MACHINE_VIEW_PRESET_REFERENCE = "preset";
 
 const MACHINE_VIEW_CONFIGURATION_PARAMS = [
   "q",

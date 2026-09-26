@@ -1,6 +1,7 @@
 import type {
   MachineViewFieldId,
   MachineViewPresetId,
+  MachineViewSavedState,
   MachineViewSortDirection,
   MachineViewState,
 } from "~/lib/types";
@@ -137,6 +138,88 @@ export const MACHINE_VIEW_PRESETS: Record<
     },
   },
 };
+
+/**
+ * Built-in Views (spec machine-views.md §9): named configurations PinPoint
+ * defines for each Page Preset, the same for every viewer. Ids are stable URL
+ * `view` values; views that share a name share an id and appear in the same
+ * order on every Surface (§9.6). Exactly one per preset is the Page Preset.
+ */
+export interface MachineViewBuiltInViewDefinition {
+  id: string;
+  name: string;
+  state: MachineViewSavedState;
+}
+
+function builtIn(
+  presetId: MachineViewPresetId,
+  id: string,
+  name: string,
+  overrides: Partial<MachineViewSavedState>
+): MachineViewBuiltInViewDefinition {
+  const { page: _page, ...defaults } =
+    MACHINE_VIEW_PRESETS[presetId].defaultState;
+  return { id, name, state: { ...defaults, ...overrides } };
+}
+
+const NEEDS_ATTENTION: Partial<MachineViewSavedState> = {
+  presence: ["on_the_floor"],
+  status: ["needs_service", "unplayable"],
+  sort: "playability",
+  dir: "desc",
+};
+
+export const MACHINE_VIEW_BUILT_IN_VIEWS: Record<
+  MachineViewPresetId,
+  MachineViewBuiltInViewDefinition[]
+> = {
+  machines: [
+    builtIn("machines", "on-the-floor", "On the floor", {}),
+    builtIn("machines", "needs-attention", "Needs attention", NEEDS_ATTENTION),
+    builtIn("machines", "service-due", "Service due", {
+      presence: ["on_the_floor"],
+      sort: "lastServiced",
+      dir: "asc",
+    }),
+    builtIn("machines", "all-machines", "All machines", {
+      presence: "all",
+      columns: [...DEFAULT_COLUMNS, "presence"],
+    }),
+    builtIn("machines", "recently-added", "Recently added", {
+      presence: "all",
+      sort: "dateAdded",
+      dir: "desc",
+      columns: [...DEFAULT_COLUMNS, "presence", "dateAdded"],
+    }),
+  ],
+  collection: [
+    builtIn("collection", "on-the-floor", "On the floor", {
+      presence: ["on_the_floor"],
+    }),
+    builtIn(
+      "collection",
+      "needs-attention",
+      "Needs attention",
+      NEEDS_ATTENTION
+    ),
+    builtIn("collection", "all-machines", "All machines", {}),
+  ],
+};
+
+/** The Built-in View that is the Page Preset itself (spec §1, §9.1–§9.2). */
+export const MACHINE_VIEW_PAGE_PRESET_VIEW_ID: Record<
+  MachineViewPresetId,
+  string
+> = {
+  machines: "on-the-floor",
+  collection: "all-machines",
+};
+
+export function getMachineViewBuiltInViews(
+  presetId: MachineViewPresetId
+): MachineViewBuiltInViewDefinition[] {
+  return MACHINE_VIEW_BUILT_IN_VIEWS[presetId];
+}
 
 export function getMachineViewPreset(
   preset: MachineViewPresetId

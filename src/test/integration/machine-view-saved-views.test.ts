@@ -19,9 +19,10 @@ vi.mock("~/server/db", async () => {
 const {
   createSavedMachineView,
   deleteSavedMachineView,
+  getMachineViewDefault,
   listSavedMachineViews,
   renameSavedMachineView,
-  setSavedMachineViewDefault,
+  setMachineViewDefault,
   updateSavedMachineViewState,
 } = await import("~/lib/machines/view/saved-views");
 
@@ -160,56 +161,68 @@ describe("machine view saved views persistence", () => {
     expect(result).toMatchObject({ ok: false, code: "INVALID_NAME" });
   });
 
-  it("keeps at most one default per Surface", async () => {
+  it("keeps one default per Surface, a Saved View or a Built-in View", async () => {
     const db = asDbOrTx(await getTestDb());
-    const first = await create(
-      "First",
-      { surface: "machines" },
-      {
-        makeDefault: true,
-      }
-    );
-    const second = await create(
-      "Second",
-      { surface: "machines" },
-      {
-        makeDefault: true,
-      }
-    );
+    const machines = { surface: "machines" } as const;
+    const first = await create("First", machines, { makeDefault: true });
+    const second = await create("Second", machines, { makeDefault: true });
     const collectionDefault = await create(
       "Collection",
       { surface: "collection", collectionId },
       { makeDefault: true }
     );
 
-    const views = await listSavedMachineViews(db, userId, {
-      surface: "machines",
-    });
-    expect(
-      views.filter((view) => view.isDefault).map((view) => view.id)
-    ).toEqual([second]);
+    expect(await getMachineViewDefault(db, userId, machines)).toBe(second);
 
-    await setSavedMachineViewDefault(db, {
+    await setMachineViewDefault(db, {
       userId,
-      id: first,
-      isDefault: true,
+      key: machines,
+      target: { kind: "saved", id: first },
     });
-    const afterSwitch = await listSavedMachineViews(db, userId, {
-      surface: "machines",
+    expect(await getMachineViewDefault(db, userId, machines)).toBe(first);
+
+    await setMachineViewDefault(db, {
+      userId,
+      key: machines,
+      target: { kind: "builtIn", id: "needs-attention" },
     });
-    expect(
-      afterSwitch.filter((view) => view.isDefault).map((view) => view.id)
-    ).toEqual([first]);
+    expect(await getMachineViewDefault(db, userId, machines)).toBe(
+      "needs-attention"
+    );
 
     // Defaults on other Surfaces are independent (spec §8.10).
-    const [collectionView] = await listSavedMachineViews(db, userId, {
+    expect(
+      await getMachineViewDefault(db, userId, {
+        surface: "collection",
+        collectionId,
+      })
+    ).toBe(collectionDefault);
+
+    await setMachineViewDefault(db, { userId, key: machines, target: null });
+    expect(await getMachineViewDefault(db, userId, machines)).toBeNull();
+  });
+
+  it("refuses a Built-in View the Surface does not offer or another Surface's view", async () => {
+    const db = asDbOrTx(await getTestDb());
+    const collectionView = await create("In collection", {
       surface: "collection",
       collectionId,
     });
-    expect(collectionView).toMatchObject({
-      id: collectionDefault,
-      isDefault: true,
-    });
+
+    expect(
+      await setMachineViewDefault(db, {
+        userId,
+        key: { surface: "collection", collectionId },
+        target: { kind: "builtIn", id: "service-due" },
+      })
+    ).toMatchObject({ ok: false, code: "NOT_FOUND" });
+    expect(
+      await setMachineViewDefault(db, {
+        userId,
+        key: { surface: "machines" },
+        target: { kind: "saved", id: collectionView },
+      })
+    ).toMatchObject({ ok: false, code: "NOT_FOUND" });
   });
 
   it("leaves the Surface without a default when the default is deleted", async () => {
@@ -224,12 +237,13 @@ describe("machine view saved views persistence", () => {
     await create("Other");
 
     await deleteSavedMachineView(db, { userId, id: defaultId });
+    expect(
+      await getMachineViewDefault(db, userId, { surface: "machines" })
+    ).toBeNull();
     const views = await listSavedMachineViews(db, userId, {
       surface: "machines",
     });
-    expect(views.map((view) => [view.name, view.isDefault])).toEqual([
-      ["Other", false],
-    ]);
+    expect(views.map((view) => view.name)).toEqual(["Other"]);
   });
 
   it("only lets the owning account change a view", async () => {
@@ -251,10 +265,10 @@ describe("machine view saved views persistence", () => {
       })
     ).toMatchObject({ ok: false, code: "NOT_FOUND" });
     expect(
-      await setSavedMachineViewDefault(db, {
+      await setMachineViewDefault(db, {
         userId: otherUserId,
-        id,
-        isDefault: true,
+        key: { surface: "machines" },
+        target: { kind: "saved", id },
       })
     ).toMatchObject({ ok: false, code: "NOT_FOUND" });
     expect(
@@ -264,7 +278,10 @@ describe("machine view saved views persistence", () => {
     const [view] = await listSavedMachineViews(db, userId, {
       surface: "machines",
     });
-    expect(view).toMatchObject({ name: "Mine", isDefault: false, state });
+    expect(view).toMatchObject({ name: "Mine", state });
+    expect(
+      await getMachineViewDefault(db, otherUserId, { surface: "machines" })
+    ).toBeNull();
   });
 
   it("renames and saves changes for the owner", async () => {

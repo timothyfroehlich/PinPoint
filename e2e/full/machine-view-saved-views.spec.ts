@@ -26,16 +26,14 @@ test.describe("Machine View saved views", () => {
     await deleteTestUser(userId);
   });
 
-  test("a default view opens on a bare URL and the built-in view stays reachable", async ({
+  test("a default view opens on a bare URL and Built-in Views stay reachable", async ({
     page,
   }, testInfo) => {
     await loginAs(page, testInfo, { email, password });
 
     await page.goto("/m?status=unplayable");
-    const trigger = page.getByRole("button", { name: /^Saved views:/ });
-    await expect(trigger).toHaveAccessibleName(
-      "Saved views: Built-in view, edited"
-    );
+    const trigger = page.getByRole("button", { name: /^Views:/ });
+    await expect(trigger).toHaveAccessibleName("Views: On the floor, edited");
 
     await trigger.click();
     await page.getByText("Save as new…").click();
@@ -45,22 +43,22 @@ test.describe("Machine View saved views", () => {
     await dialog.getByRole("button", { name: "Save" }).click();
     await expect(dialog).toBeHidden();
     await expect(page).toHaveURL(/[?&]view=[0-9a-f-]{36}/);
-    await expect(trigger).toHaveAccessibleName("Saved views: Unplayable only");
+    await expect(trigger).toHaveAccessibleName("Views: Unplayable only");
 
     // A bare URL opens the default at its canonical URL (§8.11, §8.12).
     await page.goto("/m");
     await expect(page).toHaveURL(/status=unplayable/);
     await expect(page).toHaveURL(/[?&]view=[0-9a-f-]{36}/);
-    await expect(trigger).toHaveAccessibleName("Saved views: Unplayable only");
+    await expect(trigger).toHaveAccessibleName("Views: Unplayable only");
 
-    // The Page Preset stays reachable despite the default (§8.13).
+    // Built-in Views stay reachable despite the default (§8.13).
     await trigger.click();
-    await page.getByText("Built-in view", { exact: true }).click();
-    await expect(page).toHaveURL(/[?&]view=preset$/);
-    await expect(trigger).toHaveAccessibleName("Saved views: Built-in view");
+    await page.getByText("On the floor", { exact: true }).click();
+    await expect(page).toHaveURL(/[?&]view=on-the-floor$/);
+    await expect(trigger).toHaveAccessibleName("Views: On the floor");
 
     await page.reload();
-    await expect(page).toHaveURL(/[?&]view=preset$/);
-    await expect(trigger).toHaveAccessibleName("Saved views: Built-in view");
+    await expect(page).toHaveURL(/[?&]view=on-the-floor$/);
+    await expect(trigger).toHaveAccessibleName("Views: On the floor");
   });
 });

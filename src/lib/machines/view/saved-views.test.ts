@@ -12,10 +12,9 @@ const {
   toMachineViewSavedState,
 } = await import("./state");
 
-const defaultView: MachineViewSavedViewSummary = {
+const savedView: MachineViewSavedViewSummary = {
   id: "11111111-1111-4111-8111-111111111111",
-  name: "Needs attention",
-  isDefault: true,
+  name: "Broken machines",
   state: {
     q: "",
     presence: ["on_the_floor"],
@@ -27,63 +26,70 @@ const defaultView: MachineViewSavedViewSummary = {
     columns: ["machine", "playability", "openIssues", "lastServiced"],
   },
 };
-const otherView: MachineViewSavedViewSummary = {
-  ...defaultView,
-  id: "22222222-2222-4222-8222-222222222222",
-  name: "Other",
-  isDefault: false,
-};
 
 function resolve(
   query: string,
-  views: MachineViewSavedViewSummary[] = [defaultView, otherView]
+  defaultViewId: string | null = null,
+  preset: "machines" | "collection" = "machines"
 ): ReturnType<typeof resolveSavedMachineViewRequest> {
   return resolveSavedMachineViewRequest({
-    views,
-    preset: "machines",
+    views: [savedView],
+    defaultViewId,
+    preset,
     searchParams: new URLSearchParams(query),
     pathname: "/m",
   });
 }
 
 describe("saved view request resolution", () => {
-  it("opens the Default Saved View at its canonical URL for a bare URL", () => {
-    expect(resolve("")).toEqual({
-      activeViewId: defaultView.id,
-      redirectTo: `/m?status=needs_service%2Cunplayable&sort=playability&dir=desc&pageSize=50&view=${defaultView.id}`,
+  it("opens a default Saved View at its canonical URL for a bare URL", () => {
+    expect(resolve("", savedView.id)).toEqual({
+      activeViewId: savedView.id,
+      redirectTo: `/m?status=needs_service%2Cunplayable&sort=playability&dir=desc&pageSize=50&view=${savedView.id}`,
+    });
+  });
+
+  it("opens a default Built-in View at its canonical URL", () => {
+    expect(resolve("", "service-due")).toEqual({
+      activeViewId: "service-due",
+      redirectTo: "/m?sort=lastServiced&dir=asc&view=service-due",
+    });
+  });
+
+  it("needs no redirect when the default is the Page Preset", () => {
+    expect(resolve("", "on-the-floor")).toEqual({
+      activeViewId: "on-the-floor",
+      redirectTo: null,
     });
   });
 
   it("keeps the page when a URL carries only a page", () => {
-    expect(resolve("page=3").redirectTo).toMatch(/&page=3$/);
+    expect(resolve("page=3", savedView.id).redirectTo).toMatch(/&page=3$/);
   });
 
   it("opens the Page Preset for a bare URL without a default", () => {
-    expect(resolve("", [otherView])).toEqual({
+    expect(resolve("")).toEqual({ activeViewId: null, redirectTo: null });
+  });
+
+  it("opens any configured URL as written, ignoring the default", () => {
+    expect(resolve("status=unplayable", savedView.id)).toEqual({
       activeViewId: null,
       redirectTo: null,
     });
   });
 
-  it("opens any configured URL as written", () => {
-    expect(resolve("status=unplayable")).toEqual({
-      activeViewId: null,
-      redirectTo: null,
-    });
-  });
-
-  it("reaches the Page Preset through view=preset despite a default", () => {
-    expect(resolve("view=preset")).toEqual({
-      activeViewId: "preset",
-      redirectTo: null,
-    });
-  });
-
-  it("names an owned Saved View and ignores one the account does not own", () => {
-    expect(resolve(`view=${otherView.id}`).activeViewId).toBe(otherView.id);
+  it("names owned Saved Views and this preset's Built-in Views only", () => {
+    expect(resolve(`view=${savedView.id}`).activeViewId).toBe(savedView.id);
+    expect(resolve("view=needs-attention").activeViewId).toBe(
+      "needs-attention"
+    );
     expect(
-      resolve("view=33333333-3333-4333-8333-333333333333&status=unplayable")
-    ).toEqual({ activeViewId: null, redirectTo: null });
+      resolve("view=33333333-3333-4333-8333-333333333333").activeViewId
+    ).toBeNull();
+    // Service due is a Machines view; Collections do not offer it.
+    expect(
+      resolve("view=service-due", null, "collection").activeViewId
+    ).toBeNull();
   });
 });
 
@@ -100,15 +106,15 @@ describe("saved view URL helpers", () => {
   });
 
   it("appends the view reference without changing other parameters", () => {
-    const state = { ...defaultView.state, page: 2 };
+    const state = { ...savedView.state, page: 2 };
     const plain = serializeMachineViewState(state, "machines").toString();
     expect(
-      serializeMachineViewState(state, "machines", "preset").toString()
-    ).toBe(`${plain}&view=preset`);
+      serializeMachineViewState(state, "machines", "needs-attention").toString()
+    ).toBe(`${plain}&view=needs-attention`);
   });
 
   it("compares configurations without the page", () => {
-    const saved = defaultView.state;
+    const saved = savedView.state;
     expect(
       machineViewSavedStatesEqual(
         toMachineViewSavedState({ ...saved, page: 4 }),

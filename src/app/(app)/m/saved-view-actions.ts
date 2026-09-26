@@ -10,16 +10,16 @@ import {
   createSavedMachineView,
   deleteSavedMachineView,
   renameSavedMachineView,
-  setSavedMachineViewDefault,
+  setMachineViewDefault,
   findOwnedSavedMachineView,
+  presetForSurface,
   updateSavedMachineViewState,
   type SavedMachineViewError,
-  type SavedMachineViewSurfaceKey,
 } from "~/lib/machines/view/saved-views";
 import { isPgErrorCode } from "~/lib/db/postgres-errors";
 import { VALID_MACHINE_PRESENCE_STATUSES } from "~/lib/machines/presence";
 import { normalizeMachineViewSavedState } from "~/lib/machines/view/state";
-import { MACHINE_VIEW_FIELD_IDS, type MachineViewPresetId } from "~/lib/types";
+import { MACHINE_VIEW_FIELD_IDS } from "~/lib/types";
 import { db } from "~/server/db";
 import { resolveMachineViewSurface } from "./saved-view-surface";
 
@@ -49,10 +49,6 @@ const savedStateSchema = z.object({
   pageSize: z.union([z.literal(25), z.literal(50), z.literal(100)]),
   columns: z.array(z.enum(MACHINE_VIEW_FIELD_IDS)),
 });
-
-function presetFor(key: SavedMachineViewSurfaceKey): MachineViewPresetId {
-  return key.surface === "machines" ? "machines" : "collection";
-}
 
 /**
  * The name check runs before the write, so two concurrent saves of one name
@@ -119,7 +115,10 @@ const updateProtected = createProtectedAction({
     return updateSavedMachineViewState(db, {
       userId: user.id,
       id: owned.id,
-      state: normalizeMachineViewSavedState(input.state, presetFor(owned.key)),
+      state: normalizeMachineViewSavedState(
+        input.state,
+        presetForSurface(owned.key)
+      ),
     });
   },
 });
@@ -165,20 +164,43 @@ export async function deleteSavedMachineViewAction(
   return deleteProtected(id);
 }
 
-const defaultSchema = z.object({ id: z.uuid(), isDefault: z.boolean() });
-
-const defaultProtected = createProtectedAction({
-  actionName: "setSavedMachineViewDefaultAction",
-  schema: defaultSchema,
-  permission: "machines.views.save",
-  handler: async (input, { user }): Promise<SavedViewActionResult> =>
-    db.transaction((tx) =>
-      setSavedMachineViewDefault(tx, { userId: user.id, ...input })
-    ),
+const defaultSchema = z.object({
+  surface: surfaceSchema,
+  target: z
+    .discriminatedUnion("kind", [
+      z.object({ kind: z.literal("saved"), id: z.uuid() }),
+      z.object({ kind: z.literal("builtIn"), id: z.string().max(64) }),
+    ])
+    .nullable(),
 });
 
-export async function setSavedMachineViewDefaultAction(
+const defaultProtected = createProtectedAction({
+  actionName: "setMachineViewDefaultAction",
+  schema: defaultSchema,
+  permission: "machines.views.save",
+  handler: async (
+    input,
+    { user }
+  ): Promise<
+    ProtectedActionResult<{ id: string | null }, SavedMachineViewError>
+  > => {
+    const surface = await resolveMachineViewSurface(input.surface);
+    if (!surface) return err("NOT_FOUND", "View not found.");
+    return db.transaction((tx) =>
+      setMachineViewDefault(tx, {
+        userId: user.id,
+        key: surface.key,
+        target: input.target,
+      })
+    );
+  },
+});
+
+/** Set or clear the account's default on a Surface (spec §8.9, §8.10). */
+export async function setMachineViewDefaultAction(
   input: z.infer<typeof defaultSchema>
-): Promise<SavedViewActionResult> {
+): Promise<
+  ProtectedActionResult<{ id: string | null }, SavedMachineViewError>
+> {
   return defaultProtected(input);
 }

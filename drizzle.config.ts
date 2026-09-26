@@ -103,6 +103,7 @@ export default defineConfig({
     "collections",
     "collection_machines",
     "machine_view_saved_views",
+    "machine_view_defaults",
   ],
   schemaFilter: ["public"],
   verbose: true,

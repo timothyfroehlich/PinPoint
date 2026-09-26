@@ -2,7 +2,7 @@ import "server-only";
 
 import { and, asc, eq, isNull, ne, sql, type SQL } from "drizzle-orm";
 import type { DbTransaction } from "~/server/db";
-import { machineViewSavedViews } from "~/server/db/schema";
+import { machineViewDefaults, machineViewSavedViews } from "~/server/db/schema";
 import { err, ok, type Result } from "~/lib/result";
 import type {
   MachineViewPresetId,
@@ -10,8 +10,11 @@ import type {
   MachineViewSavedViewSummary,
 } from "~/lib/types";
 import {
+  getMachineViewBuiltInViews,
+  MACHINE_VIEW_PAGE_PRESET_VIEW_ID,
+} from "./config";
+import {
   hasMachineViewConfiguration,
-  MACHINE_VIEW_PRESET_REFERENCE,
   savedMachineViewSearchParams,
   type MachineViewSearchParams,
 } from "./state";
@@ -28,8 +31,23 @@ export type SavedMachineViewSurfaceKey =
 /** Longest Saved View name accepted. */
 export const SAVED_MACHINE_VIEW_NAME_MAX = 60;
 
+type SurfaceColumns = Pick<
+  typeof machineViewSavedViews | typeof machineViewDefaults,
+  "surface" | "collectionId" | "ownerCollectionUserId"
+>;
+
 function surfaceWhere(key: SavedMachineViewSurfaceKey): SQL | undefined {
-  const t = machineViewSavedViews;
+  return surfaceWhereOn(machineViewSavedViews, key);
+}
+
+function defaultSurfaceWhere(key: SavedMachineViewSurfaceKey): SQL | undefined {
+  return surfaceWhereOn(machineViewDefaults, key);
+}
+
+function surfaceWhereOn(
+  t: SurfaceColumns,
+  key: SavedMachineViewSurfaceKey
+): SQL | undefined {
   switch (key.surface) {
     case "machines":
       return and(
@@ -88,12 +106,26 @@ export async function listSavedMachineViews(
     .select({
       id: t.id,
       name: t.name,
-      isDefault: t.isDefault,
       state: t.state,
     })
     .from(t)
     .where(and(eq(t.userId, userId), surfaceWhere(key)))
     .orderBy(asc(sql`lower(${t.name})`), asc(t.id));
+}
+
+/** The account's default on one Surface (spec §8.10), or null. */
+export async function getMachineViewDefault(
+  tx: DbTransaction,
+  userId: string,
+  key: SavedMachineViewSurfaceKey
+): Promise<string | null> {
+  const d = machineViewDefaults;
+  const [row] = await tx
+    .select({ savedViewId: d.savedViewId, builtInViewId: d.builtInViewId })
+    .from(d)
+    .where(and(eq(d.userId, userId), defaultSurfaceWhere(key)))
+    .limit(1);
+  return row?.savedViewId ?? row?.builtInViewId ?? null;
 }
 
 export interface SavedMachineViewRequest {
@@ -104,25 +136,42 @@ export interface SavedMachineViewRequest {
 }
 
 /**
- * Decides how a Surface URL relates to the account's Saved Views. A URL with
- * no view configuration other than `page` opens the Default Saved View at its
- * canonical URL (spec §8.11, §8.12); any other URL opens as written, and a
- * `view` naming a Saved View the account does not own is ignored (§4.11).
+ * Decides how a Surface URL relates to the viewer's views. A URL with no view
+ * configuration other than `page` opens the account's default at its
+ * canonical URL (spec §8.11, §8.12); any other URL opens as written. `view`
+ * is kept only when it names an owned Saved View or one of this preset's
+ * Built-in Views (§4.11).
  */
 export function resolveSavedMachineViewRequest({
   views,
+  defaultViewId,
   preset,
   searchParams,
   pathname,
 }: {
   views: MachineViewSavedViewSummary[];
+  defaultViewId: string | null;
   preset: MachineViewPresetId;
   searchParams: MachineViewSearchParams;
   pathname: string;
 }): SavedMachineViewRequest {
+  const builtIns = getMachineViewBuiltInViews(preset);
+  const find = (
+    id: string | null
+  ): { id: string; state: MachineViewSavedState } | null =>
+    id === null
+      ? null
+      : (views.find((view) => view.id === id) ??
+        builtIns.find((view) => view.id === id) ??
+        null);
+
   if (!hasMachineViewConfiguration(searchParams)) {
-    const defaultView = views.find((view) => view.isDefault);
+    const defaultView = find(defaultViewId);
     if (!defaultView) return { activeViewId: null, redirectTo: null };
+    // The Page Preset needs no redirect: the bare URL already shows it.
+    if (defaultView.id === MACHINE_VIEW_PAGE_PRESET_VIEW_ID[preset]) {
+      return { activeViewId: defaultView.id, redirectTo: null };
+    }
     const params = savedMachineViewSearchParams(
       defaultView.state,
       preset,
@@ -135,12 +184,10 @@ export function resolveSavedMachineViewRequest({
       redirectTo: `${pathname}?${params.toString()}`,
     };
   }
-  const requested = searchParams.get("view");
-  if (requested === MACHINE_VIEW_PRESET_REFERENCE) {
-    return { activeViewId: MACHINE_VIEW_PRESET_REFERENCE, redirectTo: null };
-  }
-  const owned = views.find((view) => view.id === requested);
-  return { activeViewId: owned?.id ?? null, redirectTo: null };
+  return {
+    activeViewId: find(searchParams.get("view"))?.id ?? null,
+    redirectTo: null,
+  };
 }
 
 export type SavedMachineViewError = "NOT_FOUND" | "NAME_TAKEN" | "INVALID_NAME";
@@ -174,18 +221,6 @@ async function nameTaken(
     )
     .limit(1);
   return rows.length > 0;
-}
-
-async function clearDefault(
-  tx: DbTransaction,
-  userId: string,
-  key: SavedMachineViewSurfaceKey
-): Promise<void> {
-  const t = machineViewSavedViews;
-  await tx
-    .update(t)
-    .set({ isDefault: false, updatedAt: new Date() })
-    .where(and(eq(t.userId, userId), surfaceWhere(key), eq(t.isDefault, true)));
 }
 
 /** An account's own Saved View and its Surface, or null. */
@@ -240,7 +275,6 @@ export async function createSavedMachineView(
   if (await nameTaken(tx, input.userId, input.key, name, null)) {
     return err("NAME_TAKEN", "A view with this name already exists");
   }
-  if (input.makeDefault) await clearDefault(tx, input.userId, input.key);
   const [row] = await tx
     .insert(machineViewSavedViews)
     .values({
@@ -248,10 +282,16 @@ export async function createSavedMachineView(
       ...surfaceColumns(input.key),
       name,
       state: input.state,
-      isDefault: input.makeDefault,
     })
     .returning({ id: machineViewSavedViews.id });
   if (!row) throw new Error("Saved view insert returned no row");
+  if (input.makeDefault) {
+    await setMachineViewDefault(tx, {
+      userId: input.userId,
+      key: input.key,
+      target: { kind: "saved", id: row.id },
+    });
+  }
   return ok({ id: row.id });
 }
 
@@ -291,8 +331,8 @@ export async function renameSavedMachineView(
 }
 
 /**
- * Delete (spec §8.9). Deleting the Default Saved View leaves the Surface
- * without one (§8.14); no other view is promoted.
+ * Delete (spec §8.9). Deleting the Default Saved View deletes its default row,
+ * leaving the Surface without one (§8.14); no other view is promoted.
  */
 export async function deleteSavedMachineView(
   tx: DbTransaction,
@@ -307,18 +347,67 @@ export async function deleteSavedMachineView(
   return ok({ id: input.id });
 }
 
-/** Set or clear the Default Saved View (spec §8.9, §8.10). */
-export async function setSavedMachineViewDefault(
+export type MachineViewDefaultTarget =
+  { kind: "saved"; id: string } | { kind: "builtIn"; id: string } | null;
+
+/**
+ * Sets the account's default on a Surface to one of its Saved Views or one of
+ * the Surface preset's Built-in Views, or clears it with null (spec §8.9,
+ * §8.10). A Saved View must be the account's own and on the same Surface.
+ */
+export async function setMachineViewDefault(
   tx: DbTransaction,
-  input: { userId: string; id: string; isDefault: boolean }
-): Promise<Result<{ id: string }, SavedMachineViewError>> {
-  const owned = await findOwnedSavedMachineView(tx, input.userId, input.id);
-  if (!owned) return err("NOT_FOUND", "View not found.");
-  const t = machineViewSavedViews;
-  if (input.isDefault) await clearDefault(tx, input.userId, owned.key);
+  input: {
+    userId: string;
+    key: SavedMachineViewSurfaceKey;
+    target: MachineViewDefaultTarget;
+  }
+): Promise<Result<{ id: string | null }, SavedMachineViewError>> {
+  const { target } = input;
+  if (target?.kind === "saved") {
+    const owned = await findOwnedSavedMachineView(tx, input.userId, target.id);
+    if (!owned || !sameSurface(owned.key, input.key)) {
+      return err("NOT_FOUND", "View not found.");
+    }
+  }
+  if (
+    target?.kind === "builtIn" &&
+    !getMachineViewBuiltInViews(presetForSurface(input.key)).some(
+      (view) => view.id === target.id
+    )
+  ) {
+    return err("NOT_FOUND", "View not found.");
+  }
+  const d = machineViewDefaults;
   await tx
-    .update(t)
-    .set({ isDefault: input.isDefault, updatedAt: new Date() })
-    .where(and(eq(t.id, owned.id), eq(t.userId, input.userId)));
-  return ok({ id: owned.id });
+    .delete(d)
+    .where(and(eq(d.userId, input.userId), defaultSurfaceWhere(input.key)));
+  if (target === null) return ok({ id: null });
+  await tx.insert(d).values({
+    userId: input.userId,
+    ...surfaceColumns(input.key),
+    savedViewId: target.kind === "saved" ? target.id : null,
+    builtInViewId: target.kind === "builtIn" ? target.id : null,
+  });
+  return ok({ id: target.id });
+}
+
+/** The Page Preset a Surface uses (spec §2.3). */
+export function presetForSurface(
+  key: SavedMachineViewSurfaceKey
+): MachineViewPresetId {
+  return key.surface === "machines" ? "machines" : "collection";
+}
+
+function sameSurface(
+  left: SavedMachineViewSurfaceKey,
+  right: SavedMachineViewSurfaceKey
+): boolean {
+  const a = surfaceColumns(left);
+  const b = surfaceColumns(right);
+  return (
+    a.surface === b.surface &&
+    a.collectionId === b.collectionId &&
+    a.ownerCollectionUserId === b.ownerCollectionUserId
+  );
 }
