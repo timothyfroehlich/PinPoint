@@ -77,7 +77,7 @@ If you’re changing code, **start here**:
 
 ### Prerequisites
 
-- [mise](https://mise.jdx.dev/) **2026.8.11+**
+- [mise](https://mise.jdx.dev/) **2026.9.5+**
 - A Docker-compatible container runtime for the local Supabase stack
 - GNU parallel for the host-wide `pnpm run preflight` concurrency cap
 - A Supabase account only for preview or production administration
