@@ -775,6 +775,40 @@ jobs:
           cp playwright-report/results-smoke.json e2e-verdicts/ 2>/dev/null || \
             echo "no smoke report to preserve"
 
+      # When the Smoke step hits its timeout-minutes, GitHub kills the
+      # Playwright runner but not its webServer: `next dev` is spawned in its
+      # own process group and survives, still bound to :3000. Full's webServer
+      # then refuses to start ("http://localhost:3000/api/health is already
+      # used") and reports zero specs, so one systemic Smoke failure hid the
+      # entire Full verdict (run 36071532799, PP-2fuv). A clean Smoke run tears
+      # its own server down, which makes this a no-op on the green path.
+      #
+      # Scoped to whatever is LISTENING on the port — not a process-name kill.
+      # continue-on-error so a cleanup problem cannot skip Full: if the port is
+      # still held, Full fails on its own and the Full evaluate reports it.
+      # Smoke's verdict is untouched either way: a timed-out Smoke leaves no
+      # results-smoke.json, which its evaluate step already treats as a failure.
+      - name: Free the Smoke web server port
+        if: always()
+        continue-on-error: true
+        run: |
+          port="${PORT:-3000}"
+          for attempt in 1 2 3 4 5; do
+            # iproute2's `ss` ships on every Ubuntu runner (lsof is not guaranteed).
+            pids=$(ss -Hltnp "sport = :$port" | grep -o 'pid=[0-9]*' | cut -d= -f2 | sort -u || true)
+            if [ -z "$pids" ]; then
+              echo "port $port is free"
+              exit 0
+            fi
+            echo "attempt $attempt: stopping listener(s) on :$port: $pids"
+            # shellcheck disable=SC2086  # word-split the PID list on purpose
+            if [ "$attempt" -lt 3 ]; then kill $pids || true; else kill -9 $pids || true; fi
+            sleep 2
+          done
+          echo "::error::port $port is still held after cleanup; the Full run will not get a clean web server."
+          ss -Hltnp "sport = :$port" || true
+          exit 1
+
       # Both evaluate steps are continue-on-error so that a gating Smoke
       # failure does not abort the job before Full ever runs. Letting the
       # script's `exit 1` end the step here would mean one red smoke spec
