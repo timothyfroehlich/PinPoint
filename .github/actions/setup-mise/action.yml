@@ -38,7 +38,7 @@ runs:
     - name: Install mise-managed tools
       uses: jdx/mise-action@3c2e0cf82a5b2e5249f0d3635a4d83d0ae861518  # ratchet:jdx/mise-action@v4.2.5
       with:
-        version: "2026.9.13"
+        version: "2026.9.5"
         install_args: ${{ inputs.install-args }}
         working_directory: ${{ inputs.working-directory }}
         cache: true

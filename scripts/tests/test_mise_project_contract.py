@@ -6,7 +6,7 @@ Verifies that:
 3. mise.toml does not duplicate the pnpm version (idiomatic_version_file_enable_tools is used).
 4. mise.lock exists and captures resolved artifacts across platforms.
 5. mise rejects mismatched packageManager checksum suffixes (negative test).
-6. mise meets the minimum version requirement (>= 2026.9.13).
+6. mise meets the minimum version requirement (>= 2026.9.5).
 7. CI's required mise-only canary validates the locked toolchain and cache identity (PP-h2ui.8).
 8. CI and preview workflows use the shared mise setup without legacy setup actions (PP-h2ui.9).
 """
@@ -310,8 +310,8 @@ def test_mise_toml_exists_and_is_valid() -> None:
     data = tomllib.loads(MISE_TOML_PATH.read_text(encoding="utf-8"))
 
     # Top-level min_version must be enforced
-    assert data.get("min_version") == "2026.9.13", (
-        f"mise.toml must enforce min_version = '2026.9.13', got {data.get('min_version')!r}"
+    assert data.get("min_version") == "2026.9.5", (
+        f"mise.toml must enforce min_version = '2026.9.5', got {data.get('min_version')!r}"
     )
 
     # Managed development runtimes must remain exact pins. Their current values
@@ -674,7 +674,7 @@ def test_negative_checksum_mismatch_rejected(tmp_path: Path) -> None:
     # Create an isolated sandbox with mise.toml and a package.json with a bad sha512
     test_mise_toml = tmp_path / "mise.toml"
     test_mise_toml.write_text(
-        'min_version = "2026.9.13"\n\n'
+        'min_version = "2026.9.5"\n\n'
         f'[tools]\nnode = "{node_version}"\n\n'
         '[settings]\nidiomatic_version_file_enable_tools = ["pnpm"]\n',
         encoding="utf-8",
