@@ -26,8 +26,8 @@ import { getTopScoresForMachine } from "~/lib/iscored";
 import { TopScoresCard } from "~/components/machines/TopScoresCard";
 import { InfoHero } from "./info-hero";
 import { InfoRail } from "./info-rail";
-import { manufacturerTagHref } from "~/lib/machines/manufacturer";
-import { getManufacturerTagForMachine } from "~/lib/tags/manufacturer";
+import { getTagsForMachine } from "~/lib/tags/tags";
+import { tagHref } from "~/lib/tags/types";
 
 /**
  * Machine Info Tab (default route for /m/[initials]/) — the QR-scanning
@@ -192,11 +192,11 @@ export default async function MachineInfoTab({
   // tab layout and the route-level deep-link guard.
   const canOpenManage = canAccessMachineManage(accessLevel, ownershipContext);
 
-  const [topScores, manufacturerTag] = await Promise.all([
+  const [topScores, tags] = await Promise.all([
     machine.iscoredGameId
       ? getTopScoresForMachine(machine.iscoredGameId, 3)
       : Promise.resolve([]),
-    getManufacturerTagForMachine(undefined, machine.id),
+    getTagsForMachine(db, machine.id),
   ]);
 
   const rail = (
@@ -206,14 +206,10 @@ export default async function MachineInfoTab({
       addedAt={machine.createdAt}
       modelName={modelName}
       manufacturer={machine.currentManufacturer}
-      manufacturerTag={
-        manufacturerTag
-          ? {
-              name: manufacturerTag.name,
-              href: manufacturerTagHref(manufacturerTag.slug),
-            }
-          : null
-      }
+      tags={tags.map((tag) => ({
+        name: tag.name,
+        href: tagHref(tag.type, tag.slug),
+      }))}
       year={machine.year}
       topScoresSlot={
         <TopScoresCard

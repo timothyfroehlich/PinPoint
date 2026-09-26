@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   getCurrentManufacturer,
   groupManufacturerTags,
-  manufacturerTagHref,
   manufacturerTagKey,
 } from "./manufacturer";
 
@@ -113,9 +112,5 @@ describe("manufacturer tag groups", () => {
       { slug: "stern-electronics", ids: ["space"] },
       { slug: "stern-electronics-2", ids: ["hyphen"] },
     ]);
-  });
-
-  it("links a tag's page by its URL-encoded address", () => {
-    expect(manufacturerTagHref("a&b")).toBe("/c/tags/manufacturer/a%26b");
   });
 });

@@ -5,9 +5,8 @@ import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
 import { AutomaticBadge } from "~/components/tags/AutomaticBadge";
 import { TagList } from "~/components/tags/TagList";
-import { manufacturerTagHref } from "~/lib/machines/manufacturer";
-import { listManufacturerTags } from "~/lib/tags/manufacturer";
-import { MANUFACTURER_TAG_TYPE } from "~/lib/tags/types";
+import { listTags } from "~/lib/tags/tags";
+import { TAG_TYPE_IDS, TAG_TYPES, tagHref } from "~/lib/tags/types";
 
 export const metadata: Metadata = {
   title: "Tags | PinPoint",
@@ -15,38 +14,44 @@ export const metadata: Metadata = {
 
 /** Public tag browse, grouped by tag type (spec collections-and-tags 7.3). */
 export default async function TagsPage(): Promise<React.JSX.Element> {
-  const manufacturers = await listManufacturerTags();
+  const tags = await listTags();
+  const types = TAG_TYPE_IDS.filter((type) => tags[type].length > 0);
 
   return (
     <PageContainer size="standard">
       <div className="space-y-6">
         <PageHeader title="Tags" />
-        {manufacturers.length === 0 ? (
+        {types.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
             No tags yet
           </p>
         ) : (
-          <section aria-labelledby="manufacturer-tags-heading">
-            <h2
-              id="manufacturer-tags-heading"
-              className="mb-2 flex items-center gap-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-            >
-              <Link
-                href={MANUFACTURER_TAG_TYPE.href}
-                className="text-primary hover:underline"
-              >
-                {MANUFACTURER_TAG_TYPE.label}
-              </Link>
-              {MANUFACTURER_TAG_TYPE.automatic ? <AutomaticBadge /> : null}
-            </h2>
-            <TagList
-              tags={manufacturers.map((tag) => ({
-                href: manufacturerTagHref(tag.slug),
-                name: tag.name,
-                machineCount: tag.machines.length,
-              }))}
-            />
-          </section>
+          types.map((type) => {
+            const info = TAG_TYPES[type];
+            return (
+              <section key={type} aria-labelledby={`${type}-tags-heading`}>
+                <h2
+                  id={`${type}-tags-heading`}
+                  className="mb-2 flex items-center gap-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                >
+                  <Link
+                    href={info.href}
+                    className="text-primary hover:underline"
+                  >
+                    {info.label}
+                  </Link>
+                  {info.automatic ? <AutomaticBadge /> : null}
+                </h2>
+                <TagList
+                  tags={tags[type].map((tag) => ({
+                    href: tagHref(tag.type, tag.slug),
+                    name: tag.name,
+                    machineCount: tag.machines.length,
+                  }))}
+                />
+              </section>
+            );
+          })
         )}
       </div>
     </PageContainer>
