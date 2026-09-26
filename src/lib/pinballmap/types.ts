@@ -146,6 +146,12 @@ export interface CatalogMachine {
    * endpoint (`fetchMachineGroups`), not this record.
    */
   machineGroupId: number | null;
+  /**
+   * PBM's `ic_eligible`: whether the title can carry Insider Connected at all.
+   * PBM refuses `ic_toggle` for any other title. Absent or non-boolean reads as
+   * false, so nothing is offered on a title PBM would refuse (spec 3.8).
+   */
+  icEligible: boolean;
 }
 
 /** A PBM machine group — a "family" name shared by editions of one title. */
@@ -203,12 +209,10 @@ export type PbmWriteResult = { ok: true } | PbmWriteFailure;
 export type PbmAddMachineResult = { ok: true; lmxId: number } | PbmWriteFailure;
 
 /**
- * `toggleInsiderConnected` returns the *new* IC state PBM reports after the
- * toggle. The endpoint flips state — it is not a setter — so callers that want a
- * specific state must compare the snapshot's `icEnabled` and only toggle when it
- * differs. `null` means PBM returned no IC state for the lmx.
+ * `setInsiderConnected` returns the IC state PBM reports after the write. `null`
+ * means PBM's response carried no IC state for the lmx.
  */
-export type PbmToggleResult =
+export type PbmInsiderConnectedResult =
   { ok: true; icEnabled: boolean | null } | PbmWriteFailure;
 
 /** Result of exchanging a login+password for an API token (bead F). */
@@ -276,14 +280,15 @@ export interface PinballMapClient {
     comment: string;
   }): Promise<PbmWriteResult>;
   /**
-   * Toggle Insider Connected for an lmx and return the new state. PBM's endpoint
-   * flips state rather than setting it, so this takes no desired value; callers
-   * wanting a specific state compare the snapshot first.
+   * Set Insider Connected for an lmx to `enabled` and return the resulting state.
+   * Always sends the target value: PBM's `ic_toggle` flips when given no state
+   * param, and a flip from a stale view inverts the setting (spec 3.8).
    */
-  toggleInsiderConnected(input: {
+  setInsiderConnected(input: {
     credentials: PbmCredentials;
     lmxId: number;
-  }): Promise<PbmToggleResult>;
+    enabled: boolean;
+  }): Promise<PbmInsiderConnectedResult>;
   /** Confirm the location's lineup is accurate as of today (no mutation). */
   confirmLineup(input: {
     credentials: PbmCredentials;
