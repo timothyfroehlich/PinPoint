@@ -100,7 +100,7 @@ export function getSmartBadgeLabel(selectedStatuses: IssueStatus[]): string {
 /**
  * Produce the standardized assignee ordering for dropdown/listbox display.
  *
- * Pattern (from 03-patterns.md):
+ * Pattern (see .agents/skills/pinpoint-ui/references/filter-conventions.md):
  *   Me (current user) -> Unassigned -> separator -> alphabetical users
  *
  * When `currentUserId` is null, the "Me" entry is omitted.
@@ -158,7 +158,7 @@ export function getAssigneeOrdering<T extends { id: string; name: string }>(
 /**
  * Produce the standardized machine quick-select ordering for dropdown display.
  *
- * Pattern (from 03-patterns.md):
+ * Pattern (see .agents/skills/pinpoint-ui/references/filter-conventions.md):
  *   "My machines" quick-toggle -> separator -> alphabetical machines
  *
  * When `currentUserId` is null or the user owns no machines, the quick-select

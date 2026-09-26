@@ -44,8 +44,9 @@ status chips; any status not covered by a fully-selected group gets its own chip
 
 ## Quick-selects
 
-Two current-user quick-selects exist, with **fixed label strings** — reuse them
-exactly, never invent "Mine" / "My games":
+Two current-user quick-selects exist. Their exact label strings ("Me",
+"My machines") and the reuse-these-strings rule are owned by `key-files.md`
+§ Label Standards; this section covers the **wiring**.
 
 - **"Me"** (and "Unassigned", a sentinel) — injected as the first options of the
   Assignee and Reporter dropdowns by `getAssigneeOrdering` in `filter-utils.ts`.
@@ -67,9 +68,10 @@ exactly, never invent "Mine" / "My games":
   mobile filter tree. (The orphaned `getSmartBadgeLabel` /
   `getMachineQuickSelectOrdering` helpers are leftovers from it.)
 - **CSS-only responsiveness.** Both bars adapt with Tailwind viewport utilities;
-  `md:` (768px) is the mobile/desktop pivot. No JavaScript viewport detection
-  (`useMediaQuery` / `matchMedia`) — this is the design-bible §4 responsive rule,
-  and it is exactly why a re-styling-only `MobileFilterBar` was rejected.
+  `md:` (768px) is the mobile/desktop pivot. The filter bars use no JavaScript
+  viewport detection (`useMediaQuery` / `matchMedia`) — the design-bible §4
+  responsive rule (which sanctions only a couple of narrow exceptions elsewhere
+  in the app), and exactly why a re-styling-only `MobileFilterBar` was rejected.
 - **Chips wrap and keep an always-visible ✕.** Touch has no hover, and narrow
   viewports can't spill the chip row off-screen — so removal affordances are
   always shown, not hover-revealed.
