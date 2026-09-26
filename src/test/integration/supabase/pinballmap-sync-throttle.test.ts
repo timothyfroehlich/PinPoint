@@ -55,7 +55,7 @@ const REFILL_MS = 3 * 60 * 1000;
  * drag in `server-only` plus a PinballMap fetch; the SQL is what is under test,
  * so keep this identical to `stampSyncAttempt` in `src/lib/pinballmap/state.ts`.
  */
-const ELAPSED_PERIODS = sql`floor(extract(epoch from (now() - ${pinballmapState.refreshTokensAt})) * 1000 / ${REFILL_MS})`;
+const ELAPSED_PERIODS = sql`greatest(0, floor(extract(epoch from (now() - ${pinballmapState.refreshTokensAt})) * 1000 / ${REFILL_MS}))`;
 const AVAILABLE_TOKENS = sql`least(${BURST}, ${pinballmapState.refreshTokens} + ${ELAPSED_PERIODS})`;
 
 async function claim(attemptAt: Date): Promise<boolean> {
@@ -75,7 +75,10 @@ async function claim(attemptAt: Date): Promise<boolean> {
         lastSyncAttemptAt: attemptAt,
         updatedAt: attemptAt,
         refreshTokens: sql`${AVAILABLE_TOKENS} - 1`,
-        refreshTokensAt: sql`${pinballmapState.refreshTokensAt} + (interval '1 millisecond' * ${REFILL_MS} * ${ELAPSED_PERIODS})`,
+        refreshTokensAt: sql`CASE
+          WHEN ${AVAILABLE_TOKENS} >= ${BURST} THEN now()
+          ELSE ${pinballmapState.refreshTokensAt} + (interval '1 millisecond' * ${REFILL_MS} * ${ELAPSED_PERIODS})
+        END`,
       },
       setWhere: sql`${AVAILABLE_TOKENS} >= 1`,
     })
@@ -169,7 +172,7 @@ describe("manual-refresh token bucket (real postgres.js driver)", () => {
   it("never refills past the burst ceiling, however long it has been idle", async () => {
     // `least()` doing its job. Without it, a day of quiet would bank 480 tokens
     // and the sustained-rate commitment (CORE-PBM-001) would mean nothing.
-    await setBucket(0, new Date(Date.now() - 24 * 60 * 60 * 1000));
+    await setBucket(0, new Date(Date.now() - 24 * 60 * 60 * 1000 - 1000));
 
     for (let i = 0; i < BURST; i++) {
       await expect(claim(new Date())).resolves.toBe(true);
