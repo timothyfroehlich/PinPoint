@@ -27,6 +27,10 @@ These are the canonical pattern sources. Read these files to understand PinPoint
 
 ### Status & Filter System
 
+For the conventions these files embody — the status-group model, smart-badge
+grouping, "Me" / "My machines" quick-selects, and the CSS-only mobile approach —
+read `filter-conventions.md`.
+
 | File                                            | What It Teaches                                                                     |
 | :---------------------------------------------- | :---------------------------------------------------------------------------------- |
 | `src/lib/issues/status.ts`                      | STATUS_CONFIG, STATUS_GROUPS, the status color system. Single source of truth.      |

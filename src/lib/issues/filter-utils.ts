@@ -2,8 +2,8 @@
  * Shared filter utilities for issue and machine filtering.
  *
  * These functions extract reusable logic from IssueFilters.tsx and follow
- * the canonical patterns defined in docs/design-consistency/03-patterns.md.
- * They are designed to be shared between desktop and mobile filter UIs.
+ * the canonical filter-bar conventions in
+ * .agents/skills/pinpoint-ui/references/filter-conventions.md.
  */
 
 import {
