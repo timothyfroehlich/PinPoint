@@ -13,11 +13,15 @@ export const BLOB_CONFIG = {
     CROPPED_IMAGE_QUALITY: 0.95, // Higher quality for detail shots
   },
 
-  // Upload limits
+  // Upload limits (per-entity, not lifetime per-user quotas)
   LIMITS: {
+    /** Maximum images an unauthenticated / public reporter can attach to a new issue report. */
     PUBLIC_USER_MAX: 2,
+    /** Maximum images an authenticated reporter can attach to a new issue report. */
     AUTHENTICATED_USER_MAX: 4,
+    /** Maximum images that can be attached to a single comment. */
     COMMENT_MAX: 4,
+    /** Maximum total non-deleted images across an issue (description + all comments). */
     ISSUE_TOTAL_MAX: 10,
   },
 

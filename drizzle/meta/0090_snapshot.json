@@ -1,6 +1,6 @@
 {
-  "id": "0f858be8-b627-4159-b52c-09ec915562b3",
-  "prevId": "b5a27faf-e69f-4c70-a700-d2cc61bcb296",
+  "id": "41bc2d94-b3f9-4942-99eb-63fb5a7834c8",
+  "prevId": "0f858be8-b627-4159-b52c-09ec915562b3",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1358,6 +1358,212 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
+      "isRLSEnabled": true
+    },
+    "public.machine_view_saved_views": {
+      "name": "machine_view_saved_views",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "surface": {
+          "name": "surface",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "collection_id": {
+          "name": "collection_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "owner_collection_user_id": {
+          "name": "owner_collection_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "state": {
+          "name": "state",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_default": {
+          "name": "is_default",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "uq_machine_view_saved_views_name": {
+          "name": "uq_machine_view_saved_views_name",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "surface",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "coalesce(\"collection_id\", \"owner_collection_user_id\", '00000000-0000-0000-0000-000000000000'::uuid)",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "lower(\"name\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "uq_machine_view_saved_views_default": {
+          "name": "uq_machine_view_saved_views_default",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "surface",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "coalesce(\"collection_id\", \"owner_collection_user_id\", '00000000-0000-0000-0000-000000000000'::uuid)",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"machine_view_saved_views\".\"is_default\"",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_machine_view_saved_views_collection": {
+          "name": "idx_machine_view_saved_views_collection",
+          "columns": [
+            {
+              "expression": "collection_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_machine_view_saved_views_owner_collection": {
+          "name": "idx_machine_view_saved_views_owner_collection",
+          "columns": [
+            {
+              "expression": "owner_collection_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "machine_view_saved_views_user_id_user_profiles_id_fk": {
+          "name": "machine_view_saved_views_user_id_user_profiles_id_fk",
+          "tableFrom": "machine_view_saved_views",
+          "tableTo": "user_profiles",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "machine_view_saved_views_collection_id_collections_id_fk": {
+          "name": "machine_view_saved_views_collection_id_collections_id_fk",
+          "tableFrom": "machine_view_saved_views",
+          "tableTo": "collections",
+          "columnsFrom": ["collection_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "machine_view_saved_views_owner_collection_user_id_user_profiles_id_fk": {
+          "name": "machine_view_saved_views_owner_collection_user_id_user_profiles_id_fk",
+          "tableFrom": "machine_view_saved_views",
+          "tableTo": "user_profiles",
+          "columnsFrom": ["owner_collection_user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "machine_view_saved_views_surface_check": {
+          "name": "machine_view_saved_views_surface_check",
+          "value": "(\"machine_view_saved_views\".\"surface\" = 'machines' AND \"machine_view_saved_views\".\"collection_id\" IS NULL AND \"machine_view_saved_views\".\"owner_collection_user_id\" IS NULL)\n        OR (\"machine_view_saved_views\".\"surface\" = 'collection' AND \"machine_view_saved_views\".\"collection_id\" IS NOT NULL AND \"machine_view_saved_views\".\"owner_collection_user_id\" IS NULL)\n        OR (\"machine_view_saved_views\".\"surface\" = 'owner' AND \"machine_view_saved_views\".\"collection_id\" IS NULL AND \"machine_view_saved_views\".\"owner_collection_user_id\" IS NOT NULL)"
+        },
+        "machine_view_saved_views_name_not_blank": {
+          "name": "machine_view_saved_views_name_not_blank",
+          "value": "length(btrim(\"machine_view_saved_views\".\"name\")) > 0"
+        }
+      },
       "isRLSEnabled": true
     },
     "public.machine_watchers": {

@@ -98,3 +98,11 @@ echo "::endgroup::"
   node supabase/seed-pinballmap-catalog.mjs
   echo "::endgroup::"
 }
+
+# OPDB copy (PP-wqit.12): the refresh cron is prod-only; seed from the offline
+# fixture (src/lib/opdb/fixtures) so tags and credits render on previews.
+[[ -f supabase/seed-opdb.mjs ]] && {
+  echo "::group::Seed OPDB copy"
+  node supabase/seed-opdb.mjs
+  echo "::endgroup::"
+}

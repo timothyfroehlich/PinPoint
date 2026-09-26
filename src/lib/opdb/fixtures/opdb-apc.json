@@ -1,0 +1,4349 @@
+{
+  "entries": [
+    {
+      "opdbId": "G3EBl-Mq1zy",
+      "name": "Venom (Pro)",
+      "type": "ss",
+      "display": "lcd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 106,
+          "name": "Brian Eddy",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 386,
+          "name": "Jeremy Packer",
+          "role": "art",
+          "index": 1
+        }
+      ]
+    },
+    {
+      "opdbId": "G417e-MDvXz",
+      "name": "Mata Hari",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 33,
+          "name": "Jim Patla",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 34,
+          "name": "Dave Christensen",
+          "role": "art",
+          "index": 1
+        }
+      ]
+    },
+    {
+      "opdbId": "G41d5-MKNwX",
+      "name": "Game Of Thrones (Pro)",
+      "type": "ss",
+      "display": "dmd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 21,
+          "name": "Lonnie D. Ropp",
+          "role": "software",
+          "index": 14
+        },
+        {
+          "opdbPersonId": 22,
+          "name": "Brian Schmidt",
+          "role": "music",
+          "index": 26
+        },
+        {
+          "opdbPersonId": 35,
+          "name": "Steve Ritchie",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 101,
+          "name": "Greg Freres",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 123,
+          "name": "Dwight Sullivan",
+          "role": "software",
+          "index": 8
+        },
+        {
+          "opdbPersonId": 139,
+          "name": "Tom Kopera",
+          "role": "mechanics",
+          "index": 7
+        },
+        {
+          "opdbPersonId": 151,
+          "name": "Jon Hey",
+          "role": "sound",
+          "index": 16
+        },
+        {
+          "opdbPersonId": 183,
+          "name": "Ken Hale",
+          "role": "sound",
+          "index": 15
+        },
+        {
+          "opdbPersonId": 312,
+          "name": "Dave Link",
+          "role": "art",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 321,
+          "name": "Mark Galvez",
+          "role": "dots_animation",
+          "index": 20
+        },
+        {
+          "opdbPersonId": 326,
+          "name": "John Rotharmel",
+          "role": "mechanics",
+          "index": 4
+        },
+        {
+          "opdbPersonId": 334,
+          "name": "Rob Blakeman",
+          "role": "mechanics",
+          "index": 6
+        },
+        {
+          "opdbPersonId": 336,
+          "name": "Mike Redoble",
+          "role": "mechanics",
+          "index": 5
+        },
+        {
+          "opdbPersonId": 338,
+          "name": "Mike Kyzivat",
+          "role": "software",
+          "index": 9
+        },
+        {
+          "opdbPersonId": 339,
+          "name": "Tom Kyzivat",
+          "role": "dots_animation",
+          "index": 21
+        },
+        {
+          "opdbPersonId": 342,
+          "name": "Waison Cheng",
+          "role": "software",
+          "index": 11
+        },
+        {
+          "opdbPersonId": 352,
+          "name": "Steven Martin",
+          "role": "art",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 353,
+          "name": "Tanio Klyce",
+          "role": "software",
+          "index": 12
+        },
+        {
+          "opdbPersonId": 354,
+          "name": "Jack Benson",
+          "role": "software",
+          "index": 13
+        },
+        {
+          "opdbPersonId": 365,
+          "name": "Chuck Ernst",
+          "role": "dots_animation",
+          "index": 19
+        },
+        {
+          "opdbPersonId": 367,
+          "name": "Kevin James",
+          "role": "dots_animation",
+          "index": 23
+        },
+        {
+          "opdbPersonId": 368,
+          "name": "Danai Kittivathana",
+          "role": "dots_animation",
+          "index": 24
+        },
+        {
+          "opdbPersonId": 374,
+          "name": "Jerry Thompson",
+          "role": "sound",
+          "index": 18
+        },
+        {
+          "opdbPersonId": 375,
+          "name": "Corey Stup",
+          "role": "software",
+          "index": 10
+        },
+        {
+          "opdbPersonId": 376,
+          "name": "Ron Ivan Staley",
+          "role": "sound",
+          "index": 17
+        },
+        {
+          "opdbPersonId": 377,
+          "name": "Zac Stark",
+          "role": "dots_animation",
+          "index": 22
+        },
+        {
+          "opdbPersonId": 378,
+          "name": "Alex Borre",
+          "role": "dots_animation",
+          "index": 25
+        }
+      ]
+    },
+    {
+      "opdbId": "G41Z8-MJKvP",
+      "name": "Pinbot",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 14,
+          "name": "Chris Granner",
+          "role": "music",
+          "index": 7
+        },
+        {
+          "opdbPersonId": 14,
+          "name": "Chris Granner",
+          "role": "sound",
+          "index": 5
+        },
+        {
+          "opdbPersonId": 73,
+          "name": "Barry Oursler",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 74,
+          "name": "Python Anghelo",
+          "role": "art",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 74,
+          "name": "Python Anghelo",
+          "role": "design",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 75,
+          "name": "Joe Joos Jr.",
+          "role": "mechanics",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 95,
+          "name": "Bill Pfutzenreuter",
+          "role": "software",
+          "index": 4
+        },
+        {
+          "opdbPersonId": 165,
+          "name": "Bill Parod",
+          "role": "sound",
+          "index": 6
+        }
+      ]
+    },
+    {
+      "opdbId": "G42E2-MQP9e",
+      "name": "World Cup Soccer",
+      "type": "ss",
+      "display": "dmd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 9,
+          "name": "Larry DeMar",
+          "role": "design",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 9,
+          "name": "Larry DeMar",
+          "role": "software",
+          "index": 4
+        },
+        {
+          "opdbPersonId": 15,
+          "name": "Scott Slomiany",
+          "role": "dots_animation",
+          "index": 7
+        },
+        {
+          "opdbPersonId": 17,
+          "name": "Kevin O'Connor",
+          "role": "art",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 121,
+          "name": "Jack Skalon",
+          "role": "mechanics",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 142,
+          "name": "Eugene Geer",
+          "role": "dots_animation",
+          "index": 8
+        },
+        {
+          "opdbPersonId": 156,
+          "name": "Vince Pontarelli",
+          "role": "music",
+          "index": 9
+        },
+        {
+          "opdbPersonId": 156,
+          "name": "Vince Pontarelli",
+          "role": "sound",
+          "index": 6
+        },
+        {
+          "opdbPersonId": 233,
+          "name": "Matt Coriale",
+          "role": "software",
+          "index": 5
+        },
+        {
+          "opdbPersonId": 241,
+          "name": "John Popadiuk",
+          "role": "design",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "opdbId": "G42Pk-MZe2e",
+      "name": "Xenon",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 14,
+          "name": "Chris Granner",
+          "role": "sound",
+          "index": 4
+        },
+        {
+          "opdbPersonId": 30,
+          "name": "Rehman Merchant",
+          "role": "software",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 30,
+          "name": "Rehman Merchant",
+          "role": "sound",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 39,
+          "name": "Greg Kmiec",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 51,
+          "name": "Paul Faris",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 242,
+          "name": "Suzanne Ciani",
+          "role": "music",
+          "index": 6
+        },
+        {
+          "opdbPersonId": 242,
+          "name": "Suzanne Ciani",
+          "role": "sound",
+          "index": 5
+        }
+      ]
+    },
+    {
+      "opdbId": "G42PX-MyNXo",
+      "name": "Space Invaders",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 33,
+          "name": "Jim Patla",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 51,
+          "name": "Paul Faris",
+          "role": "art",
+          "index": 1
+        }
+      ]
+    },
+    {
+      "opdbId": "G43kO-MQ50p",
+      "name": "Ali",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 42,
+          "name": "Harry Williams",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 43,
+          "name": "Bob Timm",
+          "role": "art",
+          "index": 1
+        }
+      ]
+    },
+    {
+      "opdbId": "G4835-M2YPK",
+      "name": "Cactus Canyon (Remake)",
+      "type": "ss",
+      "display": "dmd",
+      "playerCount": 4,
+      "people": []
+    },
+    {
+      "opdbId": "G4835-M2YPK-ARkb7",
+      "name": "Cactus Canyon (Lyman Upgrade)",
+      "type": "ss",
+      "display": "dmd",
+      "playerCount": 4,
+      "people": []
+    },
+    {
+      "opdbId": "G48kY-MDxRV",
+      "name": "Flight 2000",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 42,
+          "name": "Harry Williams",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 86,
+          "name": "Doug Watson",
+          "role": "art",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 92,
+          "name": "Gerry Simkus",
+          "role": "art",
+          "index": 1
+        }
+      ]
+    },
+    {
+      "opdbId": "G48on-ML8B9",
+      "name": "Torpedo Alley",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 17,
+          "name": "Kevin O'Connor",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 21,
+          "name": "Lonnie D. Ropp",
+          "role": "software",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 70,
+          "name": "Claude Fernandez",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 71,
+          "name": "Margaret Hudson",
+          "role": "art",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 203,
+          "name": "Richard Ditton",
+          "role": "software",
+          "index": 4
+        },
+        {
+          "opdbPersonId": 204,
+          "name": "David Thiel",
+          "role": "music",
+          "index": 7
+        },
+        {
+          "opdbPersonId": 204,
+          "name": "David Thiel",
+          "role": "sound",
+          "index": 6
+        },
+        {
+          "opdbPersonId": 217,
+          "name": "Kyle Johnson",
+          "role": "sound",
+          "index": 5
+        }
+      ]
+    },
+    {
+      "opdbId": "G48w3-Mq1Zk",
+      "name": "Monopoly",
+      "type": "ss",
+      "display": "dmd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 10,
+          "name": "Pat Lawlor",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 11,
+          "name": "John Youssi",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 12,
+          "name": "John Krutsch",
+          "role": "mechanics",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 14,
+          "name": "Chris Granner",
+          "role": "music",
+          "index": 7
+        },
+        {
+          "opdbPersonId": 14,
+          "name": "Chris Granner",
+          "role": "sound",
+          "index": 5
+        },
+        {
+          "opdbPersonId": 23,
+          "name": "Kurt Andersen",
+          "role": "dots_animation",
+          "index": 6
+        },
+        {
+          "opdbPersonId": 273,
+          "name": "Louis Koziarz",
+          "role": "software",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 322,
+          "name": "Greg Dunlap",
+          "role": "software",
+          "index": 4
+        }
+      ]
+    },
+    {
+      "opdbId": "G48YQ-MDxbK",
+      "name": "Satin Doll",
+      "type": "em",
+      "display": "reels",
+      "playerCount": 2,
+      "people": [
+        {
+          "opdbPersonId": 8,
+          "name": "Christian Marche",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 31,
+          "name": "Norm Clark",
+          "role": "design",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "opdbId": "G4do5-MDlN7",
+      "name": "Attack from Mars",
+      "type": "ss",
+      "display": "dmd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 64,
+          "name": "Dan Forden",
+          "role": "music",
+          "index": 7
+        },
+        {
+          "opdbPersonId": 64,
+          "name": "Dan Forden",
+          "role": "sound",
+          "index": 4
+        },
+        {
+          "opdbPersonId": 86,
+          "name": "Doug Watson",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 106,
+          "name": "Brian Eddy",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 157,
+          "name": "Adam Rhine",
+          "role": "dots_animation",
+          "index": 5
+        },
+        {
+          "opdbPersonId": 158,
+          "name": "Brian Morris",
+          "role": "dots_animation",
+          "index": 6
+        },
+        {
+          "opdbPersonId": 191,
+          "name": "Lyman F. Sheats Jr.",
+          "role": "software",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 238,
+          "name": "Robert C. Friesl",
+          "role": "mechanics",
+          "index": 2
+        }
+      ]
+    },
+    {
+      "opdbId": "G4dOQ-MyNbb",
+      "name": "Iron Maiden: Legacy of the Beast",
+      "type": "ss",
+      "display": "lcd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 365,
+          "name": "Chuck Ernst",
+          "role": "dots_animation",
+          "index": 5
+        },
+        {
+          "opdbPersonId": 374,
+          "name": "Jerry Thompson",
+          "role": "music",
+          "index": 7
+        },
+        {
+          "opdbPersonId": 374,
+          "name": "Jerry Thompson",
+          "role": "sound",
+          "index": 4
+        },
+        {
+          "opdbPersonId": 386,
+          "name": "Jeremy Packer",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 431,
+          "name": "Keith Elwin",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 432,
+          "name": "Harrison Drake",
+          "role": "mechanics",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 433,
+          "name": "Rick Naegele",
+          "role": "software",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 434,
+          "name": "Iron Maiden",
+          "role": "music",
+          "index": 6
+        }
+      ]
+    },
+    {
+      "opdbId": "G4j8k-MJK5K",
+      "name": "Domino",
+      "type": "em",
+      "display": "reels",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 6,
+          "name": "Art Stenholm",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 38,
+          "name": "Ed Krynski",
+          "role": "design",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "opdbId": "G4jQw-MJ5rl",
+      "name": "Big Game",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 42,
+          "name": "Harry Williams",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 86,
+          "name": "Doug Watson",
+          "role": "art",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 92,
+          "name": "Gerry Simkus",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 93,
+          "name": "Alan McNeil",
+          "role": "software",
+          "index": 3
+        }
+      ]
+    },
+    {
+      "opdbId": "G4jXr-MQ6kz",
+      "name": "KISS",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 17,
+          "name": "Kevin O'Connor",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 33,
+          "name": "Jim Patla",
+          "role": "design",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "opdbId": "G4jXW-MQdrN",
+      "name": "Diamond Lady",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 26,
+          "name": "Constantino Mitchell",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 27,
+          "name": "Jeanine Mitchell",
+          "role": "art",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 54,
+          "name": "John Buras",
+          "role": "software",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 77,
+          "name": "Jon Norris",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 79,
+          "name": "Dave Zabriskie",
+          "role": "sound",
+          "index": 4
+        }
+      ]
+    },
+    {
+      "opdbId": "G4kBL-MLndo",
+      "name": "The Lost World Jurassic Park",
+      "type": "ss",
+      "display": "dmd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 89,
+          "name": "Neil Falconer",
+          "role": "software",
+          "index": 5
+        },
+        {
+          "opdbPersonId": 170,
+          "name": "John Borg",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 170,
+          "name": "John Borg",
+          "role": "mechanics",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 171,
+          "name": "Orin Day",
+          "role": "software",
+          "index": 4
+        },
+        {
+          "opdbPersonId": 208,
+          "name": "Morgan Weistling",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 259,
+          "name": "Rob Hurtado",
+          "role": "mechanics",
+          "index": 3
+        }
+      ]
+    },
+    {
+      "opdbId": "G4llj-MQYb2",
+      "name": "Tales of the Arabian Nights",
+      "type": "ss",
+      "display": "dmd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 61,
+          "name": "Pat McMahon",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 79,
+          "name": "Dave Zabriskie",
+          "role": "music",
+          "index": 9
+        },
+        {
+          "opdbPersonId": 79,
+          "name": "Dave Zabriskie",
+          "role": "sound",
+          "index": 6
+        },
+        {
+          "opdbPersonId": 107,
+          "name": "Ernie Pizarro",
+          "role": "mechanics",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 121,
+          "name": "Jack Skalon",
+          "role": "mechanics",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 157,
+          "name": "Adam Rhine",
+          "role": "dots_animation",
+          "index": 7
+        },
+        {
+          "opdbPersonId": 158,
+          "name": "Brian Morris",
+          "role": "dots_animation",
+          "index": 8
+        },
+        {
+          "opdbPersonId": 241,
+          "name": "John Popadiuk",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 273,
+          "name": "Louis Koziarz",
+          "role": "software",
+          "index": 5
+        },
+        {
+          "opdbPersonId": 289,
+          "name": "Joe Loveday",
+          "role": "mechanics",
+          "index": 4
+        }
+      ]
+    },
+    {
+      "opdbId": "G4NY0-MDE29",
+      "name": "Night Moves",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 47,
+          "name": "John Trudeau",
+          "role": "design",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "opdbId": "G4O1L-MDW47",
+      "name": "Grand Prix",
+      "type": "em",
+      "display": "reels",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 7,
+          "name": "Steve Kordek",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 8,
+          "name": "Christian Marche",
+          "role": "art",
+          "index": 1
+        }
+      ]
+    },
+    {
+      "opdbId": "G4ODR-MDXEy",
+      "name": "The Addams Family",
+      "type": "ss",
+      "display": "dmd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 9,
+          "name": "Larry DeMar",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 9,
+          "name": "Larry DeMar",
+          "role": "software",
+          "index": 4
+        },
+        {
+          "opdbPersonId": 10,
+          "name": "Pat Lawlor",
+          "role": "design",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 11,
+          "name": "John Youssi",
+          "role": "art",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 12,
+          "name": "John Krutsch",
+          "role": "mechanics",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 13,
+          "name": "Mike Boon",
+          "role": "software",
+          "index": 5
+        },
+        {
+          "opdbPersonId": 14,
+          "name": "Chris Granner",
+          "role": "music",
+          "index": 8
+        },
+        {
+          "opdbPersonId": 14,
+          "name": "Chris Granner",
+          "role": "sound",
+          "index": 6
+        },
+        {
+          "opdbPersonId": 15,
+          "name": "Scott Slomiany",
+          "role": "dots_animation",
+          "index": 7
+        }
+      ]
+    },
+    {
+      "opdbId": "G4Pvp-MLBO0",
+      "name": "Vagabond",
+      "type": "em",
+      "display": "reels",
+      "playerCount": 1,
+      "people": [
+        {
+          "opdbPersonId": 7,
+          "name": "Steve Kordek",
+          "role": "design",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "opdbId": "G4qqv-MDW0P",
+      "name": "Secret Service",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 17,
+          "name": "Kevin O'Connor",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 21,
+          "name": "Lonnie D. Ropp",
+          "role": "software",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 71,
+          "name": "Margaret Hudson",
+          "role": "art",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 72,
+          "name": "Joe Kaminkow",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 203,
+          "name": "Richard Ditton",
+          "role": "software",
+          "index": 4
+        },
+        {
+          "opdbPersonId": 204,
+          "name": "David Thiel",
+          "role": "music",
+          "index": 7
+        },
+        {
+          "opdbPersonId": 204,
+          "name": "David Thiel",
+          "role": "sound",
+          "index": 6
+        },
+        {
+          "opdbPersonId": 217,
+          "name": "Kyle Johnson",
+          "role": "sound",
+          "index": 5
+        }
+      ]
+    },
+    {
+      "opdbId": "G4x0p-MDyyq",
+      "name": "Lucky Draw",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": []
+    },
+    {
+      "opdbId": "G4Xdq-MLBlD",
+      "name": "The 30's",
+      "type": "em",
+      "display": "reels",
+      "playerCount": 1,
+      "people": []
+    },
+    {
+      "opdbId": "G50pv-MdE6R",
+      "name": "Stargate",
+      "type": "ss",
+      "display": "dmd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 26,
+          "name": "Constantino Mitchell",
+          "role": "art",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 27,
+          "name": "Jeanine Mitchell",
+          "role": "art",
+          "index": 4
+        },
+        {
+          "opdbPersonId": 53,
+          "name": "Ray Tanzer",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 77,
+          "name": "Jon Norris",
+          "role": "design",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 80,
+          "name": "Craig Beierwaltes",
+          "role": "sound",
+          "index": 8
+        },
+        {
+          "opdbPersonId": 97,
+          "name": "Allen Edwall",
+          "role": "software",
+          "index": 7
+        },
+        {
+          "opdbPersonId": 125,
+          "name": "David Moore",
+          "role": "art",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 144,
+          "name": "Rand Paulin",
+          "role": "dots_animation",
+          "index": 9
+        },
+        {
+          "opdbPersonId": 175,
+          "name": "Alycen Hareas",
+          "role": "dots_animation",
+          "index": 10
+        },
+        {
+          "opdbPersonId": 178,
+          "name": "Vecennia Jordan",
+          "role": "dots_animation",
+          "index": 11
+        },
+        {
+          "opdbPersonId": 179,
+          "name": "Duane Decker",
+          "role": "music",
+          "index": 12
+        },
+        {
+          "opdbPersonId": 243,
+          "name": "Marion Czyz",
+          "role": "mechanics",
+          "index": 5
+        },
+        {
+          "opdbPersonId": 244,
+          "name": "Wesley Chang",
+          "role": "mechanics",
+          "index": 6
+        }
+      ]
+    },
+    {
+      "opdbId": "G50Wr-MLeZP",
+      "name": "Revenge From Mars",
+      "type": "ss",
+      "display": "cga",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 11,
+          "name": "John Youssi",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 15,
+          "name": "Scott Slomiany",
+          "role": "dots_animation",
+          "index": 10
+        },
+        {
+          "opdbPersonId": 24,
+          "name": "Jack Liddon",
+          "role": "dots_animation",
+          "index": 11
+        },
+        {
+          "opdbPersonId": 64,
+          "name": "Dan Forden",
+          "role": "music",
+          "index": 14
+        },
+        {
+          "opdbPersonId": 64,
+          "name": "Dan Forden",
+          "role": "sound",
+          "index": 8
+        },
+        {
+          "opdbPersonId": 101,
+          "name": "Greg Freres",
+          "role": "art",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 123,
+          "name": "Dwight Sullivan",
+          "role": "software",
+          "index": 5
+        },
+        {
+          "opdbPersonId": 137,
+          "name": "George Gomez",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 157,
+          "name": "Adam Rhine",
+          "role": "dots_animation",
+          "index": 9
+        },
+        {
+          "opdbPersonId": 191,
+          "name": "Lyman F. Sheats Jr.",
+          "role": "software",
+          "index": 4
+        },
+        {
+          "opdbPersonId": 296,
+          "name": "Chris Shipman",
+          "role": "mechanics",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 304,
+          "name": "Graham West",
+          "role": "software",
+          "index": 7
+        },
+        {
+          "opdbPersonId": 314,
+          "name": "Keith P. Johnson",
+          "role": "software",
+          "index": 6
+        },
+        {
+          "opdbPersonId": 315,
+          "name": "Scott Sanders",
+          "role": "dots_animation",
+          "index": 12
+        },
+        {
+          "opdbPersonId": 316,
+          "name": "Dave Mueller",
+          "role": "dots_animation",
+          "index": 13
+        }
+      ]
+    },
+    {
+      "opdbId": "G57lj-MJwxY",
+      "name": "Stingray",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 50,
+          "name": "Mike Kubin",
+          "role": "design",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 84,
+          "name": "Roger Sharpe",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 133,
+          "name": "Sam Stern",
+          "role": "design",
+          "index": 1
+        }
+      ]
+    },
+    {
+      "opdbId": "G59zN-MLy0N",
+      "name": "Batman Forever",
+      "type": "ss",
+      "display": "dmd",
+      "playerCount": 6,
+      "people": [
+        {
+          "opdbPersonId": 20,
+          "name": "John Carpenter",
+          "role": "software",
+          "index": 6
+        },
+        {
+          "opdbPersonId": 22,
+          "name": "Brian Schmidt",
+          "role": "music",
+          "index": 11
+        },
+        {
+          "opdbPersonId": 22,
+          "name": "Brian Schmidt",
+          "role": "sound",
+          "index": 7
+        },
+        {
+          "opdbPersonId": 23,
+          "name": "Kurt Andersen",
+          "role": "dots_animation",
+          "index": 8
+        },
+        {
+          "opdbPersonId": 24,
+          "name": "Jack Liddon",
+          "role": "dots_animation",
+          "index": 9
+        },
+        {
+          "opdbPersonId": 72,
+          "name": "Joe Kaminkow",
+          "role": "design",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 173,
+          "name": "Marc Raneses",
+          "role": "art",
+          "index": 4
+        },
+        {
+          "opdbPersonId": 173,
+          "name": "Marc Raneses",
+          "role": "dots_animation",
+          "index": 10
+        },
+        {
+          "opdbPersonId": 208,
+          "name": "Morgan Weistling",
+          "role": "art",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 246,
+          "name": "Jeff Busch",
+          "role": "art",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 260,
+          "name": "Paul Leslie",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 261,
+          "name": "Brian Rudolph",
+          "role": "software",
+          "index": 5
+        }
+      ]
+    },
+    {
+      "opdbId": "G5b38-MDqkx",
+      "name": "Meteor",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 93,
+          "name": "Alan McNeil",
+          "role": "software",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 98,
+          "name": "Steve Kirk",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 210,
+          "name": "Leslie Kaip",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 211,
+          "name": "Jorge Obregon",
+          "role": "art",
+          "index": 2
+        }
+      ]
+    },
+    {
+      "opdbId": "G5D94-M3d5w",
+      "name": "Spider-Man (Vault Edition)",
+      "type": "ss",
+      "display": "dmd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 35,
+          "name": "Steve Ritchie",
+          "role": "design",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "opdbId": "G5Dbo-M3dv6",
+      "name": "Future Spa",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 34,
+          "name": "Dave Christensen",
+          "role": "art",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 51,
+          "name": "Paul Faris",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 91,
+          "name": "George Christian",
+          "role": "design",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "opdbId": "G5Dz7-Mq139",
+      "name": "Funhouse",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 9,
+          "name": "Larry DeMar",
+          "role": "design",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 9,
+          "name": "Larry DeMar",
+          "role": "software",
+          "index": 4
+        },
+        {
+          "opdbPersonId": 10,
+          "name": "Pat Lawlor",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 11,
+          "name": "John Youssi",
+          "role": "art",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 12,
+          "name": "John Krutsch",
+          "role": "mechanics",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 14,
+          "name": "Chris Granner",
+          "role": "music",
+          "index": 7
+        },
+        {
+          "opdbPersonId": 106,
+          "name": "Brian Eddy",
+          "role": "software",
+          "index": 5
+        },
+        {
+          "opdbPersonId": 151,
+          "name": "Jon Hey",
+          "role": "sound",
+          "index": 6
+        }
+      ]
+    },
+    {
+      "opdbId": "G5KXk-MLB9V",
+      "name": "Eight Ball Deluxe",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 71,
+          "name": "Margaret Hudson",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 91,
+          "name": "George Christian",
+          "role": "design",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "opdbId": "G5Lk0-MQjl3",
+      "name": "Bone Busters Inc.",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 26,
+          "name": "Constantino Mitchell",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 27,
+          "name": "Jeanine Mitchell",
+          "role": "art",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 53,
+          "name": "Ray Tanzer",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 79,
+          "name": "Dave Zabriskie",
+          "role": "music",
+          "index": 5
+        },
+        {
+          "opdbPersonId": 80,
+          "name": "Craig Beierwaltes",
+          "role": "music",
+          "index": 6
+        },
+        {
+          "opdbPersonId": 97,
+          "name": "Allen Edwall",
+          "role": "software",
+          "index": 4
+        },
+        {
+          "opdbPersonId": 117,
+          "name": "Brian R. Johnson",
+          "role": "art",
+          "index": 2
+        }
+      ]
+    },
+    {
+      "opdbId": "G5n2D-MLn85",
+      "name": "Transporter the Rescue",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 12,
+          "name": "John Krutsch",
+          "role": "mechanics",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 39,
+          "name": "Greg Kmiec",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 40,
+          "name": "Tony Kraemer",
+          "role": "design",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 63,
+          "name": "Robin Seaver",
+          "role": "music",
+          "index": 7
+        },
+        {
+          "opdbPersonId": 69,
+          "name": "Tim Elliott",
+          "role": "art",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 122,
+          "name": "Dan Lee",
+          "role": "software",
+          "index": 4
+        },
+        {
+          "opdbPersonId": 151,
+          "name": "Jon Hey",
+          "role": "music",
+          "index": 6
+        },
+        {
+          "opdbPersonId": 151,
+          "name": "Jon Hey",
+          "role": "sound",
+          "index": 5
+        }
+      ]
+    },
+    {
+      "opdbId": "G5nj6-MyNEZ",
+      "name": "Toledo",
+      "type": "em",
+      "display": "reels",
+      "playerCount": 2,
+      "people": [
+        {
+          "opdbPersonId": 8,
+          "name": "Christian Marche",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 42,
+          "name": "Harry Williams",
+          "role": "design",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "opdbId": "G5pe4-M61y6",
+      "name": "Medieval Madness (Remake LE)",
+      "type": "ss",
+      "display": "dmd",
+      "playerCount": 4,
+      "people": []
+    },
+    {
+      "opdbId": "G5pe4-MePZv",
+      "name": "Medieval Madness",
+      "type": "ss",
+      "display": "dmd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 11,
+          "name": "John Youssi",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 64,
+          "name": "Dan Forden",
+          "role": "music",
+          "index": 8
+        },
+        {
+          "opdbPersonId": 64,
+          "name": "Dan Forden",
+          "role": "sound",
+          "index": 5
+        },
+        {
+          "opdbPersonId": 101,
+          "name": "Greg Freres",
+          "role": "art",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 106,
+          "name": "Brian Eddy",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 157,
+          "name": "Adam Rhine",
+          "role": "dots_animation",
+          "index": 6
+        },
+        {
+          "opdbPersonId": 158,
+          "name": "Brian Morris",
+          "role": "dots_animation",
+          "index": 7
+        },
+        {
+          "opdbPersonId": 191,
+          "name": "Lyman F. Sheats Jr.",
+          "role": "software",
+          "index": 4
+        },
+        {
+          "opdbPersonId": 238,
+          "name": "Robert C. Friesl",
+          "role": "mechanics",
+          "index": 3
+        }
+      ]
+    },
+    {
+      "opdbId": "G5pe4-MkPRV",
+      "name": "Medieval Madness (Remake Royal Edition)",
+      "type": "ss",
+      "display": "dmd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 11,
+          "name": "John Youssi",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 101,
+          "name": "Greg Freres",
+          "role": "art",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 106,
+          "name": "Brian Eddy",
+          "role": "design",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "opdbId": "G5pe4-MrR1B",
+      "name": "Medieval Madness (Remake Special Edition)",
+      "type": "ss",
+      "display": "dmd",
+      "playerCount": 4,
+      "people": []
+    },
+    {
+      "opdbId": "G5pe4-MrRrv",
+      "name": "Medieval Madness (Remake Merlin Edition)",
+      "type": "ss",
+      "display": "dmd",
+      "playerCount": 4,
+      "people": []
+    },
+    {
+      "opdbId": "G5pe4-MyNkp",
+      "name": "Medieval Madness (Remake)",
+      "type": "ss",
+      "display": "dmd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 11,
+          "name": "John Youssi",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 101,
+          "name": "Greg Freres",
+          "role": "art",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 106,
+          "name": "Brian Eddy",
+          "role": "design",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "opdbId": "G5W1w-MQVkq",
+      "name": "Top Score",
+      "type": "em",
+      "display": "reels",
+      "playerCount": 2,
+      "people": [
+        {
+          "opdbPersonId": 2,
+          "name": "Gordon Morison",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 38,
+          "name": "Ed Krynski",
+          "role": "design",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "opdbId": "G5wxv-MQP9z",
+      "name": "A.G. Soccer-Ball",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 2,
+      "people": [
+        {
+          "opdbPersonId": 30,
+          "name": "Rehman Merchant",
+          "role": "software",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 67,
+          "name": "Jerry Armstrong",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 68,
+          "name": "Michael Gottlieb",
+          "role": "design",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 69,
+          "name": "Tim Elliott",
+          "role": "art",
+          "index": 2
+        }
+      ]
+    },
+    {
+      "opdbId": "G6lnq-Mq1kv",
+      "name": "Deadpool (Pro)",
+      "type": "ss",
+      "display": "lcd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 101,
+          "name": "Greg Freres",
+          "role": "art",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 137,
+          "name": "George Gomez",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 156,
+          "name": "Vince Pontarelli",
+          "role": "music",
+          "index": 22
+        },
+        {
+          "opdbPersonId": 321,
+          "name": "Mark Galvez",
+          "role": "dots_animation",
+          "index": 18
+        },
+        {
+          "opdbPersonId": 334,
+          "name": "Rob Blakeman",
+          "role": "mechanics",
+          "index": 4
+        },
+        {
+          "opdbPersonId": 338,
+          "name": "Mike Kyzivat",
+          "role": "software",
+          "index": 7
+        },
+        {
+          "opdbPersonId": 339,
+          "name": "Tom Kyzivat",
+          "role": "dots_animation",
+          "index": 19
+        },
+        {
+          "opdbPersonId": 342,
+          "name": "Waison Cheng",
+          "role": "software",
+          "index": 9
+        },
+        {
+          "opdbPersonId": 352,
+          "name": "Steven Martin",
+          "role": "art",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 353,
+          "name": "Tanio Klyce",
+          "role": "software",
+          "index": 5
+        },
+        {
+          "opdbPersonId": 365,
+          "name": "Chuck Ernst",
+          "role": "dots_animation",
+          "index": 12
+        },
+        {
+          "opdbPersonId": 368,
+          "name": "Danai Kittivathana",
+          "role": "dots_animation",
+          "index": 14
+        },
+        {
+          "opdbPersonId": 374,
+          "name": "Jerry Thompson",
+          "role": "sound",
+          "index": 11
+        },
+        {
+          "opdbPersonId": 378,
+          "name": "Alex Borre",
+          "role": "dots_animation",
+          "index": 20
+        },
+        {
+          "opdbPersonId": 386,
+          "name": "Jeremy Packer",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 435,
+          "name": "Tim Sexton",
+          "role": "software",
+          "index": 6
+        },
+        {
+          "opdbPersonId": 436,
+          "name": "Brett Rubin",
+          "role": "software",
+          "index": 8
+        },
+        {
+          "opdbPersonId": 437,
+          "name": "JT Anderson",
+          "role": "software",
+          "index": 10
+        },
+        {
+          "opdbPersonId": 438,
+          "name": "Josh Clay",
+          "role": "dots_animation",
+          "index": 13
+        },
+        {
+          "opdbPersonId": 439,
+          "name": "Olivia Jensen",
+          "role": "dots_animation",
+          "index": 15
+        },
+        {
+          "opdbPersonId": 440,
+          "name": "Mimi Ernst",
+          "role": "dots_animation",
+          "index": 16
+        },
+        {
+          "opdbPersonId": 441,
+          "name": "Estelle Ernst",
+          "role": "dots_animation",
+          "index": 17
+        },
+        {
+          "opdbPersonId": 442,
+          "name": "Thompson Audio Productions (thompsonaudio.com)",
+          "role": "music",
+          "index": 21
+        },
+        {
+          "opdbPersonId": 443,
+          "name": "Shane Black",
+          "role": "music",
+          "index": 23
+        }
+      ]
+    },
+    {
+      "opdbId": "G6lYl-MdEwd",
+      "name": "Round Up",
+      "type": "em",
+      "display": "lights",
+      "playerCount": 1,
+      "people": [
+        {
+          "opdbPersonId": 4,
+          "name": "Roy Parker",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 44,
+          "name": "Harry Mabs",
+          "role": "design",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "opdbId": "GBLLd-MdEON",
+      "name": "Ultraman: Kaiju Rumble (SE)",
+      "type": "ss",
+      "display": "lcd",
+      "playerCount": 4,
+      "people": []
+    },
+    {
+      "opdbId": "GBLLd-MdEON-A94po",
+      "name": "Ultraman: Kaiju Rumble (Blood Sucker Edition)",
+      "type": "ss",
+      "display": "lcd",
+      "playerCount": 4,
+      "people": []
+    },
+    {
+      "opdbId": "GbPxB-MkPol",
+      "name": "Avatar: The Battle for Pandora",
+      "type": "ss",
+      "display": "lcd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 511,
+          "name": "Mark Seiden",
+          "role": "design",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "opdbId": "GbPxB-MkPol-A93vd",
+      "name": "Avatar: The Battle for Pandora (LE)",
+      "type": "ss",
+      "display": "lcd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 511,
+          "name": "Mark Seiden",
+          "role": "design",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "opdbId": "GEL0V-MBRyb",
+      "name": "King Kong: Myth of Terror Island (Pro)",
+      "type": "ss",
+      "display": "lcd",
+      "playerCount": 4,
+      "people": []
+    },
+    {
+      "opdbId": "Gj66P-M3dxn",
+      "name": "Avengers: Infinity Quest (Pro)",
+      "type": "ss",
+      "display": "lcd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 386,
+          "name": "Jeremy Packer",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 431,
+          "name": "Keith Elwin",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 433,
+          "name": "Rick Naegele",
+          "role": "software",
+          "index": 2
+        }
+      ]
+    },
+    {
+      "opdbId": "Gj66Z-Mp4BN",
+      "name": "Halloween (SE)",
+      "type": "ss",
+      "display": "lcd",
+      "playerCount": 4,
+      "people": []
+    },
+    {
+      "opdbId": "Gj66Z-Mp4BN-A9Y6n",
+      "name": "Halloween (CE)",
+      "type": "ss",
+      "display": "lcd",
+      "playerCount": 4,
+      "people": []
+    },
+    {
+      "opdbId": "GK17D-MdEqz",
+      "name": "Jurassic Park (Pro)",
+      "type": "ss",
+      "display": "lcd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 365,
+          "name": "Chuck Ernst",
+          "role": "dots_animation",
+          "index": 5
+        },
+        {
+          "opdbPersonId": 374,
+          "name": "Jerry Thompson",
+          "role": "music",
+          "index": 6
+        },
+        {
+          "opdbPersonId": 374,
+          "name": "Jerry Thompson",
+          "role": "sound",
+          "index": 4
+        },
+        {
+          "opdbPersonId": 431,
+          "name": "Keith Elwin",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 432,
+          "name": "Harrison Drake",
+          "role": "mechanics",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 433,
+          "name": "Rick Naegele",
+          "role": "software",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 449,
+          "name": "Jonathan Bergeron",
+          "role": "art",
+          "index": 1
+        }
+      ]
+    },
+    {
+      "opdbId": "GK17D-MKNKd",
+      "name": "Jurassic Park (Premium/LE)",
+      "type": "ss",
+      "display": "lcd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 365,
+          "name": "Chuck Ernst",
+          "role": "dots_animation",
+          "index": 5
+        },
+        {
+          "opdbPersonId": 374,
+          "name": "Jerry Thompson",
+          "role": "music",
+          "index": 6
+        },
+        {
+          "opdbPersonId": 374,
+          "name": "Jerry Thompson",
+          "role": "sound",
+          "index": 4
+        },
+        {
+          "opdbPersonId": 431,
+          "name": "Keith Elwin",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 432,
+          "name": "Harrison Drake",
+          "role": "mechanics",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 433,
+          "name": "Rick Naegele",
+          "role": "software",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 449,
+          "name": "Jonathan Bergeron",
+          "role": "art",
+          "index": 1
+        }
+      ]
+    },
+    {
+      "opdbId": "GK17D-MKNKd-A15Yn",
+      "name": "Jurassic Park (Premium)",
+      "type": "ss",
+      "display": "lcd",
+      "playerCount": 4,
+      "people": []
+    },
+    {
+      "opdbId": "GK17D-MKNKd-AOxoz",
+      "name": "Jurassic Park (30th Anniversary)",
+      "type": "ss",
+      "display": "lcd",
+      "playerCount": 4,
+      "people": []
+    },
+    {
+      "opdbId": "GK17D-MKNKd-AOyKv",
+      "name": "Jurassic Park (LE)",
+      "type": "ss",
+      "display": "lcd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 365,
+          "name": "Chuck Ernst",
+          "role": "dots_animation",
+          "index": 5
+        },
+        {
+          "opdbPersonId": 374,
+          "name": "Jerry Thompson",
+          "role": "music",
+          "index": 6
+        },
+        {
+          "opdbPersonId": 374,
+          "name": "Jerry Thompson",
+          "role": "sound",
+          "index": 4
+        },
+        {
+          "opdbPersonId": 431,
+          "name": "Keith Elwin",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 432,
+          "name": "Harrison Drake",
+          "role": "mechanics",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 433,
+          "name": "Rick Naegele",
+          "role": "software",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 449,
+          "name": "Jonathan Bergeron",
+          "role": "art",
+          "index": 1
+        }
+      ]
+    },
+    {
+      "opdbId": "GkBnQ-MBRxV",
+      "name": "The Princess Bride",
+      "type": "ss",
+      "display": "lcd",
+      "playerCount": 4,
+      "people": []
+    },
+    {
+      "opdbId": "GkBnQ-MBRxV-A96qp",
+      "name": "The Princess Bride (CE)",
+      "type": "ss",
+      "display": "lcd",
+      "playerCount": 4,
+      "people": []
+    },
+    {
+      "opdbId": "GllPz-MBRrV",
+      "name": "Scooby-Doo (SE)",
+      "type": "ss",
+      "display": "lcd",
+      "playerCount": 4,
+      "people": []
+    },
+    {
+      "opdbId": "GllPz-MBRrV-A9vWL",
+      "name": "Scooby-Doo (CE)",
+      "type": "ss",
+      "display": "lcd",
+      "playerCount": 4,
+      "people": []
+    },
+    {
+      "opdbId": "GQK1P-Ml95Z",
+      "name": "John Wick (Premium/LE)",
+      "type": "ss",
+      "display": "lcd",
+      "playerCount": 4,
+      "people": []
+    },
+    {
+      "opdbId": "GQK1P-Ml95Z-AOY43",
+      "name": "John Wick (Premium)",
+      "type": "ss",
+      "display": "lcd",
+      "playerCount": 4,
+      "people": []
+    },
+    {
+      "opdbId": "GQKb2-MYek0",
+      "name": "Rick and Morty (SE)",
+      "type": "ss",
+      "display": "lcd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 396,
+          "name": "David Van Es",
+          "role": "dots_animation",
+          "index": 5
+        },
+        {
+          "opdbPersonId": 412,
+          "name": "Scott Danesi",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 412,
+          "name": "Scott Danesi",
+          "role": "mechanics",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 412,
+          "name": "Scott Danesi",
+          "role": "music",
+          "index": 6
+        },
+        {
+          "opdbPersonId": 412,
+          "name": "Scott Danesi",
+          "role": "sound",
+          "index": 4
+        },
+        {
+          "opdbPersonId": 467,
+          "name": "Eric Priepke",
+          "role": "software",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 468,
+          "name": "Bowen Kerins",
+          "role": "software",
+          "index": 3
+        }
+      ]
+    },
+    {
+      "opdbId": "Gr28v-Mp4Wr",
+      "name": "Flip Flop",
+      "type": "em",
+      "display": "reels",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 33,
+          "name": "Jim Patla",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 49,
+          "name": "Dick White",
+          "role": "art",
+          "index": 1
+        }
+      ]
+    },
+    {
+      "opdbId": "Gr2wz-MLBob",
+      "name": "Genesis",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 47,
+          "name": "John Trudeau",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 48,
+          "name": "Larry Day",
+          "role": "art",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 54,
+          "name": "John Buras",
+          "role": "software",
+          "index": 4
+        },
+        {
+          "opdbPersonId": 182,
+          "name": "Don Marshall",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 183,
+          "name": "Ken Hale",
+          "role": "art",
+          "index": 2
+        }
+      ]
+    },
+    {
+      "opdbId": "GR6d8-M1rZd",
+      "name": "Star Trek: The Next Generation",
+      "type": "ss",
+      "display": "dmd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 15,
+          "name": "Scott Slomiany",
+          "role": "dots_animation",
+          "index": 8
+        },
+        {
+          "opdbPersonId": 35,
+          "name": "Steve Ritchie",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 64,
+          "name": "Dan Forden",
+          "role": "music",
+          "index": 10
+        },
+        {
+          "opdbPersonId": 64,
+          "name": "Dan Forden",
+          "role": "sound",
+          "index": 7
+        },
+        {
+          "opdbPersonId": 101,
+          "name": "Greg Freres",
+          "role": "art",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 101,
+          "name": "Greg Freres",
+          "role": "design",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 123,
+          "name": "Dwight Sullivan",
+          "role": "design",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 123,
+          "name": "Dwight Sullivan",
+          "role": "software",
+          "index": 5
+        },
+        {
+          "opdbPersonId": 142,
+          "name": "Eugene Geer",
+          "role": "dots_animation",
+          "index": 9
+        },
+        {
+          "opdbPersonId": 186,
+          "name": "Carl Biagi",
+          "role": "mechanics",
+          "index": 4
+        },
+        {
+          "opdbPersonId": 233,
+          "name": "Matt Coriale",
+          "role": "software",
+          "index": 6
+        }
+      ]
+    },
+    {
+      "opdbId": "GR6do-MLBq4",
+      "name": "The Who's Tommy Pinball Wizard",
+      "type": "ss",
+      "display": "dmd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 20,
+          "name": "John Carpenter",
+          "role": "software",
+          "index": 8
+        },
+        {
+          "opdbPersonId": 21,
+          "name": "Lonnie D. Ropp",
+          "role": "design",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 21,
+          "name": "Lonnie D. Ropp",
+          "role": "software",
+          "index": 6
+        },
+        {
+          "opdbPersonId": 22,
+          "name": "Brian Schmidt",
+          "role": "music",
+          "index": 12
+        },
+        {
+          "opdbPersonId": 22,
+          "name": "Brian Schmidt",
+          "role": "sound",
+          "index": 9
+        },
+        {
+          "opdbPersonId": 23,
+          "name": "Kurt Andersen",
+          "role": "art",
+          "index": 4
+        },
+        {
+          "opdbPersonId": 23,
+          "name": "Kurt Andersen",
+          "role": "dots_animation",
+          "index": 10
+        },
+        {
+          "opdbPersonId": 24,
+          "name": "Jack Liddon",
+          "role": "dots_animation",
+          "index": 11
+        },
+        {
+          "opdbPersonId": 28,
+          "name": "Ed Cebula",
+          "role": "design",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 72,
+          "name": "Joe Kaminkow",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 191,
+          "name": "Lyman F. Sheats Jr.",
+          "role": "design",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 191,
+          "name": "Lyman F. Sheats Jr.",
+          "role": "software",
+          "index": 7
+        },
+        {
+          "opdbPersonId": 193,
+          "name": "Markus Rothkranz",
+          "role": "art",
+          "index": 5
+        }
+      ]
+    },
+    {
+      "opdbId": "GR6kW-Mo1W3",
+      "name": "Cheetah",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 42,
+          "name": "Harry Williams",
+          "role": "design",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "opdbId": "GrdqX-MLW81",
+      "name": "Gaucho",
+      "type": "em",
+      "display": "reels",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 3,
+          "name": "Wayne Neyens",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 4,
+          "name": "Roy Parker",
+          "role": "art",
+          "index": 1
+        }
+      ]
+    },
+    {
+      "opdbId": "Gre8z-MLeK2",
+      "name": "Slick Chick",
+      "type": "em",
+      "display": "reels",
+      "playerCount": 1,
+      "people": [
+        {
+          "opdbPersonId": 3,
+          "name": "Wayne Neyens",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 4,
+          "name": "Roy Parker",
+          "role": "art",
+          "index": 1
+        }
+      ]
+    },
+    {
+      "opdbId": "Grep0-MQYN4",
+      "name": "Hot Tip",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 8,
+          "name": "Christian Marche",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 40,
+          "name": "Tony Kraemer",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 135,
+          "name": "Ron Crouse",
+          "role": "software",
+          "index": 2
+        }
+      ]
+    },
+    {
+      "opdbId": "Grj6X-MJNV1",
+      "name": "X-Men (LE)",
+      "type": "ss",
+      "display": "dmd",
+      "playerCount": 4,
+      "people": []
+    },
+    {
+      "opdbId": "Grj6X-MJNV1-AO209",
+      "name": "X-Men Wolverine (LE)",
+      "type": "ss",
+      "display": "dmd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 17,
+          "name": "Kevin O'Connor",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 21,
+          "name": "Lonnie D. Ropp",
+          "role": "software",
+          "index": 8
+        },
+        {
+          "opdbPersonId": 170,
+          "name": "John Borg",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 170,
+          "name": "John Borg",
+          "role": "mechanics",
+          "index": 5
+        },
+        {
+          "opdbPersonId": 204,
+          "name": "David Thiel",
+          "role": "music",
+          "index": 13
+        },
+        {
+          "opdbPersonId": 204,
+          "name": "David Thiel",
+          "role": "sound",
+          "index": 9
+        },
+        {
+          "opdbPersonId": 321,
+          "name": "Mark Galvez",
+          "role": "dots_animation",
+          "index": 10
+        },
+        {
+          "opdbPersonId": 326,
+          "name": "John Rotharmel",
+          "role": "mechanics",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 336,
+          "name": "Mike Redoble",
+          "role": "mechanics",
+          "index": 4
+        },
+        {
+          "opdbPersonId": 338,
+          "name": "Mike Kyzivat",
+          "role": "software",
+          "index": 7
+        },
+        {
+          "opdbPersonId": 339,
+          "name": "Tom Kyzivat",
+          "role": "dots_animation",
+          "index": 11
+        },
+        {
+          "opdbPersonId": 342,
+          "name": "Waison Cheng",
+          "role": "software",
+          "index": 6
+        },
+        {
+          "opdbPersonId": 345,
+          "name": "Stephen Jensen",
+          "role": "art",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 346,
+          "name": "Rory O'Donnell",
+          "role": "dots_animation",
+          "index": 12
+        }
+      ]
+    },
+    {
+      "opdbId": "GrkL5-MLvrX",
+      "name": "Disney TRON: Legacy",
+      "type": "ss",
+      "display": "dmd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 11,
+          "name": "John Youssi",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 21,
+          "name": "Lonnie D. Ropp",
+          "role": "software",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 140,
+          "name": "Tom Uban",
+          "role": "software",
+          "index": 4
+        },
+        {
+          "opdbPersonId": 170,
+          "name": "John Borg",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 191,
+          "name": "Lyman F. Sheats Jr.",
+          "role": "software",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 204,
+          "name": "David Thiel",
+          "role": "music",
+          "index": 6
+        },
+        {
+          "opdbPersonId": 204,
+          "name": "David Thiel",
+          "role": "sound",
+          "index": 5
+        }
+      ]
+    },
+    {
+      "opdbId": "GrknN-MQrdv",
+      "name": "Cleopatra",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 2,
+          "name": "Gordon Morison",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 38,
+          "name": "Ed Krynski",
+          "role": "design",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "opdbId": "GrkOB-MJVvl",
+      "name": "Playboy",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 33,
+          "name": "Jim Patla",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 51,
+          "name": "Paul Faris",
+          "role": "art",
+          "index": 1
+        }
+      ]
+    },
+    {
+      "opdbId": "GRL9r-MD34z",
+      "name": "Star Wars Episode I",
+      "type": "ss",
+      "display": "cga",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 17,
+          "name": "Kevin O'Connor",
+          "role": "art",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 24,
+          "name": "Jack Liddon",
+          "role": "dots_animation",
+          "index": 10
+        },
+        {
+          "opdbPersonId": 121,
+          "name": "Jack Skalon",
+          "role": "mechanics",
+          "index": 4
+        },
+        {
+          "opdbPersonId": 241,
+          "name": "John Popadiuk",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 247,
+          "name": "Paul Barker",
+          "role": "art",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 272,
+          "name": "Bob Brown",
+          "role": "mechanics",
+          "index": 5
+        },
+        {
+          "opdbPersonId": 292,
+          "name": "Cameron Silver",
+          "role": "software",
+          "index": 6
+        },
+        {
+          "opdbPersonId": 316,
+          "name": "Dave Mueller",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 317,
+          "name": "Duncan Brown",
+          "role": "software",
+          "index": 7
+        },
+        {
+          "opdbPersonId": 318,
+          "name": "Eric Pryzby",
+          "role": "music",
+          "index": 11
+        },
+        {
+          "opdbPersonId": 318,
+          "name": "Eric Pryzby",
+          "role": "sound",
+          "index": 8
+        },
+        {
+          "opdbPersonId": 319,
+          "name": "Alan Cruz",
+          "role": "dots_animation",
+          "index": 9
+        }
+      ]
+    },
+    {
+      "opdbId": "GRLbz-MDnxo",
+      "name": "Split Second",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 42,
+          "name": "Harry Williams",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 86,
+          "name": "Doug Watson",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 92,
+          "name": "Gerry Simkus",
+          "role": "art",
+          "index": 2
+        }
+      ]
+    },
+    {
+      "opdbId": "GrleW-MYeod",
+      "name": "Strikes and Spares",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 17,
+          "name": "Kevin O'Connor",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 163,
+          "name": "Gary Gayton",
+          "role": "design",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "opdbId": "GRLz0-MeP4B",
+      "name": "Al's Garage Band goes on a World Tour",
+      "type": "ss",
+      "display": "dmd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 30,
+          "name": "Rehman Merchant",
+          "role": "software",
+          "index": 5
+        },
+        {
+          "opdbPersonId": 67,
+          "name": "Jerry Armstrong",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 69,
+          "name": "Tim Elliott",
+          "role": "art",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 138,
+          "name": "Dan Hughes",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 178,
+          "name": "Vecennia Jordan",
+          "role": "dots_animation",
+          "index": 7
+        },
+        {
+          "opdbPersonId": 217,
+          "name": "Kyle Johnson",
+          "role": "music",
+          "index": 8
+        },
+        {
+          "opdbPersonId": 217,
+          "name": "Kyle Johnson",
+          "role": "sound",
+          "index": 6
+        },
+        {
+          "opdbPersonId": 256,
+          "name": "Andy G. Reynolds",
+          "role": "art",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 257,
+          "name": "Len Vedeen",
+          "role": "mechanics",
+          "index": 4
+        }
+      ]
+    },
+    {
+      "opdbId": "GrNd0-MJNW1",
+      "name": "Congo",
+      "type": "ss",
+      "display": "dmd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 17,
+          "name": "Kevin O'Connor",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 47,
+          "name": "John Trudeau",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 141,
+          "name": "Bill Grupp",
+          "role": "software",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 156,
+          "name": "Vince Pontarelli",
+          "role": "music",
+          "index": 5
+        },
+        {
+          "opdbPersonId": 156,
+          "name": "Vince Pontarelli",
+          "role": "sound",
+          "index": 4
+        },
+        {
+          "opdbPersonId": 282,
+          "name": "Dean Grover",
+          "role": "software",
+          "index": 3
+        }
+      ]
+    },
+    {
+      "opdbId": "GrNpY-MJrZw",
+      "name": "Mars God of War",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 54,
+          "name": "John Buras",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 125,
+          "name": "David Moore",
+          "role": "art",
+          "index": 1
+        }
+      ]
+    },
+    {
+      "opdbId": "GRnwQ-M9R5d",
+      "name": "Harlem Globetrotters On Tour",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 39,
+          "name": "Greg Kmiec",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 101,
+          "name": "Greg Freres",
+          "role": "art",
+          "index": 1
+        }
+      ]
+    },
+    {
+      "opdbId": "GRnX6-MQk8L",
+      "name": "Space Mission",
+      "type": "em",
+      "display": "reels",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 7,
+          "name": "Steve Kordek",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 8,
+          "name": "Christian Marche",
+          "role": "art",
+          "index": 1
+        }
+      ]
+    },
+    {
+      "opdbId": "GrNZ7-MDOjq",
+      "name": "Skyrocket",
+      "type": "em",
+      "display": "reels",
+      "playerCount": 2,
+      "people": [
+        {
+          "opdbPersonId": 42,
+          "name": "Harry Williams",
+          "role": "design",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "opdbId": "GrO7w-M9R03",
+      "name": "Black Knight",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 9,
+          "name": "Larry DeMar",
+          "role": "software",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 35,
+          "name": "Steve Ritchie",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 46,
+          "name": "Tony Ramunni",
+          "role": "art",
+          "index": 1
+        }
+      ]
+    },
+    {
+      "opdbId": "GRoN2-MRj30",
+      "name": "Sea Hunt",
+      "type": "em",
+      "display": "reels",
+      "playerCount": 1,
+      "people": [
+        {
+          "opdbPersonId": 119,
+          "name": "Roland Berrios",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 227,
+          "name": "Ron Halliburton",
+          "role": "design",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "opdbId": "GRoW6-MQk81",
+      "name": "Family Fun!",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 28,
+          "name": "Ed Cebula",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 49,
+          "name": "Dick White",
+          "role": "art",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 114,
+          "name": "Wendell McAdams",
+          "role": "design",
+          "index": 1
+        }
+      ]
+    },
+    {
+      "opdbId": "GRoZw-MLW3j",
+      "name": "Judge Dredd",
+      "type": "ss",
+      "display": "dmd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 15,
+          "name": "Scott Slomiany",
+          "role": "dots_animation",
+          "index": 6
+        },
+        {
+          "opdbPersonId": 17,
+          "name": "Kevin O'Connor",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 47,
+          "name": "John Trudeau",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 107,
+          "name": "Ernie Pizarro",
+          "role": "mechanics",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 108,
+          "name": "Paul Heitsch",
+          "role": "music",
+          "index": 7
+        },
+        {
+          "opdbPersonId": 108,
+          "name": "Paul Heitsch",
+          "role": "sound",
+          "index": 4
+        },
+        {
+          "opdbPersonId": 142,
+          "name": "Eugene Geer",
+          "role": "dots_animation",
+          "index": 5
+        },
+        {
+          "opdbPersonId": 143,
+          "name": "Jeff Johnson",
+          "role": "software",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 156,
+          "name": "Vince Pontarelli",
+          "role": "music",
+          "index": 8
+        }
+      ]
+    },
+    {
+      "opdbId": "GRpee-MePdR",
+      "name": "Bride of Pinbot",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 11,
+          "name": "John Youssi",
+          "role": "art",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 47,
+          "name": "John Trudeau",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 64,
+          "name": "Dan Forden",
+          "role": "music",
+          "index": 10
+        },
+        {
+          "opdbPersonId": 74,
+          "name": "Python Anghelo",
+          "role": "art",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 74,
+          "name": "Python Anghelo",
+          "role": "design",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 75,
+          "name": "Joe Joos Jr.",
+          "role": "mechanics",
+          "index": 4
+        },
+        {
+          "opdbPersonId": 106,
+          "name": "Brian Eddy",
+          "role": "software",
+          "index": 7
+        },
+        {
+          "opdbPersonId": 121,
+          "name": "Jack Skalon",
+          "role": "mechanics",
+          "index": 5
+        },
+        {
+          "opdbPersonId": 151,
+          "name": "Jon Hey",
+          "role": "sound",
+          "index": 8
+        },
+        {
+          "opdbPersonId": 154,
+          "name": "Zofia Bil",
+          "role": "mechanics",
+          "index": 6
+        },
+        {
+          "opdbPersonId": 169,
+          "name": "Rich Karstens",
+          "role": "sound",
+          "index": 9
+        }
+      ]
+    },
+    {
+      "opdbId": "GrPx2-M5RRk",
+      "name": "Spin Out",
+      "type": "em",
+      "display": "reels",
+      "playerCount": 1,
+      "people": [
+        {
+          "opdbPersonId": 2,
+          "name": "Gordon Morison",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 38,
+          "name": "Ed Krynski",
+          "role": "design",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "opdbId": "GRQKz-MyNXz",
+      "name": "White Water",
+      "type": "ss",
+      "display": "dmd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 11,
+          "name": "John Youssi",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 13,
+          "name": "Mike Boon",
+          "role": "software",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 14,
+          "name": "Chris Granner",
+          "role": "music",
+          "index": 6
+        },
+        {
+          "opdbPersonId": 14,
+          "name": "Chris Granner",
+          "role": "sound",
+          "index": 4
+        },
+        {
+          "opdbPersonId": 15,
+          "name": "Scott Slomiany",
+          "role": "dots_animation",
+          "index": 5
+        },
+        {
+          "opdbPersonId": 110,
+          "name": "Dennis Nordman",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 148,
+          "name": "Win Schilling",
+          "role": "mechanics",
+          "index": 2
+        }
+      ]
+    },
+    {
+      "opdbId": "GrqZX-MD15w",
+      "name": "Lord of the Rings",
+      "type": "ss",
+      "display": "dmd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 14,
+          "name": "Chris Granner",
+          "role": "design",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 14,
+          "name": "Chris Granner",
+          "role": "music",
+          "index": 16
+        },
+        {
+          "opdbPersonId": 14,
+          "name": "Chris Granner",
+          "role": "sound",
+          "index": 13
+        },
+        {
+          "opdbPersonId": 17,
+          "name": "Kevin O'Connor",
+          "role": "art",
+          "index": 4
+        },
+        {
+          "opdbPersonId": 23,
+          "name": "Kurt Andersen",
+          "role": "dots_animation",
+          "index": 15
+        },
+        {
+          "opdbPersonId": 53,
+          "name": "Ray Tanzer",
+          "role": "mechanics",
+          "index": 7
+        },
+        {
+          "opdbPersonId": 71,
+          "name": "Margaret Hudson",
+          "role": "art",
+          "index": 5
+        },
+        {
+          "opdbPersonId": 123,
+          "name": "Dwight Sullivan",
+          "role": "software",
+          "index": 12
+        },
+        {
+          "opdbPersonId": 137,
+          "name": "George Gomez",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 137,
+          "name": "George Gomez",
+          "role": "mechanics",
+          "index": 6
+        },
+        {
+          "opdbPersonId": 244,
+          "name": "Wesley Chang",
+          "role": "mechanics",
+          "index": 10
+        },
+        {
+          "opdbPersonId": 314,
+          "name": "Keith P. Johnson",
+          "role": "design",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 314,
+          "name": "Keith P. Johnson",
+          "role": "software",
+          "index": 11
+        },
+        {
+          "opdbPersonId": 321,
+          "name": "Mark Galvez",
+          "role": "dots_animation",
+          "index": 14
+        },
+        {
+          "opdbPersonId": 326,
+          "name": "John Rotharmel",
+          "role": "mechanics",
+          "index": 8
+        },
+        {
+          "opdbPersonId": 328,
+          "name": "Jerry Vanderstelt",
+          "role": "art",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 329,
+          "name": "Jim Novy",
+          "role": "mechanics",
+          "index": 9
+        }
+      ]
+    },
+    {
+      "opdbId": "GRvBL-MP3Ev",
+      "name": "The Simpsons Pinball Party",
+      "type": "ss",
+      "display": "dmd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 14,
+          "name": "Chris Granner",
+          "role": "sound",
+          "index": 8
+        },
+        {
+          "opdbPersonId": 17,
+          "name": "Kevin O'Connor",
+          "role": "art",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 53,
+          "name": "Ray Tanzer",
+          "role": "mechanics",
+          "index": 5
+        },
+        {
+          "opdbPersonId": 64,
+          "name": "Dan Forden",
+          "role": "music",
+          "index": 10
+        },
+        {
+          "opdbPersonId": 71,
+          "name": "Margaret Hudson",
+          "role": "art",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 123,
+          "name": "Dwight Sullivan",
+          "role": "software",
+          "index": 7
+        },
+        {
+          "opdbPersonId": 244,
+          "name": "Wesley Chang",
+          "role": "mechanics",
+          "index": 4
+        },
+        {
+          "opdbPersonId": 245,
+          "name": "Joe Balcer",
+          "role": "design",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 314,
+          "name": "Keith P. Johnson",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 314,
+          "name": "Keith P. Johnson",
+          "role": "software",
+          "index": 6
+        },
+        {
+          "opdbPersonId": 321,
+          "name": "Mark Galvez",
+          "role": "dots_animation",
+          "index": 9
+        }
+      ]
+    },
+    {
+      "opdbId": "GRVnY-MDz0l",
+      "name": "Black Pyramid",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 30,
+          "name": "Rehman Merchant",
+          "role": "software",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 91,
+          "name": "George Christian",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 101,
+          "name": "Greg Freres",
+          "role": "art",
+          "index": 1
+        }
+      ]
+    },
+    {
+      "opdbId": "GRwBN-MJ5ln",
+      "name": "Hokus Pokus",
+      "type": "em",
+      "display": "reels",
+      "playerCount": 2,
+      "people": [
+        {
+          "opdbPersonId": 8,
+          "name": "Christian Marche",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 39,
+          "name": "Greg Kmiec",
+          "role": "design",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "opdbId": "GRwl7-MJ45o",
+      "name": "Spy Hunter",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 30,
+          "name": "Rehman Merchant",
+          "role": "software",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 39,
+          "name": "Greg Kmiec",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 46,
+          "name": "Tony Ramunni",
+          "role": "art",
+          "index": 1
+        }
+      ]
+    },
+    {
+      "opdbId": "Grx1z-Mx02z",
+      "name": "Doodle Bug",
+      "type": "em",
+      "display": "reels",
+      "playerCount": 1,
+      "people": [
+        {
+          "opdbPersonId": 8,
+          "name": "Christian Marche",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 31,
+          "name": "Norm Clark",
+          "role": "design",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "opdbId": "GrXEW-MDEwr",
+      "name": "Stars",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 98,
+          "name": "Steve Kirk",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 211,
+          "name": "Jorge Obregon",
+          "role": "art",
+          "index": 1
+        }
+      ]
+    },
+    {
+      "opdbId": "GrXy3-ML0Ey",
+      "name": "Paragon",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 39,
+          "name": "Greg Kmiec",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 51,
+          "name": "Paul Faris",
+          "role": "art",
+          "index": 1
+        }
+      ]
+    },
+    {
+      "opdbId": "Gry0Z-MP3zR",
+      "name": "Memory Lane",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 50,
+          "name": "Mike Kubin",
+          "role": "design",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 133,
+          "name": "Sam Stern",
+          "role": "design",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "opdbId": "GRY2O-MLWdy",
+      "name": "F-14 Tomcat",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 14,
+          "name": "Chris Granner",
+          "role": "music",
+          "index": 8
+        },
+        {
+          "opdbPersonId": 14,
+          "name": "Chris Granner",
+          "role": "sound",
+          "index": 6
+        },
+        {
+          "opdbPersonId": 35,
+          "name": "Steve Ritchie",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 35,
+          "name": "Steve Ritchie",
+          "role": "music",
+          "index": 7
+        },
+        {
+          "opdbPersonId": 37,
+          "name": "Eugene Jarvis",
+          "role": "software",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 83,
+          "name": "Ed Boon",
+          "role": "software",
+          "index": 4
+        },
+        {
+          "opdbPersonId": 86,
+          "name": "Doug Watson",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 164,
+          "name": "Craig Fitpold",
+          "role": "mechanics",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 165,
+          "name": "Bill Parod",
+          "role": "sound",
+          "index": 5
+        }
+      ]
+    },
+    {
+      "opdbId": "GRYbJ-MnKex",
+      "name": "High Hand",
+      "type": "em",
+      "display": "reels",
+      "playerCount": 1,
+      "people": [
+        {
+          "opdbPersonId": 2,
+          "name": "Gordon Morison",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 38,
+          "name": "Ed Krynski",
+          "role": "design",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "opdbId": "Grypn-MQdbe",
+      "name": "Flash",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 26,
+          "name": "Constantino Mitchell",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 27,
+          "name": "Jeanine Mitchell",
+          "role": "art",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 35,
+          "name": "Steve Ritchie",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 136,
+          "name": "Randy Pfeiffer",
+          "role": "software",
+          "index": 4
+        },
+        {
+          "opdbPersonId": 136,
+          "name": "Randy Pfeiffer",
+          "role": "sound",
+          "index": 5
+        },
+        {
+          "opdbPersonId": 167,
+          "name": "John Jung",
+          "role": "mechanics",
+          "index": 3
+        }
+      ]
+    },
+    {
+      "opdbId": "GRYPN-Mz2RE",
+      "name": "Counterforce",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 2,
+          "name": "Gordon Morison",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 38,
+          "name": "Ed Krynski",
+          "role": "design",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "opdbId": "GrZY2-ML0Rb",
+      "name": "Star Gazer",
+      "type": "ss",
+      "display": "alphanumeric",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 92,
+          "name": "Gerry Simkus",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 199,
+          "name": "Brian Poklacki",
+          "role": "design",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "opdbId": "GV8wB-Mq12N",
+      "name": "Pokémon (Pro)",
+      "type": "ss",
+      "display": "lcd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 137,
+          "name": "George Gomez",
+          "role": "design",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 489,
+          "name": "Jack Danger",
+          "role": "design",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "opdbId": "GvBn8-Mz291",
+      "name": "Jim Henson's Labyrinth",
+      "type": "ss",
+      "display": "lcd",
+      "playerCount": 4,
+      "people": []
+    },
+    {
+      "opdbId": "GvBQX-M0ody",
+      "name": "Houdini: Master of Mystery",
+      "type": "ss",
+      "display": "lcd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 245,
+          "name": "Joe Balcer",
+          "role": "design",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "opdbId": "GvBQX-M0ody-A1kee",
+      "name": "Houdini: Master of Mystery (100th Anniversary)",
+      "type": "ss",
+      "display": "lcd",
+      "playerCount": 4,
+      "people": []
+    },
+    {
+      "opdbId": "GweeP-Ml9pZ",
+      "name": "Godzilla (Premium/LE)",
+      "type": "ss",
+      "display": "lcd",
+      "playerCount": 4,
+      "people": []
+    },
+    {
+      "opdbId": "GweeP-Ml9pZ-A9vXB",
+      "name": "Godzilla (LE)",
+      "type": "ss",
+      "display": "lcd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 386,
+          "name": "Jeremy Packer",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 431,
+          "name": "Keith Elwin",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 433,
+          "name": "Rick Naegele",
+          "role": "software",
+          "index": 2
+        }
+      ]
+    },
+    {
+      "opdbId": "GweeP-Ml9pZ-AOvNL",
+      "name": "Godzilla (70th Anniversary)",
+      "type": "ss",
+      "display": "lcd",
+      "playerCount": 4,
+      "people": []
+    },
+    {
+      "opdbId": "GweeP-Ml9pZ-ARZoY",
+      "name": "Godzilla (Premium)",
+      "type": "ss",
+      "display": "lcd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 386,
+          "name": "Jeremy Packer",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 431,
+          "name": "Keith Elwin",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 433,
+          "name": "Rick Naegele",
+          "role": "software",
+          "index": 2
+        }
+      ]
+    },
+    {
+      "opdbId": "GweeP-MW95j",
+      "name": "Godzilla (Pro)",
+      "type": "ss",
+      "display": "lcd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 386,
+          "name": "Jeremy Packer",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 431,
+          "name": "Keith Elwin",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 433,
+          "name": "Rick Naegele",
+          "role": "software",
+          "index": 2
+        }
+      ]
+    },
+    {
+      "opdbId": "GxvvB-MOEKX",
+      "name": "Jurassic Park (Home Edition)",
+      "type": "ss",
+      "display": "lcd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 334,
+          "name": "Rob Blakeman",
+          "role": "mechanics",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 342,
+          "name": "Waison Cheng",
+          "role": "software",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 449,
+          "name": "Jonathan Bergeron",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 489,
+          "name": "Jack Danger",
+          "role": "design",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "opdbId": "GyVb1-MYeq1",
+      "name": "Drained",
+      "type": "ss",
+      "display": "lcd",
+      "playerCount": 4,
+      "people": []
+    },
+    {
+      "opdbId": "GyVVQ-MVKYX",
+      "name": "Humpty Dumpty",
+      "type": "em",
+      "display": "lights",
+      "playerCount": 1,
+      "people": [
+        {
+          "opdbPersonId": 4,
+          "name": "Roy Parker",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 44,
+          "name": "Harry Mabs",
+          "role": "design",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "opdbId": "GZVOd-MwNxZ",
+      "name": "Elvira's House of Horrors (Premium/LE)",
+      "type": "ss",
+      "display": "lcd",
+      "playerCount": 4,
+      "people": []
+    },
+    {
+      "opdbId": "GZVOd-MwNxZ-AOLoy",
+      "name": "Elvira's House of Horrors (Premium)",
+      "type": "ss",
+      "display": "lcd",
+      "playerCount": 4,
+      "people": [
+        {
+          "opdbPersonId": 101,
+          "name": "Greg Freres",
+          "role": "art",
+          "index": 1
+        },
+        {
+          "opdbPersonId": 110,
+          "name": "Dennis Nordman",
+          "role": "design",
+          "index": 0
+        },
+        {
+          "opdbPersonId": 139,
+          "name": "Tom Kopera",
+          "role": "mechanics",
+          "index": 2
+        },
+        {
+          "opdbPersonId": 191,
+          "name": "Lyman F. Sheats Jr.",
+          "role": "software",
+          "index": 3
+        },
+        {
+          "opdbPersonId": 374,
+          "name": "Jerry Thompson",
+          "role": "music",
+          "index": 5
+        },
+        {
+          "opdbPersonId": 374,
+          "name": "Jerry Thompson",
+          "role": "sound",
+          "index": 4
+        }
+      ]
+    },
+    {
+      "opdbId": "GZVXY-MyNOq",
+      "name": "Ninja Eclipse",
+      "type": "ss",
+      "display": "lcd",
+      "playerCount": 4,
+      "people": []
+    },
+    {
+      "opdbId": "GZVXY-MyNOq-ARWE8",
+      "name": "Ninja Eclipse (First Edition)",
+      "type": "ss",
+      "display": "lcd",
+      "playerCount": 4,
+      "people": []
+    }
+  ]
+}

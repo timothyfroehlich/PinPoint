@@ -27,6 +27,11 @@ import { type TimelineEventSourceType } from "~/lib/timeline/machine-events";
 import { type TimelineTag } from "~/lib/timeline/machine-tags";
 import { type SettingsSection } from "~/lib/machines/settings-types";
 import type { LocationSnapshot } from "~/lib/pinballmap/types";
+import {
+  OPDB_DISPLAY_TYPES,
+  OPDB_MACHINE_TYPES,
+  type OpdbPerson,
+} from "~/lib/opdb/types";
 import { REPORT_MODE_VALUES } from "~/lib/types/user";
 import type { MachineViewSavedState } from "~/lib/types/machine-view";
 
@@ -365,6 +370,46 @@ export const pinballmapCatalog = pgTable(
     nameIdx: index("idx_pinballmap_catalog_name").on(t.name),
     // Edition lookup for a selected family.
     groupIdx: index("idx_pinballmap_catalog_group").on(t.machineGroupId),
+  })
+).enableRLS();
+
+/**
+ * Local copy of the Open Pinball Database's daily export (PP-wqit.12), keyed by
+ * full OPDB ID. Holds only the machine and alias entries and only the fields
+ * Pinball Map's catalog does not relay: type, display, player count, and people
+ * credits. A catalog title reaches its row through `pinballmap_catalog.opdb_id`
+ * (not a foreign key: an alias missing here falls back to its machine-level ID,
+ * see `~/lib/opdb/records`). Refreshed daily by /api/cron/refresh-opdb; read at
+ * render time, never fetched per request (spec collections-and-tags 9.1).
+ */
+export const opdbMachines = pgTable(
+  "opdb_machines",
+  {
+    opdbId: text("opdb_id").primaryKey(),
+    name: text("name").notNull(),
+    type: text("type", { enum: OPDB_MACHINE_TYPES }),
+    display: text("display", { enum: OPDB_DISPLAY_TYPES }),
+    playerCount: integer("player_count"),
+    people: jsonb("people").$type<OpdbPerson[]>().notNull().default([]),
+    refreshedAt: timestamp("refreshed_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  () => ({
+    // Drizzle's `enum` on a text column narrows TypeScript only; these keep a
+    // stray writer from storing a value no tag label exists for.
+    typeCheck: check(
+      "opdb_machines_type_check",
+      sql`type IN ('em', 'ss', 'me')`
+    ),
+    displayCheck: check(
+      "opdb_machines_display_check",
+      sql`display IN ('reels', 'lights', 'alphanumeric', 'cga', 'dmd', 'lcd')`
+    ),
+    playerCountCheck: check(
+      "opdb_machines_player_count_check",
+      sql`player_count > 0`
+    ),
   })
 ).enableRLS();
 
