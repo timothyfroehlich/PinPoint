@@ -666,3 +666,16 @@ export async function seedSavedApronCard(
     .eq("id", machineId);
   if (error) throw error;
 }
+
+/**
+ * Drop a user's Pinball Map account link row (pinballmap spec 8.4), so a test
+ * that links the shared role account leaves it unlinked for the next spec.
+ * The Vault secret is left behind; the next global reset clears it.
+ */
+export async function deletePinballMapLink(userId: string): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from("pinballmap_user_credentials")
+    .delete()
+    .eq("user_id", userId);
+  if (error) throw error;
+}
