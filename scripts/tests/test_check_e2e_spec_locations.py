@@ -110,3 +110,33 @@ def test_main_failure_exit(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
     assert "ERROR: Found 1 E2E spec file(s)" in captured.err
     assert "e2e/profiles/profile-edit.spec.ts" in captured.err
     assert "playwright.config.full.ts" in captured.err
+
+
+def test_directory_named_like_spec_is_ignored(tmp_path: Path):
+    """A directory ending in .spec.ts is not treated as a spec file."""
+    spec_dir = tmp_path / "e2e" / "profiles" / "fake.spec.ts"
+    spec_dir.mkdir(parents=True)
+    assert find_misplaced_specs(tmp_path) == []
+
+
+def test_find_repo_root(tmp_path: Path):
+    """find_repo_root walks up until package.json is found, or returns start."""
+    (tmp_path / "package.json").write_text("{}", encoding="utf-8")
+    nested = tmp_path / "a" / "b" / "c"
+    nested.mkdir(parents=True)
+
+    assert find_repo_root(nested) == tmp_path
+
+    unrelated = tmp_path / "unrelated"
+    unrelated.mkdir()
+    # Path without package.json in its tree
+    assert find_repo_root(Path("/tmp")) == Path("/tmp")
+
+
+def test_main_default_root(capsys: pytest.CaptureFixture[str]):
+    """main() with no arguments resolves repo root automatically and passes."""
+    exit_code = main([])
+    assert exit_code == 0
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == ""
