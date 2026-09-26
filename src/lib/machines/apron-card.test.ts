@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   apronCardContent,
   apronCardPixelSize,
+  apronCreditRows,
   cardParagraphs,
   fitTitleSize,
   groupedEdition,
+  shrinkUntilFits,
 } from "~/lib/machines/apron-card";
+import { NO_CREDITS } from "~/lib/opdb/credits";
 import { qrSvgPath } from "~/lib/machines/apron-qr";
 import { plainTextToDoc } from "~/lib/tiptap/types";
 
@@ -64,6 +67,8 @@ describe("apronCardContent", () => {
     apronDescription: "Custom description",
     apronTip: "Aim for the scoop",
     apronTipEnabled: false,
+    apronDesignEnabled: true,
+    apronArtEnabled: false,
     owner: { name: "Tim" },
     pinballmapTitle: {
       name: "Godzilla (Premium)",
@@ -73,8 +78,10 @@ describe("apronCardContent", () => {
     },
   };
 
+  const credits = { design: ["Keith Elwin"], art: ["Jeremy Packer"] };
+
   it("uses the main description while retaining disabled tip text", () => {
-    expect(apronCardContent(machine)).toMatchObject({
+    expect(apronCardContent(machine, credits)).toMatchObject({
       edition: "Premium Edition",
       description: "Main description",
       tip: "Aim for the scoop",
@@ -83,14 +90,96 @@ describe("apronCardContent", () => {
   });
 
   it("prints the current manufacturer rather than the stored copy", () => {
-    expect(apronCardContent(machine).manufacturer).toBe("Stern");
+    expect(apronCardContent(machine, credits).manufacturer).toBe("Stern");
   });
 
   it("uses the custom description only when selected", () => {
     expect(
-      apronCardContent({ ...machine, apronUseCustomDescription: true })
+      apronCardContent({ ...machine, apronUseCustomDescription: true }, credits)
         .description
     ).toBe("Custom description");
+  });
+
+  it("carries the credits and each role's display setting", () => {
+    expect(apronCardContent(machine, credits)).toMatchObject({
+      credits,
+      designEnabled: true,
+      artEnabled: false,
+    });
+  });
+});
+
+describe("apronCreditRows", () => {
+  const both = { designEnabled: true, artEnabled: true };
+
+  it("shows Design then Art", () => {
+    expect(
+      apronCreditRows({
+        ...both,
+        credits: {
+          design: ["Pat Lawlor", "Larry DeMar"],
+          art: ["John Youssi"],
+        },
+      })
+    ).toEqual([
+      { label: "Design", text: "Pat Lawlor, Larry DeMar" },
+      { label: "Art", text: "John Youssi" },
+    ]);
+  });
+
+  it("limits a role to two names and counts the rest (spec 10.3)", () => {
+    const [, art] = apronCreditRows({
+      ...both,
+      credits: {
+        design: ["Steve Ritchie"],
+        art: ["Bob Stevlic", "Kevin O'Connor", "Stephen Alexander"],
+      },
+    });
+    expect(art?.text).toBe("Bob Stevlic, Kevin O'Connor +1 more");
+  });
+
+  it("shows Unknown for a role with no credits (spec 10.4)", () => {
+    expect(apronCreditRows({ ...both, credits: NO_CREDITS })).toEqual([
+      { label: "Design", text: "Unknown" },
+      { label: "Art", text: "Unknown" },
+    ]);
+  });
+
+  it("drops a role whose display setting is off (spec 10.5)", () => {
+    expect(
+      apronCreditRows({
+        designEnabled: false,
+        artEnabled: true,
+        credits: { design: ["Keith Elwin"], art: ["Jeremy Packer"] },
+      })
+    ).toEqual([{ label: "Art", text: "Jeremy Packer" }]);
+    expect(
+      apronCreditRows({
+        designEnabled: false,
+        artEnabled: false,
+        credits: NO_CREDITS,
+      })
+    ).toEqual([]);
+  });
+});
+
+describe("shrinkUntilFits", () => {
+  it("keeps the starting size when the panel already fits", () => {
+    expect(shrinkUntilFits({ startPx: 42, minPx: 24, fits: () => true })).toBe(
+      42
+    );
+  });
+
+  it("shrinks in half-pixel steps until the panel fits", () => {
+    expect(
+      shrinkUntilFits({ startPx: 42, minPx: 24, fits: (px) => px <= 33.5 })
+    ).toBe(33.5);
+  });
+
+  it("stops at the floor when nothing fits", () => {
+    expect(shrinkUntilFits({ startPx: 42, minPx: 24, fits: () => false })).toBe(
+      24
+    );
   });
 });
 
