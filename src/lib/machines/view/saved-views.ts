@@ -168,9 +168,9 @@ export function resolveSavedMachineViewRequest({
   if (!hasMachineViewConfiguration(searchParams)) {
     const defaultView = find(defaultViewId);
     if (!defaultView) return { activeViewId: null, redirectTo: null };
-    // The Page Preset needs no redirect: the bare URL already shows it.
+    // The bare URL already shows the Page Preset, which no `view` names.
     if (defaultView.id === MACHINE_VIEW_PAGE_PRESET_VIEW_ID[preset]) {
-      return { activeViewId: defaultView.id, redirectTo: null };
+      return { activeViewId: null, redirectTo: null };
     }
     const params = savedMachineViewSearchParams(
       defaultView.state,
@@ -372,7 +372,7 @@ export async function setMachineViewDefault(
   }
   if (
     target?.kind === "builtIn" &&
-    !getMachineViewBuiltInViews(presetForSurface(input.key)).some(
+    !getMachineViewBuiltInViews(presetForSurface(input.key.surface)).some(
       (view) => view.id === target.id
     )
   ) {
@@ -394,9 +394,9 @@ export async function setMachineViewDefault(
 
 /** The Page Preset a Surface uses (spec §2.3). */
 export function presetForSurface(
-  key: SavedMachineViewSurfaceKey
+  surface: SavedMachineViewSurfaceKey["surface"]
 ): MachineViewPresetId {
-  return key.surface === "machines" ? "machines" : "collection";
+  return surface === "machines" ? "machines" : "collection";
 }
 
 function sameSurface(

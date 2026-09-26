@@ -58,7 +58,7 @@ describe("saved view request resolution", () => {
 
   it("needs no redirect when the default is the Page Preset", () => {
     expect(resolve("", "on-the-floor")).toEqual({
-      activeViewId: "on-the-floor",
+      activeViewId: null,
       redirectTo: null,
     });
   });

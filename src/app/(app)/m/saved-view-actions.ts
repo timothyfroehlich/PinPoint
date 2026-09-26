@@ -117,7 +117,7 @@ const updateProtected = createProtectedAction({
       id: owned.id,
       state: normalizeMachineViewSavedState(
         input.state,
-        presetForSurface(owned.key)
+        presetForSurface(owned.key.surface)
       ),
     });
   },

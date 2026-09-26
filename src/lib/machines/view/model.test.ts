@@ -134,7 +134,7 @@ describe("applyMachineViewState", () => {
     expect(result.rows.map((row) => row.initials)).toEqual(["A", "Z", "B"]);
   });
 
-  it("keeps missing dates last in both sort directions", () => {
+  it("sorts never-serviced machines as the oldest service", () => {
     const rows = [
       candidate({ id: "never", initials: "N", lastServicedAt: null }),
       candidate({
@@ -165,7 +165,7 @@ describe("applyMachineViewState", () => {
         sort: "lastServiced",
         dir: "asc",
       }).rows.map((row) => row.id)
-    ).toEqual(["old", "recent", "never"]);
+    ).toEqual(["never", "old", "recent"]);
   });
 });
 

@@ -5,6 +5,7 @@ import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { getMachineViewBuiltInViews } from "~/lib/machines/view/config";
 import {
   getMachineViewDefault,
+  presetForSurface,
   listSavedMachineViews,
   resolveSavedMachineViewRequest,
   type SavedMachineViewSurfaceKey,
@@ -69,10 +70,6 @@ export interface MachineViewSurfacePageState {
   redirectTo: string | null;
 }
 
-function presetForRef(ref: MachineViewSurfaceRef): MachineViewPresetId {
-  return ref.kind === "machines" ? "machines" : "collection";
-}
-
 /**
  * Loads the views a page's Surface offers the viewer and decides whether a
  * configuration-free URL opens the account's default (spec §8.11). Every
@@ -84,7 +81,7 @@ export async function loadMachineViewSurfacePageState(
   searchParams: MachineViewSearchParams
 ): Promise<MachineViewSurfacePageState> {
   const viewer = await getViewer();
-  const preset = presetForRef(ref);
+  const preset = presetForSurface(ref.kind);
   const builtInViews = getMachineViewBuiltInViews(preset).map(
     ({ id, name, state }) => ({ id, name, state })
   );
