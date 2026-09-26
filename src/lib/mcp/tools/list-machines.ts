@@ -20,16 +20,14 @@ import {
   VALID_MACHINE_PRESENCE_STATUSES,
   type MachinePresenceStatus,
 } from "~/lib/machines/presence";
-import type {
-  PbmListingView,
-  PbmSiblingInput,
-} from "~/lib/pinballmap/listing-state";
+import type { PbmListingView } from "~/lib/pinballmap/listing-state";
 import { db } from "~/server/db";
-import { machines } from "~/server/db/schema";
+import { machines, pinballmapCatalog } from "~/server/db/schema";
 
 import {
-  deriveLineupView,
+  deriveLineupWithInsiderConnected,
   loadLineupSource,
+  type LineupSibling,
   type LineupSource,
 } from "./pinballmap-block";
 import {
@@ -113,7 +111,8 @@ interface OutOfSyncLineup {
 
 /**
  * Every linked cabinet whose intent disagrees with the stored lineup — the
- * machine page's "Out of sync" (Missing or Lingering), from the same derivation.
+ * machine page's "Out of sync" (Missing, Lingering, or Insider Connected
+ * differs), from the same derivation.
  *
  * Throws rather than returning an empty set when there is no lineup to compare
  * against: `total: 0` would read as "Pinball Map matches PinPoint" when nothing
@@ -143,11 +142,17 @@ async function loadOutOfSync(): Promise<OutOfSyncLineup> {
       pinballmapMachineId: machines.pinballmapMachineId,
       pinballmapExcluded: machines.pinballmapExcluded,
       pinballmapIntent: machines.pinballmapIntent,
+      pinballmapIcIntent: machines.pinballmapIcIntent,
+      icEligible: pinballmapCatalog.icEligible,
     })
     .from(machines)
+    .leftJoin(
+      pinballmapCatalog,
+      eq(pinballmapCatalog.pinballmapMachineId, machines.pinballmapMachineId)
+    )
     .where(isNotNull(machines.pinballmapMachineId));
 
-  const byTitle = new Map<number, PbmSiblingInput[]>();
+  const byTitle = new Map<number, LineupSibling[]>();
   for (const m of linked) {
     if (m.pinballmapMachineId === null) continue;
     const group = byTitle.get(m.pinballmapMachineId) ?? [];
@@ -156,6 +161,7 @@ async function loadOutOfSync(): Promise<OutOfSyncLineup> {
       initials: m.initials,
       name: m.name,
       intent: m.pinballmapIntent,
+      icIntent: m.pinballmapIcIntent,
     });
     byTitle.set(m.pinballmapMachineId, group);
   }
@@ -163,10 +169,11 @@ async function loadOutOfSync(): Promise<OutOfSyncLineup> {
   const views = new Map<string, PbmListingView>();
   for (const m of linked) {
     if (m.pinballmapMachineId === null) continue;
-    const view = deriveLineupView(
+    const { view } = deriveLineupWithInsiderConnected(
       m,
       source,
-      byTitle.get(m.pinballmapMachineId) ?? []
+      byTitle.get(m.pinballmapMachineId) ?? [],
+      m.icEligible ?? false
     );
     if (view.outOfSync) views.set(m.id, view);
   }
@@ -223,7 +230,7 @@ export const listMachinesSchema = z.object({
     .enum(PINBALLMAP_FILTERS)
     .optional()
     .describe(
-      "Filter by PinballMap state: 'unlinked' (no catalog match and not excluded), 'linked' (matched to catalog), 'excluded' (marked not on PinballMap), or 'out_of_sync' (linked, and the last-synced lineup disagrees with the lineup intent: 'missing' = intent On but not on the lineup, 'lingering' = intent Off but still on it). 'out_of_sync' fails if no lineup has been synced, and never covers unlinked machines — use 'unlinked' for those."
+      "Filter by PinballMap state: 'unlinked' (no catalog match and not excluded), 'linked' (matched to catalog), 'excluded' (marked not on PinballMap), or 'out_of_sync' (linked, and the last-synced lineup disagrees with the lineup intent: 'missing' = intent On but not on the lineup, 'lingering' = intent Off but still on it, or pushAction 'update' = only the Insider Connected setting differs). 'out_of_sync' fails if no lineup has been synced, and never covers unlinked machines — use 'unlinked' for those."
     ),
   limit: z
     .number()

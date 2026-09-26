@@ -443,10 +443,15 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
 
       it("'out_of_sync' returns only cabinets whose intent disagrees with the synced lineup", async () => {
         const admin = await makeUser("admin");
-        // Titles 61_001 and 61_002 are on the lineup; 61_003 is not.
+        // Titles 61_001, 61_002 and 61_004 are on the lineup; 61_003 is not.
         await seedLineup([
           { id: 52_001, machineId: 61_001 },
           { id: 52_002, machineId: 61_002 },
+          { id: 52_004, machineId: 61_004 },
+        ]);
+        // 61_004 offers Insider Connected; the lineup has it never set.
+        await seedCatalog([
+          { pinballmapMachineId: 61_004, name: "Godzilla", icEligible: true },
         ]);
         const pbm = (
           pinballmapMachineId: number,
@@ -471,6 +476,11 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
         });
         // Unlinked machines have nothing to compare; 'unlinked' owns them.
         await seedMachine({ name: "Sync F Unlinked" });
+        // In the lineup, but its Insider Connected intent differs (PP-u4ab.22).
+        const icDiffers = await seedMachine({
+          name: "Sync G IC Differs",
+          pbm: { ...pbm(61_004, "on"), pinballmapIcIntent: "on" },
+        });
 
         const outcome = await runListMachines(
           { pinballmap: "out_of_sync" },
@@ -495,8 +505,12 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
             initials: missing.initials,
             lineup: { state: "missing", pushAction: "add" },
           },
+          {
+            initials: icDiffers.initials,
+            lineup: { state: "on", pushAction: "update" },
+          },
         ]);
-        expect(result.total).toBe(2);
+        expect(result.total).toBe(3);
         expect(result.lineupSnapshot).toEqual({
           syncedAt: LINEUP_SYNCED_AT,
           lastSyncStatus: "ok",

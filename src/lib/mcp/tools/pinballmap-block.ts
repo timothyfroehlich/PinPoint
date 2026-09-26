@@ -8,6 +8,7 @@ import {
   withInsiderConnected,
   type PbmIcIntent,
   type PbmInsiderConnectedSetting,
+  type PbmInsiderConnectedView,
 } from "~/lib/pinballmap/insider-connected";
 import {
   derivePbmListingView,
@@ -213,6 +214,37 @@ export function deriveLineupView(
   });
 }
 
+/** A same-title cabinet, with the Insider Connected intent the entry's target needs. */
+export type LineupSibling = PbmSiblingInput & { icIntent: PbmIcIntent | null };
+
+/**
+ * The lineup view with Insider Connected folded in, as the machine page shows
+ * it: `outOfSync` / `pushAction` include Insider Connected differs (spec §4.2).
+ * `ic` is null when the title is not eligible.
+ */
+export function deriveLineupWithInsiderConnected(
+  machine: Parameters<typeof deriveLineupView>[0] & {
+    pinballmapIcIntent: PbmIcIntent | null;
+  },
+  source: LineupSource,
+  siblings: readonly LineupSibling[],
+  icEligible: boolean
+): { view: PbmListingView; ic: PbmInsiderConnectedView | null } {
+  const listing = deriveLineupView(machine, source, siblings);
+  const ic =
+    machine.pinballmapMachineId === null
+      ? null
+      : deriveInsiderConnectedView({
+          listing,
+          pinballmapMachineId: machine.pinballmapMachineId,
+          icEligible,
+          intent: machine.pinballmapIcIntent,
+          siblingIntents: siblings.map((sibling) => sibling.icIntent),
+          snapshot: source.snapshot,
+        });
+  return { view: withInsiderConnected(listing, ic), ic };
+}
+
 function toMcpLineup(
   view: PbmListingView,
   source: LineupSource
@@ -279,15 +311,12 @@ export async function buildMachinePinballmap(
       : (await isCatalogEmpty())
         ? "mirror_unpopulated"
         : "missing";
-    const listing = deriveLineupView(machine, source, siblings);
-    const ic = deriveInsiderConnectedView({
-      listing,
-      pinballmapMachineId,
-      icEligible: entry?.icEligible ?? false,
-      intent: machine.pinballmapIcIntent,
-      siblingIntents: siblings.map((sibling) => sibling.icIntent),
-      snapshot: source.snapshot,
-    });
+    const { view, ic } = deriveLineupWithInsiderConnected(
+      machine,
+      source,
+      siblings,
+      entry?.icEligible ?? false
+    );
     return {
       status: "linked",
       pinballmapMachineId,
@@ -307,7 +336,7 @@ export async function buildMachinePinballmap(
         pinballMap: ic?.pinballMap ?? null,
         differs: ic?.differs ?? false,
       },
-      lineup: toMcpLineup(withInsiderConnected(listing, ic), source),
+      lineup: toMcpLineup(view, source),
     };
   }
 
