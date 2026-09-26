@@ -60,7 +60,7 @@ function groupByLabel(
  * Every tag with at least one machine, by tag type, covering machines in any
  * presence state. Membership is derived from stored machine, catalog and OPDB
  * rows, so reading a tag never calls an external service (spec
- * collections-and-tags 7.6). Type, Display and Players tags come from the
+ * collections-and-tags 7.6). Type, Display and Player Count tags come from the
  * OPDB record of a machine's catalog title (spec 9.1–9.2).
  */
 export async function listTags(tx: DbTransaction = db): Promise<TagsByType> {
@@ -117,7 +117,7 @@ export async function listTags(tx: DbTransaction = db): Promise<TagsByType> {
     display: groupByLabel("display", members, (opdb) =>
       displayTag(opdb.display)
     ),
-    players: groupByLabel("players", members, (opdb) =>
+    "player-count": groupByLabel("player-count", members, (opdb) =>
       playersTag(opdb.playerCount)
     ),
   };

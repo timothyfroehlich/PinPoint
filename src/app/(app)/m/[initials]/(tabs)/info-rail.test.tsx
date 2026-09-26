@@ -84,7 +84,7 @@ describe("InfoRail", () => {
         { name: "Williams", href: "/c/tags/manufacturer/williams" },
         { name: "Solid State", href: "/c/tags/type/solid-state" },
         { name: "DMD", href: "/c/tags/display/dmd" },
-        { name: "4 Players", href: "/c/tags/players/4-players" },
+        { name: "4 Players", href: "/c/tags/player-count/4-players" },
       ],
     });
     const links = within(screen.getByTestId("machine-tags")).getAllByRole(

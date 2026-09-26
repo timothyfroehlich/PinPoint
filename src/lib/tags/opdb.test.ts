@@ -22,7 +22,7 @@ describe("OPDB tag labels", () => {
     expect(displayTag(null)).toBeNull();
   });
 
-  it("names Players tags singular for one, plural otherwise (spec 9.5)", () => {
+  it("names Player Count tags singular for one, plural otherwise (spec 9.5)", () => {
     expect(playersTag(1)).toMatchObject({ slug: "1-player", name: "1 Player" });
     expect(playersTag(4)).toMatchObject({
       slug: "4-players",
@@ -44,6 +44,8 @@ describe("OPDB tag labels", () => {
 describe("tagHref", () => {
   it("links a tag's page by its URL-encoded address", () => {
     expect(tagHref("manufacturer", "a&b")).toBe("/c/tags/manufacturer/a%26b");
-    expect(tagHref("players", "4-players")).toBe("/c/tags/players/4-players");
+    expect(tagHref("player-count", "4-players")).toBe(
+      "/c/tags/player-count/4-players"
+    );
   });
 });

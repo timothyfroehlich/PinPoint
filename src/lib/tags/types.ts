@@ -3,7 +3,7 @@ export const TAG_TYPE_IDS = [
   "manufacturer",
   "type",
   "display",
-  "players",
+  "player-count",
 ] as const;
 export type TagTypeId = (typeof TAG_TYPE_IDS)[number];
 
@@ -40,10 +40,10 @@ export const TAG_TYPES: Record<TagTypeId, TagTypeInfo> = {
     automatic: true,
     source: "Set from each machine's OPDB record",
   },
-  players: {
-    id: "players",
-    label: "Players",
-    href: "/c/tags/players",
+  "player-count": {
+    id: "player-count",
+    label: "Player Count",
+    href: "/c/tags/player-count",
     automatic: true,
     source: "Set from each machine's OPDB record",
   },

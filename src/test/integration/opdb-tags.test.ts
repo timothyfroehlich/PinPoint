@@ -13,7 +13,7 @@ const { loadMachineViewFromDatabase } =
 const { getTagsForMachine, listTags } = await import("~/lib/tags/tags");
 
 /**
- * Type, Display and Players tags (spec collections-and-tags 9.1–9.6): taken
+ * Type, Display and Player Count tags (spec collections-and-tags 9.1–9.6): taken
  * from the stored OPDB record of a machine's catalog title, never from a
  * machine without one.
  */
@@ -98,7 +98,7 @@ describe("OPDB tags", () => {
 
   it("groups machines into ordered, labeled tags of each type", async () => {
     const tags = await listTags(asDbOrTx(await getTestDb()));
-    const summary = (type: "type" | "display" | "players") =>
+    const summary = (type: "type" | "display" | "player-count") =>
       tags[type].map((tag) => ({
         slug: tag.slug,
         name: tag.name,
@@ -118,7 +118,7 @@ describe("OPDB tags", () => {
       { slug: "alphanumeric", name: "Alphanumeric", initials: ["FH"] },
       { slug: "lcd", name: "LCD", initials: ["GZ"] },
     ]);
-    expect(summary("players")).toEqual([
+    expect(summary("player-count")).toEqual([
       { slug: "1-player", name: "1 Player", initials: ["FF"] },
       { slug: "4-players", name: "4 Players", initials: ["FH", "GZ"] },
     ]);
@@ -138,7 +138,7 @@ describe("OPDB tags", () => {
     expect(gz.map((tag) => `${tag.type}:${tag.name}`)).toEqual([
       "type:Solid State",
       "display:LCD",
-      "players:4 Players",
+      "player-count:4 Players",
     ]);
     for (const initials of ["BLK", "NOP"]) {
       expect(
@@ -156,7 +156,7 @@ describe("OPDB tags", () => {
     const result = await loadMachineViewFromDatabase(
       asDbOrTx(await getTestDb()),
       {
-        scope: { kind: "tag", tagType: "players", slug: "4-players" },
+        scope: { kind: "tag", tagType: "player-count", slug: "4-players" },
         preset: "collection",
         searchParams: new URLSearchParams({ columns: "machine" }),
       }
