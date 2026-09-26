@@ -26,9 +26,9 @@ export interface GetIscoredGamesOptions {
  * Returns `{ games: IscoredGame[] }` on success, or `{ error: string }` on failure.
  */
 export async function getIscoredGamesAction(
-  options?: GetIscoredGamesOptions | string
+  options?: GetIscoredGamesOptions
 ): Promise<GetIscoredGamesResult> {
-  const machineId = typeof options === "string" ? options : options?.machineId;
+  const machineId = options?.machineId;
   const supabase = await createClient();
   const {
     data: { user },

@@ -94,19 +94,6 @@ describe("getIscoredGamesAction", () => {
     expect(getGameroomGames).toHaveBeenCalledTimes(1);
   });
 
-  it("returns games list when user is member, owns the machine, and machineId is passed as string", async () => {
-    const mockGames = [{ gameId: "77956", gameName: "Medieval Madness" }];
-    mockGetUser.mockResolvedValue({ data: { user: { id: "user-123" } } });
-    mockFindFirstProfile.mockResolvedValue({ role: "member" });
-    mockFindFirstMachine.mockResolvedValue({ ownerId: "user-123" });
-    vi.mocked(isIscoredConfigured).mockReturnValue(true);
-    vi.mocked(getGameroomGames).mockResolvedValue(mockGames);
-
-    const result = await getIscoredGamesAction("machine-abc");
-    expect(result).toEqual({ games: mockGames });
-    expect(getGameroomGames).toHaveBeenCalledTimes(1);
-  });
-
   it("returns error when user is member and does not own the machine", async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: "user-123" } } });
     mockFindFirstProfile.mockResolvedValue({ role: "member" });
