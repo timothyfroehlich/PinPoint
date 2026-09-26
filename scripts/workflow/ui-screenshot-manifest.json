@@ -58,13 +58,13 @@
     "label": "New Machine",
     "route": "/m/new",
     "authRole": "admin",
-    "seedNeeds": "default seed (owner picker options + PinballMap catalog mirror). Added by PP-o355.19: this page hosts PinballMapLinkField, whose Model/Edition pairing is driven by the field's own container — a regression here is invisible from the Manage tab alone."
+    "seedNeeds": "default seed (owner picker options + PinballMap catalog mirror). Added by PP-o355.19: this page hosts PinballMapLinkField, whose Model/Edition pairing is driven by the field's own container \u2014 a regression here is invisible from the Manage tab alone."
   },
   "machine-settings": {
     "label": "Machine Settings (Attack from Mars)",
     "route": "/m/AFM/settings",
     "authRole": "admin",
-    "seedNeeds": "seeded AFM settings sets (supabase/seed-machine-settings.mjs) — 6 sets spanning both owner/community kinds × public/private-draft + the Tournament tag; admin sees all six"
+    "seedNeeds": "seeded AFM settings sets (supabase/seed-machine-settings.mjs) \u2014 6 sets spanning both owner/community kinds \u00d7 public/private-draft + the Tournament tag; admin sees all six"
   },
   "admin-integrations": {
     "label": "Admin Integrations",
@@ -77,5 +77,17 @@
     "route": "/settings",
     "authRole": "member",
     "seedNeeds": "seeded member profile (default report-form preferences)"
+  },
+  "tags": {
+    "label": "Tag Browse",
+    "route": "/c/tags",
+    "authRole": "member",
+    "seedNeeds": "pinballmap catalog + OPDB seeds (seed-pinballmap-catalog.mjs, seed-opdb.mjs)"
+  },
+  "tag-display-dmd": {
+    "label": "Tag (Display / DMD)",
+    "route": "/c/tags/display/dmd",
+    "authRole": "member",
+    "seedNeeds": "OPDB seed: machines whose catalog title's OPDB display is dmd"
   }
 }

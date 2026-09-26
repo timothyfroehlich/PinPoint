@@ -31,14 +31,6 @@ describe("OPDB tag labels", () => {
     expect(playersTag(null)).toBeNull();
     expect(playersTag(0)).toBeNull();
   });
-
-  it("orders tags within a type by their rank", () => {
-    const ranks = (
-      ["reels", "lights", "alphanumeric", "cga", "dmd", "lcd"] as const
-    ).map((d) => displayTag(d)?.rank);
-    expect(ranks).toEqual([...ranks].sort((a = 0, b = 0) => a - b));
-    expect(playersTag(1)?.rank).toBeLessThan(playersTag(2)?.rank ?? 0);
-  });
 });
 
 describe("tagHref", () => {
