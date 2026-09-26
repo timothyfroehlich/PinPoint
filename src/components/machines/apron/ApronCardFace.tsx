@@ -73,6 +73,20 @@ export function ApronCardFace({
     creditRows,
   ]);
 
+  // The card does not fit when description and tip overflow their region
+  // (§3.5) or when the identity panel still reaches the logo with the title
+  // at its floor (§6.4). Reads refs only, so any render's copy is current.
+  const reportOverflow = (): void => {
+    const text = textRef.current;
+    const identity = identityRef.current;
+    if (!text) return;
+    const overflows = (el: HTMLElement): boolean =>
+      el.scrollHeight > el.clientHeight + 0.5;
+    onOverflowRef.current?.(
+      overflows(text) || (identity !== null && overflows(identity))
+    );
+  };
+
   // Title fit (spec §1, §6.1, §6.3), measured against the loaded faces:
   // first the three-line fit by text width, then down until the identity
   // panel's content fits above the logo.
@@ -112,6 +126,9 @@ export function ApronCardFace({
           title.style.fontSize = `${px}px`;
         }
         setTitlePx(px);
+        // The fit can finish without a re-render (same size as before), so
+        // re-check here rather than rely on the per-render check alone.
+        reportOverflow();
       }
       onReadyRef.current?.();
     };
@@ -124,15 +141,10 @@ export function ApronCardFace({
     };
   }, [content.name, layout, panelKey]);
 
-  // Combined-region overflow (spec §3.5): a boolean, no line counting.
+  // Combined-region overflow (spec §3.5, §6.4): a boolean, no line counting.
   useLayoutEffect(() => {
-    const el = textRef.current;
-    if (!el) return;
-    const check = (): void => {
-      onOverflowRef.current?.(el.scrollHeight > el.clientHeight + 0.5);
-    };
-    check();
-    void document.fonts.ready.then(check);
+    reportOverflow();
+    void document.fonts.ready.then(reportOverflow);
   });
 
   const makerYear = [content.manufacturer, content.year]
