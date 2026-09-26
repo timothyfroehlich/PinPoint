@@ -104,17 +104,39 @@ function main() {
       );
       process.exit(1);
     }
-    console.log(error.stdout ?? "");
-    console.error(error.stderr ?? "");
-    console.error(
-      "\nFAIL — pinpoint_readonly has drifted from what readonly-role.sql intends.\n" +
-        "File a P1/P2 bead (severity per what leaked — a credential-shaped column is\n" +
-        "P1) and revoke the specific grant, e.g.:\n" +
-        '  psql "$POSTGRES_URL_ADMIN" -c \\\n' +
-        '    "REVOKE SELECT (<leaked_column>) ON public.<table> FROM pinpoint_readonly;"\n' +
-        "(the pattern scripts/sql/readonly-role.sql already uses for\n" +
-        "collections.view_token), then re-run this check."
-    );
+    const stdout = error.stdout ?? "";
+    const stderr = error.stderr ?? "";
+    console.log(stdout);
+    console.error(stderr);
+
+    // The SQL file's own failure mode: `RAISE EXCEPTION 'pinpoint_readonly: %
+    // of % checks failed ...'`, which psql surfaces as an ERROR line. Only
+    // THAT is real drift. Anything else here — a bad/expired password, a
+    // network blip, or the CLI_TIMEOUT_MS above tripping on a slow prod
+    // connection — is a failure to complete the check, not a finding, and
+    // must not be reported as one: it would send the weekly-chores operator
+    // to file a security bead and run a REVOKE against prod over a transient
+    // connectivity issue.
+    const isRealDrift = /checks failed/.test(stdout + stderr);
+
+    if (isRealDrift) {
+      console.error(
+        "\nFAIL — pinpoint_readonly has drifted from what readonly-role.sql intends.\n" +
+          "File a P1/P2 bead (severity per what leaked — a credential-shaped column is\n" +
+          "P1) and revoke the specific grant, e.g.:\n" +
+          '  psql "$POSTGRES_URL_ADMIN" -c \\\n' +
+          '    "REVOKE SELECT (<leaked_column>) ON public.<table> FROM pinpoint_readonly;"\n' +
+          "(the pattern scripts/sql/readonly-role.sql already uses for\n" +
+          "collections.view_token), then re-run this check."
+      );
+    } else {
+      console.error(
+        "\nFAIL — could not complete the verification (see the psql error above).\n" +
+          "This is NOT a drift finding — investigate the connection/psql failure\n" +
+          "(expired credential, network issue, timeout) and re-run, rather than\n" +
+          "filing a security bead or revoking anything on the strength of this alone."
+      );
+    }
     process.exit(1);
   }
 
