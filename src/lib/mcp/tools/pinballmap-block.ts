@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getCatalogEntry, isCatalogEmpty } from "~/lib/pinballmap/catalog";
+import type { PbmIcIntent } from "~/lib/pinballmap/insider-connected";
 import type { PbmListingIntent } from "~/lib/pinballmap/listing-state";
 import type { MachinePbmColumns } from "~/services/machines";
 
@@ -85,6 +86,23 @@ export interface McpMachinePinballmapLinked {
    * ordinary state a person resolves (spec §1, §4).
    */
   intent: PbmListingIntent;
+  /** The entry's Insider Connected setting as PinPoint intends it (spec §3.8). */
+  insiderConnected: McpMachineInsiderConnected;
+}
+
+/**
+ * Insider Connected is an INTENT like `intent`: what PinPoint wants Pinball Map
+ * to show, never what it currently shows.
+ */
+export interface McpMachineInsiderConnected {
+  /**
+   * Whether Pinball Map's catalog marks the title Insider Connected eligible.
+   * `null` when the title didn't resolve (`catalogLookup` is not `"found"`), so
+   * an unknown title never reads as ineligible.
+   */
+  eligible: boolean | null;
+  /** `"on"`, `"off"`, or `null` when none has been chosen. */
+  intent: PbmIcIntent | null;
 }
 
 /** A machine deliberately marked as not on Pinball Map. */
@@ -107,7 +125,7 @@ export interface McpMachinePinballmapExcluded {
  * (CORE-PBM-001).
  */
 export async function buildMachinePinballmap(
-  machine: MachinePbmColumns
+  machine: MachinePbmColumns & { pinballmapIcIntent: PbmIcIntent | null }
 ): Promise<McpMachinePinballmap | null> {
   if (machine.pinballmapMachineId !== null) {
     const entry = await getCatalogEntry(machine.pinballmapMachineId);
@@ -132,6 +150,10 @@ export async function buildMachinePinballmap(
       opdbId: machine.opdbId,
       ipdbId: machine.ipdbId,
       intent: machine.pinballmapIntent,
+      insiderConnected: {
+        eligible: entry ? entry.icEligible : null,
+        intent: machine.pinballmapIcIntent,
+      },
     };
   }
 

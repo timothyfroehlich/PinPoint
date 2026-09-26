@@ -165,9 +165,21 @@ export async function runSetMachinePinballmap(
   // and the write that followed it never describe one machine differently.
   // `previous` comes from the locked read inside the write, not from the
   // `resolveMachine` snapshot above, so it names the state actually replaced.
+  // The write keeps the Insider Connected intent only while the title stays the
+  // same (`applyMachinePbmLink`), which is all this tool can change about it.
+  const icIntentAfter =
+    updated.previous.pinballmapMachineId === updated.columns.pinballmapMachineId
+      ? machine.pinballmapIcIntent
+      : null;
   const [previous, pinballmap] = await Promise.all([
-    buildMachinePinballmap(updated.previous),
-    buildMachinePinballmap(updated.columns),
+    buildMachinePinballmap({
+      ...updated.previous,
+      pinballmapIcIntent: machine.pinballmapIcIntent,
+    }),
+    buildMachinePinballmap({
+      ...updated.columns,
+      pinballmapIcIntent: icIntentAfter,
+    }),
   ]);
 
   return {
