@@ -136,6 +136,7 @@ The control's states (§4) are comparisons across these: _in sync_ means intent 
 - **9.1** All access uses their documented API, with attribution and a link back to the specific location page wherever their data is rendered.
 - **9.2** Automated reads are limited to the hourly sync; human-triggered refreshes are throttled. PinPoint backs off when asked.
 - **9.3** These are commitments to another community's service, not internal preferences. See `docs/NON_NEGOTIABLES.md` (CORE-PBM-001).
+- **9.4** Under the machine Info tab's Pinball Map link, one muted line invites visitors to correct the listing there: "Something wrong? Anyone can update this listing on Pinball Map." It appears only when that link does (a location is configured), the link's own label stays unchanged, and no other surface repeats the invitation.
 
 ## 10. Admin configuration
 
@@ -183,6 +184,7 @@ Replacing the tracked location is a rare, near-never operation — PinPoint trac
 | 2.7 catalog corrections | Manufacturer and year are copied when a machine is matched and never refreshed | PP-o355.46 |
 | 3.6–3.7 lineup confirmation | The client method exists, but no app action exposes venue-lineup confirmation | PP-o355.58 (confirm lineup, needs `/fleet` base PP-o355.7.1); condition-comment posting deferred (PP-o355.57) |
 | 8.2, 8.4–8.6 per-member account linking | Writes use one admin-provisioned operator credential; no member linking, relink state, or link prompt exists | PP-o355.6 |
+| 9.4 update-listing invitation | The Info tab shows the Pinball Map link with no invitation line | PP-2h1b |
 
 ---
 
@@ -193,6 +195,7 @@ Changes to this document. Divergence-table rows are working state and are not lo
 | Date | Change |
 | :-- | :-- |
 | 2026-09-26 | Added §2.7: a matched machine's manufacturer and year follow its Pinball Map catalog title, so a catalog correction updates every matched machine automatically and a cleared value becomes blank; the manual model is untouched. |
+| 2026-09-26 | Added §9.4: the machine Info tab carries one muted line under its Pinball Map link inviting visitors to update the listing there, Pinball Map's encouraged attribution guidance; no other surface repeats it. |
 | 2026-09-26 | §3.8: Insider Connected is now an intent stored in PinPoint for every eligible title, set by anyone who can set listing intent and pushed by the same single sync as the lineup (§4.3, **Update Pinball Map** when only it differs); a mismatch is the new **Insider Connected differs** Out of sync state (§4.2, §4.10). The switch sits on the intent row, so the control is two rows again (§4.1, §4.9). §4.4 drops "…then Refresh to update". |
 | 2026-09-25 | Dropped the obsolete "no-op until comment import exists" note from §10.9 now that comments are imported and marked. |
 | 2026-09-25 | §3.8: eligibility now comes from Pinball Map's catalog flag, so an eligible entry with no recorded value shows **Not set**; the setting is a switch in a row between intent and status that every eligible title keeps, showing "—" without a setting (§4.1), read-only for a member without the machine-linking capability (§4.9); PinPoint sends the target setting instead of flipping it, replacing the re-read-before-write rule. |
