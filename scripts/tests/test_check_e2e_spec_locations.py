@@ -12,12 +12,13 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from check_e2e_spec_locations import (  # noqa: E402
     find_misplaced_specs,
     find_repo_root,
+    find_spec_violations,
     main,
 )
 
 
 def test_current_repo_has_no_misplaced_specs():
-    """Verify that current repository main checkout passes the gate."""
+    """Verify that current repository checkout passes the gate."""
     repo_root = find_repo_root(Path(__file__).resolve().parent)
     misplaced = find_misplaced_specs(repo_root)
     assert misplaced == []
@@ -32,7 +33,7 @@ def test_empty_or_missing_e2e_dir(tmp_path: Path):
 
 
 def test_allowed_suite_directories(tmp_path: Path):
-    """Specs placed under e2e/full/ or e2e/smoke/ are allowed."""
+    """Valid *.spec.ts files placed under e2e/full/ or e2e/smoke/ are allowed."""
     full_spec = tmp_path / "e2e" / "full" / "dashboard.spec.ts"
     full_nested_spec = tmp_path / "e2e" / "full" / "sub" / "admin.spec.ts"
     smoke_spec = tmp_path / "e2e" / "smoke" / "auth.spec.ts"
@@ -47,29 +48,63 @@ def test_allowed_suite_directories(tmp_path: Path):
         p.write_text("// test", encoding="utf-8")
 
     assert find_misplaced_specs(tmp_path) == []
+    assert find_spec_violations(tmp_path) == []
 
 
 def test_misplaced_specs_flagged(tmp_path: Path):
-    """Specs placed directly in e2e/ or in other subdirectories are flagged."""
+    """Test files placed directly in e2e/ or in other subdirectories are flagged."""
     root_spec = tmp_path / "e2e" / "orphaned.spec.ts"
+    root_test = tmp_path / "e2e" / "orphaned.test.ts"
     profiles_spec = tmp_path / "e2e" / "profiles" / "profile-edit.spec.ts"
+    profiles_test = tmp_path / "e2e" / "profiles" / "profile-edit.test.ts"
     fixtures_spec = tmp_path / "e2e" / "fixtures" / "leak.spec.ts"
     support_spec = tmp_path / "e2e" / "support" / "helper.spec.ts"
 
-    root_spec.parent.mkdir(parents=True, exist_ok=True)
-    profiles_spec.parent.mkdir(parents=True, exist_ok=True)
-    fixtures_spec.parent.mkdir(parents=True, exist_ok=True)
-    support_spec.parent.mkdir(parents=True, exist_ok=True)
-
-    for p in (root_spec, profiles_spec, fixtures_spec, support_spec):
+    for p in (
+        root_spec,
+        root_test,
+        profiles_spec,
+        profiles_test,
+        fixtures_spec,
+        support_spec,
+    ):
+        p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text("// test", encoding="utf-8")
 
     misplaced = find_misplaced_specs(tmp_path)
-    assert set(misplaced) == {root_spec, profiles_spec, fixtures_spec, support_spec}
+    assert set(misplaced) == {
+        root_spec,
+        root_test,
+        profiles_spec,
+        profiles_test,
+        fixtures_spec,
+        support_spec,
+    }
+
+    violations = find_spec_violations(tmp_path)
+    for _, reason in violations:
+        assert "outside allowed suite directories" in reason
+
+
+def test_invalid_extension_under_allowed_suite_flagged(tmp_path: Path):
+    """Playwright test files under full/ or smoke/ that are not *.spec.ts are flagged."""
+    full_test_ts = tmp_path / "e2e" / "full" / "foo.test.ts"
+    full_spec_tsx = tmp_path / "e2e" / "full" / "foo.spec.tsx"
+    smoke_test_ts = tmp_path / "e2e" / "smoke" / "bar.test.ts"
+    smoke_spec_js = tmp_path / "e2e" / "smoke" / "bar.spec.js"
+
+    for p in (full_test_ts, full_spec_tsx, smoke_test_ts, smoke_spec_js):
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text("// test", encoding="utf-8")
+
+    violations = dict(find_spec_violations(tmp_path))
+    for p in (full_test_ts, full_spec_tsx, smoke_test_ts, smoke_spec_js):
+        assert p in violations
+        assert "must end with .spec.ts" in violations[p]
 
 
 def test_non_spec_files_ignored(tmp_path: Path):
-    """Non-spec files under e2e/ (e.g. fixtures, helpers, configs) are ignored."""
+    """Non-spec files under e2e/ (e.g. fixtures, helpers, configs, setups) are ignored."""
     setup_file = tmp_path / "e2e" / "auth.setup.ts"
     global_setup = tmp_path / "e2e" / "global-setup.ts"
     tsconfig = tmp_path / "e2e" / "tsconfig.json"
@@ -102,13 +137,21 @@ def test_main_failure_exit(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
     bad_spec = tmp_path / "e2e" / "profiles" / "profile-edit.spec.ts"
     bad_spec.write_text("// test")
 
+    (tmp_path / "e2e" / "full").mkdir(parents=True)
+    bad_ext = tmp_path / "e2e" / "full" / "bad-ext.test.ts"
+    bad_ext.write_text("// test")
+
     exit_code = main(["--root", str(tmp_path)])
     assert exit_code == 1
 
     captured = capsys.readouterr()
     assert captured.out == ""
-    assert "ERROR: Found 1 E2E spec file(s)" in captured.err
-    assert "e2e/profiles/profile-edit.spec.ts" in captured.err
+    assert "ERROR: Found 2 invalid or misplaced E2E spec file(s)" in captured.err
+    assert (
+        "e2e/profiles/profile-edit.spec.ts: outside allowed suite directories"
+        in captured.err
+    )
+    assert "e2e/full/bad-ext.test.ts: must end with .spec.ts" in captured.err
     assert "playwright.config.full.ts" in captured.err
 
 
