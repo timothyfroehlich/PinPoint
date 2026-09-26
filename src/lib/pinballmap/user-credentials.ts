@@ -44,7 +44,7 @@ export async function getPinballMapLinkStatus(
     : { status: "needs_relink", username: row.pbmUsername };
 }
 
-/** Shape returned by `get_pinballmap_user_credentials()` (drizzle/0088). */
+/** Shape returned by `get_pinballmap_user_credentials()` (drizzle/0090). */
 interface UserCredentialsRow {
   pbm_email: string | null;
   token: string | null;

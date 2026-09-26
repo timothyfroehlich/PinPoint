@@ -1,6 +1,6 @@
 {
-  "id": "b5a27faf-e69f-4c70-a700-d2cc61bcb296",
-  "prevId": "dbd1750b-ee1c-4435-9c78-e54e64e3ae5f",
+  "id": "b1fe7b27-d925-450f-a383-355ab12da895",
+  "prevId": "0f858be8-b627-4159-b52c-09ec915562b3",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2113,6 +2113,76 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.opdb_machines": {
+      "name": "opdb_machines",
+      "schema": "",
+      "columns": {
+        "opdb_id": {
+          "name": "opdb_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "display": {
+          "name": "display",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "player_count": {
+          "name": "player_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "people": {
+          "name": "people",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "refreshed_at": {
+          "name": "refreshed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "opdb_machines_type_check": {
+          "name": "opdb_machines_type_check",
+          "value": "type IN ('em', 'ss', 'me')"
+        },
+        "opdb_machines_display_check": {
+          "name": "opdb_machines_display_check",
+          "value": "display IN ('reels', 'lights', 'alphanumeric', 'cga', 'dmd', 'lcd')"
+        },
+        "opdb_machines_player_count_check": {
+          "name": "opdb_machines_player_count_check",
+          "value": "player_count > 0"
+        }
+      },
+      "isRLSEnabled": true
+    },
     "public.pinballmap_abandoned_listings": {
       "name": "pinballmap_abandoned_listings",
       "schema": "",
@@ -3045,6 +3115,66 @@
           "value": "region_alert_status IN ('not_configured', 'posting', 'cant_post', 'couldnt_check', 'needs_discord')"
         }
       },
+      "isRLSEnabled": true
+    },
+    "public.pinballmap_user_credentials": {
+      "name": "pinballmap_user_credentials",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "pbm_username": {
+          "name": "pbm_username",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pbm_email": {
+          "name": "pbm_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token_vault_id": {
+          "name": "token_vault_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "linked_at": {
+          "name": "linked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "needs_relink_at": {
+          "name": "needs_relink_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "pinballmap_user_credentials_user_id_user_profiles_id_fk": {
+          "name": "pinballmap_user_credentials_user_id_user_profiles_id_fk",
+          "tableFrom": "pinballmap_user_credentials",
+          "tableTo": "user_profiles",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
       "isRLSEnabled": true
     },
     "public.timeline_event_people": {

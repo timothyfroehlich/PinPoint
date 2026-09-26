@@ -25,11 +25,13 @@ vi.mock("~/lib/rate-limit", () => ({
   formatResetTime: vi.fn(() => "15 minutes"),
 }));
 
+let mockSelectCount = 0;
+
 vi.mock("~/server/db", () => ({
   db: {
     select: vi.fn(() => ({
       from: vi.fn(() => ({
-        where: vi.fn(() => Promise.resolve([{ val: 0 }])),
+        where: vi.fn(() => Promise.resolve([{ val: mockSelectCount }])),
       })),
     })),
     insert: vi.fn(() => ({
@@ -76,6 +78,7 @@ function createMockFile(name: string, type: string, sizeInBytes: number) {
 describe("uploadIssueImage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSelectCount = 0;
   });
 
   it("should fail if rate limit exceeded", async () => {
@@ -206,5 +209,60 @@ describe("uploadIssueImage", () => {
     expect(blobClient.deleteFromBlob).toHaveBeenCalledWith(
       "issue-images/test-issue/test.jpg"
     );
+  });
+
+  it("should allow upload even if user has previous images in database (no lifetime cap)", async () => {
+    vi.mocked(rateLimit.checkImageUploadLimit).mockResolvedValue({
+      success: true,
+      limit: 5,
+      remaining: 4,
+      reset: 0,
+    });
+
+    vi.mocked(blobClient.uploadToBlob).mockResolvedValue({
+      url: "https://blob.com/test.jpg",
+      downloadUrl: "https://blob.com/test.jpg?download=1",
+      pathname: "issue-images/pending/test.jpg",
+      contentType: "image/jpeg",
+      contentDisposition: 'inline; filename="test.jpg"',
+      etag: "test-etag",
+    });
+
+    const formData = new FormData();
+    formData.append("issueId", "new");
+    const file = createMockFile("test.jpg", "image/jpeg", 2048);
+    formData.append("image", file);
+
+    const result = await uploadIssueImage(formData);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.blobUrl).toBe("https://blob.com/test.jpg");
+    }
+  });
+
+  it("should reject upload if issue total image limit is reached on existing issue", async () => {
+    vi.mocked(rateLimit.checkImageUploadLimit).mockResolvedValue({
+      success: true,
+      limit: 5,
+      remaining: 4,
+      reset: 0,
+    });
+
+    mockSelectCount = 10;
+
+    const formData = new FormData();
+    formData.append("issueId", "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11");
+    const file = createMockFile("test.jpg", "image/jpeg", 2048);
+    formData.append("image", file);
+
+    const result = await uploadIssueImage(formData);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("VALIDATION");
+      expect(result.message).toBe("This issue has reached its image limit.");
+    }
+    expect(blobClient.uploadToBlob).not.toHaveBeenCalled();
   });
 });

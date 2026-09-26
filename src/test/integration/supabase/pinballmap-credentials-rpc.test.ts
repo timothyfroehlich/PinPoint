@@ -1,7 +1,7 @@
 /**
  * The in-body role guard on the Pinball Map credential RPCs:
  * `get_pinballmap_credentials()` (PP-rnup) and
- * `get_pinballmap_user_credentials(uuid)` (PP-o355.6, drizzle/0088).
+ * `get_pinballmap_user_credentials(uuid)` (PP-o355.6, drizzle/0090).
  *
  * Each is a SECURITY DEFINER function that hands back a decrypted Vault secret —
  * the operator write token, or a member's linked Pinball Map token. The REVOKE/GRANT on it is defense in
