@@ -184,6 +184,33 @@ describe("machine view database pipeline", () => {
     expect(all.rows.every((row) => !Object.hasOwn(row, "ownerId"))).toBe(true);
   });
 
+  it("counts Summary Widget health without sending health on rows that do not need it", async () => {
+    const db = await getTestDb();
+    await db
+      .insert(issues)
+      .values([
+        createTestIssue("AAA", { issueNumber: 1, severity: "unplayable" }),
+        createTestIssue("CCC", { issueNumber: 1, severity: "minor" }),
+      ]);
+
+    const result = await loadMachineViewFromDatabase(asDbOrTx(db), {
+      scope: { kind: "all" },
+      preset: "machines",
+      searchParams: new URLSearchParams({
+        presence: "all",
+        columns: "machine",
+      }),
+    });
+
+    expect(result.summary.issues).toEqual({
+      openIssues: 2,
+      machinesWithOpenIssues: 2,
+      bySeverity: { cosmetic: 0, minor: 1, major: 0, unplayable: 1 },
+    });
+    expect(result.summary.playability.byStatus.unplayable).toBe(1);
+    expect(result.rows.every((row) => row.health === undefined)).toBe(true);
+  });
+
   it("ignores owner IDs that are not available in the active scope", async () => {
     const db = await getTestDb();
     const result = await loadMachineViewFromDatabase(asDbOrTx(db), {

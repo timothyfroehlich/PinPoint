@@ -16,6 +16,7 @@ import type {
   MachineViewState,
 } from "~/lib/types";
 import { cn } from "~/lib/utils";
+import { MachineSummaryWidgets } from "./MachineSummaryWidgets";
 import { MachineViewCompactList } from "./MachineViewCompactList";
 import { MachineViewTable } from "./MachineViewTable";
 import { MachineViewToolbar } from "./MachineViewToolbar";
@@ -103,6 +104,7 @@ export function MachineView({
       q: "",
       presence: defaults.presence,
       status: [],
+      severity: [],
       owner: [],
       page: 1,
     });
@@ -110,6 +112,11 @@ export function MachineView({
 
   return (
     <div className="space-y-4" aria-busy={isPending}>
+      <MachineSummaryWidgets
+        summary={result.summary}
+        state={state}
+        onStateChange={navigate}
+      />
       <MachineViewToolbar
         state={state}
         preset={preset}

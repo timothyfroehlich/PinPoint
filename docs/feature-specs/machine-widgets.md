@@ -52,9 +52,7 @@
 
 ## Known divergences (code vs spec)
 
-| Spec | Code today | Resolution |
-| :-- | :-- | :-- |
-| §1–§5 | Machine View shows no Summary Widgets | Machine widgets implementation (PP-3h21) |
+_None — the current implementation matches this spec._
 
 ---
 

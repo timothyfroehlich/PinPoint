@@ -26,6 +26,7 @@ import { getMachineViewPreset, planMachineViewDependencies } from "./config";
 import {
   applyMachineViewState,
   healthFromSeverityCounts,
+  summarizeMachineView,
   type MachineViewCandidate,
 } from "./model";
 import { parseMachineViewState } from "./state";
@@ -241,7 +242,10 @@ export function getLatestMachineActivityDates(
   return latestTimelineDates(tx, machineIds, false);
 }
 
-function publicRow(candidate: MachineViewCandidate): MachineViewRow {
+function publicRow(
+  candidate: MachineViewCandidate,
+  includeHealth: boolean
+): MachineViewRow {
   const row: MachineViewRow = {
     id: candidate.id,
     initials: candidate.initials,
@@ -252,7 +256,9 @@ function publicRow(candidate: MachineViewCandidate): MachineViewRow {
     presence: candidate.presence,
     createdAt: candidate.createdAt,
   };
-  if (candidate.health !== undefined) row.health = candidate.health;
+  if (includeHealth && candidate.health !== undefined) {
+    row.health = candidate.health;
+  }
   if (candidate.lastServicedAt !== undefined) {
     row.lastServicedAt = candidate.lastServicedAt;
   }
@@ -278,10 +284,11 @@ export async function loadMachineViewFromDatabase(
   const dependencyPlan = planMachineViewDependencies(validatedState);
   const machineIds = baseRows.map((row) => row.id);
   const machineInitials = baseRows.map((row) => row.initials);
+  // Summary Widgets always need health across the whole scope
+  // (machine-widgets §2.3), so it loads regardless of the row plan; rows only
+  // carry it to the browser when a field, sort, or filter needs it.
   const [health, serviceDates, activityDates] = await Promise.all([
-    dependencyPlan.health
-      ? getMachineViewHealth(tx, machineInitials)
-      : Promise.resolve(new Map<string, MachineViewHealth>()),
+    getMachineViewHealth(tx, machineInitials),
     dependencyPlan.service
       ? getLatestMachineServiceDates(tx, machineIds)
       : Promise.resolve(new Map<string, Date>()),
@@ -303,17 +310,15 @@ export async function loadMachineViewFromDatabase(
       canonicalModelName: machine.canonicalModelName,
       legacyModelName: machine.legacyModelName,
     };
-    if (dependencyPlan.health) {
-      row.health =
-        health.get(machine.initials) ??
-        healthFromSeverityCounts({
-          cosmetic: 0,
-          minor: 0,
-          major: 0,
-          unplayable: 0,
-          oldestOpenIssueAt: null,
-        });
-    }
+    row.health =
+      health.get(machine.initials) ??
+      healthFromSeverityCounts({
+        cosmetic: 0,
+        minor: 0,
+        major: 0,
+        unplayable: 0,
+        oldestOpenIssueAt: null,
+      });
     if (dependencyPlan.service) {
       row.lastServicedAt = serviceDates.get(machine.id)?.toISOString() ?? null;
     }
@@ -330,9 +335,10 @@ export async function loadMachineViewFromDatabase(
   const state = { ...validatedState, page: applied.page };
 
   return {
-    rows: applied.rows.map(publicRow),
+    rows: applied.rows.map((row) => publicRow(row, dependencyPlan.health)),
     scopeCount: baseRows.length,
     totalCount: applied.totalCount,
+    summary: summarizeMachineView(candidates, applied.filteredRows, state),
     state,
     ownerOptions: [...ownerOptionsById]
       .map(([id, name]) => ({ id, name }))

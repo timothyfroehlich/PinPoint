@@ -113,12 +113,16 @@ export const MACHINE_VIEW_PRESETS: Record<
       q: "",
       presence: ["on_the_floor"],
       status: [],
+      severity: [],
       owner: [],
       sort: "machine",
       dir: "asc",
       page: 1,
       pageSize: 25,
       columns: DEFAULT_COLUMNS,
+      presenceWidget: "all",
+      playabilityWidget: "all",
+      issuesWidget: "all",
     },
   },
   collection: {
@@ -128,12 +132,16 @@ export const MACHINE_VIEW_PRESETS: Record<
       q: "",
       presence: "all",
       status: [],
+      severity: [],
       owner: [],
       sort: "playability",
       dir: "desc",
       page: 1,
       pageSize: 25,
       columns: DEFAULT_COLUMNS,
+      presenceWidget: "all",
+      playabilityWidget: "all",
+      issuesWidget: "all",
     },
   },
 };
@@ -150,6 +158,11 @@ export interface MachineViewDependencyPlan {
   activity: boolean;
 }
 
+/**
+ * The optional enrichment the visible rows need: displayed fields, sorting,
+ * and filters. Summary Widgets need health independently of this plan; the
+ * loader always loads health for them (machine-widgets §2.3).
+ */
 export function planMachineViewDependencies(
   state: MachineViewState
 ): MachineViewDependencyPlan {
@@ -165,7 +178,9 @@ export function planMachineViewDependencies(
     }
   }
 
-  if (state.status.length > 0) dependencies.add("health");
+  if (state.status.length > 0 || state.severity.length > 0) {
+    dependencies.add("health");
+  }
 
   return {
     health: dependencies.has("health"),

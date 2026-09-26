@@ -62,6 +62,27 @@ function result(overrides: Partial<MachineViewResult> = {}): MachineViewResult {
     ],
     scopeCount: 1,
     totalCount: 1,
+    summary: {
+      presence: {
+        total: 3,
+        byPresence: {
+          on_the_floor: 2,
+          off_the_floor: 0,
+          on_loan: 0,
+          pending_arrival: 1,
+          removed: 0,
+        },
+      },
+      playability: {
+        onTheFloor: 2,
+        byStatus: { operational: 1, needs_service: 1, unplayable: 0 },
+      },
+      issues: {
+        openIssues: 1,
+        machinesWithOpenIssues: 1,
+        bySeverity: { cosmetic: 0, minor: 0, major: 1, unplayable: 0 },
+      },
+    },
     state: getMachineViewPreset("machines").defaultState,
     ownerOptions: [{ id: "owner-1", name: "Alex" }],
     permittedFields: getMachineViewPreset("machines").permittedFields,
@@ -210,6 +231,34 @@ describe("MachineView", () => {
     expect(navigation.replace).toHaveBeenLastCalledWith("/m", {
       scroll: false,
     });
+  });
+
+  it("sets filters from widget Segments and keeps the page for populations", async () => {
+    const user = userEvent.setup();
+    const state = {
+      ...getMachineViewPreset("collection").defaultState,
+      q: "mars",
+      page: 3,
+    };
+    navigation.searchParams = new URLSearchParams({ q: "mars", page: "3" });
+    render(<MachineView result={result({ state })} preset="collection" />);
+    const playability = screen.getByRole("region", { name: "Playability" });
+
+    await user.click(
+      within(playability).getByRole("button", { name: "Filtered" })
+    );
+    expect(navigation.replace).toHaveBeenLastCalledWith(
+      "/m?q=mars&page=3&playabilityWidget=filtered",
+      { scroll: false }
+    );
+
+    await user.click(
+      within(playability).getByRole("button", { name: "1 Needs Service" })
+    );
+    expect(navigation.replace).toHaveBeenLastCalledWith(
+      "/m?q=mars&presence=on_the_floor&status=needs_service&playabilityWidget=filtered",
+      { scroll: false }
+    );
   });
 
   it("restores and updates the phone display preference", async () => {

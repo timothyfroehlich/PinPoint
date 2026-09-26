@@ -30,4 +30,14 @@ describe("planMachineViewDependencies", () => {
       activity: true,
     });
   });
+
+  it("loads health for the Open Issue Severity filter", () => {
+    const state = {
+      ...getMachineViewPreset("machines").defaultState,
+      columns: ["machine" as const],
+      severity: ["cosmetic" as const],
+    };
+
+    expect(planMachineViewDependencies(state).health).toBe(true);
+  });
 });
