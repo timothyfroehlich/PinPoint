@@ -4,8 +4,22 @@ import {
   applyMachineViewState,
   formatCompactAgeAgo,
   healthFromSeverityCounts,
+  summarizeMachineView,
   type MachineViewCandidate,
 } from "./model";
+
+function health(
+  counts: Partial<Record<"cosmetic" | "minor" | "major" | "unplayable", number>>
+): ReturnType<typeof healthFromSeverityCounts> {
+  return healthFromSeverityCounts({
+    cosmetic: 0,
+    minor: 0,
+    major: 0,
+    unplayable: 0,
+    oldestOpenIssueAt: null,
+    ...counts,
+  });
+}
 
 function candidate(
   overrides: Partial<MachineViewCandidate> = {}
@@ -100,6 +114,22 @@ describe("applyMachineViewState", () => {
     ).toEqual(["machine-2"]);
   });
 
+  it("matches machines with an open issue of any selected severity", () => {
+    const rows = [
+      candidate({ id: "cosmetic", health: health({ cosmetic: 2 }) }),
+      candidate({ id: "major", health: health({ minor: 1, major: 1 }) }),
+      candidate({ id: "clean", health: health({}) }),
+    ];
+    const state = {
+      ...getMachineViewPreset("collection").defaultState,
+      severity: ["minor" as const, "unplayable" as const],
+    };
+
+    expect(
+      applyMachineViewState(rows, state).rows.map((row) => row.id)
+    ).toEqual(["major"]);
+  });
+
   it("sorts deterministically and clamps pagination", () => {
     const rows = [
       candidate({ id: "2", initials: "B", title: "Same" }),
@@ -166,6 +196,108 @@ describe("applyMachineViewState", () => {
         dir: "asc",
       }).rows.map((row) => row.id)
     ).toEqual(["old", "recent", "never"]);
+  });
+});
+
+describe("summarizeMachineView", () => {
+  const rows = [
+    candidate({
+      id: "a",
+      initials: "A",
+      health: health({ major: 1, cosmetic: 2 }),
+    }),
+    candidate({ id: "b", initials: "B", health: health({ unplayable: 1 }) }),
+    candidate({ id: "c", initials: "C", health: health({}) }),
+    candidate({
+      id: "d",
+      initials: "D",
+      presence: "off_the_floor",
+      health: health({ unplayable: 2 }),
+    }),
+    candidate({
+      id: "e",
+      initials: "E",
+      presence: "removed",
+      health: health({}),
+    }),
+  ];
+
+  it("counts the Filtered population across every page, not the current page", () => {
+    const many = Array.from({ length: 30 }, (_, index) =>
+      candidate({
+        id: `m-${index}`,
+        initials: `M${index}`,
+        health: health({ cosmetic: 1 }),
+      })
+    );
+    const state = {
+      ...getMachineViewPreset("collection").defaultState,
+      presenceWidget: "filtered" as const,
+      issuesWidget: "filtered" as const,
+    };
+    const applied = applyMachineViewState(many, state);
+
+    const summary = summarizeMachineView(many, applied.filteredRows, state);
+
+    expect(applied.rows).toHaveLength(25);
+    expect(summary.presence.total).toBe(30);
+    expect(summary.issues.openIssues).toBe(30);
+  });
+
+  it("divides the All population by presence and open issue severity", () => {
+    const summary = summarizeMachineView(
+      rows,
+      [],
+      getMachineViewPreset("collection").defaultState
+    );
+
+    expect(summary.presence).toEqual({
+      total: 5,
+      byPresence: {
+        on_the_floor: 3,
+        off_the_floor: 1,
+        on_loan: 0,
+        pending_arrival: 0,
+        removed: 1,
+      },
+    });
+    expect(summary.issues).toEqual({
+      openIssues: 6,
+      machinesWithOpenIssues: 3,
+      bySeverity: { cosmetic: 2, minor: 0, major: 1, unplayable: 3 },
+    });
+  });
+
+  it("counts playability over On the Floor machines only", () => {
+    const summary = summarizeMachineView(
+      rows,
+      rows,
+      getMachineViewPreset("collection").defaultState
+    );
+
+    expect(summary.playability).toEqual({
+      onTheFloor: 3,
+      byStatus: { operational: 1, needs_service: 1, unplayable: 1 },
+    });
+  });
+
+  it("counts each widget over its own All or Filtered population", () => {
+    const state = {
+      ...getMachineViewPreset("collection").defaultState,
+      severity: ["unplayable" as const],
+      issuesWidget: "filtered" as const,
+    };
+    const { filteredRows } = applyMachineViewState(rows, state);
+
+    const summary = summarizeMachineView(rows, filteredRows, state);
+
+    expect(summary.presence.total).toBe(5);
+    expect(summary.playability.onTheFloor).toBe(3);
+    expect(summary.issues).toEqual({
+      openIssues: 3,
+      machinesWithOpenIssues: 2,
+      bySeverity: { cosmetic: 0, minor: 0, major: 0, unplayable: 3 },
+    });
   });
 });
 

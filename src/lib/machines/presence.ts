@@ -58,3 +58,19 @@ export function getMachinePresenceStyles(
 export function isOnTheFloor(status: MachinePresenceStatus): boolean {
   return status === "on_the_floor";
 }
+
+/**
+ * Summary Widget colors per presence: `text` for the count, `fill` for the bar
+ * segment. Mirrors {@link getMachinePresenceStyles}: On the Floor is success,
+ * Pending Arrival secondary, and the away states stay neutral.
+ */
+export const MACHINE_PRESENCE_WIDGET_COLORS: Record<
+  MachinePresenceStatus,
+  { text: string; fill: string }
+> = {
+  on_the_floor: { text: "text-success", fill: "bg-success" },
+  off_the_floor: { text: "text-muted-foreground", fill: "bg-muted-foreground" },
+  on_loan: { text: "text-foreground", fill: "bg-outline-variant" },
+  pending_arrival: { text: "text-secondary", fill: "bg-secondary" },
+  removed: { text: "text-muted-foreground", fill: "bg-outline" },
+};

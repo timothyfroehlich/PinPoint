@@ -41,12 +41,15 @@ import {
   getMachineViewPreset,
   MACHINE_VIEW_FIELDS,
 } from "~/lib/machines/view/config";
-import type {
-  MachineViewFieldId,
-  MachineViewOwnerOption,
-  MachineViewPageSize,
-  MachineViewPresetId,
-  MachineViewState,
+import { SEVERITY_CONFIG } from "~/lib/issues/status";
+import {
+  ISSUE_SEVERITY_VALUES,
+  type IssueSeverity,
+  type MachineViewFieldId,
+  type MachineViewOwnerOption,
+  type MachineViewPageSize,
+  type MachineViewPresetId,
+  type MachineViewState,
 } from "~/lib/types";
 import { cn } from "~/lib/utils";
 
@@ -104,6 +107,10 @@ export function MachineViewToolbar({
     value,
     label: getMachineStatusLabel(value),
   }));
+  const severityOptions: Option[] = ISSUE_SEVERITY_VALUES.map((value) => ({
+    value,
+    label: SEVERITY_CONFIG[value].label,
+  }));
   const ownerSelectOptions: Option[] = ownerOptions.map((owner) => ({
     value: owner.id,
     label: owner.name,
@@ -112,6 +119,11 @@ export function MachineViewToolbar({
     [...presenceOptions, ...statusOptions, ...ownerSelectOptions].map(
       (option) => [option.value, option.label]
     )
+  );
+  // Severity and Playability share the value `unplayable`, so severity
+  // labels resolve from their own map.
+  const severityLabelByValue = new Map(
+    severityOptions.map((option) => [option.value, option.label])
   );
   const presenceIsDefault =
     state.presence === "all" || defaults.presence === "all"
@@ -132,6 +144,11 @@ export function MachineViewToolbar({
       value,
       label: labelByValue.get(value) ?? value,
     })),
+    ...state.severity.map((value) => ({
+      key: "severity" as const,
+      value,
+      label: `${severityLabelByValue.get(value) ?? value} severity`,
+    })),
     ...state.owner.map((value) => ({
       key: "owner" as const,
       value,
@@ -149,7 +166,7 @@ export function MachineViewToolbar({
   }
 
   function removeChip(
-    key: "presence" | "status" | "owner",
+    key: "presence" | "status" | "severity" | "owner",
     value: string
   ): void {
     if (key === "presence") {
@@ -162,7 +179,15 @@ export function MachineViewToolbar({
       update({ presence: next.length === 0 ? "all" : next });
       return;
     }
-    update({ [key]: state[key].filter((item) => item !== value) });
+    if (key === "status") {
+      update({ status: state.status.filter((item) => item !== value) });
+      return;
+    }
+    if (key === "severity") {
+      update({ severity: state.severity.filter((item) => item !== value) });
+      return;
+    }
+    update({ owner: state.owner.filter((item) => item !== value) });
   }
 
   function clearFilters(): void {
@@ -171,6 +196,7 @@ export function MachineViewToolbar({
       q: "",
       presence: defaults.presence,
       status: [],
+      severity: [],
       owner: [],
     });
   }
@@ -248,7 +274,7 @@ export function MachineViewToolbar({
             </div>
           ) : null}
         </div>
-        <div className="grid min-w-0 grid-cols-1 gap-2 border-t border-outline-variant p-3 @sm:grid-cols-2 @md:grid-cols-3">
+        <div className="grid min-w-0 grid-cols-1 gap-2 border-t border-outline-variant p-3 @sm:grid-cols-2 @3xl:grid-cols-4">
           <MultiSelect
             options={presenceOptions}
             value={state.presence === "all" ? [] : state.presence}
@@ -279,11 +305,22 @@ export function MachineViewToolbar({
             placeholder="Playability"
           />
           <MultiSelect
+            options={severityOptions}
+            value={state.severity}
+            onChange={(value) =>
+              update({
+                severity: value.filter((item): item is IssueSeverity =>
+                  ISSUE_SEVERITY_VALUES.some((severity) => severity === item)
+                ),
+              })
+            }
+            placeholder="Severity"
+          />
+          <MultiSelect
             options={ownerSelectOptions}
             value={state.owner}
             onChange={(owner) => update({ owner })}
             placeholder="Owner"
-            className="@sm:col-span-2 @md:col-span-1"
           />
         </div>
       </div>

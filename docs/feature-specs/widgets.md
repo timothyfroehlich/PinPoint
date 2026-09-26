@@ -70,9 +70,9 @@
 
 ## Known divergences (code vs spec)
 
-| Spec  | Code today               | Resolution                               |
-| :---- | :----------------------- | :--------------------------------------- |
-| §1–§6 | No Summary Widget exists | Machine widgets implementation (PP-3h21) |
+| Spec | Code today | Resolution |
+| :-- | :-- | :-- |
+| §1–§6 | Issue-list Widget Hosts show no Summary Widgets; only Machine View does | Issue widgets implementation |
 
 ---
 

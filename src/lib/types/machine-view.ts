@@ -1,6 +1,7 @@
 import type { IssueSeverity } from "./database";
 import type { MachinePresenceStatus } from "~/lib/machines/presence";
 import type { MachineStatus } from "~/lib/machines/status";
+import type { WidgetPopulation } from "./summary-widget";
 
 export const MACHINE_VIEW_FIELD_IDS = [
   "machine",
@@ -33,12 +34,16 @@ export interface MachineViewState {
   q: string;
   presence: "all" | MachinePresenceStatus[];
   status: MachineStatus[];
+  severity: IssueSeverity[];
   owner: string[];
   sort: MachineViewFieldId;
   dir: MachineViewSortDirection;
   page: number;
   pageSize: MachineViewPageSize;
   columns: MachineViewFieldId[];
+  presenceWidget: WidgetPopulation;
+  playabilityWidget: WidgetPopulation;
+  issuesWidget: WidgetPopulation;
 }
 
 export interface MachineViewOwnerOption {
@@ -68,10 +73,31 @@ export interface MachineViewRow {
   lastActivityAt?: string | null;
 }
 
+/**
+ * Summary Widget counts (machine-widgets §3–§5). Each widget's counts cover
+ * the Widget Population its state parameter selects, across every page.
+ */
+export interface MachineViewSummary {
+  presence: {
+    total: number;
+    byPresence: Record<MachinePresenceStatus, number>;
+  };
+  playability: {
+    onTheFloor: number;
+    byStatus: Record<MachineStatus, number>;
+  };
+  issues: {
+    openIssues: number;
+    machinesWithOpenIssues: number;
+    bySeverity: Record<IssueSeverity, number>;
+  };
+}
+
 export interface MachineViewResult {
   rows: MachineViewRow[];
   scopeCount: number;
   totalCount: number;
+  summary: MachineViewSummary;
   state: MachineViewState;
   ownerOptions: MachineViewOwnerOption[];
   permittedFields: MachineViewFieldId[];
