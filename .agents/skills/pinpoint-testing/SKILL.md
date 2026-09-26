@@ -109,7 +109,7 @@ Each of these makes a test pass without proving the contract. A new test matchin
 
 - **Assertion-free probe:** runs a code path and asserts nothing about its outcome.
 - **Self-derived expectation:** the expected value comes from the helper, serializer, or renderer under test, so the test compares the code to itself.
-- **Copied inventory:** restates a fixture, schema, enum, route list, or export list from source; it changes whenever source changes and catches nothing.
+- **Copied inventory:** asserts that a fixture, schema, enum, or export list equals a copy of itself from source; it changes whenever source changes and catches nothing. A table whose rows each run through behavior (the `publicRoutes` `it.each` in `middleware.test.ts`) is a keeper, not an inventory.
 - **Source grep:** asserts file contents, import paths, or AST shape instead of behavior. Keep one only when it is the cheapest independent guard of an architecture contract and fails when that contract breaks.
 - **Mock that implements the behavior:** a hand-written fake carries the business logic, so the assertion tests the fake. Canned `~/server/db` or Drizzle-chain mocks are the house instance (CORE-TEST-004); use [the PGlite forwarding pattern](#the-one-mocking-pattern-worth-knowing).
 - **Wrong-reason negative control:** a "rejects X" test that passes because an unrelated guard (auth, a missing fixture) rejects first. Assert the specific error or state the guard under test produces.
