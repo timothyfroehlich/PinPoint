@@ -237,4 +237,18 @@ describe("IscoredGamePicker component", () => {
     const searchInput = screen.getByPlaceholderText("Search iScored games…");
     expect(searchInput).toHaveAttribute("autocomplete", "off");
   });
+
+  it("passes machineId to getIscoredGamesAction when provided", async () => {
+    vi.mocked(getIscoredGamesAction).mockResolvedValue({
+      games: mockGames,
+    });
+
+    render(<IscoredGamePicker machineId="test-machine-id" />);
+
+    await waitFor(() => {
+      expect(getIscoredGamesAction).toHaveBeenCalledWith({
+        machineId: "test-machine-id",
+      });
+    });
+  });
 });
