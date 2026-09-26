@@ -98,8 +98,8 @@ Homebrew, or another version manager.
 
 Vercel does not install or invoke mise. `package.json#engines` is its Node
 compatibility contract, `vercel-build` retains the production migration/build
-ordering, and the preview Vercel CLI remains pinned behind the repository-owned
-wrapper. The Supabase pin in `mise.toml` owns only the CLI executable: container
+ordering, and the preview workflows call the Vercel REST API directly (no
+Vercel CLI). The Supabase pin in `mise.toml` owns only the CLI executable: container
 images, generated worktree configuration, database lifecycle, and deployment
 migrations remain with their existing owners.
 
