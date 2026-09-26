@@ -29,6 +29,7 @@ function renderRail(overrides: Partial<RailProps> = {}): void {
       modelName="Medieval Madness"
       manufacturer="Williams"
       year={1997}
+      credits={{ design: ["Brian Eddy"], art: ["John Youssi", "Greg Freres"] }}
       tags={[]}
       pinballmap={{
         locationUrl: LOCATION_URL,
@@ -145,6 +146,31 @@ describe("InfoRail", () => {
       const block = screen.getByTestId("machine-model-block");
       expect(within(block).queryByText("Manufacturer")).not.toBeInTheDocument();
       expect(within(block).queryByText("Year")).not.toBeInTheDocument();
+      expect(within(block).queryByText("Design")).not.toBeInTheDocument();
+      expect(within(block).queryByText("Art")).not.toBeInTheDocument();
+    });
+
+    it("lists every designer and artist in OPDB's order", () => {
+      renderRail({
+        credits: {
+          design: ["Steve Ritchie"],
+          art: ["Kevin O'Connor", "Dave Link", "Harrison Drake"],
+        },
+      });
+      const block = screen.getByTestId("machine-model-block");
+      expect(within(block).getByText("Steve Ritchie")).toBeInTheDocument();
+      // The apron card's two-name limit does not apply here.
+      expect(
+        within(block).getByText("Kevin O'Connor, Dave Link, Harrison Drake")
+      ).toBeInTheDocument();
+    });
+
+    it("reads 'Unknown' for a role with no credits", () => {
+      renderRail({ credits: { design: [], art: [] } });
+      const block = screen.getByTestId("machine-model-block");
+      expect(within(block).getByText("Design")).toBeInTheDocument();
+      expect(within(block).getByText("Art")).toBeInTheDocument();
+      expect(within(block).getAllByText("Unknown")).toHaveLength(2);
     });
   });
 

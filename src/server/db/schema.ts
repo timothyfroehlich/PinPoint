@@ -217,6 +217,11 @@ export const machines = pgTable(
     apronDescription: text("apron_description"),
     apronTip: text("apron_tip"),
     apronTipEnabled: boolean("apron_tip_enabled").notNull().default(false),
+    // Whether the card shows its Design and Art credit rows (spec
+    // apron-cards 10.5). On by default, even for a machine with no credits,
+    // whose rows then read "Unknown".
+    apronDesignEnabled: boolean("apron_design_enabled").notNull().default(true),
+    apronArtEnabled: boolean("apron_art_enabled").notNull().default(true),
     apronSavedAt: timestamp("apron_saved_at", { withTimezone: true }),
     ownerRequirements: jsonb("owner_requirements").$type<ProseMirrorDoc>(),
     // Machine-level "Before you change anything": the owner's honor-system
@@ -276,6 +281,15 @@ export const machines = pgTable(
     })
       .notNull()
       .default("off"),
+    // Whether this cabinet SHOULD be marked Insider Connected on Pinball Map
+    // (spec 3.8) — an operator decision like `pinballmap_intent`, owned by
+    // PinPoint and pushed by the same sync. NULL means no intent recorded: the
+    // control then shows Pinball Map's own value and never flags it, so entries
+    // nobody has touched are not all Out of sync on day one. Meaningful only for
+    // a title Pinball Map's catalog marks eligible; the column does not enforce
+    // that, because eligibility lives in the refreshed catalog mirror and can
+    // change under a stored intent.
+    pinballmapIcIntent: text("pinballmap_ic_intent", { enum: ["on", "off"] }),
     // Hand-entered model name for a machine PinballMap's catalog cannot cover —
     // a homebrew, a flipperless game (PP-3bbr, folded into PP-o355.21). Set ONLY
     // alongside `pinballmap_excluded` (CHECK below): a linked machine reads its
@@ -321,6 +335,10 @@ export const machines = pgTable(
       "machines_pinballmap_intent_check",
       sql`pinballmap_intent IN ('on', 'off', 'no_sync')`
     ),
+    pinballmapIcIntentCheck: check(
+      "machines_pinballmap_ic_intent_check",
+      sql`pinballmap_ic_intent IS NULL OR pinballmap_ic_intent IN ('on', 'off')`
+    ),
     pinballmapIntentRequiresLinkCheck: check(
       "machines_pinballmap_intent_requires_link",
       sql`NOT (pinballmap_intent = 'on' AND pinballmap_machine_id IS NULL)`
@@ -358,6 +376,11 @@ export const pinballmapCatalog = pgTable(
     // join. Null for standalone/ungrouped titles (most older machines).
     machineGroupId: integer("machine_group_id"),
     groupName: text("group_name"),
+    // PBM's own Insider Connected eligibility for the title (spec 3.8). An
+    // entry's `ic_enabled` cannot answer this: null there means "never set" on
+    // eligible and ineligible titles alike. False until the catalog refresh
+    // reports otherwise, so nothing is offered on a title PBM would refuse.
+    icEligible: boolean("ic_eligible").notNull().default(false),
     refreshedAt: timestamp("refreshed_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

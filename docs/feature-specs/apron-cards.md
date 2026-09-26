@@ -51,6 +51,7 @@
 - **6.1** The title uses the fit rule (§1) to size and wrap the machine's name within the identity panel.
 - **6.2** The edition line, when present, renders under the title at a fixed size — it does not participate in the title's shrink rule.
 - **6.3** The APC logo keeps its place at the bottom of the identity panel. When the panel's other content would reach it, the title shrinks further (§1) instead.
+- **6.4** When the identity panel's content still reaches the logo with the title at its floor size, the card does not fit: as with description and tip (§3.5), it can be neither saved nor exported, and the same card-level notice shows.
 
 ## 7. Edition
 
@@ -80,13 +81,13 @@
 
 | Requirement | Current implementation gap |
 | :-- | :-- |
-| §6.3, §10 | Not built: credits on the card, their display settings, and the panel-fit title shrink (PP-tv2u, which needs the OPDB copy from PP-wqit.12). |
 | §4.2 | Automatic apron-size fill from a Pinball Map match is intentionally deferred. Editors choose Stern/SPIKE or WPC manually for now; unmatched machines still have no default. |
 
 ## Changelog
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-25 | Added §6.4: an identity panel that does not fit at the title's floor size blocks save and export, like description and tip overflow. |
 | 2026-09-25 | Added §10 Credits (OPDB design and art credits in the identity panel, per-role display settings on by default, "Unknown" when missing, two-name limit) and §6.3 (the title shrinks so the panel fits above the logo); updated §1, §2.1, §3.6, §5.1 to match. |
 | 2026-09-20 | Added §3.6 and §9.3: card edits use the machine-management capability; exporting is member+ and does not grant editing. |
 | 2026-09-18 | §1 Scan target, §8.1, §8.2: the QR encodes the machine's scan hub (`/m/<initials>/hub`) rather than the machine page; the landing experience is now specified in `machine-scan-hub.md`. |

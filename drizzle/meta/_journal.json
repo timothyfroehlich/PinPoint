@@ -631,6 +631,20 @@
       "when": 1790369609379,
       "tag": "0089_opdb-machines",
       "breakpoints": true
+    },
+    {
+      "idx": 90,
+      "version": "7",
+      "when": 1790394616312,
+      "tag": "0090_insider-connected-intent",
+      "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "7",
+      "when": 1790440490199,
+      "tag": "0091_apron-credit-settings",
+      "breakpoints": true
     }
   ]
 }
