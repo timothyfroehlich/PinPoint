@@ -78,6 +78,8 @@ describe("saveApronCardAction (PP-esta)", () => {
       description: "Shoot the ramps.",
       tip: "Extra ball at 3 modes.",
       tipEnabled: true,
+      designEnabled: false,
+      artEnabled: true,
     };
   }
 
@@ -99,6 +101,8 @@ describe("saveApronCardAction (PP-esta)", () => {
       apronDescription: "Shoot the ramps.",
       apronTip: "Extra ball at 3 modes.",
       apronTipEnabled: true,
+      apronDesignEnabled: false,
+      apronArtEnabled: true,
     });
     expect(row?.apronSavedAt).toBeInstanceOf(Date);
   });
