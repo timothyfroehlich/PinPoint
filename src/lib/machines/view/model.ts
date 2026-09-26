@@ -4,8 +4,12 @@ import type {
   MachineViewHealth,
   MachineViewRow,
   MachineViewState,
+  MachineViewSummary,
 } from "~/lib/types";
-import { MACHINE_PRESENCE_RANK } from "~/lib/machines/presence";
+import {
+  MACHINE_PRESENCE_RANK,
+  type MachinePresenceStatus,
+} from "~/lib/machines/presence";
 import {
   MACHINE_STATUS_RANK,
   SEVERITY_RANK,
@@ -183,29 +187,54 @@ function compareRows(
   return compareIdentity(left, right);
 }
 
+function matchesMachineViewFilters(
+  row: MachineViewCandidate,
+  state: MachineViewState,
+  query: string
+): boolean {
+  if (query && !searchableText(row).includes(query)) return false;
+  if (state.presence !== "all" && !state.presence.includes(row.presence)) {
+    return false;
+  }
+  if (
+    state.status.length > 0 &&
+    !state.status.includes(row.health?.playability ?? "operational")
+  ) {
+    return false;
+  }
+  if (
+    state.severity.length > 0 &&
+    !state.severity.some(
+      (severity) => (row.health?.bySeverity[severity] ?? 0) > 0
+    )
+  ) {
+    return false;
+  }
+  if (state.owner.length > 0) {
+    const ownerKey = row.ownerId ?? "unassigned";
+    if (!state.owner.includes(ownerKey)) return false;
+  }
+  return true;
+}
+
+/**
+ * Filters, sorts, and paginates. `filteredRows` is every row matching the
+ * current search and filters across all pages — the Filtered Widget Population.
+ */
 export function applyMachineViewState(
   rows: MachineViewCandidate[],
   state: MachineViewState
-): { rows: MachineViewCandidate[]; totalCount: number; page: number } {
+): {
+  rows: MachineViewCandidate[];
+  filteredRows: MachineViewCandidate[];
+  totalCount: number;
+  page: number;
+} {
   const query = state.q.toLocaleLowerCase();
-  const filtered = rows.filter((row) => {
-    if (query && !searchableText(row).includes(query)) return false;
-    if (state.presence !== "all" && !state.presence.includes(row.presence)) {
-      return false;
-    }
-    if (
-      state.status.length > 0 &&
-      !state.status.includes(row.health?.playability ?? "operational")
-    ) {
-      return false;
-    }
-    if (state.owner.length > 0) {
-      const ownerKey = row.ownerId ?? "unassigned";
-      if (!state.owner.includes(ownerKey)) return false;
-    }
-    return true;
-  });
-  const sorted = [...filtered].sort((left, right) =>
+  const filteredRows = rows.filter((row) =>
+    matchesMachineViewFilters(row, state, query)
+  );
+  const sorted = [...filteredRows].sort((left, right) =>
     compareRows(left, right, state)
   );
   const maxPage = Math.max(1, Math.ceil(sorted.length / state.pageSize));
@@ -214,8 +243,87 @@ export function applyMachineViewState(
 
   return {
     rows: sorted.slice(offset, offset + state.pageSize),
+    filteredRows,
     totalCount: sorted.length,
     page,
+  };
+}
+
+function summarizePresence(
+  rows: MachineViewCandidate[]
+): MachineViewSummary["presence"] {
+  const byPresence: Record<MachinePresenceStatus, number> = {
+    on_the_floor: 0,
+    off_the_floor: 0,
+    on_loan: 0,
+    pending_arrival: 0,
+    removed: 0,
+  };
+  for (const row of rows) byPresence[row.presence] += 1;
+  return { total: rows.length, byPresence };
+}
+
+function summarizePlayability(
+  rows: MachineViewCandidate[]
+): MachineViewSummary["playability"] {
+  const byStatus: Record<MachineStatus, number> = {
+    operational: 0,
+    needs_service: 0,
+    unplayable: 0,
+  };
+  let onTheFloor = 0;
+  for (const row of rows) {
+    if (row.presence !== "on_the_floor") continue;
+    onTheFloor += 1;
+    byStatus[row.health?.playability ?? "operational"] += 1;
+  }
+  return { onTheFloor, byStatus };
+}
+
+function summarizeIssues(
+  rows: MachineViewCandidate[]
+): MachineViewSummary["issues"] {
+  const bySeverity: Record<IssueSeverity, number> = {
+    cosmetic: 0,
+    minor: 0,
+    major: 0,
+    unplayable: 0,
+  };
+  let openIssues = 0;
+  let machinesWithOpenIssues = 0;
+  for (const row of rows) {
+    const health = row.health;
+    if (health === undefined || health.openIssues === 0) continue;
+    openIssues += health.openIssues;
+    machinesWithOpenIssues += 1;
+    for (const severity of ISSUE_SEVERITIES) {
+      bySeverity[severity] += health.bySeverity[severity];
+    }
+  }
+  return { openIssues, machinesWithOpenIssues, bySeverity };
+}
+
+/**
+ * Summary Widget counts (machine-widgets §3–§5). `allRows` is the route's
+ * whole scope and `filteredRows` every row matching the current search and
+ * filters; each widget counts the population its state parameter selects.
+ * Rows must carry health enrichment.
+ */
+export function summarizeMachineView(
+  allRows: MachineViewCandidate[],
+  filteredRows: MachineViewCandidate[],
+  state: Pick<
+    MachineViewState,
+    "presenceWidget" | "playabilityWidget" | "issuesWidget"
+  >
+): MachineViewSummary {
+  const population = (
+    choice: MachineViewState["presenceWidget"]
+  ): MachineViewCandidate[] => (choice === "filtered" ? filteredRows : allRows);
+  return {
+    presence: summarizePresence(population(state.presenceWidget)),
+    playability: summarizePlayability(population(state.playabilityWidget)),
+    issues: summarizeIssues(population(state.issuesWidget)),
   };
 }
 
