@@ -233,6 +233,41 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
     ]);
   }
 
+  const LINEUP_SYNCED_AT = "2026-08-02T00:00:00.000Z";
+
+  /**
+   * A lineup the local snapshot already holds. Every lineup read in these tests
+   * is served from this row, never pinballmap.com (CORE-PBM-001,
+   * CORE-TEST-006). A stored location is the sole integration-configuration
+   * signal.
+   */
+  async function seedLineup(
+    rows: { id: number; machineId: number }[]
+  ): Promise<void> {
+    const db = await getTestDb();
+    await db.insert(pinballmapState).values({
+      id: "singleton",
+      locationId: 26454,
+      lastSyncStatus: "ok",
+      lastSyncedAt: new Date(LINEUP_SYNCED_AT),
+      snapshotJson: {
+        locationId: 26454,
+        name: "APC",
+        dateLastUpdated: null,
+        lastUpdatedByUsername: null,
+        machineCount: rows.length,
+        lmxes: rows.map((r) => ({
+          ...r,
+          icEnabled: null,
+          lastUpdatedByUsername: null,
+          conditions: [],
+        })),
+        fetchedAtIso: LINEUP_SYNCED_AT,
+        raw: {},
+      },
+    });
+  }
+
   describe("list_machines", () => {
     it("returns machines with owner name and open-issue count", async () => {
       const admin = await makeUser("admin");
@@ -403,6 +438,100 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
         expect(result.total).toBe(1);
         expect(result.hasMore).toBe(false);
       });
+
+      it("'out_of_sync' returns only cabinets whose intent disagrees with the synced lineup", async () => {
+        const admin = await makeUser("admin");
+        // Titles 61_001 and 61_002 are on the lineup; 61_003 is not.
+        await seedLineup([
+          { id: 52_001, machineId: 61_001 },
+          { id: 52_002, machineId: 61_002 },
+        ]);
+        const pbm = (
+          pinballmapMachineId: number,
+          pinballmapIntent: "on" | "off" | "no_sync"
+        ): SeedPbm => ({ pinballmapMachineId, pinballmapIntent });
+
+        await seedMachine({ name: "Sync A In Sync", pbm: pbm(61_001, "on") });
+        // Off, but its sibling above is On and covers the entry: quiet.
+        await seedMachine({ name: "Sync B Covered", pbm: pbm(61_001, "off") });
+        const lingering = await seedMachine({
+          name: "Sync C Lingering",
+          pbm: pbm(61_002, "off"),
+        });
+        const missing = await seedMachine({
+          name: "Sync D Missing",
+          pbm: pbm(61_003, "on"),
+        });
+        // Opted out of sync: absent from the lineup, but never flagged.
+        await seedMachine({
+          name: "Sync E No Sync",
+          pbm: pbm(61_003, "no_sync"),
+        });
+        // Unlinked machines have nothing to compare; 'unlinked' owns them.
+        await seedMachine({ name: "Sync F Unlinked" });
+
+        const outcome = await runListMachines(
+          { pinballmap: "out_of_sync" },
+          ctx("admin", admin)
+        );
+        const result = outcome.result as Omit<LinkStatePage, "machines"> & {
+          machines: { initials: string; lineup?: unknown }[];
+          lineupSnapshot?: unknown;
+        };
+
+        expect(
+          result.machines.map((m) => ({
+            initials: m.initials,
+            lineup: m.lineup,
+          }))
+        ).toEqual([
+          {
+            initials: lingering.initials,
+            lineup: { state: "lingering", pushAction: "remove" },
+          },
+          {
+            initials: missing.initials,
+            lineup: { state: "missing", pushAction: "add" },
+          },
+        ]);
+        expect(result.total).toBe(2);
+        expect(result.lineupSnapshot).toEqual({
+          syncedAt: LINEUP_SYNCED_AT,
+          lastSyncStatus: "ok",
+        });
+      });
+
+      it.each([
+        ["no tracked location is configured", false],
+        ["the configured location has never synced", true],
+      ])(
+        "'out_of_sync' fails instead of reporting none when %s",
+        async (_label, configured) => {
+          const admin = await makeUser("admin");
+          await seedMachine({
+            pbm: { pinballmapMachineId: 61_010, pinballmapIntent: "on" },
+          });
+          if (configured) {
+            const db = await getTestDb();
+            await db
+              .insert(pinballmapState)
+              .values({ id: "singleton", locationId: 26454 });
+          }
+
+          // An intent-On cabinet with no evidence either way: an empty page
+          // here would read as "Pinball Map matches PinPoint" (CORE-ARCH-012).
+          await expect(
+            runListMachines({ pinballmap: "out_of_sync" }, ctx("admin", admin))
+          ).rejects.toMatchObject({
+            reason: "invalid",
+            message: expect.stringMatching(
+              configured
+                ? /no pinball map lineup has been synced/i
+                : /no tracked location/i
+            ),
+          });
+        }
+      );
 
       it("'linked' and 'excluded' return their own buckets", async () => {
         const admin = await makeUser("admin");
@@ -810,6 +939,61 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
           opdbId: "GRBN4-MQGE5",
           ipdbId: 6587,
           intent: "on",
+          // No tracked location in this test, so there is no lineup to look in:
+          // "unknown" (null), never "not on it" (false).
+          lineup: {
+            state: "not_configured",
+            onLineup: null,
+            outOfSync: false,
+            pushAction: null,
+            coveredBy: [],
+            snapshotSyncedAt: null,
+            lastSyncStatus: null,
+          },
+        });
+      });
+
+      it("reports what the last-synced lineup shows against the intent", async () => {
+        const admin = await makeUser("admin");
+        await seedElviraCatalog();
+        // Premium is on the lineup; the standalone Party Monsters title is not.
+        await seedLineup([{ id: 51_001, machineId: ELVIRA_PREMIUM_ID }]);
+        const listed = await seedMachine({
+          pbm: {
+            pinballmapMachineId: ELVIRA_PREMIUM_ID,
+            pinballmapIntent: "on",
+          },
+        });
+        const absent = await seedMachine({
+          pbm: { pinballmapMachineId: 70_020, pinballmapIntent: "on" },
+        });
+
+        const lineupOf = async (initials: string): Promise<unknown> => {
+          const outcome = await runGetMachine(
+            { machine: initials },
+            ctx("admin", admin)
+          );
+          const { pinballmap } = outcome.result as {
+            pinballmap: McpMachinePinballmap | null;
+          };
+          return pinballmap?.status === "linked" ? pinballmap.lineup : null;
+        };
+
+        expect(await lineupOf(listed.initials)).toMatchObject({
+          state: "on",
+          onLineup: true,
+          outOfSync: false,
+          pushAction: null,
+          snapshotSyncedAt: LINEUP_SYNCED_AT,
+          lastSyncStatus: "ok",
+        });
+        // The question that motivated this field: intent alone said nothing
+        // about whether Pinball Map actually carries the title.
+        expect(await lineupOf(absent.initials)).toMatchObject({
+          state: "missing",
+          onLineup: false,
+          outOfSync: true,
+          pushAction: "add",
         });
       });
 
@@ -1505,37 +1689,6 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
   });
 
   describe("set_machine_pinballmap (PP-u4ab.12)", () => {
-    /**
-     * A lineup the local snapshot already holds. Auto-link reads this table and
-     * never pinballmap.com (CORE-PBM-001, CORE-TEST-006). A stored location is
-     * the sole integration-configuration signal.
-     */
-    async function seedLineup(
-      rows: { id: number; machineId: number }[]
-    ): Promise<void> {
-      const db = await getTestDb();
-      await db.insert(pinballmapState).values({
-        id: "singleton",
-        locationId: 26454,
-        lastSyncStatus: "ok",
-        snapshotJson: {
-          locationId: 26454,
-          name: "APC",
-          dateLastUpdated: null,
-          lastUpdatedByUsername: null,
-          machineCount: rows.length,
-          lmxes: rows.map((r) => ({
-            ...r,
-            icEnabled: null,
-            lastUpdatedByUsername: null,
-            conditions: [],
-          })),
-          fetchedAtIso: "2026-08-02T00:00:00Z",
-          raw: {},
-        },
-      });
-    }
-
     async function pbmRow(machineId: string): Promise<{
       pinballmapMachineId: number | null;
       pinballmapExcluded: boolean;
