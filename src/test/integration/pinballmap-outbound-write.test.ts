@@ -1030,7 +1030,7 @@ describe("PinballMap outbound writes (PGlite)", () => {
     const admin = await createUser("admin");
     await mockAuthAs(admin.id);
     await seedState([{ id: 500, machineId: TITLE_ID }]);
-    pbm.removeResult = { ok: false, reason: "unauthorized" };
+    pbm.removeResult = { ok: false, reason: "rejected" };
 
     const [machine] = await db
       .insert(machines)
@@ -1277,8 +1277,8 @@ describe("PinballMap outbound writes (PGlite)", () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.code).toBe("PBM_REJECTED");
-      expect(result.message).toMatch(/Relink/);
+      expect(result.code).toBe("PBM_AUTH_FAILED");
+      expect(result.message).toMatch(/Reconnect/);
     }
     const link = await db.query.pinballmapUserCredentials.findFirst({
       where: eq(pinballmapUserCredentials.userId, admin.id),

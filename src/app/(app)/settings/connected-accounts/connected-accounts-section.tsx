@@ -9,7 +9,10 @@ import { canUnlinkIdentity } from "~/lib/auth/identity-guards";
 import { isDiscordIntegrationConfigured } from "~/lib/discord/config";
 import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
+import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
+import { getPinballMapLinkStatus } from "~/lib/pinballmap/user-credentials";
 import { ConnectedAccountRow } from "./connected-account-row";
+import { PinballMapAccountRow } from "./pinballmap-account-row";
 import { DiscordTestDmButton } from "./discord-test-dm-button";
 
 /**
@@ -79,11 +82,32 @@ export async function ConnectedAccountsSection(): Promise<React.JSX.Element> {
   // not sign-in.
   const profile = await db.query.userProfiles.findFirst({
     where: eq(userProfiles.id, user.id),
-    columns: { discordUserId: true },
+    columns: { discordUserId: true, role: true },
   });
   const canReceiveDiscordDms = profile?.discordUserId != null;
 
-  if (visibleKeys.length === 0) {
+  // A member's own Pinball Map account, which their pushes run as (pinballmap
+  // spec 8.4). Read off the link row; the token is never decrypted here.
+  const canLinkPinballMap = checkPermission(
+    "machines.pinballmap.account",
+    getAccessLevel(profile?.role)
+  );
+  const pinballMapLink = canLinkPinballMap
+    ? await getPinballMapLinkStatus(user.id)
+    : null;
+  const pinballMapRow =
+    pinballMapLink === null ? null : (
+      <PinballMapAccountRow
+        status={pinballMapLink.status}
+        username={
+          pinballMapLink.status === "not_linked"
+            ? null
+            : pinballMapLink.username
+        }
+      />
+    );
+
+  if (visibleKeys.length === 0 && pinballMapRow === null) {
     return (
       <div>
         {header}
@@ -119,6 +143,7 @@ export async function ConnectedAccountsSection(): Promise<React.JSX.Element> {
             />
           );
         })}
+        {pinballMapRow}
       </div>
     </div>
   );

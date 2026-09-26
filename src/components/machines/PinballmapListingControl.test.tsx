@@ -422,6 +422,72 @@ describe("push actions", () => {
   });
 });
 
+describe("the viewer's Pinball Map link (spec 8.2, 8.5, 8.6)", () => {
+  it("prompts an unlinked pusher to link, beside the link-out", () => {
+    renderControl({ view: VIEWS.missing, linkStatus: "not_linked" });
+    expect(
+      screen.getByRole("link", { name: "link your Pinball Map account" })
+    ).toHaveAttribute("href", "/settings#pinball-map");
+    expect(status()).toContain("to add it from here");
+  });
+
+  it("uses the remove verb on Lingering", () => {
+    renderControl({ view: VIEWS.lingering, linkStatus: "not_linked" });
+    expect(status()).toContain("to remove it from here");
+  });
+
+  it("does not prompt a viewer without the push capability", () => {
+    renderControl({
+      view: VIEWS.missing,
+      canPush: false,
+      linkStatus: "not_linked",
+    });
+    expect(
+      screen.queryByRole("link", { name: "link your Pinball Map account" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows the authentication-failed note, not the link prompt, after a rejected token", () => {
+    renderControl({ view: VIEWS.missing, linkStatus: "needs_relink" });
+    expect(screen.getByTestId("pbm-listing-auth-failed")).toHaveTextContent(
+      "Pinball Map authentication failed."
+    );
+    expect(
+      screen.getByRole("link", { name: "Reconnect your account" })
+    ).toHaveAttribute("href", "/settings#pinball-map");
+    expect(
+      screen.queryByRole("link", { name: "link your Pinball Map account" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows no note or prompt to a linked viewer", () => {
+    renderControl({ view: VIEWS.missing, linkStatus: "linked" });
+    expect(
+      screen.queryByTestId("pbm-listing-auth-failed")
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "link your Pinball Map account" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not repeat an authentication failure as a transient error", async () => {
+    const user = userEvent.setup();
+    vi.mocked(addMachineToPinballMapAction).mockResolvedValue({
+      ok: false,
+      code: "PBM_AUTH_FAILED",
+      message: "Pinball Map authentication failed.",
+    });
+    renderControl({ view: VIEWS.missing });
+    await user.click(screen.getByTestId("pbm-listing-add"));
+    await user.click(screen.getByRole("button", { name: "Add machine" }));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.queryByTestId("pbm-listing-error")).not.toBeInTheDocument();
+  });
+});
+
 describe("the intent toggle", () => {
   it("uses lineup vocabulary in its accessible name (spec 4.8)", () => {
     renderControl({ view: VIEWS.syncOff });

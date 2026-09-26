@@ -415,7 +415,7 @@ function pbmWriteFailureMessage(failure: PbmWriteFailure): string {
     case "rate_limited":
       return "Pinball Map is rate-limiting us. Try again in a few minutes.";
     case "unauthorized":
-      return "Pinball Map rejected your saved sign-in. Relink your Pinball Map account in Settings.";
+      return "Pinball Map authentication failed. Reconnect your account in Settings.";
     case "not_found":
       return "Pinball Map couldn't find that entry. It may already be gone.";
     case "rejected":
@@ -430,18 +430,21 @@ const NOT_LINKED_MESSAGE =
   "Link your Pinball Map account in Settings to change the lineup from here.";
 
 /**
- * Turn a rejected push into the action's error, marking the member's link
- * Needs relink when Pinball Map refused the token itself (spec 8.5). That
- * rejection is the only time PinPoint learns a token is dead — it never polls.
+ * Turn a rejected push into the action's error. When Pinball Map refused the
+ * token itself, the member's link is marked failed (spec 8.5) — that rejection
+ * is the only time PinPoint learns a token is dead; it never polls — and the
+ * error carries its own code, because the machine page then shows a standing
+ * "authentication failed" note and a second, transient copy would repeat it.
  */
 async function pushRejected(
   userId: string,
   linked: LinkedPinballMapCredentials,
   failure: PbmWriteFailure
-): Promise<Result<never, "PBM_REJECTED">> {
+): Promise<Result<never, "PBM_REJECTED" | "PBM_AUTH_FAILED">> {
   if (failure.reason === "unauthorized") {
     await markPinballMapLinkNeedsRelink(userId, linked.tokenVaultId);
     revalidatePath("/settings");
+    return err("PBM_AUTH_FAILED", pbmWriteFailureMessage(failure));
   }
   return err("PBM_REJECTED", pbmWriteFailureMessage(failure));
 }
@@ -536,6 +539,7 @@ export type ListPinballmapResult = Result<
   | "BLOCKED"
   | "NOT_LINKED"
   | "PBM_REJECTED"
+  | "PBM_AUTH_FAILED"
   | "SERVER"
 >;
 
@@ -721,6 +725,7 @@ export type UnlistPinballmapResult = Result<
   | "NOT_FOUND"
   | "NOT_LINKED"
   | "PBM_REJECTED"
+  | "PBM_AUTH_FAILED"
   | "SERVER"
 >;
 
