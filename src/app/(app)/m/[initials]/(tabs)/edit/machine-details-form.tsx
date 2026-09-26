@@ -413,6 +413,7 @@ export function MachineDetailsForm({
         )}
 
         <IscoredGamePicker
+          machineId={machineId}
           defaultGameId={iscoredGameId}
           machineName={liveName}
           onDirty={markDirty}

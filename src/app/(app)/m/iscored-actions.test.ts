@@ -1,12 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { eq } from "drizzle-orm";
+import { machines } from "~/server/db/schema";
 import { getIscoredGamesAction } from "./iscored-actions";
 import { getGameroomGames } from "~/lib/iscored/client";
 import { isIscoredConfigured } from "~/lib/iscored/config";
 
-const { mockGetUser, mockFindFirstProfile } = vi.hoisted(() => ({
-  mockGetUser: vi.fn(),
-  mockFindFirstProfile: vi.fn(),
-}));
+const { mockGetUser, mockFindFirstProfile, mockFindFirstMachine } = vi.hoisted(
+  () => ({
+    mockGetUser: vi.fn(),
+    mockFindFirstProfile: vi.fn(),
+    mockFindFirstMachine: vi.fn(),
+  })
+);
 
 vi.mock("~/lib/supabase/server", () => ({
   createClient: vi.fn(async () => {
@@ -22,6 +27,9 @@ vi.mock("~/server/db", () => ({
     query: {
       userProfiles: {
         findFirst: mockFindFirstProfile,
+      },
+      machines: {
+        findFirst: mockFindFirstMachine,
       },
     },
   },
@@ -73,6 +81,73 @@ describe("getIscoredGamesAction", () => {
     const result = await getIscoredGamesAction();
     expect(result).toEqual({ error: "Permission denied" });
     expect(getGameroomGames).not.toHaveBeenCalled();
+  });
+
+  it("returns games list when user is member and owns the machine", async () => {
+    const mockGames = [{ gameId: "77956", gameName: "Medieval Madness" }];
+    mockGetUser.mockResolvedValue({ data: { user: { id: "user-123" } } });
+    mockFindFirstProfile.mockResolvedValue({ role: "member" });
+    mockFindFirstMachine.mockResolvedValue({ ownerId: "user-123" });
+    vi.mocked(isIscoredConfigured).mockReturnValue(true);
+    vi.mocked(getGameroomGames).mockResolvedValue(mockGames);
+
+    const result = await getIscoredGamesAction({ machineId: "machine-abc" });
+    expect(result).toEqual({ games: mockGames });
+    expect(getGameroomGames).toHaveBeenCalledTimes(1);
+    expect(mockFindFirstMachine).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: eq(machines.id, "machine-abc"),
+        columns: { ownerId: true },
+      })
+    );
+  });
+
+  it("returns error when user is member and does not own the machine", async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: "user-123" } } });
+    mockFindFirstProfile.mockResolvedValue({ role: "member" });
+    mockFindFirstMachine.mockResolvedValue({ ownerId: "other-user" });
+
+    const result = await getIscoredGamesAction({ machineId: "machine-abc" });
+    expect(result).toEqual({ error: "Permission denied" });
+    expect(getGameroomGames).not.toHaveBeenCalled();
+    expect(mockFindFirstMachine).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: eq(machines.id, "machine-abc"),
+        columns: { ownerId: true },
+      })
+    );
+  });
+
+  it("returns error when user is member and machine is not found", async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: "user-123" } } });
+    mockFindFirstProfile.mockResolvedValue({ role: "member" });
+    mockFindFirstMachine.mockResolvedValue(undefined);
+
+    const result = await getIscoredGamesAction({ machineId: "machine-abc" });
+    expect(result).toEqual({ error: "Permission denied" });
+    expect(getGameroomGames).not.toHaveBeenCalled();
+    expect(mockFindFirstMachine).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: eq(machines.id, "machine-abc"),
+        columns: { ownerId: true },
+      })
+    );
+  });
+
+  it("returns error when user is guest even if machineId is provided", async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: "user-123" } } });
+    mockFindFirstProfile.mockResolvedValue({ role: "guest" });
+    mockFindFirstMachine.mockResolvedValue({ ownerId: "user-123" });
+
+    const result = await getIscoredGamesAction({ machineId: "machine-abc" });
+    expect(result).toEqual({ error: "Permission denied" });
+    expect(getGameroomGames).not.toHaveBeenCalled();
+    expect(mockFindFirstMachine).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: eq(machines.id, "machine-abc"),
+        columns: { ownerId: true },
+      })
+    );
   });
 
   it("returns error when iScored is not configured", async () => {
