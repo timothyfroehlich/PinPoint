@@ -276,6 +276,15 @@ export const machines = pgTable(
     })
       .notNull()
       .default("off"),
+    // Whether this cabinet SHOULD be marked Insider Connected on Pinball Map
+    // (spec 3.8) — an operator decision like `pinballmap_intent`, owned by
+    // PinPoint and pushed by the same sync. NULL means no intent recorded: the
+    // control then shows Pinball Map's own value and never flags it, so entries
+    // nobody has touched are not all Out of sync on day one. Meaningful only for
+    // a title Pinball Map's catalog marks eligible; the column does not enforce
+    // that, because eligibility lives in the refreshed catalog mirror and can
+    // change under a stored intent.
+    pinballmapIcIntent: text("pinballmap_ic_intent", { enum: ["on", "off"] }),
     // Hand-entered model name for a machine PinballMap's catalog cannot cover —
     // a homebrew, a flipperless game (PP-3bbr, folded into PP-o355.21). Set ONLY
     // alongside `pinballmap_excluded` (CHECK below): a linked machine reads its
@@ -320,6 +329,10 @@ export const machines = pgTable(
     pinballmapIntentCheck: check(
       "machines_pinballmap_intent_check",
       sql`pinballmap_intent IN ('on', 'off', 'no_sync')`
+    ),
+    pinballmapIcIntentCheck: check(
+      "machines_pinballmap_ic_intent_check",
+      sql`pinballmap_ic_intent IS NULL OR pinballmap_ic_intent IN ('on', 'off')`
     ),
     pinballmapIntentRequiresLinkCheck: check(
       "machines_pinballmap_intent_requires_link",

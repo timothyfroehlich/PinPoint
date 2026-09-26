@@ -64,6 +64,7 @@ function makeMachine(
     pinballmapExcluded: false,
     pinballmapExcludedReason: null,
     pinballmapIntent: "off" as const,
+    pinballmapIcIntent: null,
     opdbId: null,
     ipdbId: null,
     iscoredGameId: null,

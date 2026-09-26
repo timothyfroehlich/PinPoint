@@ -1,15 +1,17 @@
 /**
- * E2E: the Insider Connected row on a machine's Manage tab (spec 3.8, 4.1).
+ * E2E: the Insider Connected switch on a machine's Manage tab (spec 3.8, 4.1).
  *
  * What only this layer sees is the join: eligibility lives on the catalog row,
- * the setting on the stored lineup entry, and the row appears only when the
- * machine loader carries the catalog flag through to the control. Unit tests
+ * Pinball Map's value on the stored lineup entry, the intent on the machine
+ * row, and the switch appears only when the loader carries the catalog flag
+ * through to the control. Unit tests
  * render the control with a view handed to them, and integration tests stop at
  * the action; dropping `icEligible` from the loader would pass both.
  *
- * The E2E database has no operator credential, so the switch renders read-only
- * — which is itself the 8.2 rule. The write path is covered by
- * `src/test/integration/pinballmap-insider-connected.test.ts`.
+ * The E2E database has no operator credential, which is the case the intent
+ * exists for: the switch still records the intent, and the difference shows as
+ * Out of sync with a link out instead of a push (4.4). The push path is covered
+ * by `src/test/integration/pinballmap-insider-connected.test.ts`.
  *
  * Catalog rows and the lineup entry are seeded directly; nothing reaches
  * pinballmap.com (CORE-PBM-001 / CORE-TEST-006).
@@ -29,14 +31,14 @@ import {
   removeLmxFromStoredLineup,
 } from "../support/supabase-admin.js";
 
-test.describe("Pinball Map Insider Connected row (PP-o355.59)", () => {
+test.describe("Pinball Map Insider Connected switch (PP-o355.59)", () => {
   test.use({ storageState: STORAGE_STATE.technician });
 
   for (const { icEligible, rowCount } of [
     { icEligible: true, rowCount: 1 },
     { icEligible: false, rowCount: 0 },
   ]) {
-    test(`${icEligible ? "shows" : "hides"} the row for an ${icEligible ? "eligible" : "ineligible"} title`, async ({
+    test(`${icEligible ? "shows" : "hides"} the switch for an ${icEligible ? "eligible" : "ineligible"} title`, async ({
       page,
       request,
     }) => {
@@ -65,18 +67,33 @@ test.describe("Pinball Map Insider Connected row (PP-o355.59)", () => {
 
         await page.goto(`/m/${initials}/edit`);
         await expect(page.getByTestId("pbm-listing-control")).toBeVisible();
-        await expect(
-          page.getByTestId("pbm-listing-row-insider-connected")
-        ).toHaveCount(rowCount);
+        await expect(page.getByTestId("pbm-insider-connected")).toHaveCount(
+          rowCount
+        );
         if (!icEligible) return;
 
+        // No intent yet: the switch shows Pinball Map's value, unflagged.
         const toggle = page.getByRole("switch", { name: "Insider Connected" });
         await expect(toggle).toBeChecked();
-        // No operator credential in the E2E database: status only (8.2).
-        await expect(toggle).toBeDisabled();
+        await expect(page.getByTestId("pbm-listing-out-of-sync")).toHaveCount(
+          0
+        );
+
+        // Recording Off needs no credential (3.8) and is now Out of sync.
+        await toggle.click();
+        await expect(toggle).not.toBeChecked();
+        await expect(page.getByTestId("pbm-listing-out-of-sync")).toBeVisible();
         await expect(
-          page.getByTestId("pbm-insider-connected-setting")
-        ).toHaveText("On");
+          page.getByRole("img", { name: "Pinball Map: On" })
+        ).toBeVisible();
+        await expect(
+          page.getByTestId("pbm-insider-connected-status")
+        ).toHaveText("Insider Connected on.");
+        // Without a credential: a link out, never a push that would fail (4.4).
+        await expect(page.getByTestId("pbm-listing-update")).toHaveCount(0);
+        await expect(
+          page.getByRole("link", { name: "Set on Pinball Map" })
+        ).toBeVisible();
       } finally {
         await cleanupTestEntities(request, { machineInitials: [initials] });
         await deletePinballMapCatalogEntries([titleId]);
