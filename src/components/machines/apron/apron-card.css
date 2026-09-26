@@ -133,6 +133,9 @@
   font-size: 11.5px;
   line-height: 1.25;
   color: var(--apron-on-panel-soft);
+  /* A name with no break point wraps rather than running past the panel's
+     edge, where the vertical overflow check (§6.4) could not see it. */
+  overflow-wrap: anywhere;
 }
 
 .apron-card__logo {
