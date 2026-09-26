@@ -142,7 +142,7 @@ Native Supabase auto-branching is **disabled** — no PR gets a preview by defau
   - Later pushes do not re-migrate the branch. After pushing a migration or seed change, comment `/preview` again — it resets the live branch and re-runs migrate + seed from the new head.
 - **State**: one sticky bot comment per PR (keyed `<!-- pinpoint-preview-status -->`) holds the `Expires:` timestamp — the TTL source of truth.
 - **Reaper**: `Preview Reaper` runs hourly; deletes branches past expiry or on closed/merged PRs, and flips the sticky comment to "expired — comment `/preview` to restart."
-- **Implementation** (workflows, the Vercel git-integration wiring, and required secrets): `.github/workflows/preview-control.yaml`, `preview-reaper.yaml`, `scripts/workflow/preview/*.sh` (including the pinned Vercel CLI wrapper `scripts/workflow/preview/vercel-cli.sh`, PP-h2ui.7).
+- **Implementation** (workflows, the Vercel git-integration wiring, and required secrets): `.github/workflows/preview-control.yaml`, `preview-reaper.yaml`, `scripts/workflow/preview/*.sh`. Vercel calls in the preview path are direct REST through `scripts/workflow/preview/vercel-env.sh` (branch-scoped env upsert/remove, plus the deployment trigger and poll): no Vercel CLI and no npm fetch run while `VERCEL_TOKEN`/`SUPABASE_ACCESS_TOKEN` are in scope, and neither the token nor env values reach argv. Secrets are step-scoped in both workflows (PP-fmli).
 
 Vercel preview migrations: preview deployments skip `migrate:production` (branch DB user lacks `CREATE SCHEMA`). The on-demand `Preview Controller` workflow migrates + seeds the branch DB before building the preview. Production deploys still migrate.
 
