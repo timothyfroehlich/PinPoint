@@ -134,7 +134,7 @@ chromium-only smoke. `pnpm run preflight` wraps it in `quiet-run.py`;
 
 | Checker      | Covers head when                                                                                                                                                                   | Other verdicts                                                                    |
 | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `claude`     | A review record from the owner whose marker names head (or, across a clean merge of `main`, the pre-merge head)                                                                    | `stale` (newest record names an older commit), `none`                             |
+| `claude`     | A review record from the owner whose marker names head (or, across a clean merge of `main` or a `Mechanical-Resolution:`-trailered fixup/renumbering, the pre-merge head)          | `stale` (newest record names an older commit), `none`                             |
 | `coderabbit` | Native `APPROVED` from `coderabbitai[bot]` pinned to head                                                                                                                          | `changes_requested` (its `CHANGES_REQUESTED` on head), `stale` (off-head), `none` |
 | `codex`      | Newest exact-head record among: native `APPROVED`; native `COMMENTED`/`CHANGES_REQUESTED` (thread gate owns findings); trusted clean comment (10/40-char prefix); reaction witness | `stale` (newest Codex record names an older commit), `none` (nothing usable)      |
 

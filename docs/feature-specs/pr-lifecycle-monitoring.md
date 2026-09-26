@@ -97,7 +97,7 @@
 - **8.9** _Retired 2026-09-24._ CodeRabbit re-review requests. Number kept so older citations don't dangle.
 - **8.10** _Retired 2026-09-24._ Codex review requests. Number kept so older citations don't dangle.
 - **8.11** _Retired 2026-09-24._ Anchoring review requests to a head; the review record names its reviewed head instead (8.18). Number kept so older citations don't dangle.
-- **8.12** Pushing new commits to a pull request branch invalidates previous review coverage, and the updated head requires a new local review. The one exception: a head whose only new commits are clean merges of the base branch keeps the earlier coverage.
+- **8.12** Pushing new commits to a pull request branch invalidates previous review coverage, and the updated head requires a new local review. Two exceptions keep the earlier coverage: a head whose only new commits are clean merges of the base branch, and a head whose only new commits beyond that are mechanical resolutions — a merge-conflict fixup or a migration renumbering with no logic change — each commit carrying a `Mechanical-Resolution:` trailer naming what it resolved. A resolution that touches logic is not mechanical and needs a fresh review.
 - **8.13** The owning agent runs a local review after CI passes on the current head.
 - **8.14** The review level follows the weighted diff size: low below 50 lines, medium from 50 up to 1,500, and high from 1,500 through 3,000. Above 3,000, the owning agent asks the owner before reviewing.
 - **8.15** The weighted diff size counts added plus deleted lines against the base branch. It leaves out the lockfile, migration snapshots, test fixtures, binary files, and feature specs, and counts test code at half weight.
@@ -142,6 +142,7 @@
 
 | Date | Amendment |
 | :-- | :-- |
+| 2026-09-26 | Extend §8.12: a `Mechanical-Resolution:`-trailered merge-conflict fixup or migration renumbering keeps review coverage the same as a clean base-branch merge, on the owning agent's attestation that no logic changed. |
 | 2026-09-24 | Replace CodeRabbit and Codex with a local Claude Code review (§1, §3.2, §8, §9–§11): the owning agent reviews at a level set by weighted diff size, re-reviews after fixes until clean, posts a review record pinned to the head, then promotes; a forced merge promotes a draft first; §8.12 keeps coverage across clean base-branch merges; §9–§11 retired. |
 | 2026-09-24 | Drop local owner attestation as a review provider (§1, §8.3, §8.4, §9.3): only CodeRabbit and Codex cover a head; the owner merges a PR without that coverage by directing a forced merge. |
 | 2026-09-16 | Amend spec to add automated review requirements (§8–§11): CodeRabbit default review, draft-promotion auto-trigger, manual re-reviews and Codex requests, 5/hr rate limits and fallback, concurrent review first-success reporting with in-progress notices, and prompt extraction. |
