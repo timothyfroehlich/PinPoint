@@ -14,7 +14,7 @@ import {
   canAccessMachineManage,
   type OwnershipContext,
 } from "~/lib/permissions/index";
-import { getMachineForLayout } from "../_data";
+import { getMachineCredits, getMachineForLayout } from "../_data";
 import { pinballmapLocationUrl } from "~/lib/pinballmap/public-url";
 import { getPinballMapState } from "~/lib/pinballmap/state";
 import {
@@ -211,11 +211,12 @@ export default async function MachineInfoTab({
   // tab layout and the route-level deep-link guard.
   const canOpenManage = canAccessMachineManage(accessLevel, ownershipContext);
 
-  const [topScores, manufacturerTag] = await Promise.all([
+  const [topScores, manufacturerTag, credits] = await Promise.all([
     machine.iscoredGameId
       ? getTopScoresForMachine(machine.iscoredGameId, 3)
       : Promise.resolve([]),
     getManufacturerTagForMachine(undefined, machine.id),
+    getMachineCredits(machine.pinballmapTitle?.opdbId ?? null),
   ]);
 
   const rail = (
@@ -234,6 +235,7 @@ export default async function MachineInfoTab({
           : null
       }
       year={machine.year}
+      credits={credits}
       topScoresSlot={
         <TopScoresCard
           iscoredGameId={machine.iscoredGameId}

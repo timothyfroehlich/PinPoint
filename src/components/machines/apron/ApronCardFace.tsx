@@ -6,8 +6,10 @@ import { Trophy, Wrench } from "lucide-react";
 
 import {
   APRON_CARD_LAYOUTS,
+  apronCreditRows,
   cardParagraphs,
   fitTitleSize,
+  shrinkUntilFits,
   type ApronCardContent,
   type ApronCardSize,
 } from "~/lib/machines/apron-card";
@@ -43,6 +45,8 @@ export function ApronCardFace({
   const layout = APRON_CARD_LAYOUTS[size];
   const [titlePx, setTitlePx] = useState(layout.titleMaxPx);
   const textRef = useRef<HTMLDivElement>(null);
+  const identityRef = useRef<HTMLDivElement>(null);
+  const titleRef = useRef<HTMLDivElement>(null);
   const qr = useMemo(() => qrSvgPath(scanUrl), [scanUrl]);
 
   const onOverflowRef = useRef(onOverflowChange);
@@ -56,8 +60,36 @@ export function ApronCardFace({
   const tip = content.tipEnabled ? cardParagraphs(content.tip) : [];
   const showTip = content.tipEnabled;
   const qrPx = showTip ? layout.qrWithTipPx : layout.qrPx;
+  const creditRows = apronCreditRows(content);
+  const logoWidth =
+    creditRows.length > 0 ? layout.logoWithCreditsWidth : layout.logoWidth;
+  // Everything in the identity panel other than the title — the title fit's
+  // last step re-runs when any of it changes (spec 6.3).
+  const panelKey = JSON.stringify([
+    content.edition,
+    content.manufacturer,
+    content.year,
+    content.ownerName,
+    creditRows,
+  ]);
 
-  // Title fit (spec §1, §6.1), measured against the loaded display face.
+  // The card does not fit when description and tip overflow their region
+  // (§3.5) or when the identity panel still reaches the logo with the title
+  // at its floor (§6.4). Reads refs only, so any render's copy is current.
+  const reportOverflow = (): void => {
+    const text = textRef.current;
+    const identity = identityRef.current;
+    if (!text) return;
+    const overflows = (el: HTMLElement): boolean =>
+      el.scrollHeight > el.clientHeight + 0.5;
+    onOverflowRef.current?.(
+      overflows(text) || (identity !== null && overflows(identity))
+    );
+  };
+
+  // Title fit (spec §1, §6.1, §6.3), measured against the loaded faces:
+  // first the three-line fit by text width, then down until the identity
+  // panel's content fits above the logo.
   useLayoutEffect(() => {
     let cancelled = false;
     const family = barlowCondensed.style.fontFamily;
@@ -65,18 +97,38 @@ export function ApronCardFace({
     const fit = (): void => {
       if (cancelled) return;
       if (context) {
-        setTitlePx(
-          fitTitleSize({
-            title: content.name.toUpperCase(),
-            maxWidth: layout.titleMaxWidth,
-            maxPx: layout.titleMaxPx,
+        const lineFit = fitTitleSize({
+          title: content.name.toUpperCase(),
+          maxWidth: layout.titleMaxWidth,
+          maxPx: layout.titleMaxPx,
+          minPx: layout.titleMinPx,
+          measure: (text, px) => {
+            context.font = `800 ${px}px ${family}`;
+            return context.measureText(text).width;
+          },
+        });
+        const identity = identityRef.current;
+        const title = titleRef.current;
+        // Sizes are tried on the element directly so each measurement is one
+        // synchronous layout, not one render; state gets the final size.
+        let px = lineFit;
+        if (identity && title) {
+          px = shrinkUntilFits({
+            startPx: lineFit,
             minPx: layout.titleMinPx,
-            measure: (text, px) => {
-              context.font = `800 ${px}px ${family}`;
-              return context.measureText(text).width;
+            fits: (size) => {
+              title.style.fontSize = `${size}px`;
+              return identity.scrollHeight <= identity.clientHeight + 0.5;
             },
-          })
-        );
+          });
+          // The last size tried is not always the result (the floor is never
+          // measured), and React skips the write when state is unchanged.
+          title.style.fontSize = `${px}px`;
+        }
+        setTitlePx(px);
+        // The fit can finish without a re-render (same size as before), so
+        // re-check here rather than rely on the per-render check alone.
+        reportOverflow();
       }
       onReadyRef.current?.();
     };
@@ -87,17 +139,12 @@ export function ApronCardFace({
     return () => {
       cancelled = true;
     };
-  }, [content.name, layout]);
+  }, [content.name, layout, panelKey]);
 
-  // Combined-region overflow (spec §3.5): a boolean, no line counting.
+  // Combined-region overflow (spec §3.5, §6.4): a boolean, no line counting.
   useLayoutEffect(() => {
-    const el = textRef.current;
-    if (!el) return;
-    const check = (): void => {
-      onOverflowRef.current?.(el.scrollHeight > el.clientHeight + 0.5);
-    };
-    check();
-    void document.fonts.ready.then(check);
+    reportOverflow();
+    void document.fonts.ready.then(reportOverflow);
   });
 
   const makerYear = [content.manufacturer, content.year]
@@ -110,7 +157,7 @@ export function ApronCardFace({
     "--apron-panel-width": `${layout.panelWidth}px`,
     "--apron-panel-padding": layout.panelPadding,
     "--apron-body-padding": layout.bodyPadding,
-    "--apron-logo-width": `${layout.logoWidth}px`,
+    "--apron-logo-width": `${logoWidth}px`,
     "--apron-qr-size": `${qrPx}px`,
     "--apron-body-font": `${layout.bodyFontPx}px`,
   };
@@ -127,8 +174,9 @@ export function ApronCardFace({
       data-apron-size={size}
     >
       <div className="apron-card__panel">
-        <div className="apron-card__identity">
+        <div className="apron-card__identity" ref={identityRef}>
           <div
+            ref={titleRef}
             className="apron-card__display apron-card__title"
             style={{ fontSize: `${titlePx}px` }}
           >
@@ -141,6 +189,18 @@ export function ApronCardFace({
           ) : null}
           {makerYear ? (
             <div className="apron-card__meta">{makerYear}</div>
+          ) : null}
+          {creditRows.length > 0 ? (
+            <dl className="apron-card__credits">
+              {creditRows.map((row) => (
+                <div key={row.label} className="apron-card__credit">
+                  <dt className="apron-card__display apron-card__credit-label">
+                    {row.label}
+                  </dt>
+                  <dd className="apron-card__credit-names">{row.text}</dd>
+                </div>
+              ))}
+            </dl>
           ) : null}
           {content.ownerName ? (
             <div className="apron-card__owner">Owner: {content.ownerName}</div>

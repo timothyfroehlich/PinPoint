@@ -4,6 +4,7 @@ import { TriangleAlert } from "lucide-react";
 
 import { PersonHoverCard } from "~/components/people/PersonHoverCard";
 import { formatDate } from "~/lib/dates";
+import { formatCreditNames, type MachineCredits } from "~/lib/opdb/credits";
 
 interface InfoRailProps {
   owner: { id: string; name: string; avatarUrl: string | null } | null;
@@ -39,6 +40,13 @@ interface InfoRailProps {
    */
   manufacturer: string | null;
   year: number | null;
+  /**
+   * Design and art credits from the machine's OPDB record, rendered under
+   * Year with the same rule: only alongside a model, and a role with no
+   * credits reads **Unknown** (PP-tv2u). Every name shows here; only the
+   * apron card limits the list.
+   */
+  credits: MachineCredits;
   /**
    * The machine's manufacturer tag, or null when it has no current
    * manufacturer (spec collections-and-tags 7.4, 8.4).
@@ -95,6 +103,26 @@ interface InfoRailProps {
 }
 
 const CARD = "rounded-xl border border-outline-variant bg-card p-4";
+
+function CreditRow({
+  label,
+  names,
+}: {
+  label: string;
+  names: string[];
+}): React.JSX.Element {
+  const text = formatCreditNames(names);
+  return (
+    <p className="mt-1 text-sm">
+      <span className="font-semibold text-muted-foreground">{label}</span>{" "}
+      {text === null ? (
+        <span className="text-muted-foreground">Unknown</span>
+      ) : (
+        <span className="text-foreground">{text}</span>
+      )}
+    </p>
+  );
+}
 const LABEL =
   "text-[10px] font-bold uppercase tracking-wider text-muted-foreground";
 
@@ -124,6 +152,7 @@ export function InfoRail({
   modelName,
   manufacturer,
   year,
+  credits,
   manufacturerTag,
   pinballmap,
 }: InfoRailProps): React.JSX.Element {
@@ -179,6 +208,8 @@ export function InfoRail({
                   <span className="text-foreground">{year}</span>
                 )}
               </p>
+              <CreditRow label="Design" names={credits.design} />
+              <CreditRow label="Art" names={credits.art} />
             </>
           )}
 
