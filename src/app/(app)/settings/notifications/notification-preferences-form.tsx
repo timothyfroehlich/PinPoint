@@ -145,8 +145,7 @@ export function NotificationPreferencesForm({
     useState<NotificationPreferencesData>(preferences);
   const [baselinePreferences, setBaselinePreferences] =
     useState<NotificationPreferencesData>(preferences);
-  const formValuesRef = useRef(formValues);
-  formValuesRef.current = formValues;
+  const submittedValuesRef = useRef<NotificationPreferencesData | null>(null);
 
   const [pendingNavigation, setPendingNavigation] =
     useState<PendingNavigation | null>(null);
@@ -171,37 +170,25 @@ export function NotificationPreferencesForm({
   const prevPreferencesRef = useRef(preferences);
   useEffect(() => {
     if (prevPreferencesRef.current !== preferences) {
+      if (isDirty || isPending) return;
       prevPreferencesRef.current = preferences;
       setBaselinePreferences(preferences);
       setFormValues(preferences);
     }
-  }, [preferences]);
+  }, [preferences, isDirty, isPending]);
 
   // Show feedback when state updates
   useEffect(() => {
     if (state) {
       setShowFeedback(true);
-      if (state.ok) {
-        setBaselinePreferences(formValuesRef.current);
+      if (state.ok && submittedValuesRef.current) {
+        setBaselinePreferences(submittedValuesRef.current);
+        submittedValuesRef.current = null;
       }
     }
   }, [state]);
 
   // Prevent React 19 form action auto-reset from triggering Radix Switch reset (which reverts to initial mount state)
-  useEffect(() => {
-    const form = formRef.current;
-    if (!form) return;
-    const handleReset = (event: Event): void => {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-    };
-    form.addEventListener("reset", handleReset, true);
-    return () => {
-      form.removeEventListener("reset", handleReset, true);
-    };
-  }, []);
-
-  // Prevent React 19 form action auto-reset from triggering Radix Switch reset
   useEffect(() => {
     const form = formRef.current;
     if (!form) return;
@@ -421,6 +408,9 @@ export function NotificationPreferencesForm({
       <form
         ref={formRef}
         action={formAction}
+        onSubmit={() => {
+          submittedValuesRef.current = { ...formValues };
+        }}
         onReset={(e) => {
           e.preventDefault();
         }}
