@@ -4,7 +4,7 @@ import { createTestUser, deleteTestUser } from "../support/supabase-admin.js";
 import { getTestEmail } from "../support/test-isolation.js";
 
 /**
- * The one journey only a browser covers: a Default Saved View is applied by a
+ * The one journey only a browser covers: a Default View is applied by a
  * server redirect when the Surface opens without view configuration
  * (machine-views.md §8.11–§8.13). Persistence and URL resolution are covered
  * in src/test/integration/machine-view-saved-views.test.ts and

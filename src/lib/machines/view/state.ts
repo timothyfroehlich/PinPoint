@@ -196,7 +196,7 @@ const MACHINE_VIEW_CONFIGURATION_PARAMS = [
 
 /**
  * Whether a URL carries view configuration other than `page` (spec §8.11).
- * A URL without any opens the account's Default Saved View.
+ * A URL without any opens the account's Default View.
  */
 export function hasMachineViewConfiguration(
   searchParams: MachineViewSearchParams

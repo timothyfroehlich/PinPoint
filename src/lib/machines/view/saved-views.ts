@@ -331,7 +331,7 @@ export async function renameSavedMachineView(
 }
 
 /**
- * Delete (spec §8.9). Deleting the Default Saved View deletes its default row,
+ * Delete (spec §8.9). Deleting a Saved View that is the Default View deletes its default row,
  * leaving the Surface without one (§8.14); no other view is promoted.
  */
 export async function deleteSavedMachineView(
