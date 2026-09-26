@@ -519,4 +519,94 @@ describe("rate-limit module — environment isolation & limiter behavior", () =>
       expect(limitMock).toHaveBeenCalledWith("unknown-ip-fallback");
     });
   });
+
+  describe("checkQuickSearchLimit", () => {
+    it("configures 120/1m sliding window and keys on IP for anonymous requests", async () => {
+      vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://mock-redis.upstash.io");
+      vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "mock-token-secret");
+
+      limitMock.mockResolvedValueOnce({
+        success: true,
+        limit: 120,
+        remaining: 119,
+        reset: 1700000000000,
+      });
+
+      const { checkQuickSearchLimit } = await import("./rate-limit");
+      const result = await checkQuickSearchLimit("198.51.100.42");
+
+      expect(slidingWindowMock).toHaveBeenCalledWith(120, "1 m");
+      expect(ctorMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prefix: "ratelimit:quick-search",
+          analytics: true,
+        })
+      );
+      expect(limitMock).toHaveBeenCalledWith("198.51.100.42");
+      expect(result).toEqual({
+        success: true,
+        limit: 120,
+        remaining: 119,
+        reset: 1700000000000,
+      });
+    });
+
+    it("keys on hashed user ID for authenticated requests (CORE-SEC-007)", async () => {
+      vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://mock-redis.upstash.io");
+      vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "mock-token-secret");
+
+      limitMock.mockResolvedValueOnce({
+        success: true,
+        limit: 120,
+        remaining: 119,
+        reset: 1700000000000,
+      });
+
+      const { checkQuickSearchLimit } = await import("./rate-limit");
+      const userId = "user-member-456";
+      const expectedHash = createHash("sha256")
+        .update(userId, "utf8")
+        .digest("hex");
+
+      const result = await checkQuickSearchLimit("198.51.100.42", userId);
+
+      expect(limitMock).toHaveBeenCalledWith(`user:${expectedHash}`);
+      expect(result).toEqual({
+        success: true,
+        limit: 120,
+        remaining: 119,
+        reset: 1700000000000,
+      });
+    });
+  });
+
+  describe("getClientIp", () => {
+    it("extracts the first IP from x-forwarded-for when custom headers are provided", async () => {
+      const { getClientIp } = await import("./rate-limit");
+      const headers = new Headers({
+        "x-forwarded-for": "203.0.113.195, 70.41.3.18, 150.172.238.178",
+      });
+
+      const ip = await getClientIp(headers);
+      expect(ip).toBe("203.0.113.195");
+    });
+
+    it("falls back to x-real-ip when x-forwarded-for is missing", async () => {
+      const { getClientIp } = await import("./rate-limit");
+      const headers = new Headers({
+        "x-real-ip": "198.51.100.10",
+      });
+
+      const ip = await getClientIp(headers);
+      expect(ip).toBe("198.51.100.10");
+    });
+
+    it("returns 'unknown' when neither header is present", async () => {
+      const { getClientIp } = await import("./rate-limit");
+      const headers = new Headers();
+
+      const ip = await getClientIp(headers);
+      expect(ip).toBe("unknown");
+    });
+  });
 });
