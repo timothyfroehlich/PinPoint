@@ -1269,6 +1269,10 @@ describe("PinballMap outbound writes (PGlite)", () => {
       })
       .returning();
     if (!machine) throw new Error("failed to seed machine");
+    // Earlier tests' successful pushes also revalidate /m/GZ; only this push's
+    // calls may satisfy the assertion below.
+    const { revalidatePath } = await import("next/cache");
+    vi.mocked(revalidatePath).mockClear();
 
     const result = await addMachineToPinballMapAction(
       undefined,
@@ -1286,7 +1290,6 @@ describe("PinballMap outbound writes (PGlite)", () => {
     expect(link?.needsRelinkAt).not.toBeNull();
     // The control hides the transient error for this code, so the machine
     // page has to re-render into its standing note.
-    const { revalidatePath } = await import("next/cache");
     expect(vi.mocked(revalidatePath)).toHaveBeenCalledWith("/m/GZ");
   });
 

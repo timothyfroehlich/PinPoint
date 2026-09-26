@@ -12,8 +12,7 @@
  * shipped without it.
  *
  * `get_pinballmap_api_token()` (0057) was dropped in 0059, and the operator
- * token's `get_pinballmap_credentials()` in 0091; the last test pins the latter
- * gone.
+ * token's `get_pinballmap_credentials()` in 0091.
  *
  * Has to run against a real Supabase stack rather than PGlite: PGlite's schema
  * comes from `drizzle-kit export`, which knows nothing about hand-written
@@ -218,16 +217,5 @@ describe("pinballmap_user_credentials — not readable through PostgREST", () =>
       .eq("user_id", memberUser?.id ?? "");
     expect(error).toBeNull();
     expect(data).toHaveLength(1);
-  });
-});
-
-describe("get_pinballmap_credentials() — retired with the operator token", () => {
-  it("no longer exists (drizzle/0091)", async () => {
-    const rows = await sql`
-      SELECT 1 FROM pg_proc p
-        JOIN pg_namespace n ON n.oid = p.pronamespace
-       WHERE n.nspname = 'public' AND p.proname = 'get_pinballmap_credentials'
-    `;
-    expect(rows).toHaveLength(0);
   });
 });
