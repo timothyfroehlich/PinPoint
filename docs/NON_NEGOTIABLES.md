@@ -286,7 +286,7 @@
 
 - **Severity:** Required
 - **Why:** Consistent structure
-- **Do:** Reference the `pinpoint-testing` skill (`.agents/skills/pinpoint-testing/SKILL.md`) for bug-class-driven test layer selection
+- **Do:** Reference the `pinpoint-testing` skill (`.agents/skills/pinpoint-testing/SKILL.md`) for bug-class-driven test layer selection and `pinpoint-test-audit` (`.agents/skills/pinpoint-test-audit/SKILL.md`) for authoring gates, junk-pattern defense, and test-audit workflows
 - **Don't:** Mix test types or create per-test database instances
 
 **CORE-TEST-004:** Prefer Integration Tests for DB Logic
@@ -663,6 +663,6 @@ If all Yes → ship it. Perfect is the enemy of done.
 
 **Cross-References:**
 
-- Testing patterns: `pinpoint-testing` skill (`.agents/skills/pinpoint-testing/SKILL.md`)
+- Testing patterns & test authoring/audit: `pinpoint-testing` skill (`.agents/skills/pinpoint-testing/SKILL.md`) and `pinpoint-test-audit` skill (`.agents/skills/pinpoint-test-audit/SKILL.md`)
 - Product requirements: approved documents in `docs/feature-specs/`
 - Technical architecture: the relevant `.agents/skills/` guidance and source code
