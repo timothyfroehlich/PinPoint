@@ -175,22 +175,23 @@ export interface PbmCredentials {
  *
  * IMPORTANT: PBM signals logical failures with HTTP 200 and an `errors` field
  * in the body (not a 4xx status) — e.g. `{"errors":"Failed to find machine"}`.
- * A disabled account is the lone exception (HTTP 401 + `{"error":"..."}`). The
+ * The status-based exceptions are 401 (PinPoint's platform X-Api-Token
+ * refused) and 403 (a disabled account), both `{"error":"..."}`. Otherwise the
  * live client classifies on the body, so these reasons are derived from PBM's
  * error message, not the status code. See the RSpec contract referenced in
  * `docs/external/README.md`.
  *
  * - `rate_limited` — hit a 429 (see vendored llms.txt rate-limit table); retry later
- * - `unauthorized` — auth required / token rejected / not the owner of the resource
+ * - `unauthorized` — the writer's own identity refused: user_token rejected (200 +
+ *   "Authentication is required") or account disabled (403). Marks their link
+ *   Authentication failed (spec 8.5).
+ * - `api_token` — PinPoint's platform X-Api-Token refused (401); says nothing
+ *   about the writer, so it never touches their link
  * - `not_found` — the target lmx/location/machine no longer exists on PBM
  * - `rejected` — PBM understood the request but refused it (e.g. machine not
- *   Insider-Connected eligible, blank condition); not retryable, surface `message`
+ *   Insider-Connected eligible, blank condition, editing a condition the writer
+ *   does not own); not retryable, surface `message`
  * - `transient` — network error or 5xx; safe to retry later
- */
-/**
- * `unauthorized` is the writer's own identity refused (the user_token no longer
- * matches, or the account is disabled); `api_token` is PinPoint's platform
- * X-Api-Token refused, which says nothing about the writer (CORE-PBM-001).
  */
 export type PbmWriteFailureReason =
   | "rate_limited"

@@ -54,7 +54,8 @@ import type {
  *
  * ERROR MODEL: PBM reports logical failures with HTTP 200 and an `errors` string
  * in the JSON body (e.g. `{"errors":"Failed to find machine"}`), NOT a 4xx — the
- * sole status-based exception is a disabled account (401 + `{"error":"..."}`).
+ * status-based exceptions are 401 (our platform X-Api-Token refused) and 403 (a
+ * disabled account), both `{"error":"..."}` — see writeReasonFor.
  * So we classify success/failure from the body, never from `res.ok` alone.
  * Contract source: pinballmap/pbm spec (see docs/external/README.md).
  *
