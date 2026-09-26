@@ -27,6 +27,11 @@ import { type TimelineEventSourceType } from "~/lib/timeline/machine-events";
 import { type TimelineTag } from "~/lib/timeline/machine-tags";
 import { type SettingsSection } from "~/lib/machines/settings-types";
 import type { LocationSnapshot } from "~/lib/pinballmap/types";
+import {
+  OPDB_DISPLAY_TYPES,
+  OPDB_MACHINE_TYPES,
+  type OpdbPerson,
+} from "~/lib/opdb/types";
 import { REPORT_MODE_VALUES } from "~/lib/types/user";
 
 /**
@@ -369,6 +374,46 @@ export const pinballmapCatalog = pgTable(
     nameIdx: index("idx_pinballmap_catalog_name").on(t.name),
     // Edition lookup for a selected family.
     groupIdx: index("idx_pinballmap_catalog_group").on(t.machineGroupId),
+  })
+).enableRLS();
+
+/**
+ * Local copy of the Open Pinball Database's daily export (PP-wqit.12), keyed by
+ * full OPDB ID. Holds only the machine and alias entries and only the fields
+ * Pinball Map's catalog does not relay: type, display, player count, and people
+ * credits. A catalog title reaches its row through `pinballmap_catalog.opdb_id`
+ * (not a foreign key: an alias missing here falls back to its machine-level ID,
+ * see `~/lib/opdb/records`). Refreshed daily by /api/cron/refresh-opdb; read at
+ * render time, never fetched per request (spec collections-and-tags 9.1).
+ */
+export const opdbMachines = pgTable(
+  "opdb_machines",
+  {
+    opdbId: text("opdb_id").primaryKey(),
+    name: text("name").notNull(),
+    type: text("type", { enum: OPDB_MACHINE_TYPES }),
+    display: text("display", { enum: OPDB_DISPLAY_TYPES }),
+    playerCount: integer("player_count"),
+    people: jsonb("people").$type<OpdbPerson[]>().notNull().default([]),
+    refreshedAt: timestamp("refreshed_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  () => ({
+    // Drizzle's `enum` on a text column narrows TypeScript only; these keep a
+    // stray writer from storing a value no tag label exists for.
+    typeCheck: check(
+      "opdb_machines_type_check",
+      sql`type IN ('em', 'ss', 'me')`
+    ),
+    displayCheck: check(
+      "opdb_machines_display_check",
+      sql`display IN ('reels', 'lights', 'alphanumeric', 'cga', 'dmd', 'lcd')`
+    ),
+    playerCountCheck: check(
+      "opdb_machines_player_count_check",
+      sql`player_count > 0`
+    ),
   })
 ).enableRLS();
 
@@ -1718,11 +1763,36 @@ export const pinballmapComments = pgTable(
     convertedBy: uuid("converted_by").references(() => userProfiles.id, {
       onDelete: "set null",
     }),
+    // When a sync first saw the comment's entry missing from the tracked
+    // location's lineup; cleared when the entry is seen again. Starts the
+    // restoration window (spec 7.2) from our observation, which is never
+    // earlier than Pinball Map's removal.
+    entryMissingSince: timestamp("entry_missing_since", {
+      withTimezone: true,
+    }),
+    // Set when the comment's entry has ended for good (spec 7.3, 10.9):
+    // removed past the restoration window, replaced by a new entry for the
+    // same title, or left behind by a tracked-location change. The first two
+    // are cleared if the entry comes back; a location change never is.
+    previousListingReason: text("previous_listing_reason", {
+      enum: ["removed", "replaced", "location_changed"],
+    }),
+    previousListingAt: timestamp("previous_listing_at", {
+      withTimezone: true,
+    }),
   },
   (t) => ({
     convertedIssueIdx: uniqueIndex("pinballmap_comments_converted_issue_idx")
       .on(t.convertedIssueId)
       .where(sql`${t.convertedIssueId} IS NOT NULL`),
+    previousListingReasonCheck: check(
+      "pinballmap_comments_previous_listing_reason_check",
+      sql`previous_listing_reason IN ('removed', 'replaced', 'location_changed')`
+    ),
+    previousListingPairCheck: check(
+      "pinballmap_comments_previous_listing_pair",
+      sql`(previous_listing_reason IS NULL) = (previous_listing_at IS NULL)`
+    ),
   })
 ).enableRLS();
 
