@@ -1,6 +1,6 @@
 {
-  "id": "69dab03c-f179-4c3b-96e7-8dc950dc2297",
-  "prevId": "0f858be8-b627-4159-b52c-09ec915562b3",
+  "id": "4ec0d79f-294f-4930-b51f-98d2778db866",
+  "prevId": "69dab03c-f179-4c3b-96e7-8dc950dc2297",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1532,6 +1532,20 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
+        },
+        "apron_design_enabled": {
+          "name": "apron_design_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "apron_art_enabled": {
+          "name": "apron_art_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
         },
         "apron_saved_at": {
           "name": "apron_saved_at",

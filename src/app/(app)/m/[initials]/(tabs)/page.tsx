@@ -21,6 +21,11 @@ import {
   derivePbmListingView,
   type PbmSiblingInput,
 } from "~/lib/pinballmap/listing-state";
+import {
+  deriveInsiderConnectedView,
+  withInsiderConnected,
+  type PbmIcIntent,
+} from "~/lib/pinballmap/insider-connected";
 import { listSurfacingAbandonedForMachine } from "~/lib/pinballmap/abandoned-listings";
 import { getTopScoresForMachine } from "~/lib/iscored";
 import { TopScoresCard } from "~/components/machines/TopScoresCard";
@@ -154,7 +159,7 @@ export default async function MachineInfoTab({
   // what separates Covered (quiet) from Lingering (out of sync), so deriving
   // without it would raise a warning on a machine whose entry a sibling covers
   // — and send the reader to a Manage tab that says everything is fine.
-  const sameTitle: PbmSiblingInput[] =
+  const sameTitle: (PbmSiblingInput & { icIntent: PbmIcIntent | null })[] =
     canDiagnose && machine.pinballmapMachineId !== null
       ? await db
           .select({
@@ -162,12 +167,13 @@ export default async function MachineInfoTab({
             initials: machines.initials,
             name: machines.name,
             intent: machines.pinballmapIntent,
+            icIntent: machines.pinballmapIcIntent,
           })
           .from(machines)
           .where(eq(machines.pinballmapMachineId, machine.pinballmapMachineId))
       : [];
 
-  const listingView = derivePbmListingView({
+  const baseListingView = derivePbmListingView({
     machineId: machine.id,
     pinballmapMachineId: machine.pinballmapMachineId,
     pinballmapExcluded: machine.pinballmapExcluded,
@@ -177,6 +183,19 @@ export default async function MachineInfoTab({
     snapshot,
     siblings: sameTitle,
   });
+  // Insider Connected differs is Out of sync too (spec 4.2), so it raises the
+  // same chip the Manage tab would explain.
+  const listingView = withInsiderConnected(
+    baseListingView,
+    deriveInsiderConnectedView({
+      listing: baseListingView,
+      pinballmapMachineId: machine.pinballmapMachineId,
+      icEligible: machine.pinballmapTitle?.icEligible ?? false,
+      intent: machine.pinballmapIcIntent,
+      siblingIntents: sameTitle.map((sibling) => sibling.icIntent),
+      snapshot,
+    })
+  );
   const configIssue =
     canDiagnose &&
     configured &&
