@@ -14,8 +14,8 @@ const UPSERT_CHUNK = 1_000;
  * Refresh the stored OPDB copy from the daily export. Returns the number of
  * rows written.
  *
- * The download happens before any write and outside a transaction
- * (CORE-ARCH-011). Rows are upserted and never deleted, so a failed or partial
+ * The download happens before the write transaction opens (CORE-ARCH-011).
+ * All rows are upserted in one transaction and never deleted, so a failed
  * refresh leaves the previous data in place, and an entry OPDB later drops
  * keeps its last known values rather than silently losing its tags.
  */
@@ -25,25 +25,29 @@ export async function refreshOpdbRecords(
 ): Promise<number> {
   const machines = await fetchExport();
   const refreshedAt = new Date();
-  for (let i = 0; i < machines.length; i += UPSERT_CHUNK) {
-    const chunk = machines
-      .slice(i, i + UPSERT_CHUNK)
-      .map((m) => ({ ...m, refreshedAt }));
-    await tx
-      .insert(opdbMachines)
-      .values(chunk)
-      .onConflictDoUpdate({
-        target: opdbMachines.opdbId,
-        set: {
-          name: sql`excluded.name`,
-          type: sql`excluded.type`,
-          display: sql`excluded.display`,
-          playerCount: sql`excluded.player_count`,
-          people: sql`excluded.people`,
-          refreshedAt: sql`excluded.refreshed_at`,
-        },
-      });
-  }
+  // One transaction across the chunks, so a failure partway leaves every row
+  // at its previous values rather than a mix of old and new.
+  await tx.transaction(async (write) => {
+    for (let i = 0; i < machines.length; i += UPSERT_CHUNK) {
+      const chunk = machines
+        .slice(i, i + UPSERT_CHUNK)
+        .map((m) => ({ ...m, refreshedAt }));
+      await write
+        .insert(opdbMachines)
+        .values(chunk)
+        .onConflictDoUpdate({
+          target: opdbMachines.opdbId,
+          set: {
+            name: sql`excluded.name`,
+            type: sql`excluded.type`,
+            display: sql`excluded.display`,
+            playerCount: sql`excluded.player_count`,
+            people: sql`excluded.people`,
+            refreshedAt: sql`excluded.refreshed_at`,
+          },
+        });
+    }
+  });
   return machines.length;
 }
 
