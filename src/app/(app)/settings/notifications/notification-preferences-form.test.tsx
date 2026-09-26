@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import {
@@ -7,6 +7,17 @@ import {
   type NotificationPreferencesData,
 } from "./notification-preferences-form";
 import * as actions from "./actions";
+
+const pushMock = vi.fn();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: pushMock }),
+}));
+
+function dispatchBeforeUnload(): Event {
+  const event = new Event("beforeunload", { cancelable: true });
+  window.dispatchEvent(event);
+  return event;
+}
 
 const updatePreferencesSpy = vi.spyOn(
   actions,
@@ -140,5 +151,185 @@ describe("NotificationPreferencesForm", () => {
       "data-state",
       "unchecked"
     );
+  });
+
+  describe("dirty state & guards (PP-bhd7.1)", () => {
+    it("arms beforeunload guard when any switch differs from saved value, and disarms when reverted", async () => {
+      const user = userEvent.setup();
+      render(<NotificationPreferencesForm preferences={defaultPreferences} />);
+
+      expect(dispatchBeforeUnload().defaultPrevented).toBe(false);
+
+      const emailSwitch = screen.getByLabelText("Email Notifications");
+      await user.click(emailSwitch);
+
+      expect(dispatchBeforeUnload().defaultPrevented).toBe(true);
+
+      await user.click(emailSwitch);
+      expect(dispatchBeforeUnload().defaultPrevented).toBe(false);
+    });
+
+    it("disarms beforeunload guard on cancel", async () => {
+      const user = userEvent.setup();
+      render(<NotificationPreferencesForm preferences={defaultPreferences} />);
+
+      const emailSwitch = screen.getByLabelText("Email Notifications");
+      await user.click(emailSwitch);
+      expect(dispatchBeforeUnload().defaultPrevented).toBe(true);
+
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(dispatchBeforeUnload().defaultPrevented).toBe(false);
+    });
+
+    it("disarms beforeunload guard on successful save", async () => {
+      const user = userEvent.setup();
+      updatePreferencesSpy.mockResolvedValue({
+        ok: true,
+        value: { success: true },
+      });
+
+      render(<NotificationPreferencesForm preferences={defaultPreferences} />);
+
+      const emailSwitch = screen.getByLabelText("Email Notifications");
+      await user.click(emailSwitch);
+      expect(dispatchBeforeUnload().defaultPrevented).toBe(true);
+
+      await user.click(
+        screen.getByRole("button", { name: "Save Preferences" })
+      );
+      await waitFor(() => {
+        expect(dispatchBeforeUnload().defaultPrevented).toBe(false);
+      });
+    });
+
+    it("does not intercept Link Discord CTA when form is clean", async () => {
+      const user = userEvent.setup();
+      render(
+        <NotificationPreferencesForm
+          preferences={defaultPreferences}
+          discordIntegrationEnabled
+        />
+      );
+
+      const linkCta = screen.getByRole("link", { name: /link discord/i });
+      await user.click(linkCta);
+
+      expect(
+        screen.queryByText(/unsaved preferences/i)
+      ).not.toBeInTheDocument();
+    });
+
+    it("prompts on Link Discord CTA when form is dirty, stays on page when cancelled", async () => {
+      const user = userEvent.setup();
+      render(
+        <NotificationPreferencesForm
+          preferences={defaultPreferences}
+          discordIntegrationEnabled
+        />
+      );
+
+      const emailSwitch = screen.getByLabelText("Email Notifications");
+      await user.click(emailSwitch);
+
+      const linkCta = screen.getByRole("link", { name: /link discord/i });
+      await user.click(linkCta);
+
+      expect(screen.getByText(/unsaved preferences/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          /you have unsaved changes in your notification preferences/i
+        )
+      ).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: /stay on page/i }));
+      expect(
+        screen.queryByText(/unsaved preferences/i)
+      ).not.toBeInTheDocument();
+      expect(dispatchBeforeUnload().defaultPrevented).toBe(true);
+    });
+
+    it("discards changes and navigates when clicking Discard and continue in Discord CTA prompt", async () => {
+      const user = userEvent.setup();
+      render(
+        <NotificationPreferencesForm
+          preferences={defaultPreferences}
+          discordIntegrationEnabled
+        />
+      );
+
+      const emailSwitch = screen.getByLabelText("Email Notifications");
+      await user.click(emailSwitch);
+      expect(emailSwitch).not.toBeChecked();
+
+      const linkCta = screen.getByRole("link", { name: /link discord/i });
+      await user.click(linkCta);
+
+      await user.click(
+        screen.getByRole("button", { name: /discard and continue/i })
+      );
+
+      expect(
+        screen.queryByText(/unsaved preferences/i)
+      ).not.toBeInTheDocument();
+      expect(emailSwitch).toBeChecked();
+      expect(dispatchBeforeUnload().defaultPrevented).toBe(false);
+    });
+
+    it("saves changes and navigates when clicking Save and continue in Discord CTA prompt", async () => {
+      const user = userEvent.setup();
+      updatePreferencesSpy.mockResolvedValue({
+        ok: true,
+        value: { success: true },
+      });
+
+      render(
+        <NotificationPreferencesForm
+          preferences={defaultPreferences}
+          discordIntegrationEnabled
+        />
+      );
+
+      const emailSwitch = screen.getByLabelText("Email Notifications");
+      await user.click(emailSwitch);
+
+      const linkCta = screen.getByRole("link", { name: /link discord/i });
+      await user.click(linkCta);
+
+      await user.click(
+        screen.getByRole("button", { name: /save and continue/i })
+      );
+
+      expect(updatePreferencesSpy).toHaveBeenCalled();
+      expect(
+        screen.queryByText(/unsaved preferences/i)
+      ).not.toBeInTheDocument();
+    });
+
+    it("prompts on in-app link navigation when form is dirty, and navigates on discard", async () => {
+      const user = userEvent.setup();
+      pushMock.mockReset();
+
+      render(
+        <div>
+          <a href="/machines">Machines</a>
+          <NotificationPreferencesForm preferences={defaultPreferences} />
+        </div>
+      );
+
+      const emailSwitch = screen.getByLabelText("Email Notifications");
+      await user.click(emailSwitch);
+
+      await user.click(screen.getByRole("link", { name: "Machines" }));
+
+      expect(
+        screen.getByText(/discard unsaved changes\?/i)
+      ).toBeInTheDocument();
+
+      await user.click(
+        screen.getByRole("button", { name: /discard and leave/i })
+      );
+
+      expect(pushMock).toHaveBeenCalledWith("/machines");
+    });
   });
 });

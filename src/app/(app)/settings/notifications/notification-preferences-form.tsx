@@ -1,9 +1,28 @@
 "use client";
 
-import { useActionState, useState, useEffect, useRef } from "react";
+import {
+  useActionState,
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
+import { useRouter } from "next/navigation";
 import { SaveCancelButtons } from "~/components/save-cancel-buttons";
 import { Switch } from "~/components/ui/switch";
 import { Label } from "~/components/ui/label";
+import { Button } from "~/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "~/components/ui/alert-dialog";
 import {
   updateNotificationPreferencesAction,
   type UpdatePreferencesResult,
@@ -40,6 +59,62 @@ export interface NotificationPreferencesData {
   discordNotifyOnPinballMapComment: boolean;
 }
 
+const ALL_PREFERENCE_KEYS = [
+  "emailEnabled",
+  "inAppEnabled",
+  "discordEnabled",
+  "suppressOwnActions",
+  "emailNotifyOnAssigned",
+  "inAppNotifyOnAssigned",
+  "discordNotifyOnAssigned",
+  "emailNotifyOnStatusChange",
+  "inAppNotifyOnStatusChange",
+  "discordNotifyOnStatusChange",
+  "emailNotifyOnNewComment",
+  "inAppNotifyOnNewComment",
+  "discordNotifyOnNewComment",
+  "emailNotifyOnMentioned",
+  "inAppNotifyOnMentioned",
+  "discordNotifyOnMentioned",
+  "emailNotifyOnNewIssue",
+  "inAppNotifyOnNewIssue",
+  "discordNotifyOnNewIssue",
+  "emailWatchNewIssuesGlobal",
+  "inAppWatchNewIssuesGlobal",
+  "discordWatchNewIssuesGlobal",
+  "emailNotifyOnPinballMapComment",
+  "inAppNotifyOnPinballMapComment",
+  "discordNotifyOnPinballMapComment",
+] as const satisfies readonly (keyof NotificationPreferencesData)[];
+
+function isPreferencesDirty(
+  current: NotificationPreferencesData,
+  baseline: NotificationPreferencesData,
+  options: {
+    isInternalAccount?: boolean | undefined;
+    showDiscord: boolean;
+    userHasDiscord: boolean;
+  }
+): boolean {
+  for (const key of ALL_PREFERENCE_KEYS) {
+    if (options.isInternalAccount && key.startsWith("email")) {
+      continue;
+    }
+    if (
+      (!options.showDiscord || !options.userHasDiscord) &&
+      key.startsWith("discord")
+    ) {
+      continue;
+    }
+    if (current[key] !== baseline[key]) {
+      return true;
+    }
+  }
+  return false;
+}
+
+type PendingNavigation = { type: "discord" } | { type: "href"; href: string };
+
 interface NotificationPreferencesFormProps {
   preferences: NotificationPreferencesData;
   isInternalAccount?: boolean;
@@ -55,6 +130,8 @@ export function NotificationPreferencesForm({
   discordIntegrationEnabled = false,
   userHasDiscord = false,
 }: NotificationPreferencesFormProps): React.JSX.Element {
+  const router = useRouter();
+  const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, isPending] = useActionState<
     UpdatePreferencesResult | undefined,
     FormData
@@ -63,77 +140,211 @@ export function NotificationPreferencesForm({
   // Control visibility of feedback (flash message and button state)
   const [showFeedback, setShowFeedback] = useState(false);
 
-  // Reset key to force re-render on cancel and on server-revalidated preferences
-  const [resetKey, setResetKey] = useState(0);
+  // Controlled form state for all preferences
+  const [formValues, setFormValues] =
+    useState<NotificationPreferencesData>(preferences);
+  const [baselinePreferences, setBaselinePreferences] =
+    useState<NotificationPreferencesData>(preferences);
+  const formValuesRef = useRef(formValues);
+  formValuesRef.current = formValues;
+
+  const [pendingNavigation, setPendingNavigation] =
+    useState<PendingNavigation | null>(null);
+
+  const showDiscord = discordIntegrationEnabled;
+
+  const isDirty = useMemo(() => {
+    return isPreferencesDirty(formValues, baselinePreferences, {
+      isInternalAccount,
+      showDiscord,
+      userHasDiscord,
+    });
+  }, [
+    formValues,
+    baselinePreferences,
+    isInternalAccount,
+    showDiscord,
+    userHasDiscord,
+  ]);
+
+  // Sync state if server revalidates preferences or prop updates (PP-az4)
+  const prevPreferencesRef = useRef(preferences);
+  useEffect(() => {
+    if (prevPreferencesRef.current !== preferences) {
+      prevPreferencesRef.current = preferences;
+      setBaselinePreferences(preferences);
+      setFormValues(preferences);
+    }
+  }, [preferences]);
 
   // Show feedback when state updates
   useEffect(() => {
     if (state) {
       setShowFeedback(true);
+      if (state.ok) {
+        setBaselinePreferences(formValuesRef.current);
+      }
     }
   }, [state]);
 
-  // Client-side state for main switches to control disabled state of other inputs
-  const [emailMainEnabled, setEmailMainEnabled] = useState(
-    preferences.emailEnabled
-  );
-  const [inAppMainEnabled, setInAppMainEnabled] = useState(
-    preferences.inAppEnabled
-  );
-  const [discordMainEnabled, setDiscordMainEnabled] = useState(
-    preferences.discordEnabled
+  // Prevent React 19 form action auto-reset from triggering Radix Switch reset (which reverts to initial mount state)
+  useEffect(() => {
+    const form = formRef.current;
+    if (!form) return;
+    const handleReset = (event: Event): void => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    };
+    form.addEventListener("reset", handleReset, true);
+    return () => {
+      form.removeEventListener("reset", handleReset, true);
+    };
+  }, []);
+
+  // Prevent React 19 form action auto-reset from triggering Radix Switch reset
+  useEffect(() => {
+    const form = formRef.current;
+    if (!form) return;
+    const handleReset = (event: Event): void => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    };
+    form.addEventListener("reset", handleReset, true);
+    return () => {
+      form.removeEventListener("reset", handleReset, true);
+    };
+  }, []);
+
+  // beforeunload guard: disallows silent data loss on tab close, reload, or full navigation
+  useEffect(() => {
+    if (!isDirty) return;
+    const handleBeforeUnload = (event: BeforeUnloadEvent): void => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [isDirty]);
+
+  // In-app navigation guard: intercepts links leaving /settings while dirty
+  useEffect(() => {
+    if (!isDirty) return;
+    const handleClick = (event: MouseEvent): void => {
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      ) {
+        return;
+      }
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const anchor = target.closest("a[href]");
+      if (!(anchor instanceof HTMLAnchorElement)) return;
+      if (anchor.target !== "" && anchor.target !== "_self") return;
+      if (anchor.hasAttribute("download")) return;
+
+      const destination = new URL(anchor.href, window.location.href);
+      if (destination.origin !== window.location.origin) return;
+      if (
+        destination.pathname === window.location.pathname &&
+        destination.search === window.location.search
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      setPendingNavigation({
+        type: "href",
+        href: `${destination.pathname}${destination.search}${destination.hash}`,
+      });
+    };
+
+    document.addEventListener("click", handleClick, true);
+    return () => {
+      document.removeEventListener("click", handleClick, true);
+    };
+  }, [isDirty]);
+
+  const updatePreference = useCallback(
+    (key: keyof NotificationPreferencesData, value: boolean): void => {
+      setFormValues((prev) => ({ ...prev, [key]: value }));
+    },
+    []
   );
 
-  // When preferences change from the server (e.g., after a successful save +
-  // revalidatePath), remount the form so PreferenceRow Switches — which use
-  // defaultChecked and only read it at mount — reflect the new values.
-  // Also re-sync the controlled main switches. Skip the first run so the
-  // initial mount doesn't trigger an unnecessary remount.
-  const isFirstPreferencesSync = useRef(true);
-  useEffect(() => {
-    if (isFirstPreferencesSync.current) {
-      isFirstPreferencesSync.current = false;
+  const navigateToConnectedAccounts = (): void => {
+    const el = document.getElementById("connected-accounts");
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth" });
+    }
+    window.location.hash = "connected-accounts";
+  };
+
+  const handleDiscordCtaClick = (
+    event: React.MouseEvent<HTMLAnchorElement>
+  ): void => {
+    if (
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
       return;
     }
-    setResetKey((k) => k + 1);
-    setEmailMainEnabled(preferences.emailEnabled);
-    setInAppMainEnabled(preferences.inAppEnabled);
-    setDiscordMainEnabled(preferences.discordEnabled);
-  }, [
-    preferences.emailEnabled,
-    preferences.inAppEnabled,
-    preferences.discordEnabled,
-    preferences.suppressOwnActions,
-    preferences.emailNotifyOnAssigned,
-    preferences.inAppNotifyOnAssigned,
-    preferences.discordNotifyOnAssigned,
-    preferences.emailNotifyOnStatusChange,
-    preferences.inAppNotifyOnStatusChange,
-    preferences.discordNotifyOnStatusChange,
-    preferences.emailNotifyOnNewComment,
-    preferences.inAppNotifyOnNewComment,
-    preferences.discordNotifyOnNewComment,
-    preferences.emailNotifyOnMentioned,
-    preferences.inAppNotifyOnMentioned,
-    preferences.discordNotifyOnMentioned,
-    preferences.emailNotifyOnNewIssue,
-    preferences.inAppNotifyOnNewIssue,
-    preferences.discordNotifyOnNewIssue,
-    preferences.emailWatchNewIssuesGlobal,
-    preferences.inAppWatchNewIssuesGlobal,
-    preferences.discordWatchNewIssuesGlobal,
-    preferences.emailNotifyOnPinballMapComment,
-    preferences.inAppNotifyOnPinballMapComment,
-    preferences.discordNotifyOnPinballMapComment,
-  ]);
 
-  const showDiscord = discordIntegrationEnabled;
+    if (!isDirty) {
+      return;
+    }
+
+    event.preventDefault();
+    setPendingNavigation({ type: "discord" });
+  };
+
+  const handleDiscardAndNavigateToDiscord = (): void => {
+    setPendingNavigation(null);
+    setFormValues(baselinePreferences);
+    setShowFeedback(false);
+    navigateToConnectedAccounts();
+  };
+
+  const handleSaveAndNavigateToDiscord = (): void => {
+    setPendingNavigation(null);
+    formRef.current?.requestSubmit();
+    navigateToConnectedAccounts();
+  };
+
+  const handleDiscardAndLeave = (): void => {
+    const href =
+      pendingNavigation?.type === "href" ? pendingNavigation.href : null;
+    setPendingNavigation(null);
+    setFormValues(baselinePreferences);
+    setShowFeedback(false);
+    if (href) {
+      router.push(href);
+    }
+  };
+
+  const handleCancel = (): void => {
+    setFormValues(baselinePreferences);
+    setShowFeedback(false);
+  };
 
   // When a master switch is off, dim only the per-row toggles that are ON.
   const dimWhenChecked = "data-[state=checked]:opacity-50";
-  const emailDimClass = !emailMainEnabled ? dimWhenChecked : undefined;
-  const inAppDimClass = !inAppMainEnabled ? dimWhenChecked : undefined;
-  const discordDimClass = !discordMainEnabled ? dimWhenChecked : undefined;
+  const emailDimClass = !formValues.emailEnabled ? dimWhenChecked : undefined;
+  const inAppDimClass = !formValues.inAppEnabled ? dimWhenChecked : undefined;
+  const discordDimClass = !formValues.discordEnabled
+    ? dimWhenChecked
+    : undefined;
 
   const NEW_ISSUE_ROWS = [
     {
@@ -144,11 +355,6 @@ export function NotificationPreferencesForm({
         inApp: "inAppNotifyOnNewIssue",
         discord: "discordNotifyOnNewIssue",
       },
-      defaults: {
-        email: preferences.emailNotifyOnNewIssue,
-        inApp: preferences.inAppNotifyOnNewIssue,
-        discord: preferences.discordNotifyOnNewIssue,
-      },
     },
     {
       label: "All Machines",
@@ -157,11 +363,6 @@ export function NotificationPreferencesForm({
         email: "emailWatchNewIssuesGlobal",
         inApp: "inAppWatchNewIssuesGlobal",
         discord: "discordWatchNewIssuesGlobal",
-      },
-      defaults: {
-        email: preferences.emailWatchNewIssuesGlobal,
-        inApp: preferences.inAppWatchNewIssuesGlobal,
-        discord: preferences.discordWatchNewIssuesGlobal,
       },
     },
   ] as const;
@@ -175,11 +376,6 @@ export function NotificationPreferencesForm({
         inApp: "inAppNotifyOnAssigned",
         discord: "discordNotifyOnAssigned",
       },
-      defaults: {
-        email: preferences.emailNotifyOnAssigned,
-        inApp: preferences.inAppNotifyOnAssigned,
-        discord: preferences.discordNotifyOnAssigned,
-      },
     },
     {
       label: "Status Changes",
@@ -188,11 +384,6 @@ export function NotificationPreferencesForm({
         email: "emailNotifyOnStatusChange",
         inApp: "inAppNotifyOnStatusChange",
         discord: "discordNotifyOnStatusChange",
-      },
-      defaults: {
-        email: preferences.emailNotifyOnStatusChange,
-        inApp: preferences.inAppNotifyOnStatusChange,
-        discord: preferences.discordNotifyOnStatusChange,
       },
     },
     {
@@ -203,11 +394,6 @@ export function NotificationPreferencesForm({
         inApp: "inAppNotifyOnNewComment",
         discord: "discordNotifyOnNewComment",
       },
-      defaults: {
-        email: preferences.emailNotifyOnNewComment,
-        inApp: preferences.inAppNotifyOnNewComment,
-        discord: preferences.discordNotifyOnNewComment,
-      },
     },
     {
       label: "Mentions",
@@ -216,11 +402,6 @@ export function NotificationPreferencesForm({
         email: "emailNotifyOnMentioned",
         inApp: "inAppNotifyOnMentioned",
         discord: "discordNotifyOnMentioned",
-      },
-      defaults: {
-        email: preferences.emailNotifyOnMentioned,
-        inApp: preferences.inAppNotifyOnMentioned,
-        discord: preferences.discordNotifyOnMentioned,
       },
     },
     {
@@ -232,206 +413,282 @@ export function NotificationPreferencesForm({
         inApp: "inAppNotifyOnPinballMapComment",
         discord: "discordNotifyOnPinballMapComment",
       },
-      defaults: {
-        email: preferences.emailNotifyOnPinballMapComment,
-        inApp: preferences.inAppNotifyOnPinballMapComment,
-        discord: preferences.discordNotifyOnPinballMapComment,
-      },
     },
   ] as const;
 
   return (
-    <form
-      key={resetKey}
-      action={formAction}
-      className="space-y-8"
-      data-testid="notification-preferences-form"
-    >
-      {state && !state.ok && showFeedback && (
-        <div
-          className={cn(
-            "rounded-md border p-4 border-destructive/20 bg-destructive/10 text-destructive-text"
-          )}
-        >
-          <p className="text-sm font-medium">{state.message}</p>
-        </div>
-      )}
-
-      {/* Main Switches */}
-      <div className="space-y-3">
-        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-          Channels
-        </h3>
-        {isInternalAccount && (
-          <p className="text-sm text-muted-foreground">
-            Email notifications are not available for username accounts.
-          </p>
-        )}
-        <div className="@container">
+    <>
+      <form
+        ref={formRef}
+        action={formAction}
+        onReset={(e) => {
+          e.preventDefault();
+        }}
+        className="space-y-8"
+        data-testid="notification-preferences-form"
+      >
+        {state && !state.ok && showFeedback && (
           <div
             className={cn(
-              "grid gap-4",
-              showDiscord
-                ? "@sm:grid-cols-2 @lg:grid-cols-3"
-                : "@sm:grid-cols-2"
+              "rounded-md border p-4 border-destructive/20 bg-destructive/10 text-destructive-text"
             )}
           >
-            <MainSwitchItem
-              id="inAppEnabled"
-              label="In-App Notifications"
-              description="Main switch for all in-app notifications"
-              checked={inAppMainEnabled}
-              onCheckedChange={setInAppMainEnabled}
-            />
-            {!isInternalAccount && (
-              <MainSwitchItem
-                id="emailEnabled"
-                label="Email Notifications"
-                description="Main switch for all email notifications"
-                checked={emailMainEnabled}
-                onCheckedChange={setEmailMainEnabled}
-              />
-            )}
-            {showDiscord && (
-              <MainSwitchItem
-                id="discordEnabled"
-                label="Discord Notifications"
-                description={
-                  userHasDiscord
-                    ? "Main switch for all Discord DM notifications"
-                    : "Link Discord in Connected Accounts to enable"
-                }
-                checked={discordMainEnabled}
-                onCheckedChange={setDiscordMainEnabled}
-                disabled={!userHasDiscord}
-                cta={
-                  userHasDiscord ? null : (
-                    <a
-                      href="#connected-accounts"
-                      className="text-xs text-primary underline"
-                    >
-                      Link Discord
-                    </a>
-                  )
-                }
-              />
-            )}
+            <p className="text-sm font-medium">{state.message}</p>
           </div>
-        </div>
-      </div>
+        )}
 
-      {/* Suppress Own Actions */}
-      <div className="space-y-3">
-        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-          Behavior
-        </h3>
-        <div className="flex items-center justify-between rounded-lg border border-outline-variant/50 bg-surface/50 p-3 shadow-sm transition-colors duration-150 hover:bg-surface-variant/30">
-          <div className="space-y-0.5 pr-4">
-            <Label
-              htmlFor="suppressOwnActions"
-              className="text-sm font-medium cursor-pointer"
-            >
-              {"Don't notify me about my own actions"}
-            </Label>
-            <p className="text-xs text-muted-foreground">
-              Skip all notifications when you are the one performing the action
+        {/* Main Switches */}
+        <div className="space-y-3">
+          <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+            Channels
+          </h3>
+          {isInternalAccount && (
+            <p className="text-sm text-muted-foreground">
+              Email notifications are not available for username accounts.
             </p>
-          </div>
-          <Switch
-            id="suppressOwnActions"
-            name="suppressOwnActions"
-            defaultChecked={preferences.suppressOwnActions}
-          />
-        </div>
-      </div>
-
-      {/* New Issue Notifications */}
-      <div className="space-y-3">
-        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-          New Issue Notifications
-        </h3>
-        <div className="rounded-lg border border-outline-variant/50 bg-surface/50 overflow-hidden">
-          <MatrixHeaderRow
-            firstLabel="Scope"
-            isInternalAccount={isInternalAccount}
-            showDiscord={showDiscord}
-          />
-          <div className="divide-y divide-outline-variant/50">
-            {NEW_ISSUE_ROWS.map((row) => (
-              <PreferenceRow
-                key={row.ids.inApp}
-                label={row.label}
-                description={row.description}
-                emailId={row.ids.email}
-                inAppId={row.ids.inApp}
-                emailDefault={row.defaults.email}
-                inAppDefault={row.defaults.inApp}
-                hideEmail={isInternalAccount}
-                hideDiscord={!showDiscord}
-                emailClassName={emailDimClass}
-                inAppClassName={inAppDimClass}
-                discordClassName={discordDimClass}
-                discordDisabled={!userHasDiscord}
-                discordId={row.ids.discord}
-                discordDefault={row.defaults.discord}
+          )}
+          <div className="@container">
+            <div
+              className={cn(
+                "grid gap-4",
+                showDiscord
+                  ? "@sm:grid-cols-2 @lg:grid-cols-3"
+                  : "@sm:grid-cols-2"
+              )}
+            >
+              <MainSwitchItem
+                id="inAppEnabled"
+                label="In-App Notifications"
+                description="Main switch for all in-app notifications"
+                checked={formValues.inAppEnabled}
+                onCheckedChange={(checked) =>
+                  updatePreference("inAppEnabled", checked)
+                }
               />
-            ))}
+              {!isInternalAccount && (
+                <MainSwitchItem
+                  id="emailEnabled"
+                  label="Email Notifications"
+                  description="Main switch for all email notifications"
+                  checked={formValues.emailEnabled}
+                  onCheckedChange={(checked) =>
+                    updatePreference("emailEnabled", checked)
+                  }
+                />
+              )}
+              {showDiscord && (
+                <MainSwitchItem
+                  id="discordEnabled"
+                  label="Discord Notifications"
+                  description={
+                    userHasDiscord
+                      ? "Main switch for all Discord DM notifications"
+                      : "Link Discord in Connected Accounts to enable"
+                  }
+                  checked={formValues.discordEnabled}
+                  onCheckedChange={(checked) =>
+                    updatePreference("discordEnabled", checked)
+                  }
+                  disabled={!userHasDiscord}
+                  cta={
+                    userHasDiscord ? null : (
+                      <a
+                        href="#connected-accounts"
+                        className="text-xs text-primary underline"
+                        onClick={handleDiscordCtaClick}
+                      >
+                        Link Discord
+                      </a>
+                    )
+                  }
+                />
+              )}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Events Matrix */}
-      <div className="space-y-3">
-        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-          Events
-        </h3>
-        <div className="rounded-lg border border-outline-variant/50 bg-surface/50 overflow-hidden">
-          <MatrixHeaderRow
-            firstLabel="Event Type"
-            isInternalAccount={isInternalAccount}
-            showDiscord={showDiscord}
+        {/* Suppress Own Actions */}
+        <div className="space-y-3">
+          <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+            Behavior
+          </h3>
+          <div className="flex items-center justify-between rounded-lg border border-outline-variant/50 bg-surface/50 p-3 shadow-sm transition-colors duration-150 hover:bg-surface-variant/30">
+            <div className="space-y-0.5 pr-4">
+              <Label
+                htmlFor="suppressOwnActions"
+                className="text-sm font-medium cursor-pointer"
+              >
+                {"Don't notify me about my own actions"}
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Skip all notifications when you are the one performing the
+                action
+              </p>
+            </div>
+            <Switch
+              id="suppressOwnActions"
+              name="suppressOwnActions"
+              checked={formValues.suppressOwnActions}
+              onCheckedChange={(checked) =>
+                updatePreference("suppressOwnActions", checked)
+              }
+            />
+          </div>
+        </div>
+
+        {/* New Issue Notifications */}
+        <div className="space-y-3">
+          <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+            New Issue Notifications
+          </h3>
+          <div className="rounded-lg border border-outline-variant/50 bg-surface/50 overflow-hidden">
+            <MatrixHeaderRow
+              firstLabel="Scope"
+              isInternalAccount={isInternalAccount}
+              showDiscord={showDiscord}
+            />
+            <div className="divide-y divide-outline-variant/50">
+              {NEW_ISSUE_ROWS.map((row) => (
+                <PreferenceRow
+                  key={row.ids.inApp}
+                  label={row.label}
+                  description={row.description}
+                  emailId={row.ids.email}
+                  inAppId={row.ids.inApp}
+                  emailChecked={formValues[row.ids.email]}
+                  inAppChecked={formValues[row.ids.inApp]}
+                  onEmailChange={(checked) =>
+                    updatePreference(row.ids.email, checked)
+                  }
+                  onInAppChange={(checked) =>
+                    updatePreference(row.ids.inApp, checked)
+                  }
+                  hideEmail={isInternalAccount}
+                  hideDiscord={!showDiscord}
+                  emailClassName={emailDimClass}
+                  inAppClassName={inAppDimClass}
+                  discordClassName={discordDimClass}
+                  discordDisabled={!userHasDiscord}
+                  discordId={row.ids.discord}
+                  discordChecked={formValues[row.ids.discord]}
+                  onDiscordChange={(checked) =>
+                    updatePreference(row.ids.discord, checked)
+                  }
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Events Matrix */}
+        <div className="space-y-3">
+          <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+            Events
+          </h3>
+          <div className="rounded-lg border border-outline-variant/50 bg-surface/50 overflow-hidden">
+            <MatrixHeaderRow
+              firstLabel="Event Type"
+              isInternalAccount={isInternalAccount}
+              showDiscord={showDiscord}
+            />
+
+            {/* Rows */}
+            <div className="divide-y divide-outline-variant/50">
+              {EVENT_ROWS.map((row) => (
+                <PreferenceRow
+                  key={row.ids.inApp}
+                  label={row.label}
+                  description={row.description}
+                  emailId={row.ids.email}
+                  inAppId={row.ids.inApp}
+                  emailChecked={formValues[row.ids.email]}
+                  inAppChecked={formValues[row.ids.inApp]}
+                  onEmailChange={(checked) =>
+                    updatePreference(row.ids.email, checked)
+                  }
+                  onInAppChange={(checked) =>
+                    updatePreference(row.ids.inApp, checked)
+                  }
+                  hideEmail={isInternalAccount}
+                  hideDiscord={!showDiscord}
+                  emailClassName={emailDimClass}
+                  inAppClassName={inAppDimClass}
+                  discordClassName={discordDimClass}
+                  discordDisabled={!userHasDiscord}
+                  discordId={row.ids.discord}
+                  discordChecked={formValues[row.ids.discord]}
+                  onDiscordChange={(checked) =>
+                    updatePreference(row.ids.discord, checked)
+                  }
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="pt-2">
+          <SaveCancelButtons
+            isPending={isPending}
+            isSuccess={!!state?.ok && showFeedback}
+            onCancel={handleCancel}
+            saveLabel="Save Preferences"
           />
-
-          {/* Rows */}
-          <div className="divide-y divide-outline-variant/50">
-            {EVENT_ROWS.map((row) => (
-              <PreferenceRow
-                key={row.ids.inApp}
-                label={row.label}
-                description={row.description}
-                emailId={row.ids.email}
-                inAppId={row.ids.inApp}
-                emailDefault={row.defaults.email}
-                inAppDefault={row.defaults.inApp}
-                hideEmail={isInternalAccount}
-                hideDiscord={!showDiscord}
-                emailClassName={emailDimClass}
-                inAppClassName={inAppDimClass}
-                discordClassName={discordDimClass}
-                discordDisabled={!userHasDiscord}
-                discordId={row.ids.discord}
-                discordDefault={row.defaults.discord}
-              />
-            ))}
-          </div>
         </div>
-      </div>
+      </form>
 
-      <div className="pt-2">
-        <SaveCancelButtons
-          isPending={isPending}
-          isSuccess={!!state?.ok && showFeedback}
-          onCancel={() => {
-            setResetKey((k) => k + 1);
-            setEmailMainEnabled(preferences.emailEnabled);
-            setInAppMainEnabled(preferences.inAppEnabled);
-            setDiscordMainEnabled(preferences.discordEnabled);
-            setShowFeedback(false);
-          }}
-          saveLabel="Save Preferences"
-        />
-      </div>
-    </form>
+      <AlertDialog
+        open={pendingNavigation !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingNavigation(null);
+        }}
+      >
+        <AlertDialogContent>
+          {pendingNavigation?.type === "discord" ? (
+            <>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Unsaved preferences</AlertDialogTitle>
+                <AlertDialogDescription>
+                  You have unsaved changes in your notification preferences. If
+                  you navigate to link Discord, your changes will be lost unless
+                  you save them first.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Stay on page</AlertDialogCancel>
+                <AlertDialogAction
+                  variant="destructive"
+                  onClick={handleDiscardAndNavigateToDiscord}
+                >
+                  Discard and continue
+                </AlertDialogAction>
+                <Button type="button" onClick={handleSaveAndNavigateToDiscord}>
+                  Save and continue
+                </Button>
+              </AlertDialogFooter>
+            </>
+          ) : (
+            <>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  You have unsaved changes on this page. If you leave now, those
+                  changes will be lost.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Stay on page</AlertDialogCancel>
+                <AlertDialogAction
+                  variant="destructive"
+                  onClick={handleDiscardAndLeave}
+                >
+                  Discard and leave
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </>
+          )}
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 
@@ -504,16 +761,19 @@ function MainSwitchItem({
 interface PreferenceRowProps {
   label: string;
   description: string;
-  emailId: string;
-  inAppId: string;
-  emailDefault: boolean;
-  inAppDefault: boolean;
+  emailId: keyof NotificationPreferencesData;
+  inAppId: keyof NotificationPreferencesData;
+  emailChecked: boolean;
+  inAppChecked: boolean;
+  onEmailChange: (checked: boolean) => void;
+  onInAppChange: (checked: boolean) => void;
   emailClassName?: string | undefined;
   inAppClassName?: string | undefined;
   hideEmail?: boolean | undefined;
   hideDiscord?: boolean | undefined;
-  discordId?: string | undefined;
-  discordDefault?: boolean | undefined;
+  discordId?: keyof NotificationPreferencesData | undefined;
+  discordChecked?: boolean | undefined;
+  onDiscordChange?: ((checked: boolean) => void) | undefined;
   discordClassName?: string | undefined;
   discordDisabled?: boolean | undefined;
 }
@@ -523,14 +783,17 @@ function PreferenceRow({
   description,
   emailId,
   inAppId,
-  emailDefault,
-  inAppDefault,
+  emailChecked,
+  inAppChecked,
+  onEmailChange,
+  onInAppChange,
   emailClassName,
   inAppClassName,
   hideEmail,
   hideDiscord,
   discordId,
-  discordDefault,
+  discordChecked,
+  onDiscordChange,
   discordClassName,
   discordDisabled,
 }: PreferenceRowProps): React.JSX.Element {
@@ -551,7 +814,8 @@ function PreferenceRow({
           id={inAppId}
           name={inAppId}
           aria-label={`${label} — in-app`}
-          defaultChecked={inAppDefault}
+          checked={inAppChecked}
+          onCheckedChange={onInAppChange}
           className={inAppClassName}
         />
       </div>
@@ -561,7 +825,8 @@ function PreferenceRow({
             id={emailId}
             name={emailId}
             aria-label={`${label} — email`}
-            defaultChecked={emailDefault}
+            checked={emailChecked}
+            onCheckedChange={onEmailChange}
             className={emailClassName}
           />
         </div>
@@ -572,7 +837,8 @@ function PreferenceRow({
             id={discordId}
             name={discordId}
             aria-label={`${label} — Discord`}
-            defaultChecked={discordDefault ?? false}
+            checked={discordChecked ?? false}
+            {...(onDiscordChange ? { onCheckedChange: onDiscordChange } : {})}
             disabled={discordDisabled ?? false}
             className={discordClassName}
           />
