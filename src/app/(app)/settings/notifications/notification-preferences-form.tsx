@@ -169,13 +169,25 @@ export function NotificationPreferencesForm({
   // Sync state if server revalidates preferences or prop updates (PP-az4)
   const prevPreferencesRef = useRef(preferences);
   useEffect(() => {
-    if (prevPreferencesRef.current !== preferences) {
-      if (isDirty || isPending) return;
-      prevPreferencesRef.current = preferences;
-      setBaselinePreferences(preferences);
-      setFormValues(preferences);
+    const hasServerChanges = ALL_PREFERENCE_KEYS.some(
+      (k) => prevPreferencesRef.current[k] !== preferences[k]
+    );
+    prevPreferencesRef.current = preferences;
+    if (!hasServerChanges) {
+      return;
     }
-  }, [preferences, isDirty, isPending]);
+
+    setBaselinePreferences(preferences);
+    setFormValues((prev) => {
+      const next = { ...prev };
+      for (const k of ALL_PREFERENCE_KEYS) {
+        if (prev[k] === baselinePreferences[k]) {
+          next[k] = preferences[k];
+        }
+      }
+      return next;
+    });
+  }, [preferences, baselinePreferences]);
 
   // Show feedback when state updates
   useEffect(() => {

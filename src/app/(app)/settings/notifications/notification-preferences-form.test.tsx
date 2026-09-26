@@ -337,5 +337,28 @@ describe("NotificationPreferencesForm", () => {
 
       expect(pushMock).toHaveBeenCalledWith("/machines");
     });
+
+    it("preserves dirty form edits across same-value server re-renders (PP-bhd7.1)", async () => {
+      const user = userEvent.setup();
+      const { rerender } = render(
+        <NotificationPreferencesForm preferences={defaultPreferences} />
+      );
+
+      const emailSwitch = screen.getByLabelText("Email Notifications");
+      await user.click(emailSwitch);
+      expect(emailSwitch).not.toBeChecked();
+      expect(dispatchBeforeUnload().defaultPrevented).toBe(true);
+
+      // Simulate server revalidation passing a fresh object reference with identical values
+      const freshPreferencesRef: NotificationPreferencesData = {
+        ...defaultPreferences,
+      };
+      rerender(
+        <NotificationPreferencesForm preferences={freshPreferencesRef} />
+      );
+
+      expect(emailSwitch).not.toBeChecked();
+      expect(dispatchBeforeUnload().defaultPrevented).toBe(true);
+    });
   });
 });
