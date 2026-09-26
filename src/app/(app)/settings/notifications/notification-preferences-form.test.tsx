@@ -53,6 +53,10 @@ const defaultPreferences: NotificationPreferencesData = {
 };
 
 describe("NotificationPreferencesForm", () => {
+  beforeEach(() => {
+    window.location.hash = "";
+    vi.clearAllMocks();
+  });
   it("should render form with initial preferences", () => {
     render(<NotificationPreferencesForm preferences={defaultPreferences} />);
     expect(screen.getByLabelText("Email Notifications")).toBeChecked();
@@ -273,6 +277,7 @@ describe("NotificationPreferencesForm", () => {
       ).not.toBeInTheDocument();
       expect(emailSwitch).toBeChecked();
       expect(dispatchBeforeUnload().defaultPrevented).toBe(false);
+      expect(window.location.hash).toBe("#connected-accounts");
     });
 
     it("saves changes and navigates when clicking Save and continue in Discord CTA prompt", async () => {
@@ -303,6 +308,7 @@ describe("NotificationPreferencesForm", () => {
       expect(
         screen.queryByText(/unsaved preferences/i)
       ).not.toBeInTheDocument();
+      expect(window.location.hash).toBe("#connected-accounts");
     });
 
     it("prompts on in-app link navigation when form is dirty, and navigates on discard", async () => {
