@@ -10,6 +10,7 @@ import {
   isNotNull,
   isNull,
   or,
+  sql,
   type SQL,
 } from "drizzle-orm";
 import { z } from "zod";
@@ -19,9 +20,18 @@ import {
   VALID_MACHINE_PRESENCE_STATUSES,
   type MachinePresenceStatus,
 } from "~/lib/machines/presence";
+import type {
+  PbmListingView,
+  PbmSiblingInput,
+} from "~/lib/pinballmap/listing-state";
 import { db } from "~/server/db";
 import { machines } from "~/server/db/schema";
 
+import {
+  deriveLineupView,
+  loadLineupSource,
+  type LineupSource,
+} from "./pinballmap-block";
 import {
   getOpenIssueCounts,
   getOwnerNamesByMachine,
@@ -36,20 +46,34 @@ import type { McpAuthContext } from "~/lib/mcp/verify-token";
 const DEFAULT_LIMIT = 50;
 
 /**
- * PinballMap link states a caller can filter on (PP-u4ab.9).
+ * PinballMap states a caller can filter on (PP-u4ab.9, PP-u4ab.21).
  *
- * These three partition the fleet exactly: a DB CHECK
+ * `unlinked`, `linked` and `excluded` partition the fleet exactly: a DB CHECK
  * (`machines_pinballmap_link_exclusive`) forbids a row that is both linked and
- * excluded, so every machine is in exactly one bucket.
+ * excluded, so every machine is in exactly one bucket. `out_of_sync` is a
+ * subset of `linked`.
  *
  * `unlinked` is the one that matters for the fleet linking pass (PP-h059): it is
  * the *worklist*, so it must exclude machines deliberately marked as not on
  * PinballMap. Those are finished work, not a to-do — folding them in would make
  * the pass re-examine the same rows on every sweep and never reach empty.
  */
-const PINBALLMAP_FILTERS = ["unlinked", "linked", "excluded"] as const;
+const PINBALLMAP_FILTERS = [
+  "unlinked",
+  "linked",
+  "excluded",
+  "out_of_sync",
+] as const;
 
 type PinballmapFilter = (typeof PINBALLMAP_FILTERS)[number];
+
+/**
+ * `out_of_sync` is not a column predicate: it compares each linked cabinet's
+ * intent with the stored lineup snapshot, so it is resolved in
+ * {@link loadOutOfSync} and handed to the query as an id set. The other three
+ * stay a static record.
+ */
+type ColumnPinballmapFilter = Exclude<PinballmapFilter, "out_of_sync">;
 
 /**
  * The WHERE fragments each link state selects, ANDed into the shared condition
@@ -67,17 +91,87 @@ type PinballmapFilter = (typeof PINBALLMAP_FILTERS)[number];
  * exactly the whole-fleet answer above: `SQL | undefined` (what `and()` itself
  * returns) and an empty `SQL[]`. Neither is expressible here.
  */
-const PINBALLMAP_FILTER_CONDITIONS: Record<PinballmapFilter, [SQL, ...SQL[]]> =
-  {
-    // Both halves are load-bearing: "no catalog match" alone would keep handing
-    // the linking pass the machines someone already decided are not on PBM.
-    unlinked: [
-      isNull(machines.pinballmapMachineId),
-      eq(machines.pinballmapExcluded, false),
-    ],
-    linked: [isNotNull(machines.pinballmapMachineId)],
-    excluded: [eq(machines.pinballmapExcluded, true)],
-  };
+const PINBALLMAP_FILTER_CONDITIONS: Record<
+  ColumnPinballmapFilter,
+  [SQL, ...SQL[]]
+> = {
+  // Both halves are load-bearing: "no catalog match" alone would keep handing
+  // the linking pass the machines someone already decided are not on PBM.
+  unlinked: [
+    isNull(machines.pinballmapMachineId),
+    eq(machines.pinballmapExcluded, false),
+  ],
+  linked: [isNotNull(machines.pinballmapMachineId)],
+  excluded: [eq(machines.pinballmapExcluded, true)],
+};
+
+interface OutOfSyncLineup {
+  source: LineupSource;
+  /** Out-of-sync machines only, keyed by machine id. */
+  views: Map<string, PbmListingView>;
+}
+
+/**
+ * Every linked cabinet whose intent disagrees with the stored lineup — the
+ * machine page's "Out of sync" (Missing or Lingering), from the same derivation.
+ *
+ * Throws rather than returning an empty set when there is no lineup to compare
+ * against: `total: 0` would read as "Pinball Map matches PinPoint" when nothing
+ * was checked (CORE-ARCH-012).
+ */
+async function loadOutOfSync(): Promise<OutOfSyncLineup> {
+  const source = await loadLineupSource();
+  if (!source.configured) {
+    throw new McpToolError(
+      "invalid",
+      "Pinball Map has no tracked location configured, so there is no lineup to compare against."
+    );
+  }
+  if (source.snapshot === null) {
+    throw new McpToolError(
+      "invalid",
+      "No Pinball Map lineup has been synced yet, so out-of-sync machines cannot be determined."
+    );
+  }
+
+  const linked = await db
+    .select({
+      id: machines.id,
+      initials: machines.initials,
+      name: machines.name,
+      presenceStatus: machines.presenceStatus,
+      pinballmapMachineId: machines.pinballmapMachineId,
+      pinballmapExcluded: machines.pinballmapExcluded,
+      pinballmapIntent: machines.pinballmapIntent,
+    })
+    .from(machines)
+    .where(isNotNull(machines.pinballmapMachineId));
+
+  const byTitle = new Map<number, PbmSiblingInput[]>();
+  for (const m of linked) {
+    if (m.pinballmapMachineId === null) continue;
+    const group = byTitle.get(m.pinballmapMachineId) ?? [];
+    group.push({
+      id: m.id,
+      initials: m.initials,
+      name: m.name,
+      intent: m.pinballmapIntent,
+    });
+    byTitle.set(m.pinballmapMachineId, group);
+  }
+
+  const views = new Map<string, PbmListingView>();
+  for (const m of linked) {
+    if (m.pinballmapMachineId === null) continue;
+    const view = deriveLineupView(
+      m,
+      source,
+      byTitle.get(m.pinballmapMachineId) ?? []
+    );
+    if (view.outOfSync) views.set(m.id, view);
+  }
+  return { source, views };
+}
 
 /**
  * `presence` takes a SET, not a single value (PP-u4ab.13).
@@ -129,7 +223,7 @@ export const listMachinesSchema = z.object({
     .enum(PINBALLMAP_FILTERS)
     .optional()
     .describe(
-      "Filter by PinballMap link state: 'unlinked' (no catalog match and not excluded), 'linked' (matched to catalog), or 'excluded' (marked not on PinballMap)."
+      "Filter by PinballMap state: 'unlinked' (no catalog match and not excluded), 'linked' (matched to catalog), 'excluded' (marked not on PinballMap), or 'out_of_sync' (linked, and the last-synced lineup disagrees with the lineup intent: 'missing' = intent On but not on the lineup, 'lingering' = intent Off but still on it). 'out_of_sync' fails if no lineup has been synced, and never covers unlinked machines — use 'unlinked' for those."
     ),
   limit: z
     .number()
@@ -174,7 +268,12 @@ export async function runListMachines(
     );
   }
 
-  if (args.pinballmap) {
+  let outOfSync: OutOfSyncLineup | null = null;
+  if (args.pinballmap === "out_of_sync") {
+    outOfSync = await loadOutOfSync();
+    const ids = [...outOfSync.views.keys()];
+    conditions.push(ids.length > 0 ? inArray(machines.id, ids) : sql`false`);
+  } else if (args.pinballmap) {
     conditions.push(...PINBALLMAP_FILTER_CONDITIONS[args.pinballmap]);
   }
 
@@ -220,13 +319,19 @@ export async function runListMachines(
     getOpenIssueCounts(rows.map((r) => r.initials)),
   ]);
 
-  const machineList = rows.map((r) => ({
-    initials: r.initials,
-    name: r.name,
-    presence: r.presenceStatus,
-    owner: ownerNames.get(r.id) ?? null,
-    openIssues: openCounts.get(r.initials) ?? 0,
-  }));
+  const machineList = rows.map((r) => {
+    const base = {
+      initials: r.initials,
+      name: r.name,
+      presence: r.presenceStatus,
+      owner: ownerNames.get(r.id) ?? null,
+      openIssues: openCounts.get(r.initials) ?? 0,
+    };
+    const view = outOfSync?.views.get(r.id);
+    return view
+      ? { ...base, lineup: { state: view.name, pushAction: view.pushAction } }
+      : base;
+  });
 
   return {
     result: {
@@ -235,6 +340,14 @@ export async function runListMachines(
       offset,
       hasMore: offset + machineList.length < total,
       machines: machineList,
+      // How old the evidence is, so a caller can tell a stale lineup from a
+      // current one before acting on it.
+      ...(outOfSync && {
+        lineupSnapshot: {
+          syncedAt: outOfSync.source.syncedAt?.toISOString() ?? null,
+          lastSyncStatus: outOfSync.source.lastSyncStatus,
+        },
+      }),
     },
   };
 }
@@ -254,7 +367,7 @@ export function registerListMachines(server: McpServer): void {
     {
       title: "List machines",
       description:
-        "List machines with initials, name, availability (presence), owner name, and open-issue count. Supports search by name/initials, presence filtering, and PinballMap link-state filtering ('unlinked' | 'linked' | 'excluded'). Returns paginated results with total count and hasMore.",
+        "List machines with initials, name, availability (presence), owner name, and open-issue count. Supports search by name/initials, presence filtering, and PinballMap filtering ('unlinked' | 'linked' | 'excluded' | 'out_of_sync'). Under 'out_of_sync' each machine carries lineup.state and lineup.pushAction, and the result carries lineupSnapshot (when the lineup was last synced). Returns paginated results with total count and hasMore.",
       inputSchema: listMachinesSchema,
       annotations: READ_ONLY_TOOL_ANNOTATIONS,
     },
