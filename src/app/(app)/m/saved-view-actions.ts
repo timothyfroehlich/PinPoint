@@ -11,14 +11,15 @@ import {
   deleteSavedMachineView,
   renameSavedMachineView,
   setSavedMachineViewDefault,
+  findOwnedSavedMachineView,
   updateSavedMachineViewState,
   type SavedMachineViewError,
+  type SavedMachineViewSurfaceKey,
 } from "~/lib/machines/view/saved-views";
-import {
-  parseMachineViewState,
-  toMachineViewSavedState,
-} from "~/lib/machines/view/state";
-import type { MachineViewPresetId, MachineViewSavedState } from "~/lib/types";
+import { isPgErrorCode } from "~/lib/db/postgres-errors";
+import { VALID_MACHINE_PRESENCE_STATUSES } from "~/lib/machines/presence";
+import { normalizeMachineViewSavedState } from "~/lib/machines/view/state";
+import { MACHINE_VIEW_FIELD_IDS, type MachineViewPresetId } from "~/lib/types";
 import { db } from "~/server/db";
 import { resolveMachineViewSurface } from "./saved-view-surface";
 
@@ -33,40 +34,41 @@ const surfaceSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("owner"), ownerId: z.uuid() }),
 ]);
 
-// Shape only: values are re-validated against the Surface's Page Preset
-// exactly as URL parameters are (spec §8.15) before they are stored.
+// Values the Machine View parser accepts; the stored configuration is then
+// re-validated against the Surface's Page Preset (spec §4.10, §8.15).
 const savedStateSchema = z.object({
   q: z.string().max(200),
-  presence: z.union([z.literal("all"), z.array(z.string()).max(20)]),
-  status: z.array(z.string()).max(20),
-  owner: z.array(z.string()).max(500),
-  sort: z.string(),
+  presence: z.union([
+    z.literal("all"),
+    z.array(z.enum(VALID_MACHINE_PRESENCE_STATUSES)),
+  ]),
+  status: z.array(z.enum(["operational", "needs_service", "unplayable"])),
+  owner: z.array(z.string().max(64)).max(500),
+  sort: z.enum(MACHINE_VIEW_FIELD_IDS),
   dir: z.enum(["asc", "desc"]),
-  pageSize: z.number().int(),
-  columns: z.array(z.string()).max(50),
+  pageSize: z.union([z.literal(25), z.literal(50), z.literal(100)]),
+  columns: z.array(z.enum(MACHINE_VIEW_FIELD_IDS)),
 });
 
+function presetFor(key: SavedMachineViewSurfaceKey): MachineViewPresetId {
+  return key.surface === "machines" ? "machines" : "collection";
+}
+
 /**
- * Runs a submitted configuration through the URL parser, so storage and URLs
- * agree (spec §4.10) and every unrecognized value is dropped (§8.15).
+ * The name check runs before the write, so two concurrent saves of one name
+ * can both pass it; the unique index then rejects the second (spec §8.8).
  */
-function normalizeState(
-  state: z.infer<typeof savedStateSchema>,
-  preset: MachineViewPresetId
-): MachineViewSavedState {
-  const params = new URLSearchParams();
-  params.set("q", state.q);
-  params.set(
-    "presence",
-    state.presence === "all" ? "all" : state.presence.join(",")
-  );
-  if (state.status.length > 0) params.set("status", state.status.join(","));
-  if (state.owner.length > 0) params.set("owner", state.owner.join(","));
-  params.set("sort", state.sort);
-  params.set("dir", state.dir);
-  params.set("pageSize", String(state.pageSize));
-  params.set("columns", state.columns.join(","));
-  return toMachineViewSavedState(parseMachineViewState(params, preset));
+async function withNameConflict(
+  write: () => Promise<SavedViewActionResult>
+): Promise<SavedViewActionResult> {
+  try {
+    return await write();
+  } catch (error) {
+    if (isPgErrorCode(error, "23505")) {
+      return err("NAME_TAKEN", "A view with this name already exists");
+    }
+    throw error;
+  }
 }
 
 const createSchema = z.object({
@@ -83,14 +85,16 @@ const createProtected = createProtectedAction({
   handler: async (input, { user }): Promise<SavedViewActionResult> => {
     const surface = await resolveMachineViewSurface(input.surface);
     if (!surface) return err("NOT_FOUND", "View not found.");
-    return db.transaction((tx) =>
-      createSavedMachineView(tx, {
-        userId: user.id,
-        key: surface.key,
-        name: input.name,
-        state: normalizeState(input.state, surface.preset),
-        makeDefault: input.makeDefault,
-      })
+    return withNameConflict(() =>
+      db.transaction((tx) =>
+        createSavedMachineView(tx, {
+          userId: user.id,
+          key: surface.key,
+          name: input.name,
+          state: normalizeMachineViewSavedState(input.state, surface.preset),
+          makeDefault: input.makeDefault,
+        })
+      )
     );
   },
 });
@@ -102,23 +106,20 @@ export async function createSavedMachineViewAction(
   return createProtected(input);
 }
 
-const updateSchema = z.object({
-  id: z.uuid(),
-  surface: surfaceSchema,
-  state: savedStateSchema,
-});
+const updateSchema = z.object({ id: z.uuid(), state: savedStateSchema });
 
 const updateProtected = createProtectedAction({
   actionName: "updateSavedMachineViewAction",
   schema: updateSchema,
   permission: "machines.views.save",
   handler: async (input, { user }): Promise<SavedViewActionResult> => {
-    const surface = await resolveMachineViewSurface(input.surface);
-    if (!surface) return err("NOT_FOUND", "View not found.");
+    // Validate against the stored view's own Surface, not one the client names.
+    const owned = await findOwnedSavedMachineView(db, user.id, input.id);
+    if (!owned) return err("NOT_FOUND", "View not found.");
     return updateSavedMachineViewState(db, {
       userId: user.id,
-      id: input.id,
-      state: normalizeState(input.state, surface.preset),
+      id: owned.id,
+      state: normalizeMachineViewSavedState(input.state, presetFor(owned.key)),
     });
   },
 });
@@ -137,8 +138,10 @@ const renameProtected = createProtectedAction({
   schema: renameSchema,
   permission: "machines.views.save",
   handler: async (input, { user }): Promise<SavedViewActionResult> =>
-    db.transaction((tx) =>
-      renameSavedMachineView(tx, { userId: user.id, ...input })
+    withNameConflict(() =>
+      db.transaction((tx) =>
+        renameSavedMachineView(tx, { userId: user.id, ...input })
+      )
     ),
 });
 

@@ -9,6 +9,7 @@ import {
   userProfiles,
 } from "~/server/db/schema";
 import type { MachineViewSavedState } from "~/lib/types";
+import { isPgErrorCode } from "~/lib/db/postgres-errors";
 
 vi.mock("~/server/db", async () => {
   const { getTestDb } = await import("~/test/setup/pglite");
@@ -129,6 +130,22 @@ describe("machine view saved views persistence", () => {
         userId: otherUserId,
       }
     );
+  });
+
+  it("enforces unique names in the database for concurrent saves", async () => {
+    const db = await getTestDb();
+    await create("Needs attention");
+    const duplicate = db.insert(machineViewSavedViews).values({
+      userId,
+      surface: "machines",
+      name: "NEEDS ATTENTION",
+      state,
+    });
+    const error: unknown = await duplicate.then(
+      () => null,
+      (caught: unknown) => caught
+    );
+    expect(isPgErrorCode(error, "23505")).toBe(true);
   });
 
   it("rejects a blank name", async () => {

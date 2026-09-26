@@ -188,7 +188,8 @@ async function clearDefault(
     .where(and(eq(t.userId, userId), surfaceWhere(key), eq(t.isDefault, true)));
 }
 
-async function findOwned(
+/** An account's own Saved View and its Surface, or null. */
+export async function findOwnedSavedMachineView(
   tx: DbTransaction,
   userId: string,
   id: string
@@ -274,7 +275,7 @@ export async function renameSavedMachineView(
   tx: DbTransaction,
   input: { userId: string; id: string; name: string }
 ): Promise<Result<{ id: string }, SavedMachineViewError>> {
-  const owned = await findOwned(tx, input.userId, input.id);
+  const owned = await findOwnedSavedMachineView(tx, input.userId, input.id);
   if (!owned) return err("NOT_FOUND", "View not found.");
   const name = normalizeName(input.name);
   if (!name) return err("INVALID_NAME", "Enter a name.");
@@ -311,7 +312,7 @@ export async function setSavedMachineViewDefault(
   tx: DbTransaction,
   input: { userId: string; id: string; isDefault: boolean }
 ): Promise<Result<{ id: string }, SavedMachineViewError>> {
-  const owned = await findOwned(tx, input.userId, input.id);
+  const owned = await findOwnedSavedMachineView(tx, input.userId, input.id);
   if (!owned) return err("NOT_FOUND", "View not found.");
   const t = machineViewSavedViews;
   if (input.isDefault) await clearDefault(tx, input.userId, owned.key);

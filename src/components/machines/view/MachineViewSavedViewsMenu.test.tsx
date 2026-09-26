@@ -54,7 +54,9 @@ function renderMenu(
     <MachineViewSavedViewsMenu
       layout="desktop"
       savedViews={savedViews}
+      activeViewId={activeViewId}
       state={state}
+      ownerIds={[]}
       preset="machines"
       onApply={onApply}
       onViewSaved={vi.fn()}
@@ -116,7 +118,6 @@ describe("MachineViewSavedViewsMenu", () => {
 
     expect(actions.updateSavedMachineViewAction).toHaveBeenCalledWith({
       id: brokenView.id,
-      surface: { kind: "machines" },
       state: { ...brokenView.state, q: "stern" },
     });
     expect(refresh).toHaveBeenCalled();

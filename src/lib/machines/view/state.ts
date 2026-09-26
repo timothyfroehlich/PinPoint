@@ -229,6 +229,18 @@ export function savedMachineViewSearchParams(
   return serializeMachineViewState({ ...saved, page: 1 }, presetId, viewId);
 }
 
+/**
+ * Re-validates a configuration exactly as URL parameters are (spec §4.10,
+ * §8.15): fields the preset does not permit are dropped.
+ */
+export function normalizeMachineViewSavedState(
+  saved: MachineViewSavedState,
+  presetId: MachineViewPresetId
+): MachineViewSavedState {
+  const params = serializeMachineViewState({ ...saved, page: 1 }, presetId);
+  return toMachineViewSavedState(parseMachineViewState(params, presetId));
+}
+
 /** Whether two configurations are the same view, ignoring the page. */
 export function machineViewSavedStatesEqual(
   left: MachineViewSavedState,

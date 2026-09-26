@@ -55,8 +55,10 @@ export function MachineView({
   // another Saved View or the Page Preset is chosen.
   const serverViewReference = savedViews?.activeViewId ?? null;
   const viewReference = React.useRef(serverViewReference);
+  const [activeViewId, setActiveViewId] = React.useState(serverViewReference);
   React.useEffect(() => {
     viewReference.current = serverViewReference;
+    setActiveViewId(serverViewReference);
   }, [serverViewReference]);
 
   React.useEffect(() => {
@@ -78,6 +80,7 @@ export function MachineView({
     ): void => {
       requestedQuery.current = next.q;
       viewReference.current = view;
+      setActiveViewId(view);
       setState(next);
       const query = serializeMachineViewState(next, preset, view).toString();
       startTransition(() => {
@@ -161,7 +164,9 @@ export function MachineView({
                 <MachineViewSavedViewsMenu
                   layout={layout}
                   savedViews={savedViews}
+                  activeViewId={activeViewId}
                   state={state}
+                  ownerIds={result.ownerOptions.map((owner) => owner.id)}
                   preset={preset}
                   onApply={applySavedView}
                   onViewSaved={(viewId) => navigate(state, viewId)}

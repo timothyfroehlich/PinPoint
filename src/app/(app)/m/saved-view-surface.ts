@@ -1,7 +1,6 @@
 import "server-only";
 
 import { getViewer } from "~/lib/collections/viewer";
-import { getOwnerCollection } from "~/lib/collections/owner";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import {
   listSavedMachineViews,
@@ -16,6 +15,7 @@ import type {
 } from "~/lib/types";
 import { db } from "~/server/db";
 import { getCollectionForLayout } from "~/app/(app)/c/[id]/_data";
+import { getOwnerCollectionForLayout } from "~/app/(app)/c/owner/[userId]/_data";
 
 export interface ResolvedMachineViewSurface {
   key: SavedMachineViewSurfaceKey;
@@ -48,7 +48,7 @@ export async function resolveMachineViewSurface(
       };
     }
     case "owner": {
-      const collection = await getOwnerCollection(undefined, ref.ownerId);
+      const collection = await getOwnerCollectionForLayout(ref.ownerId);
       if (!collection) return null;
       return {
         key: {

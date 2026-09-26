@@ -58,7 +58,14 @@ interface MachineViewSavedViewsMenuProps {
   /** Desktop renders the dropdown; mobile renders the bottom sheet. */
   layout: "desktop" | "mobile";
   savedViews: MachineViewSavedViews;
+  /**
+   * The applied Saved View id or Page Preset reference, as last navigated to;
+   * it runs ahead of `savedViews.activeViewId` until the server responds.
+   */
+  activeViewId: string | null;
   state: MachineViewState;
+  /** Owner filter values valid in this scope (the loader drops the rest). */
+  ownerIds: string[];
   preset: MachineViewPresetId;
   /** Opens a Saved View, or the Page Preset for null (spec §8.6, §8.13). */
   onApply: (view: MachineViewSavedViewSummary | null) => void;
@@ -73,7 +80,9 @@ interface MachineViewSavedViewsMenuProps {
 export function MachineViewSavedViewsMenu({
   layout,
   savedViews,
+  activeViewId,
   state,
+  ownerIds,
   preset,
   onApply,
   onViewSaved,
@@ -86,10 +95,14 @@ export function MachineViewSavedViewsMenu({
   const [saveError, setSaveError] = React.useState<string | null>(null);
 
   const activeView =
-    savedViews.views.find((view) => view.id === savedViews.activeViewId) ??
-    null;
+    savedViews.views.find((view) => view.id === activeViewId) ?? null;
+  // A stored owner that no longer exists in this scope was dropped when the
+  // view was applied (spec §8.15); it does not make the view read as edited.
   const baseline = activeView
-    ? activeView.state
+    ? {
+        ...activeView.state,
+        owner: activeView.state.owner.filter((id) => ownerIds.includes(id)),
+      }
     : toMachineViewSavedState(getMachineViewPreset(preset).defaultState);
   const edited = !machineViewSavedStatesEqual(
     toMachineViewSavedState(state),
@@ -104,7 +117,6 @@ export function MachineViewSavedViewsMenu({
     startSaving(async () => {
       const result = await updateSavedMachineViewAction({
         id: activeView.id,
-        surface: savedViews.surface,
         state: toMachineViewSavedState(state),
       });
       if (!result.ok) {
@@ -113,11 +125,6 @@ export function MachineViewSavedViewsMenu({
       }
       router.refresh();
     });
-  }
-
-  function choose(view: MachineViewSavedViewSummary | null): void {
-    setSheetOpen(false);
-    onApply(view);
   }
 
   const entries = (
@@ -133,7 +140,7 @@ export function MachineViewSavedViewsMenu({
           <MenuEntry
             key={view?.id ?? MACHINE_VIEW_PRESET_REFERENCE}
             className={itemClassName}
-            onSelect={() => close(() => choose(view))}
+            onSelect={() => close(() => onApply(view))}
             active={isActive}
           >
             <span className="truncate">{view?.name ?? PRESET_LABEL}</span>
