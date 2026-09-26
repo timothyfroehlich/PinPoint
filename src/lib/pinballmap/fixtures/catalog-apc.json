@@ -6,7 +6,8 @@
     "year": 2026,
     "opdb_id": "GV8wB-Mq12N",
     "ipdb_id": null,
-    "machine_group_id": 130
+    "machine_group_id": 130,
+    "ic_eligible": true
   },
   {
     "id": 1456,
@@ -15,7 +16,8 @@
     "year": 1980,
     "opdb_id": "G43kO-MQ50p",
     "ipdb_id": 43,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 2647,
@@ -24,7 +26,8 @@
     "year": 1988,
     "opdb_id": "G48on-ML8B9",
     "ipdb_id": 2603,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 4622,
@@ -33,7 +36,8 @@
     "year": 2026,
     "opdb_id": "GvBQX-M0ody-A1kee",
     "ipdb_id": null,
-    "machine_group_id": 127
+    "machine_group_id": 127,
+    "ic_eligible": false
   },
   {
     "id": 3846,
@@ -42,7 +46,8 @@
     "year": 2024,
     "opdb_id": "GQK1P-Ml95Z-AOY43",
     "ipdb_id": null,
-    "machine_group_id": 115
+    "machine_group_id": 115,
+    "ic_eligible": true
   },
   {
     "id": 3877,
@@ -51,7 +56,8 @@
     "year": 1948,
     "opdb_id": "G6lYl-MdEwd",
     "ipdb_id": 2027,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 2042,
@@ -60,7 +66,8 @@
     "year": 1968,
     "opdb_id": "G4j8k-MJK5K",
     "ipdb_id": 701,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 2349,
@@ -69,7 +76,8 @@
     "year": 1988,
     "opdb_id": "G4jXW-MQdrN",
     "ipdb_id": 678,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 1252,
@@ -78,7 +86,8 @@
     "year": 1997,
     "opdb_id": "G4kBL-MLndo",
     "ipdb_id": 4136,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 3738,
@@ -87,7 +96,8 @@
     "year": 2023,
     "opdb_id": "G3EBl-Mq1zy",
     "ipdb_id": 7064,
-    "machine_group_id": 104
+    "machine_group_id": 104,
+    "ic_eligible": true
   },
   {
     "id": 2923,
@@ -96,7 +106,8 @@
     "year": 2018,
     "opdb_id": "G4dOQ-MyNbb",
     "ipdb_id": 6555,
-    "machine_group_id": 66
+    "machine_group_id": 66,
+    "ic_eligible": true
   },
   {
     "id": 2116,
@@ -105,7 +116,8 @@
     "year": 1988,
     "opdb_id": "G4qqv-MDW0P",
     "ipdb_id": 2090,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 1997,
@@ -114,7 +126,8 @@
     "year": 1977,
     "opdb_id": "G57lj-MJwxY",
     "ipdb_id": 2377,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 2565,
@@ -123,7 +136,8 @@
     "year": 2016,
     "opdb_id": "G5D94-M3d5w",
     "ipdb_id": 6328,
-    "machine_group_id": 8
+    "machine_group_id": 8,
+    "ic_eligible": false
   },
   {
     "id": 2008,
@@ -132,7 +146,8 @@
     "year": 1989,
     "opdb_id": "G5Lk0-MQjl3",
     "ipdb_id": 347,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 1278,
@@ -141,7 +156,8 @@
     "year": 1989,
     "opdb_id": "G5n2D-MLn85",
     "ipdb_id": 2630,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 2230,
@@ -150,7 +166,8 @@
     "year": 1975,
     "opdb_id": "G5nj6-MyNEZ",
     "ipdb_id": 2577,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 1582,
@@ -159,7 +176,8 @@
     "year": 1975,
     "opdb_id": "G5W1w-MQVkq",
     "ipdb_id": 2589,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 2761,
@@ -168,7 +186,8 @@
     "year": 1991,
     "opdb_id": "G5wxv-MQP9z",
     "ipdb_id": 120,
-    "machine_group_id": 117
+    "machine_group_id": 117,
+    "ic_eligible": false
   },
   {
     "id": 1927,
@@ -177,7 +196,8 @@
     "year": 1974,
     "opdb_id": "Gr28v-Mp4Wr",
     "ipdb_id": 889,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 785,
@@ -186,7 +206,8 @@
     "year": 1978,
     "opdb_id": "G4jXr-MQ6kz",
     "ipdb_id": 1386,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 1429,
@@ -195,7 +216,8 @@
     "year": 1980,
     "opdb_id": "GR6kW-Mo1W3",
     "ipdb_id": 500,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 2441,
@@ -204,7 +226,8 @@
     "year": 2015,
     "opdb_id": "G41d5-MKNwX",
     "ipdb_id": 6307,
-    "machine_group_id": 22
+    "machine_group_id": 22,
+    "ic_eligible": false
   },
   {
     "id": 1513,
@@ -213,7 +236,8 @@
     "year": 1963,
     "opdb_id": "Gre8z-MLeK2",
     "ipdb_id": 2208,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 1158,
@@ -222,7 +246,8 @@
     "year": 1977,
     "opdb_id": "Grep0-MQYN4",
     "ipdb_id": 3163,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 1455,
@@ -231,7 +256,8 @@
     "year": 1977,
     "opdb_id": "GrknN-MQrdv",
     "ipdb_id": 532,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 3022,
@@ -240,7 +266,8 @@
     "year": 2018,
     "opdb_id": "G6lnq-Mq1kv",
     "ipdb_id": 6558,
-    "machine_group_id": 70
+    "machine_group_id": 70,
+    "ic_eligible": true
   },
   {
     "id": 4278,
@@ -249,7 +276,8 @@
     "year": 1978,
     "opdb_id": "G4x0p-MDyyq",
     "ipdb_id": 1486,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 3414,
@@ -258,7 +286,8 @@
     "year": 2021,
     "opdb_id": "GBLLd-MdEON-A94po",
     "ipdb_id": null,
-    "machine_group_id": 87
+    "machine_group_id": 87,
+    "ic_eligible": false
   },
   {
     "id": 3267,
@@ -267,7 +296,8 @@
     "year": 2020,
     "opdb_id": "Gj66P-M3dxn",
     "ipdb_id": 6754,
-    "machine_group_id": 82
+    "machine_group_id": 82,
+    "ic_eligible": true
   },
   {
     "id": 3408,
@@ -276,7 +306,8 @@
     "year": 2021,
     "opdb_id": "Gj66Z-Mp4BN-A9Y6n",
     "ipdb_id": null,
-    "machine_group_id": 86
+    "machine_group_id": 86,
+    "ic_eligible": false
   },
   {
     "id": 3670,
@@ -285,7 +316,8 @@
     "year": 2023,
     "opdb_id": "GllPz-MBRrV-A9vWL",
     "ipdb_id": null,
-    "machine_group_id": 97
+    "machine_group_id": 97,
+    "ic_eligible": false
   },
   {
     "id": 3224,
@@ -294,7 +326,8 @@
     "year": 2019,
     "opdb_id": "GQKb2-MYek0",
     "ipdb_id": 6640,
-    "machine_group_id": 114
+    "machine_group_id": 114,
+    "ic_eligible": false
   },
   {
     "id": 2433,
@@ -303,7 +336,8 @@
     "year": 1981,
     "opdb_id": "GrNpY-MJrZw",
     "ipdb_id": 1549,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 2987,
@@ -312,7 +346,8 @@
     "year": 1971,
     "opdb_id": "GrNZ7-MDOjq",
     "ipdb_id": 2204,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 2367,
@@ -321,7 +356,8 @@
     "year": 1971,
     "opdb_id": "Grx1z-Mx02z",
     "ipdb_id": 703,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 3328,
@@ -330,7 +366,8 @@
     "year": 1972,
     "opdb_id": "GRoN2-MRj30",
     "ipdb_id": 2081,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 737,
@@ -339,7 +376,8 @@
     "year": 1991,
     "opdb_id": "GRpee-MePdR",
     "ipdb_id": 1502,
-    "machine_group_id": 60
+    "machine_group_id": 60,
+    "ic_eligible": false
   },
   {
     "id": 931,
@@ -348,7 +386,8 @@
     "year": 1975,
     "opdb_id": "GrPx2-M5RRk",
     "ipdb_id": 2286,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 815,
@@ -357,7 +396,8 @@
     "year": 1993,
     "opdb_id": "GRoZw-MLW3j",
     "ipdb_id": 1322,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 723,
@@ -366,7 +406,8 @@
     "year": 1986,
     "opdb_id": "G41Z8-MJKvP",
     "ipdb_id": 1796,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 726,
@@ -375,7 +416,8 @@
     "year": 1979,
     "opdb_id": "G42Pk-MZe2e",
     "ipdb_id": 2821,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 908,
@@ -384,7 +426,8 @@
     "year": 1979,
     "opdb_id": "G42PX-MyNXo",
     "ipdb_id": 2252,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 698,
@@ -393,7 +436,8 @@
     "year": 2001,
     "opdb_id": "G48w3-Mq1Zk",
     "ipdb_id": 4505,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 1048,
@@ -402,7 +446,8 @@
     "year": 1975,
     "opdb_id": "G48YQ-MDxbK",
     "ipdb_id": 2057,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 734,
@@ -411,7 +456,8 @@
     "year": 1978,
     "opdb_id": "G417e-MDvXz",
     "ipdb_id": 4501,
-    "machine_group_id": 67
+    "machine_group_id": 67,
+    "ic_eligible": false
   },
   {
     "id": 650,
@@ -420,7 +466,8 @@
     "year": 1996,
     "opdb_id": "G4llj-MQYb2",
     "ipdb_id": 3824,
-    "machine_group_id": 134
+    "machine_group_id": 134,
+    "ic_eligible": false
   },
   {
     "id": 730,
@@ -429,7 +476,8 @@
     "year": 1980,
     "opdb_id": "G4jQw-MJ5rl",
     "ipdb_id": 249,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 793,
@@ -438,7 +486,8 @@
     "year": 1976,
     "opdb_id": "G4O1L-MDW47",
     "ipdb_id": 1072,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 984,
@@ -447,7 +496,8 @@
     "year": 1989,
     "opdb_id": "G4NY0-MDE29",
     "ipdb_id": 3507,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 3732,
@@ -456,7 +506,8 @@
     "year": 1962,
     "opdb_id": "G4Pvp-MLBO0",
     "ipdb_id": 2713,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 685,
@@ -465,7 +516,8 @@
     "year": 1995,
     "opdb_id": "G50pv-MdE6R",
     "ipdb_id": 2847,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 851,
@@ -474,7 +526,8 @@
     "year": 1979,
     "opdb_id": "G5b38-MDqkx",
     "ipdb_id": 1580,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 678,
@@ -483,7 +536,8 @@
     "year": 1999,
     "opdb_id": "G50Wr-MLeZP",
     "ipdb_id": 4446,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 669,
@@ -492,7 +546,8 @@
     "year": 1995,
     "opdb_id": "G59zN-MLy0N",
     "ipdb_id": 3593,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 3829,
@@ -501,7 +556,8 @@
     "year": 1977,
     "opdb_id": "G4Xdq-MLBlD",
     "ipdb_id": 2532,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 703,
@@ -510,7 +566,8 @@
     "year": 1990,
     "opdb_id": "G5Dz7-Mq139",
     "ipdb_id": 966,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 808,
@@ -519,7 +576,8 @@
     "year": 1979,
     "opdb_id": "G5Dbo-M3dv6",
     "ipdb_id": 974,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 707,
@@ -528,7 +586,8 @@
     "year": 1994,
     "opdb_id": "G42E2-MQP9e",
     "ipdb_id": 2811,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 1079,
@@ -537,7 +596,8 @@
     "year": 1986,
     "opdb_id": "Gr2wz-MLBob",
     "ipdb_id": 996,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 684,
@@ -546,7 +606,8 @@
     "year": 1993,
     "opdb_id": "GR6d8-M1rZd",
     "ipdb_id": 2357,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 4317,
@@ -555,7 +616,8 @@
     "year": 1979,
     "opdb_id": "GRoW6-MQk81",
     "ipdb_id": 817,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 721,
@@ -564,7 +626,8 @@
     "year": 1994,
     "opdb_id": "GR6do-MLBq4",
     "ipdb_id": 2579,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 3405,
@@ -573,7 +636,8 @@
     "year": 1963,
     "opdb_id": "GrdqX-MLW81",
     "ipdb_id": 988,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 1118,
@@ -582,7 +646,8 @@
     "year": 2011,
     "opdb_id": "GrkL5-MLvrX",
     "ipdb_id": 5682,
-    "machine_group_id": 9
+    "machine_group_id": 9,
+    "ic_eligible": false
   },
   {
     "id": 708,
@@ -591,7 +656,8 @@
     "year": 1999,
     "opdb_id": "GRL9r-MD34z",
     "ipdb_id": 4458,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 766,
@@ -600,7 +666,8 @@
     "year": 1978,
     "opdb_id": "GrkOB-MJVvl",
     "ipdb_id": 1823,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 847,
@@ -609,7 +676,8 @@
     "year": 1977,
     "opdb_id": "GrleW-MYeod",
     "ipdb_id": 2406,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 990,
@@ -618,7 +686,8 @@
     "year": 1992,
     "opdb_id": "GRLz0-MeP4B",
     "ipdb_id": 3513,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 715,
@@ -627,7 +696,8 @@
     "year": 1995,
     "opdb_id": "GrNd0-MJNW1",
     "ipdb_id": 3780,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 834,
@@ -636,7 +706,8 @@
     "year": 1978,
     "opdb_id": "GRnwQ-M9R5d",
     "ipdb_id": 1125,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 791,
@@ -645,7 +716,8 @@
     "year": 1976,
     "opdb_id": "GRnX6-MQk8L",
     "ipdb_id": 2253,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 689,
@@ -654,7 +726,8 @@
     "year": 1993,
     "opdb_id": "GRQKz-MyNXz",
     "ipdb_id": 2768,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 662,
@@ -663,7 +736,8 @@
     "year": 2003,
     "opdb_id": "GrqZX-MD15w",
     "ipdb_id": 4858,
-    "machine_group_id": 13
+    "machine_group_id": 13,
+    "ic_eligible": false
   },
   {
     "id": 682,
@@ -672,7 +746,8 @@
     "year": 2003,
     "opdb_id": "GRvBL-MP3Ev",
     "ipdb_id": 4674,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 1096,
@@ -681,7 +756,8 @@
     "year": 1984,
     "opdb_id": "GRVnY-MDz0l",
     "ipdb_id": 312,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 794,
@@ -690,7 +766,8 @@
     "year": 1975,
     "opdb_id": "GRwBN-MJ5ln",
     "ipdb_id": 1206,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 728,
@@ -699,7 +776,8 @@
     "year": 1984,
     "opdb_id": "GRwl7-MJ45o",
     "ipdb_id": 2328,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 1055,
@@ -708,7 +786,8 @@
     "year": 1980,
     "opdb_id": "GrO7w-M9R03",
     "ipdb_id": 310,
-    "machine_group_id": 20
+    "machine_group_id": 20,
+    "ic_eligible": false
   },
   {
     "id": 897,
@@ -717,7 +796,8 @@
     "year": 1979,
     "opdb_id": "GrXy3-ML0Ey",
     "ipdb_id": 1755,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 751,
@@ -726,7 +806,8 @@
     "year": 1987,
     "opdb_id": "GRY2O-MLWdy",
     "ipdb_id": 804,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 795,
@@ -735,7 +816,8 @@
     "year": 1973,
     "opdb_id": "GRYbJ-MnKex",
     "ipdb_id": 1173,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 875,
@@ -744,7 +826,8 @@
     "year": 1979,
     "opdb_id": "Grypn-MQdbe",
     "ipdb_id": 871,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 4509,
@@ -753,7 +836,8 @@
     "year": 2024,
     "opdb_id": "GbPxB-MkPol-A93vd",
     "ipdb_id": null,
-    "machine_group_id": 118
+    "machine_group_id": 118,
+    "ic_eligible": false
   },
   {
     "id": 3833,
@@ -762,7 +846,8 @@
     "year": 2024,
     "opdb_id": "GkBnQ-MBRxV-A96qp",
     "ipdb_id": null,
-    "machine_group_id": 137
+    "machine_group_id": 137,
+    "ic_eligible": false
   },
   {
     "id": 4527,
@@ -771,7 +856,8 @@
     "year": 2025,
     "opdb_id": "G4835-M2YPK-ARkb7",
     "ipdb_id": null,
-    "machine_group_id": 90
+    "machine_group_id": 90,
+    "ic_eligible": false
   },
   {
     "id": 4533,
@@ -780,7 +866,8 @@
     "year": 2025,
     "opdb_id": "GEL0V-MBRyb",
     "ipdb_id": null,
-    "machine_group_id": 125
+    "machine_group_id": 125,
+    "ic_eligible": true
   },
   {
     "id": 2837,
@@ -789,7 +876,8 @@
     "year": 1978,
     "opdb_id": "Gry0Z-MP3zR",
     "ipdb_id": 1570,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 944,
@@ -798,7 +886,8 @@
     "year": 1981,
     "opdb_id": "GRLbz-MDnxo",
     "ipdb_id": 2297,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 2713,
@@ -807,7 +896,8 @@
     "year": 1980,
     "opdb_id": "GrZY2-ML0Rb",
     "ipdb_id": 2346,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 937,
@@ -816,7 +906,8 @@
     "year": 1980,
     "opdb_id": "G48kY-MDxRV",
     "ipdb_id": 887,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 1335,
@@ -825,7 +916,8 @@
     "year": 2012,
     "opdb_id": "Grj6X-MJNV1-AO209",
     "ipdb_id": 5824,
-    "machine_group_id": 11
+    "machine_group_id": 11,
+    "ic_eligible": false
   },
   {
     "id": 3245,
@@ -834,7 +926,8 @@
     "year": 1980,
     "opdb_id": "GRYPN-Mz2RE",
     "ipdb_id": 570,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 1211,
@@ -843,7 +936,8 @@
     "year": 1947,
     "opdb_id": "GyVVQ-MVKYX",
     "ipdb_id": 1254,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 855,
@@ -852,7 +946,8 @@
     "year": 1978,
     "opdb_id": "GrXEW-MDEwr",
     "ipdb_id": 2366,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 3784,
@@ -861,7 +956,8 @@
     "year": 2023,
     "opdb_id": "GvBn8-Mz291",
     "ipdb_id": null,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 3416,
@@ -870,7 +966,8 @@
     "year": 2021,
     "opdb_id": "GweeP-Ml9pZ-ARZoY",
     "ipdb_id": 6842,
-    "machine_group_id": 88
+    "machine_group_id": 88,
+    "ic_eligible": true
   },
   {
     "id": 3787,
@@ -879,7 +976,8 @@
     "year": 2022,
     "opdb_id": "GyVb1-MYeq1",
     "ipdb_id": null,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 3419,
@@ -888,7 +986,8 @@
     "year": 2021,
     "opdb_id": "GxvvB-MOEKX",
     "ipdb_id": null,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 3836,
@@ -897,7 +996,8 @@
     "year": 2024,
     "opdb_id": "GZVXY-MyNOq-ARWE8",
     "ipdb_id": null,
-    "machine_group_id": 112
+    "machine_group_id": 112,
+    "ic_eligible": false
   },
   {
     "id": 3179,
@@ -906,7 +1006,8 @@
     "year": 2019,
     "opdb_id": "GZVOd-MwNxZ-AOLoy",
     "ipdb_id": 6596,
-    "machine_group_id": 79
+    "machine_group_id": 79,
+    "ic_eligible": true
   },
   {
     "id": 642,
@@ -918,7 +1019,8 @@
     "opdb_img_width": 640,
     "opdb_img_height": 444,
     "ipdb_id": 4032,
-    "machine_group_id": 18
+    "machine_group_id": 18,
+    "ic_eligible": false
   },
   {
     "id": 2306,
@@ -927,7 +1029,8 @@
     "year": 2016,
     "opdb_id": "G5pe4-MyNkp",
     "ipdb_id": 6263,
-    "machine_group_id": 18
+    "machine_group_id": 18,
+    "ic_eligible": false
   },
   {
     "id": 2966,
@@ -936,7 +1039,8 @@
     "year": 2015,
     "opdb_id": "G5pe4-MkPRV",
     "ipdb_id": 6264,
-    "machine_group_id": 18
+    "machine_group_id": 18,
+    "ic_eligible": false
   },
   {
     "id": 3259,
@@ -945,7 +1049,8 @@
     "year": 2016,
     "opdb_id": "G5pe4-MrR1B",
     "ipdb_id": null,
-    "machine_group_id": 18
+    "machine_group_id": 18,
+    "ic_eligible": false
   },
   {
     "id": 3507,
@@ -954,7 +1059,8 @@
     "year": 2015,
     "opdb_id": "G5pe4-M61y6",
     "ipdb_id": null,
-    "machine_group_id": 18
+    "machine_group_id": 18,
+    "ic_eligible": false
   },
   {
     "id": 4550,
@@ -963,7 +1069,8 @@
     "year": 2025,
     "opdb_id": "G5pe4-MrRrv",
     "ipdb_id": null,
-    "machine_group_id": 18
+    "machine_group_id": 18,
+    "ic_eligible": false
   },
   {
     "id": 3167,
@@ -972,7 +1079,8 @@
     "year": 2019,
     "opdb_id": "GK17D-MdEqz",
     "ipdb_id": 6573,
-    "machine_group_id": 78
+    "machine_group_id": 78,
+    "ic_eligible": false
   },
   {
     "id": 3168,
@@ -981,7 +1089,8 @@
     "year": 2019,
     "opdb_id": "GK17D-MKNKd-AOyKv",
     "ipdb_id": 6575,
-    "machine_group_id": 78
+    "machine_group_id": 78,
+    "ic_eligible": false
   },
   {
     "id": 3169,
@@ -990,7 +1099,8 @@
     "year": 2019,
     "opdb_id": "GK17D-MKNKd-A15Yn",
     "ipdb_id": 6574,
-    "machine_group_id": 78
+    "machine_group_id": 78,
+    "ic_eligible": false
   },
   {
     "id": 3780,
@@ -999,7 +1109,8 @@
     "year": 2023,
     "opdb_id": "GK17D-MKNKd-AOxoz",
     "ipdb_id": null,
-    "machine_group_id": 78
+    "machine_group_id": 78,
+    "ic_eligible": false
   },
   {
     "id": 3415,
@@ -1008,7 +1119,8 @@
     "year": 2021,
     "opdb_id": "GweeP-MW95j",
     "ipdb_id": 6841,
-    "machine_group_id": 88
+    "machine_group_id": 88,
+    "ic_eligible": false
   },
   {
     "id": 3417,
@@ -1017,7 +1129,8 @@
     "year": 2021,
     "opdb_id": "GweeP-Ml9pZ-A9vXB",
     "ipdb_id": 6843,
-    "machine_group_id": 88
+    "machine_group_id": 88,
+    "ic_eligible": false
   },
   {
     "id": 4500,
@@ -1026,7 +1139,8 @@
     "year": 2024,
     "opdb_id": "GweeP-Ml9pZ-AOvNL",
     "ipdb_id": null,
-    "machine_group_id": 88
+    "machine_group_id": 88,
+    "ic_eligible": false
   },
   {
     "id": 90001,
@@ -1035,7 +1149,8 @@
     "year": 1995,
     "opdb_id": "G4do5-MDlN7",
     "ipdb_id": 3781,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 90002,
@@ -1044,7 +1159,8 @@
     "year": 1992,
     "opdb_id": "G4ODR-MDXEy",
     "ipdb_id": 20,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   },
   {
     "id": 90003,
@@ -1053,6 +1169,7 @@
     "year": 1981,
     "opdb_id": "G5KXk-MLB9V",
     "ipdb_id": 762,
-    "machine_group_id": null
+    "machine_group_id": null,
+    "ic_eligible": false
   }
 ]

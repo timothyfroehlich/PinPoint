@@ -14,7 +14,7 @@ import type {
   PbmCondition,
   PbmRegionLmx,
   PbmRegionLocation,
-  PbmToggleResult,
+  PbmInsiderConnectedResult,
   PbmWriteResult,
   PinballMapClient,
   PinballMapRegion,
@@ -195,7 +195,10 @@ export function createMockClient(): PinballMapClient {
       return Promise.resolve({ ok: true });
     },
 
-    toggleInsiderConnected({ lmxId }): Promise<PbmToggleResult> {
+    setInsiderConnected({
+      lmxId,
+      enabled,
+    }): Promise<PbmInsiderConnectedResult> {
       const lmx = lmxes.find((l) => l.id === lmxId);
       if (!lmx) {
         return Promise.resolve({
@@ -204,8 +207,15 @@ export function createMockClient(): PinballMapClient {
           message: "Failed to find machine",
         });
       }
-      // PBM flips state; null (never set) becomes enabled.
-      lmx.icEnabled = lmx.icEnabled === true ? false : true;
+      // PBM refuses titles its catalog does not mark eligible.
+      if (!catalog.some((m) => m.machineId === lmx.machineId && m.icEligible)) {
+        return Promise.resolve({
+          ok: false,
+          reason: "rejected",
+          message: "Could not update Insider Connected for this machine",
+        });
+      }
+      lmx.icEnabled = enabled;
       return Promise.resolve({ ok: true, icEnabled: lmx.icEnabled });
     },
 
