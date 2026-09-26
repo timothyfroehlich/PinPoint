@@ -36,9 +36,9 @@ checksum = "sha256:6cac9ffbca8f6a47091e4b5c772e0606049c3871cb67d900c0cedde630e54
 url = "https://nodejs.org/dist/v24.20.0/node-v24.20.0-win-x64.zip"
 
 [[tools.pnpm]]
-version = "11.17.0"
-backend = "npm:pnpm"
-specifiers = ["11.17.0"]
+version = "12.0.0"
+backend = "aqua:pnpm/pnpm"
+specifiers = ["12.0.0"]
 
 [[tools.python]]
 version = "3.14.7"
