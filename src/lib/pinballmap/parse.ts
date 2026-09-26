@@ -234,6 +234,7 @@ function parseCatalogMachine(raw: unknown): CatalogMachine | null {
     opdbImageWidth: asPositiveInteger(r["opdb_img_width"]),
     opdbImageHeight: asPositiveInteger(r["opdb_img_height"]),
     machineGroupId: asNumber(r["machine_group_id"]),
+    icEligible: r["ic_eligible"] === true,
   };
 }
 
