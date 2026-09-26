@@ -1576,12 +1576,10 @@ export const discordIntegrationConfig = pgTable(
  * endpoints — reads included — once REQUIRE_API_TOKEN flips on (July 30 2026 gate,
  * CORE-PBM-001) is deliberately NOT stored here: it is a platform capability
  * issued to PinPoint-the-application, so it reads from the `PINBALLMAP_API_TOKEN`
- * env var (PP-o355.23 dropped the Vault pointer column and its read RPC). The
- * per-operator write creds below stay in Vault because they are per-user identity
- * arriving at runtime — a DISTINCT layer: the api_token gates access, the operator
- * creds identify who is writing. `outboundTokenVaultId` and `updatedBy` reference
- * other schemas (`vault.secrets.id`, `auth.users.id`) — no FK (Drizzle cannot
- * express cross-schema references).
+ * env var (PP-o355.23 dropped the Vault pointer column and its read RPC). Who is
+ * writing is a separate layer: each member's own linked token, in
+ * `pinballmap_user_credentials` (PP-o355.6). `updatedBy` references
+ * `auth.users.id` — no FK (Drizzle cannot express cross-schema references).
  */
 export const pinballmapState = pgTable(
   "pinballmap_state",
@@ -1641,6 +1639,9 @@ export const pinballmapState = pgTable(
     refreshTokensAt: timestamp("refresh_tokens_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    // Retired shared operator credential (PP-o355.6). Nothing reads or writes
+    // these; 0091 deleted the secret and nulled them, and a follow-up contract
+    // migration drops them once no deployment still selects them.
     outboundEmail: text("outbound_email"),
     outboundTokenVaultId: uuid("outbound_token_vault_id"),
     // Region alert configuration and delivery health (PP-o355.51.7)

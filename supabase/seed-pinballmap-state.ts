@@ -61,8 +61,7 @@ if (!POSTGRES_URL) {
   process.exit(1);
 }
 
-// Refuses production outright rather than taking a force flag, unlike
-// seed-pinballmap-creds.mjs. Prod's snapshot is live data from the cron;
+// Refuses production outright rather than taking a force flag. Prod's snapshot is live data from the cron;
 // overwriting it with a fixture capture would make every machine's derived
 // listing state wrong at once, and the only repair would be waiting for the
 // next cron. There is no legitimate reason to point this at prod.

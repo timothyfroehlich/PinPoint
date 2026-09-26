@@ -105,7 +105,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO pinpoint_rea
 -- would be re-exposed, which is why verify-readonly-role.sql scans public for
 -- credential-shaped column names the role can read.
 --
--- (`bot_token_vault_id` / `outbound_token_vault_id` elsewhere in public are UUID
+-- (`bot_token_vault_id` / `token_vault_id` elsewhere in public are UUID
 -- pointers into `vault`, not secrets — the secret is only decryptable with vault
 -- access, which this role does not have. They stay readable.)
 REVOKE SELECT ON public.collections FROM pinpoint_readonly;
@@ -206,7 +206,7 @@ REVOKE ALL ON ALL TABLES IN SCHEMA readonly_auth FROM anon, authenticated;
 GRANT USAGE ON SCHEMA readonly_auth TO pinpoint_readonly;
 GRANT SELECT ON readonly_auth.users, readonly_auth.identities TO pinpoint_readonly;
 
--- Vault holds the PinballMap operator credentials; a read-only investigation
+-- Vault holds members' Pinball Map tokens; a read-only investigation
 -- role has no business decrypting them. Guarded on the schema existing: a plain
 -- Postgres or a project without supabase_vault has no `vault` schema, and a
 -- REVOKE against a missing schema is a hard error that would (under

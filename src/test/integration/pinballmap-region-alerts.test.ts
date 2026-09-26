@@ -1288,8 +1288,6 @@ describe("GET /api/cron/pinballmap-region-alerts", () => {
           lastSyncError: null,
           refreshTokens: 0,
           refreshTokensAt: new Date(),
-          outboundEmail: null,
-          outboundTokenVaultId: null,
           regionAlertRegion: "austin",
           regionAlertStatus: "not_configured",
           regionAlertLastPostAt: null,

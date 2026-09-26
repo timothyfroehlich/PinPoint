@@ -1,18 +1,19 @@
 /**
- * The in-body role guard on the Pinball Map credential RPCs:
- * `get_pinballmap_credentials()` (PP-rnup) and
- * `get_pinballmap_user_credentials(uuid)` (PP-o355.6, drizzle/0090).
+ * The in-body role guard on `get_pinballmap_user_credentials(uuid)` (PP-o355.6,
+ * drizzle/0090).
  *
- * Each is a SECURITY DEFINER function that hands back a decrypted Vault secret —
- * the operator write token, or a member's linked Pinball Map token. The REVOKE/GRANT on it is defense in
- * depth, not the gate: Supabase re-grants EXECUTE on `public.*` functions to
- * `authenticated` at connection time, and PostgREST exposes every public
- * function as `POST /rest/v1/rpc/<name>`. So the only thing standing between a
- * logged-in member and the operator token is the `auth.role()` check inside the
- * function body — which is exactly what 0061 shipped without and 0062 adds.
+ * It is a SECURITY DEFINER function that hands back a member's decrypted Pinball
+ * Map token from Vault. The REVOKE/GRANT on it is defense in depth, not the
+ * gate: Supabase re-grants EXECUTE on `public.*` functions to `authenticated` at
+ * connection time, and PostgREST exposes every public function as
+ * `POST /rest/v1/rpc/<name>`. So the only thing standing between a logged-in
+ * member and every other member's token is the `auth.role()` check inside the
+ * function body — the fix 0062 made to the operator-token RPC after 0061
+ * shipped without it.
  *
- * `get_pinballmap_api_token()` (0057) carried the same guard but was dropped in
- * 0059 once `api-token.ts` moved to reading `process.env`.
+ * `get_pinballmap_api_token()` (0057) was dropped in 0059, and the operator
+ * token's `get_pinballmap_credentials()` in 0091; the last test pins the latter
+ * gone.
  *
  * Has to run against a real Supabase stack rather than PGlite: PGlite's schema
  * comes from `drizzle-kit export`, which knows nothing about hand-written
@@ -56,11 +57,6 @@ afterAll(async () => {
 });
 
 const RPCS = [
-  {
-    rpc: "get_pinballmap_credentials",
-    signature: "public.get_pinballmap_credentials()",
-    args: undefined,
-  },
   {
     rpc: "get_pinballmap_user_credentials",
     signature: "public.get_pinballmap_user_credentials(uuid)",
@@ -222,5 +218,16 @@ describe("pinballmap_user_credentials — not readable through PostgREST", () =>
       .eq("user_id", memberUser?.id ?? "");
     expect(error).toBeNull();
     expect(data).toHaveLength(1);
+  });
+});
+
+describe("get_pinballmap_credentials() — retired with the operator token", () => {
+  it("no longer exists (drizzle/0091)", async () => {
+    const rows = await sql`
+      SELECT 1 FROM pg_proc p
+        JOIN pg_namespace n ON n.oid = p.pronamespace
+       WHERE n.nspname = 'public' AND p.proname = 'get_pinballmap_credentials'
+    `;
+    expect(rows).toHaveLength(0);
   });
 });
