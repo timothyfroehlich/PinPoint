@@ -3,6 +3,17 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Bookmark, Check, ChevronDown, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "~/components/ui/alert-dialog";
 import { Button } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Input } from "~/components/ui/input";
@@ -639,6 +650,7 @@ function ManageViewRow({
   const [name, setName] = React.useState(view.name);
   const { error, setError, isPending, run } = useViewAction();
   const errorId = `machine-view-manage-error-${view.id}`;
+  const isDefault = savedViews.defaultViewId === view.id;
 
   React.useEffect(() => {
     setName(view.name);
@@ -683,16 +695,40 @@ function ManageViewRow({
           viewName={view.name}
           target={{ kind: "saved", id: view.id }}
         />
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          aria-label={`Delete ${view.name}`}
-          onClick={() => run(() => deleteSavedMachineViewAction(view.id))}
-          className="size-9 shrink-0 text-destructive-text"
-        >
-          <Trash2 className="size-4" aria-hidden="true" />
-        </Button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              aria-label={`Delete ${view.name}`}
+              disabled={isPending}
+              className="size-9 shrink-0 text-destructive-text"
+            >
+              <Trash2 className="size-4" aria-hidden="true" />
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete {view.name}?</AlertDialogTitle>
+              <AlertDialogDescription>
+                {isDefault
+                  ? "This is your default view. This page will open to its standard view instead."
+                  : "This view will be removed permanently."}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                type="button"
+                variant="destructive"
+                onClick={() => run(() => deleteSavedMachineViewAction(view.id))}
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
       {error ? (
         <p id={errorId} role="alert" className="text-sm text-destructive-text">

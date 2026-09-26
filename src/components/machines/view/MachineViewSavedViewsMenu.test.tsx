@@ -201,4 +201,31 @@ describe("MachineViewSavedViewsMenu", () => {
       target: { kind: "builtIn", id: "service-due" },
     });
   });
+
+  it("deletes a Saved View only after confirmation", async () => {
+    const user = userEvent.setup();
+    actions.deleteSavedMachineViewAction.mockResolvedValue({
+      ok: true,
+      value: { id: brokenView.id },
+    });
+    renderMenu(presetState, null);
+
+    await user.click(screen.getByRole("button", { name: /^Views:/ }));
+    await user.click(screen.getByRole("menuitem", { name: "Manage views…" }));
+    await user.click(
+      screen.getByRole("button", { name: "Delete Broken machines" })
+    );
+    expect(actions.deleteSavedMachineViewAction).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(actions.deleteSavedMachineViewAction).not.toHaveBeenCalled();
+
+    await user.click(
+      screen.getByRole("button", { name: "Delete Broken machines" })
+    );
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    expect(actions.deleteSavedMachineViewAction).toHaveBeenCalledWith(
+      brokenView.id
+    );
+  });
 });
