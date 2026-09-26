@@ -10,7 +10,7 @@ An audit applies the same standard to existing tests that [`pinpoint-testing`](.
 Two modes:
 
 - **Focused audit** — a few high-confidence candidates in one area, landed as one coherent PR. Broad audits continue as separate follow-up PRs. Optimize for confidence, not deletion count.
-- **Campaign** — one subsystem's whole test surface in one coordinated effort. Read [CAMPAIGN.md](CAMPAIGN.md) before starting one.
+- **Campaign** — one subsystem's whole test surface, run as an epic bead with one child bead and one PR per lane. Read [CAMPAIGN.md](CAMPAIGN.md) before starting or picking up a campaign bead.
 
 ## Discovery
 
