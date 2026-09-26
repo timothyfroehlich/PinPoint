@@ -81,7 +81,7 @@
 
 | Requirement | Current implementation gap |
 | :-- | :-- |
-| §6.3, §10 | Not built: credits on the card, their display settings, and the panel-fit title shrink (PP-tv2u, which needs the OPDB copy from PP-wqit.12). |
+| §6.3, §6.4, §10 | Not built: credits on the card, their display settings, the panel-fit title shrink, and the identity-panel overflow check (PP-tv2u, #2235). |
 | §4.2 | Automatic apron-size fill from a Pinball Map match is intentionally deferred. Editors choose Stern/SPIKE or WPC manually for now; unmatched machines still have no default. |
 
 ## Changelog
