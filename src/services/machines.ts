@@ -1,4 +1,4 @@
-import { eq, and, type InferSelectModel } from "drizzle-orm";
+import { eq, and, sql, type InferSelectModel } from "drizzle-orm";
 import { db, type DbTransaction } from "~/server/db";
 import {
   machines,
@@ -674,7 +674,18 @@ export async function applyMachinePbmLink(
   actorUserId: string,
   previousIntent?: PbmListingIntent
 ): Promise<void> {
-  await tx.update(machines).set(plan.columns).where(eq(machines.id, machineId));
+  await tx
+    .update(machines)
+    .set({
+      ...plan.columns,
+      // An Insider Connected intent is about one title's entry (spec 3.8), so a
+      // re-match clears it rather than silently asserting it for the new title
+      // — the same reason intent On does not survive a re-match (2.3).
+      // Evaluated against the row's OLD title, which is what SET's right-hand
+      // side reads.
+      pinballmapIcIntent: sql`CASE WHEN ${machines.pinballmapMachineId} IS NOT DISTINCT FROM ${plan.columns.pinballmapMachineId} THEN ${machines.pinballmapIcIntent} ELSE NULL END`,
+    })
+    .where(eq(machines.id, machineId));
 
   if (plan.abandoned) {
     await recordAbandonedListing(tx, machineId, plan.abandoned, actorUserId);

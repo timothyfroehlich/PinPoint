@@ -7,7 +7,11 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { withLmxAdded, withLmxRemoved } from "./snapshot-edit";
+import {
+  withLmxAdded,
+  withLmxIcEnabled,
+  withLmxRemoved,
+} from "./snapshot-edit";
 import type { LocationSnapshot } from "./types";
 
 const snapshot = (
@@ -142,5 +146,23 @@ describe("withLmxRemoved", () => {
     withLmxRemoved(input, 1, 10);
 
     expect(input.lmxes).toHaveLength(1);
+  });
+});
+
+describe("withLmxIcEnabled", () => {
+  it("replaces only the named lmx's setting", () => {
+    const input = snapshot([
+      { id: 1, machineId: 10 },
+      { id: 2, machineId: 20 },
+    ]);
+    const result = withLmxIcEnabled(input, 2, true);
+
+    expect(result.lmxes.map((l) => l.icEnabled)).toEqual([null, true]);
+    expect(input.lmxes[1]?.icEnabled).toBeNull();
+  });
+
+  it("returns the snapshot unchanged when the lmx is absent", () => {
+    const input = snapshot([{ id: 1, machineId: 10 }]);
+    expect(withLmxIcEnabled(input, 99, true)).toBe(input);
   });
 });
