@@ -137,7 +137,6 @@
 | Spec | Code today | Resolution |
 | :-- | :-- | :-- |
 | §4.11, §8 Saved Views, §9 Built-in Views | No saved-view storage, menu, Built-in Views, or default resolution; URL canonicalization drops `view` | Saved-views implementation (PP-8bh6) |
-| §3.11 severity filter, Widget Population URL state (§4.1) | Not built | Machine widgets implementation (PP-3h21) |
 
 ---
 

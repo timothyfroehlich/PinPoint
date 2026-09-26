@@ -1238,9 +1238,9 @@ export async function setMachineIcIntent({
     };
   }
 
+  // No shortcut when the intent already matches: the title-pinned UPDATE is what
+  // notices a re-match that landed after the read above.
   const previous = current.pinballmapIcIntent;
-  if (previous === icIntent) return { ok: true, changed: false, previous };
-
   const updated = await db
     .update(machines)
     .set({ pinballmapIcIntent: icIntent })
@@ -1249,5 +1249,5 @@ export async function setMachineIcIntent({
     )
     .returning({ id: machines.id });
   if (updated.length === 0) return notLinked;
-  return { ok: true, changed: true, previous };
+  return { ok: true, changed: previous !== icIntent, previous };
 }

@@ -1,10 +1,12 @@
 import {
+  ISSUE_SEVERITY_VALUES,
   MACHINE_VIEW_FIELD_IDS,
   type MachineViewFieldId,
   type MachineViewPageSize,
   type MachineViewPresetId,
   type MachineViewSortDirection,
   type MachineViewState,
+  type WidgetPopulation,
 } from "~/lib/types";
 import {
   VALID_MACHINE_PRESENCE_STATUSES,
@@ -52,6 +54,17 @@ function parseCanonicalList<T extends string>(
     allowedSet.has(item)
   );
 }
+
+function widgetPopulation(value: string | null): WidgetPopulation {
+  return value === "filtered" ? "filtered" : "all";
+}
+
+/** Widget Population URL parameters (machine-widgets §2.2); `all` is omitted. */
+const WIDGET_POPULATION_PARAMS = [
+  "presenceWidget",
+  "playabilityWidget",
+  "issuesWidget",
+] as const satisfies readonly (keyof MachineViewState)[];
 
 function positiveInteger(value: string | null, fallback: number): number {
   if (!value || !/^[1-9]\d*$/.test(value)) return fallback;
@@ -131,6 +144,10 @@ export function parseMachineViewState(
       searchParams.get("status"),
       MACHINE_STATUS_VALUES
     ),
+    severity: parseCanonicalList(
+      searchParams.get("severity"),
+      ISSUE_SEVERITY_VALUES
+    ),
     owner: [...new Set(searchParams.get("owner")?.split(",") ?? [])].filter(
       Boolean
     ),
@@ -139,6 +156,9 @@ export function parseMachineViewState(
     page: positiveInteger(searchParams.get("page"), defaults.page),
     pageSize,
     columns,
+    presenceWidget: widgetPopulation(searchParams.get("presenceWidget")),
+    playabilityWidget: widgetPopulation(searchParams.get("playabilityWidget")),
+    issuesWidget: widgetPopulation(searchParams.get("issuesWidget")),
   };
 }
 
@@ -157,6 +177,9 @@ export function serializeMachineViewState(
     );
   }
   if (state.status.length > 0) params.set("status", state.status.join(","));
+  if (state.severity.length > 0) {
+    params.set("severity", state.severity.join(","));
+  }
   if (state.owner.length > 0) params.set("owner", state.owner.join(","));
   if (state.sort !== defaults.sort || state.dir !== defaults.dir) {
     params.set("sort", state.sort);
@@ -168,6 +191,9 @@ export function serializeMachineViewState(
   }
   if (!arraysEqual(state.columns, defaults.columns)) {
     params.set("columns", state.columns.join(","));
+  }
+  for (const param of WIDGET_POPULATION_PARAMS) {
+    if (state[param] === "filtered") params.set(param, "filtered");
   }
 
   return params;

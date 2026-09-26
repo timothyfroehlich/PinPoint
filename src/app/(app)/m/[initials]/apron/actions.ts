@@ -63,6 +63,8 @@ export async function saveApronCardAction(
         apronDescription: parsed.data.description,
         apronTip: parsed.data.tip,
         apronTipEnabled: parsed.data.tipEnabled,
+        apronDesignEnabled: parsed.data.designEnabled,
+        apronArtEnabled: parsed.data.artEnabled,
         apronSavedAt: savedAt,
         updatedAt: savedAt,
       })

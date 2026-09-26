@@ -47,4 +47,7 @@ export {
   type MachineViewScope,
   type MachineViewSortDirection,
   type MachineViewState,
+  type MachineViewSummary,
 } from "./machine-view";
+
+export { WIDGET_POPULATIONS, type WidgetPopulation } from "./summary-widget";

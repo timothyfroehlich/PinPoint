@@ -95,3 +95,16 @@ export function getMachineStatusStyles(status: MachineStatus): string {
   };
   return styles[status];
 }
+
+/**
+ * Summary Widget colors per playability: `text` for the count, `fill` for the
+ * bar segment. Same families as {@link getMachineStatusStyles}.
+ */
+export const MACHINE_STATUS_WIDGET_COLORS: Record<
+  MachineStatus,
+  { text: string; fill: string }
+> = {
+  operational: { text: "text-success", fill: "bg-success" },
+  needs_service: { text: "text-warning", fill: "bg-warning" },
+  unplayable: { text: "text-destructive-text", fill: "bg-destructive" },
+};
