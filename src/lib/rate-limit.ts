@@ -11,10 +11,12 @@
  * - Public Issue (anonymous): 5 submissions per IP per 15 min
  * - Authenticated Issue: 20 submissions per user per 15 min
  * - MCP: 120 authenticated requests/minute and 20 mutations/minute per user+client
+ * - Quick Search: 60 requests per IP per minute
  *
  * @see https://github.com/timothyfroehlich/PinPoint/issues/536
  * @see https://github.com/timothyfroehlich/PinPoint/issues/537
  * @see https://github.com/timothyfroehlich/PinPoint/issues/538
+ * @see PP-rw29
  */
 
 import { Ratelimit } from "@upstash/ratelimit";
@@ -247,6 +249,22 @@ function createMcpWriteLimiter(): Ratelimit | null {
 }
 
 /**
+ * Quick search rate limiter
+ * - IP-based: 60 requests per minute (sliding window)
+ */
+function createQuickSearchLimiter(): Ratelimit | null {
+  const redis = getRedis();
+  if (!redis) return null;
+
+  return new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(60, "1 m"),
+    prefix: "ratelimit:quick-search:ip",
+    analytics: true,
+  });
+}
+
+/**
  * Whether a limit bucket is keyed by client IP, account email, or user ID.
  * IP-keyed checks apply the "unknown IP" handling; email-keyed checks
  * normalize the key to lowercase and mask it in logs; user-keyed checks
@@ -352,8 +370,8 @@ function makeLimitChecker(
  * (like Vercel) that sets the `x-forwarded-for` header securely.
  * If deployed elsewhere, ensure your proxy configuration prevents header spoofing.
  */
-export async function getClientIp(): Promise<string> {
-  const headersList = await headers();
+export async function getClientIp(customHeaders?: Headers): Promise<string> {
+  const headersList = customHeaders ?? (await headers());
   // x-forwarded-for may contain multiple IPs (client, proxies)
   // Take the first one which is the original client
   const forwardedFor = headersList.get("x-forwarded-for");
@@ -446,6 +464,21 @@ export const checkMcpWriteLimit = makeLimitChecker(createMcpWriteLimiter, {
   label: "MCP write",
   keyType: "user",
 });
+
+/**
+ * Check quick search rate limit (IP-based)
+ *
+ * @param key - Client IP address
+ * @returns Allow/deny result. Fails closed in production, and open in
+ *   development, when rate limiting is unavailable.
+ */
+export const checkQuickSearchLimit = makeLimitChecker(
+  createQuickSearchLimiter,
+  {
+    label: "Quick search",
+    keyType: "ip",
+  }
+);
 
 /**
  * Check signup rate limit (IP-based)

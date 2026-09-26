@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getUserContext } from "~/lib/auth/context";
 import { log } from "~/lib/logger";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
+import { checkQuickSearchLimit, getClientIp } from "~/lib/rate-limit";
 import { createClient } from "~/lib/supabase/server";
 import {
   quickSearchQuerySchema,
@@ -31,6 +32,22 @@ export async function GET(request: Request): Promise<NextResponse> {
     return NextResponse.json(
       { error: "Invalid search query" },
       { status: 400 }
+    );
+  }
+
+  const clientIp = await getClientIp(request.headers);
+  const limitResult = await checkQuickSearchLimit(clientIp);
+  if (!limitResult.success) {
+    const retryAfterSeconds = Math.max(
+      1,
+      Math.ceil((limitResult.reset - Date.now()) / 1000)
+    );
+    return NextResponse.json(
+      { error: "Quick search rate limit reached" },
+      {
+        status: 429,
+        headers: { "Retry-After": String(retryAfterSeconds) },
+      }
     );
   }
 
