@@ -1,12 +1,21 @@
 -- Does `pinpoint_readonly` actually have the shape readonly-role.sql intends?
 --
--- Run as the admin/service role, against any database where the role has been
--- set up. Raises on the first failing batch, so a plain `psql -f` exits non-zero
--- BECAUSE of the \set below:
+-- Run as the admin/service role right after readonly-role.sql sets the role up,
+-- against any database where the role has been created. Raises on the first
+-- failing batch, so a plain `psql -f` exits non-zero BECAUSE of the \set below:
 --
 --   psql "$POSTGRES_URL_ADMIN" -f scripts/sql/verify-readonly-role.sql
 --
--- Reads catalogs and writes nothing, so it is safe against production.
+-- For the recurring drift check (scripts/check-readonly-role.mjs, the weekly
+-- pinpoint-chores item), it is instead run AS pinpoint_readonly itself, over
+-- POSTGRES_URL_READONLY. That's deliberate, not an oversight: every check below
+-- is a catalog fact reachable by any connected role about any other role
+-- (has_table_privilege, has_schema_privilege, pg_roles, ...), so pinpoint_readonly
+-- sees the same results an admin connection would — and running it this way
+-- means the recurring check can never write, on prod or anywhere else, because
+-- the connecting role holds no write grant to begin with.
+--
+-- Reads catalogs and writes nothing, so it is safe against production either way.
 --
 -- Why this exists rather than "just read the setup script": that script's most
 -- important statement used to be one that SILENTLY DID NOTHING.

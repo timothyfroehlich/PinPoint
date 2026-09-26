@@ -61,8 +61,11 @@ export type PbmListingStateName =
 export type PbmDisabledReason =
   "not_configured" | "no_model" | "uncataloged" | "waiting";
 
-/** The push that would make the lineup agree with the intent (4.3). */
-export type PbmPushAction = "add" | "remove";
+/**
+ * The push that would make Pinball Map agree with the intents (4.3). `update`
+ * is the Insider Connected-only push, set by `withInsiderConnected`.
+ */
+export type PbmPushAction = "add" | "remove" | "update";
 
 /** A same-title cabinet, named so the coverage sentences can link to it (4.7). */
 export interface PbmSibling {
@@ -89,7 +92,10 @@ export interface PbmListingView {
   onPositionBlockedReason: string | null;
   /** Whether the location's lineup currently carries this title. */
   observed: boolean;
-  /** Intent and lineup disagree — the header's Out of sync alert (4.1). */
+  /**
+   * Intent and lineup disagree, or Insider Connected differs once
+   * `withInsiderConnected` has run — the header's Out of sync alert (4.1).
+   */
   outOfSync: boolean;
   /** Availability advisory tier, if any (6.2 invalid → alert, 6.5 advise → flag). */
   advisory: "alert" | "flag" | null;

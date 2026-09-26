@@ -16,6 +16,7 @@ import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { issues, issueComments, issueImages } from "~/server/db/schema";
 import { log } from "~/lib/logger";
+import { BLOB_CONFIG } from "~/lib/blob/config";
 import {
   reportError,
   serverActionError,
@@ -663,6 +664,13 @@ export async function addCommentAction(
       });
       // Non-blocking — the comment still posts, but images are silently dropped
     }
+  }
+
+  if (imagesMetadata.length > BLOB_CONFIG.LIMITS.COMMENT_MAX) {
+    return err(
+      "VALIDATION",
+      `Too many images. Maximum ${BLOB_CONFIG.LIMITS.COMMENT_MAX} images allowed per comment.`
+    );
   }
 
   try {

@@ -246,6 +246,7 @@ describe("seed scripts — remote-capable seeds refuse production only", () => {
     "supabase/seed-discord.mjs",
     "supabase/seed-machine-settings.mjs",
     "supabase/seed-pinballmap-catalog.mjs",
+    "supabase/seed-opdb.mjs",
   ]) {
     it(`${script} refuses the production project`, () => {
       const { status, stderr } = runScript(script, {

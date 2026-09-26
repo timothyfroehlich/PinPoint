@@ -69,6 +69,9 @@ async function fastReset() {
       "pnpm run db:_seed-timeline-backfill",
       "pnpm run db:_seed-timeline-demo",
       "pnpm run db:_seed-pinballmap-catalog",
+      // Same never-seeded reason as the catalog: the OPDB copy is not truncated
+      // above, but E2E-only databases would otherwise never get rows (PP-wqit.12).
+      "pnpm run db:_seed-opdb",
       // Unlike the catalog, `pinballmap_state` IS reached by the TRUNCATE
       // above — `machines` is truncated CASCADE and the state seed writes
       // machine link columns — so this one is here for the original PP-tn6t

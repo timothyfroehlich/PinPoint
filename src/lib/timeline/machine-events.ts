@@ -311,7 +311,16 @@ export interface ResolvedPinballMapComment {
   } | null;
   /** Other machines whose timelines carry a copy of this comment (spec 7.6). */
   otherCopies: ResolvedMachineRef[];
+  /**
+   * Why the comment belongs to a previous listing (spec 7.3, 10.9), or null
+   * while its entry is current.
+   */
+  previousListing: PreviousListingReason | null;
 }
+
+export type PreviousListingReason = NonNullable<
+  (typeof pinballmapComments.$inferSelect)["previousListingReason"]
+>;
 
 export interface MachineTimelineRow {
   id: string;
@@ -384,6 +393,7 @@ async function resolvePinballMapComments(
       comment: pinballmapComments.comment,
       username: pinballmapComments.username,
       locationId: pinballmapComments.locationId,
+      previousListing: pinballmapComments.previousListingReason,
       issueInitials: issues.machineInitials,
       issueNumber: issues.issueNumber,
       issueTitle: issues.title,
@@ -423,6 +433,7 @@ async function resolvePinballMapComments(
       comment: c.comment,
       username: c.username,
       locationId: c.locationId,
+      previousListing: c.previousListing,
       convertedIssue:
         c.issueInitials !== null &&
         c.issueNumber !== null &&

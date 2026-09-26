@@ -617,6 +617,34 @@
       "when": 1790349796306,
       "tag": "0087_pinballmap-comment-notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "7",
+      "when": 1790367429844,
+      "tag": "0088_pinballmap-previous-listing",
+      "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1790369609379,
+      "tag": "0089_opdb-machines",
+      "breakpoints": true
+    },
+    {
+      "idx": 90,
+      "version": "7",
+      "when": 1790394616312,
+      "tag": "0090_insider-connected-intent",
+      "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "7",
+      "when": 1790440490199,
+      "tag": "0091_apron-credit-settings",
+      "breakpoints": true
     }
   ]
 }

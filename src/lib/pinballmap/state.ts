@@ -6,6 +6,7 @@ import { errorMessage } from "~/lib/errors";
 import { pinballmapLocationChecks, pinballmapState } from "~/server/db/schema";
 import { getPinballMapClient } from "./client";
 import { clearResolvedAbandonments } from "./abandoned-listings";
+import { markCommentsFromOtherLocations } from "./previous-listing";
 import {
   PBM_LOCATION_CHECK_TTL_MS,
   PBM_REFRESH_BURST,
@@ -875,6 +876,11 @@ export async function commitCheckedTrackedLocation(
       freshCandidate.snapshotJson,
       freshCandidate.locationId,
       tx
+    );
+    await markCommentsFromOtherLocations(
+      tx,
+      freshCandidate.locationId,
+      commitAt
     );
     await tx
       .delete(pinballmapLocationChecks)

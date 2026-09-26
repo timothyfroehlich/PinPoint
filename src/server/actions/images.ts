@@ -142,28 +142,10 @@ export async function uploadIssueImage(formData: FormData): Promise<
     }
 
     // 5. Enforce Limits
-    // Check per-user limit for authenticated users.
-    // Anonymous users are limited solely via IP-based rate limiting.
-    if (user) {
-      const userImagesCount = await db
-        .select({ val: count() })
-        .from(issueImages)
-        .where(
-          and(
-            eq(issueImages.uploadedBy, user.id),
-            isNull(issueImages.deletedAt)
-          )
-        );
-
-      if (
-        (userImagesCount[0]?.val ?? 0) >=
-        BLOB_CONFIG.LIMITS.AUTHENTICATED_USER_MAX
-      ) {
-        return err("VALIDATION", "You have reached your upload limit.");
-      }
-    }
-
-    // Check per-issue limit
+    // Check per-issue total limit for existing issues.
+    // New issues enforce their per-report draft limits (4 for authenticated,
+    // 2 for public) via ImageUploadButton and submitPublicIssueAction.
+    // IP-based rate limiting (step 1) prevents upload abuse.
     if (!isNewIssue) {
       const issueImagesCount = await db
         .select({ val: count() })

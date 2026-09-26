@@ -70,6 +70,29 @@ describe("NotificationList", () => {
     ).toBeInTheDocument();
   });
 
+  it("names the machine for an ownership change", async () => {
+    const user = userEvent.setup();
+    render(
+      <NotificationList
+        notifications={[
+          {
+            id: "2",
+            type: "machine_ownership_changed" as const,
+            createdAt: new Date(),
+            link: "/m/GDZ2",
+            machineInitials: "GDZ2",
+          },
+        ]}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: /notifications/i }));
+
+    expect(
+      await screen.findByText("Ownership changed on GDZ2")
+    ).toBeInTheDocument();
+  });
+
   it("should call markAsReadAction when dismiss is clicked", async () => {
     const user = userEvent.setup();
     render(<NotificationList notifications={mockNotifications} />);

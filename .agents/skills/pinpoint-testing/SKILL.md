@@ -1,9 +1,20 @@
 ---
 name: pinpoint-testing
-description: Which layer catches which class of bug, and where the coverage for each class already lives — the bug-class table AGENTS.md routes to, the canonical file per class so new tests extend rather than duplicate, and the "Test What We Own" boundary with its casework. Also the one mocking pattern worth knowing — forwarding `~/server/db` to the worker-scoped PGlite instance rather than handing a test canned rows. Use when deciding what layer a new test belongs at, before creating a new test file, when reaching for a mock of the database or an ORM, when tempted to synthesize a third party's internal state in a test, or when reviewing whether a PR picked the right layer. Playwright technique lives in `pinpoint-e2e`; the rules themselves are `CORE-TEST-*` in `docs/NON_NEGOTIABLES.md`; which commands to run is AGENTS.md §5.
+description: The authoring gate every new or changed PinPoint test passes, and which layer catches which class of bug — the four gate questions, the anti-pattern checklist, the bug-class table AGENTS.md routes to, the canonical file per class so new tests extend rather than duplicate, and the "Test What We Own" boundary with its casework. Also the one mocking pattern worth knowing — forwarding `~/server/db` to the worker-scoped PGlite instance rather than handing a test canned rows. Use before writing or changing any test, when writing a bug-fix regression test, when deciding what layer a test belongs at, when reaching for a mock of the database or an ORM, when tempted to synthesize a third party's internal state in a test, or when reviewing whether a PR's tests earn their place. Auditing or pruning existing tests is `pinpoint-test-audit`. Playwright technique lives in `pinpoint-e2e`; the rules themselves are `CORE-TEST-*` in `docs/NON_NEGOTIABLES.md`; which commands to run is AGENTS.md §5.
 ---
 
 # PinPoint Testing
+
+## Authoring Gate
+
+Every new or changed test answers four questions before it lands. A missing answer means the test is not ready.
+
+1. **What contract does it protect?** Name the observable behavior or invariant and its bug class from the [table below](#bug-classes--cheapest-catching-layer).
+2. **What credible regression turns it red?** Name the change to production code that makes it fail. For a bug fix, run it against the pre-fix code and watch it fail for that reason (CORE-TEST-007).
+3. **Why doesn't existing coverage already catch that?** Check the [canonical file for the class](#where-existing-coverage-lives-look-here-first). Extend that file (an `it.each` row, a new case) over creating a new one; a second layer needs a risk the first owner cannot reach (CORE-TEST-009).
+4. **Does it reach production only through seams real callers use?** If it needs a new export, flag, or bypass parameter, move it to the real boundary instead (CORE-TEST-008).
+
+Then check it against the [anti-patterns](#test-anti-patterns). A test that breaks under a behavior-preserving refactor is asserting implementation; rewrite it at the owning boundary.
 
 ## Bug Classes & Cheapest Catching Layer
 
@@ -92,6 +103,21 @@ Is the test setup synthesizing state that a third party owns?
 
 The line you're walking is "synthesizing state inside a third party's domain." Real Supabase running locally with real auth flow → fine to E2E. Real DB writes verified through query results → fine to E2E. Real HTTP through middleware to a real route handler → fine to E2E. Faking what GoTrue / Discord would have returned → not fine.
 
+## Test Anti-Patterns
+
+Each of these makes a test pass without proving the contract. A new test matching one fails the gate; `pinpoint-test-audit` hunts existing tests for the same list.
+
+- **Assertion-free probe:** runs a code path and asserts nothing about its outcome.
+- **Self-derived expectation:** the expected value comes from the helper, serializer, or renderer under test, so the test compares the code to itself.
+- **Copied inventory:** asserts that a fixture, schema, enum, or export list equals a copy of itself from source; it changes whenever source changes and catches nothing. A table whose rows each run through behavior (the `publicRoutes` `it.each` in `middleware.test.ts`) is a keeper, not an inventory.
+- **Source grep:** asserts file contents, import paths, or AST shape instead of behavior. Keep one only when it is the cheapest independent guard of an architecture contract and fails when that contract breaks.
+- **Mock that implements the behavior:** a hand-written fake carries the business logic, so the assertion tests the fake. Canned `~/server/db` or Drizzle-chain mocks are the house instance (CORE-TEST-004); use [the PGlite forwarding pattern](#the-one-mocking-pattern-worth-knowing).
+- **Wrong-reason negative control:** a "rejects X" test that passes because an unrelated guard (auth, a missing fixture) rejects first. Assert the specific error or state the guard under test produces.
+- **Presence without interaction:** `toBeVisible()` on a control whose handler is never invoked (CORE-TEST-005).
+- **Name promises more than the body checks:** "resets the form on error" that only asserts the error message. Assert what the name claims or rename it.
+- **Duplicate contract:** the same permission or validation asserted in several tests with trivial variation, or the same scenario replayed across layers (CORE-TEST-009). Collapse into one table.
+- **Private helper tested beside its boundary:** a direct test of an internal predicate whose branches the boundary test already drives. Keep the boundary test.
+
 ## The one mocking pattern worth knowing
 
 Mocking `~/server/db` with canned return values, or mocking `drizzle-orm` at all, means your assertions only prove the mock returned what you told it to.
@@ -105,6 +131,7 @@ The house pattern instead forwards the `db` singleton to worker-scoped PGlite, s
 ## Elsewhere
 
 - `pinpoint-e2e` — Playwright technique, selector strategy, worker isolation, environment defaults.
+- `pinpoint-test-audit` — auditing and pruning existing tests, including subsystem-wide campaigns.
 - [src/test/README.md](../../../src/test/README.md) — the mechanics: `setupTestDb()` / `getTestDb()` call contract, factories, and which command runs which project.
 - AGENTS.md §5 "Which tests to run" — the decision tree and the commands.
 - [NON_NEGOTIABLES.md](../../../docs/NON_NEGOTIABLES.md#testing) — the `CORE-TEST-*` rules themselves.

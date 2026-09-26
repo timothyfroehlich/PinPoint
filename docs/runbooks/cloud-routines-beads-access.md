@@ -104,7 +104,9 @@ first and failed. The `ls -d … | head -1` form finds the checkout regardless o
 whether `$HOME` is `/root` or the sandbox user's home, and regardless of the
 sandbox username. It fails loud (setup errors) if none of the candidates exist.
 
-That script installs `dolt` (pinned) and `bd` (pinned); the agent then runs
+That script installs `dolt` (pinned), `bd` (pinned) and the GitHub CLI `gh`
+(pinned by the `gh` version and `ghSha256` digest in the same manifest, because
+the cloud image does not ship it and the workflow scripts need it); the agent then runs
 `scripts/beads-cloud-init.sh` (below) to materialize the credential and clone.
 
 **The compatibility contract pins both `bd` and `dolt`.** The 2026-08-16

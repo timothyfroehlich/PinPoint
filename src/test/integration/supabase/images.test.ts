@@ -560,4 +560,72 @@ describe("uploadIssueImage — action integration (PGlite)", () => {
       .where(eq(issueImages.issueId, issue.id));
     expect(rows).toHaveLength(0);
   });
+
+  it("allows an authenticated user with >= AUTHENTICATED_USER_MAX previous images to upload", async () => {
+    const { reporterId, issueId } = await seedIssueWithOwner("member");
+    mockAuth(reporterId);
+    mockRateLimitPass();
+    mockBlobUpload();
+
+    const db = await getTestDb();
+
+    // Seed 5 existing images uploaded by reporterId (exceeding AUTHENTICATED_USER_MAX of 4)
+    const existingImages = Array.from({ length: 5 }, (_, i) => ({
+      issueId,
+      uploadedBy: reporterId,
+      fullImageUrl: `https://blob.com/prev-${i}.jpg`,
+      fullBlobPathname: `prev-${i}.jpg`,
+      fileSizeBytes: 1024,
+      mimeType: "image/jpeg",
+    }));
+    await db.insert(issueImages).values(existingImages);
+
+    const { uploadIssueImage } = await import("~/server/actions/images");
+
+    // Uploading for a new issue must succeed (no lifetime user quota)
+    const formData = new FormData();
+    formData.append("issueId", "new");
+    formData.append("image", createMockFile("test.jpg", "image/jpeg", 2048));
+
+    const result = await uploadIssueImage(formData);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.blobUrl).toBeDefined();
+    }
+  });
+
+  it("rejects upload when an existing issue has reached ISSUE_TOTAL_MAX", async () => {
+    const { reporterId, issueId } = await seedIssueWithOwner("member");
+    mockAuth(reporterId);
+    mockRateLimitPass();
+
+    const db = await getTestDb();
+
+    // Seed 10 images on this issue (ISSUE_TOTAL_MAX is 10)
+    const existingImages = Array.from({ length: 10 }, (_, i) => ({
+      issueId,
+      uploadedBy: reporterId,
+      fullImageUrl: `https://blob.com/issue-img-${i}.jpg`,
+      fullBlobPathname: `issue-img-${i}.jpg`,
+      fileSizeBytes: 1024,
+      mimeType: "image/jpeg",
+    }));
+    await db.insert(issueImages).values(existingImages);
+
+    const { uploadIssueImage } = await import("~/server/actions/images");
+
+    const formData = new FormData();
+    formData.append("issueId", issueId);
+    formData.append("image", createMockFile("test.jpg", "image/jpeg", 2048));
+
+    const result = await uploadIssueImage(formData);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("VALIDATION");
+      expect(result.message).toBe("This issue has reached its image limit.");
+    }
+    expect(uploadToBlob).not.toHaveBeenCalled();
+  });
 });

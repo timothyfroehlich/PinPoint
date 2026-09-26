@@ -18,6 +18,7 @@ import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import {
   machines,
   pinballmapAbandonedListings,
+  pinballmapComments,
   pinballmapLocationChecks,
   pinballmapState,
 } from "~/server/db/schema";
@@ -494,6 +495,60 @@ describe("tracked-location changes", () => {
       commitCheckedTrackedLocation(checked.candidate.checkId, CHECKED_BY)
     ).resolves.toEqual({ ok: true });
     expect(await db.select().from(pinballmapAbandonedListings)).toHaveLength(0);
+    fetchSpy.mockRestore();
+  });
+
+  it("permanently marks comments from the replaced location, and none when resuming it (spec 10.9)", async () => {
+    const db = await getTestDb();
+    const { getMockClient } = await import("~/lib/pinballmap/client-mock");
+    const { checkTrackedLocation, commitCheckedTrackedLocation } =
+      await import("~/lib/pinballmap/state");
+    const comment = (conditionId: number, locationId: number) => ({
+      conditionId,
+      locationId,
+      pinballmapMachineId: 6221,
+      lmxId: 4471,
+      comment: "flipper weak",
+      commentedAt: new Date("2026-08-01T00:00:00.000Z"),
+    });
+    await db.insert(pinballmapComments).values([
+      comment(1, 26454),
+      {
+        ...comment(2, 26454),
+        previousListingReason: "removed",
+        previousListingAt: new Date("2026-08-20T00:00:00.000Z"),
+      },
+    ]);
+    await db.insert(pinballmapState).values({
+      id: "singleton",
+      locationId: null,
+      snapshotJson: snapshotAt(26454, "Retained APC"),
+      lastSyncStatus: "ok",
+    });
+    const fetchSpy = vi
+      .spyOn(getMockClient(), "fetchLocation")
+      .mockResolvedValueOnce(snapshotAt(26454, "APC"))
+      .mockResolvedValueOnce(snapshotAt(99999, "New venue"));
+    const commitLocation = async (locationId: number): Promise<void> => {
+      const checked = await checkTrackedLocation(locationId, CHECKED_BY);
+      if (!checked.ok) throw new Error("expected a checked candidate");
+      await expect(
+        commitCheckedTrackedLocation(checked.candidate.checkId, CHECKED_BY)
+      ).resolves.toEqual({ ok: true });
+    };
+    const reasons = async (): Promise<(string | null)[]> =>
+      (
+        await db
+          .select({ reason: pinballmapComments.previousListingReason })
+          .from(pinballmapComments)
+          .orderBy(pinballmapComments.conditionId)
+      ).map((r) => r.reason);
+
+    await commitLocation(26454);
+    expect(await reasons()).toEqual([null, "removed"]);
+
+    await commitLocation(99999);
+    expect(await reasons()).toEqual(["location_changed", "location_changed"]);
     fetchSpy.mockRestore();
   });
 
