@@ -2,6 +2,7 @@ import type { IssueSeverity } from "./database";
 import type { MachinePresenceStatus } from "~/lib/machines/presence";
 import type { MachineStatus } from "~/lib/machines/status";
 import type { WidgetPopulation } from "./summary-widget";
+import type { TagTypeId } from "~/lib/tags/types";
 
 export const MACHINE_VIEW_FIELD_IDS = [
   "machine",
@@ -25,7 +26,7 @@ export type MachineViewScope =
   | { kind: "all" }
   | { kind: "collection"; collectionId: string }
   | { kind: "owner"; ownerId: string }
-  | { kind: "manufacturer"; slug: string };
+  | { kind: "tag"; tagType: TagTypeId; slug: string };
 
 export type MachineViewSortDirection = "asc" | "desc";
 export type MachineViewPageSize = 25 | 50 | 100;

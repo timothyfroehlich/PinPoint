@@ -217,6 +217,11 @@ export const machines = pgTable(
     apronDescription: text("apron_description"),
     apronTip: text("apron_tip"),
     apronTipEnabled: boolean("apron_tip_enabled").notNull().default(false),
+    // Whether the card shows its Design and Art credit rows (spec
+    // apron-cards 10.5). On by default, even for a machine with no credits,
+    // whose rows then read "Unknown".
+    apronDesignEnabled: boolean("apron_design_enabled").notNull().default(true),
+    apronArtEnabled: boolean("apron_art_enabled").notNull().default(true),
     apronSavedAt: timestamp("apron_saved_at", { withTimezone: true }),
     ownerRequirements: jsonb("owner_requirements").$type<ProseMirrorDoc>(),
     // Machine-level "Before you change anything": the owner's honor-system
