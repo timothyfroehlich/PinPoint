@@ -323,12 +323,13 @@
 - **Severity:** Required
 - **Why:** An export, flag, bypass parameter, or wrapper that exists only for a test is production surface with no production caller. It ships, it can be misused, and it keeps the test coupled to internals the real boundary already exposes.
 - **Do:** Test through the seam production callers use (the Server Action, route handler, service function, or rendered component). When a helper's branches matter, reach them through that boundary's inputs.
-- **Don't:** Export an internal helper, add an `isTest`/bypass parameter, or add an injection hook solely so a test can reach it.
+- **Don't:** Export an internal helper, add an `isTest`/bypass parameter, or add an injection hook solely so a unit or integration test can reach it.
+- **Scope:** The E2E harness is not a seam under this rule. Surfaces that exist to drive a browser suite against a running app and are refused in production — the dev-autologin opt-out (`x-skip-autologin` / `skip_autologin`) and `/api/test-data/cleanup` — are owned by `pinpoint-e2e`.
 
 **CORE-TEST-009:** One primary test owner per contract
 
 - **Severity:** Required
-- **Why:** The same scenario asserted at unit, integration, and E2E layers triples maintenance and review cost without catching anything new; the 2026-05 E2E audit found most misallocated specs duplicated a cheaper layer.
+- **Why:** The same scenario asserted at unit, integration, and E2E layers multiplies maintenance and review cost without catching anything new. The 2026-05 E2E audit (`docs/testing/e2e-audit-2026-05.md`) found 36 of 48 specs misallocated; its largest single win was `public-routes-audit.spec.ts`, whose 17 blocks restated `middleware.test.ts` almost verbatim.
 - **Do:** Give each contract one primary test at the cheapest layer that catches it (CORE-TEST-005). Add a test at a second layer only for a distinct risk the owner cannot reach (transport, hydration, a multi-page journey). Extend the canonical file for the bug class (see `pinpoint-testing`) before creating a new one.
 - **Don't:** Replay one bug's scenario across layers, or add a near-duplicate test beside an existing owner.
 

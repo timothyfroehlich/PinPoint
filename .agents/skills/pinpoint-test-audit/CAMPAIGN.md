@@ -51,15 +51,15 @@ Per lane, in order:
 1. Move or consolidate assertions into the keepers.
 2. Run each keeper at its layer (commands in SKILL.md, Validation step 1).
 3. Delete retired test files and their dead helpers.
-4. Delete the production seams the plan listed.
-5. `pnpm run check`.
+4. Delete the production seams the plan listed. The E2E harness is out of scope (CORE-TEST-008).
+5. `pnpm run check`, then commit the lane.
 
 **Done when:** every lane plan is applied, its seams are deleted, and all keepers pass.
 
 ## 6. Preservation proof
 
 1. An independent reviewer (a subagent handed the diff and the ledger, not your conclusions) checks whether any contract lost its only test.
-2. For every consolidated or deleted contract, run the mutation check from SKILL.md Validation step 2: mutate the owner's behavior, watch the keeper go red, restore, watch it go green.
+2. With the cutover committed, run the mutation check from SKILL.md Validation step 2 for every consolidated or deleted contract: mutate the owner's behavior, watch the keeper go red, restore, watch it go green.
 
 **Done when:** every consolidated contract has a recorded red result against a behavior mutation, and the production files match `HEAD`.
 

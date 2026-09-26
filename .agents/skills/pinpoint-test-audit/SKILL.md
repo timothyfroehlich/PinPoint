@@ -58,7 +58,7 @@ Take one coherent batch per PR, grouped by production owner. Move retained regre
    - PGlite integration: `pnpm run test:integration:target -- <path>`
    - Real-Supabase integration: `pnpm run test:integration:supabase`
    - E2E: `pnpm exec playwright test <spec> --project=chromium`
-2. For each contract whose test was deleted or consolidated, mutate the owner's behavior (invert the condition, drop the filter) and confirm the keeper goes red; restore the file and confirm green. A syntax error is not a mutation: it fails at parse time without testing the contract.
+2. Commit the batch, then, for each contract whose test was deleted or consolidated, mutate the owner's behavior (invert the condition, drop the filter) and confirm the keeper goes red. Undo the mutation with `git restore <file>` — safe only because the batch is committed — and confirm green. A syntax error is not a mutation: it fails at parse time without testing the contract.
 3. `pnpm run check`. Add `pnpm run smoke` when the batch touched auth, middleware, or UI specs, and `pnpm run preflight` when it touched production code in migrations, auth, or server actions. Offload heavy suites with the `crabbox` skill when the Mac is loaded.
 4. `git diff --numstat`, reported as production and tooling lines versus test and test-support lines.
 
