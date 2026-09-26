@@ -122,7 +122,7 @@
 
 | Spec | Code today | Resolution |
 | :-- | :-- | :-- |
-| §8 Saved Views | No saved-view storage, menu, or default resolution | Saved-views implementation |
+| §4.11, §8 Saved Views | No saved-view storage, menu, or default resolution; URL canonicalization drops `view` | Saved-views implementation (PP-8bh6) |
 
 ---
 
