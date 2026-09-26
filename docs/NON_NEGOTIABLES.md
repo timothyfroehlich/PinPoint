@@ -152,7 +152,7 @@
 - **Why:** Internal Supabase schema; breaks abstraction, couples to implementation details, may break with Supabase updates
 - **Do:** Query `user_profiles` table (which mirrors necessary auth data via database triggers)
 - **Don't:** Use raw SQL or Drizzle queries against `auth.users` in Server Actions or services
-- **Exception:** Database triggers (`supabase/seed.sql`) and test setup may reference `auth.users` for bootstrapping — `pglite.ts`, and the integration-test fixtures that seed paired `auth.users` + `user_profiles` rows through the `authUsers` Drizzle wrapper
+- **Exception:** Database triggers (`supabase/seed.sql`) and test setup may reference `auth.users` for bootstrapping — `pglite.ts`, and the integration-test fixtures that seed paired `auth.users` + `user_profiles` rows through the `authUsers` Drizzle wrapper. In addition, `src/app/(app)/admin/users/actions.ts` (`getAdminClient`) has an intentional test-only carve-out behind `process.env.NODE_ENV === "test"` to simulate GoTrue's paginated `auth.admin.listUsers` API directly against PGlite in integration test environments where the Supabase Auth daemon is not running.
 
 ---
 
