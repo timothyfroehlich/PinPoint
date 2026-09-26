@@ -30,7 +30,7 @@ import type {
   PbmAddMachineResult,
   PbmAuthResult,
   PbmCredentials,
-  PbmToggleResult,
+  PbmInsiderConnectedResult,
   PbmWriteFailure,
   PbmWriteFailureReason,
   PbmWriteResult,
@@ -664,17 +664,23 @@ export function createLiveClient(apiToken: string | null): PinballMapClient {
       });
     },
 
-    toggleInsiderConnected({ credentials, lmxId }): Promise<PbmToggleResult> {
-      assertNotInTransaction("pinballmap.toggleInsiderConnected");
+    setInsiderConnected({
+      credentials,
+      lmxId,
+      enabled,
+    }): Promise<PbmInsiderConnectedResult> {
+      assertNotInTransaction("pinballmap.setInsiderConnected");
       return serializeWrite(async () => {
+        // `ic_enabled` makes `ic_toggle` a setter; without it the endpoint flips
+        // (PBM request spec "it should toggle via the ic_enabled param").
         const url = buildUrl(
           `/location_machine_xrefs/${lmxId}/ic_toggle.json`,
-          credsQuery(credentials)
+          credsQuery(credentials, { ic_enabled: enabled ? "true" : "false" })
         );
         const outcome = await writeRequest(
           "PUT",
           url,
-          "toggleInsiderConnected",
+          "setInsiderConnected",
           apiToken
         );
         if (!outcome.ok) return outcome;
