@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { asc } from "drizzle-orm";
 import { db, type DbTransaction } from "~/server/db";
 import { machines } from "~/server/db/schema";
@@ -63,7 +64,7 @@ function groupByLabel(
  * collections-and-tags 7.6). Type, Display and Player Count tags come from the
  * OPDB record of a machine's catalog title (spec 9.1–9.2).
  */
-export async function listTags(tx: DbTransaction = db): Promise<TagsByType> {
+async function loadTags(tx: DbTransaction): Promise<TagsByType> {
   const rows = await tx.query.machines.findMany({
     columns: {
       id: true,
@@ -121,6 +122,17 @@ export async function listTags(tx: DbTransaction = db): Promise<TagsByType> {
       playersTag(opdb.playerCount)
     ),
   };
+}
+
+/**
+ * Request-deduped: a tag page's layout and its Machine View both need the tags,
+ * and each read scans every machine. `cache()` keys on the `tx` argument, so
+ * reads in different transactions stay separate (CORE-PERF-001).
+ */
+const loadTagsCached = cache(loadTags);
+
+export function listTags(tx: DbTransaction = db): Promise<TagsByType> {
+  return loadTagsCached(tx);
 }
 
 /** The tag at `type`/`slug`, or null when no machine currently carries it. */
