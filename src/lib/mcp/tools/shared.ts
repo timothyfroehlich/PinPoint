@@ -27,6 +27,7 @@ import type {
 } from "~/lib/types";
 import { getSiteUrl } from "~/lib/url";
 import type { MachinePbmColumns } from "~/services/machines";
+import type { PbmIcIntent } from "~/lib/pinballmap/insider-connected";
 import { db } from "~/server/db";
 import {
   invitedUsers,
@@ -177,6 +178,7 @@ export interface MachineRef extends MachinePbmColumns {
   invitedOwnerId: string | null;
   presenceStatus: MachinePresenceStatus;
   iscoredGameId: string | null;
+  pinballmapIcIntent: PbmIcIntent | null;
 }
 
 /**
@@ -207,6 +209,7 @@ export async function resolveMachine(ref: string): Promise<MachineRef> {
       opdbId: true,
       ipdbId: true,
       iscoredGameId: true,
+      pinballmapIcIntent: true,
     },
   });
   if (!machine) {

@@ -14,6 +14,7 @@ import {
   updateMachineOwner,
   updateMachinePbmLink,
   updateMachinePresence,
+  setMachineIcIntent,
 } from "~/services/machines";
 
 import {
@@ -73,6 +74,12 @@ export const updateMachineSchema = z
       .enum(["on", "off", "no_sync"])
       .optional()
       .describe("Lineup sync intent for Pinball Map."),
+    insiderConnected: z
+      .enum(["on", "off"])
+      .optional()
+      .describe(
+        "Insider Connected intent for the machine's Pinball Map entry. Only for a title Pinball Map marks Insider Connected eligible (get_machine: pinballmap.insiderConnected.eligible). Records the intent in PinPoint; Pinball Map changes when a person pushes Update. Applied after any pinballmapMachineId change, which clears it."
+      ),
     iscoredGameId: z
       .string()
       .trim()
@@ -91,10 +98,11 @@ export const updateMachineSchema = z
       args.pinballmapExcluded !== undefined ||
       args.pinballmapExcludedReason !== undefined ||
       args.intent !== undefined ||
+      args.insiderConnected !== undefined ||
       args.iscoredGameId !== undefined,
     {
       message:
-        "Supply at least one field to change: name, presenceStatus, owner, pinballmapMachineId, pinballmapExcluded, pinballmapExcludedReason, intent, or iscoredGameId.",
+        "Supply at least one field to change: name, presenceStatus, owner, pinballmapMachineId, pinballmapExcluded, pinballmapExcludedReason, intent, insiderConnected, or iscoredGameId.",
     }
   )
   .refine(
@@ -171,11 +179,13 @@ export async function runUpdateMachine(
     );
   }
 
-  const wantsPbm =
+  const wantsPbmLink =
     cleanArgs.pinballmapMachineId !== undefined ||
     cleanArgs.pinballmapExcluded !== undefined ||
     cleanArgs.pinballmapExcludedReason !== undefined ||
     cleanArgs.intent !== undefined;
+  // Insider Connected intent needs the same capability as the link (spec 8.1).
+  const wantsPbm = wantsPbmLink || cleanArgs.insiderConnected !== undefined;
 
   if (
     wantsPbm &&
@@ -351,7 +361,7 @@ export async function runUpdateMachine(
   }
 
   // 4. updateMachinePbmLink (if pinballmap fields or intent supplied)
-  if (wantsPbm) {
+  if (wantsPbmLink) {
     let updated: Awaited<ReturnType<typeof updateMachinePbmLink>>;
     try {
       updated = await updateMachinePbmLink({
@@ -415,7 +425,35 @@ export async function runUpdateMachine(
     }
   }
 
-  // 5. updateMachineIscoredLink (if iscoredGameId supplied)
+  // 5. setMachineIcIntent — after the link step, because re-matching a title
+  // clears the intent and eligibility belongs to the title the link ends on.
+  if (cleanArgs.insiderConnected !== undefined) {
+    let set: Awaited<ReturnType<typeof setMachineIcIntent>>;
+    try {
+      set = await setMachineIcIntent({
+        machineId: machine.id,
+        icIntent: cleanArgs.insiderConnected,
+      });
+    } catch (error) {
+      return handleFailure(
+        "insiderConnected",
+        error instanceof Error
+          ? error.message
+          : "Updating Insider Connected failed."
+      );
+    }
+    if (!set.ok) {
+      return handleFailure("insiderConnected", set.message, "invalid");
+    }
+    applied.push({
+      field: "insiderConnected",
+      from: set.previous,
+      to: cleanArgs.insiderConnected,
+      changed: set.changed,
+    });
+  }
+
+  // 6. updateMachineIscoredLink (if iscoredGameId supplied)
   if (cleanArgs.iscoredGameId !== undefined) {
     try {
       const { changed, iscoredGameId, previousIscoredGameId } =
@@ -457,7 +495,7 @@ export function registerUpdateMachine(server: McpServer): void {
     {
       title: "Update a machine",
       description:
-        "Update one or more fields on a machine: name, availability (presenceStatus), owner, Pinball Map link/intent, or iScored link. Supply machine (initials or UUID) and at least one field to change. Returns applied changes.",
+        "Update one or more fields on a machine: name, availability (presenceStatus), owner, Pinball Map link/intent, Insider Connected intent, or iScored link. Supply machine (initials or UUID) and at least one field to change. Returns applied changes.",
       inputSchema: updateMachineSchema,
       annotations: WRITE_TOOL_ANNOTATIONS,
     },

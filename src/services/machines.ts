@@ -40,6 +40,8 @@ import {
   INVALID_WHEN_ON,
   type PbmListingIntent,
 } from "~/lib/pinballmap/listing-state";
+import type { PbmIcIntent } from "~/lib/pinballmap/insider-connected";
+import { getCatalogEntry } from "~/lib/pinballmap/catalog";
 
 export type Machine = InferSelectModel<typeof machines>;
 
@@ -1189,4 +1191,63 @@ export async function updateMachineIscoredLink({
     iscoredGameId: normalized,
     previousIscoredGameId: current.iscoredGameId,
   };
+}
+
+export interface SetMachineIcIntentParams {
+  machineId: string;
+  icIntent: PbmIcIntent;
+}
+
+export type SetMachineIcIntentResult =
+  | { ok: true; changed: boolean; previous: PbmIcIntent | null }
+  | { ok: false; reason: "not_linked" | "ineligible"; message: string };
+
+/**
+ * Record a machine's Insider Connected intent (spec pinballmap §3.8). Writes only
+ * to PinPoint; the push to Pinball Map is a separate, person-initiated action.
+ *
+ * The machine must be linked to a title the catalog marks eligible. The UPDATE is
+ * pinned to the title that was checked, so a re-match landing in between (which
+ * clears the intent) is reported as not linked rather than overwritten.
+ */
+export async function setMachineIcIntent({
+  machineId,
+  icIntent,
+}: SetMachineIcIntentParams): Promise<SetMachineIcIntentResult> {
+  const current = await db.query.machines.findFirst({
+    where: eq(machines.id, machineId),
+    columns: { pinballmapMachineId: true, pinballmapIcIntent: true },
+  });
+  if (!current) {
+    throw new Error(`Machine ${machineId} not found`);
+  }
+  const titleId = current.pinballmapMachineId;
+  const notLinked = {
+    ok: false,
+    reason: "not_linked",
+    message: "Machine isn't linked to a Pinball Map title yet",
+  } as const;
+  if (titleId === null) return notLinked;
+
+  const catalogEntry = await getCatalogEntry(titleId);
+  if (!catalogEntry?.icEligible) {
+    return {
+      ok: false,
+      reason: "ineligible",
+      message: "Pinball Map doesn't offer Insider Connected for this game.",
+    };
+  }
+
+  const previous = current.pinballmapIcIntent;
+  if (previous === icIntent) return { ok: true, changed: false, previous };
+
+  const updated = await db
+    .update(machines)
+    .set({ pinballmapIcIntent: icIntent })
+    .where(
+      and(eq(machines.id, machineId), eq(machines.pinballmapMachineId, titleId))
+    )
+    .returning({ id: machines.id });
+  if (updated.length === 0) return notLinked;
+  return { ok: true, changed: true, previous };
 }
