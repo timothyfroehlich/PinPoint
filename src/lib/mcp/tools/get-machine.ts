@@ -98,7 +98,7 @@ export function registerGetMachine(server: McpServer): void {
     {
       title: "Get machine detail",
       description:
-        "Get full details for a machine by initials or UUID: name, presence status, owner name, Pinball Map link state and lineup intent, and recent open issues.",
+        "Get full details for a machine by initials or UUID: name, presence status, owner name, Pinball Map link state, lineup intent and what the last-synced lineup shows (pinballmap.lineup), and recent open issues.",
       inputSchema: getMachineSchema,
       annotations: READ_ONLY_TOOL_ANNOTATIONS,
     },
