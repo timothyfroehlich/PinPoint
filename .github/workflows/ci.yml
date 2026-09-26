@@ -354,9 +354,6 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Reserve Supabase ports
-        uses: ./.github/actions/reserve-supabase-ports
-
       - name: Setup locked mise toolchain
         id: toolchain
         uses: ./.github/actions/setup-mise
@@ -408,9 +405,6 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Reserve Supabase ports
-        uses: ./.github/actions/reserve-supabase-ports
-
       - name: Setup locked mise toolchain
         id: toolchain
         uses: ./.github/actions/setup-mise
@@ -455,9 +449,6 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
         with:
           persist-credentials: false
-
-      - name: Reserve Supabase ports
-        uses: ./.github/actions/reserve-supabase-ports
 
       - name: Setup locked mise toolchain
         id: toolchain
@@ -530,9 +521,6 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Reserve Supabase ports
-        uses: ./.github/actions/reserve-supabase-ports
-
       - name: Setup locked mise toolchain
         id: toolchain
         uses: ./.github/actions/setup-mise
@@ -603,9 +591,6 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
         with:
           persist-credentials: false
-
-      - name: Reserve Supabase ports
-        uses: ./.github/actions/reserve-supabase-ports
 
       - name: Setup locked mise toolchain
         id: toolchain
@@ -691,9 +676,6 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
         with:
           persist-credentials: false
-
-      - name: Reserve Supabase ports
-        uses: ./.github/actions/reserve-supabase-ports
 
       - name: Setup locked mise toolchain
         id: toolchain
