@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { eq } from "drizzle-orm";
+import { machines } from "~/server/db/schema";
 import { getIscoredGamesAction } from "./iscored-actions";
 import { getGameroomGames } from "~/lib/iscored/client";
 import { isIscoredConfigured } from "~/lib/iscored/config";
@@ -92,6 +94,12 @@ describe("getIscoredGamesAction", () => {
     const result = await getIscoredGamesAction({ machineId: "machine-abc" });
     expect(result).toEqual({ games: mockGames });
     expect(getGameroomGames).toHaveBeenCalledTimes(1);
+    expect(mockFindFirstMachine).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: eq(machines.id, "machine-abc"),
+        columns: { ownerId: true },
+      })
+    );
   });
 
   it("returns error when user is member and does not own the machine", async () => {
@@ -102,6 +110,12 @@ describe("getIscoredGamesAction", () => {
     const result = await getIscoredGamesAction({ machineId: "machine-abc" });
     expect(result).toEqual({ error: "Permission denied" });
     expect(getGameroomGames).not.toHaveBeenCalled();
+    expect(mockFindFirstMachine).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: eq(machines.id, "machine-abc"),
+        columns: { ownerId: true },
+      })
+    );
   });
 
   it("returns error when user is member and machine is not found", async () => {
@@ -112,6 +126,12 @@ describe("getIscoredGamesAction", () => {
     const result = await getIscoredGamesAction({ machineId: "machine-abc" });
     expect(result).toEqual({ error: "Permission denied" });
     expect(getGameroomGames).not.toHaveBeenCalled();
+    expect(mockFindFirstMachine).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: eq(machines.id, "machine-abc"),
+        columns: { ownerId: true },
+      })
+    );
   });
 
   it("returns error when user is guest even if machineId is provided", async () => {
@@ -122,6 +142,12 @@ describe("getIscoredGamesAction", () => {
     const result = await getIscoredGamesAction({ machineId: "machine-abc" });
     expect(result).toEqual({ error: "Permission denied" });
     expect(getGameroomGames).not.toHaveBeenCalled();
+    expect(mockFindFirstMachine).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: eq(machines.id, "machine-abc"),
+        columns: { ownerId: true },
+      })
+    );
   });
 
   it("returns error when iScored is not configured", async () => {
