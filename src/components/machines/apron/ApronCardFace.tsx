@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Trophy, Wrench } from "lucide-react";
 
 import {
@@ -10,6 +10,7 @@ import {
   cardParagraphs,
   fitTitleSize,
   shrinkUntilFits,
+  titleWords,
   type ApronCardContent,
   type ApronCardSize,
 } from "~/lib/machines/apron-card";
@@ -180,7 +181,14 @@ export function ApronCardFace({
             className="apron-card__display apron-card__title"
             style={{ fontSize: `${titlePx}px` }}
           >
-            {content.name}
+            {/* Break points match the title fit's words (spec §1): a <wbr>
+                after each hyphen and ellipsis, a space elsewhere. */}
+            {titleWords(content.name).map((word, i) => (
+              <Fragment key={i}>
+                {i === 0 ? null : word.joiner === " " ? " " : <wbr />}
+                {word.text}
+              </Fragment>
+            ))}
           </div>
           {content.edition ? (
             <div className="apron-card__display apron-card__edition">

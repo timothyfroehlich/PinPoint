@@ -206,6 +206,16 @@ describe("fitTitleSize", () => {
     expect(size).toBeGreaterThanOrEqual(24);
   });
 
+  it.each([
+    // Break after each ellipsis: widest word LIGHTS... (9 glyphs) → 38.5px,
+    // three lines. Without the break it is one 25-glyph word at the floor.
+    ["LIGHTS...CAMERA...ACTION!", 38.5],
+    // Break after the hyphen: widest word DAVIDSON (8 glyphs) → max size.
+    ["HARLEY-DAVIDSON", 42],
+  ])("breaks %s after hyphens and ellipses (spec §1)", (title, px) => {
+    expect(fitTitleSize({ ...base, title })).toBe(px);
+  });
+
   it("stops at the floor rather than breaking a word", () => {
     expect(
       fitTitleSize({ ...base, title: "SUPERCALIFRAGILISTICEXPIALIDOCIOUS" })

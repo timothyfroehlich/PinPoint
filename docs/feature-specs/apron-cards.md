@@ -81,7 +81,6 @@
 
 | Requirement | Current implementation gap |
 | :-- | :-- |
-| §1 Title fit | Titles break only at spaces; breaking after a hyphen or an ellipsis is not built (PP-xeki.1), so Lights...Camera...Action! still runs past the panel. |
 | §4.2 | Automatic apron-size fill from a Pinball Map match is intentionally deferred. Editors choose Stern/SPIKE or WPC manually for now; unmatched machines still have no default. |
 
 ## Changelog
