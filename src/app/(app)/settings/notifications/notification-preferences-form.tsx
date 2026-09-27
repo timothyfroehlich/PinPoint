@@ -182,8 +182,9 @@ export function NotificationPreferencesForm({
     setBaselinePreferences(preferences);
     setFormValues((prev) => {
       const next = { ...prev };
+      const base = submittedValuesRef.current ?? baselinePreferences;
       for (const k of ALL_PREFERENCE_KEYS) {
-        if (prev[k] === baselinePreferences[k]) {
+        if (prev[k] === base[k]) {
           next[k] = preferences[k];
         }
       }
@@ -223,7 +224,13 @@ export function NotificationPreferencesForm({
     };
   }, [isDirty]);
 
-  // In-app navigation guard: intercepts links leaving /settings while dirty
+  // In-app navigation guard: intercepts links leaving /settings while dirty.
+  //
+  // KNOWN LIMITATION:
+  // Programmatic client navigation (such as QuickSearch router.push) and in-app
+  // browser Back button (popstate) are not intercepted by this click guard without
+  // disruptive history-sentinel hacks. Hard navigations, reloads, and tab-close
+  // are covered by beforeunload above.
   useEffect(() => {
     if (!isDirty) return;
     const handleClick = (event: MouseEvent): void => {
@@ -254,7 +261,8 @@ export function NotificationPreferencesForm({
       }
 
       event.preventDefault();
-      event.stopPropagation();
+      // Do not stopPropagation so component-level React onClick handlers
+      // (like closing drawers or dropdown menus) still execute before navigation.
       setPendingNavigation({
         type: "href",
         href: `${destination.pathname}${destination.search}${destination.hash}`,

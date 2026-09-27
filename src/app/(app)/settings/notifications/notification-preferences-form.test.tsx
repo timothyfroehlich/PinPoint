@@ -363,6 +363,69 @@ describe("NotificationPreferencesForm", () => {
       expect(dispatchBeforeUnload().defaultPrevented).toBe(true);
     });
 
+    it("preserves an edit made during pending save when user reverts a submitted toggle", async () => {
+      const user = userEvent.setup();
+      updatePreferencesSpy.mockResolvedValue({
+        ok: true,
+        value: { success: true },
+      });
+
+      const { rerender } = render(
+        <NotificationPreferencesForm preferences={defaultPreferences} />
+      );
+
+      const emailSwitch = screen.getByLabelText("Email Notifications");
+      // Step 1: User toggles switch off
+      await user.click(emailSwitch);
+      expect(emailSwitch).not.toBeChecked();
+
+      // Step 2: User clicks Save (snapshot captures emailEnabled: false)
+      await user.click(
+        screen.getByRole("button", { name: "Save Preferences" })
+      );
+
+      // Step 3: While save is in flight, user toggles switch back on
+      await user.click(emailSwitch);
+      expect(emailSwitch).toBeChecked();
+
+      // Step 4: Server revalidation commits with the submitted value (emailEnabled: false)
+      const serverRevalidatedPrefs: NotificationPreferencesData = {
+        ...defaultPreferences,
+        emailEnabled: false,
+      };
+      rerender(
+        <NotificationPreferencesForm preferences={serverRevalidatedPrefs} />
+      );
+
+      // The user's in-flight toggle back to on is preserved and remains dirty against server state
+      expect(emailSwitch).toBeChecked();
+      expect(dispatchBeforeUnload().defaultPrevented).toBe(true);
+    });
+
+    it("does not stop click event propagation so link handlers still execute", async () => {
+      const user = userEvent.setup();
+      const onClickSpy = vi.fn();
+
+      render(
+        <div>
+          <a href="/machines" onClick={onClickSpy}>
+            Machines
+          </a>
+          <NotificationPreferencesForm preferences={defaultPreferences} />
+        </div>
+      );
+
+      const emailSwitch = screen.getByLabelText("Email Notifications");
+      await user.click(emailSwitch);
+
+      await user.click(screen.getByRole("link", { name: "Machines" }));
+
+      expect(onClickSpy).toHaveBeenCalled();
+      expect(
+        screen.getByText(/discard unsaved changes\?/i)
+      ).toBeInTheDocument();
+    });
+
     it("preserves dirty edits, displays error feedback, and stays on form when save fails via Discord CTA", async () => {
       const user = userEvent.setup();
       updatePreferencesSpy.mockResolvedValue({
