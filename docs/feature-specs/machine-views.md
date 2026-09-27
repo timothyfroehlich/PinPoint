@@ -134,9 +134,7 @@
 
 ## Known divergences (code vs spec)
 
-| Spec | Code today | Resolution |
-| :-- | :-- | :-- |
-| §4.11, §8 Saved Views, §9 Built-in Views | No saved-view storage, menu, Built-in Views, or default resolution; URL canonicalization drops `view` | Saved-views implementation (PP-8bh6) |
+_None currently recorded._
 
 ---
 
