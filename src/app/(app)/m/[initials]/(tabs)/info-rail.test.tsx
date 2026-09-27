@@ -30,7 +30,7 @@ function renderRail(overrides: Partial<RailProps> = {}): void {
       manufacturer="Williams"
       year={1997}
       credits={{ design: ["Brian Eddy"], art: ["John Youssi", "Greg Freres"] }}
-      manufacturerTag={null}
+      tags={[]}
       pinballmap={{
         locationUrl: LOCATION_URL,
         onLineup: true,
@@ -79,21 +79,29 @@ describe("InfoRail", () => {
     expect(screen.getByTestId("owner-block")).toHaveClass("border-t");
   });
 
-  it("links the manufacturer tag in the Tags card", () => {
+  it("links every tag in the Tags card, in the order given", () => {
     renderRail({
-      manufacturerTag: {
-        name: "Williams",
-        href: "/c/tags/manufacturer/williams",
-      },
+      tags: [
+        { name: "Williams", href: "/c/tags/manufacturer/williams" },
+        { name: "Solid State", href: "/c/tags/type/solid-state" },
+        { name: "DMD", href: "/c/tags/display/dmd" },
+        { name: "4 Players", href: "/c/tags/player-count/4-players" },
+      ],
     });
-    const card = screen.getByTestId("machine-tags");
-    expect(
-      within(card).getByRole("link", { name: "Williams" })
-    ).toHaveAttribute("href", "/c/tags/manufacturer/williams");
+    const links = within(screen.getByTestId("machine-tags")).getAllByRole(
+      "link"
+    );
+    expect(links.map((link) => link.textContent)).toEqual([
+      "Williams",
+      "Solid State",
+      "DMD",
+      "4 Players",
+    ]);
+    expect(links[1]).toHaveAttribute("href", "/c/tags/type/solid-state");
   });
 
-  it("says a machine without a manufacturer has no tags", () => {
-    renderRail({ manufacturerTag: null });
+  it("says a machine without tags has none", () => {
+    renderRail({ tags: [] });
     expect(
       within(screen.getByTestId("machine-tags")).getByText("No tags")
     ).toBeInTheDocument();

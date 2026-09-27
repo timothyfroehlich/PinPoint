@@ -31,6 +31,7 @@ import {
   withLmxRemoved,
 } from "~/lib/pinballmap/snapshot-edit";
 import { getPinballMapClient } from "~/lib/pinballmap/client";
+import { setMachineIcIntent } from "~/services/machines";
 import type { LocationSnapshot, PbmWriteFailure } from "~/lib/pinballmap/types";
 import { log } from "~/lib/logger";
 import {
@@ -1075,22 +1076,11 @@ export async function setInsiderConnectedIntentAction(
   );
   if (!authed.ok) return authed.result;
   const { machine } = authed;
-  const titleId = machine.pinballmapMachineId;
-  if (titleId === null)
-    return err("VALIDATION", "Machine isn't linked to a Pinball Map title yet");
 
-  const catalogEntry = await getCatalogEntry(titleId);
-  if (!catalogEntry?.icEligible)
-    return err(
-      "VALIDATION",
-      "Pinball Map doesn't offer Insider Connected for this game."
-    );
+  const result = await setMachineIcIntent({ machineId: machine.id, icIntent });
+  if (!result.ok) return err("VALIDATION", result.message);
 
-  if (machine.pinballmapIcIntent !== icIntent) {
-    await db
-      .update(machines)
-      .set({ pinballmapIcIntent: icIntent })
-      .where(eq(machines.id, machine.id));
+  if (result.changed) {
     revalidatePath(`/m/${machine.initials}`);
     // Same-title cabinets share the entry's target, so their pages change too.
     revalidatePath("/m", "layout");

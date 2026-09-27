@@ -12,6 +12,7 @@ export {
   applyMachineViewState,
   formatCompactAgeAgo,
   healthFromSeverityCounts,
+  summarizeMachineView,
   type MachineViewCandidate,
 } from "./model";
 export {

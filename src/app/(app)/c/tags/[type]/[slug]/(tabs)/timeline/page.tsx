@@ -1,25 +1,25 @@
 import type React from "react";
 import { notFound } from "next/navigation";
 import { MachineGroupTimelineTab } from "~/components/collections/MachineGroupTimelineTab";
-import { manufacturerTagHref } from "~/lib/machines/manufacturer";
-import { getManufacturerTagForLayout } from "~/app/(app)/c/tags/manufacturer/[slug]/_data";
+import { tagHref } from "~/lib/tags/types";
+import { getTagForLayout } from "~/app/(app)/c/tags/[type]/[slug]/_data";
 
 interface PageProps {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ type: string; slug: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-export default async function ManufacturerTagTimelinePage({
+export default async function TagTimelinePage({
   params,
   searchParams,
 }: PageProps): Promise<React.JSX.Element> {
-  const { slug } = await params;
-  const tag = await getManufacturerTagForLayout(slug);
+  const { type, slug } = await params;
+  const tag = await getTagForLayout(type, slug);
   if (!tag) notFound();
   return (
     <MachineGroupTimelineTab
       machines={tag.machines}
-      basePath={`${manufacturerTagHref(tag.slug)}/timeline`}
+      basePath={`${tagHref(tag.type, tag.slug)}/timeline`}
       searchParams={await searchParams}
     />
   );
