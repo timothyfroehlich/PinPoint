@@ -1,7 +1,9 @@
 /**
  * E2E Tests: Navigation Component
  *
- * Tests navigation bar behavior for authenticated and unauthenticated states.
+ * Tests navigation bar behavior for authenticated users.
+ * Unauthenticated nav tested in landing-page.spec.ts.
+ * Bottom Tab Bar tested in BottomTabBar.test.tsx (RTL unit).
  */
 
 import { test, expect } from "../support/fixtures.js";
@@ -10,30 +12,8 @@ import {
   loginAs,
   assertNoA11yViolations,
 } from "../support/actions.js";
-import { TEST_USERS } from "../support/constants.js";
 
 test.describe("Navigation", () => {
-  test("unauthenticated navigation - show Sign In and Sign Up buttons", async ({
-    page,
-  }) => {
-    // Navigate to home page (landing page for unauthenticated users)
-    await page.goto("/");
-
-    // Verify landing page welcome heading is visible
-    await expect(
-      page.getByRole("heading", { name: /Welcome to PinPoint/i })
-    ).toBeVisible();
-
-    // AppHeader is unified — same testids on all viewports
-    await expect(page.getByTestId("nav-signin")).toBeVisible();
-    await expect(page.getByTestId("nav-signup")).toBeVisible();
-
-    // Verify Report Issue CTA is available on landing page
-    await expect(page.getByTestId("cta-report-issue")).toBeVisible();
-
-    await assertNoA11yViolations(page);
-  });
-
   test("authenticated navigation - show user menu", async ({
     page,
   }, testInfo) => {
@@ -88,105 +68,5 @@ test.describe("Navigation", () => {
     // Close menu, then verify no horizontal overflow on dashboard
     await page.keyboard.press("Escape");
     await assertNoHorizontalOverflow(page);
-  });
-});
-
-test.describe("Bottom Tab Bar (mobile only)", () => {
-  test("tab bar opens search and links to core routes", async ({
-    page,
-  }, testInfo) => {
-    const isMobile = testInfo.project.name.includes("Mobile");
-    if (!isMobile) {
-      test.skip();
-    }
-
-    await loginAs(page, testInfo);
-
-    const tabBar = page.getByTestId("bottom-tab-bar");
-    await expect(tabBar).toBeVisible();
-
-    // Search replaces the dashboard link in the mobile tab bar.
-    await expect(tabBar.getByRole("link", { name: /dashboard/i })).toHaveCount(
-      0
-    );
-    await tabBar
-      .getByRole("button", { name: "Search" })
-      .getByText("Search")
-      .click();
-    await expect(
-      page.getByRole("dialog", { name: "Quick search" })
-    ).toBeVisible();
-    await page.keyboard.press("Escape");
-
-    // Verify the remaining tab links point to their destinations.
-    await expect(tabBar.getByRole("link", { name: /issues/i })).toHaveAttribute(
-      "href",
-      /\/issues/
-    );
-    await expect(
-      tabBar.getByRole("link", { name: /machines/i })
-    ).toHaveAttribute("href", "/m");
-    await expect(tabBar.getByRole("link", { name: /report/i })).toHaveAttribute(
-      "href",
-      "/report"
-    );
-  });
-
-  test("More tab opens a sheet with secondary nav links", async ({
-    page,
-  }, testInfo) => {
-    const isMobile = testInfo.project.name.includes("Mobile");
-    if (!isMobile) {
-      test.skip();
-    }
-
-    await loginAs(page, testInfo);
-
-    // Open the More sheet
-    const moreButton = page.getByRole("button", { name: /more options/i });
-    await expect(moreButton).toBeVisible();
-    await moreButton.click();
-
-    // Wait for the Sheet to fully animate open before asserting on children.
-    // The Sheet is a Radix Dialog portal — scope assertions to the dialog
-    // so they resolve even if the surrounding page has shifted layout.
-    const moreSheet = page.getByRole("dialog");
-    await moreSheet.waitFor({ state: "visible", timeout: 5000 });
-
-    // Sheet should open with secondary nav items.
-    // Scope to the dialog so locators are anchored to the Sheet portal content.
-    await expect(moreSheet.getByTestId("more-sheet-help")).toBeVisible();
-    await expect(moreSheet.getByTestId("more-sheet-whats-new")).toBeVisible();
-    await expect(moreSheet.getByTestId("more-sheet-about")).toBeVisible();
-  });
-
-  test("More sheet shows User Management only for admin users", async ({
-    page,
-  }, testInfo) => {
-    const isMobile = testInfo.project.name.includes("Mobile");
-    if (!isMobile) {
-      test.skip();
-    }
-
-    // Log in as admin
-    await loginAs(page, testInfo, {
-      email: TEST_USERS.admin.email,
-      password: TEST_USERS.admin.password,
-    });
-
-    const moreButton = page.getByRole("button", { name: /more options/i });
-    await moreButton.click();
-
-    // Wait for Sheet to animate open before asserting on children.
-    const moreSheet = page.getByRole("dialog");
-    await moreSheet.waitFor({ state: "visible", timeout: 5000 });
-
-    // User Management should be visible for admin role.
-    // Scope to the dialog so locators are anchored to the Sheet portal content.
-    await expect(moreSheet.getByTestId("more-sheet-admin")).toBeVisible();
-    await expect(page.getByTestId("more-sheet-admin")).toHaveAttribute(
-      "href",
-      "/admin/users"
-    );
   });
 });

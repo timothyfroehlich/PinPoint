@@ -367,4 +367,27 @@ describe("UnifiedReportForm ↔ shared draft store (PP-idrb)", () => {
       );
     });
   });
+
+  describe("stale machineId handling (PP-lql)", () => {
+    it("drops stale machineId from draft and disables submit", () => {
+      seedDraft({
+        entry: {
+          machineId: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+          title: "PP-lql stale draft restoration",
+        },
+      });
+      mockUseActionState.mockReturnValue(idleState());
+      render(wrapped());
+
+      // Title should be restored from the draft
+      expect(screen.getByLabelText(/Issue Title/i)).toHaveValue(
+        "PP-lql stale draft restoration"
+      );
+
+      // Submit button should be disabled because machineId is invalid
+      expect(
+        screen.getByRole("button", { name: "Submit Issue Report" })
+      ).toBeDisabled();
+    });
+  });
 });

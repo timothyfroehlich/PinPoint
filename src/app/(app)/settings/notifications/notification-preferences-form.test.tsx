@@ -141,4 +141,23 @@ describe("NotificationPreferencesForm", () => {
       "unchecked"
     );
   });
+
+  it("hides email toggles and shows notice when isInternalAccount is true", () => {
+    render(
+      <NotificationPreferencesForm
+        preferences={defaultPreferences}
+        isInternalAccount={true}
+      />
+    );
+
+    expect(
+      screen.getByText(
+        "Email notifications are not available for username accounts."
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("Email Notifications")
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText("In-App Notifications")).toBeInTheDocument();
+  });
 });
