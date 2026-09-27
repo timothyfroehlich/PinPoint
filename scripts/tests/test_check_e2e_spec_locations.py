@@ -18,7 +18,7 @@ from check_e2e_spec_locations import (  # noqa: E402
 
 
 def test_current_repo_has_no_misplaced_specs():
-    """Verify that current repository checkout passes the gate."""
+    """Verify that current repository checkout passes the gate (single live-repo test)."""
     repo_root = find_repo_root(Path(__file__).resolve().parent)
     misplaced = find_misplaced_specs(repo_root)
     assert misplaced == []
@@ -98,9 +98,18 @@ def test_invalid_extension_under_allowed_suite_flagged(tmp_path: Path):
         p.write_text("// test", encoding="utf-8")
 
     violations = dict(find_spec_violations(tmp_path))
-    for p in (full_test_ts, full_spec_tsx, smoke_test_ts, smoke_spec_js):
-        assert p in violations
-        assert "must end with .spec.ts" in violations[p]
+    assert violations[full_test_ts] == (
+        "must end with .spec.ts to be collected by playwright.config.full.ts"
+    )
+    assert violations[full_spec_tsx] == (
+        "must end with .spec.ts to be collected by playwright.config.full.ts"
+    )
+    assert violations[smoke_test_ts] == (
+        "must end with .spec.ts to follow PinPoint E2E naming conventions"
+    )
+    assert violations[smoke_spec_js] == (
+        "must end with .spec.ts to follow PinPoint E2E naming conventions"
+    )
 
 
 def test_non_spec_files_ignored(tmp_path: Path):
@@ -162,24 +171,18 @@ def test_directory_named_like_spec_is_ignored(tmp_path: Path):
     assert find_misplaced_specs(tmp_path) == []
 
 
-def test_find_repo_root(tmp_path: Path):
+def test_find_repo_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """find_repo_root walks up until package.json is found, or returns start."""
-    (tmp_path / "package.json").write_text("{}", encoding="utf-8")
-    nested = tmp_path / "a" / "b" / "c"
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "package.json").write_text("{}", encoding="utf-8")
+    nested = repo / "a" / "b" / "c"
     nested.mkdir(parents=True)
 
-    assert find_repo_root(nested) == tmp_path
+    assert find_repo_root(nested) == repo
 
-    unrelated = tmp_path / "unrelated"
-    unrelated.mkdir()
-    # Path without package.json in its tree
-    assert find_repo_root(Path("/tmp")) == Path("/tmp")
-
-
-def test_main_default_root(capsys: pytest.CaptureFixture[str]):
-    """main() with no arguments resolves repo root automatically and passes."""
-    exit_code = main([])
-    assert exit_code == 0
-    captured = capsys.readouterr()
-    assert captured.out == ""
-    assert captured.err == ""
+    # Isolated path where no package.json is found falls back to start path hermetically
+    isolated = tmp_path / "isolated"
+    isolated.mkdir()
+    monkeypatch.setattr(Path, "is_file", lambda self: False)
+    assert find_repo_root(isolated) == isolated

@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Gate: ensure all E2E spec files are placed in e2e/full/ or e2e/smoke/.
+"""Gate: ensure all E2E test files are placed in e2e/full/ or e2e/smoke/ as *.spec.ts.
 
-Playwright suite configs in PinPoint only collect tests from:
+Playwright suite configs in PinPoint only collect full tests from:
 - e2e/full/ (playwright.config.full.ts via testMatch: "**/full/**/*.spec.ts")
 - e2e/smoke/ (playwright.config.smoke.ts via testDir: "./e2e/smoke")
 
 Specs placed outside these two directories (e.g. e2e/profiles/profile-edit.spec.ts
 in PP-stut or directly under e2e/), or test files named with non-*.spec.ts patterns
-(e.g. *.test.ts, *.spec.tsx) that Playwright configs do not collect, will not be
-picked up by any suite in CI and silently rot.
+(e.g. *.test.ts, *.spec.tsx) that playwright.config.full.ts does not collect,
+will not be run as intended in CI and silently rot.
 """
 
 from __future__ import annotations
@@ -51,12 +51,20 @@ def find_spec_violations(root: Path) -> list[tuple[Path, str]]:
             violations.append(
                 (path, "outside allowed suite directories (e2e/full/ or e2e/smoke/)")
             )
-        # Must use *.spec.ts extension to be collected by playwright.config.full.ts
-        elif not path.name.endswith(".spec.ts"):
+        # Under full/, Playwright config requires *.spec.ts to collect the test
+        elif rel.parts[0] == "full" and not path.name.endswith(".spec.ts"):
             violations.append(
                 (
                     path,
-                    "must end with .spec.ts to be collected by Playwright suite configs",
+                    "must end with .spec.ts to be collected by playwright.config.full.ts",
+                )
+            )
+        # Under smoke/, PinPoint standardizes on *.spec.ts for all E2E specs
+        elif rel.parts[0] == "smoke" and not path.name.endswith(".spec.ts"):
+            violations.append(
+                (
+                    path,
+                    "must end with .spec.ts to follow PinPoint E2E naming conventions",
                 )
             )
 
@@ -64,7 +72,7 @@ def find_spec_violations(root: Path) -> list[tuple[Path, str]]:
 
 
 def find_misplaced_specs(root: Path) -> list[Path]:
-    """Find all *.spec.ts files under e2e/ that are not inside e2e/full/ or e2e/smoke/."""
+    """Find all test/spec files under e2e/ that violate location or naming rules."""
     return [path for path, _ in find_spec_violations(root)]
 
 
@@ -102,7 +110,7 @@ def main(argv: list[str] | None = None) -> int:
         "\nAll Playwright test files (*.spec.ts, *.test.ts, *.spec.tsx, etc.) under e2e/ must:\n"
         "  1. Reside under e2e/full/ or e2e/smoke/\n"
         "  2. Use the .spec.ts extension so they are collected by playwright.config.full.ts "
-        "and playwright.config.smoke.ts.\n"
+        "and follow PinPoint E2E naming conventions.\n"
         "See PP-2g7m / PP-stut.",
         file=sys.stderr,
     )
