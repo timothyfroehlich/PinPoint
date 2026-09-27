@@ -1,18 +1,23 @@
 -- beads-cloud-repair-tables.sql — tables a fresh clone of the shared beads DB
--- is missing, because bd lists them in dolt_ignore: they exist only in each
--- machine's working set and no dolt commit ever carries them. bd 1.2.2 does NOT
+-- may be missing, because bd lists them in dolt_ignore: they exist only in each
+-- machine's working set and no dolt commit ever carries them. bd 1.2.2 did NOT
 -- lazily create them in an embedded clone, so a cloud routine's first write
--- fails with "Error 1146: table not found: events" (incident 2026-08-17,
+-- failed with "Error 1146: table not found: events" (incident 2026-08-17,
 -- PP-esqi). beads-cloud-init.sh applies this file after every clone/pull.
+--
+-- Under bd 1.3.0 a fresh `bd init --remote` embedded clone already has all five
+-- tables (verified 2026-09-26, PP-s9na, against both a v53 and a v66 remote), so
+-- on 1.3.0 every statement below is a no-op. It stays as a guard for a reused
+-- workspace or a future bd that stops creating them.
 --
 -- Idempotent (IF NOT EXISTS) and mirror-safe: dolt_ignore keeps these tables
 -- untracked, so bd's autocommits and `bd dolt push` never include them
 -- (verified: after creating them and writing an issue, `events` is still
 -- absent from HEAD).
 --
--- Schema dumped from the live server (SHOW CREATE TABLE) under bd 1.2.2.
--- It is bd-version-specific: when the BD_PINNED_VERSION chore bumps the pin,
--- re-dump and refresh this file if the new bd changed these tables.
+-- Schema dumped (SHOW CREATE TABLE) from a store migrated by bd 1.3.0 (schema
+-- v66). It is bd-version-specific: when the BD_PINNED_VERSION chore bumps the
+-- pin, re-dump and refresh this file if the new bd changed these tables.
 
 CREATE TABLE IF NOT EXISTS `events` (
   `issue_id` varchar(255) NOT NULL,
@@ -36,6 +41,7 @@ CREATE TABLE IF NOT EXISTS `bd_events_journal` (
   `issue_json` longtext,
   `dep_json` longtext,
   `comment_json` longtext,
+  `actor` varchar(255) NOT NULL DEFAULT '',
   PRIMARY KEY (`seq`),
   KEY `idx_bd_events_journal_issue` (`issue_id`),
   KEY `idx_bd_events_journal_ts` (`ts`)
