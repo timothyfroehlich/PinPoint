@@ -55,7 +55,6 @@ const savedStateSchema = z.object({
   columns: z.array(z.enum(MACHINE_VIEW_FIELD_IDS)),
   presenceWidget: z.enum(WIDGET_POPULATIONS),
   playabilityWidget: z.enum(WIDGET_POPULATIONS),
-  issuesWidget: z.enum(WIDGET_POPULATIONS),
 });
 
 /**
