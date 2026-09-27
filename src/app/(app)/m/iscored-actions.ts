@@ -52,19 +52,20 @@ export async function getIscoredGamesAction(
   let canEdit = checkPermission("machines.edit", accessLevel);
 
   if (!canCreate && !canEdit && machineId) {
+    let machine;
     try {
-      const machine = await db.query.machines.findFirst({
+      machine = await db.query.machines.findFirst({
         where: eq(machines.id, machineId),
         columns: { ownerId: true },
       });
-      if (machine) {
-        canEdit = checkPermission("machines.edit", accessLevel, {
-          userId: user.id,
-          machineOwnerId: machine.ownerId,
-        });
-      }
     } catch {
-      // If DB lookup fails (e.g. invalid UUID format), treat as not found
+      return { error: "Failed to verify machine ownership" };
+    }
+    if (machine) {
+      canEdit = checkPermission("machines.edit", accessLevel, {
+        userId: user.id,
+        machineOwnerId: machine.ownerId,
+      });
     }
   }
 
