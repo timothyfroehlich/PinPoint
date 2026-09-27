@@ -165,9 +165,10 @@ export async function runSetMachinePinballmap(
   // and the write that followed it never describe one machine differently.
   // `previous` comes from the locked read inside the write, not from the
   // `resolveMachine` snapshot above, so it names the state actually replaced.
+  const subject = { id: machine.id, presenceStatus: machine.presenceStatus };
   const [previous, pinballmap] = await Promise.all([
-    buildMachinePinballmap(updated.previous),
-    buildMachinePinballmap(updated.columns),
+    buildMachinePinballmap({ ...updated.previous, ...subject }),
+    buildMachinePinballmap({ ...updated.columns, ...subject }),
   ]);
 
   return {

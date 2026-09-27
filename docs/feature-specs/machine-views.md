@@ -134,9 +134,7 @@
 
 ## Known divergences (code vs spec)
 
-| Spec | Code today | Resolution |
-| :-- | :-- | :-- |
-| §3.11 severity filter, Widget Population URL state (§4.1) | Not built | Machine widgets implementation (PP-3h21) |
+_None currently recorded._
 
 ---
 

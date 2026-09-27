@@ -19,7 +19,11 @@ import {
 import { isPgErrorCode } from "~/lib/db/postgres-errors";
 import { VALID_MACHINE_PRESENCE_STATUSES } from "~/lib/machines/presence";
 import { normalizeMachineViewSavedState } from "~/lib/machines/view/state";
-import { MACHINE_VIEW_FIELD_IDS } from "~/lib/types";
+import {
+  ISSUE_SEVERITY_VALUES,
+  MACHINE_VIEW_FIELD_IDS,
+  WIDGET_POPULATIONS,
+} from "~/lib/types";
 import { db } from "~/server/db";
 import { resolveMachineViewSurface } from "./saved-view-surface";
 
@@ -43,11 +47,15 @@ const savedStateSchema = z.object({
     z.array(z.enum(VALID_MACHINE_PRESENCE_STATUSES)),
   ]),
   status: z.array(z.enum(["operational", "needs_service", "unplayable"])),
+  severity: z.array(z.enum(ISSUE_SEVERITY_VALUES)),
   owner: z.array(z.string().max(64)).max(500),
   sort: z.enum(MACHINE_VIEW_FIELD_IDS),
   dir: z.enum(["asc", "desc"]),
   pageSize: z.union([z.literal(25), z.literal(50), z.literal(100)]),
   columns: z.array(z.enum(MACHINE_VIEW_FIELD_IDS)),
+  presenceWidget: z.enum(WIDGET_POPULATIONS),
+  playabilityWidget: z.enum(WIDGET_POPULATIONS),
+  issuesWidget: z.enum(WIDGET_POPULATIONS),
 });
 
 /**

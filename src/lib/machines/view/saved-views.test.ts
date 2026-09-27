@@ -19,11 +19,15 @@ const savedView: MachineViewSavedViewSummary = {
     q: "",
     presence: ["on_the_floor"],
     status: ["needs_service", "unplayable"],
+    severity: [],
     owner: [],
     sort: "playability",
     dir: "desc",
     pageSize: 50,
     columns: ["machine", "playability", "openIssues", "lastServiced"],
+    presenceWidget: "all",
+    playabilityWidget: "all",
+    issuesWidget: "all",
   },
 };
 
@@ -98,7 +102,15 @@ describe("saved view URL helpers", () => {
     expect(hasMachineViewConfiguration(new URLSearchParams("page=2"))).toBe(
       false
     );
-    for (const name of ["q", "presence", "status", "columns", "view"]) {
+    for (const name of [
+      "q",
+      "presence",
+      "status",
+      "severity",
+      "columns",
+      "issuesWidget",
+      "view",
+    ]) {
       expect(
         hasMachineViewConfiguration(new URLSearchParams(`${name}=x`))
       ).toBe(true);

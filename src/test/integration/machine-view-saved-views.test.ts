@@ -30,11 +30,15 @@ const state: MachineViewSavedState = {
   q: "",
   presence: ["on_the_floor"],
   status: ["unplayable"],
+  severity: ["major"],
   owner: [],
   sort: "machine",
   dir: "asc",
   pageSize: 25,
   columns: ["machine", "playability"],
+  presenceWidget: "all",
+  playabilityWidget: "filtered",
+  issuesWidget: "all",
 };
 
 describe("machine view saved views persistence", () => {

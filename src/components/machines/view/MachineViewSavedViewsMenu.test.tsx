@@ -35,11 +35,15 @@ const brokenView: MachineViewSavedViewSummary = {
     q: "",
     presence: ["on_the_floor"],
     status: ["unplayable"],
+    severity: [],
     owner: [],
     sort: "machine",
     dir: "asc",
     pageSize: 25,
     columns: presetState.columns,
+    presenceWidget: "all",
+    playabilityWidget: "all",
+    issuesWidget: "all",
   },
 };
 
