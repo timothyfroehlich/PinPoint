@@ -13,7 +13,6 @@ import { useRouter } from "next/navigation";
 import { SaveCancelButtons } from "~/components/save-cancel-buttons";
 import { Switch } from "~/components/ui/switch";
 import { Label } from "~/components/ui/label";
-import { Button } from "~/components/ui/button";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -114,8 +113,6 @@ function isPreferencesDirty(
   return false;
 }
 
-type PendingNavigation = { type: "discord" } | { type: "href"; href: string };
-
 interface NotificationPreferencesFormProps {
   preferences: NotificationPreferencesData;
   isInternalAccount?: boolean;
@@ -147,14 +144,8 @@ export function NotificationPreferencesForm({
   const [baselinePreferences, setBaselinePreferences] =
     useState<NotificationPreferencesData>(preferences);
   const submittedValuesRef = useRef<NotificationPreferencesData | null>(null);
-  const navigateToDiscordAfterSaveRef = useRef(false);
 
-  const [pendingNavigation, setPendingNavigation] =
-    useState<PendingNavigation | null>(null);
-  const activeDialogRef = useRef<PendingNavigation | null>(null);
-  if (pendingNavigation !== null) {
-    activeDialogRef.current = pendingNavigation;
-  }
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
 
   const showDiscord = discordIntegrationEnabled;
 
@@ -183,10 +174,10 @@ export function NotificationPreferencesForm({
       return;
     }
 
+    const base = submittedValuesRef.current ?? baselinePreferences;
     setBaselinePreferences(preferences);
     setFormValues((prev) => {
       const next = { ...prev };
-      const base = submittedValuesRef.current ?? baselinePreferences;
       for (const k of ALL_PREFERENCE_KEYS) {
         if (prev[k] === base[k]) {
           next[k] = preferences[k];
@@ -205,12 +196,8 @@ export function NotificationPreferencesForm({
           setBaselinePreferences(submittedValuesRef.current);
           submittedValuesRef.current = null;
         }
-        if (navigateToDiscordAfterSaveRef.current) {
-          navigateToDiscordAfterSaveRef.current = false;
-          navigateToConnectedAccounts();
-        }
       } else {
-        navigateToDiscordAfterSaveRef.current = false;
+        submittedValuesRef.current = null;
       }
     }
   }, [state]);
@@ -267,10 +254,9 @@ export function NotificationPreferencesForm({
       event.preventDefault();
       // Do not stopPropagation so component-level React onClick handlers
       // (like closing drawers or dropdown menus) still execute before navigation.
-      setPendingNavigation({
-        type: "href",
-        href: `${destination.pathname}${destination.search}${destination.hash}`,
-      });
+      setPendingHref(
+        `${destination.pathname}${destination.search}${destination.hash}`
+      );
     };
 
     document.addEventListener("click", handleClick, true);
@@ -286,53 +272,9 @@ export function NotificationPreferencesForm({
     []
   );
 
-  const navigateToConnectedAccounts = (): void => {
-    const el = document.getElementById("connected-accounts");
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth" });
-    }
-    window.location.hash = "connected-accounts";
-  };
-
-  const handleDiscordCtaClick = (
-    event: React.MouseEvent<HTMLAnchorElement>
-  ): void => {
-    if (
-      event.defaultPrevented ||
-      event.button !== 0 ||
-      event.metaKey ||
-      event.ctrlKey ||
-      event.shiftKey ||
-      event.altKey
-    ) {
-      return;
-    }
-
-    if (!isDirty) {
-      return;
-    }
-
-    event.preventDefault();
-    setPendingNavigation({ type: "discord" });
-  };
-
-  const handleDiscardAndNavigateToDiscord = (): void => {
-    setPendingNavigation(null);
-    setFormValues(baselinePreferences);
-    setShowFeedback(false);
-    navigateToConnectedAccounts();
-  };
-
-  const handleSaveAndNavigateToDiscord = (): void => {
-    setPendingNavigation(null);
-    navigateToDiscordAfterSaveRef.current = true;
-    formRef.current?.requestSubmit();
-  };
-
   const handleDiscardAndLeave = (): void => {
-    const currentNav = pendingNavigation ?? activeDialogRef.current;
-    const href = currentNav?.type === "href" ? currentNav.href : null;
-    setPendingNavigation(null);
+    const href = pendingHref;
+    setPendingHref(null);
     setFormValues(baselinePreferences);
     setShowFeedback(false);
     if (href) {
@@ -514,7 +456,6 @@ export function NotificationPreferencesForm({
                       <a
                         href="#connected-accounts"
                         className="text-xs text-primary underline"
-                        onClick={handleDiscordCtaClick}
                       >
                         Link Discord
                       </a>
@@ -656,56 +597,28 @@ export function NotificationPreferencesForm({
       </form>
 
       <AlertDialog
-        open={pendingNavigation !== null}
+        open={pendingHref !== null}
         onOpenChange={(open) => {
-          if (!open) setPendingNavigation(null);
+          if (!open) setPendingHref(null);
         }}
       >
         <AlertDialogContent>
-          {(pendingNavigation ?? activeDialogRef.current)?.type ===
-          "discord" ? (
-            <>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Unsaved preferences</AlertDialogTitle>
-                <AlertDialogDescription>
-                  You have unsaved changes in your notification preferences. If
-                  you navigate to link Discord, your changes will be lost unless
-                  you save them first.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Stay on page</AlertDialogCancel>
-                <AlertDialogAction
-                  variant="destructive"
-                  onClick={handleDiscardAndNavigateToDiscord}
-                >
-                  Discard and continue
-                </AlertDialogAction>
-                <Button type="button" onClick={handleSaveAndNavigateToDiscord}>
-                  Save and continue
-                </Button>
-              </AlertDialogFooter>
-            </>
-          ) : (
-            <>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  You have unsaved changes on this page. If you leave now, those
-                  changes will be lost.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Stay on page</AlertDialogCancel>
-                <AlertDialogAction
-                  variant="destructive"
-                  onClick={handleDiscardAndLeave}
-                >
-                  Discard and leave
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </>
-          )}
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes on this page. If you leave now, those
+              changes will be lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Stay on page</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={handleDiscardAndLeave}
+            >
+              Discard and leave
+            </AlertDialogAction>
+          </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </>

@@ -206,24 +206,7 @@ describe("NotificationPreferencesForm", () => {
       });
     });
 
-    it("does not intercept Link Discord CTA when form is clean", async () => {
-      const user = userEvent.setup();
-      render(
-        <NotificationPreferencesForm
-          preferences={defaultPreferences}
-          discordIntegrationEnabled
-        />
-      );
-
-      const linkCta = screen.getByRole("link", { name: /link discord/i });
-      await user.click(linkCta);
-
-      expect(
-        screen.queryByText(/unsaved preferences/i)
-      ).not.toBeInTheDocument();
-    });
-
-    it("prompts on Link Discord CTA when form is dirty, stays on page when cancelled", async () => {
+    it("scrolls to #connected-accounts on Link Discord CTA without prompting dialog when dirty", async () => {
       const user = userEvent.setup();
       render(
         <NotificationPreferencesForm
@@ -234,83 +217,15 @@ describe("NotificationPreferencesForm", () => {
 
       const emailSwitch = screen.getByLabelText("Email Notifications");
       await user.click(emailSwitch);
-
-      const linkCta = screen.getByRole("link", { name: /link discord/i });
-      await user.click(linkCta);
-
-      expect(screen.getByText(/unsaved preferences/i)).toBeInTheDocument();
-      expect(
-        screen.getByText(
-          /you have unsaved changes in your notification preferences/i
-        )
-      ).toBeInTheDocument();
-
-      await user.click(screen.getByRole("button", { name: /stay on page/i }));
-      expect(
-        screen.queryByText(/unsaved preferences/i)
-      ).not.toBeInTheDocument();
       expect(dispatchBeforeUnload().defaultPrevented).toBe(true);
-    });
-
-    it("discards changes and navigates when clicking Discard and continue in Discord CTA prompt", async () => {
-      const user = userEvent.setup();
-      render(
-        <NotificationPreferencesForm
-          preferences={defaultPreferences}
-          discordIntegrationEnabled
-        />
-      );
-
-      const emailSwitch = screen.getByLabelText("Email Notifications");
-      await user.click(emailSwitch);
-      expect(emailSwitch).not.toBeChecked();
 
       const linkCta = screen.getByRole("link", { name: /link discord/i });
       await user.click(linkCta);
 
-      await user.click(
-        screen.getByRole("button", { name: /discard and continue/i })
-      );
-
       expect(
-        screen.queryByText(/unsaved preferences/i)
+        screen.queryByText(/discard unsaved changes\?/i)
       ).not.toBeInTheDocument();
-      expect(emailSwitch).toBeChecked();
-      expect(dispatchBeforeUnload().defaultPrevented).toBe(false);
       expect(window.location.hash).toBe("#connected-accounts");
-    });
-
-    it("saves changes and navigates when clicking Save and continue in Discord CTA prompt", async () => {
-      const user = userEvent.setup();
-      updatePreferencesSpy.mockResolvedValue({
-        ok: true,
-        value: { success: true },
-      });
-
-      render(
-        <NotificationPreferencesForm
-          preferences={defaultPreferences}
-          discordIntegrationEnabled
-        />
-      );
-
-      const emailSwitch = screen.getByLabelText("Email Notifications");
-      await user.click(emailSwitch);
-
-      const linkCta = screen.getByRole("link", { name: /link discord/i });
-      await user.click(linkCta);
-
-      await user.click(
-        screen.getByRole("button", { name: /save and continue/i })
-      );
-
-      expect(updatePreferencesSpy).toHaveBeenCalled();
-      expect(
-        screen.queryByText(/unsaved preferences/i)
-      ).not.toBeInTheDocument();
-      await waitFor(() => {
-        expect(window.location.hash).toBe("#connected-accounts");
-      });
     });
 
     it("prompts on in-app link navigation when form is dirty, and navigates on discard", async () => {
@@ -365,10 +280,13 @@ describe("NotificationPreferencesForm", () => {
 
     it("preserves an edit made during pending save when user reverts a submitted toggle", async () => {
       const user = userEvent.setup();
-      updatePreferencesSpy.mockResolvedValue({
-        ok: true,
-        value: { success: true },
-      });
+      let resolveAction!: (value: actions.UpdatePreferencesResult) => void;
+      const actionPromise = new Promise<actions.UpdatePreferencesResult>(
+        (resolve) => {
+          resolveAction = resolve;
+        }
+      );
+      updatePreferencesSpy.mockReturnValue(actionPromise);
 
       const { rerender } = render(
         <NotificationPreferencesForm preferences={defaultPreferences} />
@@ -379,7 +297,7 @@ describe("NotificationPreferencesForm", () => {
       await user.click(emailSwitch);
       expect(emailSwitch).not.toBeChecked();
 
-      // Step 2: User clicks Save (snapshot captures emailEnabled: false)
+      // Step 2: User clicks Save (snapshot captures emailEnabled: false, action is pending)
       await user.click(
         screen.getByRole("button", { name: "Save Preferences" })
       );
@@ -388,14 +306,21 @@ describe("NotificationPreferencesForm", () => {
       await user.click(emailSwitch);
       expect(emailSwitch).toBeChecked();
 
-      // Step 4: Server revalidation commits with the submitted value (emailEnabled: false)
-      const serverRevalidatedPrefs: NotificationPreferencesData = {
-        ...defaultPreferences,
-        emailEnabled: false,
-      };
-      rerender(
-        <NotificationPreferencesForm preferences={serverRevalidatedPrefs} />
-      );
+      // Step 4: Action settles and server revalidation commits in the same update
+      React.act(() => {
+        resolveAction({
+          ok: true,
+          value: { success: true },
+        });
+        rerender(
+          <NotificationPreferencesForm
+            preferences={{
+              ...defaultPreferences,
+              emailEnabled: false,
+            }}
+          />
+        );
+      });
 
       // The user's in-flight toggle back to on is preserved and remains dirty against server state
       expect(emailSwitch).toBeChecked();
@@ -426,39 +351,40 @@ describe("NotificationPreferencesForm", () => {
       ).toBeInTheDocument();
     });
 
-    it("preserves dirty edits, displays error feedback, and stays on form when save fails via Discord CTA", async () => {
+    it("clears submitted values ref on failed save so subsequent server sync does not use rejected values as base", async () => {
       const user = userEvent.setup();
       updatePreferencesSpy.mockResolvedValue({
         ok: false,
         code: "VALIDATION",
-        message: "Failed to update notification preferences",
+        message: "Failed",
       });
 
-      render(
-        <NotificationPreferencesForm
-          preferences={defaultPreferences}
-          discordIntegrationEnabled
-        />
+      const { rerender } = render(
+        <NotificationPreferencesForm preferences={defaultPreferences} />
       );
 
       const emailSwitch = screen.getByLabelText("Email Notifications");
       await user.click(emailSwitch);
       expect(emailSwitch).not.toBeChecked();
 
-      const linkCta = screen.getByRole("link", { name: /link discord/i });
-      await user.click(linkCta);
-
       await user.click(
-        screen.getByRole("button", { name: /save and continue/i })
+        screen.getByRole("button", { name: "Save Preferences" })
+      );
+      expect(await screen.findByText("Failed")).toBeInTheDocument();
+
+      // Server later revalidates with updated preferences from another source
+      rerender(
+        <NotificationPreferencesForm
+          preferences={{
+            ...defaultPreferences,
+            emailNotifyOnAssigned: false,
+          }}
+        />
       );
 
-      expect(updatePreferencesSpy).toHaveBeenCalled();
-      expect(
-        await screen.findByText("Failed to update notification preferences")
-      ).toBeInTheDocument();
+      // User's uncommitted edit on emailEnabled is still preserved
       expect(emailSwitch).not.toBeChecked();
       expect(dispatchBeforeUnload().defaultPrevented).toBe(true);
-      expect(window.location.hash).toBe("");
     });
 
     it("preserves dirty edits and keeps beforeunload guard armed when normal save fails", async () => {
