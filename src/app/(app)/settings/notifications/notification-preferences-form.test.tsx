@@ -307,19 +307,22 @@ describe("NotificationPreferencesForm", () => {
       expect(emailSwitch).toBeChecked();
 
       // Step 4: Action settles and server revalidation commits in the same update
-      React.act(() => {
+      await React.act(async () => {
         resolveAction({
           ok: true,
           value: { success: true },
         });
-        rerender(
-          <NotificationPreferencesForm
-            preferences={{
-              ...defaultPreferences,
-              emailEnabled: false,
-            }}
-          />
-        );
+        React.startTransition(() => {
+          rerender(
+            <NotificationPreferencesForm
+              preferences={{
+                ...defaultPreferences,
+                emailEnabled: false,
+              }}
+            />
+          );
+        });
+        await Promise.resolve();
       });
 
       // The user's in-flight toggle back to on is preserved and remains dirty against server state
