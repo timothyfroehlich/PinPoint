@@ -1017,6 +1017,27 @@ def test_cancelled_ci_gate_leftover_yields_to_the_live_run() -> None:
     assert result.returncode == 0, result.stdout
 
 
+def test_superseded_cancelled_run_does_not_block_newer_passing_run() -> None:
+    # A run superseded by a newer push/re-run still does not block merge (PP-tdoq).
+    # The newer SUCCESS conclusion outranks the older CANCELLED leftover.
+    rollup = [
+        ci_gate(
+            conclusion="CANCELLED",
+            started_at="2026-08-22T12:00:00Z",
+            completed_at="2026-08-22T12:05:00Z",
+        ),
+        ci_gate(
+            conclusion="SUCCESS",
+            started_at="2026-08-22T12:10:00Z",
+            completed_at="2026-08-22T12:20:00Z",
+        ),
+    ]
+    with gate_env(rollup=rollup) as env:
+        result = run_gate("check_ci", env)
+    assert result.returncode == 0, result.stdout
+    assert "PASS: ci: CI Gate conclusion=SUCCESS" in result.stdout
+
+
 def test_unresolved_threads_block_regardless_of_author() -> None:
     with gate_env(
         threads=[
