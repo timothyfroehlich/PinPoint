@@ -787,8 +787,8 @@ function pbmLinkBasisUnchanged(a: PbmLinkBasis, b: PbmLinkBasis): boolean {
  * is right for the edit form — that form always posts all of them, so an absent
  * one means a human emptied the box. An MCP caller re-confirming an exclusion it
  * did not author has no such intent: `update_machine` has no field for the three
- * model columns, so it *cannot* send them, and it may omit the reason. The fleet pass
- * (PP-h059) does exactly that across the whole floor:
+ * model columns, so it *cannot* send them, and it may omit the reason. The
+ * fleet pass (PP-h059) does exactly that across the whole floor:
  * `{ machine: "FB", pinballmapExcluded: true }` would null both
  * "homebrew — one-off cabinet" and the model identity — name, manufacturer and
  * year — on every machine it touched, flipping the Info tab's Model row to
