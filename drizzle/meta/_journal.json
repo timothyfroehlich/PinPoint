@@ -645,6 +645,13 @@
       "when": 1790440490199,
       "tag": "0091_apron-credit-settings",
       "breakpoints": true
+    },
+    {
+      "idx": 92,
+      "version": "7",
+      "when": 1790460875208,
+      "tag": "0092_machine-view-saved-views",
+      "breakpoints": true
     }
   ]
 }

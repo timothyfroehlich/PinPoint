@@ -47,11 +47,8 @@ interface InfoRailProps {
    * apron card limits the list.
    */
   credits: MachineCredits;
-  /**
-   * The machine's manufacturer tag, or null when it has no current
-   * manufacturer (spec collections-and-tags 7.4, 8.4).
-   */
-  manufacturerTag: { name: string; href: string } | null;
+  /** Every tag the machine belongs to, in tag type order (spec 7.4). */
+  tags: { name: string; href: string }[];
   /**
    * The machine's standing on Pinball Map, rendered as one unlabelled line
    * under Model.
@@ -134,8 +131,7 @@ const LABEL =
  * right rail and folds inline on mobile (the caller controls placement + gap;
  * this returns the cards as a fragment).
  *
- * Tags links each tag the machine belongs to; manufacturer is the only tag
- * type so far.
+ * Tags links each tag the machine belongs to.
  *
  * PP-o355.21 removed the standalone Pinball Map card that PP-o355.3 introduced
  * and PP-l81u last extended. A whole card for two facts hid them: a reader
@@ -153,7 +149,7 @@ export function InfoRail({
   manufacturer,
   year,
   credits,
-  manufacturerTag,
+  tags,
   pinballmap,
 }: InfoRailProps): React.JSX.Element {
   return (
@@ -327,16 +323,18 @@ export function InfoRail({
 
       <div className={CARD} data-testid="machine-tags">
         <p className={`mb-2 ${LABEL}`}>Tags</p>
-        {manufacturerTag ? (
+        {tags.length > 0 ? (
           <ul className="flex flex-wrap gap-2">
-            <li>
-              <Link
-                href={manufacturerTag.href}
-                className="inline-flex items-center rounded-full bg-secondary-container px-3 py-1 text-sm font-medium text-on-secondary-container hover:bg-secondary-container/80"
-              >
-                {manufacturerTag.name}
-              </Link>
-            </li>
+            {tags.map((tag) => (
+              <li key={tag.href}>
+                <Link
+                  href={tag.href}
+                  className="inline-flex items-center rounded-full bg-secondary-container px-3 py-1 text-sm font-medium text-on-secondary-container hover:bg-secondary-container/80"
+                >
+                  {tag.name}
+                </Link>
+              </li>
+            ))}
           </ul>
         ) : (
           <p className="text-sm text-muted-foreground">No tags</p>
