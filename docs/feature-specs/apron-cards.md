@@ -17,7 +17,7 @@
 - **Credits** — the people the Open Pinball Database (OPDB) credits for a machine's game, in two roles: design and art. Each role has its own per-machine display setting.
 - **Edition** — the "<X> Edition" line shown under the title. Sourced only from Pinball Map's grouped-family data (PP-esta.1); PinPoint never derives an edition by parsing an ungrouped Pinball Map name.
 - **Scan target** — the URL the card's QR code encodes: the machine's scan hub, tagged with an `apron` source so that traffic is distinguishable from other QR sources.
-- **Title fit** — the rule that sizes and wraps a machine's name to the card's identity panel: shrink from a maximum size until the single longest word fits the panel on one line, keep shrinking until the full title wraps to three lines or fewer, then keep shrinking until everything in the identity panel fits above the APC logo, down to a floor size below which the title may still exceed three lines rather than shrink further. Never breaks a word mid-word.
+- **Title fit** — the rule that sizes and wraps a machine's name to the card's identity panel: shrink from a maximum size until the single longest word fits the panel on one line, keep shrinking until the full title wraps to three lines or fewer, then keep shrinking until everything in the identity panel fits above the APC logo, down to a floor size below which the title may still exceed three lines rather than shrink further. A line may break at a space, after a hyphen, or after an ellipsis, and nowhere else; a word is the text between those break points, so Lights...Camera...Action! is three words and Harley-Davidson two. Never breaks a word mid-word.
 
 ## 2. Data inputs
 
@@ -81,12 +81,14 @@
 
 | Requirement | Current implementation gap |
 | :-- | :-- |
+| §1 Title fit | Titles break only at spaces; breaking after a hyphen or an ellipsis is not built (PP-xeki.1), so Lights...Camera...Action! still runs past the panel. |
 | §4.2 | Automatic apron-size fill from a Pinball Map match is intentionally deferred. Editors choose Stern/SPIKE or WPC manually for now; unmatched machines still have no default. |
 
 ## Changelog
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-27 | §1 Title fit: a title may also break after a hyphen or an ellipsis, so a title with no spaces can still wrap (PP-xeki.1). |
 | 2026-09-25 | Added §6.4: an identity panel that does not fit at the title's floor size blocks save and export, like description and tip overflow. |
 | 2026-09-25 | Added §10 Credits (OPDB design and art credits in the identity panel, per-role display settings on by default, "Unknown" when missing, two-name limit) and §6.3 (the title shrinks so the panel fits above the logo); updated §1, §2.1, §3.6, §5.1 to match. |
 | 2026-09-20 | Added §3.6 and §9.3: card edits use the machine-management capability; exporting is member+ and does not grant editing. |
