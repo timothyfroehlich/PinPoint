@@ -43,7 +43,6 @@ const brokenView: MachineViewSavedViewSummary = {
     columns: presetState.columns,
     presenceWidget: "all",
     playabilityWidget: "all",
-    issuesWidget: "all",
   },
 };
 

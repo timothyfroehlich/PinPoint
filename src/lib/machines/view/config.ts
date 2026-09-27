@@ -123,7 +123,6 @@ export const MACHINE_VIEW_PRESETS: Record<
       columns: DEFAULT_COLUMNS,
       presenceWidget: "all",
       playabilityWidget: "all",
-      issuesWidget: "all",
     },
   },
   collection: {
@@ -142,7 +141,6 @@ export const MACHINE_VIEW_PRESETS: Record<
       columns: DEFAULT_COLUMNS,
       presenceWidget: "all",
       playabilityWidget: "all",
-      issuesWidget: "all",
     },
   },
 };

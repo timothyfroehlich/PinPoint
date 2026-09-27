@@ -244,7 +244,6 @@ describe("summarizeMachineView", () => {
     const state = {
       ...getMachineViewPreset("collection").defaultState,
       presenceWidget: "filtered" as const,
-      issuesWidget: "filtered" as const,
     };
     const applied = applyMachineViewState(many, state);
 
@@ -252,7 +251,6 @@ describe("summarizeMachineView", () => {
 
     expect(applied.rows).toHaveLength(25);
     expect(summary.presence.total).toBe(30);
-    expect(summary.issues.openIssues).toBe(30);
   });
 
   it("divides the All population by presence and open issue severity", () => {
@@ -271,11 +269,6 @@ describe("summarizeMachineView", () => {
         pending_arrival: 0,
         removed: 1,
       },
-    });
-    expect(summary.issues).toEqual({
-      openIssues: 6,
-      machinesWithOpenIssues: 3,
-      bySeverity: { cosmetic: 2, minor: 0, major: 1, unplayable: 3 },
     });
   });
 
@@ -296,19 +289,15 @@ describe("summarizeMachineView", () => {
     const state = {
       ...getMachineViewPreset("collection").defaultState,
       severity: ["unplayable" as const],
-      issuesWidget: "filtered" as const,
+      playabilityWidget: "filtered" as const,
     };
     const { filteredRows } = applyMachineViewState(rows, state);
 
     const summary = summarizeMachineView(rows, filteredRows, state);
 
     expect(summary.presence.total).toBe(5);
-    expect(summary.playability.onTheFloor).toBe(3);
-    expect(summary.issues).toEqual({
-      openIssues: 3,
-      machinesWithOpenIssues: 2,
-      bySeverity: { cosmetic: 0, minor: 0, major: 0, unplayable: 3 },
-    });
+    expect(filteredRows.map((row) => row.id)).toEqual(["b", "d"]);
+    expect(summary.playability.onTheFloor).toBe(1);
   });
 });
 

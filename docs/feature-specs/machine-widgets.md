@@ -12,16 +12,16 @@
 
 - **Presence Widget** — summarizes where the population's machines are.
 - **Playability Widget** — summarizes whether the population's On the Floor machines can be played.
-- **Open Issues Widget** — summarizes the population's open issues by severity.
+- **Open Issues Widget** — _Retired 2026-09-27._ Its Segments counted issues while selecting one filtered to machines, so its counts disagreed with the rows. The Severity Widget on Issues tabs (issue-widgets §4) summarizes open issues by severity instead.
 
 ---
 
 ## 2. Hosts
 
-- **2.1** Machine View on Machines and on every standard Collection, owner Collection, and Tag page shows the Presence Widget, the Playability Widget, and the Open Issues Widget, in that order.
-- **2.2** Their Widget Population parameters are `presenceWidget`, `playabilityWidget`, and `issuesWidget`.
+- **2.1** Machine View on Machines and on every standard Collection, owner Collection, and Tag page shows the Presence Widget and the Playability Widget, in that order.
+- **2.2** Their Widget Population parameters are `presenceWidget` and `playabilityWidget`.
 - **2.3** The widgets use only Machine View's base rows and health enrichment (machine-views §3.4) and never load service or activity enrichment.
-- **2.4** The Summary Row shows the Presence headline's machine total, the Playability headline, and the Open Issues headline's open-issue total.
+- **2.4** The Summary Row shows the Presence headline's machine total and the Playability headline.
 
 ---
 
@@ -41,12 +41,9 @@
 
 ---
 
-## 5. Open Issues Widget
+## 5. Open Issues Widget (retired)
 
-- **5.1** The headline states how many open issues the population has and how many machines they belong to.
-- **5.2** The Segments are Cosmetic, Minor, Major, and Unplayable, counting the population's open issues of each severity.
-- **5.3** Closed issues never contribute.
-- **5.4** Selecting a Segment sets the Open Issue Severity filter (machine-views §3.11) to that severity.
+- **5.1–5.4** _Retired 2026-09-27_ with the Open Issues Widget (§1). Numbers kept so older citations don't dangle.
 
 ---
 
@@ -60,4 +57,5 @@ _None — the current implementation matches this spec._
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-27 | Retired the Open Issues Widget (§1, §2.1, §2.2, §2.4, §5); the Machine View Severity filter stays. |
 | 2026-09-26 | Created. Establishes the Presence, Playability, and Open Issues widgets on Machines, Collections, and Tags. |

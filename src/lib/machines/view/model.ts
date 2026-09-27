@@ -283,31 +283,8 @@ function summarizePlayability(
   return { onTheFloor, byStatus };
 }
 
-function summarizeIssues(
-  rows: MachineViewCandidate[]
-): MachineViewSummary["issues"] {
-  const bySeverity: Record<IssueSeverity, number> = {
-    cosmetic: 0,
-    minor: 0,
-    major: 0,
-    unplayable: 0,
-  };
-  let openIssues = 0;
-  let machinesWithOpenIssues = 0;
-  for (const row of rows) {
-    const health = row.health;
-    if (health === undefined || health.openIssues === 0) continue;
-    openIssues += health.openIssues;
-    machinesWithOpenIssues += 1;
-    for (const severity of ISSUE_SEVERITIES) {
-      bySeverity[severity] += health.bySeverity[severity];
-    }
-  }
-  return { openIssues, machinesWithOpenIssues, bySeverity };
-}
-
 /**
- * Summary Widget counts (machine-widgets §3–§5). `allRows` is the route's
+ * Summary Widget counts (machine-widgets §3–§4). `allRows` is the route's
  * whole scope and `filteredRows` every row matching the current search and
  * filters; each widget counts the population its state parameter selects.
  * Rows must carry health enrichment.
@@ -315,10 +292,7 @@ function summarizeIssues(
 export function summarizeMachineView(
   allRows: MachineViewCandidate[],
   filteredRows: MachineViewCandidate[],
-  state: Pick<
-    MachineViewState,
-    "presenceWidget" | "playabilityWidget" | "issuesWidget"
-  >
+  state: Pick<MachineViewState, "presenceWidget" | "playabilityWidget">
 ): MachineViewSummary {
   const population = (
     choice: MachineViewState["presenceWidget"]
@@ -326,7 +300,6 @@ export function summarizeMachineView(
   return {
     presence: summarizePresence(population(state.presenceWidget)),
     playability: summarizePlayability(population(state.playabilityWidget)),
-    issues: summarizeIssues(population(state.issuesWidget)),
   };
 }
 
