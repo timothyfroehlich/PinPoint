@@ -22,7 +22,7 @@
 
 - **2.1** A machine may be linked to an iScored game by its game ID string (stored as text), or left unlinked.
 - **2.2** Linking can be set or cleared by users with the machine-management capability on the machine's Manage tab.
-- **2.3** Linking can be set or cleared via the `set_machine_iscored` MCP tool using machine initials or UUID.
+- **2.3** Linking can be set or cleared via the `update_machine` MCP tool's `iscoredGameId` field, using machine initials or UUID.
 - **2.4** Clearing a machine link removes the association in PinPoint immediately; no records on iScored are altered.
 
 ---
@@ -62,10 +62,9 @@ Removed 2026-09-16. The Info tab card's "View all on iScored" link replaces it: 
 
 ## Known divergences (code vs spec)
 
-| Spec | Code today | Resolution |
-| :-- | :-- | :-- |
-| §2.3 MCP tool | Handled via consolidated `update_machine` tool | PP-u4ab.18 |
-| §6.1 Fleet overview column | Not yet rendered | PP-h2bu.5 |
+| Spec                       | Code today       | Resolution |
+| :------------------------- | :--------------- | :--------- |
+| §6.1 Fleet overview column | Not yet rendered | PP-h2bu.5  |
 
 ---
 
@@ -73,6 +72,7 @@ Removed 2026-09-16. The Info tab card's "View all on iScored" link replaces it: 
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-26 | §2.3 names `update_machine`'s `iscoredGameId` field, replacing the removed `set_machine_iscored` tool (PP-u4ab.23); divergence row dropped. |
 | 2026-09-19 | Define Game link concept: public gameroom deep-link pattern (scrollTo={gameID}) used for "View all on iScored" and the card logo, distinct from the mobile score entry link. |
 | 2026-09-17 | §4.3 clarified: the iScored logo is a link only when the machine is linked; unlinked it is a plain image (CodeRabbit finding on #2134). |
 | 2026-09-16 | Design lock: Top Scores card moves to the rail under Details as top-three ranked rows with the iScored logo and an external "View all on iScored" link; §5 machine iScored tab removed; mockup added. Canvas: https://claude.ai/artifact/Rb7AXgxUVFwW8bEWFhhUgv |
