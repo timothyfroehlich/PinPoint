@@ -151,6 +151,10 @@ export function NotificationPreferencesForm({
 
   const [pendingNavigation, setPendingNavigation] =
     useState<PendingNavigation | null>(null);
+  const activeDialogRef = useRef<PendingNavigation | null>(null);
+  if (pendingNavigation !== null) {
+    activeDialogRef.current = pendingNavigation;
+  }
 
   const showDiscord = discordIntegrationEnabled;
 
@@ -326,8 +330,8 @@ export function NotificationPreferencesForm({
   };
 
   const handleDiscardAndLeave = (): void => {
-    const href =
-      pendingNavigation?.type === "href" ? pendingNavigation.href : null;
+    const currentNav = pendingNavigation ?? activeDialogRef.current;
+    const href = currentNav?.type === "href" ? currentNav.href : null;
     setPendingNavigation(null);
     setFormValues(baselinePreferences);
     setShowFeedback(false);
@@ -658,7 +662,8 @@ export function NotificationPreferencesForm({
         }}
       >
         <AlertDialogContent>
-          {pendingNavigation?.type === "discord" ? (
+          {(pendingNavigation ?? activeDialogRef.current)?.type ===
+          "discord" ? (
             <>
               <AlertDialogHeader>
                 <AlertDialogTitle>Unsaved preferences</AlertDialogTitle>
