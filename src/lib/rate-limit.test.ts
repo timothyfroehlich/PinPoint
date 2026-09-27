@@ -551,7 +551,7 @@ describe("rate-limit module — environment isolation & limiter behavior", () =>
       });
     });
 
-    it("keys on hashed user ID for authenticated requests (CORE-SEC-007)", async () => {
+    it("keys on hashed user ID for authenticated requests", async () => {
       vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://mock-redis.upstash.io");
       vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "mock-token-secret");
 
@@ -570,7 +570,7 @@ describe("rate-limit module — environment isolation & limiter behavior", () =>
 
       const result = await checkQuickSearchLimit("198.51.100.42", userId);
 
-      expect(limitMock).toHaveBeenCalledWith(`user:${expectedHash}`);
+      expect(limitMock).toHaveBeenCalledWith(expectedHash);
       expect(result).toEqual({
         success: true,
         limit: 120,

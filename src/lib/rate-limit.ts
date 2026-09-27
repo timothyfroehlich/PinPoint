@@ -466,14 +466,19 @@ export const checkMcpWriteLimit = makeLimitChecker(createMcpWriteLimiter, {
   keyType: "user",
 });
 
-const checkQuickSearchRawLimit = makeLimitChecker(createQuickSearchLimiter, {
-  label: "Quick search",
+const checkQuickSearchUserLimit = makeLimitChecker(createQuickSearchLimiter, {
+  label: "Quick search user",
+  keyType: "user",
+});
+
+const checkQuickSearchIpLimit = makeLimitChecker(createQuickSearchLimiter, {
+  label: "Quick search IP",
   keyType: "ip",
 });
 
 /**
  * Check quick search rate limit (120 requests/minute sliding window).
- * Keyed by user ID (hashed per CORE-SEC-007) for authenticated requests,
+ * Keyed by user ID (hashed per user key convention) for authenticated requests,
  * or client IP address for anonymous requests.
  *
  * @param ip - Client IP address
@@ -485,8 +490,9 @@ export async function checkQuickSearchLimit(
   ip: string,
   userId?: string | null
 ): Promise<RateLimitResult> {
-  const key = userId ? `user:${hashIdentifier(userId)}` : ip;
-  return checkQuickSearchRawLimit(key);
+  return userId
+    ? checkQuickSearchUserLimit(userId)
+    : checkQuickSearchIpLimit(ip);
 }
 
 /**
