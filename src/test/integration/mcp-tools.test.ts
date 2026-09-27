@@ -74,21 +74,13 @@ import type {
   McpCatalogFamilyResult,
 } from "~/lib/mcp/tools/search-pinballmap-catalog";
 import type { McpMachinePinballmap } from "~/lib/mcp/tools/pinballmap-block";
-import { runSetMachineAvailability } from "~/lib/mcp/tools/set-machine-availability";
-import {
-  runSetMachineIscored,
-  setMachineIscoredSchema,
-} from "~/lib/mcp/tools/set-machine-iscored";
-import { runSetMachineName } from "~/lib/mcp/tools/set-machine-name";
-import { runSetMachineOwner } from "~/lib/mcp/tools/set-machine-owner";
-import {
-  runSetMachinePinballmap,
-  setMachinePinballmapSchema,
-} from "~/lib/mcp/tools/set-machine-pinballmap";
-import { updateMachineSchema } from "~/app/(app)/m/schemas";
+import { updateMachineSchema as updateMachineFormSchema } from "~/app/(app)/m/schemas";
 import { updateMachinePbmLink } from "~/services/machines";
 import { runUpdateIssue } from "~/lib/mcp/tools/update-issue";
-import { runUpdateMachine } from "~/lib/mcp/tools/update-machine";
+import {
+  runUpdateMachine,
+  updateMachineSchema,
+} from "~/lib/mcp/tools/update-machine";
 import {
   McpToolError,
   resolveAssignee,
@@ -917,6 +909,21 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       ).rejects.toBeInstanceOf(McpToolError);
     });
 
+    it("reports the machine's iScored game ID", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({
+        name: "Jurassic Park",
+        iscoredGameId: "jp-555",
+      });
+
+      const outcome = await runGetMachine(
+        { machine: machine.initials },
+        ctx("admin", admin)
+      );
+      const result = outcome.result as { iscoredGameId: string | null };
+      expect(result.iscoredGameId).toBe("jp-555");
+    });
+
     describe("pinballmap block (PP-u4ab.8)", () => {
       it("reports the linked catalog title, edition family, model metadata and listing intent", async () => {
         const admin = await makeUser("admin");
@@ -1378,53 +1385,6 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
     });
   });
 
-  describe("set_machine_availability", () => {
-    it("changes presence for an admin and reports changed", async () => {
-      const admin = await makeUser("admin");
-      const machine = await seedMachine({ presenceStatus: "on_the_floor" });
-
-      const outcome = await runSetMachineAvailability(
-        { machine: machine.initials, presence: "off_the_floor" },
-        ctx("admin", admin)
-      );
-      const result = outcome.result as { presence: string; changed: boolean };
-
-      expect(result).toMatchObject({
-        presence: "off_the_floor",
-        changed: true,
-      });
-      const db = await getTestDb();
-      const row = await db.query.machines.findFirst({
-        where: eq(machines.id, machine.id),
-        columns: { presenceStatus: true },
-      });
-      expect(row?.presenceStatus).toBe("off_the_floor");
-    });
-
-    it("reports changed:false when already at that status", async () => {
-      const admin = await makeUser("admin");
-      const machine = await seedMachine({ presenceStatus: "on_the_floor" });
-
-      const outcome = await runSetMachineAvailability(
-        { machine: machine.initials, presence: "on_the_floor" },
-        ctx("admin", admin)
-      );
-      expect((outcome.result as { changed: boolean }).changed).toBe(false);
-    });
-
-    it("denies a member who does not own the machine", async () => {
-      const member = await makeUser("member");
-      const machine = await seedMachine({ ownerId: null });
-
-      await expect(
-        runSetMachineAvailability(
-          { machine: machine.initials, presence: "off_the_floor" },
-          ctx("member", member)
-        )
-      ).rejects.toMatchObject({ reason: "denied" });
-    });
-  });
-
   describe("add_machine", () => {
     it("creates a machine for an admin", async () => {
       const admin = await makeUser("admin");
@@ -1463,83 +1423,6 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
           ctx("admin", admin)
         )
       ).rejects.toMatchObject({ reason: "invalid" });
-    });
-  });
-
-  describe("set_machine_owner", () => {
-    it("sets the owner by full name for an admin", async () => {
-      const admin = await makeUser("admin");
-      await makeUser("member", "Dale", "Cooper");
-      const machine = await seedMachine({ ownerId: null });
-
-      const outcome = await runSetMachineOwner(
-        { machine: machine.initials, owner: "Dale Cooper" },
-        ctx("admin", admin)
-      );
-      expect((outcome.result as { owner: string | null }).owner).toBe(
-        "Dale Cooper"
-      );
-    });
-
-    it("sets the owner by a single-token name", async () => {
-      // The PP-if48 regression: last name is optional, so a Discord signup has
-      // none. Matching on `first_name || ' ' || last_name` compares
-      // "PresidentNick " against "PresidentNick" and finds nobody — the picker
-      // silently reports "no such member" for exactly the users the fix exists
-      // to make findable. The generated `name` column is btrimmed; this asserts
-      // the lookup uses it.
-      const admin = await makeUser("admin");
-      await makeUser("member", "PresidentNick", "");
-      const machine = await seedMachine({ ownerId: null });
-
-      const outcome = await runSetMachineOwner(
-        { machine: machine.initials, owner: "PresidentNick" },
-        ctx("admin", admin)
-      );
-      expect((outcome.result as { owner: string | null }).owner).toBe(
-        "PresidentNick"
-      );
-    });
-
-    it("clears the owner when owner is omitted", async () => {
-      const admin = await makeUser("admin");
-      const owner = await makeUser("member", "Gone", "Owner");
-      const machine = await seedMachine({ ownerId: owner });
-
-      const outcome = await runSetMachineOwner(
-        { machine: machine.initials },
-        ctx("admin", admin)
-      );
-      expect((outcome.result as { owner: string | null }).owner).toBeNull();
-
-      const db = await getTestDb();
-      const row = await db.query.machines.findFirst({
-        where: eq(machines.id, machine.id),
-        columns: { ownerId: true },
-      });
-      expect(row?.ownerId).toBeNull();
-    });
-
-    it("throws invalid for an unknown owner name", async () => {
-      const admin = await makeUser("admin");
-      const machine = await seedMachine();
-      await expect(
-        runSetMachineOwner(
-          { machine: machine.initials, owner: "Nobody Here" },
-          ctx("admin", admin)
-        )
-      ).rejects.toMatchObject({ reason: "not_found" });
-    });
-
-    it("denies a member who does not own the machine", async () => {
-      const member = await makeUser("member");
-      const machine = await seedMachine({ ownerId: null });
-      await expect(
-        runSetMachineOwner(
-          { machine: machine.initials, owner: member },
-          ctx("member", member)
-        )
-      ).rejects.toMatchObject({ reason: "denied" });
     });
   });
 
@@ -1639,1139 +1522,6 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
         .from(issues)
         .where(eq(issues.machineInitials, machine.initials));
       expect(rows).toHaveLength(2);
-    });
-  });
-
-  describe("set_machine_name (PP-u4ab.10)", () => {
-    /** Every timeline event recorded against a machine. */
-    async function timelineFor(machineId: string): Promise<
-      {
-        eventData: unknown;
-        authorId: string | null;
-      }[]
-    > {
-      const db = await getTestDb();
-      return db
-        .select({
-          eventData: timelineEvents.eventData,
-          authorId: timelineEvents.authorId,
-        })
-        .from(timelineEvents)
-        .where(eq(timelineEvents.machineId, machineId));
-    }
-
-    it("renames the machine and writes exactly one name_changed event", async () => {
-      const admin = await makeUser("admin");
-      const machine = await seedMachine({
-        name: "Elvira's House of Horrors",
-      });
-
-      const outcome = await runSetMachineName(
-        {
-          machine: machine.initials,
-          name: "Elvira's House of Horrors (Premium)",
-        },
-        ctx("admin", admin)
-      );
-
-      expect(outcome.result).toMatchObject({
-        initials: machine.initials,
-        name: "Elvira's House of Horrors (Premium)",
-        previousName: "Elvira's House of Horrors",
-        changed: true,
-      });
-
-      const db = await getTestDb();
-      const row = await db.query.machines.findFirst({
-        where: eq(machines.id, machine.id),
-        columns: { name: true, initials: true },
-      });
-      expect(row?.name).toBe("Elvira's House of Horrors (Premium)");
-      // Initials are the FK target for issues and the /m/<initials> URL — a
-      // rename must never touch them.
-      expect(row?.initials).toBe(machine.initials);
-
-      const events = await timelineFor(machine.id);
-      expect(events).toHaveLength(1);
-      expect(events[0]?.eventData).toEqual({
-        kind: "name_changed",
-        from: "Elvira's House of Horrors",
-        to: "Elvira's House of Horrors (Premium)",
-      });
-      expect(events[0]?.authorId).toBe(admin);
-    });
-
-    it("is a no-op when the name already matches, and says so", async () => {
-      const admin = await makeUser("admin");
-      const machine = await seedMachine({ name: "Medieval Madness" });
-
-      const outcome = await runSetMachineName(
-        { machine: machine.initials, name: "Medieval Madness" },
-        ctx("admin", admin)
-      );
-
-      // CORE-ARCH-012: nothing was written, so the response must not claim a
-      // change happened.
-      expect((outcome.result as { changed: boolean }).changed).toBe(false);
-      expect(await timelineFor(machine.id)).toHaveLength(0);
-    });
-
-    it("denies a member who does not own the machine", async () => {
-      const member = await makeUser("member");
-      const machine = await seedMachine({ ownerId: null, name: "Attack" });
-
-      await expect(
-        runSetMachineName(
-          { machine: machine.initials, name: "Attack from Mars" },
-          ctx("member", member)
-        )
-      ).rejects.toMatchObject({ reason: "denied" });
-
-      const db = await getTestDb();
-      const row = await db.query.machines.findFirst({
-        where: eq(machines.id, machine.id),
-        columns: { name: true },
-      });
-      expect(row?.name).toBe("Attack");
-    });
-
-    it("lets the machine's owner rename it", async () => {
-      const owner = await makeUser("member", "Pat", "Owner");
-      const machine = await seedMachine({ ownerId: owner, name: "Getaway" });
-
-      const outcome = await runSetMachineName(
-        { machine: machine.initials, name: "The Getaway: High Speed II" },
-        ctx("member", owner)
-      );
-
-      expect((outcome.result as { changed: boolean }).changed).toBe(true);
-    });
-
-    it("throws not_found when the machine is unknown", async () => {
-      const admin = await makeUser("admin");
-      await expect(
-        runSetMachineName({ machine: "NOPE", name: "x" }, ctx("admin", admin))
-      ).rejects.toMatchObject({ reason: "not_found" });
-    });
-  });
-
-  describe("set_machine_pinballmap (PP-u4ab.12)", () => {
-    async function pbmRow(machineId: string): Promise<{
-      pinballmapMachineId: number | null;
-      pinballmapExcluded: boolean;
-      pinballmapExcludedReason: string | null;
-      pinballmapIntent: "on" | "off" | "no_sync";
-      modelName: string | null;
-      manufacturer: string | null;
-      year: number | null;
-      opdbId: string | null;
-      ipdbId: number | null;
-    }> {
-      const db = await getTestDb();
-      const row = await db.query.machines.findFirst({
-        where: eq(machines.id, machineId),
-        columns: {
-          pinballmapMachineId: true,
-          pinballmapExcluded: true,
-          pinballmapExcludedReason: true,
-          modelName: true,
-          pinballmapIntent: true,
-          manufacturer: true,
-          year: true,
-          opdbId: true,
-          ipdbId: true,
-        },
-      });
-      if (!row) throw new Error("machine vanished");
-      return row;
-    }
-
-    async function timelineFor(machineId: string): Promise<
-      {
-        eventData: unknown;
-        authorId: string | null;
-      }[]
-    > {
-      const db = await getTestDb();
-      return db
-        .select({
-          eventData: timelineEvents.eventData,
-          authorId: timelineEvents.authorId,
-        })
-        .from(timelineEvents)
-        .where(eq(timelineEvents.machineId, machineId));
-    }
-
-    it("links an unlinked machine and derives the metadata from the catalog", async () => {
-      const admin = await makeUser("admin");
-      await seedElviraCatalog();
-      const machine = await seedMachine({ name: "Elvira" });
-
-      const outcome = await runSetMachinePinballmap(
-        { machine: machine.initials, pinballmapMachineId: ELVIRA_PREMIUM_ID },
-        ctx("admin", admin)
-      );
-
-      // The echo is the same shape `get_machine` returns — one description of a
-      // machine's PBM state, never a second one invented by the write path.
-      expect(outcome.result).toMatchObject({
-        initials: machine.initials,
-        previousPinballmap: null,
-        pinballmap: {
-          status: "linked",
-          pinballmapMachineId: ELVIRA_PREMIUM_ID,
-          catalogLookup: "found",
-          title: "Elvira's House of Horrors (Premium)",
-          manufacturer: "Stern",
-          year: 2019,
-          opdbId: "GRBN4-MQGE5",
-          ipdbId: 6587,
-          intent: "off",
-        },
-      });
-
-      // Model metadata is copied from the mirror, not accepted from the caller —
-      // there is no argument that can write these four columns.
-      expect(await pbmRow(machine.id)).toMatchObject({
-        pinballmapMachineId: ELVIRA_PREMIUM_ID,
-        manufacturer: "Stern",
-        year: 2019,
-        opdbId: "GRBN4-MQGE5",
-        ipdbId: 6587,
-      });
-    });
-
-    it("resets intent when an intent-On machine is re-targeted, and records the abandoned entry", async () => {
-      const db = await getTestDb();
-      const admin = await makeUser("admin");
-      await seedElviraCatalog();
-      // The entry the machine is about to walk away from has to be on the
-      // stored lineup, because that is where the abandonment is resolved from.
-      await seedLineup([{ id: 44_710, machineId: ELVIRA_PREMIUM_ID }]);
-      const machine = await seedMachine({
-        name: "Elvira",
-        pbm: {
-          pinballmapMachineId: ELVIRA_PREMIUM_ID,
-          pinballmapIntent: "on",
-          manufacturer: "Stern",
-          year: 2019,
-        },
-      });
-
-      const outcome = await runSetMachinePinballmap(
-        { machine: machine.initials, pinballmapMachineId: 70_013 },
-        ctx("admin", admin)
-      );
-
-      // The old public entry describes the OLD title, so it cannot follow the
-      // machine to the new one (PP-l81u / PP-o355.19).
-      expect(outcome.result).toMatchObject({
-        pinballmap: {
-          status: "linked",
-          pinballmapMachineId: 70_013,
-          title: "Elvira's House of Horrors (LE)",
-          intent: "off",
-        },
-      });
-      expect(await pbmRow(machine.id)).toMatchObject({
-        pinballmapMachineId: 70_013,
-        pinballmapIntent: "off",
-      });
-
-      // Resetting intent without writing down the live entry is what leaves an
-      // orphan on pinballmap.com that nobody can find.
-      const abandoned = await db
-        .select()
-        .from(pinballmapAbandonedListings)
-        .where(eq(pinballmapAbandonedListings.machineId, machine.id));
-      expect(abandoned).toHaveLength(1);
-      expect(abandoned[0]).toMatchObject({
-        lmxId: 44_710,
-        pinballmapMachineId: ELVIRA_PREMIUM_ID,
-      });
-    });
-
-    it("keeps intent when the SAME title is re-sent", async () => {
-      const admin = await makeUser("admin");
-      await seedElviraCatalog();
-      const machine = await seedMachine({
-        pbm: {
-          pinballmapMachineId: ELVIRA_PREMIUM_ID,
-          pinballmapIntent: "on",
-        },
-      });
-
-      await runSetMachinePinballmap(
-        { machine: machine.initials, pinballmapMachineId: ELVIRA_PREMIUM_ID },
-        ctx("admin", admin)
-      );
-
-      // The carry-over is the whole reason intent is read from the row rather
-      // than taken as an argument: a re-save that silently took a machine off
-      // the lineup is PP-o355.19.
-      expect(await pbmRow(machine.id)).toMatchObject({
-        pinballmapMachineId: ELVIRA_PREMIUM_ID,
-        pinballmapIntent: "on",
-      });
-    });
-
-    it("marks a machine excluded, clearing any existing link and its metadata", async () => {
-      const admin = await makeUser("admin");
-      await seedElviraCatalog();
-      const machine = await seedMachine({
-        pbm: {
-          pinballmapMachineId: ELVIRA_PREMIUM_ID,
-          manufacturer: "Stern",
-          year: 2019,
-        },
-      });
-
-      const outcome = await runSetMachinePinballmap(
-        {
-          machine: machine.initials,
-          pinballmapExcluded: true,
-          pinballmapExcludedReason: "Homebrew, not a catalog title",
-        },
-        ctx("admin", admin)
-      );
-
-      expect(outcome.result).toMatchObject({
-        pinballmap: {
-          status: "excluded",
-          reason: "Homebrew, not a catalog title",
-        },
-      });
-      // `machines_pinballmap_link_exclusive` forbids linked AND excluded, so the
-      // link has to come off in the same write — the row landing at all is the
-      // proof the CHECK held.
-      expect(await pbmRow(machine.id)).toMatchObject({
-        pinballmapMachineId: null,
-        pinballmapExcluded: true,
-        pinballmapExcludedReason: "Homebrew, not a catalog title",
-        manufacturer: null,
-        year: null,
-      });
-    });
-
-    it("leaves intent Off even when the title is already on the lineup", async () => {
-      // Auto-link used to capture the entry here and flip the machine on. Spec
-      // 5.1 forbids it: matching a cabinet to a title says what game it is, not
-      // that somebody wants it on a public lineup, and inferring the second
-      // from the first is exactly how a deliberate Off gets overridden.
-      //
-      // The honest result is the machine reading as Lingering afterwards — an
-      // entry on the lineup that nothing covers — which is a state with a
-      // control attached rather than a decision made on the operator's behalf.
-      const admin = await makeUser("admin");
-      await seedElviraCatalog();
-      await seedLineup([{ id: 88_001, machineId: ELVIRA_PREMIUM_ID }]);
-      const machine = await seedMachine({ name: "Elvira" });
-
-      const outcome = await runSetMachinePinballmap(
-        { machine: machine.initials, pinballmapMachineId: ELVIRA_PREMIUM_ID },
-        ctx("admin", admin)
-      );
-
-      expect(outcome.result).toMatchObject({
-        pinballmap: { status: "linked", intent: "off" },
-      });
-      expect(await pbmRow(machine.id)).toMatchObject({
-        pinballmapIntent: "off",
-      });
-    });
-
-    it("links a duplicate cabinet without disturbing the other one's intent", async () => {
-      const admin = await makeUser("admin");
-      await seedElviraCatalog();
-      await seedLineup([{ id: 88_001, machineId: ELVIRA_PREMIUM_ID }]);
-      const incumbent = await seedMachine({
-        name: "Elvira (by the door)",
-        pbm: {
-          pinballmapMachineId: ELVIRA_PREMIUM_ID,
-          pinballmapIntent: "on",
-        },
-      });
-      const duplicate = await seedMachine({ name: "Elvira (back row)" });
-
-      // Two cabinets of one title is ordinary in a 100+ machine collection, and
-      // under the coverage model (PP-o355.21) both may be On at once — there is
-      // no unique index left to trip. This must succeed quietly.
-      const outcome = await runSetMachinePinballmap(
-        { machine: duplicate.initials, pinballmapMachineId: ELVIRA_PREMIUM_ID },
-        ctx("admin", admin)
-      );
-
-      expect(outcome.result).toMatchObject({
-        pinballmap: {
-          status: "linked",
-          pinballmapMachineId: ELVIRA_PREMIUM_ID,
-          intent: "off",
-        },
-      });
-      // The other cabinet keeps its intent: an edit to one machine must never
-      // silently change what another says about the public lineup.
-      expect(await pbmRow(incumbent.id)).toMatchObject({
-        pinballmapIntent: "on",
-      });
-    });
-
-    it("denies a member who does not own the machine", async () => {
-      const member = await makeUser("member", "Not", "Owner");
-      await seedElviraCatalog();
-      const machine = await seedMachine({ name: "Elvira" });
-
-      await expect(
-        runSetMachinePinballmap(
-          { machine: machine.initials, pinballmapMachineId: ELVIRA_PREMIUM_ID },
-          ctx("member", member)
-        )
-      ).rejects.toMatchObject({ reason: "denied" });
-
-      // Denied means nothing was written, not "written and reported as denied".
-      expect(await pbmRow(machine.id)).toMatchObject({
-        pinballmapMachineId: null,
-      });
-    });
-
-    it("lets the machine's owner set its title", async () => {
-      const owner = await makeUser("member", "Pat", "Owner");
-      await seedElviraCatalog();
-      const machine = await seedMachine({ name: "Elvira", ownerId: owner });
-
-      await runSetMachinePinballmap(
-        { machine: machine.initials, pinballmapMachineId: ELVIRA_PREMIUM_ID },
-        ctx("member", owner)
-      );
-
-      expect(await pbmRow(machine.id)).toMatchObject({
-        pinballmapMachineId: ELVIRA_PREMIUM_ID,
-      });
-    });
-
-    it("refuses a call that states neither a title nor exclusion, instead of unlinking", async () => {
-      const admin = await makeUser("admin");
-      await seedElviraCatalog();
-      const machine = await seedMachine({
-        pbm: { pinballmapMachineId: ELVIRA_PREMIUM_ID, manufacturer: "Stern" },
-      });
-
-      await expect(
-        runSetMachinePinballmap(
-          { machine: machine.initials },
-          ctx("admin", admin)
-        )
-      ).rejects.toMatchObject({ reason: "invalid" });
-
-      // The resolver reads "neither" as "clear everything", which is right for a
-      // human emptying the picker and catastrophic for a forgotten argument.
-      expect(await pbmRow(machine.id)).toMatchObject({
-        pinballmapMachineId: ELVIRA_PREMIUM_ID,
-      });
-    });
-
-    it("refuses a call that is both linked and excluded", async () => {
-      const admin = await makeUser("admin");
-      await seedElviraCatalog();
-      const machine = await seedMachine();
-
-      await expect(
-        runSetMachinePinballmap(
-          {
-            machine: machine.initials,
-            pinballmapMachineId: ELVIRA_PREMIUM_ID,
-            pinballmapExcluded: true,
-          },
-          ctx("admin", admin)
-        )
-      ).rejects.toMatchObject({ reason: "invalid" });
-    });
-
-    it("rejects a catalog id the mirror does not have", async () => {
-      const admin = await makeUser("admin");
-      await seedElviraCatalog();
-      const machine = await seedMachine();
-
-      // The predictable mistake is passing a `machineGroupId` where a
-      // `pinballmapMachineId` belongs. A group id that matches no catalog row
-      // must fail rather than store a link to a title we cannot name.
-      await expect(
-        runSetMachinePinballmap(
-          { machine: machine.initials, pinballmapMachineId: ELVIRA_GROUP_ID },
-          ctx("admin", admin)
-        )
-      ).rejects.toMatchObject({ reason: "invalid" });
-      expect(await pbmRow(machine.id)).toMatchObject({
-        pinballmapMachineId: null,
-      });
-    });
-
-    it("throws not_found when the machine is unknown", async () => {
-      const admin = await makeUser("admin");
-      await expect(
-        runSetMachinePinballmap(
-          { machine: "NOPE", pinballmapMachineId: 1 },
-          ctx("admin", admin)
-        )
-      ).rejects.toMatchObject({ reason: "not_found" });
-    });
-
-    it("reports the state it actually replaced, read under the write's own lock", async () => {
-      const admin = await makeUser("admin");
-      await seedElviraCatalog();
-      const machine = await seedMachine({
-        name: "Elvira",
-        pbm: {
-          pinballmapMachineId: ELVIRA_PREMIUM_ID,
-          manufacturer: "Stern",
-          year: 2019,
-        },
-      });
-
-      const outcome = await runSetMachinePinballmap(
-        { machine: machine.initials, pinballmapMachineId: 70_013 },
-        ctx("admin", admin)
-      );
-
-      // `previousPinballmap` comes from the FOR UPDATE read inside the write,
-      // not from the resolve that ran before the permission check — so it names
-      // the state this call displaced even if something moved in between.
-      expect(outcome.result).toMatchObject({
-        previousPinballmap: {
-          status: "linked",
-          pinballmapMachineId: ELVIRA_PREMIUM_ID,
-        },
-        pinballmap: { status: "linked", pinballmapMachineId: 70_013 },
-      });
-    });
-
-    it("reports not_found, not a success payload, when the row is gone", async () => {
-      // Straight at the service: the tool's own `resolveMachine` would reject an
-      // unknown ref long before this guard, so the only way to exercise it is to
-      // hand the write a machineId that resolves to nothing. Without the guard
-      // this returned `ok` with the columns it MEANT to write — a confident
-      // wrong answer about a row that does not exist (CORE-ARCH-012).
-      const admin = await makeUser("admin");
-      await seedElviraCatalog();
-
-      const result = await updateMachinePbmLink({
-        machineId: randomUUID(),
-        actorUserId: admin,
-        selection: { pinballmapMachineId: ELVIRA_PREMIUM_ID },
-      });
-
-      expect(result).toMatchObject({ ok: false, reason: "not_found" });
-    });
-
-    it("keeps a stored exclusion reason when the exclusion is re-confirmed without one", async () => {
-      // The fleet pass (PP-h059) re-confirms exclusions it did not author, and
-      // the natural call carries no reason. Writing `reason ?? null` there would
-      // erase someone else's note on every machine it walked past — the same
-      // "a forgotten argument must not destroy stored state" rule that stops a
-      // missing id from wiping a link (CORE-ARCH-012).
-      const admin = await makeUser("admin");
-      const machine = await seedMachine({
-        name: "Unicorn Magic",
-        pbm: {
-          pinballmapExcluded: true,
-          pinballmapExcludedReason: "homebrew — one-off cabinet",
-        },
-      });
-
-      await runSetMachinePinballmap(
-        { machine: machine.initials, pinballmapExcluded: true },
-        ctx("admin", admin)
-      );
-
-      expect(await pbmRow(machine.id)).toMatchObject({
-        pinballmapExcluded: true,
-        pinballmapExcludedReason: "homebrew — one-off cabinet",
-      });
-    });
-
-    it("keeps a hand-entered model when the exclusion is re-confirmed", async () => {
-      // PP-3bbr put `modelName`/`manufacturer`/`year` in the same column set as
-      // the exclusion reason, and the resolver writes each as `value ?? null`.
-      // That is right for the edit form, which always posts all three — but
-      // `set_machine_pinballmap` has no field for ANY of them, so it cannot
-      // send them even in principle. Before the carry-over covered them, the
-      // fleet pass (PP-h059) re-confirming this machine's exclusion would have
-      // nulled the whole identity of a game whose only source is a person who
-      // typed it, flipping the Info tab's Model row to "Not specified".
-      const admin = await makeUser("admin");
-      const machine = await seedMachine({
-        name: "Fireball",
-        pbm: {
-          pinballmapExcluded: true,
-          pinballmapExcludedReason: "home-brew conversion",
-          modelName: "Fireball (home-brew conversion)",
-          manufacturer: "Bally",
-          year: 1972,
-        },
-      });
-
-      await runSetMachinePinballmap(
-        { machine: machine.initials, pinballmapExcluded: true },
-        ctx("admin", admin)
-      );
-
-      expect(await pbmRow(machine.id)).toMatchObject({
-        pinballmapExcluded: true,
-        pinballmapExcludedReason: "home-brew conversion",
-        modelName: "Fireball (home-brew conversion)",
-        manufacturer: "Bally",
-        year: 1972,
-      });
-    });
-
-    it("replaces a stored exclusion reason when the caller sends a new one", async () => {
-      // The carry-over is a floor, not a lock: a caller that states a reason
-      // still overwrites whatever was there.
-      const admin = await makeUser("admin");
-      const machine = await seedMachine({
-        name: "Border Town",
-        pbm: {
-          pinballmapExcluded: true,
-          pinballmapExcludedReason: "homebrew — one-off cabinet",
-        },
-      });
-
-      await runSetMachinePinballmap(
-        {
-          machine: machine.initials,
-          pinballmapExcluded: true,
-          pinballmapExcludedReason: "1940 pre-flipper, not a catalog title",
-        },
-        ctx("admin", admin)
-      );
-
-      expect(await pbmRow(machine.id)).toMatchObject({
-        pinballmapExcluded: true,
-        pinballmapExcludedReason: "1940 pre-flipper, not a catalog title",
-      });
-    });
-
-    it("does not carry a reason onto a machine that was not already excluded", async () => {
-      // The carry-over reads the STORED exclusion, so a machine being excluded
-      // for the first time gets no reason invented for it — and a machine
-      // moving from excluded to LINKED keeps none either (the resolver clears
-      // the whole column set on that branch).
-      const admin = await makeUser("admin");
-      await seedElviraCatalog();
-      const machine = await seedMachine({
-        name: "Hyperball",
-        pbm: {
-          pinballmapExcluded: true,
-          pinballmapExcludedReason: "rapid-fire hybrid, not a pinball title",
-        },
-      });
-
-      await runSetMachinePinballmap(
-        { machine: machine.initials, pinballmapMachineId: ELVIRA_PREMIUM_ID },
-        ctx("admin", admin)
-      );
-
-      expect(await pbmRow(machine.id)).toMatchObject({
-        pinballmapExcluded: false,
-        pinballmapExcludedReason: null,
-        pinballmapMachineId: ELVIRA_PREMIUM_ID,
-      });
-    });
-
-    it("rejects an empty exclusion reason, which the edit form must accept", () => {
-      // Deliberate divergence, not drift: an emptied input is how a human
-      // clears a reason, but from a tool call "" is a field filled with
-      // nothing — and accepting it would make the carry-over hinge on whether
-      // the caller sent "" or nothing at all.
-      expect(
-        setMachinePinballmapSchema
-          .pick({ pinballmapExcludedReason: true })
-          .safeParse({ pinballmapExcludedReason: "   " }).success
-      ).toBe(false);
-      expect(
-        updateMachineSchema
-          .pick({ pinballmapExcludedReason: true })
-          .safeParse({ pinballmapExcludedReason: "" }).success
-      ).toBe(true);
-    });
-
-    it("caps an exclusion reason exactly where the edit form caps it", () => {
-      // Both schemas write `pinballmap_excluded_reason`, and the edit form
-      // PREFILLS it. A reason accepted here but rejected there would render into
-      // an input that fails validation on every later save from that page,
-      // wedging the picker behind text the user never typed. Asserted against
-      // the form's own schema so the two cannot drift apart silently.
-      const tooLong = { pinballmapExcludedReason: "x".repeat(201) };
-      const atLimit = { pinballmapExcludedReason: "x".repeat(200) };
-
-      expect(
-        setMachinePinballmapSchema
-          .pick({ pinballmapExcludedReason: true })
-          .safeParse(tooLong).success
-      ).toBe(false);
-      expect(
-        updateMachineSchema
-          .pick({ pinballmapExcludedReason: true })
-          .safeParse(tooLong).success
-      ).toBe(false);
-
-      expect(
-        setMachinePinballmapSchema
-          .pick({ pinballmapExcludedReason: true })
-          .safeParse(atLimit).success
-      ).toBe(true);
-      expect(
-        updateMachineSchema
-          .pick({ pinballmapExcludedReason: true })
-          .safeParse(atLimit).success
-      ).toBe(true);
-    });
-
-    it("sets intent to on for an already linked machine and records a lifecycle timeline event", async () => {
-      const admin = await makeUser("admin");
-      await seedElviraCatalog();
-      const machine = await seedMachine({
-        name: "Elvira",
-        pbm: {
-          pinballmapMachineId: ELVIRA_PREMIUM_ID,
-          manufacturer: "Stern",
-          pinballmapIntent: "off",
-        },
-      });
-
-      const outcome = await runSetMachinePinballmap(
-        { machine: machine.initials, intent: "on" },
-        ctx("admin", admin)
-      );
-
-      expect(outcome.result).toMatchObject({
-        pinballmap: { status: "linked", intent: "on" },
-      });
-      expect(await pbmRow(machine.id)).toMatchObject({
-        pinballmapMachineId: ELVIRA_PREMIUM_ID,
-        pinballmapIntent: "on",
-      });
-
-      const events = await timelineFor(machine.id);
-      expect(events).toContainEqual({
-        authorId: admin,
-        eventData: { kind: "pinballmap_intent", intent: "on" },
-      });
-    });
-
-    it("sets intent to no_sync or off", async () => {
-      const admin = await makeUser("admin");
-      await seedElviraCatalog();
-      const machine = await seedMachine({
-        name: "Elvira",
-        pbm: {
-          pinballmapMachineId: ELVIRA_PREMIUM_ID,
-          manufacturer: "Stern",
-          pinballmapIntent: "on",
-        },
-      });
-
-      await runSetMachinePinballmap(
-        { machine: machine.initials, intent: "no_sync" },
-        ctx("admin", admin)
-      );
-      expect(await pbmRow(machine.id)).toMatchObject({
-        pinballmapIntent: "no_sync",
-      });
-
-      await runSetMachinePinballmap(
-        { machine: machine.initials, intent: "off" },
-        ctx("admin", admin)
-      );
-      expect(await pbmRow(machine.id)).toMatchObject({
-        pinballmapIntent: "off",
-      });
-    });
-
-    it("links a title and sets intent in a single call", async () => {
-      const admin = await makeUser("admin");
-      await seedElviraCatalog();
-      const machine = await seedMachine({ name: "Elvira" });
-
-      const outcome = await runSetMachinePinballmap(
-        {
-          machine: machine.initials,
-          pinballmapMachineId: ELVIRA_PREMIUM_ID,
-          intent: "on",
-        },
-        ctx("admin", admin)
-      );
-
-      expect(outcome.result).toMatchObject({
-        pinballmap: {
-          status: "linked",
-          pinballmapMachineId: ELVIRA_PREMIUM_ID,
-          intent: "on",
-        },
-      });
-      expect(await pbmRow(machine.id)).toMatchObject({
-        pinballmapMachineId: ELVIRA_PREMIUM_ID,
-        pinballmapIntent: "on",
-      });
-    });
-
-    it("refuses lineup intent for an unlinked machine", async () => {
-      const admin = await makeUser("admin");
-      const machine = await seedMachine({ name: "Unlinked Machine" });
-
-      await expect(
-        runSetMachinePinballmap(
-          { machine: machine.initials, intent: "on" },
-          ctx("admin", admin)
-        )
-      ).rejects.toMatchObject({
-        reason: "invalid",
-        message:
-          "A machine must be linked to a Pinball Map title to set lineup intent.",
-      });
-
-      await expect(
-        runSetMachinePinballmap(
-          { machine: machine.initials, intent: "no_sync" },
-          ctx("admin", admin)
-        )
-      ).rejects.toMatchObject({
-        reason: "invalid",
-        message:
-          "A machine must be linked to a Pinball Map title to set lineup intent.",
-      });
-
-      await expect(
-        runSetMachinePinballmap(
-          { machine: machine.initials, intent: "off" },
-          ctx("admin", admin)
-        )
-      ).rejects.toMatchObject({
-        reason: "invalid",
-        message:
-          "A machine must be linked to a Pinball Map title to set lineup intent.",
-      });
-    });
-
-    it("rejects pinballmapExcluded: false at schema validation", async () => {
-      const admin = await makeUser("admin");
-      const machine = await seedMachine({ name: "Unlinked Machine" });
-
-      await expect(
-        runSetMachinePinballmap(
-          // @ts-expect-error test schema validation for false
-          { machine: machine.initials, pinballmapExcluded: false },
-          ctx("admin", admin)
-        )
-      ).rejects.toMatchObject({
-        reason: "invalid",
-      });
-    });
-
-    it("sets intent to on for an already linked machine even when catalog mirror is empty", async () => {
-      const admin = await makeUser("admin");
-      // Note: seedElviraCatalog() is deliberately NOT called here — the catalog mirror is empty.
-      const UNCATALOGED_ID = 99_999;
-      const machine = await seedMachine({
-        name: "Rush",
-        pbm: {
-          pinballmapMachineId: UNCATALOGED_ID,
-          manufacturer: "Stern",
-          pinballmapIntent: "off",
-        },
-      });
-
-      const outcome = await runSetMachinePinballmap(
-        { machine: machine.initials, intent: "on" },
-        ctx("admin", admin)
-      );
-
-      expect(outcome.result).toMatchObject({
-        pinballmap: { status: "linked", intent: "on" },
-      });
-      expect(await pbmRow(machine.id)).toMatchObject({
-        pinballmapMachineId: UNCATALOGED_ID,
-        manufacturer: "Stern",
-        pinballmapIntent: "on",
-      });
-    });
-
-    it("refuses sync intent for an excluded machine", async () => {
-      const admin = await makeUser("admin");
-      const machine = await seedMachine({
-        name: "Homebrew",
-        pbm: {
-          pinballmapExcluded: true,
-          pinballmapExcludedReason: "custom one-off",
-        },
-      });
-
-      await expect(
-        runSetMachinePinballmap(
-          { machine: machine.initials, intent: "on" },
-          ctx("admin", admin)
-        )
-      ).rejects.toMatchObject({
-        reason: "invalid",
-        message:
-          "Uncataloged (excluded) machines do not participate in Pinball Map sync and cannot have a sync intent.",
-      });
-
-      await expect(
-        runSetMachinePinballmap(
-          { machine: machine.initials, intent: "no_sync" },
-          ctx("admin", admin)
-        )
-      ).rejects.toMatchObject({
-        reason: "invalid",
-        message:
-          "Uncataloged (excluded) machines do not participate in Pinball Map sync and cannot have a sync intent.",
-      });
-
-      await expect(
-        runSetMachinePinballmap(
-          {
-            machine: machine.initials,
-            pinballmapExcluded: true,
-            intent: "off",
-          },
-          ctx("admin", admin)
-        )
-      ).rejects.toMatchObject({
-        reason: "invalid",
-        message:
-          "Uncataloged (excluded) machines do not participate in Pinball Map sync and cannot have a sync intent.",
-      });
-    });
-
-    it("refuses intent on when retargeting to a different title", async () => {
-      const admin = await makeUser("admin");
-      await seedElviraCatalog();
-      const machine = await seedMachine({
-        name: "Elvira",
-        pbm: {
-          pinballmapMachineId: ELVIRA_PREMIUM_ID,
-          manufacturer: "Stern",
-          pinballmapIntent: "off",
-        },
-      });
-
-      await expect(
-        runSetMachinePinballmap(
-          {
-            machine: machine.initials,
-            pinballmapMachineId: ELVIRA_LE_ID,
-            intent: "on",
-          },
-          ctx("admin", admin)
-        )
-      ).rejects.toMatchObject({
-        reason: "invalid",
-        message:
-          "Retargeting a machine to a different title resets intent to 'off'. Setting intent to 'on' requires a separate action.",
-      });
-    });
-
-    it("refuses intent on when machine presence is pending_arrival or removed", async () => {
-      const admin = await makeUser("admin");
-      await seedElviraCatalog();
-      const pendingMachine = await seedMachine({
-        name: "Pending Elvira",
-        presenceStatus: "pending_arrival",
-        pbm: { pinballmapMachineId: ELVIRA_PREMIUM_ID },
-      });
-
-      await expect(
-        runSetMachinePinballmap(
-          { machine: pendingMachine.initials, intent: "on" },
-          ctx("admin", admin)
-        )
-      ).rejects.toMatchObject({
-        reason: "invalid",
-        message: "Blocked by Availability: Pending Arrival",
-      });
-
-      const removedMachine = await seedMachine({
-        name: "Removed Elvira",
-        presenceStatus: "removed",
-        pbm: { pinballmapMachineId: ELVIRA_PREMIUM_ID },
-      });
-
-      await expect(
-        runSetMachinePinballmap(
-          { machine: removedMachine.initials, intent: "on" },
-          ctx("admin", admin)
-        )
-      ).rejects.toMatchObject({
-        reason: "invalid",
-        message: "Blocked by Availability: Removed",
-      });
-    });
-  });
-
-  describe("set_machine_iscored (PP-h2bu.6)", () => {
-    it("links a machine to an iScored game ID", async () => {
-      const admin = await makeUser("admin");
-      const machine = await seedMachine({ name: "Ghostbusters" });
-
-      const outcome = await runSetMachineIscored(
-        { machine: machine.initials, gameId: "gb-pro-123" },
-        ctx("admin", admin)
-      );
-
-      expect(outcome.result).toMatchObject({
-        initials: machine.initials,
-        name: "Ghostbusters",
-        iscoredGameId: "gb-pro-123",
-        previousIscoredGameId: null,
-        changed: true,
-      });
-
-      const db = await getTestDb();
-      const row = await db.query.machines.findFirst({
-        where: eq(machines.id, machine.id),
-        columns: { iscoredGameId: true },
-      });
-      expect(row?.iscoredGameId).toBe("gb-pro-123");
-    });
-
-    it("accepts iscoredGameId as an alias for gameId", async () => {
-      const admin = await makeUser("admin");
-      const machine = await seedMachine({ name: "Deadpool" });
-
-      const outcome = await runSetMachineIscored(
-        { machine: machine.initials, iscoredGameId: "dp-prem-456" },
-        ctx("admin", admin)
-      );
-
-      expect(outcome.result).toMatchObject({
-        initials: machine.initials,
-        name: "Deadpool",
-        iscoredGameId: "dp-prem-456",
-        previousIscoredGameId: null,
-        changed: true,
-      });
-    });
-
-    it("clears an iScored link when gameId is empty or null", async () => {
-      const admin = await makeUser("admin");
-      const machine = await seedMachine({
-        name: "Godzilla",
-        iscoredGameId: "gz-789",
-      });
-
-      const outcome = await runSetMachineIscored(
-        { machine: machine.initials, gameId: null },
-        ctx("admin", admin)
-      );
-
-      expect(outcome.result).toMatchObject({
-        initials: machine.initials,
-        name: "Godzilla",
-        iscoredGameId: null,
-        previousIscoredGameId: "gz-789",
-        changed: true,
-      });
-
-      const db = await getTestDb();
-      const row = await db.query.machines.findFirst({
-        where: eq(machines.id, machine.id),
-        columns: { iscoredGameId: true },
-      });
-      expect(row?.iscoredGameId).toBeNull();
-    });
-
-    it("rejects unknown keys at schema validation via strictObject", () => {
-      const result = setMachineIscoredSchema.safeParse({
-        machine: "MM",
-        game_id: "12345",
-      });
-      expect(result.success).toBe(false);
-    });
-
-    it("is idempotent when the game ID already matches, and reports changed: false", async () => {
-      const admin = await makeUser("admin");
-      const machine = await seedMachine({
-        name: "Iron Maiden",
-        iscoredGameId: "im-101",
-      });
-
-      const outcome = await runSetMachineIscored(
-        { machine: machine.initials, gameId: "im-101" },
-        ctx("admin", admin)
-      );
-
-      expect((outcome.result as { changed: boolean }).changed).toBe(false);
-      expect(
-        (outcome.result as { iscoredGameId: string | null }).iscoredGameId
-      ).toBe("im-101");
-    });
-
-    it("denies a member who does not own the machine", async () => {
-      const member = await makeUser("member");
-      const machine = await seedMachine({
-        ownerId: null,
-        name: "Attack from Mars",
-      });
-
-      await expect(
-        runSetMachineIscored(
-          { machine: machine.initials, gameId: "afm-123" },
-          ctx("member", member)
-        )
-      ).rejects.toMatchObject({ reason: "denied" });
-
-      const db = await getTestDb();
-      const row = await db.query.machines.findFirst({
-        where: eq(machines.id, machine.id),
-        columns: { iscoredGameId: true },
-      });
-      expect(row?.iscoredGameId).toBeNull();
-    });
-
-    it("allows the machine owner or technician to update the link", async () => {
-      const owner = await makeUser("member", "Pat", "Owner");
-      const machine = await seedMachine({ ownerId: owner, name: "Getaway" });
-
-      const ownerOutcome = await runSetMachineIscored(
-        { machine: machine.initials, gameId: "gw-1" },
-        ctx("member", owner)
-      );
-      expect((ownerOutcome.result as { changed: boolean }).changed).toBe(true);
-
-      const tech = await makeUser("technician");
-      const techOutcome = await runSetMachineIscored(
-        { machine: machine.initials, gameId: "gw-2" },
-        ctx("technician", tech)
-      );
-      expect((techOutcome.result as { changed: boolean }).changed).toBe(true);
-      expect(
-        (techOutcome.result as { iscoredGameId: string | null }).iscoredGameId
-      ).toBe("gw-2");
-    });
-
-    it("throws not_found when the machine is unknown", async () => {
-      const admin = await makeUser("admin");
-      await expect(
-        runSetMachineIscored(
-          { machine: "NOPE", gameId: "123" },
-          ctx("admin", admin)
-        )
-      ).rejects.toMatchObject({ reason: "not_found" });
-    });
-
-    it("reflects iscoredGameId in get_machine", async () => {
-      const admin = await makeUser("admin");
-      const machine = await seedMachine({
-        name: "Jurassic Park",
-        iscoredGameId: "jp-555",
-      });
-
-      const outcome = await runGetMachine(
-        { machine: machine.initials },
-        ctx("admin", admin)
-      );
-      const result = outcome.result as { iscoredGameId: string | null };
-      expect(result.iscoredGameId).toBe("jp-555");
     });
   });
 
@@ -3811,6 +2561,60 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
   });
 
   describe("update_machine", () => {
+    async function pbmRow(machineId: string): Promise<{
+      pinballmapMachineId: number | null;
+      pinballmapExcluded: boolean;
+      pinballmapExcludedReason: string | null;
+      pinballmapIntent: "on" | "off" | "no_sync";
+      modelName: string | null;
+      manufacturer: string | null;
+      year: number | null;
+      opdbId: string | null;
+      ipdbId: number | null;
+    }> {
+      const db = await getTestDb();
+      const row = await db.query.machines.findFirst({
+        where: eq(machines.id, machineId),
+        columns: {
+          pinballmapMachineId: true,
+          pinballmapExcluded: true,
+          pinballmapExcludedReason: true,
+          modelName: true,
+          pinballmapIntent: true,
+          manufacturer: true,
+          year: true,
+          opdbId: true,
+          ipdbId: true,
+        },
+      });
+      if (!row) throw new Error("machine vanished");
+      return row;
+    }
+
+    /** Every timeline event recorded against a machine. */
+    async function timelineFor(machineId: string): Promise<
+      {
+        eventData: unknown;
+        authorId: string | null;
+      }[]
+    > {
+      const db = await getTestDb();
+      return db
+        .select({
+          eventData: timelineEvents.eventData,
+          authorId: timelineEvents.authorId,
+        })
+        .from(timelineEvents)
+        .where(eq(timelineEvents.machineId, machineId));
+    }
+
+    it("throws not_found when the machine is unknown", async () => {
+      const admin = await makeUser("admin");
+      await expect(
+        runUpdateMachine({ machine: "NOPE", name: "x" }, ctx("admin", admin))
+      ).rejects.toMatchObject({ reason: "not_found" });
+    });
+
     it("updates machine name individually and detects no-op", async () => {
       const admin = await makeUser("admin");
       const machine = await seedMachine({ name: "Old Name" });
@@ -3835,6 +2639,17 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
         where: eq(machines.id, machine.id),
       });
       expect(updated?.name).toBe("New Name");
+      // Initials are the FK target for issues and the /m/<initials> URL — a
+      // rename must never touch them.
+      expect(updated?.initials).toBe(machine.initials);
+
+      const events = await timelineFor(machine.id);
+      expect(events).toEqual([
+        {
+          authorId: admin,
+          eventData: { kind: "name_changed", from: "Old Name", to: "New Name" },
+        },
+      ]);
 
       // No-op when unchanged
       const noop = await runUpdateMachine(
@@ -3849,6 +2664,8 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
           changed: false,
         },
       ]);
+      // CORE-ARCH-012: nothing was written, so no second event either.
+      expect(await timelineFor(machine.id)).toHaveLength(1);
     });
 
     it("updates machine presenceStatus individually and detects no-op", async () => {
@@ -3966,6 +2783,43 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
         where: eq(machines.id, machine.id),
       });
       expect(row?.ownerId).toBeNull();
+
+      // An empty string is the other documented clear, not a name lookup.
+      await runUpdateMachine(
+        { machine: machine.initials, owner: member1 },
+        ctx("admin", admin)
+      );
+      const clearEmpty = await runUpdateMachine(
+        { machine: machine.initials, owner: "" },
+        ctx("admin", admin)
+      );
+      expect(clearEmpty.applied).toEqual([
+        { field: "owner", from: "Ada Lovelace", to: null, changed: true },
+      ]);
+      row = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(row?.ownerId).toBeNull();
+    });
+
+    it("clears iscoredGameId with an empty string", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ iscoredGameId: "gz-789" });
+
+      const outcome = await runUpdateMachine(
+        { machine: machine.initials, iscoredGameId: "" },
+        ctx("admin", admin)
+      );
+      expect(outcome.applied).toEqual([
+        { field: "iscoredGameId", from: "gz-789", to: null, changed: true },
+      ]);
+
+      const db = await getTestDb();
+      const row = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+        columns: { iscoredGameId: true },
+      });
+      expect(row?.iscoredGameId).toBeNull();
     });
 
     it("rejects invalid owner names and guest owners", async () => {
@@ -3988,6 +2842,33 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       ).rejects.toMatchObject({ reason: "invalid" });
     });
 
+    it("sets the owner by a single-token name", async () => {
+      // The PP-if48 regression: last name is optional, so a Discord signup has
+      // none. Matching on `first_name || ' ' || last_name` compares
+      // "PresidentNick " against "PresidentNick" and finds nobody — the picker
+      // silently reports "no such member" for exactly the users the fix exists
+      // to make findable. The generated `name` column is btrimmed; this asserts
+      // the lookup uses it.
+      const admin = await makeUser("admin");
+      const member = await makeUser("member", "PresidentNick", "");
+      const machine = await seedMachine({ ownerId: null });
+
+      const outcome = await runUpdateMachine(
+        { machine: machine.initials, owner: "PresidentNick" },
+        ctx("admin", admin)
+      );
+      expect(outcome.applied).toEqual([
+        { field: "owner", from: null, to: "PresidentNick", changed: true },
+      ]);
+
+      const db = await getTestDb();
+      const row = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+        columns: { ownerId: true },
+      });
+      expect(row?.ownerId).toBe(member);
+    });
+
     it("updates pinballmapMachineId individually and detects no-op", async () => {
       await seedElviraCatalog();
       const admin = await makeUser("admin");
@@ -4006,11 +2887,15 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
         },
       ]);
 
-      const db = await getTestDb();
-      const row = await db.query.machines.findFirst({
-        where: eq(machines.id, machine.id),
+      // Model metadata is copied from the mirror, not accepted from the caller —
+      // there is no argument that can write these four columns.
+      expect(await pbmRow(machine.id)).toMatchObject({
+        pinballmapMachineId: ELVIRA_PREMIUM_ID,
+        manufacturer: "Stern",
+        year: 2019,
+        opdbId: "GRBN4-MQGE5",
+        ipdbId: 6587,
       });
-      expect(row?.pinballmapMachineId).toBe(ELVIRA_PREMIUM_ID);
 
       // Re-link with same id is a no-op
       const noop = await runUpdateMachine(
@@ -4404,6 +3289,638 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
           changed: true,
         },
       ]);
+
+      // A technician may edit a machine they do not own
+      const tech = await makeUser("technician");
+      const techOutcome = await runUpdateMachine(
+        { machine: machine.initials, iscoredGameId: "tech-1" },
+        ctx("technician", tech)
+      );
+      expect(techOutcome.applied).toEqual([
+        { field: "iscoredGameId", from: null, to: "tech-1", changed: true },
+      ]);
+    });
+
+    describe("Pinball Map fields", () => {
+      it("denies a member who does not own the machine, writing nothing", async () => {
+        const member = await makeUser("member", "Not", "Owner");
+        await seedElviraCatalog();
+        const machine = await seedMachine({ name: "Elvira" });
+
+        await expect(
+          runUpdateMachine(
+            {
+              machine: machine.initials,
+              pinballmapMachineId: ELVIRA_PREMIUM_ID,
+            },
+            ctx("member", member)
+          )
+        ).rejects.toMatchObject({ reason: "denied" });
+
+        expect(await pbmRow(machine.id)).toMatchObject({
+          pinballmapMachineId: null,
+        });
+      });
+
+      it("lets the machine's owner set its title", async () => {
+        const owner = await makeUser("member", "Pat", "Owner");
+        await seedElviraCatalog();
+        const machine = await seedMachine({ name: "Elvira", ownerId: owner });
+
+        await runUpdateMachine(
+          { machine: machine.initials, pinballmapMachineId: ELVIRA_PREMIUM_ID },
+          ctx("member", owner)
+        );
+
+        expect(await pbmRow(machine.id)).toMatchObject({
+          pinballmapMachineId: ELVIRA_PREMIUM_ID,
+        });
+      });
+
+      it("rejects a catalog id the mirror does not have", async () => {
+        const admin = await makeUser("admin");
+        await seedElviraCatalog();
+        const machine = await seedMachine();
+
+        // The predictable mistake is passing a `machineGroupId` where a
+        // `pinballmapMachineId` belongs. A group id that matches no catalog row
+        // must fail rather than store a link to a title we cannot name.
+        await expect(
+          runUpdateMachine(
+            { machine: machine.initials, pinballmapMachineId: ELVIRA_GROUP_ID },
+            ctx("admin", admin)
+          )
+        ).rejects.toMatchObject({ reason: "invalid" });
+        expect(await pbmRow(machine.id)).toMatchObject({
+          pinballmapMachineId: null,
+        });
+      });
+
+      it("rejects pinballmapExcluded: false at schema validation", async () => {
+        const admin = await makeUser("admin");
+        const machine = await seedMachine();
+
+        await expect(
+          runUpdateMachine(
+            // @ts-expect-error test schema validation for false
+            { machine: machine.initials, pinballmapExcluded: false },
+            ctx("admin", admin)
+          )
+        ).rejects.toMatchObject({ reason: "invalid" });
+      });
+
+      it("rejects an empty exclusion reason, which the edit form must accept", () => {
+        // Deliberate divergence, not drift: an emptied input is how a human
+        // clears a reason, but from a tool call "" is a field filled with
+        // nothing — and accepting it would make the carry-over hinge on whether
+        // the caller sent "" or nothing at all.
+        expect(
+          updateMachineSchema.safeParse({
+            machine: "MM",
+            pinballmapExcluded: true,
+            pinballmapExcludedReason: "   ",
+          }).success
+        ).toBe(false);
+        expect(
+          updateMachineFormSchema
+            .pick({ pinballmapExcludedReason: true })
+            .safeParse({ pinballmapExcludedReason: "" }).success
+        ).toBe(true);
+      });
+
+      it("caps an exclusion reason exactly where the edit form caps it", () => {
+        // Both schemas write `pinballmap_excluded_reason`, and the edit form
+        // PREFILLS it. A reason accepted here but rejected there would render
+        // into an input that fails validation on every later save from that
+        // page, wedging the picker behind text the user never typed. Asserted
+        // against the form's own schema so the two cannot drift apart silently.
+        const toolArgs = (reason: string): Record<string, unknown> => ({
+          machine: "MM",
+          pinballmapExcluded: true,
+          pinballmapExcludedReason: reason,
+        });
+        const formSchema = updateMachineFormSchema.pick({
+          pinballmapExcludedReason: true,
+        });
+
+        expect(
+          updateMachineSchema.safeParse(toolArgs("x".repeat(201))).success
+        ).toBe(false);
+        expect(
+          formSchema.safeParse({ pinballmapExcludedReason: "x".repeat(201) })
+            .success
+        ).toBe(false);
+
+        expect(
+          updateMachineSchema.safeParse(toolArgs("x".repeat(200))).success
+        ).toBe(true);
+        expect(
+          formSchema.safeParse({ pinballmapExcludedReason: "x".repeat(200) })
+            .success
+        ).toBe(true);
+      });
+
+      it("resets intent when an intent-On machine is re-targeted, reports the replaced title, and records the abandoned entry", async () => {
+        const db = await getTestDb();
+        const admin = await makeUser("admin");
+        await seedElviraCatalog();
+        // The entry the machine is about to walk away from has to be on the
+        // stored lineup, because that is where the abandonment is resolved from.
+        await seedLineup([{ id: 44_710, machineId: ELVIRA_PREMIUM_ID }]);
+        const machine = await seedMachine({
+          name: "Elvira",
+          pbm: {
+            pinballmapMachineId: ELVIRA_PREMIUM_ID,
+            pinballmapIntent: "on",
+            manufacturer: "Stern",
+            year: 2019,
+          },
+        });
+
+        const outcome = await runUpdateMachine(
+          { machine: machine.initials, pinballmapMachineId: ELVIRA_LE_ID },
+          ctx("admin", admin)
+        );
+
+        // `from` comes from the FOR UPDATE read inside the write, not from the
+        // resolve that ran before the permission check — so it names the state
+        // this call displaced even if something moved in between.
+        expect(outcome.applied).toEqual([
+          {
+            field: "pinballmapMachineId",
+            from: String(ELVIRA_PREMIUM_ID),
+            to: String(ELVIRA_LE_ID),
+            changed: true,
+          },
+        ]);
+        // The old public entry describes the OLD title, so it cannot follow the
+        // machine to the new one (PP-l81u / PP-o355.19).
+        expect(await pbmRow(machine.id)).toMatchObject({
+          pinballmapMachineId: ELVIRA_LE_ID,
+          pinballmapIntent: "off",
+        });
+
+        // Resetting intent without writing down the live entry is what leaves an
+        // orphan on pinballmap.com that nobody can find.
+        const abandoned = await db
+          .select()
+          .from(pinballmapAbandonedListings)
+          .where(eq(pinballmapAbandonedListings.machineId, machine.id));
+        expect(abandoned).toHaveLength(1);
+        expect(abandoned[0]).toMatchObject({
+          lmxId: 44_710,
+          pinballmapMachineId: ELVIRA_PREMIUM_ID,
+        });
+      });
+
+      it("keeps intent when the SAME title is re-sent", async () => {
+        const admin = await makeUser("admin");
+        await seedElviraCatalog();
+        const machine = await seedMachine({
+          pbm: {
+            pinballmapMachineId: ELVIRA_PREMIUM_ID,
+            pinballmapIntent: "on",
+          },
+        });
+
+        await runUpdateMachine(
+          { machine: machine.initials, pinballmapMachineId: ELVIRA_PREMIUM_ID },
+          ctx("admin", admin)
+        );
+
+        // The carry-over is the whole reason intent is read from the row rather
+        // than taken from the title write: a re-save that silently took a
+        // machine off the lineup is PP-o355.19.
+        expect(await pbmRow(machine.id)).toMatchObject({
+          pinballmapMachineId: ELVIRA_PREMIUM_ID,
+          pinballmapIntent: "on",
+        });
+      });
+
+      it("leaves intent Off even when the title is already on the lineup", async () => {
+        // Matching a cabinet to a title says what game it is, not that somebody
+        // wants it on a public lineup (spec 5.1). The machine reads as Lingering
+        // afterwards — a state with a control attached rather than a decision
+        // made on the operator's behalf.
+        const admin = await makeUser("admin");
+        await seedElviraCatalog();
+        await seedLineup([{ id: 88_001, machineId: ELVIRA_PREMIUM_ID }]);
+        const machine = await seedMachine({ name: "Elvira" });
+
+        await runUpdateMachine(
+          { machine: machine.initials, pinballmapMachineId: ELVIRA_PREMIUM_ID },
+          ctx("admin", admin)
+        );
+
+        expect(await pbmRow(machine.id)).toMatchObject({
+          pinballmapMachineId: ELVIRA_PREMIUM_ID,
+          pinballmapIntent: "off",
+        });
+      });
+
+      it("links a duplicate cabinet without disturbing the other one's intent", async () => {
+        const admin = await makeUser("admin");
+        await seedElviraCatalog();
+        await seedLineup([{ id: 88_001, machineId: ELVIRA_PREMIUM_ID }]);
+        const incumbent = await seedMachine({
+          name: "Elvira (by the door)",
+          pbm: {
+            pinballmapMachineId: ELVIRA_PREMIUM_ID,
+            pinballmapIntent: "on",
+          },
+        });
+        const duplicate = await seedMachine({ name: "Elvira (back row)" });
+
+        // Two cabinets of one title is ordinary in a 100+ machine collection,
+        // and under the coverage model (PP-o355.21) both may be On at once.
+        await runUpdateMachine(
+          {
+            machine: duplicate.initials,
+            pinballmapMachineId: ELVIRA_PREMIUM_ID,
+          },
+          ctx("admin", admin)
+        );
+
+        expect(await pbmRow(duplicate.id)).toMatchObject({
+          pinballmapMachineId: ELVIRA_PREMIUM_ID,
+          pinballmapIntent: "off",
+        });
+        // An edit to one machine must never silently change what another says
+        // about the public lineup.
+        expect(await pbmRow(incumbent.id)).toMatchObject({
+          pinballmapIntent: "on",
+        });
+      });
+
+      it("marks a machine excluded, clearing any existing link and its metadata", async () => {
+        const admin = await makeUser("admin");
+        await seedElviraCatalog();
+        const machine = await seedMachine({
+          pbm: {
+            pinballmapMachineId: ELVIRA_PREMIUM_ID,
+            manufacturer: "Stern",
+            year: 2019,
+          },
+        });
+
+        await runUpdateMachine(
+          {
+            machine: machine.initials,
+            pinballmapExcluded: true,
+            pinballmapExcludedReason: "Homebrew, not a catalog title",
+          },
+          ctx("admin", admin)
+        );
+
+        // `machines_pinballmap_link_exclusive` forbids linked AND excluded, so
+        // the link has to come off in the same write — the row landing at all
+        // is the proof the CHECK held.
+        expect(await pbmRow(machine.id)).toMatchObject({
+          pinballmapMachineId: null,
+          pinballmapExcluded: true,
+          pinballmapExcludedReason: "Homebrew, not a catalog title",
+          manufacturer: null,
+          year: null,
+        });
+      });
+
+      it("keeps a stored exclusion reason when the exclusion is re-confirmed without one", async () => {
+        // The fleet pass (PP-h059) re-confirms exclusions it did not author,
+        // and the natural call carries no reason. Writing `reason ?? null` there
+        // would erase someone else's note on every machine it walked past
+        // (CORE-ARCH-012).
+        const admin = await makeUser("admin");
+        const machine = await seedMachine({
+          name: "Unicorn Magic",
+          pbm: {
+            pinballmapExcluded: true,
+            pinballmapExcludedReason: "homebrew — one-off cabinet",
+          },
+        });
+
+        await runUpdateMachine(
+          { machine: machine.initials, pinballmapExcluded: true },
+          ctx("admin", admin)
+        );
+
+        expect(await pbmRow(machine.id)).toMatchObject({
+          pinballmapExcluded: true,
+          pinballmapExcludedReason: "homebrew — one-off cabinet",
+        });
+      });
+
+      it("keeps a hand-entered model when the exclusion is re-confirmed", async () => {
+        // PP-3bbr put `modelName`/`manufacturer`/`year` in the same column set
+        // as the exclusion reason, and the resolver writes each as
+        // `value ?? null`. That is right for the edit form, which always posts
+        // all three — but `update_machine` has no field for ANY of them.
+        // Without the carry-over, re-confirming this machine's exclusion would
+        // null the whole identity of a game whose only source is a person who
+        // typed it.
+        const admin = await makeUser("admin");
+        const machine = await seedMachine({
+          name: "Fireball",
+          pbm: {
+            pinballmapExcluded: true,
+            pinballmapExcludedReason: "home-brew conversion",
+            modelName: "Fireball (home-brew conversion)",
+            manufacturer: "Bally",
+            year: 1972,
+          },
+        });
+
+        await runUpdateMachine(
+          { machine: machine.initials, pinballmapExcluded: true },
+          ctx("admin", admin)
+        );
+
+        expect(await pbmRow(machine.id)).toMatchObject({
+          pinballmapExcluded: true,
+          pinballmapExcludedReason: "home-brew conversion",
+          modelName: "Fireball (home-brew conversion)",
+          manufacturer: "Bally",
+          year: 1972,
+        });
+      });
+
+      it("replaces a stored exclusion reason when the caller sends a new one", async () => {
+        // The carry-over is a floor, not a lock.
+        const admin = await makeUser("admin");
+        const machine = await seedMachine({
+          name: "Border Town",
+          pbm: {
+            pinballmapExcluded: true,
+            pinballmapExcludedReason: "homebrew — one-off cabinet",
+          },
+        });
+
+        await runUpdateMachine(
+          {
+            machine: machine.initials,
+            pinballmapExcluded: true,
+            pinballmapExcludedReason: "1940 pre-flipper, not a catalog title",
+          },
+          ctx("admin", admin)
+        );
+
+        expect(await pbmRow(machine.id)).toMatchObject({
+          pinballmapExcluded: true,
+          pinballmapExcludedReason: "1940 pre-flipper, not a catalog title",
+        });
+      });
+
+      it("drops the exclusion reason when an excluded machine is linked", async () => {
+        const admin = await makeUser("admin");
+        await seedElviraCatalog();
+        const machine = await seedMachine({
+          name: "Hyperball",
+          pbm: {
+            pinballmapExcluded: true,
+            pinballmapExcludedReason: "rapid-fire hybrid, not a pinball title",
+          },
+        });
+
+        await runUpdateMachine(
+          { machine: machine.initials, pinballmapMachineId: ELVIRA_PREMIUM_ID },
+          ctx("admin", admin)
+        );
+
+        expect(await pbmRow(machine.id)).toMatchObject({
+          pinballmapExcluded: false,
+          pinballmapExcludedReason: null,
+          pinballmapMachineId: ELVIRA_PREMIUM_ID,
+        });
+      });
+
+      it("sets intent to on for a linked machine, keeps the link, and records a lifecycle timeline event", async () => {
+        const admin = await makeUser("admin");
+        await seedElviraCatalog();
+        const machine = await seedMachine({
+          name: "Elvira",
+          pbm: {
+            pinballmapMachineId: ELVIRA_PREMIUM_ID,
+            manufacturer: "Stern",
+            pinballmapIntent: "off",
+          },
+        });
+
+        await runUpdateMachine(
+          { machine: machine.initials, intent: "on" },
+          ctx("admin", admin)
+        );
+
+        // An intent-only call supplies no title and no exclusion; the resolver
+        // must not read that as "clear the link".
+        expect(await pbmRow(machine.id)).toMatchObject({
+          pinballmapMachineId: ELVIRA_PREMIUM_ID,
+          manufacturer: "Stern",
+          pinballmapIntent: "on",
+        });
+        expect(await timelineFor(machine.id)).toContainEqual({
+          authorId: admin,
+          eventData: { kind: "pinballmap_intent", intent: "on" },
+        });
+
+        await runUpdateMachine(
+          { machine: machine.initials, intent: "no_sync" },
+          ctx("admin", admin)
+        );
+        expect(await pbmRow(machine.id)).toMatchObject({
+          pinballmapIntent: "no_sync",
+        });
+      });
+
+      it("sets intent to on for a linked machine even when the catalog mirror is empty", async () => {
+        const admin = await makeUser("admin");
+        // seedElviraCatalog() is deliberately NOT called — the mirror is empty.
+        const UNCATALOGED_ID = 99_999;
+        const machine = await seedMachine({
+          name: "Rush",
+          pbm: {
+            pinballmapMachineId: UNCATALOGED_ID,
+            manufacturer: "Stern",
+            pinballmapIntent: "off",
+          },
+        });
+
+        await runUpdateMachine(
+          { machine: machine.initials, intent: "on" },
+          ctx("admin", admin)
+        );
+
+        expect(await pbmRow(machine.id)).toMatchObject({
+          pinballmapMachineId: UNCATALOGED_ID,
+          manufacturer: "Stern",
+          pinballmapIntent: "on",
+        });
+      });
+
+      it("links a title and sets intent in a single call", async () => {
+        const admin = await makeUser("admin");
+        await seedElviraCatalog();
+        const machine = await seedMachine({ name: "Elvira" });
+
+        const outcome = await runUpdateMachine(
+          {
+            machine: machine.initials,
+            pinballmapMachineId: ELVIRA_PREMIUM_ID,
+            intent: "on",
+          },
+          ctx("admin", admin)
+        );
+
+        expect(outcome.applied).toEqual([
+          {
+            field: "pinballmapMachineId",
+            from: null,
+            to: String(ELVIRA_PREMIUM_ID),
+            changed: true,
+          },
+          { field: "intent", from: "off", to: "on", changed: true },
+        ]);
+        expect(await pbmRow(machine.id)).toMatchObject({
+          pinballmapMachineId: ELVIRA_PREMIUM_ID,
+          pinballmapIntent: "on",
+        });
+      });
+
+      it("refuses lineup intent for an unlinked machine", async () => {
+        const admin = await makeUser("admin");
+        const machine = await seedMachine({ name: "Unlinked Machine" });
+
+        for (const intent of ["on", "no_sync", "off"] as const) {
+          await expect(
+            runUpdateMachine(
+              { machine: machine.initials, intent },
+              ctx("admin", admin)
+            )
+          ).rejects.toMatchObject({
+            reason: "invalid",
+            message:
+              "A machine must be linked to a Pinball Map title to set lineup intent.",
+          });
+        }
+      });
+
+      it("refuses sync intent for an excluded machine", async () => {
+        const admin = await makeUser("admin");
+        const machine = await seedMachine({
+          name: "Homebrew",
+          pbm: {
+            pinballmapExcluded: true,
+            pinballmapExcludedReason: "custom one-off",
+          },
+        });
+        const message =
+          "Uncataloged (excluded) machines do not participate in Pinball Map sync and cannot have a sync intent.";
+
+        await expect(
+          runUpdateMachine(
+            { machine: machine.initials, intent: "on" },
+            ctx("admin", admin)
+          )
+        ).rejects.toMatchObject({ reason: "invalid", message });
+
+        await expect(
+          runUpdateMachine(
+            { machine: machine.initials, intent: "no_sync" },
+            ctx("admin", admin)
+          )
+        ).rejects.toMatchObject({ reason: "invalid", message });
+
+        await expect(
+          runUpdateMachine(
+            {
+              machine: machine.initials,
+              pinballmapExcluded: true,
+              intent: "off",
+            },
+            ctx("admin", admin)
+          )
+        ).rejects.toMatchObject({ reason: "invalid", message });
+      });
+
+      it("refuses intent on when retargeting to a different title", async () => {
+        const admin = await makeUser("admin");
+        await seedElviraCatalog();
+        const machine = await seedMachine({
+          name: "Elvira",
+          pbm: {
+            pinballmapMachineId: ELVIRA_PREMIUM_ID,
+            manufacturer: "Stern",
+            pinballmapIntent: "off",
+          },
+        });
+
+        await expect(
+          runUpdateMachine(
+            {
+              machine: machine.initials,
+              pinballmapMachineId: ELVIRA_LE_ID,
+              intent: "on",
+            },
+            ctx("admin", admin)
+          )
+        ).rejects.toMatchObject({
+          reason: "invalid",
+          message:
+            "Retargeting a machine to a different title resets intent to 'off'. Setting intent to 'on' requires a separate action.",
+        });
+      });
+
+      it("refuses intent on when machine presence is pending_arrival or removed", async () => {
+        const admin = await makeUser("admin");
+        await seedElviraCatalog();
+        const pendingMachine = await seedMachine({
+          name: "Pending Elvira",
+          presenceStatus: "pending_arrival",
+          pbm: { pinballmapMachineId: ELVIRA_PREMIUM_ID },
+        });
+
+        await expect(
+          runUpdateMachine(
+            { machine: pendingMachine.initials, intent: "on" },
+            ctx("admin", admin)
+          )
+        ).rejects.toMatchObject({
+          reason: "invalid",
+          message: "Blocked by Availability: Pending Arrival",
+        });
+
+        const removedMachine = await seedMachine({
+          name: "Removed Elvira",
+          presenceStatus: "removed",
+          pbm: { pinballmapMachineId: ELVIRA_PREMIUM_ID },
+        });
+
+        await expect(
+          runUpdateMachine(
+            { machine: removedMachine.initials, intent: "on" },
+            ctx("admin", admin)
+          )
+        ).rejects.toMatchObject({
+          reason: "invalid",
+          message: "Blocked by Availability: Removed",
+        });
+      });
+
+      it("reports not_found from the write, not a success payload, when the row is gone", async () => {
+        // Straight at the service: the tool's own `resolveMachine` rejects an
+        // unknown ref long before this guard, so the only way to exercise it is
+        // to hand the write a machineId that resolves to nothing. Without the
+        // guard this returned `ok` with the columns it MEANT to write
+        // (CORE-ARCH-012).
+        const admin = await makeUser("admin");
+        await seedElviraCatalog();
+
+        const result = await updateMachinePbmLink({
+          machineId: randomUUID(),
+          actorUserId: admin,
+          selection: { pinballmapMachineId: ELVIRA_PREMIUM_ID },
+        });
+
+        expect(result).toMatchObject({ ok: false, reason: "not_found" });
+      });
     });
   });
 });
