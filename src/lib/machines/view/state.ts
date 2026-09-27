@@ -64,7 +64,6 @@ function widgetPopulation(value: string | null): WidgetPopulation {
 const WIDGET_POPULATION_PARAMS = [
   "presenceWidget",
   "playabilityWidget",
-  "issuesWidget",
 ] as const satisfies readonly (keyof MachineViewState)[];
 
 function positiveInteger(value: string | null, fallback: number): number {
@@ -159,7 +158,6 @@ export function parseMachineViewState(
     columns,
     presenceWidget: widgetPopulation(searchParams.get("presenceWidget")),
     playabilityWidget: widgetPopulation(searchParams.get("playabilityWidget")),
-    issuesWidget: widgetPopulation(searchParams.get("issuesWidget")),
   };
 }
 

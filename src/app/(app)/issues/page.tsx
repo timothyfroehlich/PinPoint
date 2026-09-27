@@ -5,6 +5,7 @@ import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
 import { IssueFilters } from "~/components/issues/IssueFilters";
 import { IssueList } from "~/components/issues/IssueList";
+import { IssueSummaryWidgets } from "~/components/issues/IssueSummaryWidgets";
 import { createClient } from "~/lib/supabase/server";
 import { parseIssueFilters } from "~/lib/issues/filters";
 import { loadIssueListPage } from "~/lib/issues/list-page";
@@ -71,7 +72,15 @@ export default async function IssuesPage({
     : Promise.resolve([]);
 
   const [
-    { issuesList, totalCount, filterUsers, assigneeUsers, page, pageSize },
+    {
+      issuesList,
+      totalCount,
+      filterUsers,
+      assigneeUsers,
+      page,
+      pageSize,
+      summary,
+    },
     allMachines,
     ownedMachineRows,
   ] = await Promise.all([
@@ -85,6 +94,8 @@ export default async function IssuesPage({
   return (
     <PageContainer size="wide">
       <PageHeader title="All Issues" />
+
+      <IssueSummaryWidgets summary={summary} />
 
       <p className="text-sm text-muted-foreground">
         Showing {issuesList.length} of {totalCount} issues

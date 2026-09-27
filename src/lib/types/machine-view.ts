@@ -44,7 +44,6 @@ export interface MachineViewState {
   columns: MachineViewFieldId[];
   presenceWidget: WidgetPopulation;
   playabilityWidget: WidgetPopulation;
-  issuesWidget: WidgetPopulation;
 }
 
 export interface MachineViewOwnerOption {
@@ -86,11 +85,6 @@ export interface MachineViewSummary {
   playability: {
     onTheFloor: number;
     byStatus: Record<MachineStatus, number>;
-  };
-  issues: {
-    openIssues: number;
-    machinesWithOpenIssues: number;
-    bySeverity: Record<IssueSeverity, number>;
   };
 }
 

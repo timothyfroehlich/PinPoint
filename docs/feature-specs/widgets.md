@@ -70,9 +70,7 @@
 
 ## Known divergences (code vs spec)
 
-| Spec | Code today | Resolution |
-| :-- | :-- | :-- |
-| §1–§6 | Issue-list Widget Hosts show no Summary Widgets; only Machine View does | Issue widgets implementation |
+_None — the current implementation matches this spec._
 
 ---
 

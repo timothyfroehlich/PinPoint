@@ -19,7 +19,7 @@
 ## 2. Hosts
 
 - **2.1** The Issues list at `/issues` and the Issues tab of every standard Collection, owner Collection, and Tag page show the Status Widget, the Severity Widget, and the Priority Widget, in that order.
-- **2.2** Each host's complete authoritative scope, and so each widget's All population, is every issue that host may show, open or closed. On an Issues tab that is every issue on the machines in that Collection or Tag.
+- **2.2** Each widget's All population is every issue, open or closed, on the host's On the Floor machines. On an Issues tab those are the On the Floor machines in that Collection or Tag.
 - **2.3** Their Widget Population parameters are `status_widget`, `severity_widget`, and `priority_widget`.
 - **2.4** The Summary Row shows the open-issue total, the Unplayable open-issue count, and the High priority open-issue count.
 
@@ -51,9 +51,7 @@
 
 ## Known divergences (code vs spec)
 
-| Spec  | Code today                          | Resolution                   |
-| :---- | :---------------------------------- | :--------------------------- |
-| §1–§5 | Issue lists show no Summary Widgets | Issue widgets implementation |
+_None — the current implementation matches this spec._
 
 ---
 
@@ -61,4 +59,5 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-26 | §2.2: All counts only issues on On the Floor machines, matching the issue list's default view. |
 | 2026-09-26 | Created. Establishes the Status, Severity, and Priority widgets on `/issues` and on every Collection and Tag Issues tab. |
