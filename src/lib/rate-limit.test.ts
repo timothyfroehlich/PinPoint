@@ -521,37 +521,37 @@ describe("rate-limit module — environment isolation & limiter behavior", () =>
   });
 
   describe("checkQuickSearchLimit", () => {
-    it("configures 120/1m sliding window and keys on IP for anonymous requests", async () => {
+    it("configures 60/1m sliding window and keys on IP for anonymous requests", async () => {
       vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://mock-redis.upstash.io");
       vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "mock-token-secret");
 
       limitMock.mockResolvedValueOnce({
         success: true,
-        limit: 120,
-        remaining: 119,
+        limit: 60,
+        remaining: 59,
         reset: 1700000000000,
       });
 
       const { checkQuickSearchLimit } = await import("./rate-limit");
       const result = await checkQuickSearchLimit("198.51.100.42");
 
-      expect(slidingWindowMock).toHaveBeenCalledWith(120, "1 m");
+      expect(slidingWindowMock).toHaveBeenCalledWith(60, "1 m");
       expect(ctorMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          prefix: "ratelimit:quick-search",
+          prefix: "ratelimit:quick-search:ip",
           analytics: true,
         })
       );
       expect(limitMock).toHaveBeenCalledWith("198.51.100.42");
       expect(result).toEqual({
         success: true,
-        limit: 120,
-        remaining: 119,
+        limit: 60,
+        remaining: 59,
         reset: 1700000000000,
       });
     });
 
-    it("keys on hashed user ID for authenticated requests", async () => {
+    it("configures 120/1m sliding window and keys on hashed user ID for authenticated requests", async () => {
       vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://mock-redis.upstash.io");
       vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "mock-token-secret");
 
@@ -570,6 +570,13 @@ describe("rate-limit module — environment isolation & limiter behavior", () =>
 
       const result = await checkQuickSearchLimit("198.51.100.42", userId);
 
+      expect(slidingWindowMock).toHaveBeenCalledWith(120, "1 m");
+      expect(ctorMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prefix: "ratelimit:quick-search:user",
+          analytics: true,
+        })
+      );
       expect(limitMock).toHaveBeenCalledWith(expectedHash);
       expect(result).toEqual({
         success: true,

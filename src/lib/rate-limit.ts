@@ -249,18 +249,35 @@ function createMcpWriteLimiter(): Ratelimit | null {
 }
 
 /**
- * Quick search rate limiter
- * - 120 requests per minute (sliding window)
- * - Keyed by user ID (hashed) for authenticated users, client IP for anonymous requests
+ * Anonymous quick search rate limiter
+ * - 60 requests per minute (sliding window)
+ * - Keyed by client IP
  */
-function createQuickSearchLimiter(): Ratelimit | null {
+function createQuickSearchIpLimiter(): Ratelimit | null {
+  const redis = getRedis();
+  if (!redis) return null;
+
+  return new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(60, "1 m"),
+    prefix: "ratelimit:quick-search:ip",
+    analytics: true,
+  });
+}
+
+/**
+ * Authenticated member quick search rate limiter
+ * - 120 requests per minute (sliding window)
+ * - Keyed by user ID (hashed)
+ */
+function createQuickSearchUserLimiter(): Ratelimit | null {
   const redis = getRedis();
   if (!redis) return null;
 
   return new Ratelimit({
     redis,
     limiter: Ratelimit.slidingWindow(120, "1 m"),
-    prefix: "ratelimit:quick-search",
+    prefix: "ratelimit:quick-search:user",
     analytics: true,
   });
 }
@@ -466,20 +483,23 @@ export const checkMcpWriteLimit = makeLimitChecker(createMcpWriteLimiter, {
   keyType: "user",
 });
 
-const checkQuickSearchUserLimit = makeLimitChecker(createQuickSearchLimiter, {
-  label: "Quick search user",
-  keyType: "user",
-});
+const checkQuickSearchUserLimit = makeLimitChecker(
+  createQuickSearchUserLimiter,
+  {
+    label: "Quick search user",
+    keyType: "user",
+  }
+);
 
-const checkQuickSearchIpLimit = makeLimitChecker(createQuickSearchLimiter, {
+const checkQuickSearchIpLimit = makeLimitChecker(createQuickSearchIpLimiter, {
   label: "Quick search IP",
   keyType: "ip",
 });
 
 /**
- * Check quick search rate limit (120 requests/minute sliding window).
- * Keyed by user ID (hashed per user key convention) for authenticated requests,
- * or client IP address for anonymous requests.
+ * Check quick search rate limit:
+ * - Authenticated requests: 120 requests/minute sliding window, keyed by user ID (hashed)
+ * - Anonymous requests: 60 requests/minute sliding window, keyed by client IP address
  *
  * @param ip - Client IP address
  * @param userId - Optional authenticated user ID
