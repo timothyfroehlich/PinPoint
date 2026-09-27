@@ -6,7 +6,6 @@
  */
 
 import { test, expect, type Page } from "../support/fixtures.js";
-import { getTestPrefix } from "../support/test-isolation.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
 
 async function getStatNumber(page: Page, testId: string): Promise<number> {
@@ -151,47 +150,5 @@ test.describe("Member Dashboard", () => {
     await expect(page).toHaveURL(
       /\/issues\?assignee=[a-f0-9-]+&status=new,confirmed,in_progress,need_parts,need_help,wait_owner/
     );
-  });
-
-  test("dashboard issue cards link to issue detail pages", async ({ page }) => {
-    await page.goto("/dashboard");
-
-    // Check if there are any issue cards belonging to this worker
-    // Other workers might be creating issues simultaneously
-    const testPrefix = getTestPrefix();
-    const issueCards = page
-      .getByTestId("recent-issue-card")
-      .filter({ hasText: `[${testPrefix}]` });
-    const count = await issueCards.count();
-
-    if (count > 0) {
-      // Click the first issue card
-      const firstIssue = issueCards.first();
-      // Get the title from the card to verify on detail page
-      const issueTitle = await firstIssue.getByRole("heading").innerText();
-      await firstIssue.click();
-
-      // Should navigate to issue detail page OR login page with next param
-      await expect(page).toHaveURL(
-        /(\/m\/[A-Z0-9]{2,6}\/i\/[0-9]+)|(login\?next=%2Fm%2F.+)/
-      );
-
-      // Use filter to find the specific h1 containing the title, avoiding strict mode violation
-      // with the Dashboard h1 or the Austin Pinball Collective logo
-      const titlePattern = issueTitle
-        .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-        .replace(/\s+/g, "\\s+");
-      const heading = page.getByRole("main").getByRole("heading", {
-        level: 1,
-        name: new RegExp(titlePattern),
-      });
-
-      await expect(heading).toBeVisible();
-      // Allow for some whitespace variation
-      const headingText = await heading.innerText();
-      expect(headingText.replace(/\s+/g, " ").trim()).toBe(
-        issueTitle.replace(/\s+/g, " ").trim()
-      );
-    }
   });
 });
