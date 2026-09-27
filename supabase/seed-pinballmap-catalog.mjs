@@ -57,6 +57,7 @@ const rows = catalog.map((m) => ({
   opdb_image_width: m.opdb_img_width ?? null,
   opdb_image_height: m.opdb_img_height ?? null,
   machine_group_id: m.machine_group_id ?? null,
+  ic_eligible: m.ic_eligible === true,
   group_name:
     m.machine_group_id != null
       ? (groupNames.get(m.machine_group_id) ?? null)
@@ -74,6 +75,7 @@ const cols = [
   "opdb_image_width",
   "opdb_image_height",
   "machine_group_id",
+  "ic_eligible",
   "group_name",
 ];
 
@@ -92,6 +94,7 @@ try {
       opdb_image_width = excluded.opdb_image_width,
       opdb_image_height = excluded.opdb_image_height,
       machine_group_id = excluded.machine_group_id,
+      ic_eligible = excluded.ic_eligible,
       group_name = excluded.group_name,
       refreshed_at = now()
   `;
