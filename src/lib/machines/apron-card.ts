@@ -22,6 +22,10 @@ export const APRON_CARD_SIZES = {
 
 export type ApronCardSize = keyof typeof APRON_CARD_SIZES;
 
+export function isApronCardSize(value: string): value is ApronCardSize {
+  return Object.hasOwn(APRON_CARD_SIZES, value);
+}
+
 export interface ApronCardContent {
   name: string;
   edition: string | null;
