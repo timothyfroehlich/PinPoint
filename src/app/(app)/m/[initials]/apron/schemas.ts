@@ -7,6 +7,8 @@ export const saveApronCardSchema = z.object({
   description: z.string().max(1500),
   tip: z.string().max(1500),
   tipEnabled: z.boolean(),
+  designEnabled: z.boolean(),
+  artEnabled: z.boolean(),
 });
 
 export type SaveApronCardInput = z.input<typeof saveApronCardSchema>;

@@ -193,30 +193,41 @@ export const STATUS_CONFIG: Record<
 
 export const SEVERITY_CONFIG: Record<
   IssueSeverity,
-  { label: string; styles: string; iconColor: string; icon: LucideIcon }
+  {
+    label: string;
+    styles: string;
+    iconColor: string;
+    /** Solid fill for a Summary Widget bar segment (widgets spec §5.3). */
+    barColor: string;
+    icon: LucideIcon;
+  }
 > = {
   cosmetic: {
     label: "Cosmetic",
     styles: "bg-amber-200/20 text-amber-300 border-amber-500",
     iconColor: "text-amber-300",
+    barColor: "bg-amber-300",
     icon: AlertTriangle,
   },
   minor: {
     label: "Minor",
     styles: "bg-amber-400/20 text-amber-400 border-amber-500",
     iconColor: "text-amber-400",
+    barColor: "bg-amber-400",
     icon: AlertTriangle,
   },
   major: {
     label: "Major",
     styles: "bg-amber-500/20 text-amber-500 border-amber-500",
     iconColor: "text-amber-500",
+    barColor: "bg-amber-500",
     icon: AlertTriangle,
   },
   unplayable: {
     label: "Unplayable",
     styles: "bg-amber-600/20 text-amber-500 border-amber-500",
     iconColor: "text-amber-500",
+    barColor: "bg-amber-600",
     icon: AlertTriangle,
   },
 };

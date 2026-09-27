@@ -34,6 +34,7 @@ The control's states (§4) are comparisons across these: _in sync_ means intent 
 - **2.4** An uncataloged machine can carry a hand-entered model identity (title, manufacturer, year) — the manual model. All three are optional and all three start blank. A blank title means the machine's own name: the field suggests the current name rather than pre-filling it, so a title left blank keeps following a later rename instead of freezing the name as it was the day the source was switched. A blank manufacturer or year reads as **Unknown** wherever it is shown under its own label. The machine header omits blanks instead, so it never reads "Unknown · Unknown".
 - **2.5** Cleaning up the old entry after a re-match is deliberately a separate action, never a side effect of changing the match. The orphaned entry may stay on the lineup as long as the operator wants. While any cabinet is still matched to the old title, the entry is that title's ordinary business and surfaces through those cabinets' own states (§4). When none is, PinPoint remembers which machine walked away and surfaces the entry on that machine's page, with the same removal action and matching copy. Listing the machine under its new title is likewise the standard flow — two actions, taken independently.
 - **2.6** An edition near-miss (§1) is flagged as a candidate match for operator confirmation in fleet audit surfaces. Resolving an edition near-miss by selecting or changing a match follows standard match reset and entry rules (§2.3, §2.5).
+- **2.7** A matched machine's manufacturer and year come from its Pinball Map catalog title and cannot be hand-edited. When the catalog refresh changes either value for a title, every machine matched to that title takes the new value automatically, with no review step; a value Pinball Map clears becomes blank. An uncataloged machine's manual model (§2.4) is never changed by a refresh.
 
 ## 3. Reading from Pinball Map
 
@@ -135,6 +136,7 @@ The control's states (§4) are comparisons across these: _in sync_ means intent 
 - **9.1** All access uses their documented API, with attribution and a link back to the specific location page wherever their data is rendered.
 - **9.2** Automated reads are limited to the hourly sync; human-triggered refreshes are throttled. PinPoint backs off when asked.
 - **9.3** These are commitments to another community's service, not internal preferences. See `docs/NON_NEGOTIABLES.md` (CORE-PBM-001).
+- **9.4** Under the machine Info tab's Pinball Map link, one muted line invites visitors to correct the listing there: "Something wrong? Anyone can update this listing on Pinball Map." It appears only when that link does (a location is configured), the link's own label stays unchanged, and no other surface repeats the invitation.
 
 ## 10. Admin configuration
 
@@ -179,8 +181,10 @@ Replacing the tracked location is a rare, near-never operation — PinPoint trac
 
 | Spec | Code today | Resolution |
 | :-- | :-- | :-- |
-| 3.6–3.8 additional outbound actions | Client methods exist, but no app actions expose venue-lineup confirmation or Insider Connected changes; no Insider Connected intent is stored, the Insider Connected client flips the setting instead of sending a target state, and the catalog mirror does not store eligibility | PP-o355.58 (confirm lineup, needs `/fleet` base PP-o355.7.1), PP-o355.59 (Insider Connected); condition-comment posting deferred (PP-o355.57) |
+| 2.7 catalog corrections | Manufacturer and year are copied when a machine is matched and never refreshed | PP-o355.46 |
+| 3.6–3.7 lineup confirmation | The client method exists, but no app action exposes venue-lineup confirmation | PP-o355.58 (confirm lineup, needs `/fleet` base PP-o355.7.1); condition-comment posting deferred (PP-o355.57) |
 | 8.2, 8.4–8.6 per-member account linking | Writes use one admin-provisioned operator credential; no member linking, relink state, or link prompt exists | PP-o355.6 |
+| 9.4 update-listing invitation | The Info tab shows the Pinball Map link with no invitation line | PP-2h1b |
 
 ---
 
@@ -190,6 +194,8 @@ Changes to this document. Divergence-table rows are working state and are not lo
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-26 | Added §2.7: a matched machine's manufacturer and year follow its Pinball Map catalog title, so a catalog correction updates every matched machine automatically and a cleared value becomes blank; the manual model is untouched. |
+| 2026-09-26 | Added §9.4: the machine Info tab carries one muted line under its Pinball Map link inviting visitors to update the listing there, Pinball Map's encouraged attribution guidance; no other surface repeats it. |
 | 2026-09-26 | §3.8: Insider Connected is now an intent stored in PinPoint for every eligible title, set by anyone who can set listing intent and pushed by the same single sync as the lineup (§4.3, **Update Pinball Map** when only it differs); a mismatch is the new **Insider Connected differs** Out of sync state (§4.2, §4.10). The switch sits on the intent row, so the control is two rows again (§4.1, §4.9). §4.4 drops "…then Refresh to update". |
 | 2026-09-25 | Dropped the obsolete "no-op until comment import exists" note from §10.9 now that comments are imported and marked. |
 | 2026-09-25 | §3.8: eligibility now comes from Pinball Map's catalog flag, so an eligible entry with no recorded value shows **Not set**; the setting is a switch in a row between intent and status that every eligible title keeps, showing "—" without a setting (§4.1), read-only for a member without the machine-linking capability (§4.9); PinPoint sends the target setting instead of flipping it, replacing the re-read-before-write rule. |

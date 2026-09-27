@@ -18,14 +18,14 @@ import type {
   MachineViewScope,
 } from "~/lib/types";
 import type { TimelineTag } from "~/lib/timeline/machine-tags";
-import {
-  getCurrentManufacturer,
-  groupManufacturerTags,
-} from "~/lib/machines/manufacturer";
+import { getCurrentManufacturer } from "~/lib/machines/manufacturer";
+import { getTag } from "~/lib/tags/tags";
+import { isTagTypeId } from "~/lib/tags/types";
 import { getMachineViewPreset, planMachineViewDependencies } from "./config";
 import {
   applyMachineViewState,
   healthFromSeverityCounts,
+  summarizeMachineView,
   type MachineViewCandidate,
 } from "./model";
 import { parseMachineViewState } from "./state";
@@ -63,6 +63,12 @@ async function machineIdsForScope(
   tx: DbTransaction,
   scope: MachineViewScope
 ): Promise<string[] | null> {
+  // Tag membership is derived, so the tag's own rule picks the machines before
+  // any filter or search runs; a filter can only narrow it (spec 7.2).
+  if (scope.kind === "tag") {
+    const tag = await getTag(tx, scope.tagType, scope.slug);
+    return tag?.machines.map((machine) => machine.id) ?? [];
+  }
   if (scope.kind !== "collection") return null;
   const rows = await tx
     .select({ machineId: collectionMachines.machineId })
@@ -108,20 +114,8 @@ export async function getMachineViewBaseRows(
     },
   });
 
-  const withManufacturer = rows.map((machine) => ({
-    machine,
-    manufacturer: getCurrentManufacturer(machine),
-  }));
-  // Manufacturer tag membership is derived, so a manufacturer scope loads every
-  // machine and keeps only the tag's members before any filter or search runs.
-  const scopedRows =
-    scope.kind === "manufacturer"
-      ? (groupManufacturerTags(withManufacturer).find(
-          (tag) => tag.slug === scope.slug
-        )?.machines ?? [])
-      : withManufacturer;
-
-  return scopedRows.map(({ machine, manufacturer }) => {
+  return rows.map((machine) => {
+    const manufacturer = getCurrentManufacturer(machine);
     const owner = machine.owner ?? machine.invitedOwner;
     return {
       id: machine.id,
@@ -241,7 +235,10 @@ export function getLatestMachineActivityDates(
   return latestTimelineDates(tx, machineIds, false);
 }
 
-function publicRow(candidate: MachineViewCandidate): MachineViewRow {
+function publicRow(
+  candidate: MachineViewCandidate,
+  includeHealth: boolean
+): MachineViewRow {
   const row: MachineViewRow = {
     id: candidate.id,
     initials: candidate.initials,
@@ -252,7 +249,9 @@ function publicRow(candidate: MachineViewCandidate): MachineViewRow {
     presence: candidate.presence,
     createdAt: candidate.createdAt,
   };
-  if (candidate.health !== undefined) row.health = candidate.health;
+  if (includeHealth && candidate.health !== undefined) {
+    row.health = candidate.health;
+  }
   if (candidate.lastServicedAt !== undefined) {
     row.lastServicedAt = candidate.lastServicedAt;
   }
@@ -278,10 +277,11 @@ export async function loadMachineViewFromDatabase(
   const dependencyPlan = planMachineViewDependencies(validatedState);
   const machineIds = baseRows.map((row) => row.id);
   const machineInitials = baseRows.map((row) => row.initials);
+  // Summary Widgets always need health across the whole scope
+  // (machine-widgets §2.3), so it loads regardless of the row plan; rows only
+  // carry it to the browser when a field, sort, or filter needs it.
   const [health, serviceDates, activityDates] = await Promise.all([
-    dependencyPlan.health
-      ? getMachineViewHealth(tx, machineInitials)
-      : Promise.resolve(new Map<string, MachineViewHealth>()),
+    getMachineViewHealth(tx, machineInitials),
     dependencyPlan.service
       ? getLatestMachineServiceDates(tx, machineIds)
       : Promise.resolve(new Map<string, Date>()),
@@ -303,17 +303,15 @@ export async function loadMachineViewFromDatabase(
       canonicalModelName: machine.canonicalModelName,
       legacyModelName: machine.legacyModelName,
     };
-    if (dependencyPlan.health) {
-      row.health =
-        health.get(machine.initials) ??
-        healthFromSeverityCounts({
-          cosmetic: 0,
-          minor: 0,
-          major: 0,
-          unplayable: 0,
-          oldestOpenIssueAt: null,
-        });
-    }
+    row.health =
+      health.get(machine.initials) ??
+      healthFromSeverityCounts({
+        cosmetic: 0,
+        minor: 0,
+        major: 0,
+        unplayable: 0,
+        oldestOpenIssueAt: null,
+      });
     if (dependencyPlan.service) {
       row.lastServicedAt = serviceDates.get(machine.id)?.toISOString() ?? null;
     }
@@ -330,9 +328,10 @@ export async function loadMachineViewFromDatabase(
   const state = { ...validatedState, page: applied.page };
 
   return {
-    rows: applied.rows.map(publicRow),
+    rows: applied.rows.map((row) => publicRow(row, dependencyPlan.health)),
     scopeCount: baseRows.length,
     totalCount: applied.totalCount,
+    summary: summarizeMachineView(candidates, applied.filteredRows, state),
     state,
     ownerOptions: [...ownerOptionsById]
       .map(([id, name]) => ({ id, name }))
@@ -353,8 +352,8 @@ function scopeId(scope: MachineViewScope): string {
       return scope.collectionId;
     case "owner":
       return scope.ownerId;
-    case "manufacturer":
-      return scope.slug;
+    case "tag":
+      return `${scope.tagType}/${scope.slug}`;
   }
 }
 
@@ -369,8 +368,14 @@ function scopeFromId(
       return { kind: "collection", collectionId: id };
     case "owner":
       return { kind: "owner", ownerId: id };
-    case "manufacturer":
-      return { kind: "manufacturer", slug: id };
+    case "tag": {
+      // The tag type never contains "/"; the slug may, once decoded.
+      const split = id.indexOf("/");
+      const tagType = id.slice(0, split);
+      return isTagTypeId(tagType)
+        ? { kind: "tag", tagType, slug: id.slice(split + 1) }
+        : { kind: "tag", tagType: "manufacturer", slug: "" };
+    }
   }
 }
 

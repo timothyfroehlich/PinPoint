@@ -74,7 +74,7 @@ import {
  * `pinballmapExcludedReason` is deliberately NOT submitted (PP-3bbr.3). The
  * field was write-only — nothing in the app ever rendered it back, only the MCP
  * tools read it — so it was dropped rather than kept as a box nobody sees the
- * output of. The column stays and `set_machine_pinballmap` still writes it.
+ * output of. The column stays and `update_machine` still writes it.
  * `updateMachineAction` calls `carryExcludedReason` precisely because this form
  * posts no control for it: unlike the model fields below, its absence here is
  * absence rather than a human emptying a box, so a save must leave it alone
