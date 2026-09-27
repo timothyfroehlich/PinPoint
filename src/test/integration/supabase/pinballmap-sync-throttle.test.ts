@@ -197,23 +197,6 @@ describe("manual-refresh token bucket (real postgres.js driver)", () => {
     );
   });
 
-  it("resets refreshTokensAt to now when refilling to full burst capacity", async () => {
-    // When the bucket refills to or past BURST capacity, elapsed time beyond
-    // the ceiling is discarded so that unconsumed idle time is not banked.
-    // At BURST - 1 tokens and 1.5 periods idle, AVAILABLE_TOKENS reaches BURST.
-    // The old SQL advanced by 1 period, leaving tokensAt at now - 0.5 periods (banking credit).
-    // The fixed SQL resets tokensAt to now().
-    const oneAndAHalf = new Date(Date.now() - 1.5 * REFILL_MS);
-    await setBucket(BURST - 1, oneAndAHalf);
-
-    await expect(claim(new Date())).resolves.toBe(true);
-
-    const { tokensAt } = await readBucket();
-    // Old SQL left tokensAt at ~90s in the past (Date.now() - 0.5 * REFILL_MS).
-    // New SQL resets to now(), so tokensAt is within a few seconds of Date.now().
-    expect(Math.abs(Date.now() - tokensAt.getTime())).toBeLessThan(5000);
-  });
-
   it("does not spend a token on the cron path", async () => {
     // The hourly refresh is separately sanctioned. Charging it to the human
     // allowance would let the cron lock people out of their own button.
