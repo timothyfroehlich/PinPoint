@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useId, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   CheckCircle2,
@@ -16,9 +16,12 @@ import {
   addMachineToPinballMapAction,
   refreshPinballmapLineupAction,
   removeMachineFromPinballMapAction,
+  setInsiderConnectedIntentAction,
   setPinballmapIntentAction,
+  updateInsiderConnectedAction,
 } from "~/app/(app)/m/pinballmap-actions";
 import { Button } from "~/components/ui/button";
+import { Switch } from "~/components/ui/switch";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,6 +35,7 @@ import {
 } from "~/components/ui/alert-dialog";
 import { RelativeTime } from "~/components/issues/RelativeTime";
 import { useRelativeNow } from "~/components/issues/RelativeTimeProvider";
+import type { PbmInsiderConnectedView } from "~/lib/pinballmap/insider-connected";
 import type {
   PbmListingIntent,
   PbmListingView,
@@ -102,6 +106,13 @@ export interface PinballmapListingControlProps {
   writeEnabled: boolean;
   /** Catalog title, so a confirm names the game rather than "this machine". */
   modelName: string | null;
+  /**
+   * The Insider Connected switch (spec 3.8), or null for an ineligible title.
+   * It sits on the intent row, so its presence never changes the control's
+   * height (4.1). Derived on the server by `deriveInsiderConnectedView`; a
+   * difference is already folded into `view` as Out of sync plus the push.
+   */
+  insiderConnected: PbmInsiderConnectedView | null;
 }
 
 const INTENT_OPTIONS: readonly { value: PbmListingIntent; label: string }[] = [
@@ -123,6 +134,7 @@ export function PinballmapListingControl({
   canRefresh,
   writeEnabled,
   modelName,
+  insiderConnected,
 }: PinballmapListingControlProps): React.JSX.Element {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -204,6 +216,23 @@ export function PinballmapListingControl({
               Alert: Availability set to {view.advisoryDetail}
             </span>
           ) : null}
+          {/* The Insider Connected intent shares the intent row (4.1): it is
+              the same kind of decision, set the same way, so it needs no row of
+              its own. On a phone it wraps under the toggle. */}
+          {insiderConnected !== null ? (
+            <InsiderConnectedSwitch
+              view={insiderConnected}
+              // The intent gate, not the push gate: recording the intent needs
+              // no Pinball Map credentials (3.8, 8.1).
+              readOnly={!canSetIntent || disabled}
+              pending={pending}
+              onChange={(on) => {
+                run(setInsiderConnectedIntentAction, {
+                  icIntent: on ? "on" : "off",
+                });
+              }}
+            />
+          ) : null}
         </Row>
 
         <Row label="Status">
@@ -225,6 +254,13 @@ export function PinballmapListingControl({
                 data-testid="pbm-listing-status"
               >
                 {statusSentence(view, locationUrl, showExternalFallback)}
+                {insiderConnected?.differs === true ? (
+                  <InsiderConnectedDiffers
+                    view={insiderConnected}
+                    locationUrl={locationUrl}
+                    showExternalFallback={showExternalFallback}
+                  />
+                ) : null}
               </span>
             </div>
 
@@ -239,10 +275,26 @@ export function PinballmapListingControl({
                     }}
                     copy={{
                       title: "Add to Pinball Map?",
-                      body: `Adds ${game} to the location's lineup on pinballmap.com, where it will be publicly visible.`,
+                      // One push carries the Insider Connected target too
+                      // (4.3), so the confirm names it (4.5).
+                      body: `Adds ${game} to the location's lineup on pinballmap.com${icAddClause(insiderConnected)}, where it will be publicly visible.`,
                       action: "Add machine",
                     }}
                     label="Add machine to Pinball Map"
+                  />
+                ) : view.pushAction === "update" ? (
+                  <ConfirmButton
+                    testId="pbm-listing-update"
+                    pending={pending}
+                    onConfirm={() => {
+                      run(updateInsiderConnectedAction);
+                    }}
+                    copy={{
+                      title: "Update Pinball Map?",
+                      body: `Sets Insider Connected to ${insiderConnected?.target === "off" ? "Off" : "On"} for ${game} on pinballmap.com, where it is publicly visible.`,
+                      action: "Update",
+                    }}
+                    label="Update Pinball Map"
                   />
                 ) : (
                   <ConfirmButton
@@ -443,7 +495,7 @@ function Row({
         dimmed && "opacity-45"
       )}
       {...(dimmed ? { inert: true } : {})}
-      data-testid={`pbm-listing-row-${label.toLowerCase()}`}
+      data-testid={`pbm-listing-row-${label.toLowerCase().replace(/\s+/g, "-")}`}
     >
       <span className="w-20 shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         {label}
@@ -530,6 +582,126 @@ function IntentToggle({
   );
 }
 
+const INSIDER_CONNECTED_LABEL = {
+  on: "On",
+  off: "Off",
+  not_set: "Not set",
+} as const;
+
+/**
+ * The Insider Connected intent as a switch on the intent row (spec 3.8), with
+ * its own small label. Shows the recorded intent, or Pinball Map's value while
+ * none is recorded. A warning icon names Pinball Map's value when the entry
+ * differs, so the reason for Out of sync sits beside the switch that causes it.
+ *
+ * Controlled from stored intent: the switch moves when the page revalidates,
+ * not optimistically.
+ */
+function InsiderConnectedSwitch({
+  view,
+  readOnly,
+  pending,
+  onChange,
+}: {
+  view: PbmInsiderConnectedView;
+  readOnly: boolean;
+  pending: boolean;
+  onChange: (on: boolean) => void;
+}): React.JSX.Element {
+  const settingId = useId();
+  return (
+    <div
+      className="flex items-center gap-3 sm:ml-3"
+      data-testid="pbm-insider-connected"
+    >
+      <span className="w-20 shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        Insider Connected
+      </span>
+      <div className="flex items-center gap-2">
+        <Switch
+          checked={view.shown === "on"}
+          onCheckedChange={onChange}
+          disabled={readOnly || pending}
+          aria-label="Insider Connected"
+          aria-describedby={settingId}
+          data-testid="pbm-insider-connected-switch"
+        />
+        <span
+          id={settingId}
+          className={cn(
+            "text-sm",
+            view.shown === "not_set"
+              ? "text-muted-foreground"
+              : "text-foreground"
+          )}
+          data-testid="pbm-insider-connected-setting"
+        >
+          {INSIDER_CONNECTED_LABEL[view.shown]}
+        </span>
+        {view.differs && view.pinballMap !== null ? (
+          <TriangleAlert
+            role="img"
+            aria-label={`Pinball Map: ${INSIDER_CONNECTED_LABEL[view.pinballMap]}`}
+            className="size-4 shrink-0 text-warning"
+            data-testid="pbm-insider-connected-differs"
+          />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The status row's Insider Connected clause (4.1): Pinball Map's value in the
+ * warning colour, and for a viewer who can push but has no credentials, the
+ * link out to change it there (4.4).
+ */
+function InsiderConnectedDiffers({
+  view,
+  locationUrl,
+  showExternalFallback,
+}: {
+  view: PbmInsiderConnectedView;
+  locationUrl: string | null;
+  showExternalFallback: boolean;
+}): React.JSX.Element {
+  const clause =
+    view.pinballMap === "on"
+      ? "Insider Connected on."
+      : view.pinballMap === "off"
+        ? "Insider Connected off."
+        : "Insider Connected not set.";
+  return (
+    <>
+      {" "}
+      <span className="text-warning" data-testid="pbm-insider-connected-status">
+        {clause}
+      </span>
+      {showExternalFallback && locationUrl !== null ? (
+        <>
+          {" "}
+          <a
+            href={locationUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary underline underline-offset-2 hover:no-underline"
+          >
+            Set on Pinball Map
+          </a>
+          .
+        </>
+      ) : null}
+    </>
+  );
+}
+
+/** What Add also does to Insider Connected, for its confirm (4.3, 4.5). */
+function icAddClause(view: PbmInsiderConnectedView | null): string {
+  if (view?.target === "on") return " and marks it Insider Connected";
+  if (view?.target === "off") return " with Insider Connected off";
+  return "";
+}
+
 /**
  * Amber where somebody has to act or look, a check where intent and lineup
  * agree, a neutral pin otherwise. Decorative — the sentence beside it carries
@@ -592,7 +764,7 @@ function statusSentence(
         >
           {text}
         </a>
-        , then Refresh to update.
+        .
       </>
     );
 

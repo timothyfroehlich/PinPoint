@@ -502,7 +502,7 @@ describe("updateMachineAction — PinballMap link (PGlite)", () => {
     // so a blank one is a human clearing the box. It owns no control for the
     // reason — the box was write-only and was removed in PP-3bbr.3 — so its
     // silence there is absence, not intent. Without the carry-over, saving an
-    // unrelated detail would null a reason `set_machine_pinballmap` wrote
+    // unrelated detail would null a reason `update_machine` wrote
     // (CORE-ARCH-012).
     const db = await getTestDb();
     const { updateMachineAction } = await import("~/app/(app)/m/actions");

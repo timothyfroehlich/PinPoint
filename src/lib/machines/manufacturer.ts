@@ -105,8 +105,3 @@ export function groupManufacturerTags<
   }
   return tags.sort((left, right) => left.name.localeCompare(right.name));
 }
-
-/** The public page for one manufacturer tag. */
-export function manufacturerTagHref(slug: string): string {
-  return `/c/tags/manufacturer/${encodeURIComponent(slug)}`;
-}
