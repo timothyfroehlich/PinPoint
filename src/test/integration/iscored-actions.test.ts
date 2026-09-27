@@ -82,23 +82,28 @@ describe("getIscoredGamesAction — machine ownership integration (PP-1v6u)", ()
     } as unknown as Awaited<ReturnType<typeof createClient>>);
   }
 
-  it("lets a member owner fetch iScored games for their owned machine", async () => {
-    const ownerId = await makeUser("member");
-    const machineId = await makeMachine(ownerId);
-    await mockAuth(ownerId);
+  it("lets a member owner fetch iScored games for their owned machine when multiple machines exist", async () => {
+    const callerId = await makeUser("member");
+    const otherMemberId = await makeUser("member");
+    // Seed unowned machine first so a missing where clause returns the wrong machine
+    await makeMachine(otherMemberId);
+    const ownedMachineId = await makeMachine(callerId);
+    await mockAuth(callerId);
 
-    const result = await getIscoredGamesAction({ machineId });
+    const result = await getIscoredGamesAction({ machineId: ownedMachineId });
     expect(result).toEqual({ games: mockGames });
     expect(getGameroomGames).toHaveBeenCalledTimes(1);
   });
 
-  it("refuses a member when calling with a machine they do not own", async () => {
-    const ownerId = await makeUser("member");
+  it("refuses a member when calling with a machine they do not own, even when they own another machine", async () => {
+    const callerId = await makeUser("member");
     const otherMemberId = await makeUser("member");
-    const machineId = await makeMachine(ownerId);
-    await mockAuth(otherMemberId);
+    // Seed owned machine first so a where: eq(ownerId, user.id) or missing where returns the owned machine
+    await makeMachine(callerId);
+    const unownedMachineId = await makeMachine(otherMemberId);
+    await mockAuth(callerId);
 
-    const result = await getIscoredGamesAction({ machineId });
+    const result = await getIscoredGamesAction({ machineId: unownedMachineId });
     expect(result).toEqual({ error: "Permission denied" });
     expect(getGameroomGames).not.toHaveBeenCalled();
   });
