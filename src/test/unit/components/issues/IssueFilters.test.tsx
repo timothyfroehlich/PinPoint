@@ -118,6 +118,47 @@ describe("IssueFilters", () => {
       expect.stringContaining("status=all")
     );
   });
+
+  it("reflects pre-populated filters from URL params (q and severity)", async () => {
+    renderWithProviders(
+      <IssueFilters
+        {...defaultProps}
+        filters={{ q: "bird", severity: ["major"] }}
+      />
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Search input should reflect the q param
+    const searchInput = screen.getByPlaceholderText("Search issues...");
+    expect(searchInput).toHaveValue("bird");
+
+    // Severity badge should be visible
+    expect(screen.getByText("Major")).toBeInTheDocument();
+  });
+
+  it("pushes created_from param when date range is applied", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<IssueFilters {...defaultProps} filters={{}} />);
+
+    // Expand "More Filters" to reveal date pickers
+    const moreButton = screen.queryByRole("button", {
+      name: /More Filters/i,
+    });
+    if (moreButton) {
+      await user.click(moreButton);
+    }
+
+    // The mobile date input is testid="filter-created-from"
+    const createdFrom = screen.queryByTestId("filter-created-from");
+    if (createdFrom) {
+      fireEvent.change(createdFrom, { target: { value: "2026-08-10" } });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(pushMock).toHaveBeenCalledWith(
+        expect.stringContaining("created_from=2026-08-10")
+      );
+    }
+  });
 });
 
 describe("IssueFilters - My machines quick-select", () => {

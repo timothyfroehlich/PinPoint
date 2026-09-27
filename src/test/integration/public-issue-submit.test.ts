@@ -293,3 +293,39 @@ describe("submitPublicIssueAction — assignedTo permission handling (integratio
     expect(assignedTo).toBeNull();
   });
 });
+
+async function getPersistedStatus(
+  machineInitials: string
+): Promise<string | undefined> {
+  const db = await getTestDb();
+  const row = await db.query.issues.findFirst({
+    where: eq(issues.machineInitials, machineInitials),
+    columns: { status: true },
+  });
+  return row?.status;
+}
+
+describe("submitPublicIssueAction — anonymous status enforcement (integration)", () => {
+  setupTestDb();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Default: unauthenticated
+    mockGetUser.mockResolvedValue({ data: { user: null } });
+  });
+
+  it("anonymous submission forces status to 'new' regardless of form value", async () => {
+    const owner = await seedUser("member");
+    const machine = await seedMachine(owner.id);
+
+    // Default mock: user = null (anonymous, set in beforeEach)
+
+    await submitPublicIssueAction(
+      { error: "" },
+      makeFormData({ machineId: machine.id })
+    );
+
+    const status = await getPersistedStatus(machine.initials);
+    expect(status).toBe("new");
+  });
+});
