@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  startTransition,
   useActionState,
   useState,
   useEffect,
@@ -146,6 +147,7 @@ export function NotificationPreferencesForm({
   const [baselinePreferences, setBaselinePreferences] =
     useState<NotificationPreferencesData>(preferences);
   const submittedValuesRef = useRef<NotificationPreferencesData | null>(null);
+  const navigateToDiscordAfterSaveRef = useRef(false);
 
   const [pendingNavigation, setPendingNavigation] =
     useState<PendingNavigation | null>(null);
@@ -193,26 +195,20 @@ export function NotificationPreferencesForm({
   useEffect(() => {
     if (state) {
       setShowFeedback(true);
-      if (state.ok && submittedValuesRef.current) {
-        setBaselinePreferences(submittedValuesRef.current);
-        submittedValuesRef.current = null;
+      if (state.ok) {
+        if (submittedValuesRef.current) {
+          setBaselinePreferences(submittedValuesRef.current);
+          submittedValuesRef.current = null;
+        }
+        if (navigateToDiscordAfterSaveRef.current) {
+          navigateToDiscordAfterSaveRef.current = false;
+          navigateToConnectedAccounts();
+        }
+      } else {
+        navigateToDiscordAfterSaveRef.current = false;
       }
     }
   }, [state]);
-
-  // Prevent React 19 form action auto-reset from triggering Radix Switch reset (which reverts to initial mount state)
-  useEffect(() => {
-    const form = formRef.current;
-    if (!form) return;
-    const handleReset = (event: Event): void => {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-    };
-    form.addEventListener("reset", handleReset, true);
-    return () => {
-      form.removeEventListener("reset", handleReset, true);
-    };
-  }, []);
 
   // beforeunload guard: disallows silent data loss on tab close, reload, or full navigation
   useEffect(() => {
@@ -317,8 +313,8 @@ export function NotificationPreferencesForm({
 
   const handleSaveAndNavigateToDiscord = (): void => {
     setPendingNavigation(null);
+    navigateToDiscordAfterSaveRef.current = true;
     formRef.current?.requestSubmit();
-    navigateToConnectedAccounts();
   };
 
   const handleDiscardAndLeave = (): void => {
@@ -417,14 +413,23 @@ export function NotificationPreferencesForm({
 
   return (
     <>
+      {/*
+       * No `action={formAction}` on purpose (PP-1ajq). React 19 auto-resets
+       * a `<form action={...}>` once the action settles — on failure as well
+       * as success — and this form stays on screen after a rejected save.
+       * Dispatching `useActionState` directly inside `startTransition` means no
+       * native form submission completes, so React never fires the reset.
+       */}
       <form
         ref={formRef}
-        action={formAction}
-        onSubmit={() => {
-          submittedValuesRef.current = { ...formValues };
-        }}
-        onReset={(e) => {
+        onSubmit={(e) => {
+          if (e.target !== e.currentTarget) return;
           e.preventDefault();
+          submittedValuesRef.current = { ...formValues };
+          const fd = new FormData(e.currentTarget);
+          startTransition(() => {
+            formAction(fd);
+          });
         }}
         className="space-y-8"
         data-testid="notification-preferences-form"

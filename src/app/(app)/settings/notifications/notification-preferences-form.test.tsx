@@ -308,7 +308,9 @@ describe("NotificationPreferencesForm", () => {
       expect(
         screen.queryByText(/unsaved preferences/i)
       ).not.toBeInTheDocument();
-      expect(window.location.hash).toBe("#connected-accounts");
+      await waitFor(() => {
+        expect(window.location.hash).toBe("#connected-accounts");
+      });
     });
 
     it("prompts on in-app link navigation when form is dirty, and navigates on discard", async () => {
@@ -357,6 +359,67 @@ describe("NotificationPreferencesForm", () => {
         <NotificationPreferencesForm preferences={freshPreferencesRef} />
       );
 
+      expect(emailSwitch).not.toBeChecked();
+      expect(dispatchBeforeUnload().defaultPrevented).toBe(true);
+    });
+
+    it("preserves dirty edits, displays error feedback, and stays on form when save fails via Discord CTA", async () => {
+      const user = userEvent.setup();
+      updatePreferencesSpy.mockResolvedValue({
+        ok: false,
+        code: "VALIDATION",
+        message: "Failed to update notification preferences",
+      });
+
+      render(
+        <NotificationPreferencesForm
+          preferences={defaultPreferences}
+          discordIntegrationEnabled
+        />
+      );
+
+      const emailSwitch = screen.getByLabelText("Email Notifications");
+      await user.click(emailSwitch);
+      expect(emailSwitch).not.toBeChecked();
+
+      const linkCta = screen.getByRole("link", { name: /link discord/i });
+      await user.click(linkCta);
+
+      await user.click(
+        screen.getByRole("button", { name: /save and continue/i })
+      );
+
+      expect(updatePreferencesSpy).toHaveBeenCalled();
+      expect(
+        await screen.findByText("Failed to update notification preferences")
+      ).toBeInTheDocument();
+      expect(emailSwitch).not.toBeChecked();
+      expect(dispatchBeforeUnload().defaultPrevented).toBe(true);
+      expect(window.location.hash).toBe("");
+    });
+
+    it("preserves dirty edits and keeps beforeunload guard armed when normal save fails", async () => {
+      const user = userEvent.setup();
+      updatePreferencesSpy.mockResolvedValue({
+        ok: false,
+        code: "VALIDATION",
+        message: "Network error occurred",
+      });
+
+      render(<NotificationPreferencesForm preferences={defaultPreferences} />);
+
+      const emailSwitch = screen.getByLabelText("Email Notifications");
+      await user.click(emailSwitch);
+      expect(emailSwitch).not.toBeChecked();
+
+      await user.click(
+        screen.getByRole("button", { name: "Save Preferences" })
+      );
+
+      expect(updatePreferencesSpy).toHaveBeenCalled();
+      expect(
+        await screen.findByText("Network error occurred")
+      ).toBeInTheDocument();
       expect(emailSwitch).not.toBeChecked();
       expect(dispatchBeforeUnload().defaultPrevented).toBe(true);
     });
