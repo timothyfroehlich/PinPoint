@@ -50,4 +50,9 @@ export {
   type MachineViewSummary,
 } from "./machine-view";
 
-export { WIDGET_POPULATIONS, type WidgetPopulation } from "./summary-widget";
+export {
+  WIDGET_POPULATIONS,
+  type IssueListSummary,
+  type IssueWidgetCounts,
+  type WidgetPopulation,
+} from "./summary-widget";
