@@ -358,43 +358,6 @@ function Header({
   pending: boolean;
   onRefresh: () => void;
 }): React.JSX.Element {
-  const spent = refreshRemaining <= 0;
-  // `null` until the shared ticker's first tick, which is also every SSR pass.
-  const now = useRelativeNow();
-  const refreshAvailableTime = refreshAvailableAt?.getTime() ?? null;
-  const hasValidRefreshTime =
-    refreshAvailableTime !== null && Number.isFinite(refreshAvailableTime);
-  const [reachedRefreshTime, setReachedRefreshTime] = useState<number | null>(
-    null
-  );
-
-  useEffect(() => {
-    if (!spent || !hasValidRefreshTime) return undefined;
-
-    const timer = window.setTimeout(
-      () => {
-        setReachedRefreshTime(refreshAvailableTime);
-      },
-      Math.max(0, refreshAvailableTime - Date.now())
-    );
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [hasValidRefreshTime, refreshAvailableTime, spent]);
-
-  const refreshDeadlineReached =
-    hasValidRefreshTime &&
-    (reachedRefreshTime === refreshAvailableTime ||
-      (now !== null && now >= refreshAvailableTime));
-  const refreshCooldownMinutes =
-    now !== null && spent && hasValidRefreshTime && !refreshDeadlineReached
-      ? Math.max(1, Math.ceil((refreshAvailableTime - now) / 60_000))
-      : null;
-  // Keep the button inert through SSR and whenever the next refill is unknown.
-  // Once the shared ticker reaches the refill instant, the server-side token
-  // bucket will refill on the next press, so the control can become live.
-  const refreshDisabled =
-    spent && (!hasValidRefreshTime || !refreshDeadlineReached);
   return (
     <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
       <h3 className="text-base font-semibold">
@@ -449,26 +412,89 @@ function Header({
         </span>
 
         {canRefresh && locationUrl !== null ? (
-          <Button
-            variant="outline"
-            size="sm"
-            loading={pending}
-            disabled={refreshDisabled}
-            onClick={onRefresh}
-            data-testid="pbm-listing-refresh"
-          >
-            {refreshCooldownMinutes === null ? (
-              <RefreshCw aria-hidden="true" className="size-3.5" />
-            ) : (
-              <Clock3 aria-hidden="true" className="size-3.5" />
-            )}
-            {refreshCooldownMinutes === null
-              ? "Refresh"
-              : `Refresh in ${String(refreshCooldownMinutes)}m`}
-          </Button>
+          <PinballmapRefreshButton
+            refreshRemaining={refreshRemaining}
+            refreshAvailableAt={refreshAvailableAt}
+            pending={pending}
+            onRefresh={onRefresh}
+          />
         ) : null}
       </div>
     </div>
+  );
+}
+
+/**
+ * The shared, throttled Refresh (spec 3.2): disabled with a countdown while the
+ * global allowance is spent. Exported for the lineup page header, which draws
+ * from the same allowance (lineup spec §3.2).
+ */
+export function PinballmapRefreshButton({
+  refreshRemaining,
+  refreshAvailableAt,
+  pending,
+  onRefresh,
+}: {
+  refreshRemaining: number;
+  refreshAvailableAt: Date | null;
+  pending: boolean;
+  onRefresh: () => void;
+}): React.JSX.Element {
+  const spent = refreshRemaining <= 0;
+  // `null` until the shared ticker's first tick, which is also every SSR pass.
+  const now = useRelativeNow();
+  const refreshAvailableTime = refreshAvailableAt?.getTime() ?? null;
+  const hasValidRefreshTime =
+    refreshAvailableTime !== null && Number.isFinite(refreshAvailableTime);
+  const [reachedRefreshTime, setReachedRefreshTime] = useState<number | null>(
+    null
+  );
+
+  useEffect(() => {
+    if (!spent || !hasValidRefreshTime) return undefined;
+
+    const timer = window.setTimeout(
+      () => {
+        setReachedRefreshTime(refreshAvailableTime);
+      },
+      Math.max(0, refreshAvailableTime - Date.now())
+    );
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [hasValidRefreshTime, refreshAvailableTime, spent]);
+
+  const refreshDeadlineReached =
+    hasValidRefreshTime &&
+    (reachedRefreshTime === refreshAvailableTime ||
+      (now !== null && now >= refreshAvailableTime));
+  const refreshCooldownMinutes =
+    now !== null && spent && hasValidRefreshTime && !refreshDeadlineReached
+      ? Math.max(1, Math.ceil((refreshAvailableTime - now) / 60_000))
+      : null;
+  // Keep the button inert through SSR and whenever the next refill is unknown.
+  // Once the shared ticker reaches the refill instant, the server-side token
+  // bucket will refill on the next press, so the control can become live.
+  const refreshDisabled =
+    spent && (!hasValidRefreshTime || !refreshDeadlineReached);
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      loading={pending}
+      disabled={refreshDisabled}
+      onClick={onRefresh}
+      data-testid="pbm-listing-refresh"
+    >
+      {refreshCooldownMinutes === null ? (
+        <RefreshCw aria-hidden="true" className="size-3.5" />
+      ) : (
+        <Clock3 aria-hidden="true" className="size-3.5" />
+      )}
+      {refreshCooldownMinutes === null
+        ? "Refresh"
+        : `Refresh in ${String(refreshCooldownMinutes)}m`}
+    </Button>
   );
 }
 
@@ -872,14 +898,18 @@ function nameSiblings(siblings: readonly PbmSibling[]): React.ReactNode {
   );
 }
 
-interface ConfirmCopy {
+export interface ConfirmCopy {
   title: string;
   body: string;
   action: string;
 }
 
-/** Pushes confirm before acting, naming the game and the public effect (4.5). */
-function ConfirmButton({
+/**
+ * Pushes confirm before acting, naming the game and the public effect (4.5).
+ * Exported for the lineup page's row actions, which follow the same rules
+ * (lineup spec §5.8).
+ */
+export function ConfirmButton({
   copy,
   onConfirm,
   pending,

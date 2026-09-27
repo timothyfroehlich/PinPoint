@@ -151,8 +151,12 @@ export function PinballmapAbandonedEntries({
   );
 }
 
-/** Refreshes tracked-location counts; older-location cleanup remains PP-o355.49. */
-function RemoveEntryButton({
+/**
+ * Refreshes tracked-location counts; older-location cleanup remains PP-o355.49.
+ * Exported for the lineup page's To remove rows, which remove the same recorded
+ * entries under the same confirmation (lineup spec §5.8).
+ */
+export function RemoveEntryButton({
   machineId,
   entry,
   pending,

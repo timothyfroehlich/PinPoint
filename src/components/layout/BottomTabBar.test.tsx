@@ -159,6 +159,9 @@ describe("BottomTabBar", () => {
     expect(
       screen.queryByTestId("more-sheet-admin-integrations")
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("more-sheet-admin-pinball-map")
+    ).not.toBeInTheDocument();
   });
 
   it("highlights Issues tab (not Machines) when viewing an issue detail page", () => {
@@ -227,5 +230,19 @@ describe("BottomTabBar", () => {
     expect(integrationsLink).toBeInTheDocument();
     expect(integrationsLink).toHaveAttribute("href", "/admin/integrations");
     expect(integrationsLink).toHaveTextContent("Integrations");
+  });
+
+  it("shows the Pinball Map lineup after Integrations in More sheet for admin role", async () => {
+    const user = userEvent.setup();
+    render(<BottomTabBar role="admin" />);
+
+    await user.click(screen.getByRole("button", { name: /more options/i }));
+
+    const lineupLink = screen.getByTestId("more-sheet-admin-pinball-map");
+    expect(lineupLink).toHaveAttribute("href", "/m/pinball-map");
+    expect(lineupLink).toHaveTextContent("Pinball Map lineup");
+    expect(
+      screen.getByTestId("more-sheet-admin-integrations").nextElementSibling
+    ).toBe(lineupLink);
   });
 });

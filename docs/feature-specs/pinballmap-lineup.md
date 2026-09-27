@@ -79,9 +79,11 @@ Every concept in `pinballmap.md` §1 applies unchanged — match, uncataloged, l
 
 ## Known divergences (code vs spec)
 
-| Spec              | Code today           | Resolution |
-| :---------------- | :------------------- | :--------- |
-| §2–§8 lineup page | Route does not exist | PP-o355.65 |
+| Spec | Code today | Resolution |
+| :-- | :-- | :-- |
+| 3.4 Confirm lineup | The header has no Confirm lineup on Pinball Map action | PP-o355.58 |
+| 5.8 unmatched-entry removal | An unmatched entry with no left-behind record (an edition near-miss's entry, or any other unmatched entry) has no in-app Remove; the row links to the location's Pinball Map page instead | PP-o355.65 |
+| 5.8 near-miss rematch | An edition near-miss row links to the machine's Manage tab to change the match; the row offers no rematch action of its own | PP-o355.65 |
 
 ---
 
