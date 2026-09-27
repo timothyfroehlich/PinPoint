@@ -51,6 +51,15 @@ def find_spec_violations(root: Path) -> list[tuple[Path, str]]:
             violations.append(
                 (path, "outside allowed suite directories (e2e/full/ or e2e/smoke/)")
             )
+        # Any 'full' folder nested under smoke/ matches playwright.config.full.ts
+        # (testMatch: "**/full/**/*.spec.ts"), causing duplicate execution across suites
+        elif rel.parts[0] == "smoke" and "full" in rel.parts[1:-1]:
+            violations.append(
+                (
+                    path,
+                    "nested 'full' directory under e2e/smoke/ causes duplicate collection by playwright.config.full.ts",
+                )
+            )
         # Under full/, Playwright config requires *.spec.ts to collect the test
         elif rel.parts[0] == "full" and not path.name.endswith(".spec.ts"):
             violations.append(

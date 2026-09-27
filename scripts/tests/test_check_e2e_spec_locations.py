@@ -186,3 +186,18 @@ def test_find_repo_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     isolated.mkdir()
     monkeypatch.setattr(Path, "is_file", lambda self: False)
     assert find_repo_root(isolated) == isolated
+
+
+def test_nested_full_under_smoke_flagged(tmp_path: Path):
+    """A spec under e2e/smoke/ with a nested 'full' directory is flagged to avoid double collection."""
+    smoke_full_spec = tmp_path / "e2e" / "smoke" / "full" / "foo.spec.ts"
+    smoke_full_spec.parent.mkdir(parents=True)
+    smoke_full_spec.write_text("// test", encoding="utf-8")
+
+    violations = dict(find_spec_violations(tmp_path))
+    assert smoke_full_spec in violations
+    assert (
+        "nested 'full' directory under e2e/smoke/ causes duplicate collection"
+        in violations[smoke_full_spec]
+    )
+    assert smoke_full_spec in find_misplaced_specs(tmp_path)
