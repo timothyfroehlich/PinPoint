@@ -24,7 +24,7 @@ Every MCP call executes within Tim's admin identity (`accessLevel: "admin"`). Wr
 - `list_machines`: Lists cabinets with initials, name, availability, owner, and open issue counts.
 - `get_machine`: Full machine detail including PinballMap link, iScored link, and open issues.
 - `add_machine`: Create a new machine row.
-- `update_machine`: Consolidated tool to update machine `name`, `presenceStatus`, `owner`, PinballMap link (`pinballmapMachineId` / `pinballmapExcluded`), lineup intent (`intent`), or `iscoredGameId`.
+- `update_machine`: Consolidated tool to update machine `name`, `presenceStatus`, `owner`, PinballMap link (`pinballmapMachineId` / `pinballmapExcluded`), lineup intent (`intent`), Insider Connected intent (`insiderConnected`), or `iscoredGameId`.
 - `list_issues`: Lists issues across the collection or for a single machine with filters.
 - `get_issue`: Full issue detail including plain-text description, assignee, reporter, and comment thread.
 - `create_issue`: Files a new issue on a machine.
@@ -75,6 +75,10 @@ PinPoint maintains a local mirror of the PinballMap catalog. Linking a machine r
 4. **Excluding Uncataloged Cabinets**:
    - For homebrew or uncataloged one-offs: `update_machine(machine: "<INITIALS>", pinballmapExcluded: true, pinballmapExcludedReason: "Custom homebrew cabinet")`.
    - `pinballmapMachineId` and `pinballmapExcluded` are mutually exclusive.
+5. **Insider Connected**:
+   - Only for a title whose `get_machine` block reports `pinballmap.insiderConnected.eligible: true`.
+   - `update_machine(machine: "<INITIALS>", insiderConnected: "on" | "off")` records the intent in PinPoint only. Pinball Map changes when a person pushes Update on the machine page.
+   - Re-matching the title clears the intent; in the same call it is applied after the re-match.
 
 ---
 
