@@ -374,7 +374,7 @@ export interface UpdateMachineOwnerParams {
 
 /**
  * Change (or clear) a machine's owner and nothing else — the focused slice of
- * `updateMachineAction`'s owner logic, for the MCP `set_machine_owner` tool.
+ * `updateMachineAction`'s owner logic, for the MCP `update_machine` tool.
  * Atomically: (optional) guest→member promotion, the owner-column update,
  * watcher reconciliation (drop the old owner, subscribe the new), and the
  * `owner_changed` lifecycle event. Name and presence are untouched. Removed and
@@ -579,7 +579,7 @@ export async function updateMachinePresence({
 // --- PinballMap link seam (PP-u4ab.12) --------------------------------------
 //
 // One seam, two steps, shared by `updateMachineAction` (the machine edit page)
-// and the MCP `set_machine_pinballmap` tool:
+// and the MCP `update_machine` tool:
 //
 //   1. {@link planMachinePbmLink}  — decide, before any transaction opens.
 //   2. {@link applyMachinePbmLink} — write, inside the caller's transaction.
@@ -784,7 +784,7 @@ function pbmLinkBasisUnchanged(a: PbmLinkBasis, b: PbmLinkBasis): boolean {
  * `resolvePbmLinkColumnsForUpdate` writes each field as `value ?? null`, which
  * is right for the edit form — that form always posts all of them, so an absent
  * one means a human emptied the box. An MCP caller re-confirming an exclusion it
- * did not author has no such intent, and `set_machine_pinballmap`'s schema has
+ * did not author has no such intent, and `update_machine`'s schema has
  * no field for any of the four, so it *cannot* send them. The fleet pass
  * (PP-h059) does exactly that across the whole floor:
  * `{ machine: "FB", pinballmapExcluded: true }` would null both
@@ -848,7 +848,7 @@ function carryExcludedFields(
  * `value ?? null` is the right rule for those. It owns no control for the
  * reason: the box was write-only (nothing in the app rendered it back, only the
  * MCP tools read it) and was removed in PP-3bbr.3. Without this, saving an
- * unrelated detail on a machine `set_machine_pinballmap` had excluded would
+ * unrelated detail on a machine `update_machine` had excluded would
  * silently null "homebrew — one-off cabinet" — a forgotten argument destroying
  * stored state, which is the thing CORE-ARCH-012 forbids.
  *
@@ -872,7 +872,7 @@ export function carryExcludedReason(
 
 /**
  * Change a machine's PinballMap link and nothing else — the focused slice of
- * `updateMachineAction`'s PBM logic, for the MCP `set_machine_pinballmap` tool.
+ * `updateMachineAction`'s PBM logic, for the MCP `update_machine` tool.
  *
  * Runs the same steps the edit page runs, in the same order, over the same seam:
  * plan, then apply in a transaction. Authorization stays in the caller

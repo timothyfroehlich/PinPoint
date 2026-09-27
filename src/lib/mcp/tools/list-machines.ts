@@ -356,9 +356,8 @@ export async function runListMachines(
  * Offset paging over a mutating result set.
  *
  * Offset paging is only coherent over a result set that holds still, and the MCP
- * surface can move it: `set_machine_availability` writes `presenceStatus` (the
- * `presence` filter), `set_machine_name` writes `name` (both the `search` target
- * and the primary sort key), and `add_machine` inserts rows that can land inside
+ * surface can move it: `update_machine` writes `presenceStatus` (the `presence`
+ * filter) and `name` (both the `search` target and the primary sort key), and `add_machine` inserts rows that can land inside
  * any filter.
  */
 export function registerListMachines(server: McpServer): void {
