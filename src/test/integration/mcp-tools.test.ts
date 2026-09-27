@@ -2783,6 +2783,43 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
         where: eq(machines.id, machine.id),
       });
       expect(row?.ownerId).toBeNull();
+
+      // An empty string is the other documented clear, not a name lookup.
+      await runUpdateMachine(
+        { machine: machine.initials, owner: member1 },
+        ctx("admin", admin)
+      );
+      const clearEmpty = await runUpdateMachine(
+        { machine: machine.initials, owner: "" },
+        ctx("admin", admin)
+      );
+      expect(clearEmpty.applied).toEqual([
+        { field: "owner", from: "Ada Lovelace", to: null, changed: true },
+      ]);
+      row = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(row?.ownerId).toBeNull();
+    });
+
+    it("clears iscoredGameId with an empty string", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ iscoredGameId: "gz-789" });
+
+      const outcome = await runUpdateMachine(
+        { machine: machine.initials, iscoredGameId: "" },
+        ctx("admin", admin)
+      );
+      expect(outcome.applied).toEqual([
+        { field: "iscoredGameId", from: "gz-789", to: null, changed: true },
+      ]);
+
+      const db = await getTestDb();
+      const row = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+        columns: { iscoredGameId: true },
+      });
+      expect(row?.iscoredGameId).toBeNull();
     });
 
     it("rejects invalid owner names and guest owners", async () => {
@@ -3251,6 +3288,16 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
           to: "Authorized Rename",
           changed: true,
         },
+      ]);
+
+      // A technician may edit a machine they do not own
+      const tech = await makeUser("technician");
+      const techOutcome = await runUpdateMachine(
+        { machine: machine.initials, iscoredGameId: "tech-1" },
+        ctx("technician", tech)
+      );
+      expect(techOutcome.applied).toEqual([
+        { field: "iscoredGameId", from: null, to: "tech-1", changed: true },
       ]);
     });
 
