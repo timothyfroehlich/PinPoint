@@ -4,6 +4,13 @@ import { eq } from "drizzle-orm";
 
 import { getCatalogEntry, isCatalogEmpty } from "~/lib/pinballmap/catalog";
 import {
+  deriveInsiderConnectedView,
+  withInsiderConnected,
+  type PbmIcIntent,
+  type PbmInsiderConnectedSetting,
+  type PbmInsiderConnectedView,
+} from "~/lib/pinballmap/insider-connected";
+import {
   derivePbmListingView,
   type PbmListingIntent,
   type PbmListingStateName,
@@ -99,8 +106,35 @@ export interface McpMachinePinballmapLinked {
    * ordinary state a person resolves (spec §1, §4).
    */
   intent: PbmListingIntent;
-  /** What the last-synced lineup shows for this title, against `intent`. */
+  /** The entry's Insider Connected setting as PinPoint intends it (spec §3.8). */
+  insiderConnected: McpMachineInsiderConnected;
+  /**
+   * What the last-synced lineup shows for this title, against `intent` and the
+   * Insider Connected target: `outOfSync` includes Insider Connected differs.
+   */
   lineup: McpMachineLineup;
+}
+
+/**
+ * `intent` is this cabinet's own decision; `target` is what the shared entry
+ * should be across same-title cabinets (On wins); `pinballMap` is what the last
+ * sync recorded. `differs` is the Insider Connected differs state (spec §4.2).
+ */
+export interface McpMachineInsiderConnected {
+  /**
+   * Whether Pinball Map's catalog marks the title Insider Connected eligible.
+   * `null` when the title didn't resolve (`catalogLookup` is not `"found"`), so
+   * an unknown title never reads as ineligible. The fields below are `null` /
+   * `false` unless this is `true`.
+   */
+  eligible: boolean | null;
+  /** `"on"`, `"off"`, or `null` when none has been chosen. */
+  intent: PbmIcIntent | null;
+  /** The entry's target across same-title cabinets; `null` when none has an intent. */
+  target: PbmIcIntent | null;
+  /** Pinball Map's recorded value; `null` when the entry isn't on the stored lineup. */
+  pinballMap: PbmInsiderConnectedSetting | null;
+  differs: boolean;
 }
 
 /**
@@ -180,6 +214,37 @@ export function deriveLineupView(
   });
 }
 
+/** A same-title cabinet, with the Insider Connected intent the entry's target needs. */
+export type LineupSibling = PbmSiblingInput & { icIntent: PbmIcIntent | null };
+
+/**
+ * The lineup view with Insider Connected folded in, as the machine page shows
+ * it: `outOfSync` / `pushAction` include Insider Connected differs (spec §4.2).
+ * `ic` is null when the title is not eligible.
+ */
+export function deriveLineupWithInsiderConnected(
+  machine: Parameters<typeof deriveLineupView>[0] & {
+    pinballmapIcIntent: PbmIcIntent | null;
+  },
+  source: LineupSource,
+  siblings: readonly LineupSibling[],
+  icEligible: boolean
+): { view: PbmListingView; ic: PbmInsiderConnectedView | null } {
+  const listing = deriveLineupView(machine, source, siblings);
+  const ic =
+    machine.pinballmapMachineId === null
+      ? null
+      : deriveInsiderConnectedView({
+          listing,
+          pinballmapMachineId: machine.pinballmapMachineId,
+          icEligible,
+          intent: machine.pinballmapIcIntent,
+          siblingIntents: siblings.map((sibling) => sibling.icIntent),
+          snapshot: source.snapshot,
+        });
+  return { view: withInsiderConnected(listing, ic), ic };
+}
+
 function toMcpLineup(
   view: PbmListingView,
   source: LineupSource
@@ -216,7 +281,8 @@ export interface McpMachinePinballmapExcluded {
  * never pinballmap.com (CORE-PBM-001).
  */
 export async function buildMachinePinballmap(
-  machine: MachinePbmColumns & LineupSubject
+  machine: MachinePbmColumns &
+    LineupSubject & { pinballmapIcIntent: PbmIcIntent | null }
 ): Promise<McpMachinePinballmap | null> {
   if (machine.pinballmapMachineId !== null) {
     const pinballmapMachineId = machine.pinballmapMachineId;
@@ -231,6 +297,7 @@ export async function buildMachinePinballmap(
           initials: machines.initials,
           name: machines.name,
           intent: machines.pinballmapIntent,
+          icIntent: machines.pinballmapIcIntent,
         })
         .from(machines)
         .where(eq(machines.pinballmapMachineId, pinballmapMachineId)),
@@ -244,6 +311,12 @@ export async function buildMachinePinballmap(
       : (await isCatalogEmpty())
         ? "mirror_unpopulated"
         : "missing";
+    const { view, ic } = deriveLineupWithInsiderConnected(
+      machine,
+      source,
+      siblings,
+      entry?.icEligible ?? false
+    );
     return {
       status: "linked",
       pinballmapMachineId,
@@ -256,7 +329,14 @@ export async function buildMachinePinballmap(
       opdbId: machine.opdbId,
       ipdbId: machine.ipdbId,
       intent: machine.pinballmapIntent,
-      lineup: toMcpLineup(deriveLineupView(machine, source, siblings), source),
+      insiderConnected: {
+        eligible: entry ? entry.icEligible : null,
+        intent: machine.pinballmapIcIntent,
+        target: ic?.target ?? null,
+        pinballMap: ic?.pinballMap ?? null,
+        differs: ic?.differs ?? false,
+      },
+      lineup: toMcpLineup(view, source),
     };
   }
 
