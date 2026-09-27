@@ -343,9 +343,11 @@ function hasReturnedRow(result: unknown): boolean {
  *   ATTEMPT, not the last success, so a failed fetch (429/500) still spends its
  *   token rather than fail-opening into a retry loop (CORE-PBM-001).
  *
- * `refreshTokensAt` advances by whole refill periods rather than to `now()`, so
- * the fraction of a period already served is not thrown away on every claim —
- * otherwise a steady clicker could hold the bucket empty indefinitely.
+ * `refreshTokensAt` advances by whole refill periods while refilling below
+ * capacity so the fraction of a period already served is not thrown away on every
+ * claim (otherwise a steady clicker could hold the bucket empty indefinitely),
+ * but resets to `now()` when the bucket reaches or is at full burst capacity so
+ * unconsumed idle time beyond the ceiling is not banked.
  */
 async function stampSyncAttempt(
   expectedLocationId: number | null,
