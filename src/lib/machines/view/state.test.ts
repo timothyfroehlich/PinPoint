@@ -20,7 +20,6 @@ describe("machine view URL state", () => {
       severity: [],
       presenceWidget: "all",
       playabilityWidget: "all",
-      issuesWidget: "all",
     });
   });
 
@@ -38,7 +37,6 @@ describe("machine view URL state", () => {
       presence: "all",
       status: "unplayable,operational,invalid",
       severity: "major,bogus,cosmetic,major",
-      issuesWidget: "filtered",
       presenceWidget: "sideways",
       owner: "owner-2,unassigned,owner-2",
       columns: "machine,year,invalid,owner",
@@ -49,11 +47,19 @@ describe("machine view URL state", () => {
     expect(state.presence).toBe("all");
     expect(state.status).toEqual(["unplayable", "operational"]);
     expect(state.severity).toEqual(["major", "cosmetic"]);
-    expect(state.issuesWidget).toBe("filtered");
     expect(state.presenceWidget).toBe("all");
     expect(state.owner).toEqual(["owner-2", "unassigned"]);
     expect(state.columns).toEqual(["machine", "year", "owner"]);
     expect(state.pageSize).toBe(50);
+  });
+
+  it("ignores a legacy issuesWidget parameter from a retired widget", () => {
+    const state = parseMachineViewState(
+      new URLSearchParams({ issuesWidget: "filtered" }),
+      "machines"
+    );
+
+    expect(state).not.toHaveProperty("issuesWidget");
   });
 
   it("ignores invalid enums, pages, page sizes, sorts, and columns", () => {
@@ -107,11 +113,10 @@ describe("machine view URL state", () => {
       pageSize: 100 as const,
       columns: ["machine" as const, "year" as const],
       presenceWidget: "filtered" as const,
-      issuesWidget: "filtered" as const,
     };
     const serialized = serializeMachineViewState(state, "machines");
     expect(serialized.toString()).toBe(
-      "q=mars&presence=all&status=needs_service&severity=minor%2Cunplayable&owner=unassigned&sort=year&dir=desc&page=3&pageSize=100&columns=machine%2Cyear&presenceWidget=filtered&issuesWidget=filtered"
+      "q=mars&presence=all&status=needs_service&severity=minor%2Cunplayable&owner=unassigned&sort=year&dir=desc&page=3&pageSize=100&columns=machine%2Cyear&presenceWidget=filtered"
     );
     expect(parseMachineViewState(serialized, "machines")).toEqual(state);
   });

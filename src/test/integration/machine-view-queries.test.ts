@@ -202,11 +202,6 @@ describe("machine view database pipeline", () => {
       }),
     });
 
-    expect(result.summary.issues).toEqual({
-      openIssues: 2,
-      machinesWithOpenIssues: 2,
-      bySeverity: { cosmetic: 0, minor: 1, major: 0, unplayable: 1 },
-    });
     expect(result.summary.playability.byStatus.unplayable).toBe(1);
     expect(result.rows.every((row) => row.health === undefined)).toBe(true);
   });

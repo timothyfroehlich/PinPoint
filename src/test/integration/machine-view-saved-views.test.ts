@@ -38,7 +38,6 @@ const state: MachineViewSavedState = {
   columns: ["machine", "playability"],
   presenceWidget: "all",
   playabilityWidget: "filtered",
-  issuesWidget: "all",
 };
 
 describe("machine view saved views persistence", () => {
@@ -111,6 +110,30 @@ describe("machine view saved views persistence", () => {
       collectionId: otherCollectionId,
     });
     expect(otherCollection).toEqual([]);
+  });
+
+  it("still loads a row stored with the retired issuesWidget key", async () => {
+    // The jsonb column is `$type<MachineViewSavedState>()` with no runtime
+    // validation on read (src/server/db/schema.ts), so a row saved before
+    // the Open Issues widget was retired (PR #2237) still carries the key.
+    const legacyState: typeof state & { issuesWidget: string } = {
+      ...state,
+      issuesWidget: "filtered",
+    };
+    const db = asDbOrTx(await getTestDb());
+    const result = await createSavedMachineView(db, {
+      userId,
+      key: { surface: "machines" },
+      name: "Legacy",
+      state: legacyState,
+      makeDefault: false,
+    });
+    if (!result.ok) throw new Error(result.message);
+
+    const [view] = await listSavedMachineViews(db, userId, {
+      surface: "machines",
+    });
+    expect(view?.state).toEqual(legacyState);
   });
 
   it("rejects a colliding name on the same Surface, ignoring case", async () => {
