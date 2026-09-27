@@ -1,23 +1,19 @@
 import type { ApronCardContent } from "~/lib/machines/apron-card";
+import type { MachineCredits } from "~/lib/opdb/credits";
 
 /**
  * Apron card stress fixtures (PP-xeki): the hard cases every apron size must
  * survive — long and unbreakable titles, the tallest identity panel, many or
- * missing credits, and card text at the overflow limit. Unit tests and the
- * visual review run every fixture against every entry in APRON_CARD_SIZES, so
- * nothing here names a size and a new size inherits the coverage.
+ * missing credits, and card text at the overflow limit. The review page
+ * /dev/apron-cards renders every fixture at every entry in APRON_CARD_SIZES
+ * and checks each card; e2e/smoke/apron-card-stress.spec.ts fails on any
+ * card that fails. Nothing here names a size, so a new size is covered.
  *
  * Real machines are fact-checked against OPDB's public export as of
  * 2026-09-25 (opdbId below): name, manufacturer, year, and design/art credits
  * in OPDB index order. Owners are fictional. Editions come from Pinball Map's
  * grouped families, as on a real card (spec §7).
  */
-
-/** OPDB design and art credits, each in OPDB index order. */
-export interface ApronFixtureCredits {
-  design: readonly string[];
-  art: readonly string[];
-}
 
 /**
  * Card text grown word by word from `words` until the combined text region
@@ -33,7 +29,7 @@ export interface ApronFixtureTextFill {
 
 /** A fit check the visual review runs on every rendered card. */
 export type ApronStressCheck =
-  "title-width" | "title-size" | "panel-height" | "card-text";
+  "title-width" | "title-size" | "panel-height" | "card-text" | "fit-report";
 
 /**
  * A check this fixture is known to fail, tracked by `bead`. Failures of that
@@ -51,23 +47,15 @@ export interface ApronStressFixture {
   stresses: string;
   /** OPDB id for a real machine; null for a synthetic case. */
   opdbId: string | null;
+  /** Credits are OPDB's, with both credit rows on (spec §10.5 default). */
   content: ApronCardContent;
-  /** Shown on the card once PP-tv2u lands; the face ignores it until then. */
-  credits: ApronFixtureCredits;
   textFill?: ApronFixtureTextFill;
   knownIssues?: readonly ApronKnownIssue[];
 }
 
-// Spec §6.3's panel-fit title shrink is not built yet (PP-tv2u), so a tall
-// identity panel pushes the APC logo past the card's bottom edge.
-const PANEL_FIT_NOT_BUILT: ApronKnownIssue = {
-  check: "panel-height",
-  bead: "PP-tv2u",
-};
-
 const LONG_OWNER = "Maximiliana Featherstonehaugh-Worthington";
 
-const NO_CREDITS: ApronFixtureCredits = { design: [], art: [] };
+const NO_CREDITS: MachineCredits = { design: [], art: [] };
 
 const noText = {
   description: "",
@@ -90,7 +78,13 @@ const FILL_WORDS = [
   "Owners and technicians read every report, and the machine page shows when an issue is fixed or still open.",
 ].join(" ");
 
-export const APRON_STRESS_FIXTURES: readonly ApronStressFixture[] = [
+/** A fixture as written: card content without credits, plus OPDB credits. */
+type FixtureSource = Omit<ApronStressFixture, "content"> & {
+  content: Omit<ApronCardContent, "credits" | "designEnabled" | "artEnabled">;
+  credits: MachineCredits;
+};
+
+const FIXTURE_SOURCES: readonly FixtureSource[] = [
   {
     id: "sttng",
     stresses:
@@ -108,7 +102,6 @@ export const APRON_STRESS_FIXTURES: readonly ApronStressFixture[] = [
       design: ["Steve Ritchie", "Dwight Sullivan", "Greg Freres"],
       art: ["Greg Freres"],
     },
-    knownIssues: [PANEL_FIT_NOT_BUILT],
   },
   {
     id: "indiana-jones",
@@ -127,7 +120,7 @@ export const APRON_STRESS_FIXTURES: readonly ApronStressFixture[] = [
   {
     id: "black-knight-sor-premium",
     stresses:
-      "Tallest identity panel: three-line title, edition, long owner, and credits in both roles",
+      "Tallest identity panel: three-line title, edition, long owner, and credits in both roles; may not fit at the floor size (§6.4)",
     opdbId: "GD7Ld-MBRP4",
     content: {
       name: "Black Knight: Sword of Rage",
@@ -147,7 +140,6 @@ export const APRON_STRESS_FIXTURES: readonly ApronStressFixture[] = [
         "George Gomez",
       ],
     },
-    knownIssues: [PANEL_FIT_NOT_BUILT],
   },
   {
     id: "star-wars-premium",
@@ -331,8 +323,14 @@ export const APRON_STRESS_FIXTURES: readonly ApronStressFixture[] = [
   },
 ];
 
+export const APRON_STRESS_FIXTURES: readonly ApronStressFixture[] =
+  FIXTURE_SOURCES.map(({ content, credits, ...fixture }) => ({
+    ...fixture,
+    content: { ...content, credits, designEnabled: true, artEnabled: true },
+  }));
+
 /** The first `count` words of `words`, for growing a fill field. */
-export function takeWords(words: string, count: number): string {
+function takeWords(words: string, count: number): string {
   return words.split(/\s+/).filter(Boolean).slice(0, count).join(" ");
 }
 

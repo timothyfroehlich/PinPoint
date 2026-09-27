@@ -13,7 +13,6 @@ import {
 import {
   APRON_STRESS_FIXTURES,
   withFilledText,
-  type ApronFixtureCredits,
   type ApronStressCheck,
   type ApronStressFixture,
 } from "~/lib/machines/apron-card-fixtures";
@@ -29,7 +28,12 @@ const SCAN_URL = buildMachineHubUrl(
   "TEST"
 );
 
-type StressStatus = "pass" | "fail" | "known-issue";
+/**
+ * `blocked` is a card the spec lets not fit (§6.4: the identity panel still
+ * reaches the logo at the title's floor size), provided the card reports it
+ * so save and export are blocked. It is an outcome to look at, not a failure.
+ */
+type StressStatus = "pass" | "blocked" | "fail" | "known-issue";
 
 interface StressFailure {
   check: ApronStressCheck;
@@ -41,6 +45,7 @@ interface StressFailure {
 interface StressResult {
   status: StressStatus;
   failures: StressFailure[];
+  blocked: string | null;
   titlePx: number;
   words: number | null;
 }
@@ -60,12 +65,17 @@ function renderedWords(fixture: ApronStressFixture, fill: FillState): number {
   return fixture.textFill?.at === "over" ? fill.limit + 1 : fill.limit;
 }
 
+function overflows(root: HTMLElement, selector: string): boolean {
+  const el = root.querySelector<HTMLElement>(selector);
+  return el !== null && el.scrollHeight > el.clientHeight + 0.5;
+}
+
 function checkCard(
   root: HTMLElement,
   size: ApronCardSize,
   fixture: ApronStressFixture,
   fill: FillState,
-  textOverflows: boolean
+  reportedOverflow: boolean
 ): StressResult {
   const layout = APRON_CARD_LAYOUTS[size];
   const failures: StressFailure[] = [];
@@ -74,7 +84,8 @@ function checkCard(
     failures.push({ check, message, knownIssue: known?.bead ?? null });
   };
   const title = root.querySelector<HTMLElement>(".apron-card__title");
-  const panel = root.querySelector<HTMLElement>(".apron-card__panel");
+  const panelOverflows = overflows(root, ".apron-card__identity");
+  const textOverflows = overflows(root, ".apron-card__text");
   const titlePx = title
     ? Number.parseFloat(getComputedStyle(title).fontSize)
     : 0;
@@ -85,8 +96,14 @@ function checkCard(
   if (titlePx < layout.titleMinPx) {
     fail("title-size", `Title below ${layout.titleMinPx}px`);
   }
-  if (panel && panel.scrollHeight > panel.clientHeight + 0.5) {
-    fail("panel-height", "Identity panel pushes the logo off the card");
+  let blocked: string | null = null;
+  if (panelOverflows && titlePx > layout.titleMinPx) {
+    fail(
+      "panel-height",
+      "Identity panel reaches the logo above the floor size"
+    );
+  } else if (panelOverflows && reportedOverflow) {
+    blocked = "Identity panel does not fit at the floor size (§6.4)";
   }
 
   const textFill = fixture.textFill;
@@ -98,10 +115,31 @@ function checkCard(
   } else if (textFill.at === "limit" && textOverflows) {
     fail("card-text", "Card text overflows");
   } else if (textFill.at === "over" && !textOverflows) {
-    fail("card-text", "Overflow not reported one word past the limit");
+    fail("card-text", "Text still fits one word past the limit");
+  }
+  // The card's own verdict (spec §3.5, §6.4) gates save and export, so it
+  // must agree with what the page measured.
+  if (reportedOverflow !== (panelOverflows || textOverflows)) {
+    fail(
+      "fit-report",
+      reportedOverflow
+        ? "Card reports overflow the page did not measure"
+        : "Card does not report its overflow"
+    );
   }
 
-  let status: StressStatus = "pass";
+  // A known issue that stops failing was fixed: its entry must be removed.
+  for (const issue of fixture.knownIssues ?? []) {
+    if (!failures.some((failure) => failure.check === issue.check)) {
+      failures.push({
+        check: issue.check,
+        message: `Known issue ${issue.bead} no longer reproduces; remove it from the fixture`,
+        knownIssue: null,
+      });
+    }
+  }
+
+  let status: StressStatus = blocked ? "blocked" : "pass";
   if (failures.some((failure) => failure.knownIssue === null)) {
     status = "fail";
   } else if (failures.length > 0) {
@@ -111,6 +149,7 @@ function checkCard(
   return {
     status,
     failures,
+    blocked,
     titlePx,
     words: textFill ? renderedWords(fixture, fill) : null,
   };
@@ -124,7 +163,7 @@ function StressCard({
   size: ApronCardSize;
 }): React.JSX.Element {
   const rootRef = useRef<HTMLDivElement>(null);
-  const overflowRef = useRef(false);
+  const reportedRef = useRef(false);
   const [ready, setReady] = useState(false);
   const [fill, setFill] = useState<FillState>(() =>
     fixture.textFill
@@ -133,25 +172,25 @@ function StressCard({
   );
   const [result, setResult] = useState<StressResult | null>(null);
 
-  // Runs after ApronCardFace's own layout effects, so overflowRef holds the
-  // face's overflow verdict (spec §3.5) for the text rendered this pass.
+  // Runs after ApronCardFace's own layout effects, so the DOM and the face's
+  // overflow verdict (reportedRef) are current for the text rendered this pass.
   useLayoutEffect(() => {
     if (!ready || result) return;
+    const root = rootRef.current;
+    if (!root) return;
     if (fill.phase === "search") {
       const probe = renderedWords(fixture, fill);
       if (fill.lo >= fill.hi) {
         setFill({ phase: "verify", limit: fill.lo });
-      } else if (overflowRef.current) {
+      } else if (overflows(root, ".apron-card__text")) {
         setFill({ ...fill, hi: probe - 1 });
       } else {
         setFill({ ...fill, lo: probe });
       }
       return;
     }
-    const root = rootRef.current;
-    if (!root) return;
     setFill({ phase: "done", limit: fill.limit });
-    setResult(checkCard(root, size, fixture, fill, overflowRef.current));
+    setResult(checkCard(root, size, fixture, fill, reportedRef.current));
   }, [ready, result, fill, fixture, size]);
 
   const content = fixture.textFill
@@ -172,7 +211,7 @@ function StressCard({
           size={size}
           scanUrl={SCAN_URL}
           onOverflowChange={(overflowing) => {
-            overflowRef.current = overflowing;
+            reportedRef.current = overflowing;
           }}
           onReady={() => {
             setReady(true);
@@ -202,6 +241,13 @@ function StatusLine({
   if (result.status === "pass") {
     return <span className="font-medium text-success">Pass</span>;
   }
+  if (result.status === "blocked") {
+    return (
+      <span className="font-medium text-warning">
+        Blocked: {result.blocked}
+      </span>
+    );
+  }
   return (
     <span className="flex flex-col">
       {result.failures.map((failure) => (
@@ -222,25 +268,6 @@ function StatusLine({
   );
 }
 
-function creditLine(label: string, names: readonly string[]): string {
-  return `${label}: ${names.length > 0 ? names.join(", ") : "Unknown"}`;
-}
-
-function CreditsNote({
-  credits,
-}: {
-  credits: ApronFixtureCredits;
-}): React.JSX.Element {
-  return (
-    <p className="text-sm text-muted-foreground">
-      {creditLine("Design", credits.design)} · {creditLine("Art", credits.art)}
-      <span className="block text-xs">
-        Credits are not on the card until PP-tv2u lands.
-      </span>
-    </p>
-  );
-}
-
 export function ApronStressGallery(): React.JSX.Element {
   return (
     <div className="mx-auto flex max-w-[1280px] flex-col gap-10 px-4 py-8">
@@ -248,9 +275,10 @@ export function ApronStressGallery(): React.JSX.Element {
         <h1 className="text-2xl font-semibold">Apron card stress fixtures</h1>
         <p className="max-w-3xl text-muted-foreground">
           Every fixture at every apron size, at print size. Each card checks
-          title width, title size, identity panel height, and card text
-          overflow; text fixtures fill word by word to the overflow limit.
-          Fixtures live in src/lib/machines/apron-card-fixtures.ts (PP-xeki).
+          title width, title size, identity panel height, card text overflow,
+          and that the card's own fit verdict agrees; text fixtures fill word by
+          word to the overflow limit. Fixtures live in
+          src/lib/machines/apron-card-fixtures.ts (PP-xeki).
         </p>
       </header>
       {APRON_STRESS_FIXTURES.map((fixture) => (
@@ -268,7 +296,6 @@ export function ApronStressGallery(): React.JSX.Element {
               </span>
             </h2>
             <p className="text-sm">{fixture.stresses}</p>
-            <CreditsNote credits={fixture.credits} />
           </div>
           <div className="flex flex-wrap gap-6">
             {SIZES.map((size) => (
