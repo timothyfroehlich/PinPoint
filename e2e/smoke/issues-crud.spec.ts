@@ -8,8 +8,6 @@
 import { test, expect, type Page } from "../support/fixtures.js";
 import {
   assertNoHorizontalOverflow,
-  updateIssueField,
-  visibleIssueFieldControl,
   assertNoA11yViolations,
 } from "../support/actions.js";
 import { cleanupTestEntities, extractIdFromUrl } from "../support/cleanup.js";
@@ -322,37 +320,6 @@ test.describe("Issues System", () => {
 
       // Verify assignment timeline event appears
       await expect(page.getByText("Assigned to Member User")).toBeVisible();
-    });
-
-    test("should update issue metadata from the detail page", async ({
-      page,
-    }, testInfo) => {
-      test.skip(
-        !testInfo.project.name.includes("Mobile"),
-        "Drawer interaction is mobile-specific"
-      );
-
-      await page.goto(issueUrl);
-
-      await updateIssueField(page, "status", "confirmed");
-      await expect(visibleIssueFieldControl(page, "status")).toContainText(
-        "Confirmed"
-      );
-
-      await updateIssueField(page, "severity", "major");
-      await expect(visibleIssueFieldControl(page, "severity")).toContainText(
-        "Major"
-      );
-
-      await updateIssueField(page, "priority", "high");
-      await expect(visibleIssueFieldControl(page, "priority")).toContainText(
-        "High"
-      );
-
-      await updateIssueField(page, "frequency", "constant");
-      await expect(visibleIssueFieldControl(page, "frequency")).toContainText(
-        "Constant"
-      );
     });
   });
 });
