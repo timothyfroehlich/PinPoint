@@ -141,6 +141,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
     pinballmapExcluded?: boolean;
     pinballmapExcludedReason?: string;
     pinballmapIntent?: "on" | "off" | "no_sync";
+    pinballmapIcIntent?: "on" | "off";
     modelName?: string;
     manufacturer?: string;
     year?: number;
@@ -185,6 +186,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       ipdbId?: number;
       machineGroupId?: number;
       groupName?: string;
+      icEligible?: boolean;
     }[]
   ): Promise<void> {
     const db = await getTestDb();
@@ -441,10 +443,15 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
 
       it("'out_of_sync' returns only cabinets whose intent disagrees with the synced lineup", async () => {
         const admin = await makeUser("admin");
-        // Titles 61_001 and 61_002 are on the lineup; 61_003 is not.
+        // Titles 61_001, 61_002 and 61_004 are on the lineup; 61_003 is not.
         await seedLineup([
           { id: 52_001, machineId: 61_001 },
           { id: 52_002, machineId: 61_002 },
+          { id: 52_004, machineId: 61_004 },
+        ]);
+        // 61_004 offers Insider Connected; the lineup has it never set.
+        await seedCatalog([
+          { pinballmapMachineId: 61_004, name: "Godzilla", icEligible: true },
         ]);
         const pbm = (
           pinballmapMachineId: number,
@@ -469,6 +476,11 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
         });
         // Unlinked machines have nothing to compare; 'unlinked' owns them.
         await seedMachine({ name: "Sync F Unlinked" });
+        // In the lineup, but its Insider Connected intent differs (PP-u4ab.22).
+        const icDiffers = await seedMachine({
+          name: "Sync G IC Differs",
+          pbm: { ...pbm(61_004, "on"), pinballmapIcIntent: "on" },
+        });
 
         const outcome = await runListMachines(
           { pinballmap: "out_of_sync" },
@@ -493,8 +505,12 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
             initials: missing.initials,
             lineup: { state: "missing", pushAction: "add" },
           },
+          {
+            initials: icDiffers.initials,
+            lineup: { state: "on", pushAction: "update" },
+          },
         ]);
-        expect(result.total).toBe(2);
+        expect(result.total).toBe(3);
         expect(result.lineupSnapshot).toEqual({
           syncedAt: LINEUP_SYNCED_AT,
           lastSyncStatus: "ok",
@@ -944,6 +960,13 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
           opdbId: "GRBN4-MQGE5",
           ipdbId: 6587,
           intent: "on",
+          insiderConnected: {
+            eligible: false,
+            intent: null,
+            target: null,
+            pinballMap: null,
+            differs: false,
+          },
           // No tracked location, so there is no lineup to look in: "unknown"
           // (null), never "not on it" (false) — and no sync time or status
           // borrowed from the dormant snapshot.
@@ -956,6 +979,44 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
             snapshotSyncedAt: null,
             lastSyncStatus: null,
           },
+        });
+      });
+
+      it("reports Insider Connected differs, and counts it as out of sync (PP-u4ab.22)", async () => {
+        const admin = await makeUser("admin");
+        await seedCatalog([
+          {
+            pinballmapMachineId: 80001,
+            name: "Godzilla (Premium)",
+            icEligible: true,
+          },
+        ]);
+        // On the lineup with Pinball Map's Insider Connected never set.
+        await seedLineup([{ id: 51_002, machineId: 80001 }]);
+        const machine = await seedMachine({
+          pbm: {
+            pinballmapMachineId: 80001,
+            pinballmapIntent: "on",
+            pinballmapIcIntent: "on",
+          },
+        });
+
+        const outcome = await runGetMachine(
+          { machine: machine.initials },
+          ctx("admin", admin)
+        );
+        const { pinballmap } = outcome.result as {
+          pinballmap: McpMachinePinballmap | null;
+        };
+        expect(pinballmap).toMatchObject({
+          insiderConnected: {
+            eligible: true,
+            intent: "on",
+            target: "on",
+            pinballMap: "not_set",
+            differs: true,
+          },
+          lineup: { state: "on", outOfSync: true, pushAction: "update" },
         });
       });
 
@@ -4020,6 +4081,102 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
         where: eq(machines.id, machine.id),
       });
       expect(row?.pinballmapIntent).toBe("off");
+    });
+
+    describe("insiderConnected (PP-u4ab.22)", () => {
+      const IC_TITLE = 80001;
+      const IC_OTHER_TITLE = 80002;
+
+      async function seedIcCatalog(): Promise<void> {
+        await seedCatalog([
+          {
+            pinballmapMachineId: IC_TITLE,
+            name: "Godzilla (Premium)",
+            icEligible: true,
+          },
+          {
+            pinballmapMachineId: IC_OTHER_TITLE,
+            name: "Godzilla (LE)",
+            icEligible: true,
+          },
+          {
+            pinballmapMachineId: 80003,
+            name: "Medieval Madness",
+            icEligible: false,
+          },
+        ]);
+      }
+
+      async function storedIcIntent(id: string): Promise<string | null> {
+        const db = await getTestDb();
+        const row = await db.query.machines.findFirst({
+          where: eq(machines.id, id),
+          columns: { pinballmapIcIntent: true },
+        });
+        return row?.pinballmapIcIntent ?? null;
+      }
+
+      it("records the intent on an eligible title and detects no-op", async () => {
+        await seedIcCatalog();
+        const admin = await makeUser("admin");
+        const machine = await seedMachine({
+          pbm: { pinballmapMachineId: IC_TITLE },
+        });
+
+        const outcome = await runUpdateMachine(
+          { machine: machine.initials, insiderConnected: "on" },
+          ctx("admin", admin)
+        );
+        expect(outcome.applied).toEqual([
+          { field: "insiderConnected", from: null, to: "on", changed: true },
+        ]);
+        expect(await storedIcIntent(machine.id)).toBe("on");
+
+        const noop = await runUpdateMachine(
+          { machine: machine.initials, insiderConnected: "on" },
+          ctx("admin", admin)
+        );
+        expect(noop.applied).toEqual([
+          { field: "insiderConnected", from: "on", to: "on", changed: false },
+        ]);
+      });
+
+      it("refuses a title the catalog does not mark eligible", async () => {
+        await seedIcCatalog();
+        const admin = await makeUser("admin");
+        const machine = await seedMachine({
+          pbm: { pinballmapMachineId: 80003 },
+        });
+
+        await expect(
+          runUpdateMachine(
+            { machine: machine.initials, insiderConnected: "on" },
+            ctx("admin", admin)
+          )
+        ).rejects.toMatchObject({
+          reason: "invalid",
+          message: "Pinball Map doesn't offer Insider Connected for this game.",
+        });
+        expect(await storedIcIntent(machine.id)).toBeNull();
+      });
+
+      it("applies after a re-match in the same call, which would otherwise clear it", async () => {
+        await seedIcCatalog();
+        const admin = await makeUser("admin");
+        const machine = await seedMachine({
+          pbm: { pinballmapMachineId: IC_TITLE, pinballmapIcIntent: "on" },
+        });
+
+        await runUpdateMachine(
+          {
+            machine: machine.initials,
+            pinballmapMachineId: IC_OTHER_TITLE,
+            insiderConnected: "off",
+          },
+          ctx("admin", admin)
+        );
+        expect(await storedIcIntent(machine.id)).toBe("off");
+      });
     });
 
     it("updates iscoredGameId individually and clears it", async () => {
