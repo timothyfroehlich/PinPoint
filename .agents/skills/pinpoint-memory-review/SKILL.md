@@ -1,11 +1,11 @@
 ---
 name: pinpoint-memory-review
-description: Weekly curated pass over everything recorded about how we work — beads memories, Claude auto-memories on both the Mac and Bazzite, and the canonical context files. Prunes stale facts, promotes and demotes between tiers, dedupes across tiers, hands Tim a short veto list, then applies the verdicts on both machines. Use when the weekly chores checklist reaches the memory item, or when Tim says "memory review", "review memories", or asks what has been recorded. **Auditing the contents of skills is explicitly out of scope** — this pass covers recorded facts, not the skill corpus.
+description: Curated pass over everything recorded about how we work — beads memories, Claude auto-memories on both the Mac and Bazzite, and the canonical context files. Prunes stale facts, promotes and demotes between tiers, dedupes across tiers, hands Tim a short veto list, then applies the verdicts on both machines. Use when Tim says "memory review", "review memories", or asks what has been recorded. **Auditing the contents of skills is explicitly out of scope** — this pass covers recorded facts, not the skill corpus.
 ---
 
 # pinpoint-memory-review
 
-> **Use when:** the weekly `chores` pass reaches its memory item, or Tim says "memory review" / "review the memories" / "what have you been recording". Triggers on "memory review", "review memories", "context review".
+> **Use when:** Tim says "memory review" / "review the memories" / "what have you been recording". Triggers on "memory review", "review memories", "context review". Not part of the `pinpoint-chores` checklist — run it on its own when Tim asks.
 
 A curation pass, not a capture mechanism. It reads every store of recorded context across both machines, works out what is stale, misplaced, or duplicated, and applies **only what Tim approves**.
 
@@ -100,7 +100,7 @@ Report at the end: what applied, what was skipped, what is waiting on Tim.
 
 ## Phase 6 — close out
 
-Note findings as a comment on the weekly chores bead, then re-defer it a week out per `pinpoint-chores`. File beads for anything actionable that the review itself should not fix.
+Note findings as a comment on the relevant bead (e.g. PP-uoqg). File beads for anything actionable that the review itself should not fix.
 
 ## Constraints
 

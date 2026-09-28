@@ -4,6 +4,7 @@ import { TriangleAlert } from "lucide-react";
 
 import { PersonHoverCard } from "~/components/people/PersonHoverCard";
 import { formatDate } from "~/lib/dates";
+import { formatCreditNames, type MachineCredits } from "~/lib/opdb/credits";
 
 interface InfoRailProps {
   owner: { id: string; name: string; avatarUrl: string | null } | null;
@@ -40,10 +41,14 @@ interface InfoRailProps {
   manufacturer: string | null;
   year: number | null;
   /**
-   * The machine's manufacturer tag, or null when it has no current
-   * manufacturer (spec collections-and-tags 7.4, 8.4).
+   * Design and art credits from the machine's OPDB record, rendered under
+   * Year with the same rule: only alongside a model, and a role with no
+   * credits reads **Unknown** (PP-tv2u). Every name shows here; only the
+   * apron card limits the list.
    */
-  manufacturerTag: { name: string; href: string } | null;
+  credits: MachineCredits;
+  /** Every tag the machine belongs to, in tag type order (spec 7.4). */
+  tags: { name: string; href: string }[];
   /**
    * The machine's standing on Pinball Map, rendered as one unlabelled line
    * under Model.
@@ -95,6 +100,26 @@ interface InfoRailProps {
 }
 
 const CARD = "rounded-xl border border-outline-variant bg-card p-4";
+
+function CreditRow({
+  label,
+  names,
+}: {
+  label: string;
+  names: string[];
+}): React.JSX.Element {
+  const text = formatCreditNames(names);
+  return (
+    <p className="mt-1 text-sm">
+      <span className="font-semibold text-muted-foreground">{label}</span>{" "}
+      {text === null ? (
+        <span className="text-muted-foreground">Unknown</span>
+      ) : (
+        <span className="text-foreground">{text}</span>
+      )}
+    </p>
+  );
+}
 const LABEL =
   "text-[10px] font-bold uppercase tracking-wider text-muted-foreground";
 
@@ -106,8 +131,7 @@ const LABEL =
  * right rail and folds inline on mobile (the caller controls placement + gap;
  * this returns the cards as a fragment).
  *
- * Tags links each tag the machine belongs to; manufacturer is the only tag
- * type so far.
+ * Tags links each tag the machine belongs to.
  *
  * PP-o355.21 removed the standalone Pinball Map card that PP-o355.3 introduced
  * and PP-l81u last extended. A whole card for two facts hid them: a reader
@@ -124,7 +148,8 @@ export function InfoRail({
   modelName,
   manufacturer,
   year,
-  manufacturerTag,
+  credits,
+  tags,
   pinballmap,
 }: InfoRailProps): React.JSX.Element {
   return (
@@ -179,6 +204,8 @@ export function InfoRail({
                   <span className="text-foreground">{year}</span>
                 )}
               </p>
+              <CreditRow label="Design" names={credits.design} />
+              <CreditRow label="Art" names={credits.art} />
             </>
           )}
 
@@ -296,16 +323,18 @@ export function InfoRail({
 
       <div className={CARD} data-testid="machine-tags">
         <p className={`mb-2 ${LABEL}`}>Tags</p>
-        {manufacturerTag ? (
+        {tags.length > 0 ? (
           <ul className="flex flex-wrap gap-2">
-            <li>
-              <Link
-                href={manufacturerTag.href}
-                className="inline-flex items-center rounded-full bg-secondary-container px-3 py-1 text-sm font-medium text-on-secondary-container hover:bg-secondary-container/80"
-              >
-                {manufacturerTag.name}
-              </Link>
-            </li>
+            {tags.map((tag) => (
+              <li key={tag.href}>
+                <Link
+                  href={tag.href}
+                  className="inline-flex items-center rounded-full bg-secondary-container px-3 py-1 text-sm font-medium text-on-secondary-container hover:bg-secondary-container/80"
+                >
+                  {tag.name}
+                </Link>
+              </li>
+            ))}
           </ul>
         ) : (
           <p className="text-sm text-muted-foreground">No tags</p>

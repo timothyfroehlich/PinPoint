@@ -8,7 +8,7 @@ set -euo pipefail
 # Invoked by .github/workflows/preview-control.yaml on `/preview`.
 #
 # Idempotent: if the Supabase branch `pr-<PR_NUMBER>` already exists it is
-# reused rather than recreated. Vercel env vars are overwritten with --force.
+# reused rather than recreated. Vercel env vars are upserted (overwritten).
 #
 # Required environment:
 #   GIT_BRANCH                 PR head branch name (e.g. feat/foo) — Vercel only
@@ -101,7 +101,7 @@ CREDS_FILE="$(mktemp)"
 trap 'rm -f "$CREDS_FILE"' EXIT
 supabase branches get "$BRANCH_NAME" -o env \
   | sed 's/="\(.*\)"/=\1/' > "$CREDS_FILE"
-# Export every credential so child processes (drizzle-kit, node, vercel) inherit
+# Export every credential so child processes (drizzle-kit, node) inherit
 # them, not just this shell.
 set -a
 # shellcheck disable=SC1090
@@ -151,8 +151,11 @@ echo "::endgroup::"
 # the `/preview` path here and the push-triggered resync path (preview-resync.sh)
 # can never drift. PREVIEW_RESET=1 (set above when reusing a live branch) makes
 # it drop + recreate the schema first; the branch creds are already exported.
-PREVIEW_RESET="$PREVIEW_RESET" \
-PROD_PROJECT_REF="$SUPABASE_PROJECT_ID" \
+# It runs the PR head's node_modules (drizzle-kit, the seed), which need only
+# the branch creds, so the management and Vercel tokens are stripped (PP-fmli).
+env -u SUPABASE_ACCESS_TOKEN -u VERCEL_TOKEN \
+  PREVIEW_RESET="$PREVIEW_RESET" \
+  PROD_PROJECT_REF="$SUPABASE_PROJECT_ID" \
   bash scripts/workflow/preview/preview-migrate-seed.sh
 
 # --- Vercel wiring ----------------------------------------------------------
@@ -169,13 +172,15 @@ PROD_PROJECT_REF="$SUPABASE_PROJECT_ID" \
 # neither owns that alias nor reads branch-scoped env — Vercel's own
 # push-triggered build owns the alias (prod-wired). (Casework: pr-1524.)
 #
-#   env add (CLI):  vercel env add NAME preview <git-branch> --force < value-file
+#   env (API):      POST /v10/projects/{id}/env?upsert=true  {gitBranch, target:[preview]}
 #   deploy (API):   POST /v13/deployments  gitSource:{github, org, repo, ref}
 #   auth:           VERCEL_TOKEN + VERCEL_ORG_ID (teamId)
-# The CLI is invoked via the pinned wrapper (vercel-cli.sh) through npx so no
-# global install or pnpm prerequisite is needed.
+# Every Vercel call goes through vercel-env.sh: REST only, so no Vercel CLI and
+# no npm fetch runs while the tokens are in scope, and neither the token nor a
+# value appears in argv (PP-fmli).
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VERCEL="${HERE}/vercel-cli.sh"
+# shellcheck source=scripts/workflow/preview/vercel-env.sh
+source "${HERE}/vercel-env.sh"
 
 # The publishable/anon key may arrive under either name from `branches get`.
 # env.ts reads NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? NEXT_PUBLIC_SUPABASE_ANON_KEY.
@@ -188,14 +193,14 @@ set_vercel_env() {
     echo "  skip ${name} (empty value)"
     return 0
   fi
-  # `vercel env add NAME preview <git-branch>` reads the value from stdin.
-  # --force overwrites an existing var for the same target without prompting.
-  if printf '%s' "$value" \
-    | $VERCEL env add "$name" preview "$GIT_BRANCH" --force --token="$VERCEL_TOKEN" \
-    >/dev/null 2>&1; then
+  # Type "sensitive" for every var matches what the previously pinned CLI
+  # (57.0.0) chose for a value piped on stdin, so moving to REST changes no
+  # stored type. A failure fails the run: a half-wired preview would build
+  # against the production database's all-branches Preview env.
+  if printf '%s' "$value" | vercel_env_set "$name" sensitive; then
     echo "  set ${name}"
   else
-    echo "::warning::failed to set Vercel env ${name} for branch ${GIT_BRANCH}"
+    exit 1 # vercel_env_set already emitted the ::error:: with Vercel's reason
   fi
 }
 
@@ -204,7 +209,6 @@ inject_vercel_env() {
   : "${VERCEL_TOKEN:?VERCEL_TOKEN is required for Vercel wiring}"
   : "${VERCEL_ORG_ID:?VERCEL_ORG_ID is required for Vercel wiring}"
   : "${VERCEL_PROJECT_ID:?VERCEL_PROJECT_ID is required for Vercel wiring}"
-  export VERCEL_ORG_ID VERCEL_PROJECT_ID
 
   # Client-side (inlined at build time by Next.js):
   set_vercel_env "NEXT_PUBLIC_SUPABASE_URL" "$SUPABASE_URL"
@@ -226,9 +230,8 @@ wait_for_ready() {
   [[ -z "$id" ]] && return 0
   local attempts=0 max=40 json state   # ~6.7 min at 10s intervals
   while ((attempts < max)); do
-    json="$(curl -sS \
-      "https://api.vercel.com/v13/deployments/${id}?teamId=${VERCEL_ORG_ID}" \
-      -H "Authorization: Bearer ${VERCEL_TOKEN}" 2>/dev/null || true)"
+    json="$(vercel_api GET "/v13/deployments/${id}?teamId=${VERCEL_ORG_ID}" 2>/dev/null || true)"
+    json="$(_vercel_body "$json")"
     state="$(printf '%s' "$json" | jq -r '.readyState // .status // empty' 2>/dev/null || true)"
     case "$state" in
       READY)
@@ -288,12 +291,10 @@ trigger_vercel_build() {
   # message (the request token is in a header, never echoed; the payload carries
   # no secrets — branch creds live in Vercel's env store, set above).
   local raw http_code body dep_id dep_url
-  raw="$(curl -sS -X POST \
-    "https://api.vercel.com/v13/deployments?teamId=${VERCEL_ORG_ID}&forceNew=1&skipAutoDetectionConfirmation=1" \
-    -H "Authorization: Bearer ${VERCEL_TOKEN}" \
+  raw="$(printf '%s' "$payload" | vercel_api POST \
+    "/v13/deployments?teamId=${VERCEL_ORG_ID}&forceNew=1&skipAutoDetectionConfirmation=1" \
     -H "Content-Type: application/json" \
-    -d "$payload" \
-    -w $'\n%{http_code}' 2>/dev/null || true)"
+    --data-binary @- 2>/dev/null || true)"
   http_code="$(printf '%s' "$raw" | tail -n1)"
   body="$(printf '%s' "$raw" | sed '$d')"
 

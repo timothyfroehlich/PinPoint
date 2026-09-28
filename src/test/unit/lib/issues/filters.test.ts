@@ -80,6 +80,15 @@ describe("parseIssueFilters", () => {
     const filters = parseIssueFilters(params);
     expect(filters.includeInactiveMachines).toBe(true);
   });
+
+  it("parses Summary Widget populations, treating anything but filtered as All", () => {
+    const filters = parseIssueFilters(
+      new URLSearchParams("status_widget=filtered&severity_widget=bogus")
+    );
+    expect(filters.statusWidget).toBe("filtered");
+    expect(filters.severityWidget).toBeUndefined();
+    expect(filters.priorityWidget).toBeUndefined();
+  });
 });
 
 describe("hasActiveIssueFilters", () => {
