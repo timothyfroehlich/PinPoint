@@ -22,7 +22,7 @@ pnpm = "aqua:pnpm/pnpm"
 [tools]
 node = "24.20.0"
 python = "3.14.7"
-ruff = "0.16.6"
+ruff = "0.16.7"
 zizmor = "1.29.0"
 # Supabase CLI executable only — the approved local-stack / migration-tooling
 # version, sourced here for Mac, Bazzite, CI, and preview

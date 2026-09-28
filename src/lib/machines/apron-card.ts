@@ -40,7 +40,7 @@ export interface ApronCardContent {
   artEnabled: boolean;
 }
 
-interface ApronMachineSource extends MachineManufacturerSource {
+export interface ApronMachineSource extends MachineManufacturerSource {
   name: string;
   year: number | null;
   description: ProseMirrorDoc | null;
@@ -51,6 +51,7 @@ interface ApronMachineSource extends MachineManufacturerSource {
   apronDesignEnabled: boolean;
   apronArtEnabled: boolean;
   owner: { name: string } | null;
+  invitedOwner: { name: string } | null;
   pinballmapTitle: {
     name: string;
     machineGroupId: number | null;
@@ -93,7 +94,12 @@ export function apronCardContent(
     // The same manufacturer the machine page and its tag show (spec 8.5).
     manufacturer: getCurrentManufacturer(machine),
     year: machine.year,
-    ownerName: machine.owner?.name ?? null,
+    // A machine is owned by a registered user (`owner`) or by an invited
+    // member who has not signed up yet (`invitedOwner`); the schema keeps them
+    // mutually exclusive. The card prints the owner's name in either case —
+    // the "(invited)" status marker the in-app owner block shows is an
+    // internal-workflow detail, not something the physical card carries.
+    ownerName: machine.owner?.name ?? machine.invitedOwner?.name ?? null,
     description: machine.apronUseCustomDescription
       ? (machine.apronDescription ?? "")
       : docToPlainText(machine.description),

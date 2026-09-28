@@ -22,10 +22,14 @@ vi.mock("next/navigation", () => ({
 
 const EMPTY_RESULTS = { machines: [], issues: [] };
 
-function jsonResponse(value: unknown, status = 200): Response {
+function jsonResponse(
+  value: unknown,
+  status = 200,
+  headers?: Record<string, string>
+): Response {
   return new Response(JSON.stringify(value), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...headers },
   });
 }
 
@@ -294,6 +298,61 @@ describe("QuickSearch", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Try again" })).toBeVisible();
     consoleError.mockRestore();
+  });
+
+  it("displays rate-limited message with retry timing when 429 received and allows retry", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({ error: "Quick search rate limit reached" }, 429, {
+          "Retry-After": "30",
+        })
+      )
+      .mockResolvedValueOnce(jsonResponse(EMPTY_RESULTS));
+    vi.stubGlobal("fetch", fetchMock);
+    renderQuickSearch();
+
+    const input = screen.getByTestId("quick-search-desktop-input");
+    await user.click(input);
+    await user.type(input, "attack");
+
+    expect(
+      await screen.findByText(
+        "Search rate limit reached. Please wait 30s before trying again."
+      )
+    ).toBeInTheDocument();
+    expect(input).toHaveValue("attack");
+
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+    expect(
+      await screen.findByText("No machines or issues found.")
+    ).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("displays fallback rate-limited message when 429 lacks Retry-After header", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          jsonResponse({ error: "Quick search rate limit reached" }, 429)
+        )
+    );
+    renderQuickSearch();
+
+    const input = screen.getByTestId("quick-search-desktop-input");
+    await user.click(input);
+    await user.type(input, "attack");
+
+    expect(
+      await screen.findByText(
+        "Search rate limit reached. Please wait a moment before trying again."
+      )
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeVisible();
   });
 
   it("keeps the mobile result panel stable while a new query loads", async () => {
