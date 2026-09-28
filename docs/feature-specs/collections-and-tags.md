@@ -101,12 +101,12 @@
 
 ## 9. Type, Display, and Player Count Tags
 
-- **9.1** Type, Display, and Player Count are automatic tag types whose membership comes from the Open Pinball Database (OPDB) record of a machine's Pinball Map catalog title, read from a copy of OPDB's published data that PinPoint stores and refreshes on a schedule.
-- **9.2** A machine with no catalog title, or whose catalog title has no OPDB record, belongs to no Type, Display, or Player Count tag, and a value its OPDB record leaves blank produces no tag of that type.
+- **9.1** Type, Display, and Player Count are automatic tag types. A machine linked to a Pinball Map catalog title takes its values from that title's Open Pinball Database (OPDB) record, read from a copy of OPDB's published data that PinPoint stores and refreshes on a schedule. A machine explicitly declared uncataloged uses its hand-entered type, display, and player count.
+- **9.2** A machine that is neither linked nor uncataloged, or whose catalog title has no OPDB record, belongs to no Type, Display, or Player Count tag. A value left blank, in the OPDB record or by hand, produces no tag of that type.
 - **9.3** The Type tags are Electromechanical, Solid State, and Pure Mechanical.
 - **9.4** The Display tags are Reels, Lights, Alphanumeric, CGA, DMD, and LCD.
 - **9.5** A Player Count tag names the machine's player count: “1 Player” for one player and “N Players” otherwise, such as “4 Players”.
-- **9.6** A machine belongs to at most one tag of each of these types, and nobody applies or removes these tags by hand.
+- **9.6** A machine belongs to at most one tag of each of these types. Nobody applies or removes these tags by hand; changing a machine's catalog match or hand-entered values changes its tags.
 
 ---
 
@@ -134,6 +134,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-26 | Uncataloged machines join Type, Display, and Player Count tags through hand-entered values. |
 | 2026-09-25 | Added Type, Display, and Player Count tag types from OPDB data; dropped deferred era tags. |
 | 2026-09-25 | Added tag type pages and automatic tag type marking. |
 | 2026-09-24 | Created from as-built Collections behavior, with Owner Collections made public and manufacturer tags as the first tag type. |
