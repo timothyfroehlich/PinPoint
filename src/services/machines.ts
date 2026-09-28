@@ -42,6 +42,7 @@ import {
 } from "~/lib/pinballmap/listing-state";
 import type { PbmIcIntent } from "~/lib/pinballmap/insider-connected";
 import { getCatalogEntry } from "~/lib/pinballmap/catalog";
+import type { OpdbDisplayType, OpdbMachineType } from "~/lib/opdb/types";
 
 export type Machine = InferSelectModel<typeof machines>;
 
@@ -68,6 +69,14 @@ export interface MachinePbmColumns {
   modelName: string | null;
   manufacturer: string | null;
   year: number | null;
+  // The rest of the manual model (PP-wqit.14), under its own CHECK
+  // (`machines_manual_model_requires_excluded`) with the same reason to move
+  // with the set.
+  type: OpdbMachineType | null;
+  display: OpdbDisplayType | null;
+  playerCount: number | null;
+  designers: string[] | null;
+  artists: string[] | null;
   opdbId: string | null;
   ipdbId: number | null;
 }
@@ -739,6 +748,11 @@ type PbmLinkBasis = StoredPbmLinkState & {
   modelName: string | null;
   manufacturer: string | null;
   year: number | null;
+  type: OpdbMachineType | null;
+  display: OpdbDisplayType | null;
+  playerCount: number | null;
+  designers: string[] | null;
+  artists: string[] | null;
 };
 
 const PBM_LINK_COLUMNS = {
@@ -754,6 +768,12 @@ const PBM_LINK_COLUMNS = {
   modelName: true,
   manufacturer: true,
   year: true,
+  // The rest of the manual model (PP-wqit.14) — same CHECK shape, same reason.
+  type: true,
+  display: true,
+  playerCount: true,
+  designers: true,
+  artists: true,
   opdbId: true,
   ipdbId: true,
 } as const;
@@ -775,8 +795,22 @@ function pbmLinkBasisUnchanged(a: PbmLinkBasis, b: PbmLinkBasis): boolean {
     a.pinballmapExcludedReason === b.pinballmapExcludedReason &&
     a.modelName === b.modelName &&
     a.manufacturer === b.manufacturer &&
-    a.year === b.year
+    a.year === b.year &&
+    a.type === b.type &&
+    a.display === b.display &&
+    a.playerCount === b.playerCount &&
+    sameNameList(a.designers, b.designers) &&
+    sameNameList(a.artists, b.artists)
   );
+}
+
+/** Credit lists compare by value: two reads of one row are distinct arrays. */
+function sameNameList(
+  a: readonly string[] | null,
+  b: readonly string[] | null
+): boolean {
+  if (a === null || b === null) return a === b;
+  return a.length === b.length && a.every((name, i) => name === b[i]);
 }
 
 /**
@@ -786,8 +820,8 @@ function pbmLinkBasisUnchanged(a: PbmLinkBasis, b: PbmLinkBasis): boolean {
  * `resolvePbmLinkColumnsForUpdate` writes each field as `value ?? null`, which
  * is right for the edit form — that form always posts all of them, so an absent
  * one means a human emptied the box. An MCP caller re-confirming an exclusion it
- * did not author has no such intent: `update_machine` has no field for the three
- * model columns, so it *cannot* send them, and it may omit the reason. The
+ * did not author has no such intent: `update_machine` has no field for the
+ * manual model columns, so it *cannot* send them, and it may omit the reason. The
  * fleet pass (PP-h059) does exactly that across the whole floor:
  * `{ machine: "FB", pinballmapExcluded: true }` would null both
  * "homebrew — one-off cabinet" and the model identity — name, manufacturer and
@@ -800,13 +834,13 @@ function pbmLinkBasisUnchanged(a: PbmLinkBasis, b: PbmLinkBasis): boolean {
  * value the caller sent. Only `undefined` — the field absent from the request —
  * carries.
  *
- * The three model fields moved in with the reason (PP-3bbr shipped them into
+ * The manual model fields moved in with the reason (PP-3bbr shipped them into
  * `MachinePbmColumns`) rather than getting their own helper, because they are
  * one decision: what an omitted field means depends on the caller, not on which
  * column it is.
  *
  * The reason splits back out into {@link carryExcludedReason} for the ONE
- * caller whose answer differs per column: the edit form posts the three model
+ * caller whose answer differs per column: the edit form posts the manual model
  * fields (so a blank one is a human clearing the box, spec 2.4) but has no
  * control for the reason at all (PP-3bbr.3), so its silence there is absence,
  * not intent.
@@ -820,11 +854,16 @@ function carryExcludedFields(
     | "modelName"
     | "manufacturer"
     | "year"
+    | "type"
+    | "display"
+    | "playerCount"
+    | "designers"
+    | "artists"
   >
 ): PbmLinkSelection {
   // Only a re-statement of an exclusion that was already stored can carry —
   // turning exclusion ON for the first time has nothing to carry from, and a
-  // machine being linked to a title must clear all four (the
+  // machine being linked to a title must clear all of them (the
   // `machines_model_name_requires_excluded` CHECK makes "linked and
   // hand-entered" unrepresentable).
   if (selection.pinballmapExcluded !== true || !stored.pinballmapExcluded) {
@@ -838,6 +877,16 @@ function carryExcludedFields(
     carried.manufacturer = stored.manufacturer;
   if (selection.year === undefined && stored.year !== null)
     carried.year = stored.year;
+  if (selection.type === undefined && stored.type !== null)
+    carried.type = stored.type;
+  if (selection.display === undefined && stored.display !== null)
+    carried.display = stored.display;
+  if (selection.playerCount === undefined && stored.playerCount !== null)
+    carried.playerCount = stored.playerCount;
+  if (selection.designers === undefined && stored.designers !== null)
+    carried.designers = stored.designers;
+  if (selection.artists === undefined && stored.artists !== null)
+    carried.artists = stored.artists;
   return carried;
 }
 
@@ -997,10 +1046,16 @@ export async function updateMachinePbmLink({
           // the two shapes are not interchangeable. Keep them in step: this row
           // becomes `previous`, the pre-change record the caller compares
           // against, so a column missing here is a field that silently reads as
-          // unchanged. (PP-3bbr added `modelName`.)
+          // unchanged. (PP-3bbr added `modelName`; PP-wqit.14 the rest of the
+          // manual model.)
           modelName: machines.modelName,
           manufacturer: machines.manufacturer,
           year: machines.year,
+          type: machines.type,
+          display: machines.display,
+          playerCount: machines.playerCount,
+          designers: machines.designers,
+          artists: machines.artists,
           opdbId: machines.opdbId,
           ipdbId: machines.ipdbId,
           presenceStatus: machines.presenceStatus,

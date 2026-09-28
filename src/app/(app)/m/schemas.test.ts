@@ -71,3 +71,46 @@ describe("machine schema — hand-entered model fields", () => {
     expect(result.data).not.toHaveProperty("pinballmapListed");
   });
 });
+
+describe("machine schema — hand-entered type, display, players, credits", () => {
+  it("accepts the tag vocabularies and rejects anything else", () => {
+    const ok = updateMachineSchema.safeParse({
+      ...base,
+      type: "ss",
+      display: "dmd",
+    });
+    expect(ok.success).toBe(true);
+    expect(
+      updateMachineSchema.safeParse({ ...base, type: "digital" }).success
+    ).toBe(false);
+    expect(
+      updateMachineSchema.safeParse({ ...base, display: "LCD" }).success
+    ).toBe(false);
+  });
+
+  it("takes player count only as a positive whole number", () => {
+    const four = updateMachineSchema.safeParse({ ...base, playerCount: "4" });
+    expect(four.success && four.data.playerCount).toBe(4);
+    for (const bad of ["0", "-2", "2.5", "four"]) {
+      expect(
+        updateMachineSchema.safeParse({ ...base, playerCount: bad }).success
+      ).toBe(false);
+    }
+  });
+
+  it("takes designers and artists as ordered name lists", () => {
+    const result = updateMachineSchema.safeParse({
+      ...base,
+      designers: [" Pat Lawlor ", "Lawlor, Pat"],
+      artists: ["John Youssi"],
+    });
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.designers).toEqual(["Pat Lawlor", "Lawlor, Pat"]);
+    expect(result.data.artists).toEqual(["John Youssi"]);
+    expect(
+      updateMachineSchema.safeParse({ ...base, designers: ["x".repeat(101)] })
+        .success
+    ).toBe(false);
+  });
+});

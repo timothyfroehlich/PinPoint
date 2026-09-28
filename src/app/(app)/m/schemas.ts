@@ -7,20 +7,34 @@
 
 import { z } from "zod";
 import { VALID_MACHINE_PRESENCE_STATUSES } from "~/lib/machines/presence";
+import { OPDB_DISPLAY_TYPES, OPDB_MACHINE_TYPES } from "~/lib/opdb/types";
+
+/**
+ * One hand-entered credit list (designers or artists, PP-wqit.14). The form
+ * posts one FormData entry per name, in order. Names are trimmed but never
+ * split on punctuation (machine-editing spec 3.5); blank entries are dropped
+ * later by `normalizeCreditNames`, which also stores an empty list as null.
+ */
+const creditNamesField = z
+  .array(z.string().trim().max(100, "Names must be less than 100 characters"))
+  .max(20, "At most 20 names per credit")
+  .optional();
 
 /**
  * PinballMap linking fields shared by create + edit (bead B / PP-o355.2).
  * The picker submits `pinballmapMachineId`; the "not on PinballMap" choice
  * submits `pinballmapExcluded` (+ optional reason) and, since PP-3bbr, the
- * hand-entered `modelName` / `manufacturer` / `year` for a game the catalog
- * cannot cover.
+ * hand-entered manual model — `modelName` / `manufacturer` / `year`, and since
+ * PP-wqit.14 `type` / `display` / `playerCount` / `designers` / `artists` — for
+ * a game the catalog cannot cover.
  *
  * **For a LINKED machine model metadata is still not taken from the client** —
- * the server derives it from the catalog mirror. These three are read only on
+ * the server derives it from the catalog mirror. These are read only on
  * the excluded branch of `resolvePbmLinkColumns*`, where there is no catalog row
  * to derive from and a person typing it is the only source there will be. A
- * request that sends them alongside a title has them dropped, and the DB CHECK
- * `machines_model_name_requires_excluded` is the backstop.
+ * request that sends them alongside a title has them dropped, and the DB CHECKs
+ * `machines_model_name_requires_excluded` and
+ * `machines_manual_model_requires_excluded` are the backstop.
  *
  * **`pinballmapListed` is deliberately absent** and must not be added back
  * (PP-o355.29). It records that a listing exists on the public map, so only a
@@ -61,6 +75,20 @@ const pinballmapLinkFields = {
     .min(1930, "Year must be 1930 or later")
     .max(new Date().getFullYear() + 1, "Year can't be that far in the future")
     .optional(),
+  // Type and display take their tag vocabularies (spec machine-editing 3.4);
+  // the not-set choice posts nothing, which the action reads as undefined.
+  type: z.enum(OPDB_MACHINE_TYPES).optional(),
+  display: z.enum(OPDB_DISPLAY_TYPES).optional(),
+  // A positive whole number (3.4). The ceiling only keeps a typo out of an
+  // int4 column; no real game seats anywhere near it.
+  playerCount: z.coerce
+    .number()
+    .int("Player count must be a whole number")
+    .min(1, "Player count must be at least 1")
+    .max(99, "Player count must be less than 100")
+    .optional(),
+  designers: creditNamesField,
+  artists: creditNamesField,
 };
 
 /**

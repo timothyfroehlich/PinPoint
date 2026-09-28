@@ -140,6 +140,11 @@ const baseProps: MachineDetailsFormProps = {
   modelName: null,
   manufacturer: null,
   year: null,
+  type: null,
+  display: null,
+  playerCount: null,
+  designers: null,
+  artists: null,
   iscoredGameId: null,
 };
 
