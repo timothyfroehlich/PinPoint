@@ -112,7 +112,7 @@ test.describe("Machines Public Access", () => {
     }) => {
       await page.goto("/m");
       const summaryRow = page.getByRole("button", {
-        name: /machines? · \d+ of \d+ playable · \d+ open issues?/,
+        name: /\d+ machines? · \d+ of \d+ playable$/,
       });
       await expect(summaryRow).toHaveAttribute("aria-expanded", "false");
       await expect(

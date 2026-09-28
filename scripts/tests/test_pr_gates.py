@@ -1,10 +1,10 @@
-"""Regression tests for the merge gate's three review checkers.
+"""Regression tests for the merge gate's review checkers.
 
 Gate 3 passes when ANY checker covers the exact head: a Claude review record posted by
-the owner (spec pr-lifecycle-monitoring §8.18), CodeRabbit's native approval, or
-Codex's evidence (native approval, exact-head finding review, trusted clean comment,
-or trusted reaction witness). `_review_summary` is the one JSON document every
-consumer reads; its label is one of four words.
+the owner (spec pr-lifecycle-monitoring §8.18), or Codex's evidence (native approval,
+exact-head finding review, trusted clean comment, or trusted reaction witness).
+`_review_summary` is the one JSON document every consumer reads; its label is one of
+four words.
 """
 
 import json
@@ -23,7 +23,6 @@ pytestmark = pytest.mark.integration
 GATES_PATH = Path(__file__).parent.parent / "workflow" / "_pr-gates.sh"
 CODEX_BOT = "chatgpt-codex-connector[bot]"
 CODEX_APP = "chatgpt-codex-connector"
-CODERABBIT_BOT = "coderabbitai[bot]"
 GITHUB_ACTIONS_BOT = "github-actions[bot]"
 GITHUB_ACTIONS_APP = "github-actions"
 HEAD_SHA = "d084c14a43af3ac021f0838f5c7bf4b77f72fb62"
@@ -229,7 +228,7 @@ def review_summary(env: dict, *, cwd: Path | None = None) -> dict:
 
 
 def verdicts(summary: dict) -> dict[str, str]:
-    """CodeRabbit and Codex verdicts. The Claude checker is asserted directly by the
+    """Codex verdicts. The Claude checker is asserted directly by the
     review-record tests, so the older fixtures need not spell out its "none"."""
     return {
         name: record["verdict"]
@@ -252,26 +251,6 @@ def test_codex_approval_of_head_passes() -> None:
     assert summary["label"] == "approved"
     assert summary["coverage"]["checker"] == "codex"
     assert summary["coverage"]["form"] == "approval"
-
-
-def test_coderabbit_approval_of_head_passes() -> None:
-    with gate_env(review_pages=[[codex_review(login=CODERABBIT_BOT)]]) as env:
-        result = run_gate("check_review_happened", env)
-        summary = review_summary(env)
-    assert result.returncode == 0, result.stdout
-    assert f"CodeRabbit approved head SHA {HEAD_SHA[:7]}" in result.stdout
-    assert summary["coverage"]["checker"] == "coderabbit"
-    assert summary["coverage"]["reviewer"] == CODERABBIT_BOT
-
-
-def test_coderabbit_precedence_over_codex_when_both_cover() -> None:
-    """When both CodeRabbit and Codex cover head, CodeRabbit takes precedence (§10.7)."""
-    cr = codex_review(login=CODERABBIT_BOT, submitted_at="2026-08-22T11:00:00Z")
-    cx = codex_review(login=CODEX_BOT, submitted_at="2026-08-22T12:00:00Z")
-    with gate_env(review_pages=[[cr, cx]]) as env:
-        summary = review_summary(env)
-    assert summary["coverage"]["checker"] == "coderabbit"
-    assert summary["coverage"]["reviewer"] == CODERABBIT_BOT
 
 
 def test_clean_codex_comment_of_head_passes() -> None:
@@ -317,40 +296,6 @@ def test_current_head_finding_review_passes_and_defers_to_the_thread_gate() -> N
 # ---------------------------------------------------------------------------------
 # Checkers are independent: one reviewer's verdict never masks another's
 # ---------------------------------------------------------------------------------
-
-
-def test_coderabbit_approval_covers_despite_stale_codex_approval() -> None:
-    reviews = [
-        codex_review(sha=OTHER_SHA, submitted_at="2026-08-22T11:00:00Z"),
-        codex_review(login=CODERABBIT_BOT, submitted_at="2026-08-22T12:00:00Z"),
-    ]
-    with gate_env(review_pages=[reviews]) as env:
-        result = run_gate("check_review_happened", env)
-        summary = review_summary(env)
-    assert result.returncode == 0, result.stdout
-    assert f"CodeRabbit approved head SHA {HEAD_SHA[:7]}" in result.stdout
-    assert verdicts(summary) == {
-        "coderabbit": "covers",
-        "codex": "stale",
-    }
-
-
-def test_coderabbit_changes_requested_does_not_mask_codex_approval() -> None:
-    reviews = [
-        codex_review(submitted_at="2026-08-22T11:00:00Z"),
-        codex_review(
-            login=CODERABBIT_BOT,
-            state="CHANGES_REQUESTED",
-            submitted_at="2026-08-22T12:00:00Z",
-        ),
-    ]
-    with gate_env(review_pages=[reviews]) as env:
-        result = run_gate("check_review_happened", env)
-        summary = review_summary(env)
-    assert result.returncode == 0, result.stdout
-    assert f"Codex approved head SHA {HEAD_SHA[:7]}" in result.stdout
-    assert summary["label"] == "approved"
-    assert verdicts(summary)["coderabbit"] == "changes_requested"
 
 
 def test_newest_exact_head_codex_evidence_decides_its_form() -> None:
@@ -440,7 +385,7 @@ def test_local_review_markers_are_not_evidence() -> None:
         summary = review_summary(env)
     assert result.returncode == 1, result.stdout
     assert summary["label"] == "not reviewed"
-    assert set(summary["checkers"]) == {"claude", "coderabbit", "codex"}
+    assert set(summary["checkers"]) == {"claude", "codex"}
     assert summary["checkers"]["claude"]["verdict"] == "none"
     assert "merge-pr.sh --force" in result.stdout
 
@@ -451,10 +396,6 @@ def test_local_review_markers_are_not_evidence() -> None:
         pytest.param([], id="no-review"),
         pytest.param([codex_review(login="other-reviewer[bot]")], id="untrusted-bot"),
         pytest.param([codex_review(sha=OTHER_SHA)], id="approval-of-old-head"),
-        pytest.param(
-            [codex_review(login=CODERABBIT_BOT, sha=OTHER_SHA)],
-            id="coderabbit-approval-of-old-head",
-        ),
     ],
 )
 def test_no_qualifying_review_fails(
@@ -509,87 +450,6 @@ def test_unusable_current_head_codex_review_state_fails_closed(state: str) -> No
     assert result.returncode == 1, result.stdout
     assert summary["label"] == "not reviewed"
     assert verdicts(summary)["codex"] == "none"
-
-
-@pytest.mark.parametrize("state", ["COMMENTED", "DISMISSED"])
-def test_coderabbit_non_approval_on_head_is_not_reviewed(state: str) -> None:
-    review = codex_review(login=CODERABBIT_BOT, state=state)
-    with gate_env(review_pages=[[review]]) as env:
-        result = run_gate("check_review_happened", env)
-        summary = review_summary(env)
-    assert result.returncode == 1, result.stdout
-    assert summary["label"] == "not reviewed"
-    assert verdicts(summary) == {
-        "coderabbit": "none",
-        "codex": "none",
-    }
-
-
-def test_coderabbit_changes_requested_on_head_is_changes_requested() -> None:
-    review = codex_review(login=CODERABBIT_BOT, state="CHANGES_REQUESTED")
-    with gate_env(review_pages=[[review]]) as env:
-        result = run_gate("check_review_happened", env)
-        summary = review_summary(env)
-    assert result.returncode == 1, result.stdout
-    assert "FAIL: reviewed: changes requested" in result.stdout
-    assert f"CodeRabbit: requested changes on head {HEAD_SHA[:7]}" in result.stdout
-    assert summary["label"] == "changes requested"
-
-
-@pytest.mark.parametrize("body", ["", "  \n"])
-def test_empty_coderabbit_comment_after_approval_keeps_coverage(body: str) -> None:
-    """PR #2192: CodeRabbit's reply inside a resolved thread arrives as an empty
-    COMMENTED review after its approval; it must not hide that approval."""
-    approval = codex_review(login=CODERABBIT_BOT, submitted_at="2026-08-22T12:00:00Z")
-    reply = codex_review(
-        login=CODERABBIT_BOT,
-        state="COMMENTED",
-        submitted_at="2026-08-22T12:01:00Z",
-        body=body,
-    )
-    with gate_env(review_pages=[[approval, reply]]) as env:
-        result = run_gate("check_review_happened", env)
-        summary = review_summary(env)
-    assert result.returncode == 0, result.stdout
-    assert summary["label"] == "approved"
-    assert summary["coverage"]["checker"] == "coderabbit"
-    assert summary["coverage"]["detail"] == "APPROVED"
-
-
-def test_coderabbit_comment_with_body_after_approval_revokes_coverage() -> None:
-    approval = codex_review(login=CODERABBIT_BOT, submitted_at="2026-08-22T12:00:00Z")
-    comment = codex_review(
-        login=CODERABBIT_BOT,
-        state="COMMENTED",
-        submitted_at="2026-08-22T12:01:00Z",
-        body="**Actionable comments posted: 1**",
-    )
-    with gate_env(review_pages=[[approval, comment]]) as env:
-        result = run_gate("check_review_happened", env)
-        summary = review_summary(env)
-    assert result.returncode == 1, result.stdout
-    assert summary["label"] == "not reviewed"
-    assert verdicts(summary)["coderabbit"] == "none"
-
-
-def test_empty_coderabbit_comment_after_changes_requested_keeps_changes_requested() -> (
-    None
-):
-    changes = codex_review(
-        login=CODERABBIT_BOT,
-        state="CHANGES_REQUESTED",
-        submitted_at="2026-08-22T12:00:00Z",
-    )
-    reply = codex_review(
-        login=CODERABBIT_BOT,
-        state="COMMENTED",
-        submitted_at="2026-08-22T12:01:00Z",
-        body="",
-    )
-    with gate_env(review_pages=[[changes, reply]]) as env:
-        summary = review_summary(env)
-    assert summary["label"] == "changes requested"
-    assert verdicts(summary)["coderabbit"] == "changes_requested"
 
 
 def test_unresolved_threads_make_uncovered_head_changes_requested() -> None:
@@ -647,16 +507,6 @@ def test_stale_codex_approval_reports_both_commits_and_the_request_remedy() -> N
     assert "record-claude-review.sh 123" in result.stdout
     assert "already requested" not in result.stdout
     assert summary["label"] == "stale review"
-
-
-def test_stale_coderabbit_approval_is_stale_review() -> None:
-    with gate_env(
-        review_pages=[[codex_review(login=CODERABBIT_BOT, sha=OTHER_SHA)]]
-    ) as env:
-        result = run_gate("check_review_happened", env)
-    assert result.returncode == 1, result.stdout
-    assert "FAIL: reviewed: stale review" in result.stdout
-    assert f"CodeRabbit: newest evidence names {OTHER_SHA[:7]}" in result.stdout
 
 
 @pytest.mark.parametrize("state", ["DISMISSED", "PENDING", "UNKNOWN"])
@@ -738,8 +588,6 @@ def test_review_gate_never_waits() -> None:
 def test_reviews_and_comments_are_read_across_all_pages() -> None:
     with gate_env(review_pages=[[], [codex_review()]]) as env:
         assert run_gate("check_review_happened", env).returncode == 0
-    with gate_env(review_pages=[[], [codex_review(login=CODERABBIT_BOT)]]) as env:
-        assert run_gate("check_review_happened", env).returncode == 0
     for comment in (
         clean_codex_comment(),
         clean_codex_reaction_witness(),
@@ -749,7 +597,7 @@ def test_reviews_and_comments_are_read_across_all_pages() -> None:
 
 
 def test_every_reviewer_is_consulted_even_when_codex_already_covers() -> None:
-    # One evidence fetch serves all three checkers; nothing is skipped on the way.
+    # One evidence fetch serves all checkers; nothing is skipped on the way.
     with gate_env(review_pages=[[codex_review()]]) as env:
         result = run_gate("check_review_happened", env)
         calls = Path(env["STUB_CALLS"]).read_text()
@@ -788,7 +636,7 @@ def test_review_summary_shape() -> None:
         "unresolved_threads",
     }
     assert summary["head"] == HEAD_SHA
-    assert set(summary["checkers"]) == {"claude", "coderabbit", "codex"}
+    assert set(summary["checkers"]) == {"claude", "codex"}
     coverage = summary["coverage"]
     assert (coverage["sha"], coverage["reviewer"], coverage["detail"]) == (
         HEAD_SHA,
@@ -867,23 +715,13 @@ def test_newer_record_of_an_older_head_does_not_hide_the_head_record() -> None:
     assert summary["coverage"]["checker"] == "claude"
 
 
-def test_review_record_takes_precedence_over_coderabbit() -> None:
+def test_review_record_takes_precedence_over_codex() -> None:
     with gate_env(
-        review_pages=[[codex_review(login=CODERABBIT_BOT)]],
+        review_pages=[[codex_review()]],
         comment_pages=[[claude_review_record()]],
     ) as env:
         summary = review_summary(env)
     assert summary["coverage"]["checker"] == "claude"
-
-
-def test_review_record_covers_despite_coderabbit_changes_requested() -> None:
-    with gate_env(
-        review_pages=[[codex_review(login=CODERABBIT_BOT, state="CHANGES_REQUESTED")]],
-        comment_pages=[[claude_review_record()]],
-    ) as env:
-        summary = review_summary(env)
-    assert summary["label"] == "approved"
-    assert summary["checkers"]["coderabbit"]["verdict"] == "changes_requested"
 
 
 def test_review_record_does_not_override_unresolved_threads_gate() -> None:
@@ -1017,6 +855,27 @@ def test_cancelled_ci_gate_leftover_yields_to_the_live_run() -> None:
     assert result.returncode == 0, result.stdout
 
 
+def test_superseded_cancelled_run_does_not_block_newer_passing_run() -> None:
+    # A run superseded by a newer push/re-run still does not block merge (PP-tdoq).
+    # The newer SUCCESS conclusion outranks the older CANCELLED leftover.
+    rollup = [
+        ci_gate(
+            conclusion="CANCELLED",
+            started_at="2026-08-22T12:00:00Z",
+            completed_at="2026-08-22T12:05:00Z",
+        ),
+        ci_gate(
+            conclusion="SUCCESS",
+            started_at="2026-08-22T12:10:00Z",
+            completed_at="2026-08-22T12:20:00Z",
+        ),
+    ]
+    with gate_env(rollup=rollup) as env:
+        result = run_gate("check_ci", env)
+    assert result.returncode == 0, result.stdout
+    assert "PASS: ci: CI Gate conclusion=SUCCESS" in result.stdout
+
+
 def test_unresolved_threads_block_regardless_of_author() -> None:
     with gate_env(
         threads=[
@@ -1140,26 +999,6 @@ def git_repo_with_merge(
         yield repo, approved_sha, head_sha
 
 
-def test_pure_merge_from_main_inherits_coderabbit_approval() -> None:
-    with git_repo_with_merge() as (repo, approved_sha, head_sha):
-        with gate_env(
-            review_pages=[[codex_review(sha=approved_sha, login=CODERABBIT_BOT)]],
-            head_sha=head_sha,
-        ) as env:
-            summary = review_summary(env, cwd=repo)
-            run = run_gate("check_review_happened", env, cwd=repo)
-
-    assert summary["label"] == "approved"
-    assert summary["coverage"]["checker"] == "coderabbit"
-    assert summary["coverage"]["inherited"] is True
-    assert summary["coverage"]["inherited_from"] == approved_sha
-    assert run.returncode == 0
-    assert (
-        f"CodeRabbit approved head SHA {head_sha[:7]} (inherited from {approved_sha[:7]}; pure merge from main)"
-        in run.stdout
-    )
-
-
 def test_pure_merge_from_main_inherits_review_record() -> None:
     with git_repo_with_merge() as (repo, reviewed_sha, head_sha):
         with gate_env(
@@ -1258,7 +1097,7 @@ def test_pure_merge_from_main_inherits_codex_reaction_witness() -> None:
 def test_merge_with_conflict_resolution_is_not_pure_merge_and_remains_stale() -> None:
     with git_repo_with_merge(conflict_in_merge=True) as (repo, approved_sha, head_sha):
         with gate_env(
-            review_pages=[[codex_review(sha=approved_sha, login=CODERABBIT_BOT)]],
+            review_pages=[[codex_review(sha=approved_sha)]],
             head_sha=head_sha,
         ) as env:
             summary = review_summary(env, cwd=repo)
@@ -1276,7 +1115,7 @@ def test_merge_with_extra_feature_commits_is_not_pure_merge_and_remains_stale() 
         head_sha,
     ):
         with gate_env(
-            review_pages=[[codex_review(sha=approved_sha, login=CODERABBIT_BOT)]],
+            review_pages=[[codex_review(sha=approved_sha)]],
             head_sha=head_sha,
         ) as env:
             summary = review_summary(env, cwd=repo)
@@ -1294,7 +1133,7 @@ def test_merge_of_unrelated_branch_is_not_pure_merge_and_remains_stale() -> None
         head_sha,
     ):
         with gate_env(
-            review_pages=[[codex_review(sha=approved_sha, login=CODERABBIT_BOT)]],
+            review_pages=[[codex_review(sha=approved_sha)]],
             head_sha=head_sha,
         ) as env:
             summary = review_summary(env, cwd=repo)
@@ -1305,15 +1144,14 @@ def test_merge_of_unrelated_branch_is_not_pure_merge_and_remains_stale() -> None
     assert "FAIL: reviewed: stale review" in run.stdout
 
 
-def test_non_approved_review_is_not_inherited() -> None:
+def test_unusable_codex_review_is_not_inherited() -> None:
     with git_repo_with_merge() as (repo, approved_sha, head_sha):
         with gate_env(
             review_pages=[
                 [
                     codex_review(
                         sha=approved_sha,
-                        state="CHANGES_REQUESTED",
-                        login=CODERABBIT_BOT,
+                        state="DISMISSED",
                     )
                 ]
             ],

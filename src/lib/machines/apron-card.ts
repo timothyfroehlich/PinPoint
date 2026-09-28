@@ -40,7 +40,7 @@ export interface ApronCardContent {
   artEnabled: boolean;
 }
 
-interface ApronMachineSource extends MachineManufacturerSource {
+export interface ApronMachineSource extends MachineManufacturerSource {
   name: string;
   year: number | null;
   description: ProseMirrorDoc | null;
@@ -51,6 +51,7 @@ interface ApronMachineSource extends MachineManufacturerSource {
   apronDesignEnabled: boolean;
   apronArtEnabled: boolean;
   owner: { name: string } | null;
+  invitedOwner: { name: string } | null;
   pinballmapTitle: {
     name: string;
     machineGroupId: number | null;
@@ -93,7 +94,12 @@ export function apronCardContent(
     // The same manufacturer the machine page and its tag show (spec 8.5).
     manufacturer: getCurrentManufacturer(machine),
     year: machine.year,
-    ownerName: machine.owner?.name ?? null,
+    // A machine is owned by a registered user (`owner`) or by an invited
+    // member who has not signed up yet (`invitedOwner`); the schema keeps them
+    // mutually exclusive. The card prints the owner's name in either case —
+    // the "(invited)" status marker the in-app owner block shows is an
+    // internal-workflow detail, not something the physical card carries.
+    ownerName: machine.owner?.name ?? machine.invitedOwner?.name ?? null,
     description: machine.apronUseCustomDescription
       ? (machine.apronDescription ?? "")
       : docToPlainText(machine.description),
@@ -199,9 +205,33 @@ export const APRON_SHEET_MARGIN_MM = 8;
 /** Width of `text` rendered in the title face at `fontPx`. */
 export type MeasureText = (text: string, fontPx: number) => number;
 
+/**
+ * One word of a title and what joins it to the word before: a space, or
+ * nothing when the break point is a hyphen or an ellipsis.
+ */
+export interface TitleWord {
+  text: string;
+  joiner: " " | "";
+}
+
+/**
+ * Splits a title at its line-break points (spec §1): spaces, and after each
+ * hyphen or ellipsis. "LIGHTS...CAMERA...ACTION!" is three words and
+ * "HARLEY-DAVIDSON" two; neither is ever broken anywhere else.
+ */
+export function titleWords(title: string): TitleWord[] {
+  const words: TitleWord[] = [];
+  for (const spaced of title.split(/\s+/).filter(Boolean)) {
+    spaced.split(/(?<=-|\.\.\.|…)(?=\S)/).forEach((text, i) => {
+      words.push({ text, joiner: i === 0 && words.length > 0 ? " " : "" });
+    });
+  }
+  return words;
+}
+
 /** Lines a greedy word wrap needs for `words` within `maxWidth`. */
 function greedyLineCount(
-  words: string[],
+  words: TitleWord[],
   fontPx: number,
   maxWidth: number,
   measure: MeasureText
@@ -210,11 +240,12 @@ function greedyLineCount(
   let lines = 1;
   let lineWidth = 0;
   for (const word of words) {
-    const wordWidth = measure(word, fontPx);
+    const wordWidth = measure(word.text, fontPx);
+    const gap = word.joiner === " " ? space : 0;
     if (lineWidth === 0) {
       lineWidth = wordWidth;
-    } else if (lineWidth + space + wordWidth <= maxWidth) {
-      lineWidth += space + wordWidth;
+    } else if (lineWidth + gap + wordWidth <= maxWidth) {
+      lineWidth += gap + wordWidth;
     } else {
       lines += 1;
       lineWidth = wordWidth;
@@ -225,8 +256,9 @@ function greedyLineCount(
 
 /**
  * Title fit (spec §1): shrink from the maximum until the longest word fits on
- * one line, then until the whole title wraps to at most three lines. Stops at
- * the floor even if the title still needs more lines; never breaks a word.
+ * one line, then until the whole title wraps to at most three lines. Words
+ * end at spaces, hyphens, and ellipses (titleWords). Stops at the floor even
+ * if the title still needs more lines; never breaks a word.
  */
 export function fitTitleSize({
   title,
@@ -243,11 +275,11 @@ export function fitTitleSize({
   measure: MeasureText;
   maxLines?: number;
 }): number {
-  const words = title.split(/\s+/).filter(Boolean);
+  const words = titleWords(title);
   if (words.length === 0) return maxPx;
   const STEP = 0.5;
   for (let size = maxPx; size > minPx; size -= STEP) {
-    const widest = Math.max(...words.map((w) => measure(w, size)));
+    const widest = Math.max(...words.map((w) => measure(w.text, size)));
     if (
       widest <= maxWidth &&
       greedyLineCount(words, size, maxWidth, measure) <= maxLines

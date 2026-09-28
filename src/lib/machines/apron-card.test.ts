@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   apronCardContent,
+  type ApronMachineSource,
   apronCardPixelSize,
   apronCreditRows,
   cardParagraphs,
@@ -56,7 +57,7 @@ describe("groupedEdition", () => {
 });
 
 describe("apronCardContent", () => {
-  const machine = {
+  const machine: ApronMachineSource = {
     name: "Godzilla",
     manufacturer: "Old Copy",
     pinballmapMachineId: 3416,
@@ -70,6 +71,7 @@ describe("apronCardContent", () => {
     apronDesignEnabled: true,
     apronArtEnabled: false,
     owner: { name: "Tim" },
+    invitedOwner: null,
     pinballmapTitle: {
       name: "Godzilla (Premium)",
       machineGroupId: 10,
@@ -98,6 +100,43 @@ describe("apronCardContent", () => {
       apronCardContent({ ...machine, apronUseCustomDescription: true }, credits)
         .description
     ).toBe("Custom description");
+  });
+
+  it("prints the registered owner's name", () => {
+    expect(apronCardContent(machine, credits).ownerName).toBe("Tim");
+  });
+
+  it("falls back to the invited owner's name when there is no registered owner", () => {
+    expect(
+      apronCardContent(
+        {
+          ...machine,
+          owner: null,
+          invitedOwner: { name: "Casey" },
+        },
+        credits
+      ).ownerName
+    ).toBe("Casey");
+  });
+
+  it("prefers the registered owner over an invited owner", () => {
+    expect(
+      apronCardContent(
+        {
+          ...machine,
+          owner: { name: "Tim" },
+          invitedOwner: { name: "Casey" },
+        },
+        credits
+      ).ownerName
+    ).toBe("Tim");
+  });
+
+  it("has no owner name when neither owner is set", () => {
+    expect(
+      apronCardContent({ ...machine, owner: null, invitedOwner: null }, credits)
+        .ownerName
+    ).toBeNull();
   });
 
   it("carries the credits and each role's display setting", () => {
@@ -204,6 +243,16 @@ describe("fitTitleSize", () => {
     });
     expect(size).toBeLessThan(42);
     expect(size).toBeGreaterThanOrEqual(24);
+  });
+
+  it.each([
+    // Break after each ellipsis: widest word LIGHTS... (9 glyphs) → 38.5px,
+    // three lines. Without the break it is one 25-glyph word at the floor.
+    ["LIGHTS...CAMERA...ACTION!", 38.5],
+    // Break after the hyphen: widest word DAVIDSON (8 glyphs) → max size.
+    ["HARLEY-DAVIDSON", 42],
+  ])("breaks %s after hyphens and ellipses (spec §1)", (title, px) => {
+    expect(fitTitleSize({ ...base, title })).toBe(px);
   });
 
   it("stops at the floor rather than breaking a word", () => {

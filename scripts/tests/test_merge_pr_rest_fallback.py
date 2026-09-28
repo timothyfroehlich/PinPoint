@@ -71,7 +71,7 @@ APPROVAL = {
     "commit_id": HEAD_SHA,
     "state": "APPROVED",
     "submitted_at": "2026-09-25T11:00:00Z",
-    "user": {"login": "coderabbitai[bot]"},
+    "user": {"login": "chatgpt-codex-connector[bot]"},
     "body": "LGTM",
 }
 
@@ -178,7 +178,7 @@ def test_green_pr_merges_through_rest_pinned_to_head() -> None:
     assert result.returncode == 0, out + result.stderr
     assert "PASS: ci: CI Gate conclusion=SUCCESS" in out
     assert "PASS: threads: 0 unresolved review threads" in out
-    assert "PASS: reviewed: CodeRabbit approved head SHA d084c14" in out
+    assert "PASS: reviewed: Codex approved head SHA d084c14" in out
     assert "PASS: no_conflict: MERGEABLE" in out
     assert "MERGED: PR #123" in out
     assert side["merged"] is not None
