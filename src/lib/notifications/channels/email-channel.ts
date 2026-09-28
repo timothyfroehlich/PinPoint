@@ -9,6 +9,8 @@ import { getSiteUrl } from "~/lib/url";
 import { getThreadingHeaders } from "~/lib/notifications/email-threading";
 import { buildResourceUrl } from "~/lib/notifications/resource-url";
 import { reportError } from "~/lib/observability/report-error";
+import { escapeHtml } from "~/lib/markdown";
+import { pinballmapLocationUrl } from "~/lib/pinballmap/public-url";
 import type {
   DeliveryChannel,
   NotificationPreferencesRow,
@@ -144,7 +146,8 @@ export function getEmailSubject(
   issueTitle?: string,
   machineName?: string,
   formattedIssueId?: string,
-  newStatus?: string
+  newStatus?: string,
+  machineInitials?: string
 ): string {
   const prefix = machineName ? `[${machineName}] ` : "";
   switch (type) {
@@ -161,6 +164,10 @@ export function getEmailSubject(
       return newStatus === "removed"
         ? `${prefix}Ownership Update: You have been removed as an owner`
         : `${prefix}Ownership Update: You have been added as an owner`;
+    case "pinballmap_comment":
+      // Same-title cabinets usually share a name, so the initials tell the
+      // per-cabinet emails (spec 7.7) apart.
+      return `${prefix}New Pinball Map comment${machineInitials ? ` on ${machineInitials}` : ""}`;
     default:
       return "PinPoint Notification";
   }
@@ -176,6 +183,9 @@ export interface EmailHtmlOptions {
   newStatus?: string | undefined;
   userId?: string | undefined;
   issueDescription?: string | undefined;
+  /** Pinball Map commenter, for a pinballmap_comment. */
+  actorName?: string | undefined;
+  pinballmapLocationId?: number | undefined;
 }
 
 /**
@@ -198,6 +208,8 @@ export function getEventTypeLabel(type: NotificationType): string {
       // Not issue-tied; the email subject already carries the label, so the
       // body header is empty.
       return "";
+    case "pinballmap_comment":
+      return "Pinball Map Comment";
     default: {
       const exhaustive: never = type;
       return exhaustive;
@@ -215,6 +227,8 @@ export function getEmailHtml({
   newStatus,
   userId,
   issueDescription,
+  actorName,
+  pinballmapLocationId,
 }: EmailHtmlOptions): string {
   let body = "";
   switch (type) {
@@ -246,6 +260,22 @@ export function getEmailHtml({
         ? `You have been <strong>removed</strong> as an owner of <strong>${machineName ? sanitizeHtml(machineName, EMAIL_SANITIZE_OPTIONS) : "a machine"}</strong>. You will no longer receive notifications for new issues on this machine.`
         : `You have been <strong>added</strong> as an owner of <strong>${machineName ? sanitizeHtml(machineName, EMAIL_SANITIZE_OPTIONS) : "a machine"}</strong>. You will receive notifications for new issues reported on this machine.`;
       break;
+    case "pinballmap_comment": {
+      // Pinball Map comments are plain text typed on pinballmap.com, so they
+      // are escaped rather than sanitized as HTML: markup in a comment shows
+      // as the characters the person typed.
+      const commenter = escapeHtml(actorName ?? "A Pinball Map user");
+      const comment = escapeHtml(commentContent ?? "").replace(
+        /\r?\n/g,
+        "<br/>"
+      );
+      const attribution =
+        pinballmapLocationId === undefined
+          ? "Pinball Map"
+          : `<a href="${pinballmapLocationUrl(pinballmapLocationId)}">Pinball Map</a>`;
+      body = `<strong>${commenter}</strong> commented on ${attribution}:<br/><blockquote>${comment}</blockquote>`;
+      break;
+    }
   }
 
   // For issue-tied types, the event-type label moves into the body since the
@@ -268,15 +298,23 @@ export function getEmailHtml({
 
   // Machine-ownership emails are about a machine, not an issue — pointing them
   // at the global issue list under a "View Issue" label was the email half of
-  // PP-gzq2. Every other type is issue-tied.
-  const isMachineResource = type === "machine_ownership_changed";
+  // PP-gzq2. A Pinball Map comment lands on the machine's timeline. Every other
+  // type is issue-tied.
+  const isPinballMapComment = type === "pinballmap_comment";
+  const isMachineResource =
+    type === "machine_ownership_changed" || isPinballMapComment;
   const resourceUrl = buildResourceUrl({
     siteUrl,
     resourceType: isMachineResource ? "machine" : "issue",
     formattedIssueId,
     machineInitials,
+    machineTab: isPinballMapComment ? "timeline" : undefined,
   });
-  const resourceLinkLabel = isMachineResource ? "View Machine" : "View Issue";
+  const resourceLinkLabel = isPinballMapComment
+    ? "View Timeline"
+    : isMachineResource
+      ? "View Machine"
+      : "View Issue";
 
   const sanitizedDescription =
     (type === "new_issue" || type === "issue_assigned") && issueDescription
@@ -285,7 +323,7 @@ export function getEmailHtml({
   const showDescription = !!sanitizedDescription;
 
   return `
-      <h2>${machinePrefix}${sanitizedIssueId ? `${sanitizedIssueId}: ` : ""}${sanitizedIssueTitle}</h2>
+      <h2>${machinePrefix}${sanitizedIssueId ? `${sanitizedIssueId}: ` : ""}${sanitizedIssueTitle}${isPinballMapComment && machineInitials ? sanitizeHtml(machineInitials, EMAIL_SANITIZE_OPTIONS) : ""}</h2>
       ${eventLabel ? `<h3 style="color: #555; font-weight: 600; margin-bottom: 8px;">${eventLabel}</h3>` : ""}
       <div>${body}</div>
       ${showDescription ? `<blockquote>${sanitizedDescription}</blockquote>` : ""}
@@ -320,6 +358,8 @@ export const emailChannel: DeliveryChannel = {
         return true;
       case "mentioned":
         return prefs.emailNotifyOnMentioned;
+      case "pinballmap_comment":
+        return prefs.emailNotifyOnPinballMapComment;
     }
   },
   async deliver(ctx: ChannelContext): Promise<DeliveryResult> {
@@ -331,10 +371,9 @@ export const emailChannel: DeliveryChannel = {
       const { sendEmail } = await import("~/lib/email/client");
 
       // Derive RFC 5322 threading headers for issue-tied notification types.
-      // machine_ownership_changed is not issue-tied and must not be threaded.
+      // Machine notifications are not issue-tied and must not be threaded.
       const isIssueTied =
-        ctx.type !== "machine_ownership_changed" &&
-        ctx.formattedIssueId !== undefined;
+        ctx.resourceType === "issue" && ctx.formattedIssueId !== undefined;
       const threadingHeaders =
         isIssueTied && ctx.formattedIssueId
           ? getThreadingHeaders(ctx.formattedIssueId)
@@ -360,7 +399,8 @@ export const emailChannel: DeliveryChannel = {
           ctx.formattedIssueId,
           ctx.type === "machine_ownership_changed"
             ? ctx.ownershipChange
-            : ctx.newStatus
+            : ctx.newStatus,
+          ctx.machineInitials
         ),
         html: getEmailHtml({
           type: ctx.type,
@@ -375,6 +415,8 @@ export const emailChannel: DeliveryChannel = {
               : ctx.newStatus,
           userId: ctx.userId,
           issueDescription: ctx.issueDescription,
+          actorName: ctx.actorName,
+          pinballmapLocationId: ctx.pinballmapLocationId,
         }),
         idempotencyKey: emailIdempotencyKey,
         ...threadingHeaders,

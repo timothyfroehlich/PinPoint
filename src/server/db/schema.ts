@@ -27,7 +27,13 @@ import { type TimelineEventSourceType } from "~/lib/timeline/machine-events";
 import { type TimelineTag } from "~/lib/timeline/machine-tags";
 import { type SettingsSection } from "~/lib/machines/settings-types";
 import type { LocationSnapshot } from "~/lib/pinballmap/types";
+import {
+  OPDB_DISPLAY_TYPES,
+  OPDB_MACHINE_TYPES,
+  type OpdbPerson,
+} from "~/lib/opdb/types";
 import { REPORT_MODE_VALUES } from "~/lib/types/user";
+import type { MachineViewSavedState } from "~/lib/types/machine-view";
 
 /**
  * ⚠️ IMPORTANT: When adding new tables to this schema file,
@@ -212,6 +218,11 @@ export const machines = pgTable(
     apronDescription: text("apron_description"),
     apronTip: text("apron_tip"),
     apronTipEnabled: boolean("apron_tip_enabled").notNull().default(false),
+    // Whether the card shows its Design and Art credit rows (spec
+    // apron-cards 10.5). On by default, even for a machine with no credits,
+    // whose rows then read "Unknown".
+    apronDesignEnabled: boolean("apron_design_enabled").notNull().default(true),
+    apronArtEnabled: boolean("apron_art_enabled").notNull().default(true),
     apronSavedAt: timestamp("apron_saved_at", { withTimezone: true }),
     ownerRequirements: jsonb("owner_requirements").$type<ProseMirrorDoc>(),
     // Machine-level "Before you change anything": the owner's honor-system
@@ -271,6 +282,15 @@ export const machines = pgTable(
     })
       .notNull()
       .default("off"),
+    // Whether this cabinet SHOULD be marked Insider Connected on Pinball Map
+    // (spec 3.8) — an operator decision like `pinballmap_intent`, owned by
+    // PinPoint and pushed by the same sync. NULL means no intent recorded: the
+    // control then shows Pinball Map's own value and never flags it, so entries
+    // nobody has touched are not all Out of sync on day one. Meaningful only for
+    // a title Pinball Map's catalog marks eligible; the column does not enforce
+    // that, because eligibility lives in the refreshed catalog mirror and can
+    // change under a stored intent.
+    pinballmapIcIntent: text("pinballmap_ic_intent", { enum: ["on", "off"] }),
     // Hand-entered model name for a machine PinballMap's catalog cannot cover —
     // a homebrew, a flipperless game (PP-3bbr, folded into PP-o355.21). Set ONLY
     // alongside `pinballmap_excluded` (CHECK below): a linked machine reads its
@@ -316,6 +336,10 @@ export const machines = pgTable(
       "machines_pinballmap_intent_check",
       sql`pinballmap_intent IN ('on', 'off', 'no_sync')`
     ),
+    pinballmapIcIntentCheck: check(
+      "machines_pinballmap_ic_intent_check",
+      sql`pinballmap_ic_intent IS NULL OR pinballmap_ic_intent IN ('on', 'off')`
+    ),
     pinballmapIntentRequiresLinkCheck: check(
       "machines_pinballmap_intent_requires_link",
       sql`NOT (pinballmap_intent = 'on' AND pinballmap_machine_id IS NULL)`
@@ -353,6 +377,11 @@ export const pinballmapCatalog = pgTable(
     // join. Null for standalone/ungrouped titles (most older machines).
     machineGroupId: integer("machine_group_id"),
     groupName: text("group_name"),
+    // PBM's own Insider Connected eligibility for the title (spec 3.8). An
+    // entry's `ic_enabled` cannot answer this: null there means "never set" on
+    // eligible and ineligible titles alike. False until the catalog refresh
+    // reports otherwise, so nothing is offered on a title PBM would refuse.
+    icEligible: boolean("ic_eligible").notNull().default(false),
     refreshedAt: timestamp("refreshed_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -364,6 +393,46 @@ export const pinballmapCatalog = pgTable(
     nameIdx: index("idx_pinballmap_catalog_name").on(t.name),
     // Edition lookup for a selected family.
     groupIdx: index("idx_pinballmap_catalog_group").on(t.machineGroupId),
+  })
+).enableRLS();
+
+/**
+ * Local copy of the Open Pinball Database's daily export (PP-wqit.12), keyed by
+ * full OPDB ID. Holds only the machine and alias entries and only the fields
+ * Pinball Map's catalog does not relay: type, display, player count, and people
+ * credits. A catalog title reaches its row through `pinballmap_catalog.opdb_id`
+ * (not a foreign key: an alias missing here falls back to its machine-level ID,
+ * see `~/lib/opdb/records`). Refreshed daily by /api/cron/refresh-opdb; read at
+ * render time, never fetched per request (spec collections-and-tags 9.1).
+ */
+export const opdbMachines = pgTable(
+  "opdb_machines",
+  {
+    opdbId: text("opdb_id").primaryKey(),
+    name: text("name").notNull(),
+    type: text("type", { enum: OPDB_MACHINE_TYPES }),
+    display: text("display", { enum: OPDB_DISPLAY_TYPES }),
+    playerCount: integer("player_count"),
+    people: jsonb("people").$type<OpdbPerson[]>().notNull().default([]),
+    refreshedAt: timestamp("refreshed_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  () => ({
+    // Drizzle's `enum` on a text column narrows TypeScript only; these keep a
+    // stray writer from storing a value no tag label exists for.
+    typeCheck: check(
+      "opdb_machines_type_check",
+      sql`type IN ('em', 'ss', 'me')`
+    ),
+    displayCheck: check(
+      "opdb_machines_display_check",
+      sql`display IN ('reels', 'lights', 'alphanumeric', 'cga', 'dmd', 'lcd')`
+    ),
+    playerCountCheck: check(
+      "opdb_machines_player_count_check",
+      sql`player_count > 0`
+    ),
   })
 ).enableRLS();
 
@@ -811,6 +880,13 @@ export const timelineEvents = pgTable(
     idempotencyKeyIdx: uniqueIndex("idx_timeline_events_idempotency_key")
       .on(t.idempotencyKey)
       .where(sql`${t.idempotencyKey} IS NOT NULL`),
+    // One imported copy of a Pinball Map comment per machine timeline
+    // (pinballmap spec 7.1). The importer inserts ON CONFLICT DO NOTHING
+    // against this index, so repeated and concurrent syncs never duplicate a
+    // copy. (PP-o355.4)
+    pinballmapCommentIdx: uniqueIndex("idx_timeline_events_pinballmap_comment")
+      .on(t.machineId, sql`((${t.eventData}->>'conditionId'))`)
+      .where(sql`${t.sourceType} = 'pinballmap'`),
   })
 ).enableRLS();
 
@@ -1017,6 +1093,128 @@ export const collectionCollaborators = pgTable(
 ).enableRLS();
 
 /**
+ * Personal Machine View Saved Views (spec machine-views.md §8, PP-8bh6).
+ *
+ * A row belongs to one account (`user_id`) and one Surface: Machines, one
+ * standard Collection (`collection_id`), or one owner Collection
+ * (`owner_collection_user_id`, the machine owner whose Collection it is).
+ * Deleting the Collection or either account deletes the row (§8.16). `state`
+ * is the Machine View configuration minus the page number (§8.2); it is
+ * re-validated through the URL parser whenever it is applied (§8.15).
+ */
+export const machineViewSavedViews = pgTable(
+  "machine_view_saved_views",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => userProfiles.id, { onDelete: "cascade" }),
+    surface: text("surface", {
+      enum: ["machines", "collection", "owner"],
+    }).notNull(),
+    collectionId: uuid("collection_id").references(() => collections.id, {
+      onDelete: "cascade",
+    }),
+    ownerCollectionUserId: uuid("owner_collection_user_id").references(
+      () => userProfiles.id,
+      { onDelete: "cascade" }
+    ),
+    name: text("name").notNull(),
+    state: jsonb("state").$type<MachineViewSavedState>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    // No Drizzle $onUpdate — every UPDATE sets this explicitly in the action.
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    surfaceCheck: check(
+      "machine_view_saved_views_surface_check",
+      sql`(${t.surface} = 'machines' AND ${t.collectionId} IS NULL AND ${t.ownerCollectionUserId} IS NULL)
+        OR (${t.surface} = 'collection' AND ${t.collectionId} IS NOT NULL AND ${t.ownerCollectionUserId} IS NULL)
+        OR (${t.surface} = 'owner' AND ${t.collectionId} IS NULL AND ${t.ownerCollectionUserId} IS NOT NULL)`
+    ),
+    nameNotBlank: check(
+      "machine_view_saved_views_name_not_blank",
+      sql`length(btrim(${t.name})) > 0`
+    ),
+    // §8.8: names are unique per account and Surface, ignoring case.
+    nameUnique: uniqueIndex("uq_machine_view_saved_views_name").on(
+      t.userId,
+      t.surface,
+      sql`coalesce(${t.collectionId}, ${t.ownerCollectionUserId}, '00000000-0000-0000-0000-000000000000'::uuid)`,
+      sql`lower(${t.name})`
+    ),
+    collectionIdx: index("idx_machine_view_saved_views_collection").on(
+      t.collectionId
+    ),
+    ownerCollectionIdx: index(
+      "idx_machine_view_saved_views_owner_collection"
+    ).on(t.ownerCollectionUserId),
+  })
+).enableRLS();
+
+/**
+ * An account's default view on one Surface (spec machine-views.md §8.10): one
+ * of its Saved Views or a Built-in View id (§9). Deleting the Saved View
+ * deletes the row, leaving the Surface without a default (§8.14).
+ */
+export const machineViewDefaults = pgTable(
+  "machine_view_defaults",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => userProfiles.id, { onDelete: "cascade" }),
+    surface: text("surface", {
+      enum: ["machines", "collection", "owner"],
+    }).notNull(),
+    collectionId: uuid("collection_id").references(() => collections.id, {
+      onDelete: "cascade",
+    }),
+    ownerCollectionUserId: uuid("owner_collection_user_id").references(
+      () => userProfiles.id,
+      { onDelete: "cascade" }
+    ),
+    savedViewId: uuid("saved_view_id").references(
+      () => machineViewSavedViews.id,
+      { onDelete: "cascade" }
+    ),
+    builtInViewId: text("built_in_view_id"),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    surfaceCheck: check(
+      "machine_view_defaults_surface_check",
+      sql`(${t.surface} = 'machines' AND ${t.collectionId} IS NULL AND ${t.ownerCollectionUserId} IS NULL)
+        OR (${t.surface} = 'collection' AND ${t.collectionId} IS NOT NULL AND ${t.ownerCollectionUserId} IS NULL)
+        OR (${t.surface} = 'owner' AND ${t.collectionId} IS NULL AND ${t.ownerCollectionUserId} IS NOT NULL)`
+    ),
+    targetCheck: check(
+      "machine_view_defaults_target_check",
+      sql`(${t.savedViewId} IS NULL) <> (${t.builtInViewId} IS NULL)`
+    ),
+    oneDefault: uniqueIndex("uq_machine_view_defaults_surface").on(
+      t.userId,
+      t.surface,
+      sql`coalesce(${t.collectionId}, ${t.ownerCollectionUserId}, '00000000-0000-0000-0000-000000000000'::uuid)`
+    ),
+    savedViewIdx: index("idx_machine_view_defaults_saved_view").on(
+      t.savedViewId
+    ),
+    collectionIdx: index("idx_machine_view_defaults_collection").on(
+      t.collectionId
+    ),
+    ownerCollectionIdx: index("idx_machine_view_defaults_owner_collection").on(
+      t.ownerCollectionUserId
+    ),
+  })
+).enableRLS();
+
+/**
  * Issue Images Table
  *
  * Images attached to issues and comments with soft-delete support.
@@ -1092,6 +1290,7 @@ export const notifications = pgTable(
         "new_issue",
         "machine_ownership_changed",
         "mentioned",
+        "pinballmap_comment",
       ],
     }).notNull(),
     resourceId: uuid("resource_id").notNull(), // Generic reference to issue or machine
@@ -1179,6 +1378,19 @@ export const notificationPreferences = pgTable(
       .notNull()
       .default(false),
 
+    // Pinball Map comments newly observed on a covering machine the person
+    // owns or watches (pinballmap spec 7.4, 7.7). On by default everywhere.
+    emailNotifyOnPinballMapComment: boolean(
+      "email_notify_on_pinballmap_comment"
+    )
+      .notNull()
+      .default(true),
+    inAppNotifyOnPinballMapComment: boolean(
+      "in_app_notify_on_pinballmap_comment"
+    )
+      .notNull()
+      .default(true),
+
     // Machine ownership change is treated as a critical event across all
     // channels: notifications fire regardless of per-event preference (only
     // the channel's main switch can opt out). The three per-event opt-out
@@ -1208,6 +1420,11 @@ export const notificationPreferences = pgTable(
     discordWatchNewIssuesGlobal: boolean("discord_watch_new_issues_global")
       .notNull()
       .default(false),
+    discordNotifyOnPinballMapComment: boolean(
+      "discord_notify_on_pinballmap_comment"
+    )
+      .notNull()
+      .default(true),
 
     // Set the first time an account gains a Discord identity. This separates
     // first-link defaults/welcome from a later re-link, which must preserve the
@@ -1594,6 +1811,12 @@ export const pinballmapState = pgTable(
       .notNull()
       .defaultNow(),
     updatedBy: uuid("updated_by"),
+    // The location whose comments have had their silent historical import
+    // (pinballmap spec 7.4). While this differs from `locationId`, the next
+    // comment import is that location's backfill and notifies no one; after
+    // it, a comment observed for the first time is new. Null = no backfill
+    // has run yet. (PP-o355.4)
+    commentsBaselineLocationId: integer("comments_baseline_location_id"),
   },
   (_t) => ({
     singletonCheck: check("pinballmap_state_singleton", sql`id = 'singleton'`),
@@ -1640,6 +1863,76 @@ export const pinballmapLocationChecks = pgTable(
     expiryOrderCheck: check(
       "pinballmap_location_checks_expiry_order_check",
       sql`expires_at > checked_at`
+    ),
+  })
+).enableRLS();
+
+/**
+ * Pinball Map condition comments PinPoint has observed (PP-o355.4).
+ *
+ * One row per underlying Pinball Map comment — the identity every timeline
+ * copy shares (pinballmap spec 7.1, 7.8). A comment on a shared lineup entry
+ * fans out to several machine timelines, but it can be converted to at most
+ * one PinPoint issue, so conversion lives here rather than on the copies.
+ * `conditionId` is Pinball Map's own id, globally unique there.
+ *
+ * Rows are inserted by the importer from the stored snapshot and never
+ * deleted: a comment that later leaves the lineup keeps its identity, so its
+ * timeline copies and any conversion stay intact.
+ */
+export const pinballmapComments = pgTable(
+  "pinballmap_comments",
+  {
+    conditionId: integer("condition_id").primaryKey(),
+    locationId: integer("location_id").notNull(),
+    // Catalog title of the lineup entry the comment was left on.
+    pinballmapMachineId: integer("pinballmap_machine_id").notNull(),
+    lmxId: integer("lmx_id").notNull(),
+    comment: text("comment").notNull(),
+    // Pinball Map username; null for operator/admin entries.
+    username: text("username"),
+    commentedAt: timestamp("commented_at", { withTimezone: true }).notNull(),
+    firstObservedAt: timestamp("first_observed_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    // The one issue this comment was converted to (spec 7.8). Deleting the
+    // issue releases the comment for a fresh conversion.
+    convertedIssueId: uuid("converted_issue_id").references(() => issues.id, {
+      onDelete: "set null",
+    }),
+    convertedAt: timestamp("converted_at", { withTimezone: true }),
+    convertedBy: uuid("converted_by").references(() => userProfiles.id, {
+      onDelete: "set null",
+    }),
+    // When a sync first saw the comment's entry missing from the tracked
+    // location's lineup; cleared when the entry is seen again. Starts the
+    // restoration window (spec 7.2) from our observation, which is never
+    // earlier than Pinball Map's removal.
+    entryMissingSince: timestamp("entry_missing_since", {
+      withTimezone: true,
+    }),
+    // Set when the comment's entry has ended for good (spec 7.3, 10.9):
+    // removed past the restoration window, replaced by a new entry for the
+    // same title, or left behind by a tracked-location change. The first two
+    // are cleared if the entry comes back; a location change never is.
+    previousListingReason: text("previous_listing_reason", {
+      enum: ["removed", "replaced", "location_changed"],
+    }),
+    previousListingAt: timestamp("previous_listing_at", {
+      withTimezone: true,
+    }),
+  },
+  (t) => ({
+    convertedIssueIdx: uniqueIndex("pinballmap_comments_converted_issue_idx")
+      .on(t.convertedIssueId)
+      .where(sql`${t.convertedIssueId} IS NOT NULL`),
+    previousListingReasonCheck: check(
+      "pinballmap_comments_previous_listing_reason_check",
+      sql`previous_listing_reason IN ('removed', 'replaced', 'location_changed')`
+    ),
+    previousListingPairCheck: check(
+      "pinballmap_comments_previous_listing_pair",
+      sql`(previous_listing_reason IS NULL) = (previous_listing_at IS NULL)`
     ),
   })
 ).enableRLS();

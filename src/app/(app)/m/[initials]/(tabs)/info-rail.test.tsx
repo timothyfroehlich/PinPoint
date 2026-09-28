@@ -29,6 +29,8 @@ function renderRail(overrides: Partial<RailProps> = {}): void {
       modelName="Medieval Madness"
       manufacturer="Williams"
       year={1997}
+      credits={{ design: ["Brian Eddy"], art: ["John Youssi", "Greg Freres"] }}
+      tags={[]}
       pinballmap={{
         locationUrl: LOCATION_URL,
         onLineup: true,
@@ -77,9 +79,32 @@ describe("InfoRail", () => {
     expect(screen.getByTestId("owner-block")).toHaveClass("border-t");
   });
 
-  it("renders the Tags placeholder", () => {
-    renderRail();
-    expect(screen.getByTestId("machine-tags-placeholder")).toBeInTheDocument();
+  it("links every tag in the Tags card, in the order given", () => {
+    renderRail({
+      tags: [
+        { name: "Williams", href: "/c/tags/manufacturer/williams" },
+        { name: "Solid State", href: "/c/tags/type/solid-state" },
+        { name: "DMD", href: "/c/tags/display/dmd" },
+        { name: "4 Players", href: "/c/tags/player-count/4-players" },
+      ],
+    });
+    const links = within(screen.getByTestId("machine-tags")).getAllByRole(
+      "link"
+    );
+    expect(links.map((link) => link.textContent)).toEqual([
+      "Williams",
+      "Solid State",
+      "DMD",
+      "4 Players",
+    ]);
+    expect(links[1]).toHaveAttribute("href", "/c/tags/type/solid-state");
+  });
+
+  it("says a machine without tags has none", () => {
+    renderRail({ tags: [] });
+    expect(
+      within(screen.getByTestId("machine-tags")).getByText("No tags")
+    ).toBeInTheDocument();
   });
 
   describe("model row", () => {
@@ -121,6 +146,31 @@ describe("InfoRail", () => {
       const block = screen.getByTestId("machine-model-block");
       expect(within(block).queryByText("Manufacturer")).not.toBeInTheDocument();
       expect(within(block).queryByText("Year")).not.toBeInTheDocument();
+      expect(within(block).queryByText("Design")).not.toBeInTheDocument();
+      expect(within(block).queryByText("Art")).not.toBeInTheDocument();
+    });
+
+    it("lists every designer and artist in OPDB's order", () => {
+      renderRail({
+        credits: {
+          design: ["Steve Ritchie"],
+          art: ["Kevin O'Connor", "Dave Link", "Harrison Drake"],
+        },
+      });
+      const block = screen.getByTestId("machine-model-block");
+      expect(within(block).getByText("Steve Ritchie")).toBeInTheDocument();
+      // The apron card's two-name limit does not apply here.
+      expect(
+        within(block).getByText("Kevin O'Connor, Dave Link, Harrison Drake")
+      ).toBeInTheDocument();
+    });
+
+    it("reads 'Unknown' for a role with no credits", () => {
+      renderRail({ credits: { design: [], art: [] } });
+      const block = screen.getByTestId("machine-model-block");
+      expect(within(block).getByText("Design")).toBeInTheDocument();
+      expect(within(block).getByText("Art")).toBeInTheDocument();
+      expect(within(block).getAllByText("Unknown")).toHaveLength(2);
     });
   });
 

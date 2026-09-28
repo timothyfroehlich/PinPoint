@@ -77,6 +77,22 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     ? `'self' ${supabaseUrl ?? ""} ${supabaseWsUrl ?? ""} http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:*`
     : `'self' ${supabaseUrl ?? ""} ${supabaseWsUrl ?? ""} http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:* https://vercel.live wss://ws-us3.pusher.com`;
 
+  // Mixed-content directives only make sense for a page served over HTTPS.
+  //    Over plain http (local dev and E2E on http://localhost) WebKit still
+  //    upgrades every same-origin subresource to https://localhost, which has
+  //    no TLS listener, so no chunk loads and React never hydrates (PP-b0gz).
+  //    Deployed Vercel builds always keep them: VERCEL_ENV alone is enough, so
+  //    no request-derived signal can drop them from production or preview.
+  //    Either request signal only ever adds them.
+  const isHttps =
+    vercelEnv === "production" ||
+    vercelEnv === "preview" ||
+    request.nextUrl.protocol === "https:" ||
+    request.headers.get("x-forwarded-proto") === "https";
+  const mixedContentDirectives = isHttps
+    ? "block-all-mixed-content; upgrade-insecure-requests;"
+    : "";
+
   const frameSrc = isProduction ? "'none'" : "'self' https://vercel.live";
   const frameAncestors = isProduction ? "'none'" : "'self' https://vercel.live";
 
@@ -93,8 +109,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     form-action 'self';
     frame-src ${frameSrc};
     frame-ancestors ${frameAncestors};
-    block-all-mixed-content;
-    upgrade-insecure-requests;
+    ${mixedContentDirectives}
   `
     .replace(/\s{2,}/g, " ")
     .trim();

@@ -373,6 +373,7 @@ export function UnifiedReportForm({
            * redirect). Success still resets explicitly via `resetSingleForm()`.
            */}
           <form
+            method="post"
             onSubmit={(e) => {
               // Ignore submits bubbled up from a descendant form. React
               // propagates events through the React tree, not the DOM tree, so a
@@ -747,6 +748,7 @@ export function UnifiedReportForm({
                 className="flex-1 bg-primary text-on-primary hover:bg-primary/90 h-10 text-sm font-semibold"
                 loading={isPending}
                 disabled={
+                  !hydrated ||
                   isPending ||
                   // The combobox submits via a hidden input, which the browser
                   // can't `required`-validate — gate the button instead so a

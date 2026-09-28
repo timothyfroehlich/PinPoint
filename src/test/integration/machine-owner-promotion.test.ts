@@ -45,7 +45,7 @@ vi.mock("~/lib/supabase/server", () => ({
 vi.mock("next/navigation", () => ({
   redirect: vi.fn((url: string) => {
     const error = new Error("NEXT_REDIRECT");
-    (error as any).digest = `NEXT_REDIRECT;replace;${url};`;
+    (error as { digest?: string }).digest = `NEXT_REDIRECT;replace;${url};`;
     throw error;
   }),
 }));
@@ -146,7 +146,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       const formData = new FormData();
       formData.append("id", machine.id);
@@ -194,7 +194,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       // Provide an invalid machine name to trigger a validation error BEFORE the tx
       const formData = new FormData();
@@ -238,7 +238,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       // Spy on the real transaction to intercept the tx object.
       // Type the mock/callback with the transaction's own parameter types so
@@ -328,7 +328,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       machineCounter += 1;
       const uniqueInitials = `P${String(machineCounter).padStart(3, "0")}`;
@@ -372,7 +372,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: techUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       machineCounter += 1;
       const uniqueInitials = `T${String(machineCounter).padStart(3, "0")}`;
@@ -412,7 +412,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: memberUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       machineCounter += 1;
       const uniqueInitials = `R${String(machineCounter).padStart(3, "0")}`;
@@ -455,7 +455,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       machineCounter += 1;
       const uniqueInitials = `V${String(machineCounter).padStart(3, "0")}`;
@@ -502,7 +502,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       machineCounter += 1;
       const uniqueInitials = `G${String(machineCounter).padStart(3, "0")}`;
@@ -546,7 +546,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: memberUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       machineCounter += 1;
       const uniqueInitials = `MR${String(machineCounter).padStart(2, "0")}`;
@@ -574,7 +574,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: guestUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       machineCounter += 1;
       const uniqueInitials = `GR${String(machineCounter).padStart(2, "0")}`;
@@ -603,7 +603,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: techUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       machineCounter += 1;
       const uniqueInitials = `TC${String(machineCounter).padStart(2, "0")}`;
@@ -640,7 +640,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       machineCounter += 1;
       const uniqueInitials = `ER${String(machineCounter).padStart(2, "0")}`;
@@ -677,7 +677,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       machineCounter += 1;
       const uniqueInitials = `AG${String(machineCounter).padStart(2, "0")}`;
@@ -711,7 +711,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       machineCounter += 1;
       const uniqueInitials = `IG${String(machineCounter).padStart(2, "0")}`;
@@ -749,7 +749,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       const formData = new FormData();
       formData.append("id", machine.id);
@@ -788,7 +788,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       // Someone else renames the machine after the transfer page rendered.
       await db
@@ -824,7 +824,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: ownerUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       const formData = new FormData();
       formData.append("id", machine.id);
@@ -870,7 +870,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: guestUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       const formData = new FormData();
       formData.append("id", machine.id);
@@ -905,7 +905,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: nonOwnerMember.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       const formData = new FormData();
       formData.append("id", machine.id);
@@ -938,7 +938,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: memberUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       const formData = new FormData();
       formData.append("id", randomUUID());
@@ -966,7 +966,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: ownerUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       const formData = new FormData();
       formData.append("id", machine.id);
@@ -999,7 +999,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: ownerUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       const formData = new FormData();
       formData.append("id", machine.id);
@@ -1037,7 +1037,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: techUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       const formData = new FormData();
       formData.append("id", machine.id);
@@ -1077,7 +1077,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: ownerMember.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       const formData = new FormData();
       formData.append("id", machine.id);
@@ -1120,7 +1120,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       const formData = new FormData();
       formData.append("id", machine.id);
@@ -1168,7 +1168,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       const formData = new FormData();
       formData.append("id", machine.id);
@@ -1212,7 +1212,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       const formData = new FormData();
       formData.append("id", machine.id);
@@ -1276,7 +1276,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       const doc = plainTextToDoc("A rich description of the machine.");
       const formData = new FormData();
@@ -1308,7 +1308,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       // Update only the name — no "description" key in FormData.
       const formData = new FormData();
@@ -1341,7 +1341,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       const formData = new FormData();
       formData.append("id", machine.id);
@@ -1372,7 +1372,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       // Valid ProseMirror doc whose text content is only whitespace.
       const whitespaceDoc = plainTextToDoc("   ");
@@ -1405,7 +1405,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       const formData = new FormData();
       formData.append("id", machine.id);
@@ -1439,7 +1439,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       // Valid JSON, but not a ProseMirror doc (missing type: "doc").
       const formData = new FormData();
@@ -1474,7 +1474,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       // Valid doc whose plaintext content exceeds the 10_000-char cap.
       const oversizedDoc = plainTextToDoc("x".repeat(10_001));
@@ -1511,7 +1511,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       const doc = plainTextToDoc("Description carried on the promote path.");
       const formData = new FormData();
@@ -1555,7 +1555,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       const formData = new FormData();
       formData.append("id", machine.id);
@@ -1587,7 +1587,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       const formData = new FormData();
       formData.append("id", machine.id);
@@ -1618,7 +1618,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       machineCounter += 1;
       const uniqueInitials = `N${String(machineCounter).padStart(3, "0")}`;
@@ -1672,7 +1672,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: guestUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       const result = await updateMachineDescription(machine.id, validDoc);
 
@@ -1703,7 +1703,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: ownerUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       const result = await updateMachineDescription(machine.id, validDoc);
 
@@ -1736,7 +1736,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: techUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       const result = await updateMachineDescription(machine.id, validDoc);
 
@@ -1767,7 +1767,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       const result = await updateMachineDescription(machine.id, validDoc);
 
@@ -1796,7 +1796,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: ownerUser.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       const result = await updateMachineOwnerRequirements(machine.id, validDoc);
 
@@ -1826,7 +1826,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
             .fn()
             .mockResolvedValue({ data: { user: { id: nonOwnerMember.id } } }),
         },
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
 
       const result = await updateMachineOwnerRequirements(machine.id, validDoc);
 

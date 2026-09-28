@@ -6,9 +6,13 @@ import { Button } from "~/components/ui/button";
 import { MachineNoteComposerSheet } from "~/components/machines/timeline/MachineNoteComposerSheet";
 import { MachineTimelineCommentRow } from "~/components/machines/timeline/MachineTimelineCommentRow";
 import { MachineTimelineIssueRow } from "~/components/machines/timeline/MachineTimelineIssueRow";
+import { MachineTimelinePinballMapCommentRow } from "~/components/machines/timeline/MachineTimelinePinballMapCommentRow";
 import { MachineTimelineSystemRow } from "~/components/machines/timeline/MachineTimelineSystemRow";
 import { MachineTimelineTombstoneRow } from "~/components/machines/timeline/MachineTimelineTombstoneRow";
-import { isMachineIssueEvent } from "~/lib/timeline/machine-event-types";
+import {
+  isMachineIssueEvent,
+  isPinballMapCommentEvent,
+} from "~/lib/timeline/machine-event-types";
 import { getMachineTimeline } from "~/lib/timeline/machine-events";
 import { DEFAULT_TIMELINE_TAGS } from "~/lib/timeline/machine-tags";
 import { db } from "~/server/db";
@@ -126,7 +130,22 @@ function renderRecentRow(
     );
   }
 
-  if (row.eventData) {
+  if (row.pinballmapComment && row.machineId) {
+    return (
+      <MachineTimelinePinballMapCommentRow
+        key={row.id}
+        row={{
+          id: row.id,
+          machineId: row.machineId,
+          createdAt: row.createdAt,
+          comment: row.pinballmapComment,
+        }}
+        canConvert={false}
+      />
+    );
+  }
+
+  if (row.eventData && !isPinballMapCommentEvent(row.eventData)) {
     if (isMachineIssueEvent(row.eventData)) {
       return (
         <MachineTimelineIssueRow

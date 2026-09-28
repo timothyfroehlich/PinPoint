@@ -1,4 +1,9 @@
 import { docToPlainText, type ProseMirrorDoc } from "~/lib/tiptap/types";
+import {
+  getCurrentManufacturer,
+  type MachineManufacturerSource,
+} from "~/lib/machines/manufacturer";
+import { formatCreditNames, type MachineCredits } from "~/lib/opdb/credits";
 
 export const APRON_CARD_SIZES = {
   stern: {
@@ -17,6 +22,10 @@ export const APRON_CARD_SIZES = {
 
 export type ApronCardSize = keyof typeof APRON_CARD_SIZES;
 
+export function isApronCardSize(value: string): value is ApronCardSize {
+  return Object.hasOwn(APRON_CARD_SIZES, value);
+}
+
 export interface ApronCardContent {
   name: string;
   edition: string | null;
@@ -26,29 +35,37 @@ export interface ApronCardContent {
   description: string;
   tip: string;
   tipEnabled: boolean;
+  credits: MachineCredits;
+  designEnabled: boolean;
+  artEnabled: boolean;
 }
 
-export interface ApronMachineSource {
+export interface ApronMachineSource extends MachineManufacturerSource {
   name: string;
-  manufacturer: string | null;
   year: number | null;
   description: ProseMirrorDoc | null;
   apronUseCustomDescription: boolean;
   apronDescription: string | null;
   apronTip: string | null;
   apronTipEnabled: boolean;
+  apronDesignEnabled: boolean;
+  apronArtEnabled: boolean;
   owner: { name: string } | null;
   invitedOwner: { name: string } | null;
   pinballmapTitle: {
     name: string;
     machineGroupId: number | null;
     groupName: string | null;
+    manufacturer: string | null;
   } | null;
 }
 
 /** Only grouped Pinball Map families supply edition metadata. */
 export function groupedEdition(
-  title: ApronMachineSource["pinballmapTitle"]
+  title: Pick<
+    NonNullable<ApronMachineSource["pinballmapTitle"]>,
+    "name" | "machineGroupId" | "groupName"
+  > | null
 ): string | null {
   if (title?.machineGroupId === null || !title?.groupName) return null;
   if (!title.name.startsWith(`${title.groupName} `)) return null;
@@ -68,12 +85,14 @@ export function groupedEdition(
 }
 
 export function apronCardContent(
-  machine: ApronMachineSource
+  machine: ApronMachineSource,
+  credits: MachineCredits
 ): ApronCardContent {
   return {
     name: machine.name,
     edition: groupedEdition(machine.pinballmapTitle),
-    manufacturer: machine.manufacturer,
+    // The same manufacturer the machine page and its tag show (spec 8.5).
+    manufacturer: getCurrentManufacturer(machine),
     year: machine.year,
     // A machine is owned by a registered user (`owner`) or by an invited
     // member who has not signed up yet (`invitedOwner`); the schema keeps them
@@ -86,7 +105,35 @@ export function apronCardContent(
       : docToPlainText(machine.description),
     tip: machine.apronTip ?? "",
     tipEnabled: machine.apronTipEnabled,
+    credits,
+    designEnabled: machine.apronDesignEnabled,
+    artEnabled: machine.apronArtEnabled,
   };
+}
+
+/** Names a credit row shows before collapsing the rest into a count (10.3). */
+export const APRON_CREDIT_MAX_NAMES = 2;
+
+export interface ApronCreditRow {
+  label: "Design" | "Art";
+  /** The names, or "Unknown" when the role has none (spec 10.4). */
+  text: string;
+}
+
+/** The identity panel's credit rows, Design then Art, for enabled roles. */
+export function apronCreditRows(
+  content: Pick<ApronCardContent, "credits" | "designEnabled" | "artEnabled">
+): ApronCreditRow[] {
+  const rows: ApronCreditRow[] = [];
+  const row = (label: ApronCreditRow["label"], names: string[]): void => {
+    rows.push({
+      label,
+      text: formatCreditNames(names, APRON_CREDIT_MAX_NAMES) ?? "Unknown",
+    });
+  };
+  if (content.designEnabled) row("Design", content.credits.design);
+  if (content.artEnabled) row("Art", content.credits.art);
+  return rows;
 }
 
 /**
@@ -94,7 +141,8 @@ export function apronCardContent(
  * prints at its physical size). Values come from the approved design canvas
  * (PP-esta, Claude Design artifact 2dbc7ba6): Stern/SPIKE is 529×283 with a
  * 206px identity panel; WPC is 576×312 with a 244px panel. The QR shrinks
- * when a tip is shown so the description region keeps its room.
+ * when a tip is shown so the description region keeps its room, and the logo
+ * shrinks while credit rows show so the identity panel keeps its room (10.6).
  */
 export interface ApronCardLayout {
   width: string;
@@ -107,6 +155,7 @@ export interface ApronCardLayout {
   titleMaxPx: number;
   titleMinPx: number;
   logoWidth: number;
+  logoWithCreditsWidth: number;
   qrPx: number;
   qrWithTipPx: number;
   bodyFontPx: number;
@@ -123,6 +172,7 @@ export const APRON_CARD_LAYOUTS: Record<ApronCardSize, ApronCardLayout> = {
     titleMaxPx: 42,
     titleMinPx: 24,
     logoWidth: 140,
+    logoWithCreditsWidth: 96,
     qrPx: 100,
     qrWithTipPx: 84,
     bodyFontPx: 12,
@@ -137,6 +187,7 @@ export const APRON_CARD_LAYOUTS: Record<ApronCardSize, ApronCardLayout> = {
     titleMaxPx: 46,
     titleMinPx: 26,
     logoWidth: 160,
+    logoWithCreditsWidth: 110,
     qrPx: 108,
     qrWithTipPx: 92,
     bodyFontPx: 12.5,
@@ -154,9 +205,33 @@ export const APRON_SHEET_MARGIN_MM = 8;
 /** Width of `text` rendered in the title face at `fontPx`. */
 export type MeasureText = (text: string, fontPx: number) => number;
 
+/**
+ * One word of a title and what joins it to the word before: a space, or
+ * nothing when the break point is a hyphen or an ellipsis.
+ */
+export interface TitleWord {
+  text: string;
+  joiner: " " | "";
+}
+
+/**
+ * Splits a title at its line-break points (spec §1): spaces, and after each
+ * hyphen or ellipsis. "LIGHTS...CAMERA...ACTION!" is three words and
+ * "HARLEY-DAVIDSON" two; neither is ever broken anywhere else.
+ */
+export function titleWords(title: string): TitleWord[] {
+  const words: TitleWord[] = [];
+  for (const spaced of title.split(/\s+/).filter(Boolean)) {
+    spaced.split(/(?<=-|\.\.\.|…)(?=\S)/).forEach((text, i) => {
+      words.push({ text, joiner: i === 0 && words.length > 0 ? " " : "" });
+    });
+  }
+  return words;
+}
+
 /** Lines a greedy word wrap needs for `words` within `maxWidth`. */
 function greedyLineCount(
-  words: string[],
+  words: TitleWord[],
   fontPx: number,
   maxWidth: number,
   measure: MeasureText
@@ -165,11 +240,12 @@ function greedyLineCount(
   let lines = 1;
   let lineWidth = 0;
   for (const word of words) {
-    const wordWidth = measure(word, fontPx);
+    const wordWidth = measure(word.text, fontPx);
+    const gap = word.joiner === " " ? space : 0;
     if (lineWidth === 0) {
       lineWidth = wordWidth;
-    } else if (lineWidth + space + wordWidth <= maxWidth) {
-      lineWidth += space + wordWidth;
+    } else if (lineWidth + gap + wordWidth <= maxWidth) {
+      lineWidth += gap + wordWidth;
     } else {
       lines += 1;
       lineWidth = wordWidth;
@@ -180,8 +256,9 @@ function greedyLineCount(
 
 /**
  * Title fit (spec §1): shrink from the maximum until the longest word fits on
- * one line, then until the whole title wraps to at most three lines. Stops at
- * the floor even if the title still needs more lines; never breaks a word.
+ * one line, then until the whole title wraps to at most three lines. Words
+ * end at spaces, hyphens, and ellipses (titleWords). Stops at the floor even
+ * if the title still needs more lines; never breaks a word.
  */
 export function fitTitleSize({
   title,
@@ -198,11 +275,11 @@ export function fitTitleSize({
   measure: MeasureText;
   maxLines?: number;
 }): number {
-  const words = title.split(/\s+/).filter(Boolean);
+  const words = titleWords(title);
   if (words.length === 0) return maxPx;
   const STEP = 0.5;
   for (let size = maxPx; size > minPx; size -= STEP) {
-    const widest = Math.max(...words.map((w) => measure(w, size)));
+    const widest = Math.max(...words.map((w) => measure(w.text, size)));
     if (
       widest <= maxWidth &&
       greedyLineCount(words, size, maxWidth, measure) <= maxLines
@@ -211,6 +288,29 @@ export function fitTitleSize({
     }
   }
   return minPx;
+}
+
+/**
+ * Title fit's last step (spec §1, 6.3): from the three-line fit, keep
+ * shrinking until the identity panel fits above the APC logo. `fits` measures
+ * the rendered panel at a size. Stops at the floor even if it still does not
+ * fit.
+ */
+export function shrinkUntilFits({
+  startPx,
+  minPx,
+  fits,
+}: {
+  startPx: number;
+  minPx: number;
+  fits: (px: number) => boolean;
+}): number {
+  const STEP = 0.5;
+  let size = startPx;
+  while (size > minPx && !fits(size)) {
+    size = Math.max(minPx, size - STEP);
+  }
+  return size;
 }
 
 /** Splits card text into paragraphs on blank or single line breaks. */

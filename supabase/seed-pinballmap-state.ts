@@ -125,6 +125,39 @@ assertLineup(TITLE.eightBallDeluxe, false);
 // db:reset (which is what it is for) and AFM must be re-pointed or re-added.
 assertLineup(TITLE.attackFromMars, true);
 
+/**
+ * Demo condition comments on the shared Godzilla entry (PP-o355.4).
+ *
+ * The captured Godzilla entry carries none, and the shared entry is the one
+ * that exercises every part of an imported comment — the fan-out to both
+ * intent-On cabinets and the "also on" note (pinballmap spec 7.1, 7.6). Added
+ * to the parsed snapshot only, like the AFM entry: the fixture file stays a
+ * capture. Ids sit far above Pinball Map's real condition ids.
+ *
+ * The seed does not run the import; the first lineup refresh or an intent
+ * change imports these, the same way a real location's history arrives.
+ */
+const godzillaEntry = snapshot.lmxes.find(
+  (l) => l.machineId === 3416 && l.conditions.length === 0
+);
+if (godzillaEntry) {
+  godzillaEntry.conditions = [
+    {
+      id: 900_000_001,
+      comment:
+        "Left flipper feels weak on the upper playfield shots. Still playable.",
+      username: "silverball_sam",
+      createdAtIso: "2026-08-02T19:14:00.000Z",
+    },
+    {
+      id: 900_000_002,
+      comment: "Building shot not registering — hit it 5 times, no award.",
+      username: "tilt_warning",
+      createdAtIso: "2026-09-12T01:41:00.000Z",
+    },
+  ];
+}
+
 interface MachinePlan {
   initials: string;
   pinballmapMachineId: number | null;

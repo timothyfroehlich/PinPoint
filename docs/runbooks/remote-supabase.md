@@ -80,24 +80,30 @@ back afterwards.
 
 `python3 scripts/worktree_cleanup.py <worktree>` stops a remote worktree's
 stack and removes its volumes on the remote daemon. It needs
-`PINPOINT_REMOTE_DOCKER_HOST` in the environment; without it the script keeps
-the worktree and slot and exits non-zero rather than strand the remote stack.
+`PINPOINT_REMOTE_DOCKER_HOST` in the environment; without it, or when the
+remote volumes can't be listed, the script keeps the worktree and slot and
+exits non-zero rather than strand the remote stack. Re-run it once the remote
+host is reachable.
 
 Every remote resource carries the `com.supabase.cli.project` label. Containers
 also carry `com.supabase.cli.workdir` (the worktree path); volumes do not.
 
-`python3 scripts/worktree_orphan_sweep.py` covers the remote daemon too when
-`PINPOINT_REMOTE_DOCKER_HOST` is set. It only considers projects whose
-container workdir is a path on this machine, skipping Crabbox runner projects
-and the remote host's own paths. A project whose workdir is gone and whose
+`python3 scripts/worktree_reap.py` covers the remote daemon too when this
+machine uses the remote backend (a remote setting in the shell, or a live
+worktree whose `.env.local` says `remote`, or one it can't read). It only
+considers projects whose container workdir is a worktree this machine created
+(a live one, or one still in its slot manifest), so Crabbox runner projects,
+the remote host's own checkouts and other machines' stacks are never touched,
+even under an identical home path. A project whose workdir is gone and whose
 `project_id` has no live worktree is an orphan; `--apply` removes its
-containers and volumes by name. An orphan slot is freed only once no remote
-project still references its path, so a reused slot never collides with a
-leftover stack's ports. When this machine uses the remote backend (a remote
-setting in the shell, or a live worktree whose `.env.local` says `remote`) but
-the remote daemon can't be queried, those slots are reported as UNKNOWN and
-kept. A stopped remote stack has volumes only, so the sweep can't tell whose it
-is: it lists those volumes and leaves them for a person to remove.
+containers, network and volumes by name. A deleted worktree's slot is freed
+only once no stack still references its path and its ports refuse connections
+(an unreachable host counts as in use), so a reused slot never collides with a
+leftover stack. When the remote daemon can't
+be queried (or `PINPOINT_REMOTE_DOCKER_HOST` is unset, or the slot manifest
+can't be read), its stacks are reported as UNKNOWN and those slots are kept. A stopped remote stack has
+volumes only, so the command can't tell whose it is: it lists those volumes
+and leaves them for a person to remove.
 
 ## Port slots and other stacks on the remote host
 

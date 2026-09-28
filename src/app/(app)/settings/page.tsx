@@ -173,6 +173,12 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
               inAppWatchNewIssuesGlobal: preferences.inAppWatchNewIssuesGlobal,
               discordWatchNewIssuesGlobal:
                 preferences.discordWatchNewIssuesGlobal,
+              emailNotifyOnPinballMapComment:
+                preferences.emailNotifyOnPinballMapComment,
+              inAppNotifyOnPinballMapComment:
+                preferences.inAppNotifyOnPinballMapComment,
+              discordNotifyOnPinballMapComment:
+                preferences.discordNotifyOnPinballMapComment,
             }}
             isInternalAccount={isInternalAccount(profile.email)}
             discordIntegrationEnabled={discordIntegrationEnabled}

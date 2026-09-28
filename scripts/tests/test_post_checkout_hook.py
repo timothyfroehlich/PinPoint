@@ -367,7 +367,7 @@ def test_real_untrusted_dependency_empty_worktree_uses_project_pins(
     bad_package = json.loads((linked_worktree / "package.json").read_text())
     bad_package["packageManager"] = f"pnpm@{pnpm_version}+sha512." + "0" * 128
     (linked_worktree / "package.json").write_text(json.dumps(bad_package) + "\n")
-    rejected = subprocess.run(
+    refused = subprocess.run(
         ["sh", ".husky/post-checkout", ZERO_SHA, head, "1"],
         cwd=linked_worktree,
         env=env,
@@ -376,9 +376,12 @@ def test_real_untrusted_dependency_empty_worktree_uses_project_pins(
         check=False,
     )
 
-    assert rejected.returncode != 0
-    assert "failure_class=toolchain-config" in rejected.stderr
-    assert "do not match the trusted main worktree" in rejected.stderr
+    # A pin mismatch still refuses to install, but only warns: a failing
+    # post-checkout hook would make WorktreeCreate delete the new worktree.
+    assert refused.returncode == 0, refused.stderr
+    assert "WARNING dependencies not installed" in refused.stderr
+    assert "failure_class=toolchain-config" in refused.stderr
+    assert "do not match the trusted main worktree" in refused.stderr
     assert not (linked_worktree / "node_modules").exists()
     assert not global_tool_log.exists(), global_tool_log.read_text()
 

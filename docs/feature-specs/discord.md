@@ -16,7 +16,7 @@ Related: `docs/feature-specs/admin-integrations.md` (the page this card lives on
 - **1.2** The bot token is the Discord credential, owned by this spec. Other features may use it — the Pinball Map region-alerts posts do (separate spec). This spec does not define their behavior; each is gated by its own spec.
 - **1.3** A member can only be DM'd if they have linked their Discord account, which the login side records.
 - **1.4** The first time an account gains a Discord identity, Discord DMs are enabled and PinPoint sends a welcome DM linking to notification settings. Re-linking Discord preserves the member's existing choices and does not send another welcome.
-- **1.5** First-link defaults enable assignments, direct mentions, new issues on owned or watched machines, and comments and status changes on watched issues. All-machine notifications remain off. Notifications caused by the member's own actions are suppressed by default.
+- **1.5** First-link defaults enable assignments, direct mentions, new issues and Pinball Map comments on owned or watched machines, and comments and status changes on watched issues. All-machine notifications remain off. Notifications caused by the member's own actions are suppressed by default.
 
 ## 2. Configuration (the admin card)
 
@@ -75,6 +75,7 @@ The card uses the credential-entry pattern: fields, a Save that validates and re
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-25 | Added Pinball Map comments on owned or watched machines to the first-link defaults (§1.5). |
 | 2026-09-12 | Made DMs issue-first and actionable; added comment text, per-action deduplication, and first-link onboarding. |
 | 2026-09-08 | Limited the Test DM invite link to the no-shared-server failure. |
 | 2026-08-22 | Created. |

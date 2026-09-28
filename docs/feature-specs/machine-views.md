@@ -4,7 +4,7 @@
 
 **What this document is.** The requirements for PinPoint's shared machine-list experience on `/m`, standard Collections, and owner Collections. It describes the intended final state only; what the code does or used to do lives solely in the Known divergences table. Each requirement is numbered for citation. When code and spec disagree, either the code is wrong or this document gets amended — never silently neither.
 
-**Related records.** `docs/feature-specs/fleet.md` (the existing Fleet and Pinball Map dashboard requirements; unchanged by this spec), `docs/feature-specs/collections-and-tags.md` (Collection, Owner Collection, and Tag membership and access).
+**Related records.** `docs/feature-specs/fleet.md` (the existing Fleet and Pinball Map dashboard requirements; unchanged by this spec), `docs/feature-specs/collections-and-tags.md` (Collection, Owner Collection, and Tag membership and access), `docs/feature-specs/widgets.md` and `docs/feature-specs/machine-widgets.md` (the Summary Widgets on Machine View).
 
 ---
 
@@ -14,8 +14,12 @@
 - **View Scope** — the authoritative set of machines a route may show, supplied by that route. Filtering can narrow a scope but never widen it.
 - **Page Preset** — a route-owned configuration defining default filters, displayed fields, sorting, and permitted fields without allowing the route to assemble query dependencies itself.
 - **Displayed Field** — a Machine View field selected for display. Displayed fields, active filters, sorting, and search determine which optional data enrichments Machine View loads.
-- **Bookmarkable View** — the complete displayed-field, filter, sort, and pagination state encoded in the URL so reopening or copying it restores the same view.
+- **Bookmarkable View** — the complete displayed-field, filter, sort, pagination, and Widget Population state encoded in the URL so reopening or copying it restores the same view.
 - **Display Mode** — the phone-only Compact list or Table presentation. Display Mode is a browser preference rather than bookmarkable URL state.
+- **Surface** — a place where Machine View appears and where Saved Views belong: Machines, Integrations, or one individual Collection. Every standard Collection and every owner Collection is its own Surface.
+- **Saved View** — a named, personal Machine View configuration owned by one account and belonging to one Surface. It holds displayed fields, search, filters, sorting, and page size.
+- **Default View** — the one Saved View or Built-in View an account marks to open when it visits a Surface without view configuration in the URL.
+- **Built-in View** — a named Machine View configuration PinPoint defines for a Surface, the same for every viewer. One Built-in View on each Surface is its Page Preset.
 
 ---
 
@@ -34,27 +38,30 @@
 - **3.1** The field catalog contains Machine, Playability, Open Issues, Last Serviced, Presence, Owner, Manufacturer, Year, Oldest Open Issue, Last Activity, and Date Added. Each field declares its sorting behavior, data dependencies, and table and compact presentations.
 - **3.2** Machine identity is always loaded and displayed as exactly two lines: Line 1 is the machine title link plus uppercase initials badge; Line 2 is `[Manufacturer] · [Year] · [Owner]`.
 - **3.3** Missing owner, manufacturer, or year values display as “Unassigned” or “Unknown” as appropriate. Machine View never exposes owner email addresses.
-- **3.4** Health enrichment is loaded only when required by displayed fields, active filters, or sorting. It consists of grouped open-issue count, cosmetic/minor/major/unplayable counts, worst open severity, and oldest open issue. Closed issues never contribute.
+- **3.4** Health enrichment is loaded only when required by displayed fields, active filters, sorting, or Summary Widgets. It consists of grouped open-issue count, cosmetic/minor/major/unplayable counts, worst open severity, and oldest open issue. Closed issues never contribute.
 - **3.5** Playability is derived once on the server from compact issue aggregates; Machine View does not hydrate issue children.
 - **3.6** Service enrichment is loaded only when required by displayed fields or sorting. Last Serviced is the deterministic latest non-deleted timeline event tagged `maintenance`, `adjustment`, `parts`, `upgrade`, `cleaning`, or `inspection`.
 - **3.7** Activity enrichment is loaded only when Last Activity is displayed or sorted.
 - **3.8** Search matches machine title, initials, manufacturer, canonical catalog title, and the legacy model-name fallback.
-- **3.9** Filtering, deterministic sorting, and pagination occur in the server-only pipeline. The browser receives only the current page, filtered total count, validated view state, permitted fields, and required filter options.
+- **3.9** Filtering, deterministic sorting, and pagination occur in the server-only pipeline. The browser receives only the current page, filtered total count, Summary Widget counts, validated view state, permitted fields, and required filter options.
 - **3.10** Initial delivery adds no database index. Query plans are benchmarked with realistic 100- and 500-machine fixtures and `EXPLAIN` evidence before proposing a partial open-issue or latest-service index.
+- **3.11** The Open Issue Severity filter matches a machine that has at least one open issue of any selected severity.
 
 ---
 
 ## 4. URL State and Presets
 
-- **4.1** Canonical Machine View URL state uses `q`, `presence`, `status`, `owner`, `sort`, `dir`, `page`, `pageSize`, and `columns`.
-- **4.2** Multi-values serialize as comma-separated canonical values. Owner filters use stable IDs plus the `unassigned` sentinel. Page sizes are limited to 25, 50, and 100.
+- **4.1** Canonical Machine View URL state uses `q`, `presence`, `status`, `severity`, `owner`, `sort`, `dir`, `page`, `pageSize`, `columns`, `view`, and the Widget Population parameters named in machine-widgets §2.2.
+- **4.2** Multi-values serialize as comma-separated canonical values. Owner filters use stable IDs plus the `unassigned` sentinel. Page sizes are limited to 25, 50, and 100. Severity filters use `cosmetic`, `minor`, `major`, and `unplayable`.
 - **4.3** Invalid values are ignored, positive pages are clamped, and preset defaults are omitted from the URL.
-- **4.4** Search, filter, sort, and page-size changes reset to page 1. Displayed-field changes retain the current page when that page remains valid.
+- **4.4** Search, filter, sort, and page-size changes reset to page 1. Displayed-field and Widget Population changes retain the current page when that page remains valid.
 - **4.5** Sort headers cycle the field's preferred direction, its opposite direction, and then the Page Preset's default sort.
 - **4.6** Both initial Page Presets display Machine, Playability, Open Issues, and Last Serviced by default.
 - **4.7** `/m` defaults to Presence “On the Floor” and machine-title ascending. An omitted `presence` parameter means On the Floor; `presence=all` is the explicit unfiltered state.
 - **4.8** Collections include every member presence state by default and sort worst playability first.
-- **4.9** Reopening or copying a canonical URL restores displayed fields, search, filters, sorting, page size, and page.
+- **4.9** Reopening or copying a canonical URL restores displayed fields, search, filters, sorting, page size, page, and Widget Populations.
+- **4.10** Canonical URLs are always expressed relative to the Page Preset, never relative to a viewer's Saved Views, so the same URL shows every viewer the same configuration.
+- **4.11** `view` names the Saved View or Built-in View the configuration came from. It never changes the configuration a URL shows, and a viewer who does not own the named Saved View ignores it.
 
 ---
 
@@ -83,11 +90,45 @@
 
 ## 7. Deferred Work
 
-- **7.1** Named personal saved views, per-surface default saved views, and copied-link sharing semantics are deferred.
-- **7.2** Widgets and dashboard gauge relocation are deferred.
-- **7.3** The Integrations page, Pinball Map and iScored fields, integration presets, and integration remediation are deferred.
-- **7.4** Unmatched Pinball Map entries and other external-only records are deferred.
+- **7.1** _Moved 2026-09-25._ Saved views are specified in §8. Number kept so older citations don't dangle.
+- **7.2** _Moved 2026-09-26._ Summary Widgets are specified in `docs/feature-specs/widgets.md` and `docs/feature-specs/machine-widgets.md`. Number kept so older citations don't dangle.
+- **7.3** The Integrations page, its Summary Widgets, Pinball Map and iScored fields, integration presets, and integration remediation are deferred.
+- **7.4** Unmatched Pinball Map entries appear on the Pinball Map lineup page (`docs/feature-specs/pinballmap-lineup.md`), not as Machine View rows. Other external-only records are deferred.
 - **7.5** Machine and issue inspection drawers are deferred.
+- **7.6** Sharing Saved View records with other accounts is deferred; copied URLs are the sharing mechanism.
+
+---
+
+## 8. Saved Views
+
+- **8.1** Any signed-in account can save the current Machine View configuration as a named Saved View on the Surface where it is working. Anonymous visitors have no Saved Views but can apply Built-in Views (§9).
+- **8.2** A Saved View stores displayed fields, search, filters, sorting, page size, and Widget Populations. It never stores a page number or Display Mode.
+
+- **8.3** Saved Views are personal: only the owning account can see, apply, change, or delete them.
+- **8.4** Saved Views sync across every device the owning account uses.
+- **8.5** A Saved View appears only on the Surface where it was created. A Saved View created in one Collection never appears in another Collection or on Machines.
+- **8.6** Applying a Saved View opens its configuration at page 1.
+- **8.7** While a Saved View is applied and the current configuration differs from it, Machine View offers Save changes, which overwrites that Saved View, and Save as new, which creates another. With no Saved View applied, only Save as new is offered.
+- **8.8** A Saved View name is required and must be unique, ignoring case, among the account's Saved Views on that Surface. A colliding name is rejected, never silently overwritten.
+- **8.9** A Saved Views menu in the Machine View toolbar lists the Surface's Built-in Views, then the account's Saved Views, and lets the account apply any of them, rename or delete its Saved Views, and set or clear its default.
+- **8.10** An account has at most one default per Surface, which may be one of its Saved Views or a Built-in View. Defaults on different Surfaces are independent.
+- **8.11** A Surface URL with no view configuration other than page opens the account's Default View if one exists, otherwise the Page Preset. A URL carrying any view configuration opens exactly as written and ignores the Default View.
+- **8.12** When the Default View opens, the address bar shows its canonical URL, so copying the address shares that configuration.
+- **8.13** The Saved Views menu always offers every Built-in View, so an account with a default can still reach the Page Preset.
+- **8.14** Deleting a Saved View that is the Default View leaves the Surface without a default; it then opens to the Page Preset.
+- **8.15** A stored field, filter value, or owner that no longer exists or is not permitted on the Surface is dropped when the Saved View is applied, exactly as an invalid URL value is (§4.3).
+- **8.16** Deleting a Collection deletes every Saved View belonging to that Collection's Surface.
+
+---
+
+## 9. Built-in Views
+
+- **9.1** Machines offers five Built-in Views, in order: **On the floor** (On the Floor, by name — the Page Preset); **Needs attention** (On the Floor, Playability Needs service or Unplayable, worst first); **Service due** (On the Floor, oldest Last Serviced first); **All machines** (every presence state, by name, adding the Presence field); **Recently added** (every presence state, newest Date Added first, adding the Presence and Date Added fields).
+- **9.2** Collections offer three Built-in Views, in order: **On the floor** (On the Floor, worst playability first); **Needs attention** (On the Floor, Playability Needs service or Unplayable, worst first); **All machines** (every presence state, worst playability first — the Page Preset).
+- **9.3** Unless 9.1 or 9.2 says otherwise, a Built-in View displays the Page Preset's fields at the Page Preset's page size.
+- **9.4** Built-in Views are the same for every viewer and cannot be renamed, changed, or deleted.
+- **9.5** Applying a Built-in View opens it at page 1. When the current configuration differs from it, Machine View offers Save as new, never Save changes.
+- **9.6** Built-in Views that share a name appear in the same order on every Surface.
 
 ---
 
@@ -101,5 +142,9 @@ _None currently recorded._
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-27 | §7.4: unmatched Pinball Map entries now appear on the Pinball Map lineup page rather than being deferred. |
+| 2026-09-26 | Added the Open Issue Severity filter (§3.11) and Widget Population URL state (§4.1, §4.2, §4.4, §4.9); Saved Views store Widget Populations (§8.2); moved widgets to their own specs (§7.2); deferred Integrations widgets (§7.3). |
+| 2026-09-26 | Added Built-in Views (§9): named, shared configurations per Surface that can be an account's default; anonymous visitors can apply them (§8.1, §8.9, §8.10, §8.13, §4.11). Renamed Default Saved View to Default View (§1, §8.11, §8.12, §8.14). |
+| 2026-09-25 | Added Surfaces, Saved Views, and Default Saved Views (§8); URLs are canonical relative to the Page Preset (§4.10) and carry a `view` parameter naming their Saved View or the Page Preset (§4.1, §4.11); retired §7.1; deferred Saved View record sharing (§7.6). |
 | 2026-09-24 | Made View Scope route-supplied; machine-group membership moved to the specs that own each group. |
 | 2026-09-21 | Created. Establishes one machine-specific view for `/m` and Collections, conditional enrichment, bookmarkable URL state, shared responsive presentation, route-preservation requirements, and explicit deferred integrations/saved-view work. |

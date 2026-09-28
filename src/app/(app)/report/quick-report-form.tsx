@@ -278,6 +278,7 @@ export function QuickReportForm({
 
       <form
         ref={formRef}
+        method="post"
         onSubmit={(event) => {
           event.preventDefault();
           if (!entry.machineId) {
@@ -392,6 +393,7 @@ export function QuickReportForm({
                 type="submit"
                 size="lg"
                 loading={isPending}
+                disabled={!hydrated || isPending}
                 className="h-12 w-full text-base"
               >
                 Report issue

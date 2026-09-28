@@ -104,4 +104,67 @@ describe("request proxy", () => {
       ).toBe(allowed);
     }
   );
+
+  describe("mixed-content directives (PP-b0gz)", () => {
+    const MIXED = "block-all-mixed-content; upgrade-insecure-requests;";
+    const cspFor = async (incoming: NextRequest) =>
+      (await proxy(incoming)).headers.get("content-security-policy") ?? "";
+
+    it("keeps the production header tail byte-identical over https", async () => {
+      vi.stubEnv("NODE_ENV", "production");
+      vi.stubEnv("VERCEL_ENV", "production");
+
+      const csp = await cspFor(
+        request("https://pinpoint.austinpinballcollective.org/login")
+      );
+      expect(csp.endsWith(`frame-ancestors 'none'; ${MIXED}`)).toBe(true);
+    });
+
+    it("omits them for a plain-http localhost request", async () => {
+      vi.stubEnv("NODE_ENV", "production");
+      vi.stubEnv("VERCEL_ENV", "");
+
+      const csp = await cspFor(request("http://localhost:3000/login"));
+      expect(csp).not.toContain("upgrade-insecure-requests");
+      expect(csp).not.toContain("block-all-mixed-content");
+      expect(csp.endsWith("frame-ancestors 'none';")).toBe(true);
+      expect(csp).not.toMatch(/\s{2,}/);
+    });
+
+    it.each([
+      ["https URL", "https://localhost:3000/login", {}, ""],
+      [
+        "x-forwarded-proto: https",
+        "http://localhost:3000/login",
+        { "x-forwarded-proto": "https" },
+        "",
+      ],
+      [
+        "VERCEL_ENV=production",
+        "http://localhost:3000/login",
+        {},
+        "production",
+      ],
+      ["VERCEL_ENV=preview", "http://localhost:3000/login", {}, "preview"],
+    ])(
+      "keeps them for %s",
+      async (_label, url, headers: Record<string, string>, vercelEnv) => {
+        vi.stubEnv("VERCEL_ENV", vercelEnv);
+
+        const csp = await cspFor(new NextRequest(url, { headers }));
+        expect(csp.endsWith(MIXED)).toBe(true);
+      }
+    );
+
+    it("cannot be dropped from a Vercel deployment by a forwarded-proto header", async () => {
+      vi.stubEnv("VERCEL_ENV", "production");
+
+      const csp = await cspFor(
+        new NextRequest("http://localhost/login", {
+          headers: { "x-forwarded-proto": "http" },
+        })
+      );
+      expect(csp.endsWith(MIXED)).toBe(true);
+    });
+  });
 });

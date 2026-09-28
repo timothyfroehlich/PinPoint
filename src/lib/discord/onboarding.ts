@@ -40,6 +40,7 @@ export async function syncDiscordIdentityAndClaimOnboarding(
         discordNotifyOnMentioned: true,
         discordNotifyOnNewIssue: true,
         discordWatchNewIssuesGlobal: false,
+        discordNotifyOnPinballMapComment: true,
         suppressOwnActions: true,
         discordOnboardedAt: new Date(),
         discordNoticeVersion: DISCORD_NOTICE_VERSION,

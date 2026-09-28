@@ -1,4 +1,11 @@
-import { eq, and, type InferSelectModel, type SQL, sql } from "drizzle-orm";
+import {
+  eq,
+  and,
+  isNull,
+  type InferSelectModel,
+  type SQL,
+  sql,
+} from "drizzle-orm";
 import { db } from "~/server/db";
 import {
   issues,
@@ -7,6 +14,7 @@ import {
   issueComments,
   userProfiles,
   issueImages,
+  pinballmapComments,
 } from "~/server/db/schema";
 import {
   createTimelineEvent,
@@ -96,6 +104,24 @@ export interface CreateIssueParams {
    * retried submission cannot create a duplicate. (PP-2053.7)
    */
   idempotencyKey?: string | null;
+  /**
+   * The Pinball Map comment this issue converts (pinballmap spec 7.5, 7.8).
+   * Claimed inside the issue's own transaction, so a comment is converted at
+   * most once: if another conversion won, nothing is written and
+   * {@link PinballMapCommentAlreadyConvertedError} is thrown. (PP-o355.4)
+   */
+  pinballmapConditionId?: number | undefined;
+}
+
+/**
+ * A Pinball Map comment's one conversion (spec 7.8) was already taken — by an
+ * earlier conversion or by a concurrent one that committed first.
+ */
+export class PinballMapCommentAlreadyConvertedError extends Error {
+  constructor(readonly conditionId: number) {
+    super(`Pinball Map comment ${String(conditionId)} is already converted`);
+    this.name = "PinballMapCommentAlreadyConvertedError";
+  }
 }
 
 export interface UpdateIssueStatusParams {
@@ -198,6 +224,7 @@ export async function createIssue({
   autoWatchReporter = true,
   reportSource,
   idempotencyKey,
+  pinballmapConditionId,
 }: CreateIssueParams): Promise<{
   issue: Issue;
   deliveryPlan: DeliveryPlan;
@@ -309,6 +336,30 @@ export async function createIssue({
         }
       }
       throw new Error("Issue creation failed");
+    }
+
+    // 2b. Claim the Pinball Map comment this issue converts. The conditional
+    //     UPDATE is the at-most-once guard (spec 7.8): a second conversion —
+    //     sequential or racing — matches no row, and throwing rolls back the
+    //     issue and the number reservation with it.
+    if (pinballmapConditionId !== undefined) {
+      const claimed = await tx
+        .update(pinballmapComments)
+        .set({
+          convertedIssueId: issue.id,
+          convertedAt: new Date(),
+          convertedBy: reportedBy ?? null,
+        })
+        .where(
+          and(
+            eq(pinballmapComments.conditionId, pinballmapConditionId),
+            isNull(pinballmapComments.convertedIssueId)
+          )
+        )
+        .returning({ conditionId: pinballmapComments.conditionId });
+      if (claimed.length === 0) {
+        throw new PinballMapCommentAlreadyConvertedError(pinballmapConditionId);
+      }
     }
 
     log.info(

@@ -84,8 +84,13 @@ password"`, `"Could not update Insider Connected for this machine"`, …) The
   **one** status-based exception is a disabled account: `401` + singular
   `{"error":"account_disabled"}`. Classify on the body, never on `res.ok` alone,
   or failed writes look like successes.
-- **`ic_toggle` is a toggle, not a setter** — it ignores any state param and
-  inverts the current value, returning the new state.
+- **`ic_toggle` flips unless you pass `ic_enabled`** — with no state param it
+  inverts the current value (`null` counts as off, so the first call turns it
+  on); with `ic_enabled=true|false` it sets that value. Either way it returns
+  the new state. It refuses any title whose catalog `ic_eligible` is false with
+  the `"Could not update Insider Connected…"` error. `ic_enabled: null` on an
+  entry means never set, not off. (Re-verified against the request spec
+  "it should toggle via the ic_enabled param", 2026-09-25.)
 
 If you change integration code, re-derive the contract from that spec suite (or
 extend `scripts/pinballmap/refresh-fixture.ts`, which is GET-only). Never reach

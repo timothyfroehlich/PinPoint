@@ -48,6 +48,7 @@ class TestBeadsCompatibilityManifest:
         sha256_re = re.compile(r"^[0-9a-f]{64}$")
         assert sha256_re.fullmatch(cloud_assets["linux-amd64"]["bdSha256"])
         assert sha256_re.fullmatch(cloud_assets["linux-amd64"]["doltSha256"])
+        assert sha256_re.fullmatch(cloud_assets["linux-amd64"]["ghSha256"])
 
 
 def write_executable(path: Path, content: str) -> None:
@@ -63,6 +64,7 @@ def prepare_cloud_setup_harness(
     tmp_path: Path,
     *,
     corrupt_bd: bool = False,
+    corrupt_gh: bool = False,
     uname_s: str = "Linux",
     uname_m: str = "x86_64",
 ) -> tuple[Path, dict[str, str], Path, Path]:
@@ -73,6 +75,7 @@ def prepare_cloud_setup_harness(
     manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
     bd_version = manifest["bd"]
     dolt_version = manifest["dolt"]
+    gh_version = manifest["gh"]
 
     dolt_payload = payload_dir / "dolt-linux-amd64" / "bin" / "dolt"
     dolt_payload.parent.mkdir(parents=True)
@@ -86,6 +89,14 @@ def prepare_cloud_setup_harness(
         f"#!/bin/sh\necho 'bd version {bd_version} (test)'\n",
     )
 
+    gh_dir = f"gh_{gh_version}_linux_amd64"
+    gh_payload = payload_dir / gh_dir / "bin" / "gh"
+    gh_payload.parent.mkdir(parents=True)
+    write_executable(
+        gh_payload,
+        f"#!/bin/sh\necho 'gh version {gh_version} (2026-09-15)'\n",
+    )
+
     dolt_archive = payload_dir / "dolt-linux-amd64.tar.gz"
     with tarfile.open(dolt_archive, "w:gz") as archive:
         archive.add(
@@ -97,6 +108,10 @@ def prepare_cloud_setup_harness(
     with tarfile.open(bd_archive, "w:gz") as archive:
         archive.add(bd_payload, arcname="bd")
 
+    gh_archive = payload_dir / f"{gh_dir}.tar.gz"
+    with tarfile.open(gh_archive, "w:gz") as archive:
+        archive.add(gh_payload.parent.parent, arcname=gh_dir)
+
     runtime_scripts = tmp_path / "runtime" / "scripts"
     runtime_scripts.mkdir(parents=True)
     runtime_setup = runtime_scripts / SETUP_SCRIPT.name
@@ -104,6 +119,7 @@ def prepare_cloud_setup_harness(
     manifest["cloudAssets"]["linux-amd64"] = {
         "bdSha256": file_sha256(bd_archive),
         "doltSha256": file_sha256(dolt_archive),
+        "ghSha256": file_sha256(gh_archive),
     }
     (runtime_scripts / MANIFEST_PATH.name).write_text(
         json.dumps(manifest, indent=2) + "\n",
@@ -114,6 +130,11 @@ def prepare_cloud_setup_harness(
     if corrupt_bd:
         served_bd_archive = payload_dir / "corrupt-bd.tar.gz"
         served_bd_archive.write_bytes(bd_archive.read_bytes() + b"tampered")
+
+    served_gh_archive = gh_archive
+    if corrupt_gh:
+        served_gh_archive = payload_dir / "corrupt-gh.tar.gz"
+        served_gh_archive.write_bytes(gh_archive.read_bytes() + b"tampered")
 
     stub_dir = tmp_path / "stubs"
     stub_dir.mkdir()
@@ -144,6 +165,7 @@ done
 case "$url" in
   *dolt-linux-amd64.tar.gz) cp "$TEST_DOLT_ARCHIVE" "$output" ;;
   *beads_*_linux_amd64.tar.gz) cp "$TEST_BD_ARCHIVE" "$output" ;;
+  */cli/cli/releases/download/*/gh_*_linux_amd64.tar.gz) cp "$TEST_GH_ARCHIVE" "$output" ;;
   *) exit 92 ;;
 esac
 """,
@@ -177,6 +199,7 @@ chmod 755 "$2"
         "TMPDIR": str(work_parent),
         "TEST_BD_ARCHIVE": str(served_bd_archive),
         "TEST_DOLT_ARCHIVE": str(dolt_archive),
+        "TEST_GH_ARCHIVE": str(served_gh_archive),
         "TEST_CALLS_FILE": str(calls_file),
         "TEST_UNAME_S": uname_s,
         "TEST_UNAME_M": uname_m,
@@ -199,11 +222,12 @@ class TestCloudSetupVerification:
         assert proc.returncode == 0, proc.stderr
         assert (install_dir / "bd").is_file()
         assert (install_dir / "dolt").is_file()
+        assert (install_dir / "gh").is_file()
         assert list((tmp_path / "work").iterdir()) == []
         calls = calls_file.read_text(encoding="utf-8").splitlines()
-        assert sum(call.startswith("curl ") for call in calls) == 2
-        assert sum(call.startswith("tar ") for call in calls) == 2
-        assert sum(call.startswith("install ") for call in calls) == 2
+        assert sum(call.startswith("curl ") for call in calls) == 3
+        assert sum(call.startswith("tar ") for call in calls) == 3
+        assert sum(call.startswith("install ") for call in calls) == 3
 
     def test_bd_digest_mismatch_extracts_and_installs_nothing(self, tmp_path: Path):
         setup_script, env, install_dir, calls_file = prepare_cloud_setup_harness(
@@ -216,6 +240,22 @@ class TestCloudSetupVerification:
 
         assert proc.returncode != 0
         assert "SHA-256 mismatch for bd.tgz" in proc.stderr
+        assert list(install_dir.iterdir()) == []
+        assert list((tmp_path / "work").iterdir()) == []
+        calls = calls_file.read_text(encoding="utf-8").splitlines()
+        assert all(not call.startswith(("tar ", "install ")) for call in calls)
+
+    def test_gh_digest_mismatch_extracts_and_installs_nothing(self, tmp_path: Path):
+        setup_script, env, install_dir, calls_file = prepare_cloud_setup_harness(
+            tmp_path, corrupt_gh=True
+        )
+
+        proc = subprocess.run(
+            ["bash", str(setup_script)], env=env, capture_output=True, text=True
+        )
+
+        assert proc.returncode != 0
+        assert "SHA-256 mismatch for gh.tgz" in proc.stderr
         assert list(install_dir.iterdir()) == []
         assert list((tmp_path / "work").iterdir()) == []
         calls = calls_file.read_text(encoding="utf-8").splitlines()

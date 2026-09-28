@@ -37,6 +37,10 @@ const updatePreferencesSchema = z.object({
   emailWatchNewIssuesGlobal: z.boolean().optional(),
   inAppWatchNewIssuesGlobal: z.boolean().optional(),
   discordWatchNewIssuesGlobal: z.boolean().optional(),
+
+  emailNotifyOnPinballMapComment: z.boolean().optional(),
+  inAppNotifyOnPinballMapComment: z.boolean().optional(),
+  discordNotifyOnPinballMapComment: z.boolean().optional(),
 });
 
 type PrefField = keyof z.infer<typeof updatePreferencesSchema>;

@@ -9,6 +9,7 @@ import { machines, userProfiles } from "~/server/db/schema";
 import { createClient } from "~/lib/supabase/server";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { apronCardContent } from "~/lib/machines/apron-card";
+import { getMachineCredits } from "~/app/(app)/m/[initials]/_data";
 import { buildMachineHubUrl } from "~/lib/machines/hub-url";
 import { resolveRequestUrl } from "~/lib/url";
 import { ApronCardPrintSheet } from "./ApronCardPrintSheet";
@@ -42,7 +43,13 @@ export default async function ApronCardPrintPage({
         owner: { columns: { name: true } },
         invitedOwner: { columns: { name: true } },
         pinballmapTitle: {
-          columns: { name: true, machineGroupId: true, groupName: true },
+          columns: {
+            name: true,
+            machineGroupId: true,
+            groupName: true,
+            manufacturer: true,
+            opdbId: true,
+          },
         },
       },
     }),
@@ -60,7 +67,10 @@ export default async function ApronCardPrintPage({
     <ApronCardPrintSheet
       machineName={machine.name}
       machineInitials={machine.initials}
-      content={apronCardContent(machine)}
+      content={apronCardContent(
+        machine,
+        await getMachineCredits(machine.pinballmapTitle?.opdbId ?? null)
+      )}
       size={machine.apronSize}
       scanUrl={buildMachineHubUrl(
         resolveRequestUrl(await headers()),

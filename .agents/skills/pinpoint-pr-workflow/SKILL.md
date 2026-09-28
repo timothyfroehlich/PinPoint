@@ -1,6 +1,6 @@
 ---
 name: pinpoint-pr-workflow
-description: The PR-lifecycle decisions the scripts and gates do not state — draft-first creation, CodeRabbit automated review on draft promotion, manual re-reviews, Codex fallback, exact-head review evidence, concurrent review adjudication, and why every push needs fresh CI and review. Also covers the merge handoff, screenshot gotchas, Dependabot lockfile trap, merge escape hatches, broken merge scripts, and GitHub MCP gotchas. Use when committing, opening or updating a PR, monitoring CI or review, addressing review comments, posting screenshots, handing a PR over to merge, landing the plane after Tim merges, or when a GitHub MCP call does something unexpected.
+description: The PR-lifecycle decisions the scripts and gates do not state — draft-first creation, the local Claude Code review and the review record that covers a head, exact-head review evidence, and why every push needs fresh CI and review. Also covers the merge handoff, screenshot gotchas, Dependabot lockfile trap, merge escape hatches, broken merge scripts, and GitHub MCP gotchas. Use when committing, opening or updating a PR, monitoring CI or review, addressing review comments, posting screenshots, handing a PR over to merge, landing the plane after Tim merges, or when a GitHub MCP call does something unexpected.
 ---
 
 # PinPoint PR Workflow
@@ -37,11 +37,15 @@ PinPoint scopes: `issues`, `machines`, `auth`, `ui`, `db`, `e2e`, `agents`, `wor
 
 ## Phase 2: PR
 
+Before opening the PR, stop for Tim's approval of any UI change (rendered screenshots, the
+AGENTS.md "Early UI review gate") and of any feature-spec requirement edit (the exact diff,
+AGENTS.md "Documentation"). With those approved, or with neither in the change, open the PR.
+
 Prefer MCP `create_pull_request` for typed argument handling, or `gh pr create` if you're
 already in a shell. Open every agent-created PR as a **GitHub draft**, regardless of
-size (`gh pr create --draft ...`). Promoting the draft (`gh pr ready`) is what triggers
-CodeRabbit's review; it is separate from the PinPoint `ready-for-review` label applied
-only at the end of Phase 3.
+size (`gh pr create --draft ...`). It stays draft until its review record is posted;
+`record-claude-review.sh` promotes it (3.4). Promotion is separate from the PinPoint
+`ready-for-review` label applied only at the end of Phase 3.
 
 ### Agent origin
 
@@ -115,13 +119,12 @@ After pushing a commit at `HEAD_SHA`, watch CI in the background:
 python3 scripts/workflow/pr-watch.py <PR> --phase ci --expected-head <HEAD_SHA>
 ```
 
-For a new draft PR, keep it draft until `CI Gate` succeeds for the current head, then
-run `gh pr ready <PR>`. Promotion out of draft automatically triggers CodeRabbit review
-on the current head commit. A green run for an older SHA does not qualify.
+A green `CI Gate` on the current head is what starts the local review (3.4). A green run
+for an older SHA does not qualify.
 
 **Handling the CI result**:
 
-- `outcome: "passed"` (exit 0): CI Gate passed on `HEAD_SHA`. If the PR is draft, run `gh pr ready <PR>` (which auto-triggers CodeRabbit review), then proceed to monitor review in 3.4.
+- `outcome: "passed"` (exit 0): CI Gate passed on `HEAD_SHA`. Run the local review in 3.4.
 - `outcome: "failed"` (exit 1): A run or CI Gate failed. When it can fetch the failed-step log, the watcher saves it and returns its path as `failure_artifact` (under `tmp/gh-monitor/`); if `failure_artifact` is null, open `detail_url` for the run log. Address the failure, commit, and push.
   - If judged to be a GitHub Actions **infra** flake (network timeout, runner loss, download 5xx, container start): log it with `bash scripts/workflow/log-gha-flake.sh <pr> <run-id> <class> "<symptom>"` before retrying.
 - `outcome: "stale"` (exit 1): The PR head moved away from `expected_head`. The owner re-checks branch state.
@@ -140,82 +143,47 @@ Every unresolved thread counts, whoever opened it — the `threads` gate is auth
 
 ### 3.4 Get the head commit reviewed
 
-**Review Priority Chain:**
-$$\text{CodeRabbit (Default)} \longrightarrow \text{Codex (Secondary / Fallback)}$$
+The reviewer is Claude Code's built-in `/code-review`, run by the owning agent in its own session against the PR's exact head (spec `docs/feature-specs/pr-lifecycle-monitoring.md` §8). What covers the head is the **review record** that run leaves on the PR, not the run itself.
 
-These are the only two review providers. A local review (`/code-review`, `/codex:review`) is not coverage; see "Merging without a review" below.
+1. **Pick the level.** With current-head CI green and the PR head checked out:
+   ```bash
+   bash scripts/workflow/claude-review-level.sh
+   ```
+   Line 1 is `low`, `medium`, `high`, or `ask`. On `ask` (over 3,000 weighted lines), stop and ask Tim which level to run, or whether to split the PR.
+2. **Review.** Invoke the `code-review` skill with the level first, then the PR number: `medium 1234`. The reverse order (`1234 medium`) silently runs at the last-used level.
+3. **Adjudicate every finding.** Fix it, or decline it with a one-sentence reason. Keep one findings file across all rounds (format in the header of `record-claude-review.sh`): each finding's round, file, line and summary, with `fixed` plus the fixing commit or `declined` plus the reason.
+4. **Re-review until clean.** After pushing fixes, wait for replacement CI, then repeat step 2 on the new head at the same level. The loop ends on a round that raises nothing new; a finding re-raised after a decline stays declined.
+5. **Record and promote.**
+   ```bash
+   bash scripts/workflow/record-claude-review.sh <PR> --level <level> --findings <file>
+   ```
+   It requires the local checkout to be the PR's current head with no uncommitted changes, and every finding to be fixed or declined. It posts the SHA-pinned record, which lists every finding for Tim, and marks a draft PR ready. `--dry-run` prints the record without posting.
 
-#### 1. CodeRabbit: Default Automated Reviewer
+Post a record only for a head the review actually ran on. The gate cannot tell a real review from a fabricated record; Tim reads the findings list before he merges.
 
-- **Draft promotion auto-trigger:** All agent-created PRs start as drafts (`gh pr create --draft`). When current-head CI succeeds, promote the PR out of draft:
-  ```bash
-  gh pr ready <PR>
-  ```
-  Draft promotion automatically triggers a CodeRabbit review on the current head commit.
-- **No auto re-reviews on commit push:** Pushing subsequent commits to an open PR does **not** automatically trigger a CodeRabbit re-review. Wait for replacement CI to succeed on the new head, then explicitly request a re-review:
-  ```bash
-  gh pr comment <PR> --body "@coderabbitai review"
-  ```
-  CodeRabbit edits its acknowledgement comment in place — "Review triggered" can become "Review rate limited", so check current status.
-- **Hourly Quota & Rate Limiting:** We have an allowance of 5 CodeRabbit reviews per rolling hour. When rate-limited, CodeRabbit posts an issue comment containing `Review rate limited.`
-- **Quota Fallback to Codex:** When CodeRabbit is rate-limited, immediately fall back to requesting a Codex review (see below). If Codex is also out of quota or unavailable, alert Tim and recommend waiting for the next CodeRabbit review slot, or a forced merge at his direction.
-
-#### 2. Codex: Secondary Reviewer & Rate-Limit Fallback
-
-- **Manual request only:** Codex reviews are triggered strictly via explicit manual request and never run automatically on draft promotion or commit push.
-- To request Codex review on the current head (after current-head CI passes):
-  ```bash
-  bash scripts/workflow/request-codex-review.sh <PR>
-  ```
-  This helper verifies that the authenticated account is the repository owner, the PR is open and ready, current-head CI passed, and the head lacks review coverage. It posts the SHA-pinned `@codex review` trigger with a hidden marker binding the trusted reaction witness to that SHA. Never request the same head twice.
-
-#### 3. Concurrent Review Execution & Adjudication
-
-Both CodeRabbit and Codex can review the same head. The review watch passes on the first qualifying review of the exact head and does not track the other reviewer; if a second review lands later, adjudicate its findings like any other — unresolved threads block the gate whoever opened them.
-
-#### 4. Monitor review
-
-```bash
-python3 scripts/workflow/pr-watch.py <PR> --phase review --expected-head <HEAD_SHA>
-```
-
-**Handling the review result**:
-
-- `outcome: "passed"` (exit 0): The gate label is `approved` (exact head covered by CodeRabbit approval or Codex evidence) AND 0 unresolved threads remain.
-  - Proceed to UI screenshots in 3.5, apply the `ready-for-review` label in 3.6, then enter Phase 4 merge handoff.
-- `outcome: "action_required"` (exit 1): Either `approved` with unresolved threads (>0), or the review state is `changes requested`.
-  - Adjudicate findings: fix code or reply/decline threads.
-  - If code changed, push fixes, wait for replacement CI, and re-request review.
-  - The watch does not detect CodeRabbit rate limiting — a rate-limited review runs to `timed_out`. If CodeRabbit's comment says `Review rate limited`, fall back to Codex; if Codex is also unavailable, alert Tim.
-- `outcome: "stale"` (exit 1): Branch head moved; re-orient to the new head.
-- `outcome: "conflicting"` (exit 1): Merge conflict; merge `origin/main` into the branch and push.
-- `outcome: "timed_out"` / `"undetermined"` (exit 2): Re-run watch or inspect GitHub API reachability.
-
-The owning agent stays assigned through the whole loop: monitor current-head CI and review, address or explicitly decline every finding, resolve every thread, push fixes, and request a replacement review only after replacement CI succeeds. Never request the same head twice or hand off an unreviewed PR.
-
-An exact-head finding-bearing **Codex** review is also terminal once every thread is explicitly adjudicated and resolved; declining a finding without a push does not require another review. CodeRabbit covers a head only with its native `APPROVED` review; its finding-bearing review never does, even after every thread is resolved.
+The review runs inside the session, so there is nothing to wait for; `pr-watch.py --phase review` is only needed to confirm the gate reads the record. Until both subscriptions end, the gate also accepts an exact-head CodeRabbit approval or Codex evidence already on a PR; request neither.
 
 #### Merging without a review
 
-Only CodeRabbit and Codex cover a head. When Tim reviewed a PR himself, or wants it merged without a review, he says so explicitly, and you run the guarded merge with `--force`:
+Only a review record covers a head. When Tim reviewed a PR himself, or wants it merged without a review, he says so explicitly, and you run the guarded merge with `--force`. A draft must be promoted first (`gh pr ready <PR>`), since GitHub will not merge a draft:
 
 ```bash
 bash scripts/workflow/merge-pr.sh <PR> --human --force
 ```
 
-`--force` bypasses only the `threads` and `reviewed` gates; CI, authorship and merge conflicts still apply. Never add `--force` on your own initiative, and never treat a local `/code-review` or `/codex:review` run as coverage.
+`--force` bypasses only the `threads` and `reviewed` gates; CI, authorship and merge conflicts still apply. Never add `--force` on your own initiative.
 
 #### Pushing after the review
 
-Any push invalidates review coverage for the previous SHA — except a pure merge of `main`,
-which the gate carries coverage across (PP-ojoj). Wait for replacement current-head CI, then
-re-request review for the new head (see 3.4).
+Any push invalidates review coverage for the previous SHA — except a clean merge of `main`,
+which the gate carries the record across (PP-ojoj). Any other push needs replacement CI, a
+new review round, and a new record (3.4 steps 4–5).
 
 #### Readiness is not review
 
 `pr-watch.py --check-ready` reports review state but does **not** gate on it. It answers
-whether the current head may leave draft and receive its manual review request; gating
-on review there would be circular. A PR may be GitHub-ready while still lacking the
+whether current-head CI allows the review to start; gating on review there would be
+circular. A PR may be GitHub-ready while still lacking the
 final PinPoint `ready-for-review` label. Do not call it merge-ready until 3.6 is
 satisfied.
 
@@ -237,7 +205,7 @@ Requires the local dev server (`pnpm run dev`) and Supabase (`pnpm supabase:star
 
 ### 3.6 Apply `ready-for-review` label
 
-Once CI green + exact-head CodeRabbit or Codex coverage (including an adjudicated finding-bearing review per 3.4) + zero unresolved review threads + no merge conflict + the screenshot requirement or documented opt-out in 3.5 satisfied, apply the label via `mcp__github__issue_write(method: "update", …)` or `gh pr edit <PR> --add-label ready-for-review`.
+Once CI green + an exact-head review record (3.4) + zero unresolved review threads + no merge conflict + the screenshot requirement or documented opt-out in 3.5 satisfied, apply the label via `mcp__github__issue_write(method: "update", …)` or `gh pr edit <PR> --add-label ready-for-review`.
 
 The label signals readiness, not merge authorization. A direct request from Tim in the active task authorizes the owning agent to run the guarded merge script; the script rechecks all gates.
 
@@ -263,7 +231,7 @@ It prints what Tim needs to decide whether to merge — which review ran and whe
 
 **The re-run line is part of the report, not decoration.** The block is a snapshot and is stale as soon as CI re-runs or anyone pushes. Tim re-runs it himself rather than asking you to re-check.
 
-**The merge command only appears when all four gates actually pass.** An un-ready PR gets the blocking reasons instead — so don't hand over a merge command the report didn't print. If CI is still running, the report says so; hand him the automerge form, which waits rather than making him come back. Get the head reviewed first (Phase 3.4); automerge waits out CI, not an unreviewed head. The owning agent monitors the manually requested review outside this script:
+**The merge command only appears when all four gates actually pass.** An un-ready PR gets the blocking reasons instead — so don't hand over a merge command the report didn't print. If CI is still running, the report says so; hand him the automerge form, which waits rather than making him come back. Get the head reviewed first (Phase 3.4); automerge waits out CI, not an unreviewed head:
 
 ```
 ! scripts/workflow/merge-pr.sh <PR> --human --automerge
@@ -277,7 +245,7 @@ Push completed work. Without an explicit merge request, report that the PR is re
 
 **On any FAIL the script removes the `ready-for-review` label if present** (and likewise on the `--automerge` RED path). The label's contract is "click-merge-without-thinking"; if a gate fails at merge time that contract is broken, so the label goes. Practical consequence: after Tim reports a FAIL, fix the underlying issue, push, and **re-apply the label** (3.6) before re-handing him the `--human` command — don't assume it survived.
 
-**A `reviewed` FAIL is a `--force` case only when Tim says so** — he reviewed the PR himself, or wants it merged unreviewed (3.4 "Merging without a review"). Otherwise `not reviewed` means no checker covers head, `stale review` means you pushed past the review record, and `changes requested` means a reviewer asked for changes on this head (or threads are open) — all describe an unfinished PR, not a broken gate. Get CodeRabbit or Codex to cover head (3.4).
+**A `reviewed` FAIL is a `--force` case only when Tim says so** — he reviewed the PR himself, or wants it merged unreviewed (3.4 "Merging without a review"). Otherwise `not reviewed` means no checker covers head, `stale review` means you pushed past the review record, and `changes requested` means a reviewer asked for changes on this head (or threads are open) — all describe an unfinished PR, not a broken gate. Run the review and post the record (3.4).
 
 `--bypass-merge-requirements` is for a required check failing for known-irrelevant reasons (infrastructure flake, unrelated job) where the change has been manually verified safe — log the flake first with `bash scripts/workflow/log-gha-flake.sh <pr> <run-id> <class> "<symptom>"` (see `docs/runbooks/gha-flake-log.md`) — or an emergency hotfix where waiting for CI is not acceptable. Do NOT suggest bypassing when a merge conflict exists, or when the underlying state hasn't been manually verified.
 
@@ -322,7 +290,7 @@ After Tim merges, consider watching the deployment — only if the PR could brea
 
 Close the bead, file genuine follow-up beads, and hand off freely. For destructive cleanup (removing worktrees, deleting branches/volumes), wait for explicit confirmation.
 
-**Stop the merged branch's services.** Once the PR merges, stop the dev server you started (by PID, or `preview_stop`) and the worktree's Supabase stack (`pnpm supabase:stop` from inside the worktree — data is kept, `pnpm supabase:start` brings it back). A merged branch's stack is idle memory on a host running several of them. Skip it when you have a concrete reason the stack is still in use: follow-up work in this same worktree is next, Tim is still looking at the preview, or another session shares the stack. Say which you did in the hand-off. If `merge-pr.sh` already reaped the worktree, the reap removed the stack and its volumes — unless it reported the volume state `UNKNOWN`, in which case run `python3 scripts/worktree_orphan_sweep.py --apply`.
+**Stop the merged branch's services.** Once the PR merges, stop the dev server you started (by PID, or `preview_stop`) and the worktree's Supabase stack (`pnpm supabase:stop` from inside the worktree — data is kept, `pnpm supabase:start` brings it back). A merged branch's stack is idle memory on a host running several of them. Skip it when you have a concrete reason the stack is still in use: follow-up work in this same worktree is next, Tim is still looking at the preview, or another session shares the stack. Say which you did in the hand-off. If `merge-pr.sh` already reaped the worktree, the reap removed the stack and its volumes — unless it reported the volume state `UNKNOWN`, in which case run `python3 scripts/worktree_reap.py --apply`.
 
 ### 5.3 Hand off
 

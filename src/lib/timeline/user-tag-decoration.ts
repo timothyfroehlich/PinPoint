@@ -3,6 +3,7 @@ import {
   CircleDot,
   Eye,
   History,
+  MapPin,
   Package,
   Settings,
   SlidersHorizontal,
@@ -92,12 +93,14 @@ export function isUserTag(tag: TimelineTag): tag is UserTag {
 }
 
 /**
- * Decoration for the two reserved (system-emitted) tags. They never appear
+ * Decoration for the reserved (system-emitted) tags. They never appear
  * on the comment composer, but the timeline filter dropdown lists every
  * tag — so it needs an icon + color for these too.
  *
  *   - lifecycle → machine history (added / renamed / owner / presence)
  *   - issue     → issue activity, matches the `issue_opened` event icon
+ *   - settings  → settings-set changes
+ *   - pinballmap → imported Pinball Map comments
  */
 const RESERVED_TAG_DECORATION: Record<
   ReservedTag,
@@ -114,6 +117,11 @@ const RESERVED_TAG_DECORATION: Record<
   },
   settings: {
     Icon: Settings,
+    badgeClass:
+      "border-outline-variant bg-surface-variant/30 text-muted-foreground",
+  },
+  pinballmap: {
+    Icon: MapPin,
     badgeClass:
       "border-outline-variant bg-surface-variant/30 text-muted-foreground",
   },

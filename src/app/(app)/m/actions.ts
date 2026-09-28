@@ -730,7 +730,7 @@ export async function updateMachineAction(
     // the listing carry-over, and decides any auto-link (PP-o355.20). When the
     // marker is absent, link columns are left untouched.
     //
-    // Same seam as the MCP `set_machine_pinballmap` tool — the carry-over rule,
+    // Same seam as the MCP `update_machine` tool — the carry-over rule,
     // the abandonment record and the auto-link choice exist once, in
     // `~/services/machines` (PP-u4ab.12).
     let pbmPlan: MachinePbmLinkPlan | null = null;

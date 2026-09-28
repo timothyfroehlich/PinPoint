@@ -1,5 +1,6 @@
 import "server-only";
 import { clearResolvedAbandonments } from "./abandoned-listings";
+import { importPinballMapComments } from "./comment-import";
 import { getPinballMapState } from "./state";
 
 /**
@@ -26,10 +27,13 @@ export interface ReconcileResult {
    * (`./abandoned-listings`).
    */
   abandonmentsCleared: number;
+  /** Comment copies added to covering machine timelines (`./comment-import`). */
+  commentCopiesImported: number;
 }
 
 /**
- * Drop abandoned-listing records whose entry has left the lineup.
+ * Drop abandoned-listing records whose entry has left the lineup, then import
+ * the lineup's comments into covering timelines.
  *
  * No PBM HTTP (CORE-ARCH-011 / CORE-PBM-001): it reads the already-stored
  * snapshot. A `null` snapshot (never synced) is a no-op, and so is an
@@ -38,9 +42,9 @@ export interface ReconcileResult {
 export async function reconcileAfterSync(): Promise<ReconcileResult> {
   const state = await getPinballMapState();
   if (state?.locationId === null || state?.locationId === undefined)
-    return { abandonmentsCleared: 0 };
+    return { abandonmentsCleared: 0, commentCopiesImported: 0 };
   const snapshot = state.snapshotJson ?? null;
-  if (!snapshot) return { abandonmentsCleared: 0 };
+  if (!snapshot) return { abandonmentsCleared: 0, commentCopiesImported: 0 };
 
   // Safe here because we only ever run on a freshly synced snapshot: both
   // callers return early unless the sync succeeded, and a failed sync leaves
@@ -49,5 +53,6 @@ export async function reconcileAfterSync(): Promise<ReconcileResult> {
     snapshot,
     state.locationId
   );
-  return { abandonmentsCleared };
+  const { copies } = await importPinballMapComments();
+  return { abandonmentsCleared, commentCopiesImported: copies.length };
 }

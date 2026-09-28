@@ -471,12 +471,15 @@ export async function seedPinballMapCatalogEntry(entry: {
   name: string;
   manufacturer?: string | null;
   year?: number | null;
+  /** Pinball Map's Insider Connected eligibility for the title (spec 3.8). */
+  icEligible?: boolean;
 }) {
   const { error } = await supabaseAdmin.from("pinballmap_catalog").insert({
     pinballmap_machine_id: entry.pinballmapMachineId,
     name: entry.name,
     manufacturer: entry.manufacturer ?? null,
     year: entry.year ?? null,
+    ic_eligible: entry.icEligible ?? false,
   });
   if (error) throw error;
 }
@@ -511,7 +514,11 @@ export async function deletePinballMapCatalogEntries(
  */
 export async function linkMachineToPinballMap(
   machineInitials: string,
-  link: { pinballmapMachineId: number; pinballmapLmxId: number }
+  link: {
+    pinballmapMachineId: number;
+    pinballmapLmxId: number;
+    icEnabled?: boolean | null;
+  }
 ) {
   const { error } = await supabaseAdmin
     .from("machines")
@@ -535,6 +542,7 @@ export async function linkMachineToPinballMap(
 export async function addLmxToStoredLineup(entry: {
   pinballmapMachineId: number;
   pinballmapLmxId: number;
+  icEnabled?: boolean | null;
 }) {
   const { data, error } = await supabaseAdmin
     .from("pinballmap_state")
@@ -557,7 +565,7 @@ export async function addLmxToStoredLineup(entry: {
   snapshot.lmxes.push({
     id: entry.pinballmapLmxId,
     machineId: entry.pinballmapMachineId,
-    icEnabled: null,
+    icEnabled: entry.icEnabled ?? null,
     lastUpdatedByUsername: null,
     conditions: [],
   } as never);
@@ -593,6 +601,59 @@ export async function removeLmxFromStoredLineup(lmxIds: number[]) {
     .update({ snapshot_json: snapshot })
     .eq("id", "singleton");
   if (writeError) throw writeError;
+}
+
+/**
+ * Seed one imported Pinball Map comment and its timeline copies (PP-o355.4),
+ * as the importer would leave them: the comment's identity row plus one
+ * `pinballmap` timeline event per machine. Seeded directly rather than through
+ * a sync so the test never touches the shared stored lineup and never reaches
+ * pinballmap.com (CORE-PBM-001 / CORE-TEST-006). The importer itself is covered
+ * by `src/test/integration/pinballmap-comment-import.test.ts`.
+ */
+export async function seedImportedPinballMapComment(entry: {
+  conditionId: number;
+  comment: string;
+  username: string;
+  machineIds: string[];
+}) {
+  const commentedAt = new Date().toISOString();
+  const { error } = await supabaseAdmin.from("pinballmap_comments").insert({
+    condition_id: entry.conditionId,
+    location_id: 26454,
+    pinballmap_machine_id: 900_000_000,
+    lmx_id: 900_000_000,
+    comment: entry.comment,
+    username: entry.username,
+    commented_at: commentedAt,
+  });
+  if (error) throw error;
+
+  const { error: copyError } = await supabaseAdmin
+    .from("timeline_events")
+    .insert(
+      entry.machineIds.map((machineId) => ({
+        machine_id: machineId,
+        created_at: commentedAt,
+        source_type: "pinballmap",
+        tag: "pinballmap",
+        event_data: {
+          kind: "pinballmap_comment",
+          conditionId: entry.conditionId,
+        },
+      }))
+    );
+  if (copyError) throw copyError;
+}
+
+/** Remove comment identity rows seeded by {@link seedImportedPinballMapComment}. */
+export async function deletePinballMapComments(conditionIds: number[]) {
+  if (conditionIds.length === 0) return;
+  const { error } = await supabaseAdmin
+    .from("pinballmap_comments")
+    .delete()
+    .in("condition_id", conditionIds);
+  if (error) throw error;
 }
 
 /** Store a saved Stern apron card on a machine, as the editor would (PP-esta). */

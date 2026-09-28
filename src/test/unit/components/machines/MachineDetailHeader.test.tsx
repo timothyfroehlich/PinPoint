@@ -55,6 +55,8 @@ function makeMachine(
     apronDescription: null,
     apronTip: null,
     apronTipEnabled: false,
+    apronDesignEnabled: true,
+    apronArtEnabled: true,
     apronSavedAt: null,
     ownerRequirements: null,
     settingsRequests: null,
@@ -64,6 +66,7 @@ function makeMachine(
     pinballmapExcluded: false,
     pinballmapExcludedReason: null,
     pinballmapIntent: "off" as const,
+    pinballmapIcIntent: null,
     opdbId: null,
     ipdbId: null,
     iscoredGameId: null,
@@ -75,6 +78,7 @@ function makeMachine(
     modelTitle: null,
     pinballmapTitle: null,
     manufacturer: null,
+    currentManufacturer: null,
     year: null,
     artwork: null,
     ...overrides,
@@ -100,7 +104,7 @@ describe("MachineDetailHeader", () => {
         machine={makeMachine({
           name: "Godzilla",
           modelTitle: "Godzilla (Premium)",
-          manufacturer: "Stern",
+          currentManufacturer: "Stern",
           year: 2021,
         })}
       />
@@ -119,7 +123,7 @@ describe("MachineDetailHeader", () => {
           pinballmapExcluded: true,
           modelName: "Hyperball",
           modelTitle: "Hyperball",
-          manufacturer: "Williams",
+          currentManufacturer: "Williams",
           year: 1981,
         })}
       />
@@ -139,7 +143,7 @@ describe("MachineDetailHeader", () => {
           initials: "MM",
           name: "Medieval Madness",
           modelTitle: "Medieval Madness",
-          manufacturer: "Williams",
+          currentManufacturer: "Williams",
           year: 1997,
         })}
       />
@@ -158,7 +162,7 @@ describe("MachineDetailHeader", () => {
       <MachineDetailHeader
         machine={makeMachine({
           modelTitle: null,
-          manufacturer: "Stern",
+          currentManufacturer: "Stern",
           year: 2021,
         })}
       />
@@ -172,7 +176,7 @@ describe("MachineDetailHeader", () => {
         machine={makeMachine({
           name: "Attack from Mars",
           modelTitle: null,
-          manufacturer: null,
+          currentManufacturer: null,
           year: null,
         })}
       />

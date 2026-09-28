@@ -1,7 +1,7 @@
 {
   "name": "pinpoint",
   "version": "0.2.0",
-  "packageManager": "pnpm@11.17.0+sha512.cca3cea332ad254bb84145f966d19f4879615210346fc92c79a047f23a0d7b3cca3c3792f0076ba1f1831d277efbcf0a9119b31a9a60eca7fb3d6231f331ef72",
+  "packageManager": "pnpm@12.0.0+sha512.9e2e3dc3911995868dc94b8175c217c27e95408fa03b4a22749778f2b34f773b77cdd3b39ede8171b22fcd53be6a35342e9fac9948a68ef58df6488ce89a7e67",
   "type": "module",
   "engines": {
     "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
@@ -45,7 +45,7 @@
     "supabase:stop": "bash scripts/supabase-stack.sh stop",
     "supabase:status": "bash scripts/supabase-stack.sh status",
     "supabase:use": "bash scripts/supabase-stack.sh use",
-    "db:reset": "npm-run-all db:_restart db:_drop_tables db:migrate test:_generate-schema db:_seed db:_seed-users db:_seed-collections db:_seed-machine-settings db:_seed-discord db:_seed-timeline-backfill db:_seed-timeline-demo db:_seed-pinballmap-catalog db:_seed-pinballmap-state db:_seed-iscored-demo",
+    "db:reset": "npm-run-all db:_restart db:_drop_tables db:migrate test:_generate-schema db:_seed db:_seed-users db:_seed-collections db:_seed-machine-settings db:_seed-discord db:_seed-timeline-backfill db:_seed-timeline-demo db:_seed-pinballmap-catalog db:_seed-opdb db:_seed-pinballmap-state db:_seed-iscored-demo",
     "db:studio": "drizzle-kit studio",
     "db:_restart": "bash scripts/supabase-stack.sh restart",
     "db:_drop_tables": "node --env-file=.env.local scripts/force-db-reset.mjs",
@@ -61,6 +61,7 @@
     "db:_seed-timeline-backfill": "node --env-file=.env.local supabase/seed-timeline-backfill.mjs",
     "db:_seed-timeline-demo": "node --env-file=.env.local supabase/seed-timeline-demo.mjs",
     "db:_seed-pinballmap-catalog": "node --env-file=.env.local supabase/seed-pinballmap-catalog.mjs",
+    "db:_seed-opdb": "node --env-file=.env.local supabase/seed-opdb.mjs",
     "db:_seed-pinballmap-state": "tsx --env-file=.env.local supabase/seed-pinballmap-state.ts",
     "db:fast-reset": "node --env-file=.env.local scripts/db-fast-reset.mjs > /dev/null",
     "db:reset-to-empty": "node --env-file=.env.local scripts/reset-to-empty.mjs",
@@ -87,6 +88,8 @@
     "db:seed:from-prod": "bash scripts/seed-from-backup.sh",
     "discord:rollout-notice": "node --conditions=react-server --env-file=.env.local --import tsx scripts/discord-notification-rollout.ts",
     "chores:backups": "node scripts/check-prod-backups.mjs",
+    "chores:readonly-role": "node scripts/check-readonly-role.mjs",
+    "clean:next": "rm -rf .next",
     "migrate:production": "tsx scripts/migrate-production.ts",
     "vercel-build": "pnpm run migrate:production && next build",
     "prepare": "husky"
@@ -210,7 +213,7 @@
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,mjs,cjs}": [
-      "oxlint --fix --fix-suggestions",
+      "oxlint --fix --fix-suggestions --no-error-on-unmatched-pattern",
       "prettier --write"
     ],
     "*.{json,css,md}": [

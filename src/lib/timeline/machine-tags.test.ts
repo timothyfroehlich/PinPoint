@@ -14,6 +14,7 @@ describe("machine-tags", () => {
       "lifecycle",
       "issue",
       "settings",
+      "pinballmap",
       "maintenance",
       "adjustment",
       "parts",
@@ -32,8 +33,13 @@ describe("machine-tags", () => {
     expect([...DEFAULT_TIMELINE_TAGS]).not.toContain("settings");
   });
 
-  it("marks lifecycle, issue, and settings as reserved", () => {
-    expect([...RESERVED_TAGS]).toEqual(["lifecycle", "issue", "settings"]);
+  it("marks lifecycle, issue, settings, and pinballmap as reserved", () => {
+    expect([...RESERVED_TAGS]).toEqual([
+      "lifecycle",
+      "issue",
+      "settings",
+      "pinballmap",
+    ]);
   });
 
   it("tagSchema accepts any built-in tag", () => {
@@ -52,6 +58,7 @@ describe("machine-tags", () => {
     expect(() => userTagSchema.parse("lifecycle")).toThrow();
     expect(() => userTagSchema.parse("issue")).toThrow();
     expect(() => userTagSchema.parse("settings")).toThrow();
+    expect(() => userTagSchema.parse("pinballmap")).toThrow();
     expect(userTagSchema.parse("maintenance")).toBe("maintenance");
     expect(userTagSchema.parse("adjustment")).toBe("adjustment");
     expect(userTagSchema.parse("parts")).toBe("parts");

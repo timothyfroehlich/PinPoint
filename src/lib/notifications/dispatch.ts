@@ -70,6 +70,7 @@ const DISCORD_EVENT_PRIORITY: Record<NotificationType, number> = {
   new_comment: 1,
   new_issue: 1,
   machine_ownership_changed: 1,
+  pinballmap_comment: 1,
 };
 
 const RECIPIENT_REASON_PRIORITY: Record<RecipientReason, number> = {
@@ -98,6 +99,8 @@ function directRecipientReason(event: NotificationEvent): RecipientReason {
     case "new_comment":
     case "issue_status_changed":
       return "issue_watcher";
+    case "pinballmap_comment":
+      return "machine_watcher";
   }
 }
 
@@ -124,7 +127,9 @@ async function planNotificationCandidate(
   const formattedIssueId =
     event.resourceType === "issue" ? event.formattedIssueId : undefined;
   const commentContent =
-    event.type === "new_comment" || event.type === "mentioned"
+    event.type === "new_comment" ||
+    event.type === "mentioned" ||
+    event.type === "pinballmap_comment"
       ? event.commentContent
       : undefined;
   const issueDescription =
@@ -218,6 +223,22 @@ async function planNotificationCandidate(
           .onConflictDoNothing();
       }
     }
+  } else if (type === "pinballmap_comment") {
+    // Owner and watchers of the one covering machine this copy landed on
+    // (pinballmap spec 7.4, 7.7). The importer raises one event per copy, so
+    // someone watching several covering machines hears about each.
+    const machine = await tx.query.machines.findFirst({
+      where: eq(machines.id, resourceId),
+      columns: { ownerId: true, name: true, initials: true },
+    });
+    resolvedMachineName = resolvedMachineName ?? machine?.name;
+    resolvedMachineInitials = resolvedMachineInitials ?? machine?.initials;
+    addRecipients("machine_owner", machine?.ownerId);
+    const watchersList = await tx.query.machineWatchers.findMany({
+      where: eq(machineWatchers.machineId, resourceId),
+      columns: { userId: true },
+    });
+    addRecipients("machine_watcher", ...watchersList.map((w) => w.userId));
   } else if (
     resourceType === "issue" &&
     type !== "issue_assigned" &&
@@ -355,6 +376,9 @@ async function planNotificationCandidate(
         ...(event.type === "new_issue" ? { frequency: event.frequency } : {}),
         ...(event.type === "machine_ownership_changed"
           ? { ownershipChange: event.ownershipChange }
+          : {}),
+        ...(event.type === "pinballmap_comment"
+          ? { pinballmapLocationId: event.pinballmapLocationId }
           : {}),
         actorName:
           event.actorName ?? (actorId ? nameMap.get(actorId) : undefined),
@@ -547,6 +571,9 @@ function buildDefaultPrefs(userId: string): NotificationPreferences {
     discordNotifyOnMentioned: true,
     discordNotifyOnNewIssue: true,
     discordWatchNewIssuesGlobal: false,
+    emailNotifyOnPinballMapComment: true,
+    inAppNotifyOnPinballMapComment: true,
+    discordNotifyOnPinballMapComment: true,
     discordDmBlockedAt: null,
     discordOnboardedAt: null,
     discordNoticeVersion: 0,

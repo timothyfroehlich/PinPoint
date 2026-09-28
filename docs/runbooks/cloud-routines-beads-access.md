@@ -104,7 +104,9 @@ first and failed. The `ls -d … | head -1` form finds the checkout regardless o
 whether `$HOME` is `/root` or the sandbox user's home, and regardless of the
 sandbox username. It fails loud (setup errors) if none of the candidates exist.
 
-That script installs `dolt` (pinned) and `bd` (pinned); the agent then runs
+That script installs `dolt` (pinned), `bd` (pinned) and the GitHub CLI `gh`
+(pinned by the `gh` version and `ghSha256` digest in the same manifest, because
+the cloud image does not ship it and the workflow scripts need it); the agent then runs
 `scripts/beads-cloud-init.sh` (below) to materialize the credential and clone.
 
 **The compatibility contract pins both `bd` and `dolt`.** The 2026-08-16
@@ -188,18 +190,19 @@ only (not authentication — the JWK handles that); override with `DOLT_USER_NAM
 After the clone (or re-sync pull), the script creates five tables the remote
 never carries: `events`, `bd_events_journal`, `bd_events_seq`, `leases`, and
 `wisps` are in bd's `dolt_ignore`, existing only in each machine's working set —
-and bd 1.2.2 does not lazily create them in an embedded clone, so without this
-step a routine's first write dies with `Error 1146: table not found: events`
-(incident 2026-08-17, PP-esqi). The schemas live in
-`scripts/beads-cloud-repair-tables.sql`; `dolt_ignore` keeps the created tables
-out of `bd dolt push`, so the repair cannot leak them into the shared remote.
-The SQL is a snapshot of the pinned bd version's schema — refresh it if a pin
-bump changes those tables.
+and bd 1.2.2 did not lazily create them in an embedded clone, so without this
+step a routine's first write died with `Error 1146: table not found: events`
+(incident 2026-08-17, PP-esqi). bd 1.3.0 creates all five during
+`bd init --remote`, so on the current pin the step is a no-op guard. The
+schemas live in `scripts/beads-cloud-repair-tables.sql`; `dolt_ignore` keeps
+the created tables out of `bd dolt push`, so the repair cannot leak them into
+the shared remote. The SQL is a snapshot of the pinned bd version's schema —
+refresh it if a pin bump changes those tables.
 
 Why a script and not inline preamble prose: a prompt instruction ("stop if `bd`
-isn't 1.2.2") is the weakest enforcement — a model can reason past it. A script
-that exits non-zero cannot. Keeping the logic in git also makes it reviewable,
-unlike the setup script in the claude.ai UI.
+isn't the pinned version") is the weakest enforcement — a model can reason past
+it. A script that exits non-zero cannot. Keeping the logic in git also makes it
+reviewable, unlike the setup script in the claude.ai UI.
 
 **Every beads-writing routine prompt must use this one-liner, not a hand-rolled
 copy of its steps.** The prompts live in the claude.ai UI, so they do not move
@@ -220,8 +223,8 @@ reclaimed, and every step after it (bead notes, `nightly-report`, `bd dolt
 push`) is lost. Three nightly runs went this way in September 2026: one on
 `git reset --hard` (2026-09-04), two on `bash -n scripts/workflow/merge-pr.sh`
 (2026-09-11, 2026-09-12 — a syntax check the old merge-guard hook read as
-running the script, PP-mslx; the `Bash(*merge-pr.sh *)` ask rule does not match
-it). The nightly prompt now carries the `ask`/`deny` list from
+running the script, PP-mslx; the merge-pr.sh ask rules match only a
+command that runs the script with arguments, so they do not match it). The nightly prompt now carries the `ask`/`deny` list from
 `.claude/settings.json` as a do-not-run list, and keeps `scripts/workflow/`, `.claude/hooks/`
 and the settings files out of its work scope. Keep that list in step with the
 settings file when adding an `ask` rule.

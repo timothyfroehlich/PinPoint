@@ -355,7 +355,6 @@ CI_CRITICAL_FILES = [
     ".github/workflows/ci.yml",
     ".github/actions/setup-mise/action.yml",
     ".github/actions/setup-supabase/action.yml",
-    ".github/actions/reserve-supabase-ports/action.yml",
 ]
 
 

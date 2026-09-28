@@ -35,6 +35,8 @@ export const inAppChannel: NotificationChannel = {
         return true;
       case "mentioned":
         return prefs.inAppNotifyOnMentioned;
+      case "pinballmap_comment":
+        return prefs.inAppNotifyOnPinballMapComment;
     }
   },
 };

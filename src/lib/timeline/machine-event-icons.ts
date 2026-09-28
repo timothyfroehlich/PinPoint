@@ -71,6 +71,9 @@ export const MACHINE_EVENT_ICONS: Record<
   // it already says which happened.
   pinballmap_intent: { Icon: MapPin, colorClass: "text-muted-foreground" },
   pinballmap_listing: { Icon: MapPin, colorClass: "text-muted-foreground" },
+  // Rendered by MachineTimelinePinballMapCommentRow, which draws the same pin
+  // in its avatar slot; listed here so the Record stays exhaustive.
+  pinballmap_comment: { Icon: MapPin, colorClass: "text-muted-foreground" },
 
   // Issue events
   issue_opened: { Icon: CircleDot, colorClass: "text-secondary" },

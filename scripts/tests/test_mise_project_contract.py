@@ -45,7 +45,7 @@ MINIMUM_MISE_VERSION = (2026, 8, 11)
 MISE_MANAGED_TOOLS = ("node", "python", "ruff", "supabase", "zizmor")
 EXPECTED_TOOL_BACKENDS = {
     "node": "core:node",
-    "pnpm": "npm:pnpm",
+    "pnpm": "aqua:pnpm/pnpm",
     "python": "core:python",
     "ruff": "aqua:astral-sh/ruff",
     "supabase": "aqua:supabase/cli",

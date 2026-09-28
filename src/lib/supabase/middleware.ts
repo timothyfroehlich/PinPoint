@@ -120,6 +120,10 @@ export async function updateSession(
     path.startsWith("/machines/") ||
     path.startsWith("/issues") ||
     isPublicCollectionView ||
+    // Tags are always public (spec collections-and-tags 7.1), whatever the
+    // collection rules above become.
+    path === "/c/tags" ||
+    path.startsWith("/c/tags/") ||
     path.startsWith("/login") ||
     path.startsWith("/signup") ||
     path.startsWith("/forgot-password") ||

@@ -2,12 +2,12 @@
 name: pinpoint-chores
 description: >-
   Runbook for the weekly PinPoint "chores" session — the human-in-the-loop
-  maintenance pass, ten checklist items: the Supabase CLI and pnpm version pins
+  maintenance pass, nine checklist items: the Supabase CLI and pnpm version pins
   (each with its own cooldown and its own set of sites to update), TS-7 rollout,
   Dependabot PRs, changelog, Sentry and Supabase advisors, cloud-routine review
-  beads, PinballMap vendored-docs drift, GHA infra-flake triage, prod backup
-  validation (`pnpm run chores:backups`), and the memory-and-context review it
-  hands to `pinpoint-memory-review`. Use when Tim says "let's do chores", when the
+  beads, PinballMap vendored-docs drift, GHA infra-flake triage, and prod backup
+  + read-only-role validation (`pnpm run chores:backups`, `pnpm run
+  chores:readonly-role`). Use when Tim says "let's do chores", when the
   SessionStart chores-nag fires ("🧹 Weekly chores are N days overdue"), or when
   you want the chores checklist. After finishing, re-arm the nag with `bd defer`.
   Session-start project health is `pinpoint-briefing`, not this.
@@ -48,8 +48,8 @@ Then work the checklist. For each item, note findings as a comment on the bead (
 
 ### Checklist
 
-1. **Stale version-pin checks** (mise tools, pnpm, Vercel CLI, bd/Dolt)
-   - **Ownership first.** Hosted Renovate may propose updates only for exact tool pins in root `mise.toml`, with the matching `mise.lock` changes and no automerge. Dependabot remains the sole owner of npm dependencies and GitHub Actions. The pnpm `packageManager` checksum, the Vercel wrapper, and the bd/Dolt compatibility manifest remain manual chores surfaces. Review open bot proposals before doing a duplicate manual bump.
+1. **Stale version-pin checks** (mise tools, pnpm, bd/Dolt, cloud gh)
+   - **Ownership first.** Hosted Renovate may propose updates only for exact tool pins in root `mise.toml`, with the matching `mise.lock` changes and no automerge. Dependabot remains the sole owner of npm dependencies and GitHub Actions. The pnpm `packageManager` checksum and the bd/Dolt/gh pins in the compatibility manifest remain manual chores surfaces. Review open bot proposals before doing a duplicate manual bump.
    - **Supabase CLI pin.** `mise.toml` (`[tools].supabase`, PP-h2ui.6) is the single executable-version authority for local development, Bazzite, CI, and preview orchestration. GitHub workflows consume it through the shared mise action; there are no workflow-local version mirrors to edit. The pin does not own Supabase service images, generated worktree configuration, container lifecycle, or production migration behavior.
      - Renovate applies a 7-day release cooldown. Before accepting a proposal, validate **Bazzite rootless-Podman / SELinux compatibility** and a local stack start — the CLI version triggered the PP-9mg0 breakage, so a bump is a functional change, not a number swap (see `pinpoint-deployment`).
 
@@ -70,8 +70,15 @@ Then work the checklist. For each item, note findings as a comment on the bead (
        ```
 
      - If it's newer than the current pin (mind major bumps — read the pnpm release notes/migration guide first), update `packageManager` in `package.json` with the new version and its sha512 integrity hash (e.g. from `npm view pnpm@<version> dist.integrity` converted to `+sha512.<hex>`), run `mise lock` and then `mise install --locked`, then verify no unexpected `pnpm-lock.yaml` churn (`pnpm install --frozen-lockfile`), `pnpm audit --audit-level=high` still resolves, and `pnpm run check` is green. PR it through the normal workflow; file a bead if a major bump needs real migration work.
-   - **Vercel CLI pin** (PP-h2ui.7). Privileged Vercel CLI invocations use one repository-owned wrapper: `scripts/workflow/preview/vercel-cli.sh`. Compare the pinned `VERCEL_CLI_VERSION` against the latest release on npm (applying a 14/30-day cooldown). Bumping is a single-site edit in `scripts/workflow/preview/vercel-cli.sh`.
    - **bd and Dolt compatibility version pins** (from the 2026-08-16 shared-DB schema incident). PinPoint declares exact versions for `bd` and `dolt` at a **single source**: `scripts/beads-compatibility.json`. Cloud routines install exactly those pins (`scripts/beads-cloud-setup.sh`) and refuse to touch the DB on a mismatch (`scripts/beads-cloud-init.sh`); the Mac's user-global mise declarations in dotfiles are checked against the same file by a dotfiles test. For an upgrade, validate the newer tools against the local embedded database and a `bd dolt push` round-trip, bump the manifest and its archive digests, then update the dotfiles mise pins to match. Exact pins are deliberate: an accidental _newer_ release migrated the shared DB and locked every client out for two days, so a loud refusal is the safe failure.
+   - **Cloud `gh` pin.** `scripts/beads-compatibility.json` also pins the GitHub CLI that `scripts/beads-cloud-setup.sh` installs in cloud sessions (the image ships none; `merge-pr.sh` needs it): `gh` plus `cloudAssets.linux-amd64.ghSha256`. Renovate does not own it, because the hosted app would bump the version without recomputing the digest, CI would pass on the setup tests' fake archives, and every new cloud session would then fail setup on the digest mismatch. Bump to the newest release at least 14 days old, taking the digest from that release's own checksum file:
+
+     ```bash
+     gh release list --repo cli/cli --exclude-pre-releases --limit 10 --json tagName,publishedAt
+     gh release download v<ver> --repo cli/cli --pattern 'gh_<ver>_checksums.txt' --output - | grep linux_amd64.tar.gz
+     ```
+
+     Update `gh` and `ghSha256` together, then run `mise exec -- python3 -m pytest scripts/tests/test_beads_compatibility.py`. `gh` never touches the shared DB, so a skipped week costs nothing.
 
 2. **TypeScript compiler maintenance**
    - TypeScript 7 is installed as `typescript`; its native `tsc` runs the app, test, E2E, and Next build type checks. Read `docs/plans/2026-06-27-typescript-7-upgrade-plan.md` only for the rollout record.
@@ -101,18 +108,16 @@ Then work the checklist. For each item, note findings as a comment on the bead (
    - Run the weekly triage procedure in `docs/runbooks/gha-flake-log.md`: read the recent weekly `gha-flake-week` sighting beads (current ISO week + prior 2) plus the permanent `gha-flake-log` ledger, pull new sightings past the ledger cursor, cluster by signature, rule out non-issues, spin genuine recurring infra issues into child beads, catch regressions against `fixed` rows, close aged-out weekly beads, then rewrite the ledger and advance the cursor.
    - This is context-heavy — a good candidate to delegate to a subagent (see "Running the chores").
 
-9. **Prod backup validation**
-   - Run `pnpm run chores:backups`. It calls `supabase backups list` against PinPoint-Prod and asserts the daily physical backups are still happening: newest COMPLETED backup < 48h old, at least 7 retained, `walg_enabled` true. It warns on a 24–48h-old newest backup, any non-`COMPLETED` entry, and a >36h gap inside the window; it reports `pitr_enabled` so a posture change is visible.
-   - **What this proves and doesn't.** It attests that backups **exist** and are being **retained**. It does **not** prove they restore — a real restore drill means restoring a physical backup into a throwaway project, which isn't a weekly-cadence activity. Don't let a green run read as "DR is verified."
-   - On **FAIL**: check the Supabase dashboard and `status.supabase.com` before assuming the script is wrong, then file a **P1** bead. This is the only signal we have that the DR posture in `AGENTS.md` §7 is still true.
-   - On **WARN**: note it as a comment on the chores bead; a single skipped day isn't an incident, a pattern across weeks is.
-   - Requires the Supabase CLI to be logged in (`supabase login`) — auth comes from its stored token, not an env var. `pnpm run db:backup` is unrelated: that's a data-only `public`-schema dev-seeding dump with no schema and no `auth.users`, not a DR artifact.
-
-10. **Memory & context review** (PP-uoqg)
-    - Load the `pinpoint-memory-review` skill and run a pass. It reviews every store of recorded context across both machines — beads memories, Claude auto-memories on the Mac and Bazzite, and the canonical context files — then proposes prunes, promotions, and dedupes and hands Tim a short veto list.
-    - **This is also the sync mechanism.** Claude auto-memory is per-machine and syncs nowhere, so skipping this item is what lets the two machines drift apart. It is the reason Bazzite once knew a tmux fix for twelve days while the Mac rediscovered it from scratch.
-    - The most context-heavy item on the list — **delegate the verification fan-out to subagents** per that skill and keep only the synthesis inline.
-    - The veto list is presented **in-session**, one line per item. Tim drills into whichever ones he wants; don't hand him a document.
+9. **Prod backup + read-only-role validation**
+   - **Backups.** Run `pnpm run chores:backups`. It calls `supabase backups list` against PinPoint-Prod and asserts the daily physical backups are still happening: newest COMPLETED backup < 48h old, at least 7 retained, `walg_enabled` true. It warns on a 24–48h-old newest backup, any non-`COMPLETED` entry, and a >36h gap inside the window; it reports `pitr_enabled` so a posture change is visible.
+     - **What this proves and doesn't.** It attests that backups **exist** and are being **retained**. It does **not** prove they restore — a real restore drill means restoring a physical backup into a throwaway project, which isn't a weekly-cadence activity. Don't let a green run read as "DR is verified."
+     - On **FAIL**: check the Supabase dashboard and `status.supabase.com` before assuming the script is wrong, then file a **P1** bead. This is the only signal we have that the DR posture in `AGENTS.md` §7 is still true.
+     - On **WARN**: note it as a comment on the chores bead; a single skipped day isn't an incident, a pattern across weeks is.
+     - Requires the Supabase CLI to be logged in (`supabase login`) — auth comes from its stored token, not an env var. `pnpm run db:backup` is unrelated: that's a data-only `public`-schema dev-seeding dump with no schema and no `auth.users`, not a DR artifact.
+   - **Read-only role drift** (PP-avnq). Run `pnpm run chores:readonly-role`. `pinpoint_readonly` auto-inherits SELECT on every new `public` table (by design, so the role backing `POSTGRES_URL_READONLY` doesn't go stale mid-investigation), which means a migration adding a token/secret/hash column silently re-exposes it. This runs `scripts/sql/verify-readonly-role.sql` — a read-only catalog check, no writes possible either against prod or by this script — against prod's `pinpoint_readonly` connection (needs `POSTGRES_URL_READONLY` set to prod's value; see `docs/ENV_VARS.md`).
+     - **Pass** looks like `PASS — pinpoint_readonly's privileges still match scripts/sql/readonly-role.sql.` The script distinguishes two different `FAIL`s — read which one you got before acting:
+       - **Real drift**: `FAIL — pinpoint_readonly has drifted from what readonly-role.sql intends`, with psql's warnings above it naming which check(s) tripped (e.g. a credential-shaped column the role can now read, or direct `auth` schema access). File a bead — **P1** if a credential-shaped column (token/secret/password/hmac) is now readable, **P2** for other drift (e.g. a lost default-privilege grant) — then revoke the specific column grant the same way `scripts/sql/readonly-role.sql` already does for `collections.view_token` (`REVOKE SELECT (<column>) ON public.<table> FROM pinpoint_readonly;`, run with the admin/service connection), and re-run the check.
+       - **Incomplete verification**: `FAIL — could not complete the verification`, with a psql/connection error above it (expired credential, network blip, timeout). This is NOT a finding — don't file a bead or revoke anything on it. Fix the connection issue and re-run.
 
 ## Finish: re-arm the nag
 

@@ -22,6 +22,8 @@ export interface ResourceUrlInput {
   /** `[INITIALS]-[NUMBER]`, e.g. `RUSH-01`. */
   formattedIssueId?: string | undefined;
   machineInitials?: string | undefined;
+  /** Link to a machine tab rather than the machine's overview. */
+  machineTab?: "timeline" | undefined;
 }
 
 /**
@@ -35,9 +37,11 @@ export function buildResourceUrl(input: ResourceUrlInput): string {
   const { siteUrl, resourceType, formattedIssueId, machineInitials } = input;
 
   if (resourceType === "machine") {
-    return machineInitials && INITIALS_PATTERN.test(machineInitials)
-      ? `${siteUrl}/m/${encodeURIComponent(machineInitials)}`
-      : `${siteUrl}/m`;
+    if (!machineInitials || !INITIALS_PATTERN.test(machineInitials)) {
+      return `${siteUrl}/m`;
+    }
+    const tab = input.machineTab ? `/${input.machineTab}` : "";
+    return `${siteUrl}/m/${encodeURIComponent(machineInitials)}${tab}`;
   }
 
   const parsed = parseFormattedIssueId(formattedIssueId);

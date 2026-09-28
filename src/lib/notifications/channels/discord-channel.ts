@@ -49,6 +49,8 @@ export function createDiscordChannel(config: DiscordConfig): DeliveryChannel {
           return true;
         case "mentioned":
           return prefs.discordNotifyOnMentioned;
+        case "pinballmap_comment":
+          return prefs.discordNotifyOnPinballMapComment;
       }
     },
     async deliver(ctx: ChannelContext): Promise<DeliveryResult> {
@@ -103,6 +105,18 @@ export function createDiscordChannel(config: DiscordConfig): DeliveryChannel {
               machineName: ctx.machineName,
               machineInitials: ctx.machineInitials,
               ownershipChange: ctx.ownershipChange ?? "added",
+            });
+          case "pinballmap_comment":
+            return formatDiscordMessage({
+              type: "pinballmap_comment",
+              siteUrl,
+              resourceType: "machine",
+              machineName: ctx.machineName,
+              machineInitials: ctx.machineInitials,
+              commenterName: ctx.actorName,
+              commentContent: ctx.commentContent,
+              pinballmapLocationId: ctx.pinballmapLocationId,
+              recipientReason: ctx.recipientReason,
             });
         }
       })();

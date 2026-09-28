@@ -2,7 +2,7 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import { useCallback, useRef, useEffect } from "react";
-import type { IssueFilters } from "~/lib/issues/filters";
+import { ISSUE_WIDGET_PARAMS, type IssueFilters } from "~/lib/issues/filters";
 import type { MachineFilters } from "~/lib/machines/filters";
 import { storeLastIssuesPath } from "~/lib/cookies/client";
 
@@ -145,6 +145,12 @@ export function useSearchFilters<T extends GenericFilters>(
         params.set("updated_from", merged.updatedFrom.toISOString());
       if ("updatedTo" in merged && merged.updatedTo instanceof Date)
         params.set("updated_to", merged.updatedTo.toISOString());
+
+      // Summary Widget populations: All is the default and is omitted.
+      for (const [key, param] of Object.entries(ISSUE_WIDGET_PARAMS)) {
+        if (key in merged && merged[key as keyof typeof merged] === "filtered")
+          params.set(param, "filtered");
+      }
 
       // 3. Sorting (common field, different defaults)
       if (merged.sort) {
