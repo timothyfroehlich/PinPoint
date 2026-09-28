@@ -19,8 +19,10 @@ registry.
   decision; don't relitigate it). The convenience sets `OPEN_STATUSES`
   (new + in_progress = all 6 non-closed), `NEW_STATUSES`, `IN_PROGRESS_STATUSES`,
   `CLOSED_STATUSES` are derived from the same source.
-- **Default issue view = `OPEN_STATUSES`.** When no status filter is set,
-  `IssueFilters` renders two default chips, "Open" and "In Progress".
+- **Default issue view = `OPEN_STATUSES`.** With no `status` URL param, the
+  query returns open issues and the Status dropdown shows `OPEN_STATUSES`
+  preselected, but `getBadges()` renders **no** status chips — status chips
+  appear only once a `status` param is set.
 - **Machine statuses are a separate system.** `MachineFilters` filters on
   computed machine status (`src/lib/machines/status.ts` — machines have no
   status column) plus presence (`src/lib/machines/presence.ts`), with labels
@@ -72,9 +74,14 @@ Two current-user quick-selects exist. Their exact label strings ("Me",
   viewport detection (`useMediaQuery` / `matchMedia`) — the design-bible §4
   responsive rule (which sanctions only a couple of narrow exceptions elsewhere
   in the app), and exactly why a re-styling-only `MobileFilterBar` was rejected.
-- **Chips wrap and keep an always-visible ✕.** Touch has no hover, and narrow
-  viewports can't spill the chip row off-screen — so removal affordances are
-  always shown, not hover-revealed.
+- **Removal ✕ is always visible on every chip.** Touch has no hover, so
+  removal affordances are never hover-revealed.
+- **Chip layout differs per surface today.** `IssueFilters` renders chips on
+  their own `flex-wrap` row below the search input at every viewport (it moved
+  there after chips overlaid on the input spilled off-screen on narrow
+  viewports). `MachineFilters` still overlays chips inside the search pill:
+  hidden below `sm`, and a `whitespace-nowrap` horizontal-scroll row above it.
+  Reconciling the two belongs to PP-zpje (§ Current state).
 
 ## Current state (unification)
 
