@@ -600,6 +600,15 @@ describe("updateMachineAction intent carry-over (PGlite)", () => {
     fd.set("modelName", "Bordertown");
     fd.set("manufacturer", "homebrew");
     fd.set("year", "2019");
+    // The rest of the manual model (PP-wqit.14): credits post one entry per
+    // name, in order; a blank entry is dropped, a comma never splits a name.
+    fd.set("type", "em");
+    fd.set("display", "reels");
+    fd.set("playerCount", "4");
+    fd.append("designers", "Lawlor, Pat");
+    fd.append("designers", " Steve Ritchie ");
+    fd.append("designers", "");
+    fd.append("artists", "John Youssi");
     expectOk(await updateMachineAction(undefined, fd));
 
     const row = await db.query.machines.findFirst({
@@ -609,6 +618,61 @@ describe("updateMachineAction intent carry-over (PGlite)", () => {
     expect(row?.modelName).toBe("Bordertown");
     expect(row?.manufacturer).toBe("homebrew");
     expect(row?.year).toBe(2019);
+    expect(row?.type).toBe("em");
+    expect(row?.display).toBe("reels");
+    expect(row?.playerCount).toBe(4);
+    expect(row?.designers).toEqual(["Lawlor, Pat", "Steve Ritchie"]);
+    expect(row?.artists).toEqual(["John Youssi"]);
+  });
+
+  it("stores an emptied credit list as null", async () => {
+    const db = await getTestDb();
+    const { updateMachineAction } = await import("~/app/(app)/m/actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    const machine = await seedMachine({
+      initials: "BT",
+      pinballmapMachineId: null,
+    });
+
+    const first = editFormData(machine.id, null);
+    first.set("pinballmapExcluded", "on");
+    first.append("designers", "Steve Kordek");
+    first.set("playerCount", "2");
+    expectOk(await updateMachineAction(undefined, first));
+
+    // The form always posts the whole manual model; no entries and a blank
+    // player count mean a person removed them.
+    const second = editFormData(machine.id, null);
+    second.set("pinballmapExcluded", "on");
+    second.set("playerCount", "");
+    expectOk(await updateMachineAction(undefined, second));
+
+    const row = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    expect(row?.designers).toBeNull();
+    expect(row?.playerCount).toBeNull();
+  });
+
+  it("rejects a hand-entered model on a machine that is not uncataloged", async () => {
+    // The backstop under the resolver: `machines_manual_model_requires_excluded`.
+    const db = await getTestDb();
+    const machine = await seedMachine({
+      initials: "BT",
+      pinballmapMachineId: null,
+    });
+    for (const set of [
+      { type: "em" as const },
+      { display: "dmd" as const },
+      { playerCount: 4 },
+      { designers: ["Pat Lawlor"] },
+      { artists: ["John Youssi"] },
+    ]) {
+      await expect(
+        db.update(machines).set(set).where(eq(machines.id, machine.id))
+      ).rejects.toThrow();
+    }
   });
 
   it("drops the hand-entered model when a catalog title is chosen later", async () => {
@@ -628,6 +692,11 @@ describe("updateMachineAction intent carry-over (PGlite)", () => {
     const first = editFormData(machine.id, null);
     first.set("pinballmapExcluded", "on");
     first.set("modelName", "Bordertown");
+    first.set("type", "ss");
+    first.set("display", "dmd");
+    first.set("playerCount", "4");
+    first.append("designers", "Pat Lawlor");
+    first.append("artists", "John Youssi");
     expectOk(await updateMachineAction(undefined, first));
 
     expectOk(
@@ -640,5 +709,12 @@ describe("updateMachineAction intent carry-over (PGlite)", () => {
     expect(row?.pinballmapExcluded).toBe(false);
     expect(row?.modelName).toBeNull();
     expect(row?.manufacturer).toBe("Stern");
+    expect(row).toMatchObject({
+      type: null,
+      display: null,
+      playerCount: null,
+      designers: null,
+      artists: null,
+    });
   });
 });

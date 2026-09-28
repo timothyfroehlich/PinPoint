@@ -216,7 +216,7 @@ export default async function MachineInfoTab({
       ? getTopScoresForMachine(machine.iscoredGameId, 3)
       : Promise.resolve([]),
     getTagsForMachine(db, machine.id),
-    getMachineCredits(machine.pinballmapTitle?.opdbId ?? null),
+    getMachineCredits(machine),
   ]);
 
   const rail = (

@@ -44,6 +44,7 @@ import {
   getMachinePresenceLabel,
   type MachinePresenceStatus,
 } from "~/lib/machines/presence";
+import type { OpdbDisplayType, OpdbMachineType } from "~/lib/opdb/types";
 
 export interface MachineDetailsFormProps {
   machineId: string;
@@ -59,6 +60,11 @@ export interface MachineDetailsFormProps {
   modelName: string | null;
   manufacturer: string | null;
   year: number | null;
+  type: OpdbMachineType | null;
+  display: OpdbDisplayType | null;
+  playerCount: number | null;
+  designers: string[] | null;
+  artists: string[] | null;
   /** Linked iScored game ID string, or null if unlinked. */
   iscoredGameId: string | null;
 }
@@ -90,6 +96,11 @@ export function MachineDetailsForm({
   modelName,
   manufacturer,
   year,
+  type,
+  display,
+  playerCount,
+  designers,
+  artists,
   iscoredGameId,
 }: MachineDetailsFormProps): React.JSX.Element {
   const [state, formAction, isPending] = useActionState<
@@ -405,6 +416,11 @@ export function MachineDetailsForm({
             defaultModelName={modelName}
             defaultManufacturer={manufacturer}
             defaultYear={year}
+            defaultType={type}
+            defaultDisplay={display}
+            defaultPlayerCount={playerCount}
+            defaultDesigners={designers}
+            defaultArtists={artists}
             // The Model name's placeholder — the live input, not the stored
             // prop, so a rename in the same unsaved edit previews the name a
             // blank model will actually resolve to.

@@ -66,10 +66,7 @@ export default async function ApronCardPrintPage({
     <ApronCardPrintSheet
       machineName={machine.name}
       machineInitials={machine.initials}
-      content={apronCardContent(
-        machine,
-        await getMachineCredits(machine.pinballmapTitle?.opdbId ?? null)
-      )}
+      content={apronCardContent(machine, await getMachineCredits(machine))}
       size={machine.apronSize}
       scanUrl={buildMachineHubUrl(
         resolveRequestUrl(await headers()),
