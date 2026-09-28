@@ -93,7 +93,7 @@
 - **7.1** _Moved 2026-09-25._ Saved views are specified in §8. Number kept so older citations don't dangle.
 - **7.2** _Moved 2026-09-26._ Summary Widgets are specified in `docs/feature-specs/widgets.md` and `docs/feature-specs/machine-widgets.md`. Number kept so older citations don't dangle.
 - **7.3** The Integrations page, its Summary Widgets, Pinball Map and iScored fields, integration presets, and integration remediation are deferred.
-- **7.4** Unmatched Pinball Map entries and other external-only records are deferred.
+- **7.4** Unmatched Pinball Map entries appear on the Pinball Map lineup page (`docs/feature-specs/pinballmap-lineup.md`), not as Machine View rows. Other external-only records are deferred.
 - **7.5** Machine and issue inspection drawers are deferred.
 - **7.6** Sharing Saved View records with other accounts is deferred; copied URLs are the sharing mechanism.
 
@@ -142,6 +142,7 @@ _None currently recorded._
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-27 | §7.4: unmatched Pinball Map entries now appear on the Pinball Map lineup page rather than being deferred. |
 | 2026-09-26 | Added the Open Issue Severity filter (§3.11) and Widget Population URL state (§4.1, §4.2, §4.4, §4.9); Saved Views store Widget Populations (§8.2); moved widgets to their own specs (§7.2); deferred Integrations widgets (§7.3). |
 | 2026-09-26 | Added Built-in Views (§9): named, shared configurations per Surface that can be an account's default; anonymous visitors can apply them (§8.1, §8.9, §8.10, §8.13, §4.11). Renamed Default Saved View to Default View (§1, §8.11, §8.12, §8.14). |
 | 2026-09-25 | Added Surfaces, Saved Views, and Default Saved Views (§8); URLs are canonical relative to the Page Preset (§4.10) and carry a `view` parameter naming their Saved View or the Page Preset (§4.1, §4.11); retired §7.1; deferred Saved View record sharing (§7.6). |
