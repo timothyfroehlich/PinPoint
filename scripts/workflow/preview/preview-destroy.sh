@@ -48,12 +48,13 @@ fi
 echo "::endgroup::"
 
 # --- Remove git-branch-scoped Vercel preview env vars -----------------------
-# PENDING LIVE VERIFICATION (same caveat as preview-create.sh). Best-effort:
-# missing vars are not an error. `vercel env rm NAME preview <git-branch> --yes`.
-
-# Invoked via the pinned wrapper (vercel-cli.sh) through npx so no global install is needed.
+# Best-effort: missing vars are not an error, and an API failure warns rather
+# than failing the teardown (the reaper loops over many branches). REST via
+# vercel-env.sh: list the branch's preview vars once, then delete by id, with
+# no Vercel CLI and no token or value in argv (PP-fmli).
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VERCEL="${HERE}/vercel-cli.sh"
+# shellcheck source=scripts/workflow/preview/vercel-env.sh
+source "${HERE}/vercel-env.sh"
 
 remove_vercel_env() {
   echo "::group::Remove Vercel env vars for branch '${GIT_BRANCH}'"
@@ -62,23 +63,15 @@ remove_vercel_env() {
     echo "::endgroup::"
     return 0
   fi
-  export VERCEL_ORG_ID VERCEL_PROJECT_ID
 
-  local name
-  for name in \
+  vercel_env_rm \
     NEXT_PUBLIC_SUPABASE_URL \
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY \
     NEXT_PUBLIC_SUPABASE_ANON_KEY \
     POSTGRES_URL \
     SUPABASE_URL \
-    SUPABASE_SERVICE_ROLE_KEY; do
-    if $VERCEL env rm "$name" preview "$GIT_BRANCH" --yes --token="$VERCEL_TOKEN" \
-      >/dev/null 2>&1; then
-      echo "  removed ${name}"
-    else
-      echo "  ${name} not present (skipped)"
-    fi
-  done
+    SUPABASE_SERVICE_ROLE_KEY \
+    || echo "::warning::Vercel env cleanup for branch '${GIT_BRANCH}' was incomplete"
   echo "::endgroup::"
 }
 

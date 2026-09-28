@@ -7,6 +7,18 @@
 # Minimum mise version: 2026.8.11 (verifies packageManager sha512 checksums).
 min_version = "2026.8.11"
 
+# pnpm 12 ships as a native binary; the npm registry package for it is just a
+# postinstall stub that fetches the real binary, and mise's npm: backend does
+# not run npm lifecycle scripts. aqua:pnpm/pnpm downloads the prebuilt binary
+# directly. CI's mise-action invokes `mise install --locked node pnpm`, naming
+# pnpm as an explicit CLI argument — that resolves through mise's registry
+# default backend for the bare name and skips whatever backend mise.lock has
+# recorded for the idiomatically-detected tool (PP-fmnm). This alias pins the
+# backend so both the explicit-argument and project-aware resolution paths
+# agree; the version still comes from packageManager, never duplicated here.
+[tool_alias]
+pnpm = "aqua:pnpm/pnpm"
+
 [tools]
 node = "24.20.0"
 python = "3.14.7"

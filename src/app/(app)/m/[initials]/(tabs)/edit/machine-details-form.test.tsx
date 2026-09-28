@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { renderToString } from "react-dom/server";
 import { afterEach, describe, it, expect, vi, beforeEach } from "vitest";
 import {
   act,
@@ -663,6 +664,30 @@ describe("MachineDetailsForm", () => {
       expect(screen.getByTestId("iscored-machine-name")).toHaveTextContent(
         "New Live Name"
       );
+    });
+  });
+
+  describe("hydration and pre-hydration submit safety (PP-aeei)", () => {
+    it("renders form with method='post' to prevent native GET submit", () => {
+      renderForm();
+      const form = screen.getByTestId("machine-details-form");
+      expect(form).toHaveAttribute("method", "post");
+    });
+
+    it("disables save button during SSR / before hydration", () => {
+      const html = renderToString(
+        <DetailsDirtyProvider>
+          <MachineDetailsForm {...baseProps} />
+        </DetailsDirtyProvider>
+      );
+      expect(html).toContain('method="post"');
+      expect(html).toMatch(/<button[^>]*type="submit"[^>]*disabled/);
+    });
+
+    it("enables save button once hydrated on client", () => {
+      renderForm();
+      const saveButton = screen.getByRole("button", { name: "Save details" });
+      expect(saveButton).toBeEnabled();
     });
   });
 });

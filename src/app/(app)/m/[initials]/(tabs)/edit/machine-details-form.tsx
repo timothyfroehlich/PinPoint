@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
+import { useHydrated } from "~/hooks/use-hydrated";
 import { useDetailsDirty } from "./details-dirty";
 import {
   AlertDialog,
@@ -95,6 +96,8 @@ export function MachineDetailsForm({
     UpdateMachineResult | undefined,
     FormData
   >(updateMachineAction, undefined);
+
+  const isHydrated = useHydrated();
 
   // Dirtiness lives in a context rather than local state because the Pinball
   // Map section below reads it too — this form owns the PBM link, so its
@@ -318,7 +321,9 @@ export function MachineDetailsForm({
       <form
         key={resetKey}
         ref={formRef}
+        method="post"
         // No `action={formAction}` on purpose — see `handleSubmit` (PP-1ajq).
+        // `method="post"` prevents fallback to native GET before hydration (PP-aeei).
         onSubmit={handleSubmit}
         // Any native input event marks the section dirty. Radix Select changes
         // do not bubble `input`, so Availability flags dirtiness explicitly.
@@ -462,6 +467,7 @@ export function MachineDetailsForm({
           <Button
             type="submit"
             className="bg-primary text-on-primary hover:bg-primary/90"
+            disabled={!isHydrated || isPending}
             loading={isPending}
           >
             Save details
