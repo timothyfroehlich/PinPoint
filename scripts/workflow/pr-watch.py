@@ -194,7 +194,7 @@ def review_summary(pr: int, *, timeout: float | None = None) -> dict:
     """The review summary for a PR, computed by the bash gate.
 
     `_review_summary` in scripts/workflow/_pr-gates.sh is the single implementation
-    of review evidence — two checkers (CodeRabbit approval, Codex evidence) and a
+    of review evidence — two checkers (Claude review record, Codex evidence) and a
     four-word label. This watcher and the dashboard read its JSON
     instead of mirroring the logic, so no Python copy can drift from the merge gate.
 
@@ -230,7 +230,7 @@ def review_summary(pr: int, *, timeout: float | None = None) -> dict:
 
 def _checker_lines(summary: dict) -> str:
     head = str(summary.get("head") or "")[:7]
-    names = {"claude": "Claude review", "coderabbit": "CodeRabbit", "codex": "Codex"}
+    names = {"claude": "Claude review", "codex": "Codex"}
     parts: list[str] = []
     for key, name in names.items():
         record = (summary.get("checkers") or {}).get(key) or {}
@@ -261,7 +261,6 @@ def review_state(pr: int) -> tuple[str, str]:
         coverage = summary.get("coverage") or {}
         who = {
             "claude": "Claude review record",
-            "coderabbit": "CodeRabbit approval",
             "codex": "Codex evidence",
         }.get(str(coverage.get("checker")), "review")
         return label, f"{who} covers head {head}"
