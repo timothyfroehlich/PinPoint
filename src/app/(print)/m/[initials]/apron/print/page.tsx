@@ -72,7 +72,7 @@ export default async function ApronCardPrintPage({
       machineInitials={machine.initials}
       content={apronCardContent(
         machine,
-        await getMachineCredits(machine.pinballmapTitle?.opdbId ?? null),
+        await getMachineCredits(machine),
         (await getMachinePinTips(machine.pinballmapTitle?.opdbId ?? null)) !==
           null
       )}

@@ -2,6 +2,7 @@ import {
   getMachinePresenceLabel,
   type MachinePresenceStatus,
 } from "~/lib/machines/presence";
+import type { OpdbDisplayType, OpdbMachineType } from "~/lib/opdb/types";
 import type { MachinePbmColumns } from "~/services/machines";
 
 import { getCatalogEntry } from "./catalog";
@@ -35,6 +36,30 @@ export interface PbmLinkSelection {
   modelName?: string | undefined;
   manufacturer?: string | undefined;
   year?: number | undefined;
+  /**
+   * The rest of the manual model (PP-wqit.14, pinballmap spec 2.4): what OPDB
+   * supplies for a catalog title. Same rule as `modelName` — read only on the
+   * excluded branch. Designers and artists are ordered name lists.
+   */
+  type?: OpdbMachineType | undefined;
+  display?: OpdbDisplayType | undefined;
+  playerCount?: number | undefined;
+  designers?: readonly string[] | undefined;
+  artists?: readonly string[] | undefined;
+}
+
+/**
+ * A hand-entered credit list as stored: names trimmed, blank names dropped,
+ * order kept, and an empty list as null (the `machines_credit_lists_not_empty`
+ * CHECK allows one "no value"). A name is never split on punctuation (machine
+ * editing spec 3.5) — "Lawlor, Pat" stays one name.
+ */
+export function normalizeCreditNames(
+  names: readonly string[] | undefined
+): string[] | null {
+  if (names === undefined) return null;
+  const kept = names.map((name) => name.trim()).filter((name) => name !== "");
+  return kept.length === 0 ? null : kept;
 }
 
 /** The stored machine's PBM state, read from the row — never from a request. */
@@ -203,12 +228,18 @@ async function resolveCore(
     // Intent On presupposes a link — only the linked branch below can keep it,
     // so every not-linked outcome lands on Off (or a carried Don't sync).
     pinballmapIntent: targetIntent === "no_sync" ? "no_sync" : "off",
-    // `machines_model_name_requires_excluded` forbids a hand-entered model on
+    // `machines_model_name_requires_excluded` and
+    // `machines_manual_model_requires_excluded` forbid a hand-entered model on
     // anything but an excluded machine, so the linked and unlinked branches
-    // below must leave this null or the UPDATE throws.
+    // below must leave these null or the UPDATE throws.
     modelName: null,
     manufacturer: null,
     year: null,
+    type: null,
+    display: null,
+    playerCount: null,
+    designers: null,
+    artists: null,
     opdbId: null,
     ipdbId: null,
   };
@@ -224,10 +255,15 @@ async function resolveCore(
         // The only branch where model metadata comes from the request — see
         // `PbmLinkSelection.modelName`. Absent stays null rather than keeping a
         // stored value: a save that omits these fields is a save that cleared
-        // them, and the sub-panel always submits all three together.
+        // them, and the sub-panel always submits the whole manual model.
         modelName: input.modelName ?? null,
         manufacturer: input.manufacturer ?? null,
         year: input.year ?? null,
+        type: input.type ?? null,
+        display: input.display ?? null,
+        playerCount: input.playerCount ?? null,
+        designers: normalizeCreditNames(input.designers),
+        artists: normalizeCreditNames(input.artists),
       },
       abandoned,
     };

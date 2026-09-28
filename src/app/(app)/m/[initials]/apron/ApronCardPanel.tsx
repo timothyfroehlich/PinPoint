@@ -30,10 +30,9 @@ export async function ApronCardPanel({
     resolveRequestUrl(await headers()),
     machine.initials
   );
-  const opdbId = machine.pinballmapTitle?.opdbId ?? null;
   const [credits, pinTips] = await Promise.all([
-    getMachineCredits(opdbId),
-    getMachinePinTips(opdbId),
+    getMachineCredits(machine),
+    getMachinePinTips(machine.pinballmapTitle?.opdbId ?? null),
   ]);
   const hasPinTips = pinTips !== null;
   const { name, edition, manufacturer, year, ownerName } = apronCardContent(

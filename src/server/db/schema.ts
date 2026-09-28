@@ -303,6 +303,17 @@ export const machines = pgTable(
     modelName: text("model_name"),
     manufacturer: text("manufacturer"),
     year: integer("year"),
+    // The rest of the hand-entered model (PP-wqit.14, spec pinballmap 2.4):
+    // what OPDB would supply for a catalog title. Same rule as `model_name` —
+    // set only on an uncataloged machine (CHECK below), so the Type, Display
+    // and Player Count tags and the apron credits never see two sources.
+    // Designers and artists are ordered name lists; an empty list is stored
+    // as NULL so the CHECK has one "no value" to test.
+    type: text("type", { enum: OPDB_MACHINE_TYPES }),
+    display: text("display", { enum: OPDB_DISPLAY_TYPES }),
+    playerCount: integer("player_count"),
+    designers: text("designers").array(),
+    artists: text("artists").array(),
     opdbId: text("opdb_id"),
     ipdbId: integer("ipdb_id"),
     // iScored game link (PP-h2bu.2). Nullable string identifier for the game
@@ -326,6 +337,26 @@ export const machines = pgTable(
     modelNameRequiresExcludedCheck: check(
       "machines_model_name_requires_excluded",
       sql`NOT (model_name IS NOT NULL AND NOT pinballmap_excluded)`
+    ),
+    manualModelRequiresExcludedCheck: check(
+      "machines_manual_model_requires_excluded",
+      sql`pinballmap_excluded OR (type IS NULL AND display IS NULL AND player_count IS NULL AND designers IS NULL AND artists IS NULL)`
+    ),
+    typeCheck: check(
+      "machines_type_check",
+      sql`type IS NULL OR type IN ('em', 'ss', 'me')`
+    ),
+    displayCheck: check(
+      "machines_display_check",
+      sql`display IS NULL OR display IN ('reels', 'lights', 'alphanumeric', 'cga', 'dmd', 'lcd')`
+    ),
+    playerCountCheck: check(
+      "machines_player_count_check",
+      sql`player_count IS NULL OR player_count > 0`
+    ),
+    creditListsNotEmptyCheck: check(
+      "machines_credit_lists_not_empty",
+      sql`(designers IS NULL OR cardinality(designers) > 0) AND (artists IS NULL OR cardinality(artists) > 0)`
     ),
     // Intent On presupposes a catalog link — you can only appear on the public
     // map as a recognized title. Off and `no_sync` are fine unmatched: they are

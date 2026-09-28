@@ -1,6 +1,6 @@
 {
-  "id": "5ded8237-7c8f-4409-ab27-8e9ca09195d6",
-  "prevId": "bfcbb1fb-8842-4874-8448-5ec022ec0714",
+  "id": "afd6c721-f551-4c3e-bf7d-90f9fdd152a9",
+  "prevId": "5ded8237-7c8f-4409-ab27-8e9ca09195d6",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2599,6 +2599,77 @@
         "opdb_machines_player_count_check": {
           "name": "opdb_machines_player_count_check",
           "value": "player_count > 0"
+        }
+      },
+      "isRLSEnabled": true
+    },
+    "public.pintips": {
+      "name": "pintips",
+      "schema": "",
+      "columns": {
+        "tip_id": {
+          "name": "tip_id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "opdb_group_id": {
+          "name": "opdb_group_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "category": {
+          "name": "category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "vote_total": {
+          "name": "vote_total",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "text": {
+          "name": "text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "refreshed_at": {
+          "name": "refreshed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_pintips_opdb_group_id": {
+          "name": "idx_pintips_opdb_group_id",
+          "columns": [
+            {
+              "expression": "opdb_group_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "pintips_category_check": {
+          "name": "pintips_category_check",
+          "value": "category IN ('general', 'multiball', 'skillshot', 'wizard', 'secret')"
         }
       },
       "isRLSEnabled": true

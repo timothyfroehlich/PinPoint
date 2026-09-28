@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { creditsFromPeople } from "./credits";
+import { creditsFromNames, creditsFromPeople } from "./credits";
 
 const person = (
   name: string,
@@ -45,5 +45,16 @@ describe("creditsFromPeople", () => {
     ]);
     expect(credits.design).toEqual(["Keith Elwin"]);
     expect(credits.art).toEqual([]);
+  });
+});
+
+describe("creditsFromNames", () => {
+  it("keeps hand-entered order, trimmed and deduplicated", () => {
+    expect(
+      creditsFromNames(
+        [" Steve Kordek", "Wayne Neyens", "Steve Kordek", ""],
+        null
+      )
+    ).toEqual({ design: ["Steve Kordek", "Wayne Neyens"], art: [] });
   });
 });
