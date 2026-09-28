@@ -19,10 +19,8 @@ registry.
   decision; don't relitigate it). The convenience sets `OPEN_STATUSES`
   (new + in_progress = all 6 non-closed), `NEW_STATUSES`, `IN_PROGRESS_STATUSES`,
   `CLOSED_STATUSES` are derived from the same source.
-- **Default issue view = `OPEN_STATUSES`.** With no `status` URL param, the
-  query returns open issues and the Status dropdown shows `OPEN_STATUSES`
-  preselected, but `getBadges()` renders **no** status chips — status chips
-  appear only once a `status` param is set.
+- **Default issue view = `OPEN_STATUSES`.** When no status filter is set,
+  `IssueFilters` renders two default chips, "Open" and "In Progress".
 - **Machine statuses are a separate system.** `MachineFilters` filters on
   computed machine status (`src/lib/machines/status.ts` — machines have no
   status column) plus presence (`src/lib/machines/presence.ts`), with labels
