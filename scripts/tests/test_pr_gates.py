@@ -1176,7 +1176,7 @@ def test_pure_merge_from_main_inherits_coderabbit_approval() -> None:
     assert summary["coverage"]["inherited_from"] == approved_sha
     assert run.returncode == 0
     assert (
-        f"CodeRabbit approved head SHA {head_sha[:7]} (inherited from {approved_sha[:7]}; pure merge from main)"
+        f"CodeRabbit approved head SHA {head_sha[:7]} (inherited from {approved_sha[:7]}; pure merge or mechanical resolution from main)"
         in run.stdout
     )
 
@@ -1196,7 +1196,8 @@ def test_pure_merge_from_main_inherits_review_record() -> None:
     assert run.returncode == 0
     assert (
         f"Claude Code review (medium) covers head SHA {head_sha[:7]} "
-        f"(inherited from {reviewed_sha[:7]}; pure merge from main)" in run.stdout
+        f"(inherited from {reviewed_sha[:7]}; pure merge or mechanical resolution from main)"
+        in run.stdout
     )
 
 
@@ -1231,7 +1232,7 @@ def test_pure_merge_from_main_inherits_codex_native_approval() -> None:
     assert summary["coverage"]["inherited_from"] == approved_sha
     assert run.returncode == 0
     assert (
-        f"Codex approved head SHA {head_sha[:7]} (inherited from {approved_sha[:7]}; pure merge from main)"
+        f"Codex approved head SHA {head_sha[:7]} (inherited from {approved_sha[:7]}; pure merge or mechanical resolution from main)"
         in run.stdout
     )
 
@@ -1251,7 +1252,7 @@ def test_pure_merge_from_main_inherits_codex_clean_comment() -> None:
     assert summary["coverage"]["inherited"] is True
     assert run.returncode == 0
     assert (
-        f"Codex found no major issues on head SHA {head_sha[:7]} (inherited from {approved_sha[:7]}; pure merge from main)"
+        f"Codex found no major issues on head SHA {head_sha[:7]} (inherited from {approved_sha[:7]}; pure merge or mechanical resolution from main)"
         in run.stdout
     )
 
@@ -1271,7 +1272,7 @@ def test_pure_merge_from_main_inherits_codex_reaction_witness() -> None:
     assert summary["coverage"]["inherited"] is True
     assert run.returncode == 0
     assert (
-        f"trusted workflow witnessed Codex clean reaction on head SHA {head_sha[:7]} (inherited from {approved_sha[:7]}; pure merge from main)"
+        f"trusted workflow witnessed Codex clean reaction on head SHA {head_sha[:7]} (inherited from {approved_sha[:7]}; pure merge or mechanical resolution from main)"
         in run.stdout
     )
 

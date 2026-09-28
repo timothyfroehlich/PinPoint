@@ -239,9 +239,23 @@ _codex_check() {
       end'
 }
 
+# A commit counts as a "mechanical resolution" — a merge-conflict fixup or a
+# migration renumbering, with no logic change — only when its message carries
+# this trailer. The trailer is the whole trust boundary: nothing here diffs the
+# commit's content for semantic changes, so the owning agent is attesting by
+# including it, and a false attestation is traceable to a name in `git log`.
+# See spec §8.12.
+readonly MECHANICAL_RESOLUTION_TRAILER="Mechanical-Resolution"
+
+_has_mechanical_trailer() {
+  local commit=$1
+  git log -1 --format=%B "$commit" 2>/dev/null | grep -qE "^${MECHANICAL_RESOLUTION_TRAILER}:[[:space:]]*\S"
+}
+
 # ---------------------------------------------------------------------------------
 # Pure merge check: returns 0 if head is a clean merge of origin/main (or base_ref)
-# over reviewed_sha without any unreviewed feature commits.
+# over reviewed_sha without any unreviewed feature commits — or a merge/fixup
+# whose only departure from that is commits tagged Mechanical-Resolution.
 # ---------------------------------------------------------------------------------
 _is_pure_merge_from_main() {
   local pr=$1 reviewed_sha=$2 head=$3 base_ref=${4:-main}
@@ -269,10 +283,13 @@ _is_pure_merge_from_main() {
     return 1
   fi
 
-  # Step 3: all non-merge commits in reviewed_sha..head must already be on main
-  local extra_commits
+  # Step 3: all non-merge commits in reviewed_sha..head must already be on main,
+  # or be tagged Mechanical-Resolution (e.g. a follow-up migration renumbering).
+  local extra_commits ec
   extra_commits=$(git rev-list --no-merges "${reviewed_sha}..${head}" --not "$main_ref" 2>/dev/null) || return 1
-  [[ -z "$extra_commits" ]] || return 1
+  for ec in $extra_commits; do
+    _has_mechanical_trailer "$ec" || return 1
+  done
 
   # Step 4: there must be at least one merge commit in reviewed_sha..head
   local merge_commits
@@ -305,7 +322,11 @@ _is_pure_merge_from_main() {
 
     clean_tree=$(git merge-tree --write-tree "$p1" "$p2" 2>/dev/null) || return 1
     actual_tree=$(git rev-parse "${m}^{tree}" 2>/dev/null) || return 1
-    [[ "$clean_tree" == "$actual_tree" ]] || return 1
+    if [[ "$clean_tree" != "$actual_tree" ]]; then
+      # A manually resolved merge only keeps coverage when the resolution is
+      # attested mechanical; otherwise it's an unreviewed content change.
+      _has_mechanical_trailer "$m" || return 1
+    fi
   done
 
   return 0
@@ -585,7 +606,7 @@ check_review_happened() {
     inherited=$(jq -r '.coverage.inherited // false' <<< "$RS_SUMMARY")
     if [ "$inherited" = "true" ]; then
       from_sha=$(jq -r '.coverage.inherited_from // .coverage.sha' <<< "$RS_SUMMARY")
-      suffix=" (inherited from ${from_sha:0:7}; pure merge from main)"
+      suffix=" (inherited from ${from_sha:0:7}; pure merge or mechanical resolution from main)"
     fi
     if [ "$who" = "claude" ]; then
       echo "PASS: reviewed: Claude Code review ($(jq -r '.coverage.level' <<< "$RS_SUMMARY")) covers head SHA ${RS_HEAD_SHA:0:7}${suffix}"

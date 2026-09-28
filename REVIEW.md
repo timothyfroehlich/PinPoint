@@ -60,7 +60,7 @@ Reviewers read agent skills. Consult the relevant one for the area a PR touches 
 
 **The reviewer is a local Claude Code `/code-review`**, run by the PR's owning agent on the exact head after current-head CI succeeds, at the level `scripts/workflow/claude-review-level.sh` picks from the diff size. The author fixes or declines every finding and re-reviews each new head until a round is clean, then posts a **review record**: a SHA-pinned comment from Tim's account listing every finding and its disposition. That record is what covers the head.
 
-A PR cannot merge without review coverage of its **current head commit**, with every thread resolved. Until the subscriptions end, an exact-head CodeRabbit approval or Codex evidence still counts; a PR with none merges only when Tim explicitly directs a forced merge. Any push other than a clean merge of `main` requires a new review round and record. **If you're reviewing, assume the commit you were handed is the one the author intends to be final.** Full author-side rules: `.agents/skills/pinpoint-pr-workflow/SKILL.md` Phase 3.4.
+A PR cannot merge without review coverage of its **current head commit**, with every thread resolved. Until the subscriptions end, an exact-head CodeRabbit approval or Codex evidence still counts; a PR with none merges only when Tim explicitly directs a forced merge. Any push other than a clean merge of `main`, or a merge-conflict fixup / migration renumbering carrying a `Mechanical-Resolution:` trailer that attests no logic changed, requires a new review round and record. **If you're reviewing, assume the commit you were handed is the one the author intends to be final.** Full author-side rules: `.agents/skills/pinpoint-pr-workflow/SKILL.md` Phase 3.4.
 
 ## Review mechanics
 

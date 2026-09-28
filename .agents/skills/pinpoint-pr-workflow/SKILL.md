@@ -176,8 +176,11 @@ bash scripts/workflow/merge-pr.sh <PR> --human --force
 #### Pushing after the review
 
 Any push invalidates review coverage for the previous SHA — except a clean merge of `main`,
-which the gate carries the record across (PP-ojoj). Any other push needs replacement CI, a
-new review round, and a new record (3.4 steps 4–5).
+which the gate carries the record across (PP-ojoj). The gate also carries it across a merge-conflict
+fixup or migration renumbering when every such commit carries a `Mechanical-Resolution: <what you
+resolved>` trailer, attesting no logic changed (spec §8.12) — add the trailer only when that's true;
+a resolution that touches logic needs a fresh review round like any other push. Any other push
+needs replacement CI, a new review round, and a new record (3.4 steps 4–5).
 
 #### Readiness is not review
 
