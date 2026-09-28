@@ -44,17 +44,19 @@ export default async function MachinesPage({
     viewSearchParams
   );
   if (redirectTo) redirect(redirectTo);
-  const result = await loadMachineView({
-    scope: { kind: "all" },
-    preset: "machines",
-    searchParams: viewSearchParams,
-  });
+  const [result, lineupData] = await Promise.all([
+    loadMachineView({
+      scope: { kind: "all" },
+      preset: "machines",
+      searchParams: viewSearchParams,
+    }),
+    canViewLineup ? loadLineupData() : Promise.resolve(null),
+  ]);
   // The "to review" count comes from the same stored-data comparison the
   // lineup page renders, so the badge can never disagree with the page it links
   // to (§4.1). It is zero until there is a lineup to compare (§2.4–§2.5).
-  const lineupToReview = canViewLineup
-    ? lineupToReviewCount((await loadLineupData()).comparison)
-    : 0;
+  const lineupToReview =
+    lineupData === null ? 0 : lineupToReviewCount(lineupData.comparison);
   const lineupButton = canViewLineup ? (
     <Button asChild variant="outline" data-testid="pinball-map-lineup-button">
       <Link href="/m/pinball-map">

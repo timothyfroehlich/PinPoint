@@ -331,12 +331,13 @@ export function compareLineup(args: {
       .map(cabinet)
       .sort((a, b) => a.initials.localeCompare(b.initials));
     if (titleIntent === "no_sync") {
-      if (!removedOnly) dontSync += 1;
+      // A title held only by Removed cabinets still counts while its entry is
+      // on the lineup, so every entry lands somewhere on the page (§1).
+      if (!removedOnly || lmx !== null) dontSync += 1;
       continue;
     }
 
     const target = insiderConnectedTarget(cabinetsIn.map((m) => m.icIntent));
-    if (lmx !== null && target === null) noteUnsetInsiderConnected(lmx);
 
     const pushRow = (tag: LineupOutOfSyncTag): void => {
       for (const m of basis) named.add(m.id);
@@ -369,6 +370,9 @@ export function compareLineup(args: {
       pushRow("to_add");
       continue;
     }
+    // The Insider Connected footer (§6.3) is about titles PinPoint keeps on the
+    // lineup, not ones it is about to remove.
+    if (target === null) noteUnsetInsiderConnected(lmx);
     // Same-title cabinets share one entry and one target, so any counted On
     // cabinet's Insider Connected view answers for the title (pinballmap §3.8).
     const representative = basis.find((m) => m.intent === "on");

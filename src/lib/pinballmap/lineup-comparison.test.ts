@@ -443,6 +443,28 @@ describe("In sync and not compared (§6)", () => {
     expect(result.notCompared.dontSync).toBe(2);
   });
 
+  it("counts a Don't sync title still on Pinball Map when only Removed machines hold it", () => {
+    const result = compare(
+      [
+        machine("GONE", 54, "no_sync", { presence: "removed" }),
+        machine("GONE2", 55, "no_sync", { presence: "removed" }),
+      ],
+      [entry(54, 540)]
+    );
+    expect(result.sections.pinball_map_only).toEqual([]);
+    expect(result.notCompared.dontSync).toBe(1);
+  });
+
+  it("leaves titles slated for removal out of the Insider Connected summary", () => {
+    const result = compare(
+      [machine("OFF", 65, "off")],
+      [entry(65, 650, { ic: true })],
+      [title(65, "Off title", { ic: true })]
+    );
+    expect(result.sections.out_of_sync).toMatchObject([{ tag: "to_remove" }]);
+    expect(result.insiderConnected.titles).toBe(0);
+  });
+
   it("states Pinball Map's Insider Connected values for eligible titles with no intent (§6.3)", () => {
     const result = compare(
       [machine("A", 60, "on"), machine("B", 61, "on", { ic: "on" })],

@@ -1210,6 +1210,19 @@ export async function removeUnlinkedPinballmapEntryAction(
     );
 
   try {
+    // Re-check under the lease, immediately before the outbound delete: a
+    // machine linked since the page (or the authorize step) read the lineup
+    // makes this entry that title's business, removed from its own page.
+    const linkedNow = await db.query.machines.findFirst({
+      where: eq(machines.pinballmapMachineId, titleId),
+      columns: { id: true },
+    });
+    if (linkedNow)
+      return err(
+        "VALIDATION",
+        "A PinPoint machine is linked to this entry now. Reload the page."
+      );
+
     const client = await getPinballMapClient();
     let deletedLmxId = lmx.id;
     let written = await client.removeMachine({
@@ -1323,6 +1336,10 @@ export async function linkMachineToPinballmapEntryAction(
       "VALIDATION",
       "This machine is marked as not in Pinball Map's catalog. Change that on its page first."
     );
+  // The page compares machines not marked Removed (lineup §1), and the picker
+  // never offers one; refuse a stale or hand-built request the same way.
+  if (machine.presenceStatus === "removed")
+    return err("VALIDATION", "This machine is marked Removed.");
   if (machine.pinballmapMachineId === pinballmapMachineId)
     return ok({ pinballmapMachineId });
 
