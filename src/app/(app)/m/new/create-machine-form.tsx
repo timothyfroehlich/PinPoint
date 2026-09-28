@@ -9,13 +9,6 @@ import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "~/components/ui/select";
-import {
   createMachineAction,
   type CreateMachineResult,
   type AssigneeNotMemberMeta,
@@ -25,15 +18,19 @@ import {
   OwnerSelect,
   type OwnerSelectUser,
 } from "~/components/machines/OwnerSelect";
-import { PinballMapLinkField } from "~/components/machines/PinballMapLinkField";
-import { IscoredGamePicker } from "~/components/machines/IscoredGamePicker";
-import { RichTextEditor } from "~/components/editor/RichTextEditorDynamic";
-import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 import {
-  VALID_MACHINE_PRESENCE_STATUSES,
-  getMachinePresenceLabel,
-} from "~/lib/machines/presence";
-import { MapPin } from "lucide-react";
+  PinballMapLinkField,
+  type PbmLinkFieldSelection,
+} from "~/components/machines/PinballMapLinkField";
+import { IscoredGamePicker } from "~/components/machines/IscoredGamePicker";
+import { MachineFormFields } from "~/components/machines/machine-form/MachineFormFields";
+import { MachineFormActionBar } from "~/components/machines/machine-form/MachineFormActionBar";
+import {
+  NewMachinePinballmapFields,
+  type NewMachinePinballmapFieldsProps,
+} from "~/components/machines/machine-form/NewMachinePinballmapFields";
+import type { ProseMirrorDoc } from "~/lib/tiptap/types";
+import type { MachinePresenceStatus } from "~/lib/machines/presence";
 import {
   Dialog,
   DialogContent,
@@ -44,16 +41,39 @@ import {
 } from "~/components/ui/dialog";
 import { Alert, AlertDescription } from "~/components/ui/alert";
 
+/** What the page knows about Pinball Map for the lineup choice (4.11). */
+export type NewMachinePinballmapContext = Pick<
+  NewMachinePinballmapFieldsProps,
+  "configured" | "locationName" | "canSetIntent" | "canAddAfterCreate"
+>;
+
 interface CreateMachineFormProps {
   allUsers: OwnerSelectUser[];
   canSelectOwner: boolean;
   iscoredConfigured?: boolean;
+  /** The creator may see Owner's Requirements (machine-editing 2.6). */
+  canViewOwnerRequirements?: boolean;
+  pinballmap?: NewMachinePinballmapContext;
 }
 
+const NO_PINBALLMAP: NewMachinePinballmapContext = {
+  configured: false,
+  locationName: null,
+  canSetIntent: false,
+  canAddAfterCreate: false,
+};
+
+/**
+ * The New Machine page's form: the shared machine form fields
+ * (`MachineFormFields`, machine-editing 2.1) plus Initials and Owner (2.2),
+ * created in one action (4.3).
+ */
 export function CreateMachineForm({
   allUsers,
   canSelectOwner,
   iscoredConfigured = false,
+  canViewOwnerRequirements = false,
+  pinballmap = NO_PINBALLMAP,
 }: CreateMachineFormProps): React.JSX.Element {
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, isPending] = useActionState<
@@ -73,6 +93,16 @@ export function CreateMachineForm({
   const [descriptionDoc, setDescriptionDoc] = useState<ProseMirrorDoc | null>(
     null
   );
+  const [ownerRequirementsDoc, setOwnerRequirementsDoc] =
+    useState<ProseMirrorDoc | null>(null);
+  // Live Availability and Model Details selection, which decide what the
+  // Pinball Map block in Integrations offers (pinballmap 4.11, 6.2).
+  const [presenceStatus, setPresenceStatus] =
+    useState<MachinePresenceStatus>("on_the_floor");
+  const [pbmSelection, setPbmSelection] = useState<PbmLinkFieldSelection>({
+    manual: false,
+    pinballmapMachineId: null,
+  });
   const isHydrated = useHydrated();
 
   // Promote dialog state — populated when server returns ASSIGNEE_NOT_MEMBER
@@ -98,6 +128,7 @@ export function CreateMachineForm({
     setOwnerIdValue("");
     setOwnerSelectKey((k) => k + 1);
     setDescriptionDoc(null);
+    setOwnerRequirementsDoc(null);
   };
 
   // Open the promote dialog when server returns ASSIGNEE_NOT_MEMBER (once per state)
@@ -254,145 +285,99 @@ export function CreateMachineForm({
           });
         }}
         id="create-machine-form"
-        className="space-y-4"
+        className="space-y-5"
       >
-        {/* Machine Name */}
-        <div className="space-y-1.5">
-          <Label htmlFor="name" className="text-foreground">
-            Machine Name *
-          </Label>
-          <p className="text-xs text-muted-foreground">
-            Full name of the game.
-          </p>
-          <Input
-            id="name"
-            name="name"
-            type="text"
-            required
-            placeholder="e.g., Medieval Madness"
-            className="border-outline bg-surface text-foreground placeholder:text-muted-foreground"
-            value={nameValue}
-            onChange={(e) => setNameValue(e.target.value)}
-          />
-        </div>
+        <MachineFormFields
+          idPrefix="create"
+          name={{ value: nameValue, onChange: setNameValue }}
+          availability={{
+            defaultValue: "on_the_floor",
+            onValueChange: setPresenceStatus,
+          }}
+          identityFields={
+            <>
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <Label htmlFor="initials" className="text-foreground">
+                  Initials{" "}
+                  <span className="font-normal text-muted-foreground">
+                    (cannot be changed later)
+                  </span>{" "}
+                  *
+                </Label>
+                <Input
+                  id="initials"
+                  name="initials"
+                  type="text"
+                  required
+                  minLength={2}
+                  maxLength={6}
+                  placeholder="e.g., MM"
+                  className="border-outline bg-surface text-foreground placeholder:text-muted-foreground uppercase"
+                  value={initialsValue}
+                  onChange={(e) => {
+                    setInitialsValue(
+                      e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "")
+                    );
+                  }}
+                />
+              </div>
+              {/* Owner Select (Admin/Technician Only) */}
+              {canSelectOwner && (
+                <OwnerSelect
+                  key={ownerSelectKey}
+                  users={users}
+                  onUsersChange={setUsers}
+                  onValueChange={setOwnerIdValue}
+                  showHelpText={false}
+                />
+              )}
+            </>
+          }
+          modelDetails={
+            <PinballMapLinkField
+              machineName={nameValue}
+              onSelectionChange={setPbmSelection}
+            />
+          }
+          description={{
+            initial: null,
+            value: descriptionDoc,
+            onChange: setDescriptionDoc,
+          }}
+          ownerRequirements={
+            canViewOwnerRequirements
+              ? {
+                  initial: null,
+                  value: ownerRequirementsDoc,
+                  onChange: setOwnerRequirementsDoc,
+                }
+              : null
+          }
+          iscored={
+            iscoredConfigured ? (
+              <IscoredGamePicker machineName={nameValue} />
+            ) : null
+          }
+          pinballmapUnavailable={pbmSelection.manual}
+          pinballmap={
+            pbmSelection.manual ? null : (
+              <NewMachinePinballmapFields
+                pinballmapMachineId={pbmSelection.pinballmapMachineId}
+                presenceStatus={presenceStatus}
+                {...pinballmap}
+              />
+            )
+          }
+        />
 
-        {/* Machine Initials */}
-        <div className="space-y-1.5">
-          <Label htmlFor="initials" className="text-foreground">
-            Initials{" "}
-            <span className="font-normal text-muted-foreground">
-              (cannot be changed later)
-            </span>{" "}
-            *
-          </Label>
-          <Input
-            id="initials"
-            name="initials"
-            type="text"
-            required
-            minLength={2}
-            maxLength={6}
-            placeholder="e.g., MM"
-            className="border-outline bg-surface text-foreground placeholder:text-muted-foreground uppercase"
-            value={initialsValue}
-            onChange={(e) => {
-              setInitialsValue(
-                e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "")
-              );
-            }}
-          />
-        </div>
-
-        {/* Owner Select (Admin/Technician Only) */}
-        {canSelectOwner && (
-          <OwnerSelect
-            key={ownerSelectKey}
-            users={users}
-            onUsersChange={setUsers}
-            onValueChange={setOwnerIdValue}
-            showHelpText={false}
-          />
-        )}
-
-        {/* Model — links the machine to its PinballMap catalog model/edition
-            (bead B / PP-o355.2). */}
-        <PinballMapLinkField machineName={nameValue} />
-
-        {iscoredConfigured && <IscoredGamePicker machineName={nameValue} />}
-
-        {/* Description */}
-        <div className="space-y-1.5">
-          <Label className="text-foreground">Description</Label>
-          <RichTextEditor
-            content={null}
-            onChange={setDescriptionDoc}
-            mentionsEnabled={false}
-            placeholder="Add a description for this machine..."
-            ariaLabel="Machine description"
-            compact={false}
-            className="min-h-[120px]"
-          />
-          <input
-            type="hidden"
-            name="description"
-            value={descriptionDoc ? JSON.stringify(descriptionDoc) : ""}
-          />
-        </div>
-
-        {/* Availability */}
-        <div className="space-y-1.5">
-          <Label htmlFor="presence-status" className="text-foreground">
-            Availability
-          </Label>
-          <Select name="presenceStatus" defaultValue="on_the_floor">
-            <SelectTrigger
-              id="presence-status"
-              className="border-outline bg-surface text-foreground"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {VALID_MACHINE_PRESENCE_STATUSES.map((status) => (
-                <SelectItem key={status} value={status}>
-                  {getMachinePresenceLabel(status)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* A new machine always starts Off the lineup, and create never puts it
-            there — intent is the operator's to set, and PinPoint never sets it
-            for them in either direction (spec 5.1). This line is the only thing
-            that says a person has to act; without it the failure mode is a
-            machine left off the public lineup forever because nobody knew they
-            had to do anything.
-
-            It used to describe auto-link (PP-o355.20) and promise "listing
-            controls are coming soon". PP-o355.21 deleted the first and shipped
-            the second, so both halves were false. */}
-        <div className="flex items-start gap-2">
-          <MapPin
-            aria-hidden="true"
-            className="mt-0.5 size-4 text-muted-foreground"
-          />
-          <p className="text-sm text-muted-foreground">
-            Not on the location&rsquo;s Pinball Map lineup. Put it there from
-            this machine&rsquo;s Manage tab once it&rsquo;s created.
-          </p>
-        </div>
-
-        {/* Actions */}
-        <div className="flex justify-end gap-3 pt-2">
-          <Link href="/m">
-            <Button
-              type="button"
-              variant="outline"
-              className="border-outline text-foreground hover:bg-surface-variant"
-            >
-              Cancel
-            </Button>
-          </Link>
+        <MachineFormActionBar>
+          <Button
+            variant="outline"
+            className="border-outline text-foreground hover:bg-surface-variant"
+            asChild
+          >
+            <Link href="/m">Cancel</Link>
+          </Button>
           <Button
             type="submit"
             className="bg-primary text-on-primary hover:bg-primary/90"
@@ -401,7 +386,7 @@ export function CreateMachineForm({
           >
             Create Machine
           </Button>
-        </div>
+        </MachineFormActionBar>
       </form>
     </>
   );

@@ -13,6 +13,7 @@ import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 
 import { getUnifiedUsers } from "~/lib/users/queries";
 import { isIscoredConfigured } from "~/lib/iscored/config";
+import { getPinballMapState } from "~/lib/pinballmap/state";
 
 /**
  * Create Machine Page (Protected Route)
@@ -58,10 +59,30 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
   }));
 
   const iscoredConfigured = isIscoredConfigured();
+  const accessLevel = getAccessLevel(currentUserProfile?.role);
+
+  // What the lineup choice needs (pinballmap 4.11). The creator owns no
+  // machine yet, so these are the role-level capabilities — the same ones the
+  // create action and the add push re-check on the server.
+  const pbmState = await getPinballMapState();
+  const configured = pbmState?.locationId != null;
+  // Whether an operator credential exists, read off the state row without
+  // decrypting it — the same test the Manage tab uses (CORE-ARCH-012).
+  const writeEnabled =
+    configured &&
+    pbmState.outboundEmail != null &&
+    pbmState.outboundTokenVaultId != null;
+  const pinballmap = {
+    configured,
+    locationName: configured ? (pbmState.snapshotJson?.name ?? null) : null,
+    canSetIntent: checkPermission("machines.pinballmap.link", accessLevel),
+    canAddAfterCreate:
+      writeEnabled && checkPermission("machines.pinballmap.push", accessLevel),
+  };
 
   return (
     <PageContainer size="standard" className="pt-4 pb-8">
-      <Card className="max-w-2xl gap-3 border-outline-variant">
+      <Card className="max-w-4xl gap-4 border-outline-variant">
         <CardHeader className="px-4 pt-4 pb-0 sm:px-6">
           <CardTitle className="text-xl text-foreground">New Machine</CardTitle>
         </CardHeader>
@@ -70,6 +91,11 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
             allUsers={allUsers}
             canSelectOwner={canCreateMachine}
             iscoredConfigured={iscoredConfigured}
+            canViewOwnerRequirements={checkPermission(
+              "machines.view.ownerRequirements",
+              accessLevel
+            )}
+            pinballmap={pinballmap}
           />
         </CardContent>
       </Card>

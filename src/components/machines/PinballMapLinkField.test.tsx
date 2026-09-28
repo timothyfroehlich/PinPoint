@@ -530,3 +530,49 @@ describe("PinballMapLinkField — Source control (PP-3bbr.2 / .3)", () => {
     );
   });
 });
+
+/**
+ * The live selection report the New Machine page's Pinball Map block reads
+ * (PP-wqit.14.2, pinballmap 4.11).
+ */
+describe("PinballMapLinkField — onSelectionChange", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(resolvePinballMapLinkAction).mockResolvedValue(null);
+  });
+
+  it("reports a picked catalog title, then Manual Entry", async () => {
+    vi.mocked(searchPinballMapFamiliesAction).mockResolvedValue([
+      {
+        machineGroupId: null,
+        pinballmapMachineId: 77,
+        name: "Medieval Madness",
+        manufacturer: "Williams",
+        year: 1997,
+        editionCount: 1,
+      },
+    ]);
+    const onSelectionChange = vi.fn();
+    const user = userEvent.setup();
+    render(<PinballMapLinkField onSelectionChange={onSelectionChange} />);
+
+    expect(onSelectionChange).toHaveBeenLastCalledWith({
+      manual: false,
+      pinballmapMachineId: null,
+    });
+
+    await user.click(screen.getByRole("combobox"));
+    await user.type(screen.getByPlaceholderText(/medieval madness/i), "med");
+    await user.click(await screen.findByText("Medieval Madness"));
+    expect(onSelectionChange).toHaveBeenLastCalledWith({
+      manual: false,
+      pinballmapMachineId: 77,
+    });
+
+    await user.click(screen.getByTestId("pinballmap-source-manual"));
+    expect(onSelectionChange).toHaveBeenLastCalledWith({
+      manual: true,
+      pinballmapMachineId: null,
+    });
+  });
+});
