@@ -369,7 +369,7 @@ describe("UnifiedReportForm ↔ shared draft store (PP-idrb)", () => {
   });
 
   describe("stale machineId handling (PP-lql)", () => {
-    it("drops stale machineId from draft and disables submit", () => {
+    it("drops stale machineId from draft, clears machine selection, and disables submit", () => {
       seedDraft({
         entry: {
           machineId: "ffffffff-ffff-4fff-8fff-ffffffffffff",
@@ -384,10 +384,57 @@ describe("UnifiedReportForm ↔ shared draft store (PP-idrb)", () => {
         "PP-lql stale draft restoration"
       );
 
+      // Hidden machineId input should be reset to empty string
+      const machineInput = document.querySelector<HTMLInputElement>(
+        'input[name="machineId"]'
+      );
+      expect(machineInput?.value ?? "").toBe("");
+
       // Submit button should be disabled because machineId is invalid
       expect(
         screen.getByRole("button", { name: "Submit Issue Report" })
       ).toBeDisabled();
+    });
+  });
+
+  describe("Clear button draft reset", () => {
+    it("clears title, machine, and strips ?machine= from URL on confirmation", async () => {
+      const user = userEvent.setup();
+      window.history.replaceState(
+        null,
+        "",
+        "/report/detailed?machine=11111111-1111-4111-8111-111111111111"
+      );
+
+      mockUseActionState.mockReturnValue(idleState());
+      render(wrapped());
+
+      // Fill in title
+      const titleInput = screen.getByLabelText(/Issue Title/i);
+      await user.type(titleInput, "Something broke");
+      expect(titleInput).toHaveValue("Something broke");
+
+      // Click Clear to open confirmation dialog
+      const clearBtn = screen.getByRole("button", { name: /^Clear$/ });
+      await user.click(clearBtn);
+
+      // Confirm in AlertDialog
+      const confirmBtn = await screen.findByRole("button", {
+        name: "Clear fields",
+      });
+      await user.click(confirmBtn);
+
+      // Title is cleared
+      expect(titleInput).toHaveValue("");
+
+      // Machine is cleared
+      const machineInput = document.querySelector<HTMLInputElement>(
+        'input[name="machineId"]'
+      );
+      expect(machineInput?.value ?? "").toBe("");
+
+      // URL no longer carries ?machine=
+      expect(window.location.search).not.toContain("machine=");
     });
   });
 });
