@@ -1806,8 +1806,10 @@ export const pinballmapState = pgTable(
     lastSyncError: text("last_sync_error"),
     // Manual-refresh token bucket (spec 3.2). `refreshTokens` is what is left of
     // the burst allowance; `refreshTokensAt` is the last refill instant, which
-    // advances by whole refill periods rather than to `now()` so partial
-    // progress toward the next token survives every claim.
+    // advances by whole refill periods while refilling below capacity so partial
+    // progress toward the next token survives every claim, but resets to
+    // `now()` when the bucket reaches full burst capacity so unconsumed idle
+    // time beyond the ceiling is not banked.
     //
     // A bucket rather than a flat floor because both halves of the requirement
     // are real: a person fixing several machines wants a few refreshes
