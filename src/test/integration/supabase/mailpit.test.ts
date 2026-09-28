@@ -18,8 +18,8 @@ describe("Mailpit Integration", () => {
   const mailpitUrl = `http://${mailpitHost}:${mailpitPort}/api/v1/messages`;
 
   beforeAll(() => {
-    // Ensure we're testing against local Mailpit (main: 54xxx, worktrees: 54xxx-63xxx)
-    expect(mailpitPort).toMatch(/^(5[4-9]\d{3}|6[0-3]\d{3})$/);
+    // Ensure we're testing against local Mailpit (main: 54xxx, worktrees: 54xxx-63xxx, CI: 24xxx)
+    expect(mailpitPort).toMatch(/^(24\d{3}|5[4-9]\d{3}|6[0-3]\d{3})$/);
   });
 
   it("should be accessible on configured port", async () => {

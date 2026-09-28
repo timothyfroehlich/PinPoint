@@ -101,6 +101,55 @@ test.describe("Issue List Features - Extended", () => {
     ).toBeVisible();
   });
 
+  test("a Severity Segment filters the list to its issues", async ({
+    page,
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name.includes("Mobile"),
+      "Phones collapse the widgets; the Machines phone test covers that layout"
+    );
+    await page.goto("/issues");
+    const severity = page.getByRole("region", { name: "Severity" });
+    await expect(severity).toBeVisible();
+
+    const levels = [
+      { label: "Cosmetic", value: "cosmetic" },
+      { label: "Minor", value: "minor" },
+      { label: "Major", value: "major" },
+      { label: "Unplayable", value: "unplayable" },
+    ];
+    let chosen: { label: string; value: string } | null = null;
+    for (const level of levels) {
+      const button = severity.getByRole("button", {
+        name: new RegExp(`^\\d+ ${level.label}$`),
+      });
+      if (await button.isEnabled()) {
+        chosen = level;
+        await button.click();
+        break;
+      }
+    }
+    if (chosen === null) throw new Error("No selectable Severity Segment");
+
+    await expect(page).toHaveURL(
+      new RegExp(`[?&]severity=${chosen.value}(?:&|$)`)
+    );
+    const selected = severity.getByRole("button", {
+      name: new RegExp(`^\\d+ ${chosen.label}$`),
+    });
+    await expect(selected).toHaveAttribute("aria-pressed", "true");
+    // All counts issues on On the Floor machines, the list's default view
+    // (issue-widgets §2.2), so the Segment count equals the filtered total.
+    // Both come from the same render, so other workers' issues can't race it.
+    const count = Number.parseInt(
+      (await selected.getAttribute("aria-label")) ?? "",
+      10
+    );
+    await expect(
+      page.getByText(new RegExp(`^Showing \\d+ of ${count} issues$`))
+    ).toBeVisible();
+  });
+
   test("should filter by Created and Modified date ranges", async ({
     page,
   }, testInfo) => {

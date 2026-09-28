@@ -37,6 +37,7 @@ export type { UnifiedUser, UserStatus, MachineOwner } from "./user";
 
 export {
   MACHINE_VIEW_FIELD_IDS,
+  type MachineViewBuiltInView,
   type MachineViewFieldId,
   type MachineViewHealth,
   type MachineViewOwnerOption,
@@ -44,7 +45,19 @@ export {
   type MachineViewPresetId,
   type MachineViewResult,
   type MachineViewRow,
+  type MachineViewSavedState,
+  type MachineViewSavedViews,
+  type MachineViewSavedViewSummary,
   type MachineViewScope,
+  type MachineViewSurfaceRef,
   type MachineViewSortDirection,
   type MachineViewState,
+  type MachineViewSummary,
 } from "./machine-view";
+
+export {
+  WIDGET_POPULATIONS,
+  type IssueListSummary,
+  type IssueWidgetCounts,
+  type WidgetPopulation,
+} from "./summary-widget";

@@ -85,3 +85,23 @@ export function withLmxRemoved(
   );
   return { ...snapshot, lmxes, machineCount: lmxes.length };
 }
+
+/**
+ * The snapshot with lmx `lmxId`'s Insider Connected setting replaced by what
+ * Pinball Map reported after a write (spec 3.8), so the page repaints with the
+ * new setting instead of offering the same action again until the next sync.
+ * Unchanged when the lmx is not in the snapshot.
+ */
+export function withLmxIcEnabled(
+  snapshot: LocationSnapshot,
+  lmxId: number,
+  icEnabled: boolean
+): LocationSnapshot {
+  if (!snapshot.lmxes.some((l) => l.id === lmxId)) return snapshot;
+  return {
+    ...snapshot,
+    lmxes: snapshot.lmxes.map((l) =>
+      l.id === lmxId ? { ...l, icEnabled } : l
+    ),
+  };
+}

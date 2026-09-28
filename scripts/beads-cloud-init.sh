@@ -158,12 +158,14 @@ fi
 # 6. Create the dolt_ignore'd tables a fresh clone is missing. bd keeps five
 #    tables (events, bd_events_journal, bd_events_seq, leases, wisps) out of
 #    version control via dolt_ignore — they live only in each machine's working
-#    set, so no clone of the remote ever contains them, and bd 1.2.2 does not
+#    set, so no clone of the remote ever contains them, and bd 1.2.2 did not
 #    lazily create them in an embedded clone. Without this, the first write
-#    fails: "Error 1146: table not found: events" (incident 2026-08-17,
-#    PP-esqi). Idempotent (IF NOT EXISTS) and safe for the shared remote:
-#    dolt_ignore keeps these tables out of bd's commits and pushes. Runs on the
-#    pull path too — a reused workspace may predate this repair.
+#    failed: "Error 1146: table not found: events" (incident 2026-08-17,
+#    PP-esqi). bd 1.3.0 creates them during `bd init --remote`, so on the
+#    current pin this step is a no-op guard (PP-s9na). Idempotent (IF NOT
+#    EXISTS) and safe for the shared remote: dolt_ignore keeps these tables
+#    out of bd's commits and pushes. Runs on the pull path too — a reused
+#    workspace may predate this repair.
 #    SCRIPT_DIR is resolved at the top of the script, before any cd (see there).
 REPAIR_SQL="$SCRIPT_DIR/beads-cloud-repair-tables.sql"
 DOLT_DB_DIR="$BEADS_DIR/.beads/embeddeddolt/PP"
