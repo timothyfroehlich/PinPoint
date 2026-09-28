@@ -83,7 +83,7 @@ The control's states (§4) are comparisons across these: _in sync_ means intent 
   - **Sync off**: neutral badge indicating the machine is excluded from sync.
   - **Unlinked / Uncataloged**: neutral badge indicating no catalog model is linked (`No model`) or the machine is uncataloged (`Uncataloged`).
   - **Integration inactive**: when the integration is `Not configured` or `Waiting` for its first snapshot, the PBM column group surfaces the integration-level status rather than per-row evaluation.
-- **4.11** When a machine is created with a catalog title, the New Machine page offers the intent toggle and, for an eligible title, the Insider Connected switch, both starting Off. When intent is On and the person can push (8.2), it also offers **Add to Pinball Map after creating**, ticked by default. Ticking it stands as the 4.5 confirmation: creating the machine then runs the add push (4.3). If that push fails, the machine is still created, and its Manage tab shows the resulting out-of-sync state with the failure.
+- **4.11** When a machine is created with a catalog title, the New Machine page offers the intent toggle and, for an eligible title, the Insider Connected switch, both starting Off. The intent toggle starts On instead when the page is opened from a lineup entry (`pinballmap-lineup.md` §5.4). When intent is On, the title is not already on the lineup, and the person can push (8.2), it also offers **Add to Pinball Map after creating**, ticked by default. Ticking it stands as the 4.5 confirmation: creating the machine then runs the add push (4.3). If that push fails, the machine is still created, and its Manage tab shows the resulting out-of-sync state with the failure.
 
 ## 5. Automatic behavior
 
@@ -182,6 +182,7 @@ Replacing the tracked location is a rare, near-never operation — PinPoint trac
 
 | Spec | Code today | Resolution |
 | :-- | :-- | :-- |
+| 4.11 New Machine intent | The New Machine page has no intent toggle, Insider Connected switch, or add-after-creating option; a lineup entry's Create in PinPoint preselects only the title | PP-wqit.14 |
 | 2.7 catalog corrections | Manufacturer and year are copied when a machine is matched and never refreshed | PP-o355.46 |
 | 3.6–3.7 lineup confirmation | The client method exists, but the lineup page header offers no Confirm lineup on Pinball Map | PP-o355.58; condition-comment posting deferred (PP-o355.57) |
 | 8.2, 8.4–8.6 per-member account linking | Writes use one admin-provisioned operator credential; no member linking, relink state, or link prompt exists | PP-o355.6 |
@@ -195,6 +196,7 @@ Changes to this document. Divergence-table rows are working state and are not lo
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-28 | §4.11: the intent toggle starts On when the New Machine page is opened from a lineup entry, and Add to Pinball Map after creating is offered only when the title is not already on the lineup. |
 | 2026-09-27 | Added type, display, player count, designers, and artists to the manual model (§2.4). Added §4.11: the New Machine page sets intent and Insider Connected, and can add the machine to Pinball Map as part of creating it. |
 | 2026-09-27 | §4.3: push buttons read **Add to Pinball Map / Remove from Pinball Map**, dropping "machine". Moved lineup confirmation (§3.7), edition near-miss flagging (§2.6), and fleet-wide Pinball Map views (§10) from the `/fleet` dashboard to the new lineup page (`docs/feature-specs/pinballmap-lineup.md`). |
 | 2026-09-26 | Added §2.7: a matched machine's manufacturer and year follow its Pinball Map catalog title, so a catalog correction updates every matched machine automatically and a cleared value becomes blank; the manual model is untouched. |
