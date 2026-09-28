@@ -1,6 +1,7 @@
 /**
  * Design and art credits for a machine, taken from its stored OPDB record
- * (PP-tv2u). Shown on the Info tab's Details card and on the apron card
+ * (PP-tv2u), or for an uncataloged machine from its hand-entered lists
+ * (PP-wqit.14). Shown on the Info tab's Details card and on the apron card
  * (spec apron-cards §10).
  */
 import type { OpdbPerson } from "./types";
@@ -31,6 +32,23 @@ export function creditsFromPeople(
     design: namesForRole(people, "design"),
     art: namesForRole(people, "art"),
   };
+}
+
+/**
+ * An uncataloged machine's hand-entered designers and artists (pinballmap
+ * spec 2.4, apron-cards 10.1), cleaned the way OPDB names are: trimmed, blanks
+ * dropped, duplicates removed, entry order kept.
+ */
+export function creditsFromNames(
+  designers: readonly string[] | null,
+  artists: readonly string[] | null
+): MachineCredits {
+  const clean = (names: readonly string[] | null): string[] => [
+    ...new Set(
+      (names ?? []).map((name) => name.trim()).filter((name) => name !== "")
+    ),
+  ];
+  return { design: clean(designers), art: clean(artists) };
 }
 
 /**

@@ -14,8 +14,9 @@ const { getTagsForMachine, listTags } = await import("~/lib/tags/tags");
 
 /**
  * Type, Display and Player Count tags (spec collections-and-tags 9.1–9.6): taken
- * from the stored OPDB record of a machine's catalog title, never from a
- * machine without one.
+ * from the stored OPDB record of a machine's catalog title, or from the
+ * hand-entered model of an uncataloged machine (PP-wqit.14) — never from a
+ * machine with neither.
  */
 describe("OPDB tags", () => {
   setupTestDb();
@@ -86,12 +87,21 @@ describe("OPDB tags", () => {
         name: "No OPDB",
         pinballmapMachineId: 5,
       }),
-      // Uncataloged machines have no catalog title and so no OPDB tags.
+      // An uncataloged machine with a blank manual model has no such tags.
       createTestMachine({
         initials: "HB",
         name: "Homebrew",
         pinballmapExcluded: true,
         manufacturer: "Garage",
+      }),
+      // An uncataloged machine's hand-entered values tag it like OPDB's do.
+      createTestMachine({
+        initials: "KS",
+        name: "Kordek Special",
+        pinballmapExcluded: true,
+        type: "em",
+        display: "lights",
+        playerCount: 2,
       }),
     ]);
   });
@@ -109,17 +119,19 @@ describe("OPDB tags", () => {
       {
         slug: "electromechanical",
         name: "Electromechanical",
-        initials: ["FF"],
+        initials: ["FF", "KS"],
       },
       { slug: "solid-state", name: "Solid State", initials: ["FH", "GZ"] },
     ]);
     expect(summary("display")).toEqual([
       { slug: "reels", name: "Reels", initials: ["FF"] },
+      { slug: "lights", name: "Lights", initials: ["KS"] },
       { slug: "alphanumeric", name: "Alphanumeric", initials: ["FH"] },
       { slug: "lcd", name: "LCD", initials: ["GZ"] },
     ]);
     expect(summary("player-count")).toEqual([
       { slug: "1-player", name: "1 Player", initials: ["FF"] },
+      { slug: "2-players", name: "2 Players", initials: ["KS"] },
       { slug: "4-players", name: "4 Players", initials: ["FH", "GZ"] },
     ]);
   });
@@ -150,6 +162,15 @@ describe("OPDB tags", () => {
         (tag) => tag.type
       )
     ).toEqual(["manufacturer"]);
+    expect(
+      (await getTagsForMachine(asDbOrTx(db), await idOf("KS"))).map(
+        (tag) => `${tag.type}:${tag.name}`
+      )
+    ).toEqual([
+      "type:Electromechanical",
+      "display:Lights",
+      "player-count:2 Players",
+    ]);
   });
 
   it("scopes Machine View to a tag's members", async () => {

@@ -80,6 +80,11 @@ function makeMachine(
     manufacturer: null,
     currentManufacturer: null,
     year: null,
+    type: null,
+    display: null,
+    playerCount: null,
+    designers: null,
+    artists: null,
     artwork: null,
     ...overrides,
   };

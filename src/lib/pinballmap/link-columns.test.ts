@@ -22,6 +22,7 @@ vi.mock("./state", () => ({
 import { getCatalogEntry } from "./catalog";
 import { getPinballMapState } from "./state";
 import {
+  normalizeCreditNames,
   resolvePbmLinkColumnsForCreate,
   resolvePbmLinkColumnsForUpdate,
 } from "./link-columns";
@@ -314,5 +315,73 @@ describe("hand-entered model identity", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.columns.modelName).toBeNull();
+  });
+});
+
+/**
+ * The rest of the manual model (PP-wqit.14): type, display, player count,
+ * designers and artists follow the same one-branch rule as the model name.
+ */
+describe("hand-entered type, display, players and credits", () => {
+  const stored = {
+    pinballmapMachineId: null,
+    pinballmapIntent: "off",
+  } as const;
+  const manual = {
+    type: "em",
+    display: "reels",
+    playerCount: 4,
+    designers: ["  Steve Kordek ", "", "Wayne Neyens"],
+    artists: ["   "],
+  } as const;
+
+  it("stores them on the excluded branch, credit lists cleaned", async () => {
+    const result = await resolvePbmLinkColumnsForUpdate(
+      { pinballmapExcluded: true, ...manual },
+      stored
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.columns).toMatchObject({
+      type: "em",
+      display: "reels",
+      playerCount: 4,
+      designers: ["Steve Kordek", "Wayne Neyens"],
+      // A list of only blanks is no list — stored as null for the CHECK.
+      artists: null,
+    });
+  });
+
+  it("nulls them when a catalog title is chosen", async () => {
+    const result = await resolvePbmLinkColumnsForUpdate(
+      { pinballmapMachineId: 6221, ...manual },
+      stored
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.columns).toMatchObject({
+      type: null,
+      display: null,
+      playerCount: null,
+      designers: null,
+      artists: null,
+    });
+  });
+});
+
+describe("normalizeCreditNames", () => {
+  it("keeps order and never splits a name on punctuation", () => {
+    expect(normalizeCreditNames(["Lawlor, Pat", " John Youssi "])).toEqual([
+      "Lawlor, Pat",
+      "John Youssi",
+    ]);
+  });
+
+  it("reads absent or empty as null", () => {
+    expect(normalizeCreditNames(undefined)).toBeNull();
+    expect(normalizeCreditNames([])).toBeNull();
+    expect(normalizeCreditNames(["", "  "])).toBeNull();
   });
 });

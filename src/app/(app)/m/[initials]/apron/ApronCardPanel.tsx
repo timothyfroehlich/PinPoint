@@ -29,9 +29,7 @@ export async function ApronCardPanel({
     resolveRequestUrl(await headers()),
     machine.initials
   );
-  const credits = await getMachineCredits(
-    machine.pinballmapTitle?.opdbId ?? null
-  );
+  const credits = await getMachineCredits(machine);
   const { name, edition, manufacturer, year, ownerName } = apronCardContent(
     machine,
     credits

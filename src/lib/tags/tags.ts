@@ -24,24 +24,31 @@ export interface MachineTag {
 
 export type TagsByType = Record<TagTypeId, MachineTag[]>;
 
+/**
+ * The model facts the Type, Display and Player Count tags read. A catalog-linked
+ * machine gets them from its title's OPDB record; an uncataloged one from its
+ * own hand-entered columns (spec 9.1). Null when the machine has neither.
+ */
+type ModelFacts = Pick<OpdbMachine, "type" | "display" | "playerCount">;
+
 interface Member {
   machine: CollectionMachine;
   manufacturer: string | null;
-  opdb: OpdbMachine | null;
+  model: ModelFacts | null;
 }
 
 /** Group members under the label each maps to, ordered by the label's rank. */
 function groupByLabel(
   type: TagTypeId,
   members: readonly Member[],
-  labelOf: (opdb: OpdbMachine) => TagLabel | null
+  labelOf: (model: ModelFacts) => TagLabel | null
 ): MachineTag[] {
   const groups = new Map<
     string,
     { label: TagLabel; machines: CollectionMachine[] }
   >();
   for (const member of members) {
-    const label = member.opdb === null ? null : labelOf(member.opdb);
+    const label = member.model === null ? null : labelOf(member.model);
     if (label === null) continue;
     const group = groups.get(label.slug);
     if (group) group.machines.push(member.machine);
@@ -62,7 +69,8 @@ function groupByLabel(
  * presence state. Membership is derived from stored machine, catalog and OPDB
  * rows, so reading a tag never calls an external service (spec
  * collections-and-tags 7.6). Type, Display and Player Count tags come from the
- * OPDB record of a machine's catalog title (spec 9.1–9.2).
+ * OPDB record of a machine's catalog title, or from the hand-entered model of
+ * an uncataloged machine (spec 9.1–9.2).
  */
 async function loadTags(tx: DbTransaction): Promise<TagsByType> {
   const rows = await tx.query.machines.findMany({
@@ -74,6 +82,9 @@ async function loadTags(tx: DbTransaction): Promise<TagsByType> {
       manufacturer: true,
       pinballmapMachineId: true,
       pinballmapExcluded: true,
+      type: true,
+      display: true,
+      playerCount: true,
     },
     with: {
       pinballmapTitle: { columns: { manufacturer: true, opdbId: true } },
@@ -103,7 +114,18 @@ async function loadTags(tx: DbTransaction): Promise<TagsByType> {
         presenceStatus: row.presenceStatus,
       },
       manufacturer: getCurrentManufacturer(row),
-      opdb: opdbId === null ? null : (records.get(opdbId) ?? null),
+      // The CHECK `machines_manual_model_requires_excluded` keeps the
+      // hand-entered columns null on any other machine, so the two sources
+      // never both apply.
+      model: row.pinballmapExcluded
+        ? {
+            type: row.type,
+            display: row.display,
+            playerCount: row.playerCount,
+          }
+        : opdbId === null
+          ? null
+          : (records.get(opdbId) ?? null),
     };
   });
 
@@ -114,12 +136,12 @@ async function loadTags(tx: DbTransaction): Promise<TagsByType> {
       name: group.name,
       machines: group.machines.map((member) => member.machine),
     })),
-    type: groupByLabel("type", members, (opdb) => typeTag(opdb.type)),
-    display: groupByLabel("display", members, (opdb) =>
-      displayTag(opdb.display)
+    type: groupByLabel("type", members, (model) => typeTag(model.type)),
+    display: groupByLabel("display", members, (model) =>
+      displayTag(model.display)
     ),
-    "player-count": groupByLabel("player-count", members, (opdb) =>
-      playersTag(opdb.playerCount)
+    "player-count": groupByLabel("player-count", members, (model) =>
+      playersTag(model.playerCount)
     ),
   };
 }
