@@ -266,7 +266,7 @@ export function LineupLinkOptionsProvider({
 
 /**
  * The three actions every On Pinball Map, not linked row offers (§5.4):
- * Remove from Pinball Map, Create in PinPoint, and Link — right-aligned, so
+ * Remove from Pinball Map, Create in PinPoint, and Link to PinPoint — right-aligned, so
  * Link keeps its slot when a viewer lacks the others.
  */
 export function LineupEntryActions({
@@ -390,7 +390,7 @@ function LinkEntryDialog({
           className={LINEUP_SLOT_BUTTON}
           data-testid={`pbm-lineup-link-${String(titleId)}`}
         >
-          Link
+          Link to PinPoint
         </Button>
       </DialogTrigger>
       <DialogContent data-testid="pbm-lineup-link-dialog">

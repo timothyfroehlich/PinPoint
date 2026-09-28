@@ -259,7 +259,7 @@ function EditSlot({ initials }: { initials: string }): React.JSX.Element {
           size="sm"
           className={LINEUP_SLOT_BUTTON}
         >
-          <Link href={`/m/${initials}/edit`}>Edit</Link>
+          <Link href={`/m/${initials}/edit`}>Edit Machine</Link>
         </Button>
       </div>
     </div>
@@ -363,7 +363,7 @@ function SectionRows({
                   canLink={context.canLink}
                   createHref={
                     context.canCreate
-                      ? `/m/new?${new URLSearchParams({ title: row.title.name }).toString()}`
+                      ? `/m/new?${new URLSearchParams({ title: row.title.name, pbm: String(row.title.id) }).toString()}`
                       : null
                   }
                   writeEnabled={context.writeEnabled}

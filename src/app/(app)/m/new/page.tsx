@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { CreateMachineForm } from "./create-machine-form";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { db } from "~/server/db";
-import { userProfiles } from "~/server/db/schema";
+import { pinballmapCatalog, userProfiles } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 import { Forbidden } from "~/components/errors/Forbidden";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
@@ -23,7 +23,10 @@ import { isIscoredConfigured } from "~/lib/iscored/config";
 export default async function NewMachinePage({
   searchParams,
 }: {
-  searchParams: Promise<{ title?: string | string[] }>;
+  searchParams: Promise<{
+    title?: string | string[];
+    pbm?: string | string[];
+  }>;
 }): Promise<React.JSX.Element> {
   // Auth guard - check if user is authenticated (CORE-SSR-002)
   const supabase = await createClient();
@@ -62,8 +65,16 @@ export default async function NewMachinePage({
   }));
 
   const iscoredConfigured = isIscoredConfigured();
-  // `?title=` prefills the name, for the lineup page's Create in PinPoint.
-  const { title } = await searchParams;
+  // `?title=` prefills the name and `?pbm=` the Pinball Map title, for the
+  // lineup page's Create in PinPoint.
+  const { title, pbm } = await searchParams;
+  const pbmId = typeof pbm === "string" ? Number.parseInt(pbm, 10) : NaN;
+  const initialPinballmap = Number.isSafeInteger(pbmId)
+    ? await db.query.pinballmapCatalog.findFirst({
+        columns: { pinballmapMachineId: true, name: true },
+        where: eq(pinballmapCatalog.pinballmapMachineId, pbmId),
+      })
+    : undefined;
 
   return (
     <PageContainer size="standard" className="pt-4 pb-8">
@@ -77,6 +88,14 @@ export default async function NewMachinePage({
             canSelectOwner={canCreateMachine}
             iscoredConfigured={iscoredConfigured}
             initialName={typeof title === "string" ? title : undefined}
+            initialPinballmap={
+              initialPinballmap
+                ? {
+                    id: initialPinballmap.pinballmapMachineId,
+                    name: initialPinballmap.name,
+                  }
+                : undefined
+            }
           />
         </CardContent>
       </Card>
