@@ -410,8 +410,8 @@ function LinkEntryDialog({
         {chosen?.linkedTitle != null ? (
           <div className="text-sm text-on-warning-container">
             {chosen.initials} is linked to {chosen.linkedTitle}. Linking it here
-            sets it Off the lineup; the {chosen.linkedTitle} entry stays on
-            Pinball Map until removed.
+            sets it On the lineup for {game}; the {chosen.linkedTitle} entry
+            stays on Pinball Map until removed.
           </div>
         ) : null}
         {error !== null ? (

@@ -1397,7 +1397,10 @@ describe("Lineup page: unlinked entries (PGlite)", () => {
     ).resolves.toMatchObject({ ok: false, code: "UNAUTHORIZED" });
     await expect(
       linkMachineToPinballmapEntryAction(undefined, linkForm(mine.id))
-    ).resolves.toEqual({ ok: true, value: { pinballmapMachineId: 8080 } });
+    ).resolves.toEqual({
+      ok: true,
+      value: { pinballmapMachineId: 8080, intent: "on" },
+    });
 
     const rows = await db
       .select({
@@ -1406,13 +1409,73 @@ describe("Lineup page: unlinked entries (PGlite)", () => {
         intent: machines.pinballmapIntent,
       })
       .from(machines);
-    // Matching never touches the lineup or sets intent On (pinballmap §2.2).
+    // The entry is already on the lineup, so the match sets the machine On
+    // (pinballmap §2.3); it writes nothing to Pinball Map.
     expect(rows).toEqual(
       expect.arrayContaining([
-        { id: mine.id, title: 8080, intent: "off" },
+        { id: mine.id, title: 8080, intent: "on" },
         { id: theirs.id, title: null, intent: "off" },
       ])
     );
     expect(pbm.lineup).toEqual([]);
+  });
+
+  it("keeps Don't sync, and leaves a machine whose availability forbids On Off", async () => {
+    const db = await getTestDb();
+    const { linkMachineToPinballmapEntryAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    await seedState([
+      { id: 4041, machineId: 8081 },
+      { id: 4042, machineId: 8082 },
+      { id: 4043, machineId: 8083 },
+    ]);
+    await db.insert(pinballmapCatalog).values([
+      { pinballmapMachineId: 8081, name: "Old Title" },
+      { pinballmapMachineId: 8082, name: "Arriving" },
+      { pinballmapMachineId: 8083, name: "Retargeted" },
+    ]);
+    const [skip, arriving, moved] = await db
+      .insert(machines)
+      .values([
+        {
+          name: "Skip",
+          initials: "SKP",
+          pinballmapMachineId: 8081,
+          pinballmapIntent: "no_sync",
+        },
+        {
+          name: "Arriving",
+          initials: "ARR",
+          presenceStatus: "pending_arrival",
+        },
+        {
+          name: "Moved",
+          initials: "MOV",
+          pinballmapMachineId: 8081,
+          pinballmapIntent: "off",
+        },
+      ])
+      .returning();
+    if (!skip || !arriving || !moved)
+      throw new Error("failed to seed machines");
+
+    const link = (machineId: string, title: number): FormData => {
+      const fd = form(machineId);
+      fd.append("pinballmapMachineId", String(title));
+      return fd;
+    };
+
+    await expect(
+      linkMachineToPinballmapEntryAction(undefined, link(skip.id, 8082))
+    ).resolves.toMatchObject({ ok: true, value: { intent: "no_sync" } });
+    await expect(
+      linkMachineToPinballmapEntryAction(undefined, link(arriving.id, 8083))
+    ).resolves.toMatchObject({ ok: true, value: { intent: "off" } });
+    // A re-match from another title resets to Off, then goes On (§2.3).
+    await expect(
+      linkMachineToPinballmapEntryAction(undefined, link(moved.id, 8082))
+    ).resolves.toMatchObject({ ok: true, value: { intent: "on" } });
   });
 });

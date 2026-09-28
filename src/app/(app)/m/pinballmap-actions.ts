@@ -1300,8 +1300,8 @@ export async function removeUnlinkedPinballmapEntryAction(
 }
 
 export type LinkPinballmapEntryResult = Result<
-  { pinballmapMachineId: number },
-  "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "CONFLICT"
+  { pinballmapMachineId: number; intent: PbmListingIntent },
+  "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "CONFLICT" | "SERVER"
 >;
 
 /**
@@ -1313,6 +1313,12 @@ export type LinkPinballmapEntryResult = Result<
  * tool uses, so re-matching a machine follows the standard reset and
  * abandoned-entry rules (pinballmap §2.3, §2.5). Gated on the machine-linking
  * capability for the chosen machine (§8.1). Writes only to PinPoint.
+ *
+ * The entry is already on the lineup, so the match then sets the machine On
+ * (pinballmap §2.3) unless it is set to Don't sync or its availability forbids
+ * On (§6.2). That is a second, intent-only update: the re-match itself still
+ * resets intent as §2.3 describes, and a failure between the two is reported
+ * rather than left looking like the link did it all (CORE-ARCH-012).
  */
 export async function linkMachineToPinballmapEntryAction(
   _prev: LinkPinballmapEntryResult | undefined,
@@ -1341,7 +1347,7 @@ export async function linkMachineToPinballmapEntryAction(
   if (machine.presenceStatus === "removed")
     return err("VALIDATION", "This machine is marked Removed.");
   if (machine.pinballmapMachineId === pinballmapMachineId)
-    return ok({ pinballmapMachineId });
+    return ok({ pinballmapMachineId, intent: machine.pinballmapIntent });
 
   const updated = await updateMachinePbmLink({
     machineId: machine.id,
@@ -1355,9 +1361,30 @@ export async function linkMachineToPinballmapEntryAction(
     return err("VALIDATION", updated.message);
   }
 
+  let intent = updated.columns.pinballmapIntent;
+  if (
+    intent === "off" &&
+    !INTENT_ON_BLOCKED_BY.includes(machine.presenceStatus)
+  ) {
+    const setOn = await updateMachinePbmLink({
+      machineId: machine.id,
+      actorUserId: userId,
+      selection: { intent: "on" },
+    });
+    if (!setOn.ok) {
+      revalidatePath(`/m/${machine.initials}`);
+      revalidatePath("/m", "layout");
+      return err(
+        "SERVER",
+        `Linked ${machine.initials}, but setting it On the lineup failed: ${setOn.message} Set it On from its Manage tab.`
+      );
+    }
+    intent = setOn.columns.pinballmapIntent;
+  }
+
   revalidatePath(`/m/${machine.initials}`);
   revalidatePath("/m", "layout");
-  return ok({ pinballmapMachineId });
+  return ok({ pinballmapMachineId, intent });
 }
 
 export type SetInsiderConnectedIntentResult = Result<
