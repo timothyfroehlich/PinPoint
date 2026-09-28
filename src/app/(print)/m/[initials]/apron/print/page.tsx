@@ -41,6 +41,7 @@ export default async function ApronCardPrintPage({
       where: eq(machines.initials, initials),
       with: {
         owner: { columns: { name: true } },
+        invitedOwner: { columns: { name: true } },
         pinballmapTitle: {
           columns: {
             name: true,

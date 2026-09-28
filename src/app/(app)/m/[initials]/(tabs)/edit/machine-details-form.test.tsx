@@ -25,17 +25,19 @@ vi.mock("~/app/(app)/m/actions", () => ({
 
 vi.mock("~/components/machines/IscoredGamePicker", () => {
   const MockPicker = ({
+    machineId,
     defaultGameId,
     machineName,
     onDirty,
   }: {
+    machineId?: string;
     defaultGameId?: string | null;
     machineName?: string;
     onDirty?: () => void;
   }) => {
     const [val, setVal] = useState(defaultGameId ?? "");
     return (
-      <div data-testid="mock-iscored-game-picker">
+      <div data-testid="mock-iscored-game-picker" data-machine-id={machineId}>
         <input
           type="hidden"
           name="iscoredGameId"
@@ -668,6 +670,15 @@ describe("MachineDetailsForm", () => {
 
       expect(screen.getByTestId("iscored-machine-name")).toHaveTextContent(
         "New Live Name"
+      );
+    });
+
+    it("wires machineId to IscoredGamePicker", () => {
+      renderForm();
+
+      expect(screen.getByTestId("mock-iscored-game-picker")).toHaveAttribute(
+        "data-machine-id",
+        baseProps.machineId
       );
     });
   });

@@ -164,15 +164,12 @@ rv_label=$(jq -r '.label' <<< "$review_summary")
 rv_covered=$(jq -r '.coverage != null' <<< "$review_summary")
 
 # What one checker record is, in words: "Claude Code review record (medium)",
-# "CodeRabbit GitHub approval", "Codex clean
-# review comment", … Keyed on `detail` (the review state or the evidence kind) so a
-# stale record reads the same as the covering one it used to be.
+# "Codex clean review comment", … Keyed on `detail` (the review state or the evidence kind)
+# so a stale record reads the same as the covering one it used to be.
 record_phrase() {
   local checker=$1 detail=$2 level=${3:-}
   case "$checker:$detail" in
     claude:*) printf 'Claude Code review record (%s)\n' "$level" ;;
-    coderabbit:APPROVED) printf 'CodeRabbit GitHub approval\n' ;;
-    coderabbit:*) printf 'CodeRabbit GitHub review (%s)\n' "$detail" ;;
     codex:APPROVED) printf 'Codex GitHub approval\n' ;;
     codex:NO_FINDINGS) printf 'Codex clean review comment\n' ;;
     codex:REACTION_WITNESS) printf 'Codex clean reaction witness\n' ;;
@@ -230,7 +227,7 @@ else
     if [[ "$cr_threads" -gt 0 ]]; then
       review_desc="CHANGES REQUESTED on head ${short_head} (${cr_threads} unresolved thread(s)) — fix or decline-and-resolve, then get head re-reviewed"
     else
-      cr_who=$(jq -r '[.checkers | to_entries[] | select(.value.verdict == "changes_requested") | .key | if . == "coderabbit" then "CodeRabbit" elif . == "codex" then "Codex" else . end] | join(", ")' <<< "$review_summary")
+      cr_who=$(jq -r '[.checkers | to_entries[] | select(.value.verdict == "changes_requested") | .key | if . == "codex" then "Codex" else . end] | join(", ")' <<< "$review_summary")
       review_desc="CHANGES REQUESTED on head ${short_head} by ${cr_who} — address the review, then get head re-reviewed"
     fi
   fi

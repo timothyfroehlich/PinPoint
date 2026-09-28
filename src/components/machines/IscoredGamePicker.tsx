@@ -23,6 +23,7 @@ import { getIscoredGamesAction } from "~/app/(app)/m/iscored-actions";
 import type { IscoredGame } from "~/lib/iscored/types";
 
 export interface IscoredGamePickerProps {
+  machineId?: string;
   defaultGameId?: string | null;
   machineName?: string;
   disabled?: boolean;
@@ -120,6 +121,7 @@ export function findSuggestedGame(
  * without forcibly pre-selecting it. Submits via a hidden `iscoredGameId` input.
  */
 export function IscoredGamePicker({
+  machineId,
   defaultGameId,
   machineName,
   disabled = false,
@@ -140,7 +142,9 @@ export function IscoredGamePicker({
     async function loadGames(): Promise<void> {
       setLoading(true);
       try {
-        const result = await getIscoredGamesAction();
+        const result = await getIscoredGamesAction(
+          machineId ? { machineId } : undefined
+        );
         if (cancelled) return;
 
         if ("error" in result) {
@@ -168,7 +172,7 @@ export function IscoredGamePicker({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [machineId]);
 
   // Update selected game ID when defaultGameId prop updates
   useEffect(() => {
