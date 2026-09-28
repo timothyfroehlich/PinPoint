@@ -450,6 +450,9 @@ function Header({
 
         {canRefresh && locationUrl !== null ? (
           <Button
+            // The control now sits inside the machine form (Integrations), so
+            // an untyped button would submit that form.
+            type="button"
             variant="outline"
             size="sm"
             loading={pending}
