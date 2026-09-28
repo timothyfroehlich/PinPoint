@@ -22,28 +22,16 @@ import {
   AlertDialogTitle,
 } from "~/components/ui/alert-dialog";
 import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
-import { Label } from "~/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "~/components/ui/select";
 import {
   updateMachineAction,
   type UpdateMachineResult,
 } from "~/app/(app)/m/actions";
 import { PinballMapLinkField } from "~/components/machines/PinballMapLinkField";
 import { IscoredGamePicker } from "~/components/machines/IscoredGamePicker";
-import { RichTextEditor } from "~/components/editor/RichTextEditorDynamic";
+import { MachineFormFields } from "~/components/machines/machine-form/MachineFormFields";
+import { MachineFormActionBar } from "~/components/machines/machine-form/MachineFormActionBar";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
-import {
-  VALID_MACHINE_PRESENCE_STATUSES,
-  getMachinePresenceLabel,
-  type MachinePresenceStatus,
-} from "~/lib/machines/presence";
+import type { MachinePresenceStatus } from "~/lib/machines/presence";
 import type { OpdbDisplayType, OpdbMachineType } from "~/lib/opdb/types";
 
 export interface MachineDetailsFormProps {
@@ -67,22 +55,29 @@ export interface MachineDetailsFormProps {
   artists: string[] | null;
   /** Linked iScored game ID string, or null if unlinked. */
   iscoredGameId: string | null;
+  ownerRequirements: ProseMirrorDoc | null;
+  /** Viewer may see Owner's Requirements (machine-editing 2.6). */
+  canViewOwnerRequirements: boolean;
+  /**
+   * The machine's Pinball Map controls, rendered inside Integrations (3.6).
+   * Built by the page, which derives their whole view on the server.
+   */
+  pinballmap?: React.ReactNode;
 }
 
 /**
- * Details section of the machine edit page (PP-o355.19).
+ * The Manage tab's machine form (PP-o355.19, PP-wqit.14.2).
  *
- * The section owns its own save: everything inside this form is written by one
- * `updateMachineAction` submit, and nothing outside it rides along. Ownership
- * deliberately does NOT live here — it moved to the Danger zone, which submits
- * its own form. Because this form carries no `ownerId` field, the action leaves
- * the owner columns untouched.
+ * The same fields, in the same order, as the New Machine page
+ * (`MachineFormFields`, machine-editing 2.1). One Save writes every field in
+ * it through one `updateMachineAction` submit (4.1). Ownership deliberately
+ * does NOT live here — owner transfer is in the Danger zone, which acts on its
+ * own. Because this form carries no `ownerId` field, the action leaves the
+ * owner columns untouched.
  *
- * The PinballMap catalog picker renders here rather than in the PinballMap
- * section because it is genuinely part of this save today — it submits with
- * these fields. PP-o355.21 moves it into that section with its own Save title
- * button; until then, putting it under a heading that implies otherwise would
- * misrepresent the save model.
+ * The Pinball Map controls render inside the Integrations section but are not
+ * part of this save: they act immediately, and the page wraps them in a gate
+ * that holds them inert while this form is dirty (4.2).
  */
 export function MachineDetailsForm({
   machineId,
@@ -102,6 +97,9 @@ export function MachineDetailsForm({
   designers,
   artists,
   iscoredGameId,
+  ownerRequirements,
+  canViewOwnerRequirements,
+  pinballmap = null,
 }: MachineDetailsFormProps): React.JSX.Element {
   const [state, formAction, isPending] = useActionState<
     UpdateMachineResult | undefined,
@@ -121,14 +119,19 @@ export function MachineDetailsForm({
   const shownState = resultDismissed ? undefined : state;
 
   const router = useRouter();
-  // Non-null exactly while the discard dialog is open; holds where the user was
-  // heading so "Discard changes" can finish the trip.
-  const [pendingHref, setPendingHref] = useState<string | null>(null);
+  // Non-null exactly while the discard dialog is open: either a navigation
+  // the user started (so "Discard changes" can finish the trip), or Cancel,
+  // which discards after the same confirmation (machine-editing 4.1).
+  const [pendingDiscard, setPendingDiscard] = useState<
+    { kind: "navigate"; href: string } | { kind: "cancel" } | null
+  >(null);
   // The RichTextEditor is uncontrolled after mount (content is an initial
   // prop), so its doc is mirrored here to serialize into the hidden field.
   const [descriptionDoc, setDescriptionDoc] = useState<ProseMirrorDoc | null>(
     description
   );
+  const [ownerRequirementsDoc, setOwnerRequirementsDoc] =
+    useState<ProseMirrorDoc | null>(ownerRequirements);
   // Machine Name stays uncontrolled, but its live value is mirrored because the
   // Model Details field below shows it as the placeholder — and that
   // placeholder is a promise: a blank model name resolves to the machine's name
@@ -250,9 +253,10 @@ export function MachineDetailsForm({
 
       event.preventDefault();
       event.stopPropagation();
-      setPendingHref(
-        `${destination.pathname}${destination.search}${destination.hash}`
-      );
+      setPendingDiscard({
+        kind: "navigate",
+        href: `${destination.pathname}${destination.search}${destination.hash}`,
+      });
     };
     document.addEventListener("click", handleClick, true);
     return () => {
@@ -301,30 +305,45 @@ export function MachineDetailsForm({
   };
 
   const keepEditing = (): void => {
-    setPendingHref(null);
+    setPendingDiscard(null);
   };
 
-  const discardAndLeave = (): void => {
-    const destination = pendingHref;
-    setPendingHref(null);
-    // Clear dirtiness FIRST so both listeners unsubscribe before the navigation
-    // starts — otherwise the guard is still armed on the way out.
-    setIsDirty(false);
-    if (destination !== null) router.push(destination);
-  };
-
-  const handleCancel = (): void => {
+  const discardEdits = (): void => {
     setDescriptionDoc(description);
+    setOwnerRequirementsDoc(ownerRequirements);
     // The remount restores the input's defaultValue without firing `change`,
     // so the mirror has to be put back by hand.
     setLiveName(name);
     setResetKey((k) => k + 1);
     setIsDirty(false);
-    // Cancel discards the edits, so any banner or "Saved" note describing them
-    // has to go with them — otherwise a failed save leaves its error on screen
-    // over reverted fields, and a prior success reads as "Saved" about values
-    // that were just thrown away (PP-o355.19 review).
+    // Discarding throws the edits away, so any banner or "Saved" note
+    // describing them has to go with them — otherwise a failed save leaves its
+    // error on screen over reverted fields, and a prior success reads as
+    // "Saved" about values that were just thrown away (PP-o355.19 review).
     setResultDismissed(true);
+  };
+
+  const confirmDiscard = (): void => {
+    const pending = pendingDiscard;
+    setPendingDiscard(null);
+    if (pending?.kind === "navigate") {
+      // Clear dirtiness FIRST so both listeners unsubscribe before the
+      // navigation starts — otherwise the guard is still armed on the way out.
+      setIsDirty(false);
+      router.push(pending.href);
+      return;
+    }
+    discardEdits();
+  };
+
+  // Cancel discards after confirming (machine-editing 4.1). With nothing
+  // unsaved there is nothing to lose, so it only clears a stale result note.
+  const handleCancel = (): void => {
+    if (isDirty) {
+      setPendingDiscard({ kind: "cancel" });
+      return;
+    }
+    discardEdits();
   };
 
   return (
@@ -339,7 +358,7 @@ export function MachineDetailsForm({
         // Any native input event marks the section dirty. Radix Select changes
         // do not bubble `input`, so Availability flags dirtiness explicitly.
         onInput={markDirty}
-        className="space-y-4"
+        className="space-y-5"
         data-testid="machine-details-form"
       >
         <input type="hidden" name="id" value={machineId} />
@@ -352,132 +371,97 @@ export function MachineDetailsForm({
           </div>
         )}
 
-        {/* Name and Availability share a row once the container is wide enough.
-          This pairing is deliberate but NOT semantic — unlike Model/Edition
-          (which pair inside PinballMapLinkField, where Edition is meaningless
-          without a Model), these two fields have nothing to do with each other
-          and are paired purely because both are short. The tradeoff was taken
-          knowingly: multi-column forms cost some scanning speed when the
-          columns aren't related, and it makes tab order Name → Availability →
-          Model, but it buys enough vertical space that the whole tab —
-          including Danger zone — fits above the fold at 1440x900. Tab order is
-          pinned by a test in machine-details-form.test.tsx; if you unpair
-          these, that test is the thing that will tell you. */}
-        <div className="grid gap-4 @xl:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="edit-name" className="text-foreground">
-              Machine Name <span aria-hidden="true">*</span>
-            </Label>
-            <Input
-              id="edit-name"
-              name="name"
-              type="text"
-              required
-              defaultValue={name}
-              onChange={(event) => {
-                setLiveName(event.target.value);
-              }}
-              placeholder="e.g., Medieval Madness"
-              enterKeyHint="next"
-              className="border-outline bg-surface text-foreground placeholder:text-muted-foreground"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="edit-presence" className="text-foreground">
-              Availability
-            </Label>
-            <Select
-              name="presenceStatus"
-              defaultValue={presenceStatus}
-              onValueChange={markDirty}
-            >
-              <SelectTrigger
-                id="edit-presence"
-                className="border-outline bg-surface text-foreground"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {VALID_MACHINE_PRESENCE_STATUSES.map((status) => (
-                  <SelectItem key={status} value={status}>
-                    {getMachinePresenceLabel(status)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        {canLink && (
-          <PinballMapLinkField
-            defaultMachineId={pinballmapMachineId}
-            defaultName={pinballmapTitleName}
-            defaultExcluded={pinballmapExcluded}
-            defaultModelName={modelName}
-            defaultManufacturer={manufacturer}
-            defaultYear={year}
-            defaultType={type}
-            defaultDisplay={display}
-            defaultPlayerCount={playerCount}
-            defaultDesigners={designers}
-            defaultArtists={artists}
-            // The Model name's placeholder — the live input, not the stored
-            // prop, so a rename in the same unsaved edit previews the name a
-            // blank model will actually resolve to.
-            machineName={liveName}
-            // The picker's controls are cmdk items and a Radix Select, so none of
-            // them bubble `input` — without this the section would still claim
-            // "No unsaved changes" after a model change, and Cancel would discard
-            // it silently (PP-o355.19 review).
-            onDirty={markDirty}
-          />
-        )}
-
-        <IscoredGamePicker
-          machineId={machineId}
-          defaultGameId={iscoredGameId}
-          machineName={liveName}
-          onDirty={markDirty}
-        />
-
-        <div className="space-y-1.5">
-          {/* No htmlFor: RichTextEditor is a contenteditable widget with no
-            focusable `id`. Its accessible name comes from `ariaLabel`. */}
-          <Label className="text-foreground">Description</Label>
-          <RichTextEditor
-            content={description}
-            onChange={(doc) => {
+        <MachineFormFields
+          idPrefix="edit"
+          name={{
+            defaultValue: name,
+            onChange: setLiveName,
+          }}
+          // Radix Select changes do not bubble `input`, so Availability flags
+          // dirtiness explicitly.
+          availability={{
+            defaultValue: presenceStatus,
+            onValueChange: markDirty,
+          }}
+          modelDetails={
+            canLink ? (
+              <PinballMapLinkField
+                defaultMachineId={pinballmapMachineId}
+                defaultName={pinballmapTitleName}
+                defaultExcluded={pinballmapExcluded}
+                defaultModelName={modelName}
+                defaultManufacturer={manufacturer}
+                defaultYear={year}
+                defaultType={type}
+                defaultDisplay={display}
+                defaultPlayerCount={playerCount}
+                defaultDesigners={designers}
+                defaultArtists={artists}
+                // The Model name's placeholder — the live input, not the
+                // stored prop, so a rename in the same unsaved edit previews
+                // the name a blank model will actually resolve to.
+                machineName={liveName}
+                // The picker's controls are cmdk items and a Radix Select, so
+                // none of them bubble `input` — without this the section would
+                // still claim "No unsaved changes" after a model change, and
+                // Cancel would discard it silently (PP-o355.19 review).
+                onDirty={markDirty}
+              />
+            ) : null
+          }
+          description={{
+            initial: description,
+            value: descriptionDoc,
+            onChange: (doc) => {
               setDescriptionDoc(doc);
               markDirty();
-            }}
-            mentionsEnabled={false}
-            placeholder="Add a description for this machine..."
-            ariaLabel="Machine description"
-            compact={false}
-            className="min-h-[96px]"
-          />
-          <input
-            type="hidden"
-            name="description"
-            value={descriptionDoc ? JSON.stringify(descriptionDoc) : ""}
-          />
-        </div>
+            },
+          }}
+          ownerRequirements={
+            canViewOwnerRequirements
+              ? {
+                  initial: ownerRequirements,
+                  value: ownerRequirementsDoc,
+                  onChange: (doc) => {
+                    setOwnerRequirementsDoc(doc);
+                    markDirty();
+                  },
+                }
+              : null
+          }
+          iscored={
+            <IscoredGamePicker
+              machineId={machineId}
+              defaultGameId={iscoredGameId}
+              machineName={liveName}
+              onDirty={markDirty}
+            />
+          }
+          // The STORED source, not the form's live one: the controls act on the
+          // saved machine, and while a Source change is unsaved they are held
+          // inert anyway (4.2).
+          pinballmapUnavailable={pinballmapExcluded}
+          pinballmap={pinballmap}
+        />
 
-        <div className="flex items-center justify-end gap-3">
-          <span
-            className={
-              isDirty
-                ? "mr-auto text-sm text-warning"
-                : "mr-auto text-sm text-muted-foreground"
-            }
-            data-testid="details-dirty-note"
-          >
-            {isDirty
-              ? "Unsaved changes"
-              : shownState?.ok
-                ? "Saved"
-                : "No unsaved changes"}
-          </span>
+        <MachineFormActionBar
+          status={
+            <span
+              className={
+                isDirty
+                  ? "mr-auto text-sm text-warning"
+                  : "mr-auto text-sm text-muted-foreground"
+              }
+              data-testid="details-dirty-note"
+            >
+              {isDirty
+                ? "Unsaved changes"
+                : shownState?.ok
+                  ? "Saved"
+                  : "No unsaved changes"}
+            </span>
+          }
+        >
           <Button type="button" variant="outline" onClick={handleCancel}>
             Cancel
           </Button>
@@ -489,13 +473,13 @@ export function MachineDetailsForm({
           >
             Save details
           </Button>
-        </div>
+        </MachineFormActionBar>
       </form>
 
       {/* Copy carried over verbatim from the Edit modal this page replaced, so
           the choice reads identically to anyone who used the old dialog. */}
       <AlertDialog
-        open={pendingHref !== null}
+        open={pendingDiscard !== null}
         onOpenChange={(open) => {
           if (!open) keepEditing();
         }}
@@ -505,14 +489,16 @@ export function MachineDetailsForm({
             <AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
             <AlertDialogDescription>
               You&apos;ve made changes to {name} that haven&apos;t been saved.
-              Leaving now will discard them.
+              {pendingDiscard?.kind === "navigate"
+                ? " Leaving now will discard them."
+                : " Discarding reverts every field to its saved value."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={keepEditing}>
               Keep editing
             </AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={discardAndLeave}>
+            <AlertDialogAction variant="destructive" onClick={confirmDiscard}>
               Discard changes
             </AlertDialogAction>
           </AlertDialogFooter>

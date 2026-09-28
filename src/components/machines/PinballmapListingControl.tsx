@@ -513,7 +513,7 @@ function Row({
  * Real `<button>` elements inside a radiogroup, so keyboard and screen-reader
  * users get the same three choices (CORE-A11Y-004).
  */
-function IntentToggle({
+export function IntentToggle({
   value,
   blockedReason,
   readOnly,
