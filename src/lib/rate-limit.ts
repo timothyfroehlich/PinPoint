@@ -11,7 +11,7 @@
  * - Public Issue (anonymous): 5 submissions per IP per 15 min
  * - Authenticated Issue: 20 submissions per user per 15 min
  * - MCP: 120 authenticated requests/minute and 20 mutations/minute per user+client
- * - Quick Search: 120 requests/minute (keyed by user ID when authenticated, client IP when anonymous)
+ * - Quick Search: 60 requests/minute for anonymous requests (keyed by IP), 120 requests/minute for signed-in users (keyed by user ID)
  *
  * @see https://github.com/timothyfroehlich/PinPoint/issues/536
  * @see https://github.com/timothyfroehlich/PinPoint/issues/537
