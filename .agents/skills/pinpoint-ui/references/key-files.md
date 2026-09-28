@@ -27,6 +27,10 @@ These are the canonical pattern sources. Read these files to understand PinPoint
 
 ### Status & Filter System
 
+For the conventions these files embody — the status-group model, smart-badge
+grouping, "Me" / "My machines" quick-selects, and the CSS-only mobile approach —
+read `filter-conventions.md`.
+
 | File                                            | What It Teaches                                                                     |
 | :---------------------------------------------- | :---------------------------------------------------------------------------------- |
 | `src/lib/issues/status.ts`                      | STATUS_CONFIG, STATUS_GROUPS, the status color system. Single source of truth.      |
@@ -69,6 +73,5 @@ Every authenticated page should compose `<MainLayout>` → `<PageContainer>` →
 ## Label Standards
 
 - Status group labels: import `STATUS_GROUP_LABELS` from `src/lib/issues/status.ts`. Never hardcode the strings at a call site.
-- Quick-select labels for "current user" filters are **"Me"** (assignee — `src/components/issues/AssigneePicker.tsx`) and **"My machines"**. Reuse those exact strings rather than inventing "Mine" / "My games".
-  **"My machines" filters _issues_ by the machines the current user owns**, so it lives on the issues side: `src/components/issues/IssueFilters.tsx` builds and renders the quick-select from an `ownedMachineInitials` prop, which `src/app/(app)/issues/page.tsx` resolves. It is **not** in `MachineFilters.tsx`, which is the machines-list filter bar and has no owner-of-mine logic at all — a plausible-looking wrong turn, which is why it's called out. Note that `getMachineQuickSelectOrdering` in `src/lib/issues/filter-utils.ts` also produces a "My machines" item and has tests, but nothing in production calls it (PP-nri8) — don't take it for the live path.
+- Quick-select labels for "current user" filters are **"Me"** (assignee — `src/components/issues/AssigneePicker.tsx`) and **"My machines"**. Reuse those exact strings rather than inventing "Mine" / "My games". **"My machines" filters _issues_ by the machines the current user owns**, so it lives on the issues side (`IssueFilters.tsx`), **not** in `MachineFilters.tsx` — a plausible-looking wrong turn. For the wiring (the `ownedMachineInitials` prop, and the dead `getMachineQuickSelectOrdering` path, PP-nri8) see `filter-conventions.md` § Quick-selects.
 - Status `wait_owner`: render `STATUS_CONFIG.wait_owner.label`, never the raw enum value. Mockups occasionally spell it "Wait Owner" — **the config wins over the mockup**, and this has been decided; don't relitigate it from a design file.

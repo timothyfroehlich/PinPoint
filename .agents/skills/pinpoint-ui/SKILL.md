@@ -56,6 +56,7 @@ Everything below lives one hop away in `references/`. Load the file you need.
 | :--------------------------------- | :------------------------------------------------------------------------------------- |
 | `references/browser-support.md`    | How to look up a feature's Baseline status live; pointers to design-bible §19 / §22    |
 | `references/key-files.md`          | Component basics, Issue Field Display Order, Key Files Registry, Label Standards       |
+| `references/filter-conventions.md` | Filter-bar conventions: status groups, smart-badge grouping, quick-selects, mobile     |
 | `references/enums-and-props.md`    | Config-Driven Enums, discriminated-union props for multi-type components               |
 | `references/form-correctness.md`   | Form-correctness code (types, autocomplete, `:user-invalid`), native HTML primitives   |
 | `references/styling-and-shadcn.md` | Tailwind CSS v4 styling, shadcn/ui component patterns, Button variants/sizes/`loading` |
