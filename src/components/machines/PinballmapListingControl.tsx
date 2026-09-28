@@ -278,9 +278,9 @@ export function PinballmapListingControl({
                       // One push carries the Insider Connected target too
                       // (4.3), so the confirm names it (4.5).
                       body: `Adds ${game} to the location's lineup on pinballmap.com${icAddClause(insiderConnected)}, where it will be publicly visible.`,
-                      action: "Add machine",
+                      action: "Add",
                     }}
-                    label="Add machine to Pinball Map"
+                    label="Add to Pinball Map"
                   />
                 ) : view.pushAction === "update" ? (
                   <ConfirmButton
@@ -301,16 +301,16 @@ export function PinballmapListingControl({
                     testId="pbm-listing-remove"
                     pending={pending}
                     destructive
-                    removalMachineId={machineId}
+                    removalCheck={{ machineId }}
                     onConfirm={() => {
                       run(removeMachineFromPinballMapAction);
                     }}
                     copy={{
                       title: "Remove from Pinball Map?",
                       body: `Removes ${game} from the location's lineup on pinballmap.com. It will no longer be publicly visible.`,
-                      action: "Remove machine",
+                      action: "Remove",
                     }}
-                    label="Remove machine from Pinball Map"
+                    label="Remove from Pinball Map"
                   />
                 )}
               </div>
@@ -907,7 +907,11 @@ export interface ConfirmCopy {
 /**
  * Pushes confirm before acting, naming the game and the public effect (4.5).
  * Exported for the lineup page's row actions, which follow the same rules
- * (lineup spec §5.8).
+ * (lineup spec §5.7).
+ *
+ * `removalCheck` names the entry a removal confirms — `{ machineId }` for a
+ * machine's own entry, `{ lmxId }` for one no machine is linked to — and makes
+ * the dialog wait for its comment count (4.6).
  */
 export function ConfirmButton({
   copy,
@@ -916,7 +920,9 @@ export function ConfirmButton({
   testId,
   label,
   destructive = false,
-  removalMachineId,
+  removalCheck,
+  triggerVariant = "outline",
+  triggerClassName,
 }: {
   copy: ConfirmCopy;
   onConfirm: () => void;
@@ -924,15 +930,17 @@ export function ConfirmButton({
   testId: string;
   label: string;
   destructive?: boolean;
-  removalMachineId?: string;
+  removalCheck?: Readonly<Record<string, string>>;
+  triggerVariant?: "outline" | "default";
+  triggerClassName?: string;
 }): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const comments = useRemovalCommentCheck();
 
   function handleOpenChange(nextOpen: boolean): void {
     setOpen(nextOpen);
-    if (removalMachineId === undefined) return;
-    if (nextOpen) comments.start({ machineId: removalMachineId });
+    if (removalCheck === undefined) return;
+    if (nextOpen) comments.start(removalCheck);
     else comments.cancel();
   }
 
@@ -940,9 +948,10 @@ export function ConfirmButton({
     <AlertDialog open={open} onOpenChange={handleOpenChange}>
       <AlertDialogTrigger asChild>
         <Button
-          variant="outline"
+          variant={triggerVariant}
           size="sm"
           loading={pending}
+          className={triggerClassName}
           data-testid={testId}
         >
           {label}
@@ -953,7 +962,7 @@ export function ConfirmButton({
           <AlertDialogTitle>{copy.title}</AlertDialogTitle>
           <AlertDialogDescription>{copy.body}</AlertDialogDescription>
         </AlertDialogHeader>
-        {removalMachineId !== undefined ? (
+        {removalCheck !== undefined ? (
           <RemovalCommentNotice state={comments.state} testId={testId} />
         ) : null}
         <AlertDialogFooter>
@@ -962,7 +971,7 @@ export function ConfirmButton({
             type="button"
             variant={destructive ? "destructive" : "default"}
             disabled={
-              pending || (removalMachineId !== undefined && !comments.ready)
+              pending || (removalCheck !== undefined && !comments.ready)
             }
             onClick={onConfirm}
           >

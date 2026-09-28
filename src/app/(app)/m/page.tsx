@@ -10,6 +10,7 @@ import { EmptyState } from "~/components/ui/empty-state";
 import { getViewer } from "~/lib/collections/viewer";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { loadMachineView } from "~/lib/machines/view/queries";
+import { lineupToReviewCount } from "~/lib/pinballmap/lineup-comparison";
 import { loadLineupData } from "~/lib/pinballmap/lineup-data";
 import { toMachineViewSearchParams } from "~/lib/machines/view/state";
 import { loadMachineViewSurfacePageState } from "./saved-view-surface";
@@ -48,26 +49,24 @@ export default async function MachinesPage({
     preset: "machines",
     searchParams: viewSearchParams,
   });
-  // The difference count comes from the same stored-data comparison the lineup
-  // page renders, so the badge can never disagree with the page it links to.
-  // It is shown only while configured with a lineup to compare (§2.4–§2.5).
-  const lineup = canViewLineup ? (await loadLineupData()).comparison : null;
-  const lineupDifferences =
-    lineup?.status === "ready" ? lineup.differenceCount : 0;
+  // The "to review" count comes from the same stored-data comparison the
+  // lineup page renders, so the badge can never disagree with the page it links
+  // to (§4.1). It is zero until there is a lineup to compare (§2.4–§2.5).
+  const lineupToReview = canViewLineup
+    ? lineupToReviewCount((await loadLineupData()).comparison)
+    : 0;
   const lineupButton = canViewLineup ? (
     <Button asChild variant="outline" data-testid="pinball-map-lineup-button">
       <Link href="/m/pinball-map">
         <MapPin className="mr-2 size-4" aria-hidden="true" />
         Pinball Map
-        {lineupDifferences > 0 ? (
+        {lineupToReview > 0 ? (
           <span
-            className="ml-2 inline-flex min-w-5 items-center justify-center rounded-full border border-destructive/50 bg-destructive/10 px-1.5 text-xs font-semibold tabular-nums text-destructive-text"
-            data-testid="pinball-map-lineup-differences"
+            className="ml-2 inline-flex min-w-5 items-center justify-center rounded-full border border-error-container bg-error-container/50 px-1.5 text-xs font-semibold tabular-nums text-on-error-container"
+            data-testid="pinball-map-lineup-to-review"
           >
-            {lineupDifferences}
-            <span className="sr-only">
-              {lineupDifferences === 1 ? " difference" : " differences"}
-            </span>
+            {lineupToReview}
+            <span className="sr-only"> to review</span>
           </span>
         ) : null}
       </Link>

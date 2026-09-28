@@ -151,12 +151,8 @@ export function PinballmapAbandonedEntries({
   );
 }
 
-/**
- * Refreshes tracked-location counts; older-location cleanup remains PP-o355.49.
- * Exported for the lineup page's To remove rows, which remove the same recorded
- * entries under the same confirmation (lineup spec §5.8).
- */
-export function RemoveEntryButton({
+/** Refreshes tracked-location counts; older-location cleanup remains PP-o355.49. */
+function RemoveEntryButton({
   machineId,
   entry,
   pending,
@@ -196,7 +192,7 @@ export function RemoveEntryButton({
           loading={pending}
           data-testid={`pbm-abandoned-remove-${String(entry.lmxId)}`}
         >
-          Remove machine from Pinball Map
+          Remove from Pinball Map
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent data-testid="pbm-abandoned-remove-confirm">
@@ -218,7 +214,7 @@ export function RemoveEntryButton({
             disabled={pending || (entry.currentLocation && !comments.ready)}
             onClick={onConfirm}
           >
-            {comments.lastKnown ? "Remove anyway" : "Remove machine"}
+            {comments.lastKnown ? "Remove anyway" : "Remove"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

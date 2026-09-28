@@ -182,9 +182,8 @@ Replacing the tracked location is a rare, near-never operation — PinPoint trac
 
 | Spec | Code today | Resolution |
 | :-- | :-- | :-- |
-| 4.3 push labels | The machine page's buttons read "Add machine to Pinball Map" / "Remove machine from Pinball Map" | PP-o355.65 |
 | 2.7 catalog corrections | Manufacturer and year are copied when a machine is matched and never refreshed | PP-o355.46 |
-| 3.6–3.7 lineup confirmation | The client method exists, but no app action exposes venue-lineup confirmation | PP-o355.58 (confirm lineup, needs the lineup page); condition-comment posting deferred (PP-o355.57) |
+| 3.6–3.7 lineup confirmation | The client method exists, but the lineup page header offers no Confirm lineup on Pinball Map | PP-o355.58; condition-comment posting deferred (PP-o355.57) |
 | 8.2, 8.4–8.6 per-member account linking | Writes use one admin-provisioned operator credential; no member linking, relink state, or link prompt exists | PP-o355.6 |
 | 9.4 update-listing invitation | The Info tab shows the Pinball Map link with no invitation line | PP-2h1b |
 

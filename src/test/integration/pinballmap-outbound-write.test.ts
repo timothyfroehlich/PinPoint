@@ -22,6 +22,7 @@ import {
   timelineEvents,
   pinballmapState,
   pinballmapAbandonedListings,
+  pinballmapCatalog,
 } from "~/server/db/schema";
 import type { LocationSnapshot, PbmWriteFailure } from "~/lib/pinballmap/types";
 
@@ -1227,5 +1228,191 @@ describe("PinballMap outbound writes (PGlite)", () => {
     expect(state?.locationId).toBe(99999);
     expect(state?.snapshotJson?.lmxes.map((lmx) => lmx.id)).toEqual([500]);
     expect(await db.select().from(pinballmapAbandonedListings)).toHaveLength(1);
+  });
+});
+
+/**
+ * The lineup page's actions on an entry no PinPoint machine is linked to
+ * (lineup spec §5.4): Remove from Pinball Map under the push gate (pinballmap
+ * §8.2), and Link under the machine-linking gate (§8.1).
+ */
+describe("Lineup page: unlinked entries (PGlite)", () => {
+  setupTestDb();
+
+  beforeEach(async () => {
+    pbm.lineup = [];
+    pbm.nextLmxId = 500;
+    pbm.addResult = null;
+    pbm.removeResult = null;
+    pbm.beforeAdd = null;
+    pbm.beforeRemove = null;
+    pbm.fetchError = null;
+    const { getPinballMapWriteCredentials } =
+      await import("~/lib/pinballmap/credentials");
+    vi.mocked(getPinballMapWriteCredentials).mockResolvedValue({
+      email: "ops@example.com",
+      token: "tok_123",
+    });
+  });
+
+  function entryForm(lmxId: number): FormData {
+    const fd = new FormData();
+    fd.append("lmxId", String(lmxId));
+    return fd;
+  }
+
+  it("removes an unlinked entry from Pinball Map and the stored lineup", async () => {
+    const db = await getTestDb();
+    const { removeUnlinkedPinballmapEntryAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    pbm.lineup = [{ id: 4040, machineId: 8080 }];
+    await seedState([{ id: 4040, machineId: 8080 }]);
+    const [walkedAway] = await db
+      .insert(machines)
+      .values({ name: "Retitled", initials: "RT" })
+      .returning();
+    if (!walkedAway) throw new Error("failed to seed machine");
+    await db.insert(pinballmapAbandonedListings).values({
+      machineId: walkedAway.id,
+      lmxId: 4040,
+      pinballmapMachineId: 8080,
+      locationId: 26454,
+    });
+
+    const result = await removeUnlinkedPinballmapEntryAction(
+      undefined,
+      entryForm(4040)
+    );
+
+    expect(result).toEqual({ ok: true, value: {} });
+    expect(pbm.lineup).toEqual([]);
+    const state = await db.query.pinballmapState.findFirst();
+    expect(state?.snapshotJson?.lmxes).toEqual([]);
+    expect(await db.select().from(pinballmapAbandonedListings)).toHaveLength(0);
+  });
+
+  it("refuses a member who owns no machine that walked away from the entry", async () => {
+    const { removeUnlinkedPinballmapEntryAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const member = await createUser("member");
+    await mockAuthAs(member.id);
+    pbm.lineup = [{ id: 4040, machineId: 8080 }];
+    await seedState([{ id: 4040, machineId: 8080 }]);
+
+    const result = await removeUnlinkedPinballmapEntryAction(
+      undefined,
+      entryForm(4040)
+    );
+
+    expect(result).toMatchObject({ ok: false, code: "UNAUTHORIZED" });
+    expect(pbm.lineup).toEqual([{ id: 4040, machineId: 8080 }]);
+  });
+
+  it("lets a member remove an entry their own machine walked away from", async () => {
+    const db = await getTestDb();
+    const { removeUnlinkedPinballmapEntryAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const member = await createUser("member");
+    await mockAuthAs(member.id);
+    pbm.lineup = [{ id: 4040, machineId: 8080 }];
+    await seedState([{ id: 4040, machineId: 8080 }]);
+    const [owned] = await db
+      .insert(machines)
+      .values({ name: "Mine", initials: "MINE", ownerId: member.id })
+      .returning();
+    if (!owned) throw new Error("failed to seed machine");
+    await db.insert(pinballmapAbandonedListings).values({
+      machineId: owned.id,
+      lmxId: 4040,
+      pinballmapMachineId: 8080,
+      locationId: 26454,
+    });
+
+    const result = await removeUnlinkedPinballmapEntryAction(
+      undefined,
+      entryForm(4040)
+    );
+
+    expect(result.ok).toBe(true);
+    expect(pbm.lineup).toEqual([]);
+  });
+
+  it("refuses an entry whose title a PinPoint machine is linked to", async () => {
+    const db = await getTestDb();
+    const { removeUnlinkedPinballmapEntryAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    pbm.lineup = [{ id: 4040, machineId: TITLE_ID }];
+    await seedState([{ id: 4040, machineId: TITLE_ID }]);
+    await db.insert(machines).values({
+      name: "Linked",
+      initials: "LNK",
+      pinballmapMachineId: TITLE_ID,
+      pinballmapIntent: "on",
+    });
+
+    const result = await removeUnlinkedPinballmapEntryAction(
+      undefined,
+      entryForm(4040)
+    );
+
+    expect(result).toMatchObject({ ok: false, code: "VALIDATION" });
+    expect(pbm.lineup).toEqual([{ id: 4040, machineId: TITLE_ID }]);
+  });
+
+  it("links an owner's machine to the entry's title, and refuses another owner's", async () => {
+    const db = await getTestDb();
+    const { linkMachineToPinballmapEntryAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const member = await createUser("member");
+    const other = await createUser("member");
+    await mockAuthAs(member.id);
+    await seedState([{ id: 4040, machineId: 8080 }]);
+    await db.insert(pinballmapCatalog).values({
+      pinballmapMachineId: 8080,
+      name: "Cactus Canyon",
+      manufacturer: "Bally",
+      year: 1998,
+    });
+    const [mine, theirs] = await db
+      .insert(machines)
+      .values([
+        { name: "Mine", initials: "CC", ownerId: member.id },
+        { name: "Theirs", initials: "CC2", ownerId: other.id },
+      ])
+      .returning();
+    if (!mine || !theirs) throw new Error("failed to seed machines");
+
+    const linkForm = (machineId: string): FormData => {
+      const fd = form(machineId);
+      fd.append("pinballmapMachineId", "8080");
+      return fd;
+    };
+
+    await expect(
+      linkMachineToPinballmapEntryAction(undefined, linkForm(theirs.id))
+    ).resolves.toMatchObject({ ok: false, code: "UNAUTHORIZED" });
+    await expect(
+      linkMachineToPinballmapEntryAction(undefined, linkForm(mine.id))
+    ).resolves.toEqual({ ok: true, value: { pinballmapMachineId: 8080 } });
+
+    const rows = await db
+      .select({
+        id: machines.id,
+        title: machines.pinballmapMachineId,
+        intent: machines.pinballmapIntent,
+      })
+      .from(machines);
+    // Matching never touches the lineup or sets intent On (pinballmap §2.2).
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        { id: mine.id, title: 8080, intent: "off" },
+        { id: theirs.id, title: null, intent: "off" },
+      ])
+    );
+    expect(pbm.lineup).toEqual([]);
   });
 });

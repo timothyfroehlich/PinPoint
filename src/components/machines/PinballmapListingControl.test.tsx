@@ -346,9 +346,7 @@ describe("push actions", () => {
     );
     renderControl({ view: VIEWS.lingering });
     await user.click(screen.getByTestId("pbm-listing-remove"));
-    expect(
-      screen.getByRole("button", { name: "Remove machine" })
-    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Remove" })).toBeDisabled();
     await act(async () => {
       await Promise.resolve();
       finish?.({
@@ -364,9 +362,7 @@ describe("push actions", () => {
     expect(
       await screen.findByTestId("pbm-listing-remove-consequence")
     ).toHaveTextContent("No comments on this entry");
-    expect(
-      screen.getByRole("button", { name: "Remove machine" })
-    ).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Remove" })).toBeEnabled();
   });
 
   it("keeps removal blocked when the comment check fails", async () => {
@@ -384,9 +380,7 @@ describe("push actions", () => {
     expect(
       screen.queryByTestId("pbm-listing-remove-consequence")
     ).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Remove machine" })
-    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Remove" })).toBeDisabled();
   });
 
   it("marks a failed refresh count as old and offers an explicit proceed choice", async () => {
@@ -442,7 +436,7 @@ describe("push actions", () => {
     });
     renderControl({ view: VIEWS.missing });
     await user.click(screen.getByTestId("pbm-listing-add"));
-    await user.click(screen.getByRole("button", { name: "Add machine" }));
+    await user.click(screen.getByRole("button", { name: "Add" }));
 
     expect(await screen.findByTestId("pbm-listing-error")).toHaveTextContent(
       "Pinball Map rejected the change."

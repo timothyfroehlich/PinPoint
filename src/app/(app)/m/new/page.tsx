@@ -20,7 +20,11 @@ import { isIscoredConfigured } from "~/lib/iscored/config";
  * Form to create a new pinball machine.
  * Mutates through a Server Action.
  */
-export default async function NewMachinePage(): Promise<React.JSX.Element> {
+export default async function NewMachinePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ title?: string | string[] }>;
+}): Promise<React.JSX.Element> {
   // Auth guard - check if user is authenticated (CORE-SSR-002)
   const supabase = await createClient();
   const {
@@ -58,6 +62,8 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
   }));
 
   const iscoredConfigured = isIscoredConfigured();
+  // `?title=` prefills the name, for the lineup page's Create in PinPoint.
+  const { title } = await searchParams;
 
   return (
     <PageContainer size="standard" className="pt-4 pb-8">
@@ -70,6 +76,7 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
             allUsers={allUsers}
             canSelectOwner={canCreateMachine}
             iscoredConfigured={iscoredConfigured}
+            initialName={typeof title === "string" ? title : undefined}
           />
         </CardContent>
       </Card>
