@@ -169,6 +169,13 @@
   min-width: 0;
 }
 
+/* With the playing-tips row (spec 5.4) the column would stand 88px tall,
+   taller than the 84px QR a card with a tip uses, and push the description
+   down. A 6px gap keeps it at 82px. */
+.apron-card__actions:has(> :nth-child(4)) {
+  gap: 6px;
+}
+
 .apron-card__scan-heading {
   font-weight: 800;
   font-size: 16px;

@@ -8,6 +8,7 @@ import { docToPlainText } from "~/lib/tiptap/types";
 import { resolveRequestUrl } from "~/lib/url";
 import {
   getMachineCredits,
+  getMachinePinTips,
   type MachineForLayout,
 } from "~/app/(app)/m/[initials]/_data";
 
@@ -29,12 +30,16 @@ export async function ApronCardPanel({
     resolveRequestUrl(await headers()),
     machine.initials
   );
-  const credits = await getMachineCredits(
-    machine.pinballmapTitle?.opdbId ?? null
-  );
+  const opdbId = machine.pinballmapTitle?.opdbId ?? null;
+  const [credits, pinTips] = await Promise.all([
+    getMachineCredits(opdbId),
+    getMachinePinTips(opdbId),
+  ]);
+  const hasPinTips = pinTips !== null;
   const { name, edition, manufacturer, year, ownerName } = apronCardContent(
     machine,
-    credits
+    credits,
+    hasPinTips
   );
 
   return (
@@ -42,7 +47,15 @@ export async function ApronCardPanel({
       variant={variant}
       machineId={machine.id}
       machineInitials={machine.initials}
-      identity={{ name, edition, manufacturer, year, ownerName, credits }}
+      identity={{
+        name,
+        edition,
+        manufacturer,
+        year,
+        ownerName,
+        credits,
+        hasPinTips,
+      }}
       mainDescription={docToPlainText(machine.description)}
       saved={{
         size: machine.apronSize,
