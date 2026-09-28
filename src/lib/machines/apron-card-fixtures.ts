@@ -228,7 +228,7 @@ const FIXTURE_SOURCES: readonly FixtureSource[] = [
   {
     id: "lights-camera-action",
     stresses:
-      "Widest unbreakable title token in OPDB: no spaces, so it cannot wrap",
+      "Widest space-free title in OPDB: wraps only after its ellipses (spec §1)",
     opdbId: "GrlZe-MQY0Y",
     content: {
       name: "Lights...Camera...Action!",
@@ -242,7 +242,23 @@ const FIXTURE_SOURCES: readonly FixtureSource[] = [
       design: ["Jon Norris"],
       art: ["Constantino Mitchell", "Brian R. Johnson", "Jeanine Mitchell"],
     },
-    knownIssues: [{ check: "title-width", bead: "PP-xeki.1" }],
+  },
+  {
+    id: "harley-davidson",
+    stresses: "Hyphenated title: wraps after the hyphen (spec §1)",
+    opdbId: "G56lO-Mq153",
+    content: {
+      name: "Harley-Davidson",
+      edition: "3rd Edition",
+      manufacturer: "Stern",
+      year: 2002,
+      ownerName: "Jordan Lee",
+      ...noText,
+    },
+    credits: {
+      design: ["John Borg", "Lonnie D. Ropp"],
+      art: ["Jerry Vanderstelt", "Kevin O'Connor"],
+    },
   },
   {
     id: "ali",

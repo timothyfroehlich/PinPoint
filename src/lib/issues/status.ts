@@ -109,6 +109,8 @@ export const STATUS_CONFIG: Record<
     description: string;
     styles: string;
     iconColor: string;
+    /** Solid fill for a Summary Widget bar segment (widgets spec §5.3). */
+    barColor: string;
     icon: LucideIcon;
   }
 > = {
@@ -117,6 +119,7 @@ export const STATUS_CONFIG: Record<
     description: "Just reported, needs triage",
     styles: "bg-cyan-500/20 text-cyan-400 border-cyan-500",
     iconColor: "text-cyan-400",
+    barColor: "bg-cyan-400",
     icon: Circle,
   },
   confirmed: {
@@ -124,6 +127,7 @@ export const STATUS_CONFIG: Record<
     description: "Verified as a actual issue",
     styles: "bg-teal-500/20 text-teal-400 border-teal-500",
     iconColor: "text-teal-400",
+    barColor: "bg-teal-400",
     icon: Circle,
   },
   in_progress: {
@@ -131,6 +135,7 @@ export const STATUS_CONFIG: Record<
     description: "Active repair underway",
     styles: "bg-sky-500/20 text-sky-400 border-sky-500",
     iconColor: "text-sky-500",
+    barColor: "bg-sky-500",
     icon: CircleDot,
   },
   need_parts: {
@@ -138,6 +143,7 @@ export const STATUS_CONFIG: Record<
     description: "Waiting on new parts",
     styles: "bg-purple-600/20 text-purple-300 border-purple-600",
     iconColor: "text-purple-300",
+    barColor: "bg-purple-300",
     icon: CircleDot,
   },
   need_help: {
@@ -145,6 +151,7 @@ export const STATUS_CONFIG: Record<
     description: "Escalated to expert help",
     styles: "bg-pink-500/20 text-pink-400 border-pink-500",
     iconColor: "text-pink-400",
+    barColor: "bg-pink-400",
     icon: CircleDot,
   },
   wait_owner: {
@@ -152,6 +159,7 @@ export const STATUS_CONFIG: Record<
     description: "Pending owner decision/action",
     styles: "bg-purple-500/20 text-purple-400 border-purple-500",
     iconColor: "text-purple-400",
+    barColor: "bg-purple-400",
     icon: CircleDot,
   },
   fixed: {
@@ -159,6 +167,7 @@ export const STATUS_CONFIG: Record<
     description: "Issue is resolved",
     styles: "bg-green-500/20 text-green-400 border-green-500",
     iconColor: "text-green-400",
+    barColor: "bg-green-400",
     icon: Disc,
   },
   wai: {
@@ -166,6 +175,7 @@ export const STATUS_CONFIG: Record<
     description: "Working as intended, no action required",
     styles: "bg-zinc-500/20 text-zinc-400 border-zinc-500",
     iconColor: "text-zinc-400",
+    barColor: "bg-zinc-400",
     icon: Disc,
   },
   wont_fix: {
@@ -173,6 +183,7 @@ export const STATUS_CONFIG: Record<
     description: "Issue can't or won't be fixed",
     styles: "bg-zinc-500/20 text-zinc-400 border-zinc-500",
     iconColor: "text-zinc-400",
+    barColor: "bg-zinc-400",
     icon: Disc,
   },
   no_repro: {
@@ -180,6 +191,7 @@ export const STATUS_CONFIG: Record<
     description: "Couldn't reproduce",
     styles: "bg-slate-500/20 text-slate-400 border-slate-500",
     iconColor: "text-slate-400",
+    barColor: "bg-slate-400",
     icon: Disc,
   },
   duplicate: {
@@ -187,6 +199,7 @@ export const STATUS_CONFIG: Record<
     description: "Already reported elsewhere",
     styles: "bg-neutral-600/20 text-neutral-400 border-neutral-600",
     iconColor: "text-neutral-400",
+    barColor: "bg-neutral-400",
     icon: Disc,
   },
 };
@@ -234,24 +247,34 @@ export const SEVERITY_CONFIG: Record<
 
 export const PRIORITY_CONFIG: Record<
   IssuePriority,
-  { label: string; styles: string; iconColor: string; icon: LucideIcon }
+  {
+    label: string;
+    styles: string;
+    iconColor: string;
+    /** Solid fill for a Summary Widget bar segment (widgets spec §5.3). */
+    barColor: string;
+    icon: LucideIcon;
+  }
 > = {
   low: {
     label: "Low",
     styles: "bg-purple-950/50 text-purple-400 border-purple-500",
     iconColor: "text-purple-400",
+    barColor: "bg-purple-800",
     icon: TrendingUp,
   },
   medium: {
     label: "Medium",
     styles: "bg-purple-900/50 text-purple-400 border-purple-500",
     iconColor: "text-purple-400",
+    barColor: "bg-purple-500",
     icon: TrendingUp,
   },
   high: {
     label: "High",
     styles: "bg-purple-500/20 text-purple-200 border-purple-500",
     iconColor: "text-purple-200",
+    barColor: "bg-purple-200",
     icon: TrendingUp,
   },
 };

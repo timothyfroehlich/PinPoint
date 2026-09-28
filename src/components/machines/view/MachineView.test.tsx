@@ -77,11 +77,6 @@ function result(overrides: Partial<MachineViewResult> = {}): MachineViewResult {
         onTheFloor: 2,
         byStatus: { operational: 1, needs_service: 1, unplayable: 0 },
       },
-      issues: {
-        openIssues: 1,
-        machinesWithOpenIssues: 1,
-        bySeverity: { cosmetic: 0, minor: 0, major: 1, unplayable: 0 },
-      },
     },
     state: getMachineViewPreset("machines").defaultState,
     ownerOptions: [{ id: "owner-1", name: "Alex" }],
