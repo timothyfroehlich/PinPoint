@@ -11,7 +11,9 @@ import type React from "react";
  *
  * Absolutely positioned with no offsets, so it sits at its static position —
  * the top of whatever it is placed in — while taking no space, and so without
- * picking up the `space-y-*` margin of the stack around it.
+ * picking up the `space-y-*` margin of the stack around it. It needs a
+ * positioned ancestor inside the scroll container (`SectionNavLayout`
+ * provides one) so that it scrolls with the page.
  *
  * `scroll-mt-3` clears the phone's pinned "Jump to" control; the scroll
  * container's own `scroll-pt-14` supplies the rest.

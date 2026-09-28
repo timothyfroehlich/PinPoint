@@ -37,6 +37,7 @@ import { PinballmapDirtyGate } from "./pinballmap-dirty-gate";
 import { MachineOwnerTransfer } from "./machine-owner-transfer";
 import { SectionNavLayout } from "~/components/machines/machine-form/SectionNav";
 import { SectionAnchor } from "~/components/machines/machine-form/SectionAnchor";
+import { PinnedActionBarSpacer } from "~/components/machines/machine-form/MachineFormActionBar";
 import {
   MACHINE_FORM_SECTION_IDS,
   type SectionNavItem,
@@ -444,6 +445,7 @@ export default async function MachineEditPage({
               </div>
             </PinballmapDirtyGate>
           </section>
+          <PinnedActionBarSpacer />
         </div>
       </SectionNavLayout>
     </DetailsDirtyProvider>

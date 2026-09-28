@@ -24,7 +24,10 @@ import {
 } from "~/components/machines/PinballMapLinkField";
 import { IscoredGamePicker } from "~/components/machines/IscoredGamePicker";
 import { MachineFormFields } from "~/components/machines/machine-form/MachineFormFields";
-import { MachineFormActionBar } from "~/components/machines/machine-form/MachineFormActionBar";
+import {
+  MachineFormActionBar,
+  PinnedActionBarSpacer,
+} from "~/components/machines/machine-form/MachineFormActionBar";
 import {
   NewMachinePinballmapFields,
   type NewMachinePinballmapFieldsProps,
@@ -312,7 +315,7 @@ export function CreateMachineForm({
                   minLength={2}
                   maxLength={6}
                   placeholder="e.g., MM"
-                  className="border-outline bg-surface text-foreground placeholder:text-muted-foreground uppercase"
+                  className="border-outline bg-surface text-foreground placeholder:text-muted-foreground uppercase placeholder:normal-case"
                   value={initialsValue}
                   onChange={(e) => {
                     setInitialsValue(
@@ -387,6 +390,7 @@ export function CreateMachineForm({
             Create Machine
           </Button>
         </MachineFormActionBar>
+        <PinnedActionBarSpacer />
       </form>
     </>
   );

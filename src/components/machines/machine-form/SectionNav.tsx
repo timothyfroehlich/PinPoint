@@ -14,9 +14,11 @@ import type { SectionNavItem } from "./sections";
 
 /**
  * How far down the scroll container the reading line sits. A section is "in
- * view" once its start has scrolled above this line.
+ * view" once its start has scrolled above this line. High enough that a jump
+ * to a short section (Details is one row of fields) is not immediately
+ * credited to the section after it, which lands inside the line too.
  */
-const READING_LINE = 0.35;
+const READING_LINE = 0.2;
 
 /** The nearest scrolling ancestor — `<main>` in the app shell, else null. */
 function scrollParentOf(element: Element): Element | null {
@@ -203,7 +205,11 @@ export function SectionNavLayout({
         </DropdownMenu>
       </nav>
 
-      <div className="min-w-0 max-w-4xl flex-1">
+      {/* `relative` is load-bearing: the section anchors are absolutely
+          positioned, and without a positioned ancestor inside the scrolling
+          <main> their containing block is the viewport — they would neither
+          scroll with the page nor ever cross the reading line. */}
+      <div className="relative min-w-0 max-w-4xl flex-1">
         {children}
         <div ref={endRef} aria-hidden="true" className="h-px" />
       </div>

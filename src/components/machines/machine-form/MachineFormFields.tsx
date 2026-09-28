@@ -196,7 +196,7 @@ export function MachineFormFields({
                       still names the integration and says why it is off, so
                       nobody goes looking for it (machine-editing 3.6). */}
                   <div
-                    className="flex h-9 items-center truncate rounded-md border border-outline-variant px-3 text-sm text-muted-foreground"
+                    className="flex min-h-9 items-center rounded-md border border-outline-variant px-3 py-1.5 text-sm text-muted-foreground"
                     data-testid="pbm-listing-collapsed"
                   >
                     Disabled. Requires a model listed in their catalog.
