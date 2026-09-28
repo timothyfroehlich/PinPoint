@@ -2,9 +2,9 @@
  * Smoke: Issue detail page renders for an unauthenticated visitor.
  *
  * Coverage goal: D-class — "page loads without 500" for the unauthenticated
- * path. Authenticated render is already covered by e2e/smoke/issues-crud.spec.ts
- * (which uses STORAGE_STATE.member). All permission-enforcement assertions
- * (E-class) live in:
+ * path, plus unauthenticated comment trigger gating. Authenticated render is
+ * already covered by e2e/smoke/issues-crud.spec.ts (which uses STORAGE_STATE.member).
+ * All permission-enforcement assertions (E-class) live in:
  *   src/test/integration/issue-detail-permissions.test.ts
  * All UI-state assertions (H-class) live in:
  *   src/test/unit/components/issues/issue-detail-permissions.test.tsx

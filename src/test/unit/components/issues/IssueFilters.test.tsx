@@ -118,6 +118,23 @@ describe("IssueFilters", () => {
       expect.stringContaining("status=all")
     );
   });
+
+  it("clears all active filters when global Clear button is clicked", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <IssueFilters
+        {...defaultProps}
+        filters={{ q: "bird", severity: ["major"] }}
+      />
+    );
+
+    const clearButton = screen.getByRole("button", { name: "Clear" });
+    await user.click(clearButton);
+
+    expect(pushMock).toHaveBeenCalledWith(
+      expect.stringContaining("status=all")
+    );
+  });
 });
 
 describe("IssueFilters - My machines quick-select", () => {

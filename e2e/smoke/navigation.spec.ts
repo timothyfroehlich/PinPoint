@@ -10,6 +10,7 @@ import {
   loginAs,
   assertNoA11yViolations,
 } from "../support/actions.js";
+import { TEST_USERS } from "../support/constants.js";
 
 test.describe("Navigation", () => {
   test("unauthenticated navigation - show Sign In and Sign Up buttons", async ({
@@ -87,5 +88,37 @@ test.describe("Navigation", () => {
     // Close menu, then verify no horizontal overflow on dashboard
     await page.keyboard.press("Escape");
     await assertNoHorizontalOverflow(page);
+  });
+});
+
+test.describe("Bottom Tab Bar (mobile only)", () => {
+  test("More sheet shows User Management only for admin users", async ({
+    page,
+  }, testInfo) => {
+    const isMobile = testInfo.project.name.includes("Mobile");
+    if (!isMobile) {
+      test.skip();
+    }
+
+    // Log in as admin
+    await loginAs(page, testInfo, {
+      email: TEST_USERS.admin.email,
+      password: TEST_USERS.admin.password,
+    });
+
+    const moreButton = page.getByRole("button", { name: /more options/i });
+    await moreButton.click();
+
+    // Wait for Sheet to animate open before asserting on children.
+    const moreSheet = page.getByRole("dialog");
+    await moreSheet.waitFor({ state: "visible", timeout: 5000 });
+
+    // User Management should be visible for admin role.
+    // Scope to the dialog so locators are anchored to the Sheet portal content.
+    await expect(moreSheet.getByTestId("more-sheet-admin")).toBeVisible();
+    await expect(page.getByTestId("more-sheet-admin")).toHaveAttribute(
+      "href",
+      "/admin/users"
+    );
   });
 });

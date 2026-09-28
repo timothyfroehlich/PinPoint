@@ -4,8 +4,8 @@
  * Tests that unauthenticated users can view the machines list,
  * machine detail pages, and interact with summary widgets.
  *
- * Permission enforcement (machines.create is admin-only) is covered by
- * integration tests in machine-owner-promotion.test.ts.
+ * Permission enforcement (machines.create requires admin/technician; unauthenticated
+ * callers rejected) is covered in machine-actions.test.ts.
  */
 
 import { test, expect } from "../support/fixtures.js";

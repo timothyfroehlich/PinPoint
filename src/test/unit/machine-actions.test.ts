@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
+  createMachineAction,
   updateMachineAction,
   updateMachineDescription,
   updateMachineOwnerRequirements,
@@ -317,5 +318,56 @@ describe("updateMachineTextField", () => {
       expect(result.code).toBe("UNAUTHORIZED");
     }
     expect(db.update).not.toHaveBeenCalled();
+  });
+
+  // ---------------------------------------------------------------------------
+  // createMachineAction auth and role gate (PP-zl00.1)
+  // ---------------------------------------------------------------------------
+
+  it("unauthenticated caller → createMachineAction err('UNAUTHORIZED')", async () => {
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
+      },
+    } as unknown as SupabaseClient);
+
+    const fd = new FormData();
+    fd.set("name", "Medieval Madness");
+    fd.set("initials", "MM");
+
+    const result = await createMachineAction(undefined, fd);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("UNAUTHORIZED");
+      expect(result.message).toMatch(/unauthorized/i);
+    }
+  });
+
+  it("member caller without machines.create permission → createMachineAction err('UNAUTHORIZED')", async () => {
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi
+          .fn()
+          .mockResolvedValue({ data: { user: { id: "member-user-id" } } }),
+      },
+    } as unknown as SupabaseClient);
+
+    dbMock.query.userProfiles.findFirst.mockResolvedValue({
+      id: "member-user-id",
+      role: "member",
+    });
+
+    const fd = new FormData();
+    fd.set("name", "Medieval Madness");
+    fd.set("initials", "MM");
+
+    const result = await createMachineAction(undefined, fd);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("UNAUTHORIZED");
+      expect(result.message).toMatch(/admin or technician/i);
+    }
   });
 });

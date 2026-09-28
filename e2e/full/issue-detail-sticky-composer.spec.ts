@@ -46,7 +46,7 @@ test.describe("StickyCommentComposer — desktop signed-in", () => {
 });
 
 // ----------------------------------------------------------------------------
-// Scenario 3: Mobile, signed-in (class-E authorization verification)
+// Scenario 2: Mobile, signed-in (responsive rendering)
 // ----------------------------------------------------------------------------
 
 test.describe("StickyCommentComposer — mobile signed-in", () => {
