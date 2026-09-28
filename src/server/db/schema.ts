@@ -32,6 +32,7 @@ import {
   OPDB_MACHINE_TYPES,
   type OpdbPerson,
 } from "~/lib/opdb/types";
+import { PINTIP_CATEGORIES } from "~/lib/pintips/types";
 import { REPORT_MODE_VALUES } from "~/lib/types/user";
 import type { MachineViewSavedState } from "~/lib/types/machine-view";
 
@@ -485,6 +486,37 @@ export const pinballmapAbandonedListings = pgTable(
     ),
     machineIdx: index("idx_pinballmap_abandoned_listings_machine").on(
       t.machineId
+    ),
+  })
+).enableRLS();
+
+/**
+ * Local copy of Match Play's PinTips export (PP-a0be, spec pintips §2): the
+ * playing tips shown on a machine's Info tab and scan hub. Keyed by PinTips'
+ * own tip id; looked up by OPDB game (group) id, which every edition of a
+ * title shares. Refreshed daily by /api/cron/refresh-pintips, which replaces
+ * the whole copy so a tip removed from PinTips disappears here too (spec 2.3).
+ * `illegal`-category tips are never stored (spec 2.6).
+ */
+export const pinTips = pgTable(
+  "pintips",
+  {
+    tipId: integer("tip_id").primaryKey(),
+    opdbGroupId: text("opdb_group_id").notNull(),
+    category: text("category", { enum: PINTIP_CATEGORIES }).notNull(),
+    voteTotal: integer("vote_total").notNull(),
+    text: text("text").notNull(),
+    refreshedAt: timestamp("refreshed_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    groupIdx: index("idx_pintips_opdb_group_id").on(t.opdbGroupId),
+    // Drizzle's `enum` narrows TypeScript only; this keeps a stray writer from
+    // storing a category the tip card has no name for.
+    categoryCheck: check(
+      "pintips_category_check",
+      sql`category IN ('general', 'multiball', 'skillshot', 'wizard', 'secret')`
     ),
   })
 ).enableRLS();
