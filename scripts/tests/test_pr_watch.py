@@ -109,7 +109,7 @@ def fake_summary(
             "summary": "",
         }
 
-    none = {name: record("none", "") for name in ("claude", "coderabbit", "codex")}
+    none = {name: record("none", "") for name in ("claude", "codex")}
     checkers = dict(none)
     if label == "approved":
         checkers[checker] = record("covers", head)
@@ -598,12 +598,12 @@ def test_watch_phase_review_revalidates_evidence_before_passing(monkeypatch):
 @pytest.mark.unit
 def test_watch_phase_review_action_required_on_changes_requested(monkeypatch, capsys):
     monkeypatch.setattr(pr_watch, "gh", make_gh())
-    use_summaries(monkeypatch, fake_summary("changes requested", checker="coderabbit"))
+    use_summaries(monkeypatch, fake_summary("changes requested", checker="codex"))
 
     verdict = pr_watch._watch_phase_review(PR, HEAD_SHA, timeout_sec=10, poll_sec=0)
     assert verdict.outcome == "action_required"
     assert verdict.review_state == "changes requested"
-    assert "CodeRabbit: requested changes" in capsys.readouterr().err
+    assert "Codex: requested changes" in capsys.readouterr().err
 
 
 @pytest.mark.unit
@@ -920,7 +920,6 @@ def test_review_state_reports_the_gate_label_verbatim(monkeypatch, label):
     "checker,who",
     [
         ("claude", "Claude review record"),
-        ("coderabbit", "CodeRabbit approval"),
         ("codex", "Codex evidence"),
     ],
 )
@@ -936,7 +935,7 @@ def test_review_state_not_reviewed_recommends_one_request(monkeypatch):
     use_summaries(monkeypatch, fake_summary("not reviewed"))
     state, detail = pr_watch.review_state(PR)
     assert state == "not reviewed"
-    assert "Claude review: none; CodeRabbit: none; Codex: none" in detail
+    assert "Claude review: none; Codex: none" in detail
     assert "claude-review-level.sh" in detail
     assert f"record-claude-review.sh {PR}" in detail
     assert "Tim's explicit --force" in detail
@@ -954,21 +953,20 @@ def test_review_state_pending_request_is_not_recommended_again(monkeypatch):
 
 @pytest.mark.unit
 def test_review_state_stale_review_names_both_commits(monkeypatch):
-    use_summaries(monkeypatch, fake_summary("stale review", checker="coderabbit"))
+    use_summaries(monkeypatch, fake_summary("stale review", checker="codex"))
     state, detail = pr_watch.review_state(PR)
     assert state == "stale review"
     assert (
-        f"CodeRabbit: newest evidence names {OLD_SHA[:7]}, head is {HEAD_SHA[:7]}"
-        in detail
+        f"Codex: newest evidence names {OLD_SHA[:7]}, head is {HEAD_SHA[:7]}" in detail
     )
 
 
 @pytest.mark.unit
 def test_review_state_changes_requested_names_the_reviewer(monkeypatch):
-    use_summaries(monkeypatch, fake_summary("changes requested", checker="coderabbit"))
+    use_summaries(monkeypatch, fake_summary("changes requested", checker="codex"))
     state, detail = pr_watch.review_state(PR)
     assert state == "changes requested"
-    assert f"CodeRabbit: requested changes on head {HEAD_SHA[:7]}" in detail
+    assert f"Codex: requested changes on head {HEAD_SHA[:7]}" in detail
 
 
 # ---------------------------------------------------------------------------

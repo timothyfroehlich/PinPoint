@@ -262,6 +262,39 @@ describe("manual-refresh token bucket at the seam (PP-hbi0)", () => {
     await syncLocationSnapshot({ trigger: "cron" });
     expect((await getRefreshAllowance()).remaining).toBe(PBM_REFRESH_BURST);
   });
+
+  it("resets refreshTokensAt to now when refilling to full burst capacity (PP-6sp5)", async () => {
+    const db = await getTestDb();
+    const { syncLocationSnapshot } = await import("~/lib/pinballmap/state");
+    const { PBM_REFRESH_BURST, PBM_REFRESH_REFILL_MS } =
+      await import("~/lib/pinballmap/config");
+
+    // Seed BURST - 1 tokens and 1.5 periods idle so the bucket refills to burst capacity.
+    const oneAndAHalf = new Date(Date.now() - 1.5 * PBM_REFRESH_REFILL_MS);
+    await db
+      .update(pinballmapState)
+      .set({
+        refreshTokens: PBM_REFRESH_BURST - 1,
+        refreshTokensAt: oneAndAHalf,
+      })
+      .where(eq(pinballmapState.id, "singleton"));
+
+    const result = await syncLocationSnapshot({ trigger: "manual" });
+    expect(result.ok).toBe(true);
+
+    const [state] = await db
+      .select({ refreshTokensAt: pinballmapState.refreshTokensAt })
+      .from(pinballmapState)
+      .where(eq(pinballmapState.id, "singleton"));
+
+    // Pre-fix SQL advanced refreshTokensAt by 1 period, leaving it ~90s in the past (now - 0.5 * REFILL_MS).
+    // Post-fix SQL resets to now() at burst ceiling.
+    expect(state).toBeDefined();
+    if (!state) return;
+    expect(Math.abs(Date.now() - state.refreshTokensAt.getTime())).toBeLessThan(
+      5000
+    );
+  });
 });
 
 /**

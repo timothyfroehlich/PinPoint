@@ -3,10 +3,13 @@ import { getIscoredGamesAction } from "./iscored-actions";
 import { getGameroomGames } from "~/lib/iscored/client";
 import { isIscoredConfigured } from "~/lib/iscored/config";
 
-const { mockGetUser, mockFindFirstProfile } = vi.hoisted(() => ({
-  mockGetUser: vi.fn(),
-  mockFindFirstProfile: vi.fn(),
-}));
+const { mockGetUser, mockFindFirstProfile, mockFindFirstMachine } = vi.hoisted(
+  () => ({
+    mockGetUser: vi.fn(),
+    mockFindFirstProfile: vi.fn(),
+    mockFindFirstMachine: vi.fn(),
+  })
+);
 
 vi.mock("~/lib/supabase/server", () => ({
   createClient: vi.fn(async () => {
@@ -22,6 +25,9 @@ vi.mock("~/server/db", () => ({
     query: {
       userProfiles: {
         findFirst: mockFindFirstProfile,
+      },
+      machines: {
+        findFirst: mockFindFirstMachine,
       },
     },
   },
@@ -72,6 +78,16 @@ describe("getIscoredGamesAction", () => {
 
     const result = await getIscoredGamesAction();
     expect(result).toEqual({ error: "Permission denied" });
+    expect(getGameroomGames).not.toHaveBeenCalled();
+  });
+
+  it("returns error when machine lookup throws", async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: "user-123" } } });
+    mockFindFirstProfile.mockResolvedValue({ role: "member" });
+    mockFindFirstMachine.mockRejectedValue(new Error("Connection reset"));
+
+    const result = await getIscoredGamesAction({ machineId: "machine-abc" });
+    expect(result).toEqual({ error: "Failed to verify machine ownership" });
     expect(getGameroomGames).not.toHaveBeenCalled();
   });
 
