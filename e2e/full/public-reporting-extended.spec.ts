@@ -3,7 +3,7 @@
  *
  * Tests for email prompt and signup pre-fill flows.
  * Core reporting tests are in e2e/smoke/public-reporting.spec.ts.
- * Status enforcement tested in public-issue-submit.test.ts (PGlite integration).
+ * Anonymous and guest status/priority enforcement tested in public-issue-submit.test.ts (PGlite integration).
  */
 
 import { test, expect } from "../support/fixtures.js";

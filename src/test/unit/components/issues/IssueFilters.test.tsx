@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactElement } from "react";
 import { IssueFilters } from "~/components/issues/IssueFilters";
@@ -119,7 +119,7 @@ describe("IssueFilters", () => {
     );
   });
 
-  it("reflects pre-populated filters from URL params (q and severity)", async () => {
+  it("reflects pre-populated filters prop (q and severity badge)", async () => {
     renderWithProviders(
       <IssueFilters
         {...defaultProps}
@@ -132,32 +132,63 @@ describe("IssueFilters", () => {
     const searchInput = screen.getByPlaceholderText("Search issues...");
     expect(searchInput).toHaveValue("bird");
 
-    // Severity badge should be visible
-    expect(screen.getByText("Major")).toBeInTheDocument();
+    // Severity badge should be visible within filter bar
+    const filterBar = screen.getByTestId("filter-bar");
+    expect(within(filterBar).getByText("Major")).toBeInTheDocument();
   });
 
-  it("pushes created_from param when date range is applied", async () => {
+  it("pushes created_from and created_to params when Created date range is applied", async () => {
     const user = userEvent.setup();
     renderWithProviders(<IssueFilters {...defaultProps} filters={{}} />);
 
     // Expand "More Filters" to reveal date pickers
-    const moreButton = screen.queryByRole("button", {
+    const moreButton = screen.getByRole("button", {
       name: /More Filters/i,
     });
-    if (moreButton) {
-      await user.click(moreButton);
-    }
+    await user.click(moreButton);
 
-    // The mobile date input is testid="filter-created-from"
-    const createdFrom = screen.queryByTestId("filter-created-from");
-    if (createdFrom) {
-      fireEvent.change(createdFrom, { target: { value: "2026-08-10" } });
-      await new Promise((resolve) => setTimeout(resolve, 0));
+    const createdFrom = screen.getByTestId("filter-created-from");
+    fireEvent.change(createdFrom, { target: { value: "2026-08-10" } });
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
-      expect(pushMock).toHaveBeenCalledWith(
-        expect.stringContaining("created_from=2026-08-10")
-      );
-    }
+    expect(pushMock).toHaveBeenCalledWith(
+      expect.stringContaining("created_from=")
+    );
+
+    const createdTo = screen.getByTestId("filter-created-to");
+    fireEvent.change(createdTo, { target: { value: "2026-08-20" } });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(pushMock).toHaveBeenCalledWith(
+      expect.stringContaining("created_to=")
+    );
+  });
+
+  it("pushes updated_from and updated_to params when Modified date range is applied", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<IssueFilters {...defaultProps} filters={{}} />);
+
+    // Expand "More Filters" to reveal date pickers
+    const moreButton = screen.getByRole("button", {
+      name: /More Filters/i,
+    });
+    await user.click(moreButton);
+
+    const modifiedFrom = screen.getByTestId("filter-modified-from");
+    fireEvent.change(modifiedFrom, { target: { value: "2026-08-01" } });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(pushMock).toHaveBeenCalledWith(
+      expect.stringContaining("updated_from=")
+    );
+
+    const modifiedTo = screen.getByTestId("filter-modified-to");
+    fireEvent.change(modifiedTo, { target: { value: "2026-08-31" } });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(pushMock).toHaveBeenCalledWith(
+      expect.stringContaining("updated_to=")
+    );
   });
 });
 
