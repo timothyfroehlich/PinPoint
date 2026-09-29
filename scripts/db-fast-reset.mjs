@@ -72,6 +72,8 @@ async function fastReset() {
       // Same never-seeded reason as the catalog: the OPDB copy is not truncated
       // above, but E2E-only databases would otherwise never get rows (PP-wqit.12).
       "pnpm run db:_seed-opdb",
+      // Placeholder tips, same never-seeded reason (PP-a0be).
+      "pnpm run db:_seed-pintips",
       // Unlike the catalog, `pinballmap_state` IS reached by the TRUNCATE
       // above — `machines` is truncated CASCADE and the state seed writes
       // machine link columns — so this one is here for the original PP-tn6t

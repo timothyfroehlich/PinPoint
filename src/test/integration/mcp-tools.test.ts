@@ -137,6 +137,11 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
     modelName?: string;
     manufacturer?: string;
     year?: number;
+    type?: "em" | "ss" | "me";
+    display?: "reels" | "lights" | "alphanumeric" | "cga" | "dmd" | "lcd";
+    playerCount?: number;
+    designers?: string[];
+    artists?: string[];
     opdbId?: string;
     ipdbId?: number;
   }
@@ -2569,6 +2574,9 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       modelName: string | null;
       manufacturer: string | null;
       year: number | null;
+      type: "em" | "ss" | "me" | null;
+      playerCount: number | null;
+      designers: string[] | null;
       opdbId: string | null;
       ipdbId: number | null;
     }> {
@@ -2583,6 +2591,9 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
           pinballmapIntent: true,
           manufacturer: true,
           year: true,
+          type: true,
+          playerCount: true,
+          designers: true,
           opdbId: true,
           ipdbId: true,
         },
@@ -3626,6 +3637,10 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
             modelName: "Fireball (home-brew conversion)",
             manufacturer: "Bally",
             year: 1972,
+            // PP-wqit.14's half of the manual model carries the same way.
+            type: "ss",
+            playerCount: 4,
+            designers: ["Greg Kmiec"],
           },
         });
 
@@ -3640,6 +3655,9 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
           modelName: "Fireball (home-brew conversion)",
           manufacturer: "Bally",
           year: 1972,
+          type: "ss",
+          playerCount: 4,
+          designers: ["Greg Kmiec"],
         });
       });
 
