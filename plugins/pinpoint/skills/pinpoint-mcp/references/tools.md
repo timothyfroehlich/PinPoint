@@ -68,7 +68,7 @@ Pass exactly one of `query` (a title) or `machineGroupId` (a family id). Procedu
    - Emails, Discord-messages and notifies in-app both the old owner and the new owner.
    - Deletes the old owner's watch on the machine, even if they had set it up themselves. Making them owner again re-adds a watch, but not their old settings.
    - Guests cannot own machines. Promote them in the web app first.
-   - A name only finds signed-up members. An invited person needs their UUID.
+   - A name only finds signed-up members. An invited person needs their UUID, which no tool returns; the user sets that owner in the web app.
 4. **Pinball Map fields**: `pinballmapMachineId`, `pinballmapExcluded`, `pinballmapExcludedReason`, `intent`. Procedure and traps: [`pinballmap.md`](pinballmap.md).
 5. **`insiderConnected`**: `on` or `off`. Records what PinPoint wants; it does not change Pinball Map. Works only when `get_machine` shows `pinballmap.insiderConnected.eligible: true`. It can be switched between `on` and `off` but never cleared. CHANGE.
 6. **`iscoredGameId`**: the iScored game id as text. `""` or `null` clears it. CHANGE. No call to iScored is made.

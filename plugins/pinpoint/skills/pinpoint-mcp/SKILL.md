@@ -102,7 +102,7 @@ When the user asks for one of these, say so and name the closest option. Do not 
 - **Change Pinball Map itself.** PinPoint tools only record what PinPoint wants (`intent`, `insiderConnected`). A person must open the machine in the PinPoint web app and push the update to Pinball Map. Never tell the user a machine "is listed" or "is on Pinball Map" because you set intent `on`; say PinPoint now wants it listed and a person must push the update.
 - **Enter hand-entered model details** (manufacturer, year, designers, artists).
 - **Look up anyone's email address.** PinPoint never returns them; do not ask for or guess them.
-- **Set an invited (not yet signed-up) person as owner by name.** It needs their UUID, which only an error message or `whoami` returns.
+- **Set an invited (not yet signed-up) person as owner.** It needs their UUID, and no tool returns it. Ask the user to set that owner in the PinPoint web app. Never pass the UUID from `whoami` as an owner: that is Tim's own id.
 
 ## 6. Finding the right record
 
