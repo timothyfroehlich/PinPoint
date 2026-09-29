@@ -13,6 +13,9 @@ interface PaginationControlsProps {
   prevTestId?: string;
   nextTestId?: string;
   className?: string;
+  /** Overrides the 28px arrow button size (e.g. touch-sized on phones). */
+  buttonClassName?: string;
+  iconClassName?: string;
 }
 
 export function PaginationControls({
@@ -23,6 +26,8 @@ export function PaginationControls({
   prevTestId,
   nextTestId,
   className,
+  buttonClassName,
+  iconClassName,
 }: PaginationControlsProps): React.JSX.Element {
   const maxPage = Math.max(1, Math.ceil(totalCount / pageSize));
   const safePage = Math.min(Math.max(1, page), maxPage);
@@ -46,25 +51,25 @@ export function PaginationControls({
           type="button"
           variant="ghost"
           size="icon"
-          className="h-7 w-7 hover:bg-muted"
+          className={cn("h-7 w-7 hover:bg-muted", buttonClassName)}
           onClick={() => onNavigate(safePage - 1)}
           disabled={isFirstPage}
           aria-label="Previous page"
           data-testid={prevTestId}
         >
-          <ChevronLeft className="h-4 w-4" />
+          <ChevronLeft className={cn("h-4 w-4", iconClassName)} />
         </Button>
         <Button
           type="button"
           variant="ghost"
           size="icon"
-          className="h-7 w-7 hover:bg-muted"
+          className={cn("h-7 w-7 hover:bg-muted", buttonClassName)}
           onClick={() => onNavigate(safePage + 1)}
           disabled={isLastPage}
           aria-label="Next page"
           data-testid={nextTestId}
         >
-          <ChevronRight className="h-4 w-4" />
+          <ChevronRight className={cn("h-4 w-4", iconClassName)} />
         </Button>
       </div>
     </div>
