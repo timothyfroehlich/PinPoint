@@ -116,7 +116,10 @@ async function createAdmin(): Promise<{ id: string }> {
 }
 
 async function seedPinballmap(
-  opts: { icEligible?: boolean } = {}
+  opts: {
+    icEligible?: boolean;
+    lineup?: { id: number; machineId: number }[];
+  } = {}
 ): Promise<void> {
   const db = await getTestDb();
   await db.insert(pinballmapCatalog).values({
@@ -129,7 +132,7 @@ async function seedPinballmap(
   await db.insert(pinballmapState).values({
     id: "singleton",
     locationId: 26454,
-    snapshotJson: snapshotOf([]),
+    snapshotJson: snapshotOf(opts.lineup ?? []),
     lastSyncStatus: "ok",
   });
 }
@@ -249,6 +252,26 @@ describe("createMachineAction — Pinball Map lineup choice (PGlite)", () => {
     const machine = await createdMachine();
     expect(machine.pinballmapIntent).toBe("on");
     expect(pbm.lineup).toEqual([]);
+  });
+
+  it("adds nothing for a title already on the lineup (opened from a lineup entry)", async () => {
+    const { createMachineAction } = await import("~/app/(app)/m/actions");
+    await createAdmin();
+    const entry = { id: 42, machineId: TITLE_ID };
+    await seedPinballmap({ lineup: [entry] });
+    pbm.lineup = [entry];
+
+    const result = await createMachineAction(
+      undefined,
+      createForm({ pinballmapIntent: "on", pbmAddAfterCreate: "1" })
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // The new cabinet covers the existing entry; nothing is written out.
+    expect(result.value.redirectTo).toBe("/m/GZ");
+    expect(pbm.lineup).toEqual([entry]);
+    expect((await createdMachine()).pinballmapIntent).toBe("on");
   });
 
   it("ignores the add checkbox unless intent is On", async () => {

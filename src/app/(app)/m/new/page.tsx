@@ -2,11 +2,11 @@ import type React from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "~/lib/supabase/server";
 import { getLoginUrl } from "~/lib/url";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { PageHeader } from "~/components/layout/PageHeader";
 import { CreateMachineForm } from "./create-machine-form";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { db } from "~/server/db";
-import { userProfiles } from "~/server/db/schema";
+import { pinballmapCatalog, userProfiles } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 import { Forbidden } from "~/components/errors/Forbidden";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
@@ -21,7 +21,14 @@ import { getPinballMapState } from "~/lib/pinballmap/state";
  * Form to create a new pinball machine.
  * Mutates through a Server Action.
  */
-export default async function NewMachinePage(): Promise<React.JSX.Element> {
+export default async function NewMachinePage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    title?: string | string[];
+    pbm?: string | string[];
+  }>;
+}): Promise<React.JSX.Element> {
   // Auth guard - check if user is authenticated (CORE-SSR-002)
   const supabase = await createClient();
   const {
@@ -59,6 +66,16 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
   }));
 
   const iscoredConfigured = isIscoredConfigured();
+  // `?title=` prefills the name and `?pbm=` the Pinball Map title, for the
+  // lineup page's Create in PinPoint.
+  const { title, pbm } = await searchParams;
+  const pbmId = typeof pbm === "string" ? Number.parseInt(pbm, 10) : NaN;
+  const initialPinballmap = Number.isSafeInteger(pbmId)
+    ? await db.query.pinballmapCatalog.findFirst({
+        columns: { pinballmapMachineId: true, name: true },
+        where: eq(pinballmapCatalog.pinballmapMachineId, pbmId),
+      })
+    : undefined;
   const accessLevel = getAccessLevel(currentUserProfile?.role);
 
   // What the lineup choice needs (pinballmap 4.11). The creator owns no
@@ -78,27 +95,39 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
     canSetIntent: checkPermission("machines.pinballmap.link", accessLevel),
     canAddAfterCreate:
       writeEnabled && checkPermission("machines.pinballmap.push", accessLevel),
+    // Titles already on the lineup: adding one of those has nothing to add,
+    // so the add-after-creating option is not offered for them (4.11).
+    lineupTitleIds: configured
+      ? (pbmState.snapshotJson?.lmxes.map((lmx) => lmx.machineId) ?? [])
+      : [],
   };
 
   return (
+    // No card around the form: it sits on the page as the Manage tab's form
+    // does, under the page title (Tim, PP-wqit.14.2 review).
     <PageContainer size="standard" className="pt-4 pb-8">
-      <Card className="max-w-4xl gap-4 border-outline-variant">
-        <CardHeader className="px-4 pt-4 pb-0 sm:px-6">
-          <CardTitle className="text-xl text-foreground">New Machine</CardTitle>
-        </CardHeader>
-        <CardContent className="px-4 pb-4 sm:px-6">
-          <CreateMachineForm
-            allUsers={allUsers}
-            canSelectOwner={canCreateMachine}
-            iscoredConfigured={iscoredConfigured}
-            canViewOwnerRequirements={checkPermission(
-              "machines.view.ownerRequirements",
-              accessLevel
-            )}
-            pinballmap={pinballmap}
-          />
-        </CardContent>
-      </Card>
+      <div className="max-w-4xl space-y-6">
+        <PageHeader title="New Machine" />
+        <CreateMachineForm
+          allUsers={allUsers}
+          canSelectOwner={canCreateMachine}
+          iscoredConfigured={iscoredConfigured}
+          canViewOwnerRequirements={checkPermission(
+            "machines.view.ownerRequirements",
+            accessLevel
+          )}
+          pinballmap={pinballmap}
+          initialName={typeof title === "string" ? title : undefined}
+          initialPinballmap={
+            initialPinballmap
+              ? {
+                  id: initialPinballmap.pinballmapMachineId,
+                  name: initialPinballmap.name,
+                }
+              : undefined
+          }
+        />
+      </div>
     </PageContainer>
   );
 }

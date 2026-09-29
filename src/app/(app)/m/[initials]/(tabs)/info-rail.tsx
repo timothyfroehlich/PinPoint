@@ -14,6 +14,8 @@ interface InfoRailProps {
   editSlot?: React.ReactNode;
   /** Top scores card slot, rendered below Details and above Tags placeholder. */
   topScoresSlot?: React.ReactNode;
+  /** PinTips tip card slot (spec pintips 4.1), between Top scores and Tags. */
+  tipSlot?: React.ReactNode;
   /**
    * The game's model identity — normally the Pinball Map catalog title (e.g.
    * "Godzilla (Premium)"), or a hand-entered name for a machine their catalog
@@ -145,6 +147,7 @@ export function InfoRail({
   addedAt,
   editSlot,
   topScoresSlot,
+  tipSlot,
   modelName,
   manufacturer,
   year,
@@ -320,6 +323,8 @@ export function InfoRail({
       </div>
 
       {topScoresSlot}
+
+      {tipSlot}
 
       <div className={CARD} data-testid="machine-tags">
         <p className={`mb-2 ${LABEL}`}>Tags</p>

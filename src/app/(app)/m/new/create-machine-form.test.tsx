@@ -22,8 +22,39 @@ vi.mock("~/components/machines/OwnerSelect", () => ({
   OwnerSelect: () => <div data-testid="mock-owner-select" />,
 }));
 
-vi.mock("~/components/machines/PinballMapLinkField", () => ({
-  PinballMapLinkField: () => <div data-testid="mock-pbm-link-field" />,
+// Reports its preselected title the way the real field does on mount, so the
+// Pinball Map block in Integrations sees it.
+vi.mock("~/components/machines/PinballMapLinkField", async () => {
+  const { useEffect } = await import("react");
+  return {
+    PinballMapLinkField: ({
+      defaultMachineId = null,
+      onSelectionChange,
+    }: {
+      defaultMachineId?: number | null;
+      onSelectionChange?: (s: {
+        manual: boolean;
+        pinballmapMachineId: number | null;
+      }) => void;
+    }) => {
+      useEffect(() => {
+        onSelectionChange?.({
+          manual: false,
+          pinballmapMachineId: defaultMachineId,
+        });
+      }, [defaultMachineId, onSelectionChange]);
+      return (
+        <div
+          data-testid="mock-pbm-link-field"
+          data-default-id={defaultMachineId ?? ""}
+        />
+      );
+    },
+  };
+});
+
+vi.mock("~/app/(app)/m/pinballmap-actions", () => ({
+  getPinballMapTitleIcEligibleAction: vi.fn().mockResolvedValue(false),
 }));
 
 describe("CreateMachineForm — iScored picker integration", () => {
@@ -100,5 +131,50 @@ describe("CreateMachineForm — iScored picker integration", () => {
     expect(fd?.get("name")).toBe("Medieval Madness");
     expect(fd?.get("initials")).toBe("MM");
     expect(fd?.get("iscoredGameId")).toBe("104656");
+  });
+});
+
+describe("CreateMachineForm — opened from a lineup entry (pinballmap 4.11)", () => {
+  const pinballmap = {
+    configured: true,
+    locationName: "Austin Pinball Collective",
+    canSetIntent: true,
+    canAddAfterCreate: true,
+    lineupTitleIds: [],
+  };
+
+  it("prefills the name and title, and starts the lineup intent On", async () => {
+    render(
+      <CreateMachineForm
+        allUsers={[]}
+        canSelectOwner={false}
+        pinballmap={pinballmap}
+        initialName="Godzilla"
+        initialPinballmap={{ id: 3416, name: "Godzilla (Premium)" }}
+      />
+    );
+
+    expect(screen.getByLabelText(/Machine Name/)).toHaveValue("Godzilla");
+    expect(screen.getByTestId("mock-pbm-link-field")).toHaveAttribute(
+      "data-default-id",
+      "3416"
+    );
+    expect(
+      await screen.findByRole("radio", { name: "On the lineup" })
+    ).toHaveAttribute("aria-checked", "true");
+  });
+
+  it("starts Off when opened directly", async () => {
+    render(
+      <CreateMachineForm
+        allUsers={[]}
+        canSelectOwner={false}
+        pinballmap={pinballmap}
+      />
+    );
+
+    expect(
+      await screen.findByText("Lineup choice needs a model")
+    ).toBeInTheDocument();
   });
 });

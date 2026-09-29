@@ -16,6 +16,7 @@ vi.mock("~/app/(app)/m/pinballmap-actions", () => ({
 }));
 
 const base: NewMachinePinballmapFieldsProps = {
+  lineupTitleIds: [],
   pinballmapMachineId: 77,
   presenceStatus: "on_the_floor",
   configured: true,
@@ -68,6 +69,34 @@ describe("NewMachinePinballmapFields", () => {
     );
     expect(posted("pbmAddAfterCreate")).toBeNull();
     expect(posted("pinballmapIntent")).toBe("on");
+  });
+
+  it("starts On when opened from a lineup entry", () => {
+    render(<NewMachinePinballmapFields {...base} initialIntent="on" />);
+
+    expect(
+      screen.getByRole("radio", { name: "On the lineup" })
+    ).toHaveAttribute("aria-checked", "true");
+    expect(posted("pinballmapIntent")).toBe("on");
+    expect(
+      screen.getByLabelText("Add to Pinball Map after creating")
+    ).toBeChecked();
+  });
+
+  it("offers no add for a title already on the lineup", () => {
+    render(
+      <NewMachinePinballmapFields
+        {...base}
+        initialIntent="on"
+        lineupTitleIds={[77]}
+      />
+    );
+
+    expect(posted("pinballmapIntent")).toBe("on");
+    expect(
+      screen.queryByLabelText("Add to Pinball Map after creating")
+    ).not.toBeInTheDocument();
+    expect(posted("pbmAddAfterCreate")).toBeNull();
   });
 
   it("offers no add to someone who cannot push", async () => {

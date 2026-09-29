@@ -47,7 +47,11 @@ import { Alert, AlertDescription } from "~/components/ui/alert";
 /** What the page knows about Pinball Map for the lineup choice (4.11). */
 export type NewMachinePinballmapContext = Pick<
   NewMachinePinballmapFieldsProps,
-  "configured" | "locationName" | "canSetIntent" | "canAddAfterCreate"
+  | "configured"
+  | "locationName"
+  | "canSetIntent"
+  | "canAddAfterCreate"
+  | "lineupTitleIds"
 >;
 
 interface CreateMachineFormProps {
@@ -57,6 +61,9 @@ interface CreateMachineFormProps {
   /** The creator may see Owner's Requirements (machine-editing 2.6). */
   canViewOwnerRequirements?: boolean;
   pinballmap?: NewMachinePinballmapContext;
+  initialName?: string | undefined;
+  /** Pinball Map title to preselect in the Model field. */
+  initialPinballmap?: { id: number; name: string } | undefined;
 }
 
 const NO_PINBALLMAP: NewMachinePinballmapContext = {
@@ -64,6 +71,7 @@ const NO_PINBALLMAP: NewMachinePinballmapContext = {
   locationName: null,
   canSetIntent: false,
   canAddAfterCreate: false,
+  lineupTitleIds: [],
 };
 
 /**
@@ -77,6 +85,8 @@ export function CreateMachineForm({
   iscoredConfigured = false,
   canViewOwnerRequirements = false,
   pinballmap = NO_PINBALLMAP,
+  initialName,
+  initialPinballmap,
 }: CreateMachineFormProps): React.JSX.Element {
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, isPending] = useActionState<
@@ -88,7 +98,7 @@ export function CreateMachineForm({
   const [users, setUsers] = useState<OwnerSelectUser[]>(allUsers);
 
   // Controlled field values so they survive re-renders after server action errors
-  const [nameValue, setNameValue] = useState("");
+  const [nameValue, setNameValue] = useState(initialName ?? "");
   const [initialsValue, setInitialsValue] = useState("");
   const [ownerIdValue, setOwnerIdValue] = useState("");
   // Bumped on reset to remount OwnerSelect (which holds its own internal state).
@@ -338,6 +348,9 @@ export function CreateMachineForm({
           }
           modelDetails={
             <PinballMapLinkField
+              // Preselected from a lineup entry's Create in PinPoint (`?pbm=`).
+              defaultMachineId={initialPinballmap?.id ?? null}
+              defaultName={initialPinballmap?.name ?? null}
               machineName={nameValue}
               onSelectionChange={setPbmSelection}
             />
@@ -367,6 +380,9 @@ export function CreateMachineForm({
               <NewMachinePinballmapFields
                 pinballmapMachineId={pbmSelection.pinballmapMachineId}
                 presenceStatus={presenceStatus}
+                // Opened from a lineup entry: the title is on the lineup
+                // already, so intent starts On (pinballmap 4.11).
+                initialIntent={initialPinballmap ? "on" : "off"}
                 {...pinballmap}
               />
             )

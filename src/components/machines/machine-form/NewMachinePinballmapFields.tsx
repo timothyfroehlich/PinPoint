@@ -33,13 +33,24 @@ export interface NewMachinePinballmapFieldsProps {
    * offered, rather than offered and failing.
    */
   canAddAfterCreate: boolean;
+  /**
+   * Catalog titles already on the location's lineup. Adding one has nothing
+   * to add, so "Add to Pinball Map after creating" is not offered (4.11).
+   */
+  lineupTitleIds: readonly number[];
+  /**
+   * Where the intent toggle starts: On when the page was opened from a lineup
+   * entry (4.11, pinballmap-lineup 5.4), otherwise Off.
+   */
+  initialIntent?: PbmListingIntent;
 }
 
 /**
  * The New Machine page's Pinball Map choices (pinballmap 4.11), inside
  * Integrations: the lineup intent toggle and, for an eligible title, the
- * Insider Connected switch, both starting Off. With intent On and a person
- * who can push, "Add to Pinball Map after creating" — ticked by default, and
+ * Insider Connected switch, both starting Off (intent starts On when the page
+ * was opened from a lineup entry). With intent On, a title not already on the
+ * lineup, and a person who can push, "Add to Pinball Map after creating" — ticked by default, and
  * ticking it is the 4.5 confirmation for the add push the create then runs.
  *
  * Only for a catalog title: on Manual Entry the Integrations box shows
@@ -55,10 +66,12 @@ export function NewMachinePinballmapFields({
   locationName,
   canSetIntent,
   canAddAfterCreate,
+  lineupTitleIds,
+  initialIntent = "off",
 }: NewMachinePinballmapFieldsProps): React.JSX.Element {
   const icLabelId = useId();
   const addId = useId();
-  const [intent, setIntent] = useState<PbmListingIntent>("off");
+  const [intent, setIntent] = useState<PbmListingIntent>(initialIntent);
   const [icOn, setIcOn] = useState(false);
   const [addAfterCreate, setAddAfterCreate] = useState(true);
   // Eligibility of the chosen title, keyed by id so a stale answer for a
@@ -98,7 +111,11 @@ export function NewMachinePinballmapFields({
   // is the form following its own inputs, not an automatic intent change.
   const effectiveIntent: PbmListingIntent =
     intent === "on" && blockedReason !== null ? "off" : intent;
-  const offerAdd = effectiveIntent === "on" && canAddAfterCreate;
+  const alreadyOnLineup =
+    pinballmapMachineId !== null &&
+    lineupTitleIds.includes(pinballmapMachineId);
+  const offerAdd =
+    effectiveIntent === "on" && canAddAfterCreate && !alreadyOnLineup;
 
   const title =
     locationName !== null ? `Pinball Map — ${locationName}` : "Pinball Map";

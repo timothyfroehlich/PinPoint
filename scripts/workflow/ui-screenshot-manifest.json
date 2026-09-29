@@ -89,5 +89,11 @@
     "route": "/c/tags/display/dmd",
     "authRole": "member",
     "seedNeeds": "OPDB seed: machines whose catalog title's OPDB display is dmd"
+  },
+  "pinball-map-lineup": {
+    "label": "Pinball Map lineup",
+    "route": "/m/pinball-map",
+    "authRole": "admin",
+    "seedNeeds": "seeded Pinball Map state (supabase/seed-pinballmap-state.ts)"
   }
 }

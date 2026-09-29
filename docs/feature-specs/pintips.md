@@ -42,9 +42,7 @@
 
 ## Known divergences
 
-| Requirement | Divergence | Resolution |
-| :---------- | :--------- | :--------- |
-| All         | Not built. | PP-a0be    |
+_None — the current implementation matches this spec._
 
 ## Changelog
 

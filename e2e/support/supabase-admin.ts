@@ -533,6 +533,28 @@ export async function linkMachineToPinballMap(
 }
 
 /**
+ * Link a test machine to a catalog title and set its listing intent, WITHOUT
+ * touching the stored lineup — the "PinPoint wants it on Pinball Map, Pinball
+ * Map does not show it" state (the lineup page's To add row).
+ */
+export async function setMachinePinballMapTitle(
+  machineInitials: string,
+  link: {
+    pinballmapMachineId: number;
+    intent: "on" | "off" | "no_sync";
+  }
+) {
+  const { error } = await supabaseAdmin
+    .from("machines")
+    .update({
+      pinballmap_machine_id: link.pinballmapMachineId,
+      pinballmap_intent: link.intent,
+    })
+    .eq("initials", machineInitials);
+  if (error) throw error;
+}
+
+/**
  * Add one entry to the stored lineup, leaving the rest of the capture alone.
  *
  * Read-modify-write rather than a JSON patch because `snapshot_json` is one

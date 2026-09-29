@@ -12,11 +12,16 @@
 
 "use server";
 
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { createClient } from "~/lib/supabase/server";
 import { db, type Tx } from "~/server/db";
-import { machines, userProfiles, pinballmapState } from "~/server/db/schema";
+import {
+  machines,
+  pinballmapAbandonedListings,
+  pinballmapState,
+  userProfiles,
+} from "~/server/db/schema";
 import { reconcileAfterSync } from "~/lib/pinballmap/sync";
 import { importPinballMapCommentsAfterCoverageChange } from "~/lib/pinballmap/comment-import";
 import {
@@ -31,8 +36,11 @@ import {
   withLmxRemoved,
 } from "~/lib/pinballmap/snapshot-edit";
 import { getPinballMapClient } from "~/lib/pinballmap/client";
-import { setMachineIcIntent } from "~/services/machines";
-import type { LocationSnapshot, PbmWriteFailure } from "~/lib/pinballmap/types";
+import type {
+  LocationSnapshot,
+  PbmLmx,
+  PbmWriteFailure,
+} from "~/lib/pinballmap/types";
 import { log } from "~/lib/logger";
 import {
   searchCatalogFamilies,
@@ -62,6 +70,8 @@ import {
   type PbmListingIntent,
 } from "~/lib/pinballmap/listing-state";
 import { type Result, ok, err } from "~/lib/result";
+import type { PinballmapRuntimeState } from "~/lib/types";
+import { setMachineIcIntent, updateMachinePbmLink } from "~/services/machines";
 
 export type { CatalogEdition, CatalogFamily } from "~/lib/pinballmap/catalog";
 
@@ -1061,6 +1071,336 @@ export async function removeMachineFromPinballMapAction(
   }
 }
 
+/**
+ * Shared preamble for acting on an entry no PinPoint machine is linked to
+ * (lineup spec §5.4): authenticate, find the entry on the stored lineup, confirm
+ * nothing is linked to its title, and check the push gate (pinballmap §8.2).
+ *
+ * Push is owner-scoped for members, and an unlinked entry has no machine to own.
+ * So the gate is the capability without ownership (technician or admin), or
+ * ownership of a machine that walked away from this exact entry — the same
+ * allowlist the machine page's removal uses (pinballmap §2.5). A linked entry is
+ * refused: it is its title's business, removed from its cabinets' pages.
+ */
+async function authorizeUnlinkedEntryAction(formData: FormData): Promise<
+  | {
+      ok: true;
+      userId: string;
+      state: PinballmapRuntimeState & { locationId: number };
+      lmx: PbmLmx;
+    }
+  | {
+      ok: false;
+      result: Result<
+        never,
+        "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
+      >;
+    }
+> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user)
+    return { ok: false, result: err("UNAUTHORIZED", "Sign in required") };
+
+  const lmxRaw = formData.get("lmxId");
+  if (typeof lmxRaw !== "string" || !/^\d+$/.test(lmxRaw))
+    return { ok: false, result: err("VALIDATION", "Missing entry") };
+  const lmxId = Number(lmxRaw);
+
+  const profile = await db.query.userProfiles.findFirst({
+    where: eq(userProfiles.id, user.id),
+    columns: { role: true },
+  });
+  const accessLevel = getAccessLevel(profile?.role);
+
+  const state = await getPinballMapState();
+  if (state?.locationId == null)
+    return {
+      ok: false,
+      result: err("SERVER", "Pinball Map isn't configured yet"),
+    };
+  const locationId = state.locationId;
+
+  const lmx = state.snapshotJson?.lmxes.find((entry) => entry.id === lmxId);
+  if (lmx === undefined)
+    return {
+      ok: false,
+      result: err("NOT_FOUND", "That entry is no longer on the lineup."),
+    };
+
+  const linked = await db.query.machines.findFirst({
+    where: eq(machines.pinballmapMachineId, lmx.machineId),
+    columns: { id: true },
+  });
+  if (linked)
+    return {
+      ok: false,
+      result: err(
+        "VALIDATION",
+        "A PinPoint machine is linked to this entry now. Reload the page."
+      ),
+    };
+
+  let allowed = checkPermission("machines.pinballmap.push", accessLevel);
+  if (!allowed) {
+    const walkedAway = await db
+      .select({ ownerId: machines.ownerId })
+      .from(pinballmapAbandonedListings)
+      .innerJoin(
+        machines,
+        eq(machines.id, pinballmapAbandonedListings.machineId)
+      )
+      .where(
+        and(
+          eq(pinballmapAbandonedListings.lmxId, lmxId),
+          eq(pinballmapAbandonedListings.locationId, locationId)
+        )
+      );
+    allowed = walkedAway.some((row) =>
+      checkPermission("machines.pinballmap.push", accessLevel, {
+        userId: user.id,
+        machineOwnerId: row.ownerId,
+      })
+    );
+  }
+  if (!allowed)
+    return { ok: false, result: err("UNAUTHORIZED", "Not allowed") };
+
+  return { ok: true, userId: user.id, state: { ...state, locationId }, lmx };
+}
+
+export type RemoveUnlinkedEntryResult = Result<
+  Record<string, never>,
+  | "VALIDATION"
+  | "UNAUTHORIZED"
+  | "NOT_FOUND"
+  | "NOT_PROVISIONED"
+  | "PBM_REJECTED"
+  | "SERVER"
+>;
+
+/**
+ * **Remove from Pinball Map** for an entry no PinPoint machine is linked to
+ * (lineup spec §5.4). The same push as the machine page's removal (pinballmap
+ * §4.3), for an entry with no machine to act through.
+ *
+ * Gated by {@link authorizeUnlinkedEntryAction} plus provisioned credentials
+ * (pinballmap §8.2); the caller confirms first with the entry's comment count
+ * (§4.5, §4.6). Credential decrypt and the PBM call run before the transaction
+ * (CORE-ARCH-011).
+ *
+ * A `not_found` is checked against a freshly re-fetched lineup rather than read
+ * as "already gone", exactly as `removeMachineFromPinballMapAction` does
+ * (PP-rnup), and the stored lineup is edited so the page stops offering the
+ * removal of an entry that is gone (CORE-ARCH-012).
+ */
+export async function removeUnlinkedPinballmapEntryAction(
+  _prev: RemoveUnlinkedEntryResult | undefined,
+  formData: FormData
+): Promise<RemoveUnlinkedEntryResult> {
+  const authed = await authorizeUnlinkedEntryAction(formData);
+  if (!authed.ok) return authed.result;
+  const { userId, state, lmx } = authed;
+  const titleId = lmx.machineId;
+
+  // --- non-transactional effects, all BEFORE the transaction ---
+  const credentials = await getPinballMapWriteCredentials();
+  if (!credentials)
+    return err(
+      "NOT_PROVISIONED",
+      "No Pinball Map operator account is set up yet, so PinPoint can't write to Pinball Map."
+    );
+
+  const lease = await claimPinballMapMutationLease(
+    state.locationId,
+    state.configurationGeneration
+  );
+  if (!lease)
+    return err(
+      "SERVER",
+      "The tracked Pinball Map location is being changed. Reload the page and try again."
+    );
+
+  try {
+    // Re-check under the lease, immediately before the outbound delete: a
+    // machine linked since the page (or the authorize step) read the lineup
+    // makes this entry that title's business, removed from its own page.
+    const linkedNow = await db.query.machines.findFirst({
+      where: eq(machines.pinballmapMachineId, titleId),
+      columns: { id: true },
+    });
+    if (linkedNow)
+      return err(
+        "VALIDATION",
+        "A PinPoint machine is linked to this entry now. Reload the page."
+      );
+
+    const client = await getPinballMapClient();
+    let deletedLmxId = lmx.id;
+    let written = await client.removeMachine({
+      credentials,
+      lmxId: deletedLmxId,
+    });
+
+    if (!written.ok && written.reason !== "not_found") {
+      log.error(
+        { reason: written.reason, action: "pinballmap.removeUnlinkedEntry" },
+        "PinballMap remove rejected"
+      );
+      return err("PBM_REJECTED", pbmWriteFailureMessage(written));
+    }
+
+    if (!written.ok) {
+      const verdict = await classifyRemoveNotFound({
+        attemptedLmxId: deletedLmxId,
+        pinballmapMachineId: titleId,
+        expectedLocationId: state.locationId,
+        mutationLeaseId: lease.id,
+        userId,
+      });
+      if (verdict.kind === "location_changed")
+        return err(
+          "SERVER",
+          "The tracked Pinball Map location changed while this removal was running. Reload the page and try again."
+        );
+      if (verdict.kind === "refuse")
+        return err("PBM_REJECTED", verdict.message);
+      if (verdict.kind === "retry") {
+        deletedLmxId = verdict.lmxId;
+        written = await client.removeMachine({
+          credentials,
+          lmxId: deletedLmxId,
+        });
+        if (!written.ok) {
+          log.error(
+            {
+              reason: written.reason,
+              action: "pinballmap.removeUnlinkedEntry",
+            },
+            "PinballMap remove rejected on the re-resolved lmx"
+          );
+          return err("PBM_REJECTED", pbmWriteFailureMessage(written));
+        }
+      }
+      // `gone`: confirmed absent from a lineup just re-fetched — finish locally.
+    }
+
+    // --- transaction: local state only ---
+    const committed = await db.transaction(async (tx) => {
+      if (!(await mutationLeaseOwnsLocation(tx, lease))) return false;
+      await editStoredSnapshot(tx, state.locationId, (snapshot) =>
+        withLmxRemoved(snapshot, deletedLmxId, titleId)
+      );
+      // A machine that walked away from this entry is no longer owed its
+      // cleanup alert once the entry is gone.
+      await retireAbandonmentForLmx(tx, lmx.id);
+      if (deletedLmxId !== lmx.id)
+        await retireAbandonmentForLmx(tx, deletedLmxId);
+      return true;
+    });
+    if (!committed)
+      return err(
+        "SERVER",
+        "The tracked Pinball Map location changed while this removal was running. Reload the page to verify the lineup before trying again."
+      );
+
+    revalidatePath("/m", "layout");
+    return ok({});
+  } finally {
+    await releasePinballMapMutationLease(lease.id);
+  }
+}
+
+export type LinkPinballmapEntryResult = Result<
+  { pinballmapMachineId: number; intent: PbmListingIntent },
+  "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "CONFLICT" | "SERVER"
+>;
+
+/**
+ * **Link** an entry on the lineup page (lineup spec §5.4, §5.7): match a
+ * PinPoint machine to the entry's catalog title. A person picks the machine;
+ * nothing is guessed (pinballmap §2.2).
+ *
+ * The match itself is `updateMachinePbmLink`, the same service the MCP linking
+ * tool uses, so re-matching a machine follows the standard reset and
+ * abandoned-entry rules (pinballmap §2.3, §2.5). Gated on the machine-linking
+ * capability for the chosen machine (§8.1). Writes only to PinPoint.
+ *
+ * The entry is already on the lineup, so the match then sets the machine On
+ * (pinballmap §2.3) unless it is set to Don't sync or its availability forbids
+ * On (§6.2). That is a second, intent-only update: the re-match itself still
+ * resets intent as §2.3 describes, and a failure between the two is reported
+ * rather than left looking like the link did it all (CORE-ARCH-012).
+ */
+export async function linkMachineToPinballmapEntryAction(
+  _prev: LinkPinballmapEntryResult | undefined,
+  formData: FormData
+): Promise<LinkPinballmapEntryResult> {
+  const titleRaw = formData.get("pinballmapMachineId");
+  if (typeof titleRaw !== "string" || !/^\d+$/.test(titleRaw))
+    return err("VALIDATION", "Missing Pinball Map title");
+  const pinballmapMachineId = Number(titleRaw);
+
+  const authed = await authorizeListingAction(
+    formData,
+    "machines.pinballmap.link",
+    { requireLink: false }
+  );
+  if (!authed.ok) return authed.result;
+  const { userId, machine } = authed;
+
+  if (machine.pinballmapExcluded)
+    return err(
+      "VALIDATION",
+      "This machine is marked as not in Pinball Map's catalog. Change that on its page first."
+    );
+  // The page compares machines not marked Removed (lineup §1), and the picker
+  // never offers one; refuse a stale or hand-built request the same way.
+  if (machine.presenceStatus === "removed")
+    return err("VALIDATION", "This machine is marked Removed.");
+  if (machine.pinballmapMachineId === pinballmapMachineId)
+    return ok({ pinballmapMachineId, intent: machine.pinballmapIntent });
+
+  const updated = await updateMachinePbmLink({
+    machineId: machine.id,
+    actorUserId: userId,
+    selection: { pinballmapMachineId },
+  });
+  if (!updated.ok) {
+    if (updated.reason === "not_found")
+      return err("NOT_FOUND", updated.message);
+    if (updated.reason === "conflict") return err("CONFLICT", updated.message);
+    return err("VALIDATION", updated.message);
+  }
+
+  let intent = updated.columns.pinballmapIntent;
+  if (
+    intent === "off" &&
+    !INTENT_ON_BLOCKED_BY.includes(machine.presenceStatus)
+  ) {
+    const setOn = await updateMachinePbmLink({
+      machineId: machine.id,
+      actorUserId: userId,
+      selection: { intent: "on" },
+    });
+    if (!setOn.ok) {
+      revalidatePath(`/m/${machine.initials}`);
+      revalidatePath("/m", "layout");
+      return err(
+        "SERVER",
+        `Linked ${machine.initials}, but setting it On the lineup failed: ${setOn.message} Set it On from its Manage tab.`
+      );
+    }
+    intent = setOn.columns.pinballmapIntent;
+  }
+
+  revalidatePath(`/m/${machine.initials}`);
+  revalidatePath("/m", "layout");
+  return ok({ pinballmapMachineId, intent });
+}
+
 export type SetInsiderConnectedIntentResult = Result<
   { icIntent: PbmIcIntent },
   "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND"
@@ -1325,6 +1665,10 @@ export type RemovalCommentCheckResult = Result<
  * Check the comment count when an operator opens a remove confirmation.
  * Page rendering stays on the stored snapshot; only this deliberate click may
  * spend from the shared manual-refresh allowance (spec 3.4, 4.6).
+ *
+ * Takes a `machineId` for a machine's own entry or one it left behind, or an
+ * `lmxId` alone for an entry no PinPoint machine is linked to (lineup spec
+ * §5.4), under the same gate as the removal it confirms.
  */
 export async function checkRemovalCommentsAction(
   formData: FormData
@@ -1334,6 +1678,18 @@ export async function checkRemovalCommentsAction(
     typeof explicitLmxRaw === "string" && /^\d+$/.test(explicitLmxRaw)
       ? Number(explicitLmxRaw)
       : null;
+
+  if (!formData.has("machineId")) {
+    const authed = await authorizeUnlinkedEntryAction(formData);
+    if (!authed.ok) return authed.result;
+    return countRemovalComments({
+      state: authed.state,
+      userId: authed.userId,
+      entryId: authed.lmx.id,
+      titleId: authed.lmx.machineId,
+    });
+  }
+
   const authed = await authorizeListingAction(
     formData,
     "machines.pinballmap.push",
@@ -1368,6 +1724,27 @@ export async function checkRemovalCommentsAction(
   if (entryId === null)
     return err("NOT_FOUND", "This entry is no longer on the lineup.");
 
+  return countRemovalComments({
+    state: { ...state, locationId: state.locationId },
+    userId,
+    entryId,
+    titleId: abandoned?.pinballmapMachineId ?? machine.pinballmapMachineId,
+  });
+}
+
+/**
+ * The comment count a remove confirmation shows (spec 4.6): the stored count
+ * when the lineup is under 5 minutes old, otherwise a refresh first, falling
+ * back to the last-known count and its age when the refresh cannot run.
+ */
+async function countRemovalComments(args: {
+  state: PinballmapRuntimeState & { locationId: number };
+  userId: string;
+  entryId: number;
+  /** The entry's title, to find it again if a refresh re-mints its id. */
+  titleId: number | null;
+}): Promise<RemovalCommentCheckResult> {
+  const { state, userId, entryId, titleId } = args;
   const initialEntry = state.snapshotJson?.lmxes.find(
     (entry) => entry.id === entryId
   );
@@ -1401,7 +1778,6 @@ export async function checkRemovalCommentsAction(
       "SERVER",
       "The tracked location changed. Reload before removing."
     );
-  const titleId = abandoned?.pinballmapMachineId ?? machine.pinballmapMachineId;
   const latestEntry =
     latest.snapshotJson && titleId !== null
       ? findLmxForMachine(latest.snapshotJson, titleId)
