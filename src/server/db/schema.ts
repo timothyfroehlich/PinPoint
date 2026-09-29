@@ -210,6 +210,20 @@ export const machines = pgTable(
       .notNull()
       .defaultNow(),
     description: jsonb("description").$type<ProseMirrorDoc>(),
+    // Retired: apron cards live in machine_apron_cards (PP-o23o). Nothing
+    // reads or writes these; they stay until a follow-up migration drops them,
+    // so the deployment serving while the next one builds can still query
+    // machines (migrations run before the build).
+    apronSize: text("apron_size", { enum: ["stern", "wpc"] }),
+    apronUseCustomDescription: boolean("apron_use_custom_description")
+      .notNull()
+      .default(false),
+    apronDescription: text("apron_description"),
+    apronTip: text("apron_tip"),
+    apronTipEnabled: boolean("apron_tip_enabled").notNull().default(false),
+    apronDesignEnabled: boolean("apron_design_enabled").notNull().default(true),
+    apronArtEnabled: boolean("apron_art_enabled").notNull().default(true),
+    apronSavedAt: timestamp("apron_saved_at", { withTimezone: true }),
     ownerRequirements: jsonb("owner_requirements").$type<ProseMirrorDoc>(),
     // Machine-level "Before you change anything": the owner's honor-system
     // requests for how people should handle THIS machine's settings ("ask me

@@ -20,7 +20,8 @@ CREATE UNIQUE INDEX "uq_machine_apron_cards_machine_name" ON "machine_apron_card
 -- Move each machine's saved card (spec apron-cards §11). Only machines with a
 -- size ever produced a card; the rest have none to move. Card text becomes a
 -- ProseMirror doc with one paragraph per non-empty line, which prints the same
--- paragraphs the plain-text card did.
+-- paragraphs the plain-text card did. The old machines.apron_* columns stay
+-- for now: the deployment serving during the build still selects them.
 CREATE FUNCTION pg_temp.apron_text_to_doc(body text) RETURNS jsonb
 LANGUAGE sql IMMUTABLE AS $$
   SELECT CASE
@@ -37,7 +38,7 @@ LANGUAGE sql IMMUTABLE AS $$
           )
           ORDER BY ord
         )
-        FROM regexp_split_to_table(body, E'\n+') WITH ORDINALITY AS l(line, ord)
+        FROM regexp_split_to_table(body, E'\\n+') WITH ORDINALITY AS l(line, ord)
         WHERE btrim(line) <> ''
       )
     )
@@ -55,12 +56,4 @@ SELECT
 	"apron_design_enabled", "apron_art_enabled",
 	coalesce("apron_saved_at", now()), coalesce("apron_saved_at", now())
 FROM "machines"
-WHERE "apron_size" IS NOT NULL;--> statement-breakpoint
-ALTER TABLE "machines" DROP COLUMN "apron_size";--> statement-breakpoint
-ALTER TABLE "machines" DROP COLUMN "apron_use_custom_description";--> statement-breakpoint
-ALTER TABLE "machines" DROP COLUMN "apron_description";--> statement-breakpoint
-ALTER TABLE "machines" DROP COLUMN "apron_tip";--> statement-breakpoint
-ALTER TABLE "machines" DROP COLUMN "apron_tip_enabled";--> statement-breakpoint
-ALTER TABLE "machines" DROP COLUMN "apron_design_enabled";--> statement-breakpoint
-ALTER TABLE "machines" DROP COLUMN "apron_art_enabled";--> statement-breakpoint
-ALTER TABLE "machines" DROP COLUMN "apron_saved_at";
+WHERE "apron_size" IS NOT NULL;

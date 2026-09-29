@@ -1,5 +1,5 @@
 {
-  "id": "f370400a-b4e1-42be-9528-95928c374577",
+  "id": "b0c42732-48d7-4170-aece-2eaf867251e3",
   "prevId": "afd6c721-f551-4c3e-bf7d-90f9fdd152a9",
   "version": "7",
   "dialect": "postgresql",
@@ -1973,6 +1973,58 @@
         "description": {
           "name": "description",
           "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "apron_size": {
+          "name": "apron_size",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "apron_use_custom_description": {
+          "name": "apron_use_custom_description",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "apron_description": {
+          "name": "apron_description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "apron_tip": {
+          "name": "apron_tip",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "apron_tip_enabled": {
+          "name": "apron_tip_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "apron_design_enabled": {
+          "name": "apron_design_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "apron_art_enabled": {
+          "name": "apron_art_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "apron_saved_at": {
+          "name": "apron_saved_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },
