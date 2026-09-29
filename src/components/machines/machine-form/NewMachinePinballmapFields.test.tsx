@@ -111,7 +111,7 @@ describe("NewMachinePinballmapFields", () => {
     expect(posted("pbmAddAfterCreate")).toBeNull();
   });
 
-  it("shows Insider Connected, Off, only for an eligible title", async () => {
+  it("shows Insider Connected only for an eligible title, recording only On", async () => {
     vi.mocked(getPinballMapTitleIcEligibleAction).mockResolvedValue(true);
     const user = userEvent.setup();
     render(<NewMachinePinballmapFields {...base} />);
@@ -120,7 +120,8 @@ describe("NewMachinePinballmapFields", () => {
       name: "Insider Connected",
     });
     expect(ic).not.toBeChecked();
-    expect(posted("pinballmapIcIntent")).toBe("off");
+    // Untouched records no intent at all, not Off.
+    expect(posted("pinballmapIcIntent")).toBeNull();
 
     await user.click(ic);
     expect(posted("pinballmapIcIntent")).toBe("on");

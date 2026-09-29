@@ -337,13 +337,9 @@ export function MachineDetailsForm({
   };
 
   // Cancel discards after confirming (machine-editing 4.1). With nothing
-  // unsaved there is nothing to lose, so it only clears a stale result note.
+  // unsaved it is disabled — there is nothing to discard (Tim, PP-wqit.14.2).
   const handleCancel = (): void => {
-    if (isDirty) {
-      setPendingDiscard({ kind: "cancel" });
-      return;
-    }
-    discardEdits();
+    setPendingDiscard({ kind: "cancel" });
   };
 
   return (
@@ -431,6 +427,7 @@ export function MachineDetailsForm({
           }
           iscored={
             <IscoredGamePicker
+              boxed
               machineId={machineId}
               defaultGameId={iscoredGameId}
               machineName={liveName}
@@ -462,7 +459,12 @@ export function MachineDetailsForm({
             </span>
           }
         >
-          <Button type="button" variant="outline" onClick={handleCancel}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleCancel}
+            disabled={!isDirty}
+          >
             Cancel
           </Button>
           <Button

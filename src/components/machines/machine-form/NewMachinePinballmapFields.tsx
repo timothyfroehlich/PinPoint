@@ -141,12 +141,12 @@ export function NewMachinePinballmapFields({
               value={effectiveIntent}
             />
           ) : null}
-          {canSetIntent && icEligible ? (
-            <input
-              type="hidden"
-              name="pinballmapIcIntent"
-              value={icOn ? "on" : "off"}
-            />
+          {/* Insider Connected records only an explicit On. Left untouched
+              it stores nothing — no intent — so the entry keeps Pinball Map's
+              own value (pinballmap 3.8; Tim, PP-wqit.14.2 review). Kept to
+              this one input so the three-position control can replace it. */}
+          {canSetIntent && icEligible && icOn ? (
+            <input type="hidden" name="pinballmapIcIntent" value="on" />
           ) : null}
           {offerAdd && addAfterCreate ? (
             <input type="hidden" name="pbmAddAfterCreate" value="1" />

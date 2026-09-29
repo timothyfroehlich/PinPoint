@@ -473,6 +473,17 @@ describe("MachineDetailsForm", () => {
     );
   });
 
+  it("disables Cancel until there is something to discard", async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+
+    await user.type(screen.getByLabelText(/Machine Name/), "!");
+
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
+  });
+
   it("keeps the edits when Cancel's confirmation is declined", async () => {
     const user = userEvent.setup();
     renderForm();

@@ -371,7 +371,7 @@ export function CreateMachineForm({
           }
           iscored={
             iscoredConfigured ? (
-              <IscoredGamePicker machineName={nameValue} />
+              <IscoredGamePicker machineName={nameValue} boxed />
             ) : null
           }
           pinballmapUnavailable={pbmSelection.manual}

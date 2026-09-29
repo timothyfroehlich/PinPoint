@@ -212,6 +212,21 @@ describe("createMachineAction — Pinball Map lineup choice (PGlite)", () => {
     });
   });
 
+  it("records no Insider Connected intent when the switch is left alone", async () => {
+    const { createMachineAction } = await import("~/app/(app)/m/actions");
+    await createAdmin();
+    await seedPinballmap({ icEligible: true });
+
+    // The form posts pinballmapIcIntent only when the person turned it On.
+    const result = await createMachineAction(
+      undefined,
+      createForm({ pinballmapIntent: "on" })
+    );
+
+    expect(result.ok).toBe(true);
+    expect((await createdMachine()).pinballmapIcIntent).toBeNull();
+  });
+
   it("adds the machine to Pinball Map after creating when ticked", async () => {
     const { createMachineAction } = await import("~/app/(app)/m/actions");
     await createAdmin();
