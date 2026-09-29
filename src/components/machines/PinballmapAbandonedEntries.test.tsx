@@ -80,7 +80,7 @@ describe("PinballmapAbandonedEntries", () => {
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", {
-        name: "Remove machine from Pinball Map",
+        name: "Remove from Pinball Map",
       })
     ).not.toBeInTheDocument();
   });
@@ -108,9 +108,7 @@ describe("PinballmapAbandonedEntries", () => {
     );
 
     await user.click(screen.getByTestId("pbm-abandoned-remove-101"));
-    expect(
-      screen.getByRole("button", { name: "Remove machine" })
-    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Remove" })).toBeDisabled();
     const submitted = vi.mocked(checkRemovalCommentsAction).mock.calls[0]?.[0];
     expect(submitted?.get("machineId")).toBe("machine-1");
     expect(submitted?.get("lmxId")).toBe("101");
@@ -129,9 +127,7 @@ describe("PinballmapAbandonedEntries", () => {
     expect(
       await screen.findByTestId("pbm-abandoned-remove-consequence")
     ).toHaveTextContent("2 comments");
-    expect(
-      screen.getByRole("button", { name: "Remove machine" })
-    ).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Remove" })).toBeEnabled();
   });
 
   it("offers a deliberate proceed choice when the old count is all it has", async () => {
@@ -175,8 +171,6 @@ describe("PinballmapAbandonedEntries", () => {
     await user.click(screen.getByTestId("pbm-abandoned-remove-202"));
     expect(checkRemovalCommentsAction).not.toHaveBeenCalled();
     expect(screen.getByText(/Comment count unavailable/)).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Remove machine" })
-    ).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Remove" })).toBeEnabled();
   });
 });
