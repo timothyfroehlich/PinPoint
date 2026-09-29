@@ -18,14 +18,16 @@
     "name": "Hyperball",
     "initials": "HB",
     "year": 1981,
-    "manufacturer": "Williams"
+    "manufacturer": "Williams",
+    "iscoredGameId": "93956"
   },
   "blackKnight": {
     "id": "44444444-4444-4444-8444-444444444444",
     "name": "Black Knight",
     "initials": "BK",
     "year": 1980,
-    "manufacturer": "Williams"
+    "manufacturer": "Williams",
+    "iscoredGameId": "77963"
   },
   "eightBallDeluxe": {
     "id": "55555555-5555-4555-8555-555555555555",
@@ -39,14 +41,16 @@
     "name": "The Addams Family",
     "initials": "TAF",
     "year": 1992,
-    "manufacturer": "Bally"
+    "manufacturer": "Bally",
+    "iscoredGameId": "990002"
   },
   "attackFromMars": {
     "id": "77777777-7777-4777-8777-777777777777",
     "name": "Attack from Mars",
     "initials": "AFM",
     "year": 1995,
-    "manufacturer": "Bally"
+    "manufacturer": "Bally",
+    "iscoredGameId": "990001"
   },
   "medievalMadness": {
     "id": "88888888-8888-4888-8888-888888888888",
@@ -67,7 +71,8 @@
     "name": "Godzilla",
     "initials": "GDZ",
     "year": 2021,
-    "manufacturer": "Stern"
+    "manufacturer": "Stern",
+    "iscoredGameId": "79616"
   },
   "godzilla2": {
     "id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
