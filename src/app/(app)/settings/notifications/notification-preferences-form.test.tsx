@@ -176,9 +176,7 @@ describe("NotificationPreferencesForm", () => {
     expect(screen.getByLabelText("In-App Notifications")).toBeInTheDocument();
 
     // Verify per-row hideEmail columns are omitted from matrix rows
-    expect(container.querySelectorAll('button[id^="emailNotify"]').length).toBe(
-      0
-    );
+    expect(container.querySelectorAll('button[id^="email"]').length).toBe(0);
     expect(
       container.querySelectorAll('button[id^="inAppNotify"]').length
     ).toBeGreaterThan(0);

@@ -384,11 +384,12 @@ describe("UnifiedReportForm ↔ shared draft store (PP-idrb)", () => {
         "PP-lql stale draft restoration"
       );
 
-      // Hidden machineId input should be reset to empty string
+      // Hidden machineId input should be present and reset to empty string
       const machineInput = document.querySelector<HTMLInputElement>(
         'input[name="machineId"]'
       );
-      expect(machineInput?.value ?? "").toBe("");
+      expect(machineInput).not.toBeNull();
+      expect(machineInput?.value).toBe("");
 
       // Submit button should be disabled because machineId is invalid
       expect(
@@ -406,13 +407,26 @@ describe("UnifiedReportForm ↔ shared draft store (PP-idrb)", () => {
         "/report/detailed?machine=11111111-1111-4111-8111-111111111111"
       );
 
+      seedDraft({
+        entry: {
+          machineId: "11111111-1111-4111-8111-111111111111",
+          title: "Something broke",
+        },
+      });
+
       mockUseActionState.mockReturnValue(idleState());
       render(wrapped());
 
-      // Fill in title
+      // Title should be restored from the draft
       const titleInput = screen.getByLabelText(/Issue Title/i);
-      await user.type(titleInput, "Something broke");
       expect(titleInput).toHaveValue("Something broke");
+
+      // Hidden machineId input should hold the seeded machine
+      const machineInput = document.querySelector<HTMLInputElement>(
+        'input[name="machineId"]'
+      );
+      expect(machineInput).not.toBeNull();
+      expect(machineInput?.value).toBe("11111111-1111-4111-8111-111111111111");
 
       // Click Clear to open confirmation dialog
       const clearBtn = screen.getByRole("button", { name: /^Clear$/ });
@@ -427,11 +441,9 @@ describe("UnifiedReportForm ↔ shared draft store (PP-idrb)", () => {
       // Title is cleared
       expect(titleInput).toHaveValue("");
 
-      // Machine is cleared
-      const machineInput = document.querySelector<HTMLInputElement>(
-        'input[name="machineId"]'
-      );
-      expect(machineInput?.value ?? "").toBe("");
+      // Machine is cleared and input remains present
+      expect(machineInput).not.toBeNull();
+      expect(machineInput?.value).toBe("");
 
       // URL no longer carries ?machine=
       expect(window.location.search).not.toContain("machine=");
