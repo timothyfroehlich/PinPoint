@@ -18,7 +18,6 @@ HEAD = "a" * 40
 OLD = "b" * 40
 CODEX_BOT = "chatgpt-codex-connector[bot]"
 CODEX_APP = "chatgpt-codex-connector"
-CODERABBIT_BOT = "coderabbitai[bot]"
 OWNER = "timothyfroehlich"
 
 
@@ -230,10 +229,9 @@ def test_open_pr_list_is_one_graphql_request_plus_the_gate_per_pr(run_dashboard)
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("login", [CODEX_BOT, CODERABBIT_BOT])
-def test_exact_head_native_approval_is_approved(run_dashboard, login):
+def test_exact_head_native_approval_is_approved(run_dashboard):
     result, _calls = run_dashboard(
-        [list_rule([pr_node(1)]), *gate_rules(1, reviews=[review(login=login)])]
+        [list_rule([pr_node(1)]), *gate_rules(1, reviews=[review(login=CODEX_BOT)])]
     )
 
     assert result.returncode == 0, result.stderr
@@ -248,22 +246,6 @@ def test_stale_native_approval_is_stale_review(run_dashboard):
 
     assert result.returncode == 0, result.stderr
     assert review_column(result) == "stale review"
-
-
-@pytest.mark.unit
-def test_coderabbit_changes_requested_on_head_is_changes_requested(run_dashboard):
-    result, _calls = run_dashboard(
-        [
-            list_rule([pr_node(1)]),
-            *gate_rules(
-                1,
-                reviews=[review(login=CODERABBIT_BOT, state="CHANGES_REQUESTED")],
-            ),
-        ]
-    )
-
-    assert result.returncode == 0, result.stderr
-    assert review_column(result) == "changes requested"
 
 
 @pytest.mark.unit
@@ -323,7 +305,7 @@ def test_trusted_clean_codex_comment_is_approved_and_lookalike_is_not(run_dashbo
 
 @pytest.mark.unit
 def test_local_review_marker_is_not_coverage(run_dashboard):
-    # Only CodeRabbit and Codex cover a head; a retired local marker pinned to head
+    # Only a review record and Codex cover a head; a retired local marker pinned to head
     # reads as not reviewed.
     result, _calls = run_dashboard(
         [list_rule([pr_node(1)]), *gate_rules(1, comments=[marker()])]

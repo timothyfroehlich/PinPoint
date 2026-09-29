@@ -161,7 +161,7 @@ The reviewer is Claude Code's built-in `/code-review`, run by the owning agent i
 
 Post a record only for a head the review actually ran on. The gate cannot tell a real review from a fabricated record; Tim reads the findings list before he merges.
 
-The review runs inside the session, so there is nothing to wait for; `pr-watch.py --phase review` is only needed to confirm the gate reads the record. Until both subscriptions end, the gate also accepts an exact-head CodeRabbit approval or Codex evidence already on a PR; request neither.
+The review runs inside the session, so there is nothing to wait for; `pr-watch.py --phase review` is only needed to confirm the gate reads the record. Until its subscription ends, the gate also accepts exact-head Codex evidence already on a PR; request none.
 
 #### Merging without a review
 

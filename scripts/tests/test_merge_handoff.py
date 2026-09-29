@@ -856,8 +856,9 @@ def test_a_clean_codex_comment_covering_head_is_merge_ready() -> None:
 
 
 def test_a_local_review_marker_is_not_coverage() -> None:
-    # Only CodeRabbit and Codex cover a head; a PR reviewed locally merges only
-    # through merge-pr.sh --force at Tim's direction, never via the printed command.
+    # Only a review record and Codex cover a head; an old manual review marker
+    # provides no coverage and merges only through merge-pr.sh --force at Tim's
+    # direction, never via the printed command.
     with repo_with_pr(
         branch_changes={"src/lib/thing.ts": "x\n"},
         scenario=Scenario(manual_review=True),
