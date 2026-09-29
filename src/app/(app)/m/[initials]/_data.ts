@@ -11,6 +11,10 @@ import {
   type MachineCredits,
 } from "~/lib/opdb/credits";
 import { getOpdbRecords } from "~/lib/opdb/records";
+import { opdbGroupId, pinTipsPageUrl } from "~/lib/pintips/parse";
+import { pickWeightedTipIndex } from "~/lib/pintips/pick";
+import { getPinTipsForGroup } from "~/lib/pintips/records";
+import type { PinTipForCard } from "~/lib/pintips/types";
 
 /**
  * Shared layout data for `/m/[initials]/*`.
@@ -173,6 +177,34 @@ const getOpdbCredits = cache(
   async (opdbId: string): Promise<MachineCredits> => {
     const record = (await getOpdbRecords(db, [opdbId])).get(opdbId);
     return record ? creditsFromPeople(record.people) : NO_CREDITS;
+  }
+);
+
+/**
+ * The machine's PinTips for the tip card (spec pintips §2–§3): every stored
+ * tip for its OPDB game, the index of the tip to show first — picked at
+ * random, weighted by votes, on each request (spec 3.2) — and the game's
+ * PinTips page on Match Play. Null when the machine has no tips, so the card
+ * is not rendered at all (spec 3.6): no OPDB id (spec 2.7), or none stored.
+ * Reads only the stored copy; never contacts Match Play (spec 2.5).
+ */
+export interface MachinePinTips {
+  tips: PinTipForCard[];
+  initialIndex: number;
+  href: string;
+}
+
+export const getMachinePinTips = cache(
+  async (opdbId: string | null): Promise<MachinePinTips | null> => {
+    const groupId = opdbId === null ? null : opdbGroupId(opdbId);
+    if (groupId === null) return null;
+    const tips = await getPinTipsForGroup(db, groupId);
+    if (tips.length === 0) return null;
+    return {
+      tips,
+      initialIndex: pickWeightedTipIndex(tips),
+      href: pinTipsPageUrl(groupId),
+    };
   }
 );
 

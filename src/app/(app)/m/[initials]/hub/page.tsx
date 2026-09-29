@@ -1,6 +1,9 @@
 import type React from "react";
 import { notFound } from "next/navigation";
-import { getMachineForLayout } from "~/app/(app)/m/[initials]/_data";
+import {
+  getMachineForLayout,
+  getMachinePinTips,
+} from "~/app/(app)/m/[initials]/_data";
 import {
   getGameUrl,
   getScoreEntryUrl,
@@ -22,9 +25,12 @@ export default async function MachineScanHubPage({
   const { machine } = await getMachineForLayout(initials);
   if (!machine) notFound();
 
-  const scores = machine.iscoredGameId
-    ? await getTopScoresForMachine(machine.iscoredGameId, 3)
-    : [];
+  const [scores, pinTips] = await Promise.all([
+    machine.iscoredGameId
+      ? getTopScoresForMachine(machine.iscoredGameId, 3)
+      : Promise.resolve([]),
+    getMachinePinTips(machine.pinballmapTitle?.opdbId ?? null),
+  ]);
 
   return (
     <MachineScanHub
@@ -53,6 +59,7 @@ export default async function MachineScanHubPage({
       gameHref={
         machine.iscoredGameId ? getGameUrl(machine.iscoredGameId) : null
       }
+      pinTips={pinTips}
       fromApron={source === "apron"}
     />
   );

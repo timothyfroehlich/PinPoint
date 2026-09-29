@@ -45,8 +45,9 @@
 ## 5. Layout
 
 - **5.1** A card face is two regions side by side: a dark identity panel (title, edition, manufacturer · year, design and art credits, owner, APC logo) and a light action-and-description column.
-- **5.2** The action column's top portion holds a "Scan this machine" header and two action rows (report a problem, post a score) on the left, with the QR code to their right. A divider separates this from the description (and tip, when enabled) below.
-- **5.3** Card copy names both destinations reachable through the QR: reporting an issue, and posting a score via iScored — in that order.
+- **5.2** The action column's top portion holds a "Scan this machine" header and up to three action rows (report a problem, post a score, playing tips) on the left, with the QR code to their right. A divider separates this from the description (and tip, when enabled) below.
+- **5.3** Card copy names every destination reachable through the QR: reporting an issue, posting a score via iScored, and reading playing tips — in that order.
+- **5.4** The playing tips row appears only when the machine has tips (pintips §3.6).
 
 ## 6. Title fit
 
@@ -89,6 +90,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-28 | §5.2–§5.3: the card names playing tips as a third QR destination. §5.4 added: the playing tips row appears only for a machine with tips. |
 | 2026-09-27 | Card settings are edited in the machine form's Apron card section on the Manage tab and New Machine page, with no separate editor; Preview renders unsaved values; card description and tip become rich text that prints bold, italic, and lists; the Service tab keeps a thumbnail with Preview and Export (§1, §3.1–3.8). Credits for an uncataloged machine come from its hand-entered designers and artists (§1, §10.1, §10.3, §10.4). |
 | 2026-09-27 | §1 Title fit: a title may also break after a hyphen or an ellipsis, so a title with no spaces can still wrap (PP-xeki.1). |
 | 2026-09-25 | Added §6.4: an identity panel that does not fit at the title's floor size blocks save and export, like description and tip overflow. |

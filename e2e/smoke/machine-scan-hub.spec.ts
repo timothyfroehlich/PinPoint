@@ -39,7 +39,7 @@ test("apron scan opens Quick report with AFM and source preserved", async ({
 test.describe("artwork band (PP-o355.60)", () => {
   test.use({ viewport: { width: 375, height: 667 } });
 
-  test("shows the band and still fits the smallest phone without scrolling", async ({
+  test("shows the band, peeks the next card, and pins the actions while scrolling", async ({
     page,
   }) => {
     // Answer OPDB image requests locally; the suite never reaches img.opdb.org.
@@ -60,13 +60,31 @@ test.describe("artwork band (PP-o355.60)", () => {
     await expect(
       band.getByRole("link", { name: "Medieval Madness details" })
     ).toHaveAttribute("href", `/m/${initials}`);
-    await expect(
-      page.getByRole("link", { name: "Report a problem" })
-    ).toBeInViewport();
+    const report = page.getByRole("link", { name: "Report a problem" });
+    await expect(report).toBeInViewport();
 
-    const overflow = await page
+    // Spec §3.7, §5.4: the band leaves at least the top 60px of the card after
+    // Top scores showing above the pinned actions, and never drops below 180px.
+    const layout = await page.evaluate(() => {
+      const scores = document.querySelector(
+        "section[aria-labelledby=hub-scores-heading]"
+      );
+      const next = scores?.nextElementSibling;
+      const actions = document.querySelector('[aria-label="Machine actions"]');
+      const art = document.querySelector("[data-testid=hub-artwork-band]");
+      return {
+        nextTop: next?.getBoundingClientRect().top ?? Infinity,
+        actionsTop: actions?.getBoundingClientRect().top ?? 0,
+        bandHeight: art?.getBoundingClientRect().height ?? 0,
+      };
+    });
+    expect(layout.actionsTop - layout.nextTop).toBeGreaterThanOrEqual(60);
+    expect(layout.bandHeight).toBeGreaterThanOrEqual(180);
+
+    // Spec §5.5: the hub scrolls and the actions stay pinned.
+    await page
       .locator("#main-content")
-      .evaluate((main) => main.scrollHeight - main.clientHeight);
-    expect(overflow).toBeLessThanOrEqual(0);
+      .evaluate((main) => main.scrollTo(0, main.scrollHeight));
+    await expect(report).toBeInViewport();
   });
 });
