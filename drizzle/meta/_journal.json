@@ -652,6 +652,20 @@
       "when": 1790460875208,
       "tag": "0092_machine-view-saved-views",
       "breakpoints": true
+    },
+    {
+      "idx": 93,
+      "version": "7",
+      "when": 1790607402201,
+      "tag": "0093_manual-model-fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 94,
+      "version": "7",
+      "when": 1790632837219,
+      "tag": "0094_pintips",
+      "breakpoints": true
     }
   ]
 }

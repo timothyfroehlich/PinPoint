@@ -36,5 +36,5 @@ location's lineup on pinballmap.com. It will no longer be publicly
 visible.") — a dialog is read once with attention; a status line is scanned
 repeatedly.
 
-Buttons stay imperative and specific per §12 conventions ("Add machine to
-Pinball Map", not "Add" or "Submit").
+Buttons stay imperative and specific per §12 conventions ("Add to Pinball
+Map", not "Add" or "Submit").

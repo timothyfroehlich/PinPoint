@@ -192,12 +192,21 @@ function readPbmLinkFormFields(formData: FormData): {
   modelName: string | undefined;
   manufacturer: string | undefined;
   year: string | undefined;
+  type: string | undefined;
+  display: string | undefined;
+  playerCount: string | undefined;
+  designers: string[] | undefined;
+  artists: string[] | undefined;
 } {
   const idRaw = formData.get("pinballmapMachineId");
   const nonEmpty = (key: string): string | undefined => {
     const raw = formData.get(key);
     return typeof raw === "string" && raw.trim().length > 0 ? raw : undefined;
   };
+  const nameList = (key: string): string[] =>
+    formData
+      .getAll(key)
+      .filter((value): value is string => typeof value === "string");
   return {
     pinballmapMachineId:
       typeof idRaw === "string" && idRaw.length > 0 ? idRaw : undefined,
@@ -210,6 +219,16 @@ function readPbmLinkFormFields(formData: FormData): {
     modelName: nonEmpty("modelName"),
     manufacturer: nonEmpty("manufacturer"),
     year: nonEmpty("year"),
+    // The rest of the manual model (PP-wqit.14). Type and display post their
+    // vocabulary value, or blank for "not set".
+    type: nonEmpty("type"),
+    display: nonEmpty("display"),
+    playerCount: nonEmpty("playerCount"),
+    // One entry per name, in order. Absent entirely is an empty list, which
+    // the excluded branch stores as null — the form always posts the whole
+    // manual model, so no entries means the person removed every name.
+    designers: nameList("designers"),
+    artists: nameList("artists"),
   };
 }
 

@@ -57,7 +57,13 @@ export interface ApronCardDraft {
 /** Identity lines and credits the editor never changes (spec §2.1, §10). */
 export type ApronCardIdentity = Pick<
   ApronCardContent,
-  "name" | "edition" | "manufacturer" | "year" | "ownerName" | "credits"
+  | "name"
+  | "edition"
+  | "manufacturer"
+  | "year"
+  | "ownerName"
+  | "credits"
+  | "hasPinTips"
 >;
 
 export function draftContent(

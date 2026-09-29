@@ -48,12 +48,17 @@ interface CreateMachineFormProps {
   allUsers: OwnerSelectUser[];
   canSelectOwner: boolean;
   iscoredConfigured?: boolean;
+  initialName?: string | undefined;
+  /** Pinball Map title to preselect in the Model field. */
+  initialPinballmap?: { id: number; name: string } | undefined;
 }
 
 export function CreateMachineForm({
   allUsers,
   canSelectOwner,
   iscoredConfigured = false,
+  initialName,
+  initialPinballmap,
 }: CreateMachineFormProps): React.JSX.Element {
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, isPending] = useActionState<
@@ -65,7 +70,7 @@ export function CreateMachineForm({
   const [users, setUsers] = useState<OwnerSelectUser[]>(allUsers);
 
   // Controlled field values so they survive re-renders after server action errors
-  const [nameValue, setNameValue] = useState("");
+  const [nameValue, setNameValue] = useState(initialName ?? "");
   const [initialsValue, setInitialsValue] = useState("");
   const [ownerIdValue, setOwnerIdValue] = useState("");
   // Bumped on reset to remount OwnerSelect (which holds its own internal state).
@@ -316,7 +321,11 @@ export function CreateMachineForm({
 
         {/* Model — links the machine to its PinballMap catalog model/edition
             (bead B / PP-o355.2). */}
-        <PinballMapLinkField machineName={nameValue} />
+        <PinballMapLinkField
+          machineName={nameValue}
+          defaultMachineId={initialPinballmap?.id ?? null}
+          defaultName={initialPinballmap?.name ?? null}
+        />
 
         {iscoredConfigured && <IscoredGamePicker machineName={nameValue} />}
 

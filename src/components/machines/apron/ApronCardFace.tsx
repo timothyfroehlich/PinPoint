@@ -2,7 +2,7 @@
 
 import type React from "react";
 import { Fragment, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Trophy, Wrench } from "lucide-react";
+import { Lightbulb, Trophy, Wrench } from "lucide-react";
 
 import {
   APRON_CARD_LAYOUTS,
@@ -238,6 +238,12 @@ export function ApronCardFace({
                 <span className="apron-card__iscored">iScored</span>
               </span>
             </div>
+            {content.hasPinTips ? (
+              <div className="apron-card__action">
+                <Lightbulb aria-hidden="true" />
+                <span>Get playing tips</span>
+              </div>
+            ) : null}
           </div>
           <svg
             className="apron-card__qr"

@@ -173,9 +173,80 @@ describe("PinballMapLinkField — manual model entry", () => {
     const user = userEvent.setup();
     render(<PinballMapLinkField machineName="Bordertown" />);
 
-    expect(screen.getByRole("combobox")).toBeInTheDocument();
+    const picker = screen.getByRole("combobox");
     await pickManualEntry(user);
-    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(picker).not.toBeInTheDocument();
+    // What replaces it is the hand-entry grid, whose Type and Display selects
+    // are comboboxes of their own.
+    expect(screen.getByLabelText("Model name")).toBeInTheDocument();
+  });
+
+  it("posts type, display, player count and ordered name lists", async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <form>
+        <PinballMapLinkField
+          defaultExcluded
+          defaultType="ss"
+          defaultDisplay="lights"
+          defaultPlayerCount={1}
+          defaultDesigners={["Kaneda, Pat"]}
+        />
+      </form>
+    );
+
+    const designers = screen.getByLabelText("Designers");
+    await user.type(designers, "Python Anghelo, Jr.{Enter}");
+    await user.type(screen.getByLabelText("Artists"), "Greg Freres");
+    // Leaving the box adds the name, so a name typed before Save still posts.
+    await user.tab();
+
+    const form = container.querySelector("form");
+    if (!form) throw new Error("form missing");
+    const data = new FormData(form);
+    expect(data.get("type")).toBe("ss");
+    expect(data.get("display")).toBe("lights");
+    expect(data.get("playerCount")).toBe("1");
+    // Never split on punctuation (machine-editing 3.5).
+    expect(data.getAll("designers")).toEqual([
+      "Kaneda, Pat",
+      "Python Anghelo, Jr.",
+    ]);
+    expect(data.getAll("artists")).toEqual(["Greg Freres"]);
+  });
+
+  it("removes one name at a time", async () => {
+    const user = userEvent.setup();
+    render(
+      <PinballMapLinkField
+        defaultExcluded
+        defaultDesigners={["Steve Ritchie", "Dennis Nordman"]}
+      />
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "Remove designer Steve Ritchie" })
+    );
+    expect(
+      screen.queryByRole("button", { name: "Remove designer Steve Ritchie" })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Remove designer Dennis Nordman" })
+    ).toBeInTheDocument();
+  });
+
+  it("posts an empty type and display when not set", () => {
+    const { container } = render(
+      <form>
+        <PinballMapLinkField defaultExcluded />
+      </form>
+    );
+    const form = container.querySelector("form");
+    if (!form) throw new Error("form missing");
+    const data = new FormData(form);
+    expect(data.get("type")).toBe("");
+    expect(data.get("display")).toBe("");
+    expect(data.getAll("designers")).toEqual([]);
   });
 
   it("warns before a catalog title overwrites what was typed", async () => {

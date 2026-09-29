@@ -14,7 +14,12 @@ import {
   canAccessMachineManage,
   type OwnershipContext,
 } from "~/lib/permissions/index";
-import { getMachineCredits, getMachineForLayout } from "../_data";
+import {
+  getMachineCredits,
+  getMachineForLayout,
+  getMachinePinTips,
+} from "../_data";
+import { PinTipCard } from "../pin-tip-card";
 import { pinballmapLocationUrl } from "~/lib/pinballmap/public-url";
 import { getPinballMapState } from "~/lib/pinballmap/state";
 import {
@@ -211,12 +216,13 @@ export default async function MachineInfoTab({
   // tab layout and the route-level deep-link guard.
   const canOpenManage = canAccessMachineManage(accessLevel, ownershipContext);
 
-  const [topScores, tags, credits] = await Promise.all([
+  const [topScores, tags, credits, pinTips] = await Promise.all([
     machine.iscoredGameId
       ? getTopScoresForMachine(machine.iscoredGameId, 3)
       : Promise.resolve([]),
     getTagsForMachine(db, machine.id),
-    getMachineCredits(machine.pinballmapTitle?.opdbId ?? null),
+    getMachineCredits(machine),
+    getMachinePinTips(machine.pinballmapTitle?.opdbId ?? null),
   ]);
 
   const rail = (
@@ -238,6 +244,16 @@ export default async function MachineInfoTab({
           scores={topScores}
           manageHref={canOpenManage ? `/m/${machine.initials}/edit` : null}
         />
+      }
+      tipSlot={
+        pinTips ? (
+          <PinTipCard
+            tips={pinTips.tips}
+            initialIndex={pinTips.initialIndex}
+            href={pinTips.href}
+            variant="rail"
+          />
+        ) : null
       }
       pinballmap={{
         locationUrl:

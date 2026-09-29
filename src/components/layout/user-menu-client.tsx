@@ -9,6 +9,7 @@ import {
   Shield,
   Gamepad2,
   Library,
+  MapPin,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import {
@@ -168,6 +169,16 @@ export function UserMenu({
               >
                 <Shield className="mr-2 size-4" />
                 <span>Integrations</span>
+              </a>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <a
+                href="/m/pinball-map"
+                className="flex items-center cursor-pointer"
+                data-testid="user-menu-admin-pinball-map"
+              >
+                <MapPin className="mr-2 size-4" />
+                <span>Pinball Map lineup</span>
               </a>
             </DropdownMenuItem>
           </>
