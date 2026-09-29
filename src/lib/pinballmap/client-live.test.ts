@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createLiveClient } from "./client-live";
+import { PinballMapNetworkBlockedError } from "./config";
 import { MAX_REGION_ENTRIES, PinballMapReadError } from "./types";
+import type { PinballMapClient } from "./types";
 
 const ORIGINAL_FETCH = globalThis.fetch;
 const CREDS = { email: "tim@example.com", token: "secret-tok" };
@@ -32,9 +34,14 @@ function json(body: unknown, status = 200): Response {
 afterEach(() => {
   globalThis.fetch = ORIGINAL_FETCH;
   vi.useRealTimers();
+  vi.unstubAllEnvs();
 });
+// The live client only sends requests from a Vercel production deployment
+// (`assertPinballMapNetworkAllowed`). Every suite below tests its behaviour
+// there; the non-production refusal has its own suite at the end.
 beforeEach(() => {
   globalThis.fetch = ORIGINAL_FETCH;
+  vi.stubEnv("VERCEL_ENV", "production");
 });
 
 describe("live client — reads", () => {
@@ -691,5 +698,93 @@ describe("live client — api token gate (X-Api-Token)", () => {
     );
     await createLiveClient(null).fetchLocation(26454);
     expect(calls[0]?.init?.headers).not.toHaveProperty("X-Api-Token");
+  });
+});
+
+describe("live client — refuses to reach PinballMap outside production", () => {
+  /**
+   * Every client method, reads and writes, each a thunk so the suite covers
+   * the whole surface rather than a sample. `satisfies` makes a method added
+   * to `PinballMapClient` without a row here a type error.
+   */
+  const CALLS = {
+    fetchLocation: (c) => c.fetchLocation(26454),
+    fetchCatalog: (c) => c.fetchCatalog(),
+    fetchRegionLmxes: (c) => c.fetchRegionLmxes("austin"),
+    fetchRegionLocations: (c) => c.fetchRegionLocations("austin"),
+    fetchMachineGroups: (c) => c.fetchMachineGroups(),
+    fetchRegions: (c) => c.fetchRegions(),
+    authDetails: (c) => c.authDetails("operator", "hunter2"),
+    addMachine: (c) =>
+      c.addMachine({ credentials: CREDS, locationId: 26454, machineId: 10 }),
+    removeMachine: (c) => c.removeMachine({ credentials: CREDS, lmxId: 1 }),
+    postCondition: (c) =>
+      c.postCondition({ credentials: CREDS, lmxId: 1, comment: "hi" }),
+    setInsiderConnected: (c) =>
+      c.setInsiderConnected({ credentials: CREDS, lmxId: 1, enabled: true }),
+    confirmLineup: (c) =>
+      c.confirmLineup({ credentials: CREDS, locationId: 26454 }),
+  } satisfies Record<
+    keyof PinballMapClient,
+    (client: PinballMapClient) => Promise<unknown>
+  >;
+
+  // Unset and unrecognised values are the fail-closed cases: anything that is
+  // not exactly "production" is non-production.
+  const NON_PRODUCTION = [
+    ["unset (local dev, CI, E2E)", undefined],
+    ["empty", ""],
+    ["preview", "preview"],
+    ["development", "development"],
+    ["unrecognised", "staging"],
+    ["wrong case", "Production"],
+  ] as const;
+
+  describe.each(NON_PRODUCTION)("VERCEL_ENV %s", (_name, vercelEnv) => {
+    it.each(Object.entries(CALLS))(
+      "%s throws before fetch is ever called",
+      async (_method, call) => {
+        vi.stubEnv("VERCEL_ENV", vercelEnv);
+        // Would succeed if reached, so only the guard can make this fail.
+        const calls = installFetchMock(() => json({}));
+
+        await expect(call(createLiveClient("api-tok"))).rejects.toBeInstanceOf(
+          PinballMapNetworkBlockedError
+        );
+        expect(calls).toHaveLength(0);
+      }
+    );
+  });
+
+  it("names the refused method and endpoint, never the credentialed URL", async () => {
+    vi.stubEnv("VERCEL_ENV", "preview");
+    installFetchMock(() => json({}));
+
+    const err: unknown = await createLiveClient("api-tok")
+      .addMachine({ credentials: CREDS, locationId: 26454, machineId: 10 })
+      .catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(PinballMapNetworkBlockedError);
+    const message = err instanceof Error ? err.message : "";
+    expect(message).toContain("POST");
+    expect(message).not.toContain(CREDS.token);
+    expect(message).not.toContain(CREDS.email);
+  });
+
+  it("still sends the same request once VERCEL_ENV is production", async () => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    const calls = installFetchMock(() =>
+      json({ location_machine: { id: 555 } }, 201)
+    );
+
+    const res = await createLiveClient("api-tok").addMachine({
+      credentials: CREDS,
+      locationId: 26454,
+      machineId: 10,
+    });
+
+    expect(res).toEqual({ ok: true, lmxId: 555 });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.init?.method).toBe("POST");
   });
 });

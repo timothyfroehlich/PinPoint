@@ -14,9 +14,10 @@
  * These credentials identify WHO is writing to PinballMap and are distinct from
  * `PINBALLMAP_API_TOKEN`, the blanket platform token that gates API access.
  *
- * Usage (local):
- *   PINBALLMAP_OUTBOUND_EMAIL=... PINBALLMAP_OUTBOUND_TOKEN=... \
- *     node --env-file=.env.local supabase/seed-pinballmap-creds.mjs
+ * Local and E2E databases do not need this: `seed-pinballmap-state.ts` seeds a
+ * fake operator credential in the `db:reset` chain, and non-production code can
+ * never send a request to PinballMap anyway (`assertPinballMapNetworkAllowed`).
+ * A real credential stored locally would be dead weight at best.
  *
  * Usage (production — this is the documented provisioning path, so the script
  * stays prod-capable behind an explicit opt-in rather than a hard refusal):
