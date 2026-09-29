@@ -94,6 +94,7 @@ describe("MachineView", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it("cycles sort direction and then restores the preset default", async () => {
@@ -226,6 +227,21 @@ describe("MachineView", () => {
     expect(navigation.replace).toHaveBeenLastCalledWith("/m", {
       scroll: false,
     });
+  });
+
+  it("pages from the bottom controls and returns to the top of the list", async () => {
+    const user = userEvent.setup();
+    const scrollIntoView = vi.spyOn(HTMLElement.prototype, "scrollIntoView");
+    render(
+      <MachineView result={result({ totalCount: 60 })} preset="machines" />
+    );
+
+    await user.click(screen.getByTestId("machine-view-bottom-next-page"));
+
+    expect(navigation.replace).toHaveBeenLastCalledWith("/m?page=2", {
+      scroll: false,
+    });
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "start" });
   });
 
   it("sets filters from widget Segments and keeps the page for populations", async () => {
