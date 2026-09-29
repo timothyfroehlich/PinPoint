@@ -700,7 +700,10 @@ export function InsiderConnectedToggle({
       className="flex flex-wrap items-center gap-3 sm:ml-3"
       data-testid="pbm-insider-connected"
     >
-      <span className="w-20 shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      {/* On a phone the label takes its own line in every state. Left to wrap,
+          it would drop only when the Don't sync note widens the row, and the
+          control's height would change with the state (4.1). */}
+      <span className="basis-full shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:w-20 sm:basis-auto">
         Insider Connected
       </span>
       <div className="flex items-center gap-2">
