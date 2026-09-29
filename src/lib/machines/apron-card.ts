@@ -38,6 +38,8 @@ export interface ApronCardContent {
   credits: MachineCredits;
   designEnabled: boolean;
   artEnabled: boolean;
+  /** Whether the machine has PinTips, which adds the playing tips row (5.4). */
+  hasPinTips: boolean;
 }
 
 export interface ApronMachineSource extends MachineManufacturerSource {
@@ -86,7 +88,8 @@ export function groupedEdition(
 
 export function apronCardContent(
   machine: ApronMachineSource,
-  credits: MachineCredits
+  credits: MachineCredits,
+  hasPinTips: boolean
 ): ApronCardContent {
   return {
     name: machine.name,
@@ -108,6 +111,7 @@ export function apronCardContent(
     credits,
     designEnabled: machine.apronDesignEnabled,
     artEnabled: machine.apronArtEnabled,
+    hasPinTips,
   };
 }
 

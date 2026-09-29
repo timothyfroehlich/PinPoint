@@ -5,7 +5,9 @@ import { ChevronRight, CircleAlert, Trophy } from "lucide-react";
 import type {
   MachineArtwork,
   MachineForLayout,
+  MachinePinTips,
 } from "~/app/(app)/m/[initials]/_data";
+import { PinTipCard } from "~/app/(app)/m/[initials]/pin-tip-card";
 import { formatCompactAge, formatDate } from "~/lib/dates";
 import type { IscoredScore } from "~/lib/iscored/types";
 import {
@@ -28,6 +30,8 @@ interface MachineScanHubProps {
   scores: IscoredScore[];
   scoreHref: string | null;
   gameHref: string | null;
+  /** Null when the machine has no tips: no tip card (spec pintips 3.6). */
+  pinTips: MachinePinTips | null;
   fromApron: boolean;
 }
 
@@ -51,6 +55,16 @@ function displayScoreDate(date: string): string {
  */
 const FALLBACK_ARTWORK_RATIO = 444 / 640;
 
+/**
+ * Rendered height of the Top scores card: 2px border, 24px padding, 24px
+ * header, and either 4px + 40px per score row or a one-line message (the
+ * global paragraph style's 16px top margin, 24px padding, 28px line). Rows
+ * are fixed at 40px and truncate, so this is exact unless the message wraps
+ * on a very narrow phone — then less than 60px of the next card shows.
+ */
+function scoresCardHeight(rows: number): number {
+  return rows === 0 ? 118 : 54 + 40 * rows;
+}
 function IdentityLink({
   href,
   name,
@@ -89,34 +103,41 @@ function IdentityLink({
 }
 
 /**
- * The artwork band (spec §3.6–§3.7, §5.4). It takes the height the rest of
- * the hub leaves free (`flex-1` from a zero basis), capped at the image's own
- * height at full width, and never below 120px — below that the hub scrolls.
- * When the band is shorter than the image, the image shrinks to fit
- * (`object-contain`) and a blurred copy fills the sides. Below `md` it bleeds
- * 16px past the hub column on each side — viewport-wide on phones, at most
- * 390 + 32 = 422px — so the height cap uses that width; from `md` it is the
- * hub's rounded 390px column.
+ * The artwork band (spec §3.6–§3.7, §5.4). Its height is whatever leaves the
+ * top 60px of the card after Top scores visible above the pinned action bar
+ * on first load: the free height, minus the Top scores card
+ * (`--scores-h`), 173px (the 89px action bar, two 12px gaps, and the 60px
+ * peek), and on `md` the 16px top padding the band does not bleed into.
+ * Capped at the image's own height at full width, and never below 180px —
+ * the page scrolls instead. When the band is shorter than the image, the
+ * image shrinks to fit (`object-contain`) and a blurred copy fills the sides.
+ * Below `md` it bleeds 16px past the hub column on each side — viewport-wide
+ * on phones, at most 390 + 32 = 422px — so the height cap uses that width;
+ * from `md` it is the hub's rounded 390px column.
  */
 function ArtworkBand({
   artwork,
+  scoresHeight,
   children,
 }: {
   artwork: MachineArtwork;
+  scoresHeight: number;
   children: React.ReactNode;
 }): React.JSX.Element {
   const ratio =
     artwork.width != null && artwork.height != null
       ? artwork.height / artwork.width
       : FALLBACK_ARTWORK_RATIO;
-  const style: React.CSSProperties & Record<"--art-ratio", number> = {
+  const style: React.CSSProperties &
+    Record<"--art-ratio" | "--scores-h", number | string> = {
     "--art-ratio": ratio,
+    "--scores-h": `${String(scoresHeight)}px`,
   };
   return (
     <figure
       data-testid="hub-artwork-band"
       style={style}
-      className="relative m-0 -mx-4 -mt-4 max-h-[calc(min(100vw,422px)*var(--art-ratio))] min-h-[120px] flex-1 basis-0 overflow-hidden bg-card md:mx-0 md:mt-0 md:max-h-[calc(390px*var(--art-ratio))] md:rounded-xl"
+      className="relative m-0 -mx-4 -mt-4 h-[clamp(180px,calc(100dvh-112px-env(safe-area-inset-bottom)-var(--scores-h)-173px),calc(min(100vw,422px)*var(--art-ratio)))] shrink-0 overflow-hidden bg-card md:mx-0 md:mt-0 md:h-[clamp(180px,calc(100dvh-64px-16px-var(--scores-h)-173px),calc(390px*var(--art-ratio)))] md:rounded-xl"
     >
       <Image
         src={artwork.url}
@@ -169,6 +190,7 @@ export function MachineScanHub({
   scores,
   scoreHref,
   gameHref,
+  pinTips,
   fromApron,
 }: MachineScanHubProps): React.JSX.Element {
   const infoHref = `/m/${machine.initials}`;
@@ -181,14 +203,18 @@ export function MachineScanHub({
     ownerName ? `Owned by ${ownerName}` : "Owner not listed",
   ].filter(Boolean);
   const openIssues = machine.issues;
+  const scoreRows = machine.iscoredGameId ? Math.min(scores.length, 3) : 0;
 
   return (
     <div
       data-machine-scan-hub
-      className="mx-auto flex min-h-[calc(100dvh-112px-env(safe-area-inset-bottom))] w-full max-w-[390px] flex-col gap-3 py-4 md:min-h-[calc(100dvh-64px)]"
+      className="mx-auto flex min-h-[calc(100dvh-56px)] w-full max-w-[390px] flex-col gap-3 pt-4 pb-[calc(56px+env(safe-area-inset-bottom))] md:min-h-[calc(100dvh-64px)] md:pb-0"
     >
       {machine.artwork != null ? (
-        <ArtworkBand artwork={machine.artwork}>
+        <ArtworkBand
+          artwork={machine.artwork}
+          scoresHeight={scoresCardHeight(scoreRows)}
+        >
           <IdentityLink
             href={infoHref}
             name={machine.name}
@@ -278,6 +304,15 @@ export function MachineScanHub({
         )}
       </section>
 
+      {pinTips ? (
+        <PinTipCard
+          tips={pinTips.tips}
+          initialIndex={pinTips.initialIndex}
+          href={pinTips.href}
+          variant="hub"
+        />
+      ) : null}
+
       <section className={cardClass} aria-labelledby="hub-issues-heading">
         <div className="flex min-h-7 items-center justify-between gap-2">
           <h2 id="hub-issues-heading" className={labelClass}>
@@ -303,7 +338,19 @@ export function MachineScanHub({
         )}
       </section>
 
-      <div className="mt-auto flex gap-2.5 pb-2" aria-label="Machine actions">
+      {/* The thumb zone (spec §1, §5.5): pinned above the tab bar while the hub
+          scrolls, full-bleed on phones. Content scrolling under it fades out
+          at its top edge (§5.6). The hub's bottom padding equals the tab bar's
+          height, so at the end of the page the bar's resting place and its
+          pinned place coincide. */}
+      <div
+        className="sticky bottom-[calc(56px+env(safe-area-inset-bottom))] z-10 -mx-4 mt-auto flex gap-2.5 border-t border-border bg-background/95 px-4 py-2.5 md:bottom-0 md:mx-0 md:px-0"
+        aria-label="Machine actions"
+      >
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 bottom-full h-14 bg-linear-to-b from-transparent to-background/95"
+        />
         {scoreHref ? (
           <a
             href={scoreHref}

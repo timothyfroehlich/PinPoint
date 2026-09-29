@@ -29,6 +29,7 @@ describe("MachineScanHub", () => {
         scores={[]}
         scoreHref="https://www.iscored.info/?mode=public&user=apc&game=73"
         gameHref="https://www.iscored.info/apc?scrollTo=73"
+        pinTips={null}
         fromApron
       />
     );
@@ -62,6 +63,7 @@ describe("MachineScanHub", () => {
         scores={[]}
         scoreHref={null}
         gameHref={null}
+        pinTips={null}
         fromApron={false}
       />
     );
@@ -93,6 +95,7 @@ describe("MachineScanHub", () => {
         scores={[]}
         scoreHref={null}
         gameHref={null}
+        pinTips={null}
         fromApron={false}
       />
     );
@@ -115,6 +118,7 @@ describe("MachineScanHub", () => {
         scores={[]}
         scoreHref={null}
         gameHref={null}
+        pinTips={null}
         fromApron={false}
       />
     );
@@ -135,9 +139,50 @@ describe("MachineScanHub", () => {
         scores={[]}
         scoreHref={null}
         gameHref={null}
+        pinTips={null}
         fromApron={false}
       />
     );
     expect(screen.queryByTestId("hub-artwork-band")).not.toBeInTheDocument();
+  });
+
+  it("places the tip card between Top scores and Open issues, and omits it without tips", () => {
+    const { rerender } = render(
+      <MachineScanHub
+        machine={machine}
+        scores={[]}
+        scoreHref={null}
+        gameHref={null}
+        pinTips={{
+          tips: [
+            {
+              tipId: 1,
+              category: "multiball",
+              voteTotal: 3,
+              text: "Lock early.",
+            },
+          ],
+          initialIndex: 0,
+          href: "https://app.matchplay.events/opdb/entries/GweeP/pintips",
+        }}
+        fromApron={false}
+      />
+    );
+    const headings = screen
+      .getAllByRole("heading", { level: 2 })
+      .map((h) => h.textContent);
+    expect(headings).toEqual(["Top scores", "PinTips", "Open issues · 1"]);
+
+    rerender(
+      <MachineScanHub
+        machine={machine}
+        scores={[]}
+        scoreHref={null}
+        gameHref={null}
+        pinTips={null}
+        fromApron={false}
+      />
+    );
+    expect(screen.queryByTestId("pintips-card")).not.toBeInTheDocument();
   });
 });

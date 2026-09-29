@@ -115,7 +115,9 @@ jobs:
       # The issue_comment workflow comes from the default branch, but the
       # checkout above replaces the workspace with the PR head. Keep workflow
       # infrastructure on the trusted default branch so /preview also works for
-      # PRs opened before setup-mise existed.
+      # PRs opened before setup-mise existed. The `$/` references below load
+      # setup-mise from the default-branch commit this run executes; this
+      # checkout supplies the trusted mise and package files it installs from.
       - name: Checkout trusted workflow action
         if: steps.parse.outputs.action != 'noop'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
@@ -134,7 +136,7 @@ jobs:
       # orchestration. Vercel still owns its independent preview build runtime.
       - name: Setup locked preview toolchain (Node 22 compatibility)
         if: steps.parse.outputs.action == 'start'
-        uses: ./.pinpoint-workflow/.github/actions/setup-mise
+        uses: $/.github/actions/setup-mise
         with:
           install-args: "--locked node pnpm supabase"
           node-version: "22"
@@ -142,7 +144,7 @@ jobs:
 
       - name: Setup locked Supabase CLI for stop
         if: steps.parse.outputs.action == 'stop'
-        uses: ./.pinpoint-workflow/.github/actions/setup-mise
+        uses: $/.github/actions/setup-mise
         with:
           install-args: "--locked supabase"
           cache-pnpm: "false"

@@ -54,10 +54,7 @@
 
 ## Known divergences
 
-| Requirement | Divergence | Resolution |
-| :-- | :-- | :-- |
-| §1 Thumb zone, §3.7, §5.4–§5.6 | The hub fits one screen without scrolling: the action buttons sit at the bottom of the content, and the band fills the free height down to 120px. | PP-a0be |
-| §3.8 | No tip card. | PP-a0be |
+_None — the current implementation matches this spec._
 
 ## Changelog
 

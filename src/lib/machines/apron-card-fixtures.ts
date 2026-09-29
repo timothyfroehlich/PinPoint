@@ -80,7 +80,10 @@ const FILL_WORDS = [
 
 /** A fixture as written: card content without credits, plus OPDB credits. */
 type FixtureSource = Omit<ApronStressFixture, "content"> & {
-  content: Omit<ApronCardContent, "credits" | "designEnabled" | "artEnabled">;
+  content: Omit<
+    ApronCardContent,
+    "credits" | "designEnabled" | "artEnabled" | "hasPinTips"
+  >;
   credits: MachineCredits;
 };
 
@@ -342,7 +345,14 @@ const FIXTURE_SOURCES: readonly FixtureSource[] = [
 export const APRON_STRESS_FIXTURES: readonly ApronStressFixture[] =
   FIXTURE_SOURCES.map(({ content, credits, ...fixture }) => ({
     ...fixture,
-    content: { ...content, credits, designEnabled: true, artEnabled: true },
+    content: {
+      ...content,
+      credits,
+      designEnabled: true,
+      artEnabled: true,
+      // Every fixture carries the playing tips row, the tallest action column.
+      hasPinTips: true,
+    },
   }));
 
 /** The first `count` words of `words`, for growing a fill field. */

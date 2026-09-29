@@ -1,14 +1,14 @@
 /**
  * E2E Tests for Public Issue Reporting - Extended (Full Suite)
  *
- * Tests for email prompt, status enforcement, and signup pre-fill flows.
+ * Tests for email prompt and signup pre-fill flows.
  * Core reporting tests are in e2e/smoke/public-reporting.spec.ts.
+ * Anonymous and guest status/priority enforcement tested in public-issue-submit.test.ts (PGlite integration).
  */
 
 import { test, expect } from "../support/fixtures.js";
-import { loginAs, selectMachine } from "../support/actions.js";
+import { selectMachine } from "../support/actions.js";
 import { cleanupTestEntities } from "../support/cleanup.js";
-import { TEST_USERS } from "../support/constants.js";
 import { fillReportForm } from "../support/page-helpers.js";
 
 const PUBLIC_PREFIX = "E2E Public Report";
@@ -116,57 +116,5 @@ test.describe("Public Issue Reporting - Extended", () => {
     await expect(page.getByLabel(/First Name/i)).toHaveValue("John");
     await expect(page.getByLabel(/Last Name/i)).toHaveValue("Smith");
     await expect(page.getByLabel(/Email/i)).toHaveValue(email);
-  });
-
-  test("anonymous issue should have status forced to 'new'", async ({
-    page,
-  }, testInfo) => {
-    // Security test: Verify server-side enforcement of status='new' for anonymous users
-    // Even if form data were manipulated, the server should force status to 'new'
-
-    const issueTitle = `${PUBLIC_PREFIX} Security Test ${Date.now()}`;
-
-    // 1. Submit anonymous issue
-    await page.goto("/report/detailed");
-    await selectMachine(page);
-    await expect(page).toHaveURL(/machine=/);
-
-    await fillReportForm(page, {
-      title: issueTitle,
-      description: "Testing that status is forced to new for anonymous users.",
-      includePriority: false,
-    });
-
-    await page.getByRole("button", { name: "Submit Issue Report" }).click();
-    await expect(page).toHaveURL("/report/success");
-
-    // 2. Login as admin to verify the issue
-    await loginAs(page, testInfo, {
-      email: TEST_USERS.admin.email,
-      password: TEST_USERS.admin.password,
-    });
-
-    // 3. Search for the issue we just created
-    await page.goto("/issues");
-    await page.getByPlaceholder("Search issues...").fill(issueTitle);
-    await page.keyboard.press("Enter");
-    await expect
-      .poll(() => new URL(page.url()).searchParams.has("q"), { timeout: 15000 })
-      .toBe(true);
-
-    // 4. Verify the issue appears in search results
-    const issueRow = page.getByRole("row", { name: new RegExp(issueTitle) });
-    await expect(issueRow).toBeVisible();
-
-    // 5. Click the issue title link to navigate to detail page (status column may be hidden on mobile)
-    await issueRow.getByTestId("issue-title").click();
-    await expect(page).toHaveURL(/\/m\/[A-Z0-9]+\/i\/\d+/);
-
-    // 6. Verify status display shows 'New' on the detail page.
-    // The detail page uses an interactive StatusSelect for authenticated users
-    // (testid: issue-status-select). The select trigger renders the current
-    // status label as its visible value.
-    const statusSelect = page.getByTestId("issue-status-select").first();
-    await expect(statusSelect).toContainText(/New/i);
   });
 });
