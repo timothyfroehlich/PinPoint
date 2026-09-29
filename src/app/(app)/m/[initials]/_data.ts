@@ -60,6 +60,12 @@ export const getMachineForLayout = cache(async (initials: string) => {
         watchers: {
           columns: { userId: true, watchMode: true },
         },
+        // The machine's first saved card (spec apron-cards §3.8), oldest
+        // first. Selecting among several cards is not built yet.
+        apronCards: {
+          orderBy: (cards, { asc }) => [asc(cards.createdAt), asc(cards.id)],
+          limit: 1,
+        },
         // Joined rather than looked up afterwards. A second PK query would be
         // sequential — it needs the machine row to know the id — so every one
         // of the five `/m/[initials]/*` surfaces would pay a round-trip for a
