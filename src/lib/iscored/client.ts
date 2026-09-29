@@ -10,9 +10,10 @@ import {
   getGameUrl,
   getIscoredUser,
   getScoreEntryUrl,
+  isIscoredFixtureMode,
 } from "./config";
+import { ISCORED_FIXTURE_GAMES, ISCORED_FIXTURE_SCORES } from "./fixture";
 import type { IscoredGame, IscoredScore } from "./types";
-import { getLocalAfmDemoScores } from "./local-demo";
 
 export { getGameroomUrl, getGameUrl, getScoreEntryUrl };
 export type { IscoredGame, IscoredScore };
@@ -156,6 +157,14 @@ function groupAndRankScores(
  * Catches all errors gracefully to prevent crashing callers or page loads.
  */
 async function fetchAndCacheScores(user: string): Promise<void> {
+  if (isIscoredFixtureMode()) {
+    cache.scoresByGameId = groupAndRankScores(
+      parseAndSanitizeScores([...ISCORED_FIXTURE_SCORES])
+    );
+    cache.lastFetchedAt = Date.now();
+    return;
+  }
+
   const url = `${ISCORED_BASE_URL}/api/${encodeURIComponent(user)}/getAllScores?max=10`;
 
   try {
@@ -255,7 +264,7 @@ async function ensureCacheReady(user: string): Promise<void> {
 /**
  * Retrieves all scores for a specific machine's iScored game ID.
  *
- * Returns empty array if `ISCORED_USER` is unset, game ID is unlinked/blank,
+ * Returns empty array if no gameroom is configured, game ID is unlinked/blank,
  * or if upstream is unreachable.
  */
 export const getAllScoresForMachine = reactCache(
@@ -263,11 +272,6 @@ export const getAllScoresForMachine = reactCache(
     const trimmedId = iscoredGameId.trim();
     if (!trimmedId) {
       return [];
-    }
-
-    const localDemoScores = getLocalAfmDemoScores(trimmedId);
-    if (localDemoScores) {
-      return localDemoScores;
     }
 
     const user = getIscoredUser();
@@ -382,6 +386,12 @@ function markFetchFailure(): void {
 }
 
 async function fetchAndCacheGames(user: string): Promise<void> {
+  if (isIscoredFixtureMode()) {
+    gamesCache.games = parseAndSanitizeGames([...ISCORED_FIXTURE_GAMES]) ?? [];
+    gamesCache.lastFetchedAt = Date.now();
+    return;
+  }
+
   const url = `${ISCORED_BASE_URL}/api/${encodeURIComponent(user)}`;
 
   try {
@@ -478,8 +488,8 @@ async function ensureGamesCacheReady(user: string): Promise<void> {
 /**
  * Retrieves the full list of games configured in the iScored gameroom.
  *
- * Server-side cached for 1 hour. Returns an empty array if `ISCORED_USER`
- * is not configured or upstream is unreachable.
+ * Server-side cached for 1 hour. Returns an empty array if no gameroom is
+ * configured or upstream is unreachable.
  */
 export const getGameroomGames = reactCache(async (): Promise<IscoredGame[]> => {
   const user = getIscoredUser();

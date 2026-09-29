@@ -2,8 +2,6 @@
  * Configuration and URL helpers for the iScored integration.
  */
 
-import { LOCAL_AFM_DEMO_GAME_ID } from "./local-demo";
-
 /** Upstream iScored service base URL. */
 export const ISCORED_BASE_URL = "https://www.iscored.info";
 
@@ -20,12 +18,42 @@ export const ISCORED_CACHE_TTL_MS = 15_000;
 export const ISCORED_GAMES_CACHE_TTL_MS = 60 * 60 * 1000;
 
 /**
- * Returns the configured iScored gameroom username from environment variables,
- * or null if unconfigured.
+ * Gameroom reported in fixture mode. It is the real APC gameroom, so outbound
+ * links from fixture data land on a real public page; scores never come from it.
  */
-export function getIscoredUser(): string | null {
+export const ISCORED_FIXTURE_USER = "Apcscore";
+
+function getConfiguredUser(): string | null {
   const user = process.env["ISCORED_USER"]?.trim();
   return user && user.length > 0 ? user : null;
+}
+
+/**
+ * Whether iScored data comes from the committed fixture gameroom
+ * (`fixture.ts`) instead of the live API: `ISCORED_USER` is unset and this is
+ * not a Vercel production deployment. Local dev, CI, and previews without the
+ * variable therefore render every iScored surface without reaching
+ * iscored.info. Setting `ISCORED_USER` always selects the live API.
+ *
+ * Keyed on `VERCEL_ENV` rather than `NODE_ENV` for the same reason as
+ * `getPinballMapMode` (PP-o355.24): Vercel previews also run with
+ * `NODE_ENV=production`, and CI E2E runs a production build off-Vercel.
+ */
+export function isIscoredFixtureMode(): boolean {
+  return (
+    getConfiguredUser() === null && process.env["VERCEL_ENV"] !== "production"
+  );
+}
+
+/**
+ * Returns the iScored gameroom username: `ISCORED_USER`, the fixture gameroom
+ * in fixture mode, or null when production has no gameroom configured.
+ */
+export function getIscoredUser(): string | null {
+  return (
+    getConfiguredUser() ??
+    (isIscoredFixtureMode() ? ISCORED_FIXTURE_USER : null)
+  );
 }
 
 /**
@@ -50,7 +78,7 @@ export function getScoreEntryUrl(
   const resolvedUser = (user ?? getIscoredUser())?.trim();
   const trimmedId = iscoredGameId.trim();
 
-  if (!resolvedUser || !trimmedId || trimmedId === LOCAL_AFM_DEMO_GAME_ID) {
+  if (!resolvedUser || !trimmedId) {
     return null;
   }
 
@@ -72,7 +100,7 @@ export function getGameUrl(
   const resolvedUser = (user ?? getIscoredUser())?.trim();
   const trimmedId = iscoredGameId.trim();
 
-  if (!resolvedUser || !trimmedId || trimmedId === LOCAL_AFM_DEMO_GAME_ID) {
+  if (!resolvedUser || !trimmedId) {
     return null;
   }
 
