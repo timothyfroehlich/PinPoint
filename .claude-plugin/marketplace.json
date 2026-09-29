@@ -1,0 +1,12 @@
+{
+  "name": "pinpoint",
+  "owner": { "name": "Tim Froehlich" },
+  "description": "Plugins for operating PinPoint, the Austin Pinball Collective's issue tracker.",
+  "plugins": [
+    {
+      "name": "pinpoint",
+      "source": "./plugins/pinpoint",
+      "description": "PinPoint MCP connector plus the pinpoint-mcp skill: confirmation rules and the list of changes that notify people or cannot be undone."
+    }
+  ]
+}
