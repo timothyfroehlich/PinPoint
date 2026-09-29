@@ -197,6 +197,15 @@ the degradation is a known, documented choice — not an oversight.
 > The script refuses a production target without that token, and refuses to
 > overwrite a credential that is already provisioned.
 >
+> Local and E2E databases do not need it: `supabase/seed-pinballmap-state.ts`
+> (in the `db:reset` chain) seeds a fake operator
+> (`fake-pinballmap-operator@example.invalid`, a Vault secret named
+> `pinballmap_outbound_token_fake_local`) so the push surfaces render. Nothing
+> outside a Vercel production deployment can reach Pinball Map with it:
+> `PINBALLMAP_MODE` resolves to the mock client there, and the live client's
+> single `fetch` throws `PinballMapNetworkBlockedError` unless
+> `VERCEL_ENV=production`.
+>
 > **PinballMap region alert channel (PP-o355.18).** `DISCORD_PBM_ALERT_CHANNEL_ID`
 > is the Discord channel the hourly "new machines in Austin" alert posts into. It
 > reuses the existing Discord bot token from `discord_integration_config` (Vault),
@@ -227,7 +236,7 @@ the degradation is a known, documented choice — not an oversight.
 | `DEV_AUTOLOGIN_ENABLED` / `_EMAIL` / `_PASSWORD`                                                     | 🔴(dev creds) | Dev      | `src/lib/supabase/middleware.ts`                                                       | 🚫 must be absent/`false` in prod                                                                                                          |
 | `DEV_ALLOWED_ORIGINS`                                                                                | 🟢            | Dev      | `next.config.ts`                                                                       | comma-sep origins for cross-machine `next dev`; ignored by `next build`/Vercel                                                             |
 | `ISCORED_DEMO_AFMSCORES`                                                                             | 🟢            | Dev      | `src/lib/iscored/local-demo.ts`                                                        | Opt-in AFM screenshot scores; see below.                                                                                                   |
-| `PINBALLMAP_MODE`                                                                                    | 🟢            | All      | `src/lib/pinballmap/config.ts`                                                         | default keys off `VERCEL_ENV`: `live` only on a production deployment                                                                      |
+| `PINBALLMAP_MODE`                                                                                    | 🟢            | All      | `src/lib/pinballmap/config.ts`                                                         | `mock` is a production kill switch; no value enables `live` outside `VERCEL_ENV=production` (network guard in the live client)             |
 | `MOCK_BLOB_STORAGE`                                                                                  | 🟢            | Dev/test | `src/lib/blob/client.ts`                                                               | feature flag                                                                                                                               |
 | `DRIZZLE_FORCE_PRODUCTION`                                                                           | 🟢            | Ops      | `drizzle.config.ts`                                                                    | explicit opt-in guard for prod DDL — see the `*_FORCE_PRODUCTION` note below                                                               |
 | `LOG_LEVEL` / `PINPOINT_LOG_DIR`                                                                     | 🟢            | All      | `src/lib/logger.ts`                                                                    | defaults: `info` / `<cwd>/logs`                                                                                                            |

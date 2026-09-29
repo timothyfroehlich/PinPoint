@@ -374,6 +374,28 @@ const MACHINE_PLAN: MachinePlan[] = [
   },
 ];
 
+/**
+ * Fake per-operator write credentials, so every "can push" surface renders
+ * locally and in E2E: the Manage tab's listing control, the lineup page's push
+ * buttons, and the New Machine form's "Add to Pinball Map" option. Without
+ * them `writeEnabled` is false and each of those shows only its link-out
+ * fallback.
+ *
+ * Obviously fake on purpose: an `.invalid` address (RFC 2606 reserves the TLD,
+ * so it can never be delivered) and a token that says what it is. They can
+ * never reach Pinball Map either way. This seed refuses production, and outside
+ * production the app uses the mock client, whose writes accept any credential,
+ * and the live client refuses to send (`assertPinballMapNetworkAllowed`).
+ *
+ * The token lives in Vault like the real one, under a fixed name so a re-run
+ * reuses the secret instead of piling up new ones: Vault names are unique, and
+ * the reset chain truncates `pinballmap_state` but never `vault.secrets`.
+ */
+const FAKE_OPERATOR_EMAIL = "fake-pinballmap-operator@example.invalid";
+const FAKE_OPERATOR_TOKEN =
+  "FAKE-pinballmap-operator-token-not-a-real-credential";
+const FAKE_TOKEN_SECRET_NAME = "pinballmap_outbound_token_fake_local";
+
 const sql = createScriptClient(POSTGRES_URL);
 try {
   console.log(
@@ -424,6 +446,48 @@ try {
         `${String(stored?.["entries"])} — expected object/array. The jsonb ` +
         `bind is double-encoding; keep the ::text::jsonb cast pair.`
     );
+  }
+
+  // Fake operator credentials (see FAKE_OPERATOR_EMAIL). A row that already
+  // carries both halves is left alone, so a hand-provisioned local credential
+  // survives a re-run of this step on its own.
+  const [provisioned] = await sql<
+    { outbound_email: string | null; outbound_token_vault_id: string | null }[]
+  >`
+    SELECT outbound_email, outbound_token_vault_id
+    FROM pinballmap_state WHERE id = 'singleton'
+  `;
+  if (provisioned?.outbound_email && provisioned.outbound_token_vault_id) {
+    console.log("   operator credentials already set — left untouched");
+  } else {
+    const [existingSecret] = await sql<{ id: string }[]>`
+      SELECT id FROM vault.secrets WHERE name = ${FAKE_TOKEN_SECRET_NAME}
+    `;
+    let vaultId = existingSecret?.id;
+    if (vaultId === undefined) {
+      const [created] = await sql<{ id: string }[]>`
+        SELECT vault.create_secret(
+          ${FAKE_OPERATOR_TOKEN},
+          ${FAKE_TOKEN_SECRET_NAME},
+          'FAKE PinballMap operator token for local dev and E2E — not a real credential'
+        ) AS id
+      `;
+      vaultId = created?.id;
+    } else {
+      // Reset the value too, so the secret under this name is always the fake.
+      await sql`SELECT vault.update_secret(${vaultId}::uuid, ${FAKE_OPERATOR_TOKEN})`;
+    }
+    if (vaultId === undefined) {
+      throw new Error("vault.create_secret returned no id");
+    }
+    await sql`
+      UPDATE pinballmap_state
+      SET outbound_email = ${FAKE_OPERATOR_EMAIL},
+          outbound_token_vault_id = ${vaultId}::uuid,
+          updated_at = now()
+      WHERE id = 'singleton'
+    `;
+    console.log(`   operator credentials → fake (${FAKE_OPERATOR_EMAIL})`);
   }
 
   // Catalog metadata for every title the plan links to, read once.
