@@ -134,6 +134,10 @@ describe("IssueFilters", () => {
     expect(pushMock).toHaveBeenCalledWith(
       expect.stringContaining("status=all")
     );
+    expect(pushMock).toHaveBeenCalledWith(expect.not.stringContaining("q="));
+    expect(pushMock).toHaveBeenCalledWith(
+      expect.not.stringContaining("severity=")
+    );
   });
 });
 

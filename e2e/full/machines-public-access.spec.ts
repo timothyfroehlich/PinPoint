@@ -4,8 +4,10 @@
  * Tests that unauthenticated users can view the machines list,
  * machine detail pages, and interact with summary widgets.
  *
- * Permission enforcement (machines.create requires admin/technician; unauthenticated
- * callers rejected) is covered in machine-actions.test.ts.
+ * Server Action permission enforcement (createMachineAction requires admin/technician;
+ * unauthenticated callers rejected) is covered in machine-actions.test.ts.
+ * Note: The page UI link gate (`canCreateMachine` at src/app/(app)/m/page.tsx) is a
+ * presentational conditional render, while the server action gate is the security boundary.
  */
 
 import { test, expect } from "../support/fixtures.js";
