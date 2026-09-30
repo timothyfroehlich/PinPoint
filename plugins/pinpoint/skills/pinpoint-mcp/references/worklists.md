@@ -6,7 +6,7 @@ Use this for any job like "put every off-the-floor machine on the floor", "link 
 
 1. Call the list tool with the filter and `offset: 0`. Note `total`.
 2. Show the user the job: the filter, `total`, and what you will change on each row.
-3. Work in pages of at most 10 rows. Each page gets its own change preview (SKILL.md §3) and its own "yes".
+3. Work in pages of at most 10 rows. Before each page's preview, call `get_machine` or `get_issue` on every row in it. Each page gets its own change preview (SKILL.md §3) and its own "yes".
 
 ## Paging while you change rows
 

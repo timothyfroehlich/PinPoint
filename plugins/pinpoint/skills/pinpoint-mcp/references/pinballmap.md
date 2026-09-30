@@ -8,15 +8,22 @@ Pinball Map (pinballmap.com) is a public directory of where machines can be play
 
 Pinball Map groups editions of one game (Pro, Premium, LE) into a family.
 
-1. Call `search_pinballmap_catalog` with `query` set to the game's title.
+1. Call `get_machine` on the machine first. Call `search_pinballmap_catalog` with `query` set to the name that read returned, never a title you guessed from the initials.
 2. For each result:
    - If `machineGroupId` is `null`, or `editionCount` is `1`, the result's `pinballmapMachineId` is the answer.
    - Otherwise call `search_pinballmap_catalog` with `machineGroupId` set to that family's id. Check that `familyName` in the answer is the game you meant: family ids and machine ids are different number series that overlap, so a wrong number can return a real but different game. Pick the edition's `pinballmapMachineId`.
 3. If the edition is unclear (Pro or Premium?), ask the user. Do not pick one.
+4. When linking several machines, do steps 1–3 for each machine separately. Never reuse one machine's answer for another.
 
 ## Linking
 
-Show a change preview, then call:
+Show a change preview. Each line shows the catalog title and edition next to the number, so the user can check it:
+
+```text
+1. MM pinballmapMachineId: (not linked) → 1234 (Medieval Madness, Remake LE)   PERMANENT: no tool can unlink MM
+```
+
+Then call:
 
 ```text
 update_machine(machine: "MM", pinballmapMachineId: 1234)
@@ -26,7 +33,7 @@ This is PERMANENT (SKILL.md §2):
 
 - No tool can return the machine to "not linked" afterwards.
 - If the machine was linked to a **different** title with intent `on`, intent goes back to `off`, and Insider Connected is cleared. Setting intent `on` again is a second call.
-- If the machine was marked "not on Pinball Map", its hand-entered model details (manufacturer, year, designers, artists) are erased and the catalog's details replace them. No tool can re-enter them. Say this in the preview.
+- Only if `get_machine` shows `pinballmap.status: "excluded"`: the machine was marked "not on Pinball Map", and its hand-entered model details (manufacturer, year, designers, artists) are erased and the catalog's details replace them. No tool can re-enter them. Say this in the preview.
 
 ## Intent
 
@@ -35,7 +42,7 @@ update_machine(machine: "MM", intent: "on")
 ```
 
 - The machine must be linked first.
-- `on` is refused when presence is `pending_arrival` or `removed`.
+- `on` is refused when presence is `pending_arrival` or `removed`. Check presence in your read before the preview; if it is one of those, tell the user instead of previewing.
 - `on` is PERMANENT: it can email owners and watchers about Pinball Map comments PinPoint has not imported before.
 - `off` and `no_sync` are CHANGE.
 
