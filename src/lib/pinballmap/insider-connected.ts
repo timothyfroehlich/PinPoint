@@ -2,7 +2,10 @@ import type { PbmListingView } from "./listing-state";
 import { findLmxForMachine } from "./resolve-lmx";
 import type { LocationSnapshot } from "./types";
 
-/** A cabinet's Insider Connected intent (spec 3.8). Null: none recorded. */
+/**
+ * A cabinet's Insider Connected intent (spec 3.8). Stored NULL is the toggle's
+ * Don't sync position: no intent recorded.
+ */
 export type PbmIcIntent = "on" | "off";
 
 /**
@@ -12,13 +15,8 @@ export type PbmIcIntent = "on" | "off";
 export type PbmInsiderConnectedSetting = "on" | "off" | "not_set";
 
 export interface PbmInsiderConnectedView {
-  /** This cabinet's own intent; null when none is recorded. */
+  /** This cabinet's own intent; null is Don't sync (none recorded). */
   intent: PbmIcIntent | null;
-  /**
-   * What the switch shows: the intent when one is recorded, otherwise Pinball
-   * Map's value, otherwise Not set (3.8).
-   */
-  shown: PbmInsiderConnectedSetting;
   /** Pinball Map's value for the entry; null when the entry is not on the lineup. */
   pinballMap: PbmInsiderConnectedSetting | null;
   /**
@@ -27,9 +25,10 @@ export interface PbmInsiderConnectedView {
    */
   target: PbmIcIntent | null;
   /**
-   * The entry is present, its target is set, and Pinball Map's value differs —
-   * the Insider Connected differs state (4.2). Only raised while the lineup
-   * itself is in sync; a Missing or Lingering push outranks it.
+   * This cabinet has an intent, the entry is present, its target is set, and
+   * Pinball Map's value differs — the Insider Connected differs state (4.2).
+   * Only raised while the lineup itself is in sync; a Missing or Lingering push
+   * outranks it.
    */
   differs: boolean;
 }
@@ -80,7 +79,10 @@ export function deriveInsiderConnectedView(args: {
   const target = insiderConnectedTarget(args.siblingIntents);
   // Flagged only where the lineup itself is in sync with the entry present:
   // Don't sync opts out of every flag (4.2), and Missing/Lingering own the push.
+  // A cabinet set to Don't sync for Insider Connected is never flagged, even
+  // when a sibling's intent makes the shared entry differ (3.8).
   const differs =
+    intent !== null &&
     pinballMap !== null &&
     target !== null &&
     target !== pinballMap &&
@@ -89,7 +91,6 @@ export function deriveInsiderConnectedView(args: {
 
   return {
     intent,
-    shown: intent ?? pinballMap ?? "not_set",
     pinballMap,
     target,
     differs,

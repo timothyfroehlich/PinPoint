@@ -1250,7 +1250,8 @@ export async function updateMachineIscoredLink({
 
 export interface SetMachineIcIntentParams {
   machineId: string;
-  icIntent: PbmIcIntent;
+  /** Null clears the intent: the toggle's Don't sync position (3.8). */
+  icIntent: PbmIcIntent | null;
 }
 
 export type SetMachineIcIntentResult =
@@ -1258,8 +1259,9 @@ export type SetMachineIcIntentResult =
   | { ok: false; reason: "not_linked" | "ineligible"; message: string };
 
 /**
- * Record a machine's Insider Connected intent (spec pinballmap §3.8). Writes only
- * to PinPoint; the push to Pinball Map is a separate, person-initiated action.
+ * Record a machine's Insider Connected intent (spec pinballmap §3.8), or clear it
+ * to Don't sync with null. Writes only to PinPoint; the push to Pinball Map is a
+ * separate, person-initiated action.
  *
  * The machine must be linked to a title the catalog marks eligible. The UPDATE is
  * pinned to the title that was checked, so a re-match landing in between (which
