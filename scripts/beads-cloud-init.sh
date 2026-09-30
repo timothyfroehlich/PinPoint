@@ -22,7 +22,10 @@
 # DB before anyone notices). The binaries are installed by the environment's setup
 # script before this runs — that script pins the same versions, but its invocation
 # shim in the claude.ai UI cannot be diffed. These guards are the reviewable,
-# enforced backstop.
+# enforced backstop. Because sessions start from a cached environment snapshot
+# that does not re-run setup after a pin bump, a mismatch first re-runs
+# scripts/beads-cloud-setup.sh (exact pins, digest-verified) and only then
+# refuses — see step 1b.
 #
 # When upgrading past the pins, bump scripts/beads-compatibility.json. It is a
 # weekly-chores checklist item so the bump is a known recurring task, not a
@@ -71,44 +74,76 @@ BEADS_DIR="$HOME/beads"
 DOLT_USER_NAME="${DOLT_USER_NAME:-advacar}"
 DOLT_USER_EMAIL="${DOLT_USER_EMAIL:-beads-cloud@pinpoint.invalid}"
 
-# 1. bd must be installed and actually RUN. A version that will not print usually
+# 1. Probe the installed bd and dolt. A version that will not print usually
 #    means the tarball binary is missing libicu (the setup script installs it on
 #    that failure). Capture stdout AND stderr (some CLIs print the banner to
 #    stderr), and keep the grep|head pipeline off the die path — under `set -o
 #    pipefail`, head closing the pipe early makes grep exit 141 (SIGPIPE), which
 #    would otherwise fire a false "will not run" abort on a healthy bd. The real
 #    gate is whether a version parsed at all.
-command -v bd >/dev/null 2>&1 \
-  || die "bd not found on PATH — the environment setup script should install it"
-bd_raw="$(bd version 2>&1 || true)"
-# Anchor on bd's own "bd version X.Y.Z ..." line rather than the first semver-
-# shaped token anywhere in the output — a future banner that also prints a Go
-# runtime or build id in semver shape must not be able to feed the pin guard the
-# wrong number. If the prefix ever changes, this parses empty and dies loud.
-bd_ver="$(printf '%s\n' "$bd_raw" | sed -nE 's/^bd version ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' | head -n1 || true)"
-[[ -n "$bd_ver" ]] \
-  || die "could not parse a version from 'bd version' (missing libicu, a broken binary, or a changed output format): $bd_raw"
+#    Anchor on each tool's own "<tool> version X.Y.Z ..." line rather than the
+#    first semver-shaped token anywhere in the output — a future banner that also
+#    prints a Go runtime or build id in semver shape must not be able to feed the
+#    pin guard the wrong number. If the prefix ever changes, this parses empty
+#    and the guard below dies loud.
+probe_versions() {
+  bd_raw="bd not found on PATH"
+  bd_ver=""
+  if command -v bd >/dev/null 2>&1; then
+    bd_raw="$(bd version 2>&1 || true)"
+    bd_ver="$(printf '%s\n' "$bd_raw" | sed -nE 's/^bd version ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' | head -n1 || true)"
+  fi
+  dolt_raw="dolt not found on PATH"
+  dolt_ver=""
+  if command -v dolt >/dev/null 2>&1; then
+    dolt_raw="$(dolt version 2>&1 || true)"
+    dolt_ver="$(printf '%s\n' "$dolt_raw" | sed -nE 's/^dolt version ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' | head -n1 || true)"
+  fi
+}
+probe_versions
+
+# 1b. SELF-HEAL a stale environment snapshot. Cloud sessions start from a cached
+#     snapshot of the environment, and the setup script does not re-run when a
+#     later commit bumps the pins — so after a pin bump every routine used to
+#     refuse at this guard until someone forced the environment to rebuild
+#     (2026-09-29: snapshot from 2026-09-24 held bd 1.2.2 / dolt 2.3.1, pins
+#     bumped to 1.3.0 / 2.3.5 on 2026-09-26 by #2271). On any mismatch, run the
+#     repo's own setup script once. It installs EXACTLY the pinned versions and
+#     verifies each archive against the approved SHA-256 digests before
+#     installing anything, so this can never pull in an unpinned (newer) bd —
+#     the failure the exact pin exists to prevent. Whatever setup's exit code,
+#     the guards below re-check the actual binaries and refuse any mismatch.
+#     Setup fetches all three pinned archives (bd, dolt, gh) before installing
+#     any, so a bad gh pin also blocks this repair — loudly.
+SETUP_SCRIPT="$SCRIPT_DIR/beads-cloud-setup.sh"
+if [[ "$bd_ver" != "$BD_PINNED_VERSION" || "$dolt_ver" != "$DOLT_PINNED_VERSION" ]]; then
+  log "installed bd ${bd_ver:-<none>} / dolt ${dolt_ver:-<none>} != pinned bd $BD_PINNED_VERSION / dolt $DOLT_PINNED_VERSION — stale environment snapshot?"
+  log "installing the pinned, checksum-verified binaries via $(basename "$SETUP_SCRIPT")"
+  if [[ -f "$SETUP_SCRIPT" ]] && bash "$SETUP_SCRIPT"; then
+    hash -r
+  else
+    log "setup script failed — re-checking the installed versions anyway"
+  fi
+  probe_versions
+fi
 
 # 2. bd GUARD. Exact-pin — refuse anything else, newer OR older.
+[[ -n "$bd_ver" ]] \
+  || die "could not parse a version from 'bd version' (missing binary, missing libicu, a broken binary, or a changed output format): $bd_raw"
 if [[ "$bd_ver" != "$BD_PINNED_VERSION" ]]; then
-  die "bd $bd_ver != pinned $BD_PINNED_VERSION — refusing to touch the shared beads DB.
+  die "bd $bd_ver != pinned $BD_PINNED_VERSION even after running $(basename "$SETUP_SCRIPT") — refusing to touch the shared beads DB.
        If this is a deliberate upgrade, bump \"bd\" in scripts/beads-compatibility.json.
-       Do NOT install, build, or 'upgrade' bd inside a cloud routine to get past this."
+       Do NOT install, build, or 'upgrade' bd by any other route to get past this."
 fi
 log "bd $bd_ver matches pin — proceeding"
 
-# 2b. dolt must be installed and match exact pinned version.
-command -v dolt >/dev/null 2>&1 \
-  || die "dolt not found on PATH — the environment setup script should install it"
-dolt_raw="$(dolt version 2>&1 || true)"
-dolt_ver="$(printf '%s\n' "$dolt_raw" | sed -nE 's/^dolt version ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' | head -n1 || true)"
+# 2b. dolt GUARD. Exact-pin, same rule.
 [[ -n "$dolt_ver" ]] \
-  || die "could not parse a version from 'dolt version' (a broken binary or changed output format): $dolt_raw"
-
+  || die "could not parse a version from 'dolt version' (missing binary, a broken binary, or a changed output format): $dolt_raw"
 if [[ "$dolt_ver" != "$DOLT_PINNED_VERSION" ]]; then
-  die "dolt $dolt_ver != pinned $DOLT_PINNED_VERSION — refusing to touch the shared beads DB.
+  die "dolt $dolt_ver != pinned $DOLT_PINNED_VERSION even after running $(basename "$SETUP_SCRIPT") — refusing to touch the shared beads DB.
        If this is a deliberate upgrade, bump \"dolt\" in scripts/beads-compatibility.json.
-       Do NOT install, build, or 'upgrade' dolt inside a cloud routine to get past this."
+       Do NOT install, build, or 'upgrade' dolt by any other route to get past this."
 fi
 log "dolt $dolt_ver matches pin — proceeding"
 

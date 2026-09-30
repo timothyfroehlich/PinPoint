@@ -274,3 +274,138 @@ class TestCloudSetupVerification:
         assert "unsupported cloud platform Linux/riscv64" in proc.stderr
         assert list(install_dir.iterdir()) == []
         assert not calls_file.exists()
+
+
+def prepare_cloud_init_harness(
+    tmp_path: Path,
+    *,
+    installed_bd: str | None,
+    installed_dolt: str | None,
+    corrupt_bd: bool = False,
+) -> tuple[Path, dict[str, str], Path]:
+    """Stage init beside setup, with the given bd/dolt already "installed".
+
+    The staged setup script installs the manifest's pinned stubs through the
+    same local-archive harness as TestCloudSetupVerification, so a self-heal
+    run never touches the network or the real /usr/local/bin.
+    """
+    setup_script, env, install_dir, calls_file = prepare_cloud_setup_harness(
+        tmp_path, corrupt_bd=corrupt_bd
+    )
+    init_script = setup_script.parent / INIT_SCRIPT.name
+    shutil.copy2(INIT_SCRIPT, init_script)
+
+    if installed_bd is not None:
+        write_executable(
+            install_dir / "bd", f"#!/bin/sh\necho 'bd version {installed_bd}'\n"
+        )
+    if installed_dolt is not None:
+        write_executable(
+            install_dir / "dolt", f"#!/bin/sh\necho 'dolt version {installed_dolt}'\n"
+        )
+
+    home = tmp_path / "home"
+    home.mkdir()
+    env = {
+        key: value
+        for key, value in env.items()
+        if key not in {"DOLT_CREDS_JWK", "DOLT_CREDS_PUB", "BEADS_SYNC_REMOTE"}
+    }
+    # A sanitized PATH: the installed dir first (as /usr/local/bin is in the
+    # cloud image), then the command stubs, then only system dirs. The host
+    # PATH is dropped so a real bd/dolt already installed on the machine
+    # running the tests can never satisfy the probe in setup's place.
+    stub_dir = env["PATH"].split(":", 1)[0]
+    env["PATH"] = f"{install_dir}:{stub_dir}:/usr/bin:/bin"
+    env["HOME"] = str(home)
+    return init_script, env, calls_file
+
+
+class TestCloudInitSelfHeal:
+    """Init re-runs setup on a pin mismatch, then enforces the exact pins.
+
+    Every case stops at the credential check (no DOLT_CREDS_JWK in the test
+    env), which is the first step after the version guards — reaching it
+    means the guards passed, and nothing touches a real beads DB.
+    """
+
+    @pytest.fixture
+    def pins(self) -> dict[str, str]:
+        return json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+
+    def test_matching_pins_do_not_run_setup(self, tmp_path: Path, pins):
+        init_script, env, calls_file = prepare_cloud_init_harness(
+            tmp_path, installed_bd=pins["bd"], installed_dolt=pins["dolt"]
+        )
+
+        proc = subprocess.run(
+            ["bash", str(init_script)], env=env, capture_output=True, text=True
+        )
+
+        assert "DOLT_CREDS_JWK not set" in proc.stderr, proc.stderr
+        assert not calls_file.exists()
+
+    def test_stale_snapshot_installs_pins_then_proceeds(self, tmp_path: Path, pins):
+        init_script, env, calls_file = prepare_cloud_init_harness(
+            tmp_path, installed_bd="0.0.1", installed_dolt="0.0.1"
+        )
+
+        proc = subprocess.run(
+            ["bash", str(init_script)], env=env, capture_output=True, text=True
+        )
+
+        assert "stale environment snapshot?" in proc.stderr
+        assert f"bd {pins['bd']} matches pin" in proc.stderr
+        assert f"dolt {pins['dolt']} matches pin" in proc.stderr
+        assert "DOLT_CREDS_JWK not set" in proc.stderr, proc.stderr
+        calls = calls_file.read_text(encoding="utf-8").splitlines()
+        assert sum(call.startswith("install ") for call in calls) == 3
+
+    def test_missing_binaries_are_installed(self, tmp_path: Path, pins):
+        init_script, env, calls_file = prepare_cloud_init_harness(
+            tmp_path, installed_bd=None, installed_dolt=None
+        )
+
+        proc = subprocess.run(
+            ["bash", str(init_script)], env=env, capture_output=True, text=True
+        )
+
+        assert f"bd {pins['bd']} matches pin" in proc.stderr
+        assert "DOLT_CREDS_JWK not set" in proc.stderr, proc.stderr
+        calls = calls_file.read_text(encoding="utf-8").splitlines()
+        assert sum(call.startswith("install ") for call in calls) == 3
+
+    def test_stale_binary_shadowing_the_install_dir_still_refuses(self, tmp_path: Path):
+        init_script, env, calls_file = prepare_cloud_init_harness(
+            tmp_path, installed_bd="0.0.1", installed_dolt="0.0.1"
+        )
+        shadow_dir = tmp_path / "shadow"
+        shadow_dir.mkdir()
+        write_executable(shadow_dir / "bd", "#!/bin/sh\necho 'bd version 0.0.2'\n")
+        env["PATH"] = f"{shadow_dir}:{env['PATH']}"
+
+        proc = subprocess.run(
+            ["bash", str(init_script)], env=env, capture_output=True, text=True
+        )
+
+        assert proc.returncode != 0
+        calls = calls_file.read_text(encoding="utf-8").splitlines()
+        assert sum(call.startswith("install ") for call in calls) == 3
+        assert "bd 0.0.2 != pinned" in proc.stderr
+        assert "DOLT_CREDS_JWK" not in proc.stderr
+
+    def test_failed_setup_still_refuses(self, tmp_path: Path):
+        init_script, env, _ = prepare_cloud_init_harness(
+            tmp_path, installed_bd="0.0.1", installed_dolt="0.0.1", corrupt_bd=True
+        )
+
+        proc = subprocess.run(
+            ["bash", str(init_script)], env=env, capture_output=True, text=True
+        )
+
+        assert proc.returncode != 0
+        assert "SHA-256 mismatch for bd.tgz" in proc.stderr
+        assert "setup script failed" in proc.stderr
+        assert "bd 0.0.1 != pinned" in proc.stderr
+        assert "refusing to touch the shared beads DB" in proc.stderr
+        assert "DOLT_CREDS_JWK" not in proc.stderr
