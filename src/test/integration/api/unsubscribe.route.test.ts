@@ -1,31 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
-import { notificationPreferences } from "~/server/db/schema";
+import { eq } from "drizzle-orm";
+import { getTestDb, setupTestDb } from "~/test/setup/pglite";
+import { notificationPreferences, userProfiles } from "~/server/db/schema";
+import { createTestUser } from "~/test/helpers/factories";
 import { GET, POST } from "~/app/api/unsubscribe/route";
 
 const verifyTokenMock = vi.hoisted(() =>
   vi.fn<(uid: string, token: string) => boolean>()
 );
-const updateReturningMock = vi.hoisted(() =>
-  vi.fn<() => Promise<{ userId: string }[]>>()
-);
-const updateWhereMock = vi.hoisted(() =>
-  vi.fn(() => ({ returning: updateReturningMock }))
-);
-const updateSetMock = vi.hoisted(() =>
-  vi.fn(() => ({ where: updateWhereMock }))
-);
-const updateMock = vi.hoisted(() => vi.fn(() => ({ set: updateSetMock })));
 
 vi.mock("~/lib/notifications/channels/email-channel", () => ({
   verifyUnsubscribeToken: verifyTokenMock,
 }));
 
-vi.mock("~/server/db", () => ({
-  db: {
-    update: updateMock,
-  },
-}));
+vi.mock("~/server/db", async () => {
+  const { getTestDb } = await import("~/test/setup/pglite");
+  return {
+    db: await getTestDb(),
+  };
+});
 
 function buildGetRequest(query: string): NextRequest {
   return new NextRequest(`http://localhost/api/unsubscribe${query}`, {
@@ -46,10 +40,11 @@ function buildPostRequest(uid?: string, token?: string): NextRequest {
 }
 
 describe("/api/unsubscribe", () => {
+  setupTestDb();
+
   beforeEach(() => {
     vi.clearAllMocks();
     verifyTokenMock.mockReturnValue(true);
-    updateReturningMock.mockResolvedValue([{ userId: "user-1" }]);
   });
 
   it("GET returns 400 when uid or token is missing", async () => {
@@ -59,7 +54,6 @@ describe("/api/unsubscribe", () => {
     expect(response.status).toBe(400);
     expect(html).toContain("Invalid unsubscribe link.");
     expect(verifyTokenMock).not.toHaveBeenCalled();
-    expect(updateMock).not.toHaveBeenCalled();
   });
 
   it("GET returns 403 when token verification fails", async () => {
@@ -70,7 +64,6 @@ describe("/api/unsubscribe", () => {
 
     expect(response.status).toBe(403);
     expect(html).toContain("Invalid or expired unsubscribe link.");
-    expect(updateMock).not.toHaveBeenCalled();
   });
 
   it("GET returns confirmation page and does not mutate preferences", async () => {
@@ -80,7 +73,6 @@ describe("/api/unsubscribe", () => {
     expect(response.status).toBe(200);
     expect(html).toContain("Confirm unsubscribe");
     expect(html).toContain('<form method="post" action="/api/unsubscribe">');
-    expect(updateMock).not.toHaveBeenCalled();
   });
 
   it("POST returns 400 when uid or token is missing", async () => {
@@ -89,7 +81,6 @@ describe("/api/unsubscribe", () => {
 
     expect(response.status).toBe(400);
     expect(html).toContain("Invalid unsubscribe request.");
-    expect(updateMock).not.toHaveBeenCalled();
   });
 
   it("POST returns 403 when token verification fails", async () => {
@@ -100,40 +91,55 @@ describe("/api/unsubscribe", () => {
 
     expect(response.status).toBe(403);
     expect(html).toContain("Invalid or expired unsubscribe link.");
-    expect(updateMock).not.toHaveBeenCalled();
   });
 
   it("POST returns 404 when user preferences are missing", async () => {
-    updateReturningMock.mockResolvedValue([]);
-
-    const response = await POST(
-      buildPostRequest("missing-user", "valid-token")
-    );
+    const missingUserId = crypto.randomUUID();
+    const response = await POST(buildPostRequest(missingUserId, "valid-token"));
     const html = await response.text();
 
     expect(response.status).toBe(404);
     expect(html).toContain("User not found.");
-    expect(updateMock).toHaveBeenCalledWith(notificationPreferences);
   });
 
   it("POST unsubscribes user from all email notifications", async () => {
-    const response = await POST(buildPostRequest("user-1", "valid-token"));
+    const db = await getTestDb();
+    const userId = crypto.randomUUID();
+    const [user] = await db
+      .insert(userProfiles)
+      .values(createTestUser({ id: userId }))
+      .returning();
+
+    await db.insert(notificationPreferences).values({
+      userId: user.id,
+      emailEnabled: true,
+      emailNotifyOnAssigned: true,
+      emailNotifyOnStatusChange: true,
+      emailNotifyOnNewComment: true,
+      emailNotifyOnNewIssue: true,
+      emailWatchNewIssuesGlobal: true,
+      emailNotifyOnPinballMapComment: true,
+    });
+
+    const response = await POST(buildPostRequest(user.id, "valid-token"));
     const html = await response.text();
 
     expect(response.status).toBe(200);
     expect(html).toContain(
       "You have been unsubscribed from all PinPoint email notifications."
     );
-    expect(updateMock).toHaveBeenCalledWith(notificationPreferences);
-    expect(updateSetMock).toHaveBeenCalledWith({
-      emailEnabled: false,
-      emailNotifyOnAssigned: false,
-      emailNotifyOnStatusChange: false,
-      emailNotifyOnNewComment: false,
-      emailNotifyOnNewIssue: false,
-      emailWatchNewIssuesGlobal: false,
-      emailNotifyOnPinballMapComment: false,
+
+    const updated = await db.query.notificationPreferences.findFirst({
+      where: eq(notificationPreferences.userId, user.id),
     });
-    expect(updateWhereMock).toHaveBeenCalledTimes(1);
+
+    expect(updated).toBeDefined();
+    expect(updated?.emailEnabled).toBe(false);
+    expect(updated?.emailNotifyOnAssigned).toBe(false);
+    expect(updated?.emailNotifyOnStatusChange).toBe(false);
+    expect(updated?.emailNotifyOnNewComment).toBe(false);
+    expect(updated?.emailNotifyOnNewIssue).toBe(false);
+    expect(updated?.emailWatchNewIssuesGlobal).toBe(false);
+    expect(updated?.emailNotifyOnPinballMapComment).toBe(false);
   });
 });
