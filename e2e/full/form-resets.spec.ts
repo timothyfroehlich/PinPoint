@@ -171,7 +171,9 @@ test.describe("CREATE form resets", () => {
 
     await page.goto("/m/new");
 
-    await page.getByLabel("Machine Name", { exact: true }).fill(name);
+    await page
+      .getByRole("textbox", { name: "Machine Name", exact: true })
+      .fill(name);
     // Label reads "Initials (cannot be changed later) *" — match on the stem.
     await page.getByLabel(/Initials/i).fill(initials);
 
@@ -184,9 +186,9 @@ test.describe("CREATE form resets", () => {
 
     // Re-visit /m/new — all fields must be empty (no leaked state).
     await page.goto("/m/new");
-    await expect(page.getByLabel("Machine Name", { exact: true })).toHaveValue(
-      ""
-    );
+    await expect(
+      page.getByRole("textbox", { name: "Machine Name", exact: true })
+    ).toHaveValue("");
     await expect(page.getByLabel(/Initials/i)).toHaveValue("");
   });
 

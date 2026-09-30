@@ -339,32 +339,38 @@ export default async function MachineEditPage({
 
   // A member without `machines.edit` may still open the tab for the read-only
   // Pinball Map control (pinballmap 4.9): no form, no Danger zone, and so no
-  // section list.
+  // section list. The provider stays: the Pinball Map block reads it, and
+  // with no form it never reports unsaved changes.
   if (!canEdit) {
     return (
-      <div className="@container max-w-4xl space-y-5">
-        <section className="space-y-4" aria-labelledby="section-pinballmap">
-          <h2 id="section-pinballmap" className="sr-only">
-            Pinball Map
-          </h2>
-          {machine.pinballmapExcluded ? (
-            <p
-              className="text-sm text-muted-foreground"
-              data-testid="pbm-listing-collapsed"
-            >
-              <span className="font-semibold text-foreground">Pinball Map</span>{" "}
-              — integration disabled. Requires a model listed in their catalog.
-            </p>
-          ) : null}
-          {pinballmapBlock}
-        </section>
-        <ApronCardPanel
-          machine={machine}
-          variant="row"
-          canEdit={canEdit}
-          canExport={checkPermission("machines.apron.export", accessLevel)}
-        />
-      </div>
+      <DetailsDirtyProvider>
+        <div className="@container max-w-4xl space-y-5">
+          <section className="space-y-4" aria-labelledby="section-pinballmap">
+            <h2 id="section-pinballmap" className="sr-only">
+              Pinball Map
+            </h2>
+            {machine.pinballmapExcluded ? (
+              <p
+                className="text-sm text-muted-foreground"
+                data-testid="pbm-listing-collapsed"
+              >
+                <span className="font-semibold text-foreground">
+                  Pinball Map
+                </span>{" "}
+                — integration disabled. Requires a model listed in their
+                catalog.
+              </p>
+            ) : null}
+            {pinballmapBlock}
+          </section>
+          <ApronCardPanel
+            machine={machine}
+            variant="row"
+            canEdit={canEdit}
+            canExport={checkPermission("machines.apron.export", accessLevel)}
+          />
+        </div>
+      </DetailsDirtyProvider>
     );
   }
 
