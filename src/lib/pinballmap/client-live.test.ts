@@ -477,6 +477,28 @@ describe("live client — auth", () => {
     });
   });
 
+  it("authDetails POSTs the login and password in the body, never the URL", async () => {
+    const calls = installFetchMock(() =>
+      json({
+        user: {
+          username: "ssw",
+          email: "yeah@ok.com",
+          authentication_token: "t",
+        },
+      })
+    );
+    await createLiveClient(null).authDetails("ssw", "hunter2");
+    expect(calls[0]?.init?.method).toBe("POST");
+    expect(calls[0]?.url).not.toContain("hunter2");
+    expect(new URL(calls[0]?.url ?? "").search).toBe("");
+    const body = calls[0]?.init?.body;
+    expect(body).toBeInstanceOf(URLSearchParams);
+    if (body instanceof URLSearchParams) {
+      expect(body.get("login")).toBe("ssw");
+      expect(body.get("password")).toBe("hunter2");
+    }
+  });
+
   it("authDetails keeps the password out of every log line", async () => {
     const warn = vi.spyOn(log, "warn").mockImplementation(() => undefined);
     installFetchMock(() => {
@@ -537,8 +559,13 @@ describe("live client — writes", () => {
     const url = new URL(calls[0]?.url ?? "");
     expect(calls[0]?.init?.method).toBe("POST");
     expect(url.pathname).toContain("/location_machine_xrefs.json");
-    expect(url.searchParams.get("user_email")).toBe(CREDS.email);
-    expect(url.searchParams.get("user_token")).toBe(CREDS.token);
+    // The member's identity rides in headers, never the URL (llms.txt).
+    expect(calls[0]?.init?.headers).toMatchObject({
+      "X-User-Email": CREDS.email,
+      "X-User-Token": CREDS.token,
+    });
+    expect(calls[0]?.url).not.toContain(CREDS.token);
+    expect(calls[0]?.url).not.toContain("user_email");
     expect(url.searchParams.get("location_id")).toBe("26454");
     expect(url.searchParams.get("machine_id")).toBe("10");
   });
@@ -766,7 +793,7 @@ describe("live client — api token gate (X-Api-Token)", () => {
     expect(calls[0]?.init?.headers).toMatchObject({ "X-Api-Token": API_TOKEN });
   });
 
-  it("attaches X-Api-Token on writes (alongside the operator creds)", async () => {
+  it("attaches X-Api-Token on writes (alongside the member's creds)", async () => {
     const calls = installFetchMock(() =>
       json({ location_machine: { id: 1 } }, 201)
     );
@@ -775,11 +802,12 @@ describe("live client — api token gate (X-Api-Token)", () => {
       locationId: 26454,
       machineId: 10,
     });
-    // The blanket access gate rides in the header; the operator identity still
-    // rides in the query string — two distinct auth layers.
-    expect(calls[0]?.init?.headers).toMatchObject({ "X-Api-Token": API_TOKEN });
-    const url = new URL(calls[0]?.url ?? "");
-    expect(url.searchParams.get("user_token")).toBe(CREDS.token);
+    // Two distinct auth layers, both in headers: the blanket access gate and
+    // the member's identity.
+    expect(calls[0]?.init?.headers).toMatchObject({
+      "X-Api-Token": API_TOKEN,
+      "X-User-Token": CREDS.token,
+    });
   });
 
   it("omits X-Api-Token entirely when unprovisioned (token null)", async () => {

@@ -5,9 +5,9 @@ import "server-only";
  *
  * From the July 30 2026 gate, PBM's `REQUIRE_API_TOKEN` flips on and EVERY v1
  * endpoint — reads included — requires this token (blog 2026-07-16; CORE-PBM-001,
- * PP-uusr). It is a DISTINCT layer from the per-operator write creds
- * (`user_email`/`user_token`): the api_token gates access, the operator creds
- * identify the writer. The live client sends it as the `X-Api-Token` header on
+ * PP-uusr). It is a DISTINCT layer from the member's write creds
+ * (`X-User-Email`/`X-User-Token`): the api_token gates access, the member's
+ * creds identify the writer. The live client sends it as the `X-Api-Token` header on
  * every request.
  *
  * The token is a **platform capability, not tenant data** — PBM issues it to an

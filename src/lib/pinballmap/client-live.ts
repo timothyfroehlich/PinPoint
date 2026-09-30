@@ -50,8 +50,11 @@ import type {
  *   PBM's `REQUIRE_API_TOKEN` gate flips on July 30 2026 (CORE-PBM-001, PP-uusr).
  *   The token is injected at construction (`createLiveClient(apiToken)`) — null
  *   until the integration is provisioned, in which case the header is omitted.
- * - writes ALSO append `user_email`/`user_token` (the per-operator identity) as
- *   query params — a distinct auth layer from the api_token access gate
+ * - writes ALSO send the member's identity as `X-User-Email`/`X-User-Token`
+ *   headers — a distinct auth layer from the api_token access gate. Headers,
+ *   not query params, so a token never lands in a URL that PBM, a proxy, or
+ *   an analytics log would record (pbm `ApplicationController#authenticate_from_token`
+ *   reads either; llms.txt prefers headers)
  * - identify ourselves with a descriptive User-Agent
  * - back off on 429 within a small budget, then report `rate_limited`
  * - serialize writes so we never fire concurrent mutations at PBM
@@ -63,8 +66,9 @@ import type {
  * So we classify success/failure from the body, never from `res.ok` alone.
  * Contract source: pinballmap/pbm spec (see docs/external/README.md).
  *
- * SECURITY: write/auth URLs carry credentials in the query string, so we never
- * log the full URL — only a redacted path label.
+ * SECURITY: no credential rides in a URL — member tokens go in headers and the
+ * sign-in exchange POSTs its password in the body. Logs still carry only a
+ * path label, never the full URL.
  */
 
 const MAX_RETRY_AFTER_SECONDS = 5;
@@ -94,14 +98,10 @@ function regionSegment(region: string): string {
   return encodeURIComponent(region.trim().toLowerCase());
 }
 
-function credsQuery(
-  credentials: PbmCredentials,
-  extra?: Record<string, string>
-): Record<string, string> {
+function credsHeaders(credentials: PbmCredentials): Record<string, string> {
   return {
-    user_email: credentials.email,
-    user_token: credentials.token,
-    ...(extra ?? {}),
+    "X-User-Email": credentials.email,
+    "X-User-Token": credentials.token,
   };
 }
 
@@ -275,10 +275,12 @@ type WriteOutcome =
 async function writeRequest(
   method: "POST" | "PUT" | "DELETE",
   url: string,
+  credentials: PbmCredentials,
   label: string,
   apiToken: string | null
 ): Promise<WriteOutcome> {
-  let res = await safeFetch(url, { method }, label, apiToken);
+  const init: RequestInit = { method, headers: credsHeaders(credentials) };
+  let res = await safeFetch(url, init, label, apiToken);
   if (res.status === 429) {
     const retryAfter = parseRetryAfter(res);
     if (retryAfter > MAX_RETRY_AFTER_SECONDS) {
@@ -289,7 +291,7 @@ async function writeRequest(
       return writeFailure("rate_limited");
     }
     await sleep(retryAfter * 1000);
-    res = await safeFetch(url, { method }, label, apiToken);
+    res = await safeFetch(url, init, label, apiToken);
     if (res.status === 429) return writeFailure("rate_limited");
   }
   // Network error (599) or server error: retry later.
@@ -596,13 +598,13 @@ export function createLiveClient(apiToken: string | null): PinballMapClient {
 
     async authDetails(login: string, password: string): Promise<PbmAuthResult> {
       assertNotInTransaction("pinballmap.authDetails");
-      // Credentials in the query string — never log this URL. Pinball Map
-      // routes auth_details as GET only (pbm config/routes.rb), so the
-      // password cannot move to a request body.
-      const url = buildUrl(`/users/auth_details.json`, { login, password });
+      // The password goes in the POST body, never the query string, so no URL
+      // PBM, a proxy, or an analytics log records ever carries it (pbm
+      // e0e1ca7217 added POST to `auth_details`; GET is deprecated there).
+      // URLSearchParams sends it form-encoded, which Rails reads into `params`.
       const res = await safeFetch(
-        url,
-        { method: "GET" },
+        buildUrl(`/users/auth_details.json`),
+        { method: "POST", body: new URLSearchParams({ login, password }) },
         "authDetails",
         apiToken
       );
@@ -663,14 +665,17 @@ export function createLiveClient(apiToken: string | null): PinballMapClient {
     }): Promise<PbmAddMachineResult> {
       assertNotInTransaction("pinballmap.addMachine");
       return serializeWrite(async () => {
-        const url = buildUrl(
-          `/location_machine_xrefs.json`,
-          credsQuery(credentials, {
-            location_id: String(locationId),
-            machine_id: String(machineId),
-          })
+        const url = buildUrl(`/location_machine_xrefs.json`, {
+          location_id: String(locationId),
+          machine_id: String(machineId),
+        });
+        const outcome = await writeRequest(
+          "POST",
+          url,
+          credentials,
+          "addMachine",
+          apiToken
         );
-        const outcome = await writeRequest("POST", url, "addMachine", apiToken);
         if (!outcome.ok) return outcome;
         // Success body wraps the lmx: {"location_machine": {"id": ...}}.
         const lmx = asRecord(outcome.body?.["location_machine"]);
@@ -688,12 +693,15 @@ export function createLiveClient(apiToken: string | null): PinballMapClient {
     removeMachine({ credentials, lmxId }): Promise<PbmWriteResult> {
       assertNotInTransaction("pinballmap.removeMachine");
       return serializeWrite(async () => {
-        const url = buildUrl(
-          `/location_machine_xrefs/${lmxId}.json`,
-          credsQuery(credentials)
-        );
+        const url = buildUrl(`/location_machine_xrefs/${lmxId}.json`);
         return toWriteResult(
-          await writeRequest("DELETE", url, "removeMachine", apiToken)
+          await writeRequest(
+            "DELETE",
+            url,
+            credentials,
+            "removeMachine",
+            apiToken
+          )
         );
       });
     },
@@ -701,12 +709,11 @@ export function createLiveClient(apiToken: string | null): PinballMapClient {
     postCondition({ credentials, lmxId, comment }): Promise<PbmWriteResult> {
       assertNotInTransaction("pinballmap.postCondition");
       return serializeWrite(async () => {
-        const url = buildUrl(
-          `/location_machine_xrefs/${lmxId}.json`,
-          credsQuery(credentials, { condition: comment })
-        );
+        const url = buildUrl(`/location_machine_xrefs/${lmxId}.json`, {
+          condition: comment,
+        });
         return toWriteResult(
-          await writeRequest("PUT", url, "postCondition", apiToken)
+          await writeRequest("PUT", url, credentials, "postCondition", apiToken)
         );
       });
     },
@@ -722,11 +729,12 @@ export function createLiveClient(apiToken: string | null): PinballMapClient {
         // (PBM request spec "it should toggle via the ic_enabled param").
         const url = buildUrl(
           `/location_machine_xrefs/${lmxId}/ic_toggle.json`,
-          credsQuery(credentials, { ic_enabled: enabled ? "true" : "false" })
+          { ic_enabled: enabled ? "true" : "false" }
         );
         const outcome = await writeRequest(
           "PUT",
           url,
+          credentials,
           "setInsiderConnected",
           apiToken
         );
@@ -741,12 +749,9 @@ export function createLiveClient(apiToken: string | null): PinballMapClient {
     confirmLineup({ credentials, locationId }): Promise<PbmWriteResult> {
       assertNotInTransaction("pinballmap.confirmLineup");
       return serializeWrite(async () => {
-        const url = buildUrl(
-          `/locations/${locationId}/confirm.json`,
-          credsQuery(credentials)
-        );
+        const url = buildUrl(`/locations/${locationId}/confirm.json`);
         return toWriteResult(
-          await writeRequest("PUT", url, "confirmLineup", apiToken)
+          await writeRequest("PUT", url, credentials, "confirmLineup", apiToken)
         );
       });
     },

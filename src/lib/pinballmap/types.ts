@@ -170,7 +170,7 @@ export interface PinballMapRegion {
   formalName: string;
 }
 
-/** Per-user PBM credentials appended to write requests as query params. */
+/** Per-user PBM credentials, sent on write requests as `X-User-*` headers. */
 export interface PbmCredentials {
   email: string;
   token: string;
