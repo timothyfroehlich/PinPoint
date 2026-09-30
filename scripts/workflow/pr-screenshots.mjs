@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// scripts/workflow/pr-screenshots.mjs — desktop+mobile screenshots for a PR.
+// scripts/workflow/pr-screenshots.mjs — desktop + two mobile screenshots for a PR.
 //
 // PP-wi85: UI-touching PRs must have screenshots posted before handoff to Tim
 // so he can eyeball them before the merge (which is his decision — he approves
 // the merge-pr.sh prompt, PP-wi85). This script
-// shoots a manifest of key pages at two viewports, pushes the PNGs to a
+// shoots a manifest of key pages at three viewports, pushes the PNGs to a
 // dedicated orphan `pr-screenshots` branch (repo is public, so raw.githubusercontent.com
 // URLs render inline in the PR comment), and posts/updates one sticky PR comment.
 //
@@ -87,9 +87,12 @@ const STORAGE_STATE = {
   technician: join(REPO_ROOT, "e2e/.auth/technician.json"),
 };
 
+// The review viewports from pinpoint-design-bible §4. Small mobile (320px) is
+// the layout floor: a member runs their phone zoomed in.
 const VIEWPORTS = {
-  desktop: { width: 1440, height: 900 },
-  mobile: { width: 390, height: 844 },
+  desktop: { width: 1440, height: 900, label: "Desktop (1440×900)" },
+  "mobile-large": { width: 430, height: 932, label: "Large mobile (430×932)" },
+  "mobile-small": { width: 320, height: 568, label: "Small mobile (320×568)" },
 };
 
 const SCREENSHOTS_BRANCH = "pr-screenshots";
@@ -231,10 +234,10 @@ async function captureScreenshots(browserType, baseUrl, pages, workDir) {
 
   try {
     for (const role of rolesNeeded) {
-      for (const [vpName, vp] of Object.entries(VIEWPORTS)) {
+      for (const [vpName, { width, height }] of Object.entries(VIEWPORTS)) {
         const ctx = await browser.newContext({
           storageState: STORAGE_STATE[role],
-          viewport: vp,
+          viewport: { width, height },
           baseURL: baseUrl,
         });
         contexts.set(`${role}:${vpName}`, ctx);
@@ -420,25 +423,25 @@ function buildCommentBody(repoSlug, pr, shortSha, captured) {
   const byPage = new Map();
   for (const shot of captured) {
     if (!byPage.has(shot.id))
-      byPage.set(shot.id, { label: shot.label, desktop: null, mobile: null });
-    byPage.get(shot.id)[shot.vpName] = shot.fileName;
+      byPage.set(shot.id, { label: shot.label, files: {} });
+    byPage.get(shot.id).files[shot.vpName] = shot.fileName;
   }
 
   const rawBase = `https://raw.githubusercontent.com/${repoSlug}/${SCREENSHOTS_BRANCH}/pr-${pr}/${shortSha}`;
+  const vpNames = Object.keys(VIEWPORTS);
 
-  const sections = [...byPage.values()].map(({ label, desktop, mobile }) => {
-    const desktopCell = desktop
-      ? `![desktop](${rawBase}/${desktop})`
-      : "_capture failed_";
-    const mobileCell = mobile
-      ? `![mobile](${rawBase}/${mobile})`
-      : "_capture failed_";
+  const sections = [...byPage.values()].map(({ label, files }) => {
+    const cells = vpNames.map((vpName) =>
+      files[vpName]
+        ? `![${vpName}](${rawBase}/${files[vpName]})`
+        : "_capture failed_"
+    );
     return [
       `### ${label}`,
       "",
-      "| Desktop (1440×900) | Mobile (390×844) |",
-      "| --- | --- |",
-      `| ${desktopCell} | ${mobileCell} |`,
+      `| ${vpNames.map((vpName) => VIEWPORTS[vpName].label).join(" | ")} |`,
+      `| ${vpNames.map(() => "---").join(" | ")} |`,
+      `| ${cells.join(" | ")} |`,
       "",
     ].join("\n");
   });
