@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
+import { useHydrated } from "~/hooks/use-hydrated";
 import { useDetailsDirty } from "./details-dirty";
 import {
   AlertDialog,
@@ -43,6 +44,7 @@ import {
   getMachinePresenceLabel,
   type MachinePresenceStatus,
 } from "~/lib/machines/presence";
+import type { OpdbDisplayType, OpdbMachineType } from "~/lib/opdb/types";
 
 export interface MachineDetailsFormProps {
   machineId: string;
@@ -58,6 +60,11 @@ export interface MachineDetailsFormProps {
   modelName: string | null;
   manufacturer: string | null;
   year: number | null;
+  type: OpdbMachineType | null;
+  display: OpdbDisplayType | null;
+  playerCount: number | null;
+  designers: string[] | null;
+  artists: string[] | null;
   /** Linked iScored game ID string, or null if unlinked. */
   iscoredGameId: string | null;
 }
@@ -89,12 +96,19 @@ export function MachineDetailsForm({
   modelName,
   manufacturer,
   year,
+  type,
+  display,
+  playerCount,
+  designers,
+  artists,
   iscoredGameId,
 }: MachineDetailsFormProps): React.JSX.Element {
   const [state, formAction, isPending] = useActionState<
     UpdateMachineResult | undefined,
     FormData
   >(updateMachineAction, undefined);
+
+  const isHydrated = useHydrated();
 
   // Dirtiness lives in a context rather than local state because the Pinball
   // Map section below reads it too — this form owns the PBM link, so its
@@ -318,7 +332,9 @@ export function MachineDetailsForm({
       <form
         key={resetKey}
         ref={formRef}
+        method="post"
         // No `action={formAction}` on purpose — see `handleSubmit` (PP-1ajq).
+        // `method="post"` prevents fallback to native GET before hydration (PP-aeei).
         onSubmit={handleSubmit}
         // Any native input event marks the section dirty. Radix Select changes
         // do not bubble `input`, so Availability flags dirtiness explicitly.
@@ -400,6 +416,11 @@ export function MachineDetailsForm({
             defaultModelName={modelName}
             defaultManufacturer={manufacturer}
             defaultYear={year}
+            defaultType={type}
+            defaultDisplay={display}
+            defaultPlayerCount={playerCount}
+            defaultDesigners={designers}
+            defaultArtists={artists}
             // The Model name's placeholder — the live input, not the stored
             // prop, so a rename in the same unsaved edit previews the name a
             // blank model will actually resolve to.
@@ -413,6 +434,7 @@ export function MachineDetailsForm({
         )}
 
         <IscoredGamePicker
+          machineId={machineId}
           defaultGameId={iscoredGameId}
           machineName={liveName}
           onDirty={markDirty}
@@ -462,6 +484,7 @@ export function MachineDetailsForm({
           <Button
             type="submit"
             className="bg-primary text-on-primary hover:bg-primary/90"
+            disabled={!isHydrated || isPending}
             loading={isPending}
           >
             Save details

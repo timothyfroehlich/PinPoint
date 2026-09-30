@@ -4,6 +4,7 @@ import type React from "react";
 import { useState, useRef, useEffect, startTransition } from "react";
 import Link from "next/link";
 import { useActionState } from "react";
+import { useHydrated } from "~/hooks/use-hydrated";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
@@ -47,12 +48,17 @@ interface CreateMachineFormProps {
   allUsers: OwnerSelectUser[];
   canSelectOwner: boolean;
   iscoredConfigured?: boolean;
+  initialName?: string | undefined;
+  /** Pinball Map title to preselect in the Model field. */
+  initialPinballmap?: { id: number; name: string } | undefined;
 }
 
 export function CreateMachineForm({
   allUsers,
   canSelectOwner,
   iscoredConfigured = false,
+  initialName,
+  initialPinballmap,
 }: CreateMachineFormProps): React.JSX.Element {
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, isPending] = useActionState<
@@ -64,7 +70,7 @@ export function CreateMachineForm({
   const [users, setUsers] = useState<OwnerSelectUser[]>(allUsers);
 
   // Controlled field values so they survive re-renders after server action errors
-  const [nameValue, setNameValue] = useState("");
+  const [nameValue, setNameValue] = useState(initialName ?? "");
   const [initialsValue, setInitialsValue] = useState("");
   const [ownerIdValue, setOwnerIdValue] = useState("");
   // Bumped on reset to remount OwnerSelect (which holds its own internal state).
@@ -72,6 +78,7 @@ export function CreateMachineForm({
   const [descriptionDoc, setDescriptionDoc] = useState<ProseMirrorDoc | null>(
     null
   );
+  const isHydrated = useHydrated();
 
   // Promote dialog state — populated when server returns ASSIGNEE_NOT_MEMBER
   const [promoteAssignee, setPromoteAssignee] = useState<
@@ -231,6 +238,7 @@ export function CreateMachineForm({
        */}
       <form
         ref={formRef}
+        method="post"
         onSubmit={(e) => {
           // Ignore submits that bubbled up from a DESCENDANT form. React
           // propagates events through the React tree, not the DOM tree, so the
@@ -313,7 +321,11 @@ export function CreateMachineForm({
 
         {/* Model — links the machine to its PinballMap catalog model/edition
             (bead B / PP-o355.2). */}
-        <PinballMapLinkField machineName={nameValue} />
+        <PinballMapLinkField
+          machineName={nameValue}
+          defaultMachineId={initialPinballmap?.id ?? null}
+          defaultName={initialPinballmap?.name ?? null}
+        />
 
         {iscoredConfigured && <IscoredGamePicker machineName={nameValue} />}
 
@@ -393,6 +405,7 @@ export function CreateMachineForm({
           <Button
             type="submit"
             className="bg-primary text-on-primary hover:bg-primary/90"
+            disabled={!isHydrated || isPending}
             loading={isPending}
           >
             Create Machine

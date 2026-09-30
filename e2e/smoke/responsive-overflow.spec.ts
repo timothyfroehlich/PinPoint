@@ -55,6 +55,9 @@ const authenticatedRoutes = [
   "/issues",
   `/issues${filterHeavyQuery}`,
   "/m",
+  // Desktop-only page that scrolls inside its own container; the document
+  // itself must not overflow (CORE-RESP-004, lineup spec 2.6).
+  "/m/pinball-map",
   `/m/${machineInitials}`,
   `/m/${machineInitials}/settings`,
   `/m/${machineInitials}/maintenance`,

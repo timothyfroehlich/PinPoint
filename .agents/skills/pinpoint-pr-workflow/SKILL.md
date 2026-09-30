@@ -161,7 +161,7 @@ The reviewer is Claude Code's built-in `/code-review`, run by the owning agent i
 
 Post a record only for a head the review actually ran on. The gate cannot tell a real review from a fabricated record; Tim reads the findings list before he merges.
 
-The review runs inside the session, so there is nothing to wait for; `pr-watch.py --phase review` is only needed to confirm the gate reads the record. Until both subscriptions end, the gate also accepts an exact-head CodeRabbit approval or Codex evidence already on a PR; request neither.
+The review runs inside the session, so there is nothing to wait for; `pr-watch.py --phase review` is only needed to confirm the gate reads the record. Until its subscription ends, the gate also accepts exact-head Codex evidence already on a PR; request none.
 
 #### Merging without a review
 
@@ -195,7 +195,9 @@ If the diff touches `src/app/**`, `src/components/**`, any `.css`, or design tok
 node scripts/workflow/pr-screenshots.mjs <PR>
 ```
 
-Shoots the manifest in `scripts/workflow/ui-screenshot-manifest.json` (issues list, issue detail, report form, dashboard, a machine detail, collections — pass `--pages=a,b,c` to shoot a subset) at desktop (1440×900) and mobile (390×844) viewports, pushes the PNGs to the orphan `pr-screenshots` branch, and posts/updates one sticky PR comment (marker `<!-- pr-screenshots -->`) with a desktop|mobile table per page. Re-run after any UI-affecting push — it updates the same sticky comment in place, tagged with the new head SHA.
+Shoots the manifest in `scripts/workflow/ui-screenshot-manifest.json` (issues list, issue detail, report form, dashboard, a machine detail, collections — pass `--pages=a,b,c` to shoot a subset) at the three review viewports (`pinpoint-design-bible` §4: desktop 1440×900, large mobile 430×932, small mobile 320×568), pushes the PNGs to the orphan `pr-screenshots` branch, and posts/updates one sticky PR comment (marker `<!-- pr-screenshots -->`) with a three-column table per page. Re-run after any UI-affecting push — it updates the same sticky comment in place, tagged with the new head SHA.
+
+**Shots the manifest can't reach** (a toggle in one position, an open dialog): capture them yourself, name each `<viewport>-<id>.png` (`desktop`, `mobile-large`, `mobile-small`), and publish with `node scripts/workflow/pr-screenshots.mjs <PR> --files=a.png,b.png`. It needs no dev server, runs without a permission prompt, and rebuilds the sticky comment from just those files. Never push to `pr-screenshots` or post the screenshot comment by hand: a hand-rolled push that clears its scratch dir with `rm -rf` hits the `Bash(rm -rf:*)` ask rule and prompts Tim, who has said seed-data screenshots need no approval.
 
 Two `--pages` gotchas: it only accepts the **equals** form (`--pages=machine-edit`); the space-separated form fails with `Unrecognized argument`. And a filtered run rebuilds the sticky comment from just the pages it shot, silently dropping the others — so always finish with an unfiltered run before handing the PR off.
 

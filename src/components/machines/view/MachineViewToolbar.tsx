@@ -1,33 +1,11 @@
 "use client";
 
 import type React from "react";
-import { ChevronDown, Search, SlidersHorizontal, X } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { MultiSelect, type Option } from "~/components/ui/multi-select";
 import { Input } from "~/components/ui/input";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
-import { Checkbox } from "~/components/ui/checkbox";
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerDescription,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerTrigger,
-} from "~/components/ui/drawer";
-import { PaginationControls } from "~/components/issues/PaginationControls";
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "~/components/ui/dropdown-menu";
 import {
   getMachinePresenceLabel,
   type MachinePresenceStatus,
@@ -37,20 +15,18 @@ import {
   getMachineStatusLabel,
   type MachineStatus,
 } from "~/lib/machines/status";
+import { getMachineViewPreset } from "~/lib/machines/view/config";
+import { SEVERITY_CONFIG } from "~/lib/issues/status";
 import {
-  getMachineViewPreset,
-  MACHINE_VIEW_FIELDS,
-} from "~/lib/machines/view/config";
-import type {
-  MachineViewFieldId,
-  MachineViewOwnerOption,
-  MachineViewPageSize,
-  MachineViewPresetId,
-  MachineViewState,
+  ISSUE_SEVERITY_VALUES,
+  type IssueSeverity,
+  type MachineViewFieldId,
+  type MachineViewOwnerOption,
+  type MachineViewPresetId,
+  type MachineViewState,
 } from "~/lib/types";
-import { cn } from "~/lib/utils";
+import { MachineViewPageControls } from "./MachineViewPageControls";
 
-const PAGE_SIZES: MachineViewPageSize[] = [25, 50, 100];
 const STATUS_VALUES: MachineStatus[] = [
   "operational",
   "needs_service",
@@ -68,13 +44,9 @@ interface MachineViewToolbarProps {
   onSearchChange: (value: string) => void;
   onStateChange: (next: MachineViewState) => void;
   onMobileModeChange: (mode: "compact" | "table") => void;
-}
-
-function parsePageSize(value: string): MachineViewPageSize | null {
-  if (value === "25") return 25;
-  if (value === "50") return 50;
-  if (value === "100") return 100;
-  return null;
+  /** Renders the Saved Views menu for a layout; absent when unavailable. */
+  renderSavedViewsMenu?:
+    ((layout: "desktop" | "mobile") => React.ReactNode) | undefined;
 }
 
 function listsEqual(left: string[], right: string[]): boolean {
@@ -95,6 +67,7 @@ export function MachineViewToolbar({
   onSearchChange,
   onStateChange,
   onMobileModeChange,
+  renderSavedViewsMenu,
 }: MachineViewToolbarProps): React.JSX.Element {
   const defaults = getMachineViewPreset(preset).defaultState;
   const presenceOptions: Option[] = VALID_MACHINE_PRESENCE_STATUSES.map(
@@ -104,6 +77,10 @@ export function MachineViewToolbar({
     value,
     label: getMachineStatusLabel(value),
   }));
+  const severityOptions: Option[] = ISSUE_SEVERITY_VALUES.map((value) => ({
+    value,
+    label: SEVERITY_CONFIG[value].label,
+  }));
   const ownerSelectOptions: Option[] = ownerOptions.map((owner) => ({
     value: owner.id,
     label: owner.name,
@@ -112,6 +89,11 @@ export function MachineViewToolbar({
     [...presenceOptions, ...statusOptions, ...ownerSelectOptions].map(
       (option) => [option.value, option.label]
     )
+  );
+  // Severity and Playability share the value `unplayable`, so severity
+  // labels resolve from their own map.
+  const severityLabelByValue = new Map(
+    severityOptions.map((option) => [option.value, option.label])
   );
   const presenceIsDefault =
     state.presence === "all" || defaults.presence === "all"
@@ -132,6 +114,11 @@ export function MachineViewToolbar({
       value,
       label: labelByValue.get(value) ?? value,
     })),
+    ...state.severity.map((value) => ({
+      key: "severity" as const,
+      value,
+      label: `${severityLabelByValue.get(value) ?? value} severity`,
+    })),
     ...state.owner.map((value) => ({
       key: "owner" as const,
       value,
@@ -149,7 +136,7 @@ export function MachineViewToolbar({
   }
 
   function removeChip(
-    key: "presence" | "status" | "owner",
+    key: "presence" | "status" | "severity" | "owner",
     value: string
   ): void {
     if (key === "presence") {
@@ -162,7 +149,15 @@ export function MachineViewToolbar({
       update({ presence: next.length === 0 ? "all" : next });
       return;
     }
-    update({ [key]: state[key].filter((item) => item !== value) });
+    if (key === "status") {
+      update({ status: state.status.filter((item) => item !== value) });
+      return;
+    }
+    if (key === "severity") {
+      update({ severity: state.severity.filter((item) => item !== value) });
+      return;
+    }
+    update({ owner: state.owner.filter((item) => item !== value) });
   }
 
   function clearFilters(): void {
@@ -171,15 +166,9 @@ export function MachineViewToolbar({
       q: "",
       presence: defaults.presence,
       status: [],
+      severity: [],
       owner: [],
     });
-  }
-
-  function toggleColumn(field: MachineViewFieldId, checked: boolean): void {
-    const columns = checked
-      ? [...new Set([...state.columns, field])]
-      : state.columns.filter((column) => column !== field);
-    update({ columns }, false);
   }
 
   return (
@@ -248,7 +237,7 @@ export function MachineViewToolbar({
             </div>
           ) : null}
         </div>
-        <div className="grid min-w-0 grid-cols-1 gap-2 border-t border-outline-variant p-3 @sm:grid-cols-2 @md:grid-cols-3">
+        <div className="grid min-w-0 grid-cols-1 gap-2 border-t border-outline-variant p-3 @sm:grid-cols-2 @3xl:grid-cols-4">
           <MultiSelect
             options={presenceOptions}
             value={state.presence === "all" ? [] : state.presence}
@@ -279,11 +268,22 @@ export function MachineViewToolbar({
             placeholder="Playability"
           />
           <MultiSelect
+            options={severityOptions}
+            value={state.severity}
+            onChange={(value) =>
+              update({
+                severity: value.filter((item): item is IssueSeverity =>
+                  ISSUE_SEVERITY_VALUES.some((severity) => severity === item)
+                ),
+              })
+            }
+            placeholder="Severity"
+          />
+          <MultiSelect
             options={ownerSelectOptions}
             value={state.owner}
             onChange={(owner) => update({ owner })}
             placeholder="Owner"
-            className="@sm:col-span-2 @md:col-span-1"
           />
         </div>
       </div>
@@ -296,179 +296,25 @@ export function MachineViewToolbar({
           <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-bold text-muted-foreground">
             {totalCount}
           </span>
+          {renderSavedViewsMenu ? (
+            <div className="ml-1 hidden md:block">
+              {renderSavedViewsMenu("desktop")}
+            </div>
+          ) : null}
         </div>
-        <div className="flex items-center gap-4">
-          <PaginationControls
-            page={state.page}
-            totalCount={totalCount}
-            pageSize={state.pageSize}
-            onNavigate={(page) => update({ page }, false)}
-          />
-          <Drawer direction="bottom">
-            <DrawerTrigger asChild>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-8 gap-2 px-2.5 font-medium shadow-sm md:hidden"
-                data-testid="machine-view-mobile-options-trigger"
-              >
-                <SlidersHorizontal className="size-3.5" aria-hidden="true" />
-                View Options
-              </Button>
-            </DrawerTrigger>
-            <DrawerContent className="max-h-[85dvh] rounded-t-2xl">
-              <DrawerHeader className="shrink-0 pb-1 text-left">
-                <DrawerTitle className="text-lg">View Options</DrawerTitle>
-                <DrawerDescription className="sr-only">
-                  Choose visible fields, layout, and rows per page.
-                </DrawerDescription>
-              </DrawerHeader>
-              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-2">
-                <details className="group rounded-lg border border-outline-variant bg-card">
-                  <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2 px-3 py-2 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-                    Fields
-                    <span className="ml-auto text-xs font-medium text-muted-foreground">
-                      {state.columns.length - 1} selected
-                    </span>
-                    <ChevronDown
-                      aria-hidden="true"
-                      className="size-4 text-muted-foreground transition-transform group-open:rotate-180 motion-reduce:transition-none"
-                    />
-                  </summary>
-                  <div className="grid grid-cols-2 gap-2 border-t border-outline-variant p-3">
-                    {permittedFields
-                      .filter((field) => field !== "machine")
-                      .map((field) => (
-                        <label
-                          key={field}
-                          className="flex min-h-11 items-center gap-2 rounded-md border border-outline-variant bg-card px-3 py-2 text-sm text-foreground"
-                        >
-                          <Checkbox
-                            checked={state.columns.includes(field)}
-                            onCheckedChange={(checked) =>
-                              toggleColumn(field, checked === true)
-                            }
-                            aria-label={MACHINE_VIEW_FIELDS[field].label}
-                          />
-                          <span>{MACHINE_VIEW_FIELDS[field].label}</span>
-                        </label>
-                      ))}
-                  </div>
-                </details>
-                <section aria-labelledby="machine-view-mobile-page-size">
-                  <h3
-                    id="machine-view-mobile-page-size"
-                    className="mb-2 text-sm font-semibold text-foreground"
-                  >
-                    Rows per page
-                  </h3>
-                  <div className="grid grid-cols-3 gap-2">
-                    {PAGE_SIZES.map((pageSize) => (
-                      <Button
-                        key={pageSize}
-                        type="button"
-                        variant="outline"
-                        aria-pressed={state.pageSize === pageSize}
-                        onClick={() => update({ pageSize })}
-                        className={cn(
-                          "min-h-11",
-                          state.pageSize === pageSize &&
-                            "border-primary bg-primary/10 text-primary"
-                        )}
-                      >
-                        {pageSize}
-                      </Button>
-                    ))}
-                  </div>
-                </section>
-                <section aria-labelledby="machine-view-mobile-layout">
-                  <h3
-                    id="machine-view-mobile-layout"
-                    className="mb-2 text-sm font-semibold text-foreground"
-                  >
-                    Layout
-                  </h3>
-                  <div className="grid grid-cols-2 gap-2">
-                    {(["compact", "table"] as const).map((mode) => (
-                      <Button
-                        key={mode}
-                        type="button"
-                        variant="outline"
-                        aria-pressed={mobileMode === mode}
-                        onClick={() => onMobileModeChange(mode)}
-                        className={cn(
-                          "min-h-11",
-                          mobileMode === mode &&
-                            "border-primary bg-primary/10 text-primary"
-                        )}
-                      >
-                        {mode === "compact" ? "Compact list" : "Table"}
-                      </Button>
-                    ))}
-                  </div>
-                </section>
-              </div>
-              <DrawerFooter className="shrink-0 border-t border-outline-variant pb-[calc(1rem+env(safe-area-inset-bottom))]">
-                <DrawerClose asChild>
-                  <Button type="button" className="min-h-11 w-full">
-                    Done
-                  </Button>
-                </DrawerClose>
-              </DrawerFooter>
-            </DrawerContent>
-          </Drawer>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="hidden h-8 gap-2 px-2.5 font-medium shadow-sm md:inline-flex"
-                data-testid="machine-view-desktop-options-trigger"
-              >
-                <SlidersHorizontal className="size-3.5" />
-                View Options
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>Columns</DropdownMenuLabel>
-              {permittedFields
-                .filter((field) => field !== "machine")
-                .map((field) => (
-                  <DropdownMenuCheckboxItem
-                    key={field}
-                    checked={state.columns.includes(field)}
-                    onCheckedChange={(checked) =>
-                      toggleColumn(field, checked === true)
-                    }
-                    onSelect={(event) => event.preventDefault()}
-                  >
-                    {MACHINE_VIEW_FIELDS[field].label}
-                  </DropdownMenuCheckboxItem>
-                ))}
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel>Rows per page</DropdownMenuLabel>
-              <DropdownMenuRadioGroup
-                value={String(state.pageSize)}
-                onValueChange={(value) => {
-                  const pageSize = parsePageSize(value);
-                  if (pageSize !== null) update({ pageSize });
-                }}
-              >
-                {PAGE_SIZES.map((pageSize) => (
-                  <DropdownMenuRadioItem
-                    key={pageSize}
-                    value={String(pageSize)}
-                  >
-                    {pageSize}
-                  </DropdownMenuRadioItem>
-                ))}
-              </DropdownMenuRadioGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+        <MachineViewPageControls
+          state={state}
+          permittedFields={permittedFields}
+          totalCount={totalCount}
+          mobileMode={mobileMode}
+          onStateChange={onStateChange}
+          onMobileModeChange={onMobileModeChange}
+          onNavigate={(page) => update({ page }, false)}
+        />
       </div>
+      {renderSavedViewsMenu ? (
+        <div className="px-1 md:hidden">{renderSavedViewsMenu("mobile")}</div>
+      ) : null}
     </div>
   );
 }

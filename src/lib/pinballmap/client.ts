@@ -7,9 +7,10 @@ import { getPinballMapMode } from "./config";
 import type { PinballMapClient, PinballMapRegion } from "./types";
 
 /**
- * Returns the active PinballMap client — live or mock, per `PINBALLMAP_MODE`
- * (see `./config`). All app code (sync route, server actions, pickers) reaches
- * PBM through this, never through raw fetch.
+ * Returns the active PinballMap client: live only on a Vercel production
+ * deployment, mock everywhere else (see `getPinballMapMode` in `./config`).
+ * All app code (sync route, server actions, pickers) reaches PBM through this,
+ * never through raw fetch.
  *
  * Construction is now entirely synchronous — the live client's mandatory blanket
  * API token (X-Api-Token, PP-uusr) is read straight off `process.env` rather than

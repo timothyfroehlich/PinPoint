@@ -44,6 +44,23 @@ if command -v bd >/dev/null 2>&1; then
     _bd_mode=$(jq -r '.dolt_mode // "embedded"' "$_bd_main/.beads/metadata.json" 2>/dev/null || echo embedded)
   fi
   if [ "$_bd_mode" != "server" ]; then
-    bd dolt push --quiet >&2 || echo "Warning: bd dolt push failed (non-fatal)" >&2
+    _bd_push_timeout="${BD_PUSH_TIMEOUT:-15}"
+    _timeout_bin=""
+    if command -v timeout >/dev/null 2>&1; then
+      _timeout_bin="timeout"
+    elif command -v gtimeout >/dev/null 2>&1; then
+      _timeout_bin="gtimeout"
+    fi
+    _bd_push_exit=0
+    if [ -n "$_timeout_bin" ]; then
+      "$_timeout_bin" -k 5 "$_bd_push_timeout" bd dolt push --quiet >&2 || _bd_push_exit=$?
+    else
+      bd dolt push --quiet >&2 || _bd_push_exit=$?
+    fi
+    if [ "$_bd_push_exit" -eq 124 ] || [ "$_bd_push_exit" -eq 137 ]; then
+      echo "Warning: bd dolt push timed out after ${_bd_push_timeout}s (non-fatal)" >&2
+    elif [ "$_bd_push_exit" -ne 0 ]; then
+      echo "Warning: bd dolt push failed (non-fatal)" >&2
+    fi
   fi
 fi

@@ -76,26 +76,45 @@ describe("iscored client", () => {
 
   const mockScoresPayload = (scores: unknown[] = mockApiScores) => ({ scores });
 
-  describe("local AFM screenshot fixture", () => {
-    it("serves synthetic scores only with the development opt-in", async () => {
-      vi.stubEnv("NODE_ENV", "development");
-      process.env.ISCORED_DEMO_AFMSCORES = "1";
+  describe("fixture gameroom (ISCORED_USER unset off Vercel production)", () => {
+    beforeEach(() => {
+      delete process.env.ISCORED_USER;
+      delete process.env.VERCEL_ENV;
+    });
+
+    it("serves ranked fixture scores and games without calling iscored.info", async () => {
       const fetchSpy = vi.spyOn(globalThis, "fetch");
 
-      const scores = await getTopScoresForMachine("local-afm-demo");
-      expect(scores).toHaveLength(3);
-      expect(scores[0]?.gameName).toBe("Attack from Mars");
+      const scores = await getTopScoresForMachine("79616");
+      expect(scores.map((s) => [s.rank, s.gameName])).toEqual([
+        [1, "Godzilla"],
+        [2, "Godzilla"],
+        [3, "Godzilla"],
+      ]);
+      expect(scores[0]?.score ?? 0).toBeGreaterThan(scores[1]?.score ?? 0);
+
+      const games = await getGameroomGames();
+      expect(games.map((g) => g.gameName)).toContain("Black Knight");
       expect(fetchSpy).not.toHaveBeenCalled();
     });
 
-    it("cannot serve synthetic scores in production even when opted in", async () => {
-      vi.stubEnv("NODE_ENV", "production");
-      process.env.ISCORED_DEMO_AFMSCORES = "1";
-      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-        new Response(JSON.stringify(mockScoresPayload([])), { status: 200 })
+    it("links every seeded machine to a fixture game", async () => {
+      const machinesData = (await import("~/test/data/machines.json")).default;
+      const gameIds = new Set((await getGameroomGames()).map((g) => g.gameId));
+      const linked = Object.values(machinesData).flatMap((m) =>
+        "iscoredGameId" in m ? [m.iscoredGameId] : []
       );
 
-      expect(await getTopScoresForMachine("local-afm-demo")).toEqual([]);
+      expect(linked.length).toBeGreaterThan(0);
+      for (const id of linked) expect(gameIds).toContain(id);
+    });
+
+    it("previews use the fixture too, since Vercel sets NODE_ENV=production there", async () => {
+      process.env.VERCEL_ENV = "preview";
+      const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+      expect(await getTopScoresForMachine("77963")).toHaveLength(3);
+      expect(fetchSpy).not.toHaveBeenCalled();
     });
   });
 
@@ -464,8 +483,9 @@ describe("iscored client", () => {
   });
 
   describe("graceful degradation", () => {
-    it("returns empty array if ISCORED_USER is unset", async () => {
+    it("returns empty array if ISCORED_USER is unset on production", async () => {
       delete process.env.ISCORED_USER;
+      process.env.VERCEL_ENV = "production";
       const fetchSpy = vi.spyOn(globalThis, "fetch");
 
       const scores = await getAllScoresForMachine("77956");
@@ -574,8 +594,9 @@ describe("iscored client", () => {
       expect(fetchSpy).toHaveBeenCalledTimes(1);
     });
 
-    it("returns empty array when ISCORED_USER is unset", async () => {
+    it("returns empty array when ISCORED_USER is unset on production", async () => {
       delete process.env.ISCORED_USER;
+      process.env.VERCEL_ENV = "production";
       const fetchSpy = vi.spyOn(globalThis, "fetch");
 
       const games = await getGameroomGames();

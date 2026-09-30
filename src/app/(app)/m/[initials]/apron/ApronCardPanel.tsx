@@ -6,7 +6,11 @@ import { apronCardContent } from "~/lib/machines/apron-card";
 import { buildMachineHubUrl } from "~/lib/machines/hub-url";
 import { docToPlainText } from "~/lib/tiptap/types";
 import { resolveRequestUrl } from "~/lib/url";
-import type { MachineForLayout } from "~/app/(app)/m/[initials]/_data";
+import {
+  getMachineCredits,
+  getMachinePinTips,
+  type MachineForLayout,
+} from "~/app/(app)/m/[initials]/_data";
 
 /** Server wrapper: resolves the scan URL and the saved card for the entry. */
 export async function ApronCardPanel({
@@ -26,24 +30,44 @@ export async function ApronCardPanel({
     resolveRequestUrl(await headers()),
     machine.initials
   );
-  const { name, edition, manufacturer, year, ownerName } =
-    apronCardContent(machine);
+  const [credits, pinTips] = await Promise.all([
+    getMachineCredits(machine),
+    getMachinePinTips(machine.pinballmapTitle?.opdbId ?? null),
+  ]);
+  const hasPinTips = pinTips !== null;
+  const card = machine.apronCards[0] ?? null;
+  const { name, edition, manufacturer, year, ownerName } = apronCardContent(
+    machine,
+    card,
+    credits,
+    hasPinTips
+  );
 
   return (
     <ApronCardEntry
       variant={variant}
       machineId={machine.id}
       machineInitials={machine.initials}
-      identity={{ name, edition, manufacturer, year, ownerName }}
+      identity={{
+        name,
+        edition,
+        manufacturer,
+        year,
+        ownerName,
+        credits,
+        hasPinTips,
+      }}
       mainDescription={docToPlainText(machine.description)}
       saved={{
-        size: machine.apronSize,
-        useCustomDescription: machine.apronUseCustomDescription,
-        customDescription: machine.apronDescription ?? "",
-        tip: machine.apronTip ?? "",
-        tipEnabled: machine.apronTipEnabled,
+        size: card?.size ?? null,
+        useCustomDescription: card?.useCustomDescription ?? false,
+        customDescription: docToPlainText(card?.description),
+        tip: docToPlainText(card?.tip),
+        tipEnabled: card?.tipEnabled ?? false,
+        designEnabled: card?.designEnabled ?? true,
+        artEnabled: card?.artEnabled ?? true,
       }}
-      savedAt={machine.apronSavedAt?.toISOString() ?? null}
+      savedAt={card?.updatedAt.toISOString() ?? null}
       scanUrl={scanUrl}
       canEdit={canEdit}
       canExport={canExport}

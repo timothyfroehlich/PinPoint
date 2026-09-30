@@ -6,7 +6,9 @@ import {
   getGameUrl,
   getIscoredUser,
   getScoreEntryUrl,
+  ISCORED_FIXTURE_USER,
   isIscoredConfigured,
+  isIscoredFixtureMode,
 } from "./config";
 
 describe("iscored config", () => {
@@ -15,6 +17,8 @@ describe("iscored config", () => {
   beforeEach(() => {
     vi.resetModules();
     process.env = { ...originalEnv };
+    // Production semantics by default; fixture mode has its own block below.
+    process.env.VERCEL_ENV = "production";
   });
 
   afterEach(() => {
@@ -48,10 +52,30 @@ describe("iscored config", () => {
     });
   });
 
-  it("never builds outbound links for the local AFM demo game", () => {
-    process.env.ISCORED_USER = "Apcscore";
-    expect(getScoreEntryUrl("local-afm-demo")).toBeNull();
-    expect(getGameUrl("local-afm-demo")).toBeNull();
+  describe("fixture mode", () => {
+    it("reports the fixture gameroom off Vercel production when ISCORED_USER is unset", () => {
+      delete process.env.ISCORED_USER;
+      for (const vercelEnv of [undefined, "preview", "development"]) {
+        if (vercelEnv) process.env.VERCEL_ENV = vercelEnv;
+        else delete process.env.VERCEL_ENV;
+        expect(isIscoredFixtureMode()).toBe(true);
+        expect(getIscoredUser()).toBe(ISCORED_FIXTURE_USER);
+        expect(isIscoredConfigured()).toBe(true);
+      }
+    });
+
+    it("stays off on Vercel production", () => {
+      delete process.env.ISCORED_USER;
+      expect(isIscoredFixtureMode()).toBe(false);
+      expect(isIscoredConfigured()).toBe(false);
+    });
+
+    it("stays off whenever ISCORED_USER is set", () => {
+      delete process.env.VERCEL_ENV;
+      process.env.ISCORED_USER = "OtherRoom";
+      expect(isIscoredFixtureMode()).toBe(false);
+      expect(getIscoredUser()).toBe("OtherRoom");
+    });
   });
 
   describe("getScoreEntryUrl", () => {

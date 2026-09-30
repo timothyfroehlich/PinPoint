@@ -4,14 +4,21 @@
  * Worker-scoped PGlite (CORE-TEST-001). Covers the permission split for
  * changing a card (apron-cards spec §3.6: owner, technician, or admin — the
  * `machines.edit` capability), payload rejection, and that saving writes every
- * card field plus the saved timestamp export depends on (§9.1).
+ * field of the machine's first saved card (§11), creating it on first save and
+ * updating it after.
  */
 
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { describe, expect, it, vi } from "vitest";
 
-import { authUsers, machines, userProfiles } from "~/server/db/schema";
+import {
+  authUsers,
+  machineApronCards,
+  machines,
+  userProfiles,
+} from "~/server/db/schema";
+import { docToPlainText } from "~/lib/tiptap/types";
 import { saveApronCardAction } from "~/app/(app)/m/[initials]/apron/actions";
 import type { SaveApronCardInput } from "~/app/(app)/m/[initials]/apron/schemas";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
@@ -70,6 +77,13 @@ describe("saveApronCardAction (PP-esta)", () => {
     } as unknown as Awaited<ReturnType<typeof createClient>>);
   }
 
+  async function savedCards(machineId: string) {
+    const db = await getTestDb();
+    return db.query.machineApronCards.findMany({
+      where: eq(machineApronCards.machineId, machineId),
+    });
+  }
+
   function input(machineId: string): SaveApronCardInput {
     return {
       machineId,
@@ -78,6 +92,8 @@ describe("saveApronCardAction (PP-esta)", () => {
       description: "Shoot the ramps.",
       tip: "Extra ball at 3 modes.",
       tipEnabled: true,
+      designEnabled: false,
+      artEnabled: true,
     };
   }
 
@@ -89,18 +105,30 @@ describe("saveApronCardAction (PP-esta)", () => {
     const result = await saveApronCardAction(input(machineId));
     expect(result.ok).toBe(true);
 
-    const db = await getTestDb();
-    const row = await db.query.machines.findFirst({
-      where: eq(machines.id, machineId),
+    const [card, ...rest] = await savedCards(machineId);
+    expect(rest).toHaveLength(0);
+    expect(card).toMatchObject({
+      size: "stern",
+      useCustomDescription: true,
+      tipEnabled: true,
+      designEnabled: false,
+      artEnabled: true,
     });
-    expect(row).toMatchObject({
-      apronSize: "stern",
-      apronUseCustomDescription: true,
-      apronDescription: "Shoot the ramps.",
-      apronTip: "Extra ball at 3 modes.",
-      apronTipEnabled: true,
-    });
-    expect(row?.apronSavedAt).toBeInstanceOf(Date);
+    expect(docToPlainText(card?.description)).toBe("Shoot the ramps.");
+    expect(docToPlainText(card?.tip)).toBe("Extra ball at 3 modes.");
+  });
+
+  it("updates the first saved card rather than adding another", async () => {
+    const owner = await makeUser("member");
+    const machineId = await makeMachine(owner);
+    await mockAuth(owner);
+
+    await saveApronCardAction(input(machineId));
+    await saveApronCardAction({ ...input(machineId), size: "wpc", tip: "" });
+
+    const cards = await savedCards(machineId);
+    expect(cards).toHaveLength(1);
+    expect(cards[0]).toMatchObject({ size: "wpc", tip: null });
   });
 
   it.each(["technician", "admin"] as const)(
@@ -126,11 +154,7 @@ describe("saveApronCardAction (PP-esta)", () => {
       const result = await saveApronCardAction(input(machineId));
       expect(result).toMatchObject({ ok: false, code: "UNAUTHORIZED" });
 
-      const db = await getTestDb();
-      const row = await db.query.machines.findFirst({
-        where: eq(machines.id, machineId),
-      });
-      expect(row?.apronSavedAt).toBeNull();
+      expect(await savedCards(machineId)).toHaveLength(0);
     }
   );
 

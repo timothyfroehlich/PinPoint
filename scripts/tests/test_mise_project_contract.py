@@ -45,7 +45,7 @@ MINIMUM_MISE_VERSION = (2026, 8, 11)
 MISE_MANAGED_TOOLS = ("node", "python", "ruff", "supabase", "zizmor")
 EXPECTED_TOOL_BACKENDS = {
     "node": "core:node",
-    "pnpm": "npm:pnpm",
+    "pnpm": "aqua:pnpm/pnpm",
     "python": "core:python",
     "ruff": "aqua:astral-sh/ruff",
     "supabase": "aqua:supabase/cli",
@@ -904,7 +904,7 @@ def test_ci_static_job_contract() -> None:
     static = _workflow_job_block(workflow, "static")
 
     assert static.index("uses: actions/checkout@") < static.index(
-        "uses: ./.github/actions/setup-mise"
+        "uses: $/.github/actions/setup-mise"
     )
     assert "if:" not in static.split("steps:")[0], "static must always run"
     for command in (
@@ -942,9 +942,9 @@ def test_workflows_use_mise_without_legacy_setup_actions() -> None:
     assert not offenders, f"legacy setup actions remain: {offenders}"
 
     expected_action_refs = {
-        CI_WORKFLOW_PATH: "uses: ./.github/actions/setup-mise",
-        PREVIEW_REAPER_PATH: "uses: ./.github/actions/setup-mise",
-        PREVIEW_CONTROL_PATH: ("uses: ./.pinpoint-workflow/.github/actions/setup-mise"),
+        CI_WORKFLOW_PATH: "uses: $/.github/actions/setup-mise",
+        PREVIEW_REAPER_PATH: "uses: $/.github/actions/setup-mise",
+        PREVIEW_CONTROL_PATH: "uses: $/.github/actions/setup-mise",
     }
     for path, action_ref in expected_action_refs.items():
         content = path.read_text(encoding="utf-8")
@@ -978,7 +978,7 @@ def test_ci_jobs_share_runtime_aware_dependency_cache() -> None:
     for job_name in dependency_jobs:
         job = _workflow_job_block(workflow, job_name)
         assert "id: toolchain" in job, f"{job_name} must expose toolchain outputs"
-        assert "uses: ./.github/actions/setup-mise" in job, (
+        assert "uses: $/.github/actions/setup-mise" in job, (
             f"{job_name} must use the shared mise setup"
         )
         assert "key: ${{ steps.toolchain.outputs.node-modules-key }}" in job, (
@@ -1008,7 +1008,7 @@ def test_preview_mise_compatibility_and_ordering() -> None:
             "package.json",
         ):
             assert trusted_file in workflow
-        assert "uses: ./.pinpoint-workflow/.github/actions/setup-mise" in workflow
+        assert "uses: $/.github/actions/setup-mise" in workflow
         assert "working-directory: .pinpoint-workflow" in workflow
 
     assert (

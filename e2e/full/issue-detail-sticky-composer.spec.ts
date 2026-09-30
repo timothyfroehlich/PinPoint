@@ -1,12 +1,13 @@
 /**
- * E2E Tests: StickyCommentComposer — visibility and authorization checks (class-D & class-E)
+ * E2E Tests: StickyCommentComposer — visibility checks (class-D)
  *
  * Verifies that the mobile-only fixed-bottom comment composer:
  * 1. Is hidden by `md:hidden` CSS at desktop viewport widths, and that the inline
  *    composer in IssueTimeline is the only one visible.
- * 2. Is hidden from unauthenticated (signed-out) visitors via the server-side gate,
- *    even on mobile viewports.
- * 3. Is visible for authenticated (signed-in) members on mobile viewports.
+ * 2. Is visible for authenticated (signed-in) members on mobile viewports.
+ *
+ * The unauthenticated (signed-out) check is consolidated into
+ * e2e/smoke/issue-detail-permissions.spec.ts.
  */
 
 import { test, expect } from "../support/fixtures.js";
@@ -45,33 +46,7 @@ test.describe("StickyCommentComposer — desktop signed-in", () => {
 });
 
 // ----------------------------------------------------------------------------
-// Scenario 2: Mobile, signed-out (class-E server-side authorization gate)
-// ----------------------------------------------------------------------------
-
-test.describe("StickyCommentComposer — mobile signed-out", () => {
-  test.use({ viewport: { width: 375, height: 667 } });
-
-  test("sticky bar is NOT rendered on mobile for signed-out visitor", async ({
-    page,
-  }) => {
-    await page.goto(ISSUE_URL);
-    await page.waitForLoadState("domcontentloaded");
-
-    // Assert that we are on the issue detail page and it loaded successfully (not redirected).
-    await expect(page).toHaveURL(ISSUE_URL);
-    await expect(
-      page.getByRole("heading", { level: 1, name: ISSUE.title })
-    ).toBeVisible();
-
-    // The server-side check (accessLevel !== "unauthenticated") should prevent the
-    // StickyCommentComposer from rendering entirely, meaning it is not attached to the DOM.
-    const stickyTrigger = page.getByRole("button", { name: "Add a comment" });
-    await expect(stickyTrigger).not.toBeAttached();
-  });
-});
-
-// ----------------------------------------------------------------------------
-// Scenario 3: Mobile, signed-in (class-E authorization verification)
+// Scenario 2: Mobile, signed-in (responsive rendering)
 // ----------------------------------------------------------------------------
 
 test.describe("StickyCommentComposer — mobile signed-in", () => {

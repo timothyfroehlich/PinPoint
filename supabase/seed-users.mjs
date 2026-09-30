@@ -278,13 +278,17 @@ async function seedUsersAndData() {
       const ownerId = ownerMap[machine.initials];
       const invitedOwnerId =
         machine.initials === "TAF" ? invitedMemberUserId : null;
+      // Links into the committed iScored fixture gameroom
+      // (src/lib/iscored/fixture.ts) that local dev and CI serve.
+      const iscoredGameId = machine.iscoredGameId ?? null;
 
       await sql`
-        INSERT INTO machines (id, name, initials, owner_id, invited_owner_id, created_at, updated_at)
-        VALUES (${machine.id}, ${machine.name}, ${machine.initials}, ${ownerId}, ${invitedOwnerId}, NOW(), NOW())
+        INSERT INTO machines (id, name, initials, owner_id, invited_owner_id, iscored_game_id, created_at, updated_at)
+        VALUES (${machine.id}, ${machine.name}, ${machine.initials}, ${ownerId}, ${invitedOwnerId}, ${iscoredGameId}, NOW(), NOW())
         ON CONFLICT (id) DO UPDATE SET
           owner_id = ${ownerId},
           invited_owner_id = ${invitedOwnerId},
+          iscored_game_id = ${iscoredGameId},
           initials = ${machine.initials}
       `;
 

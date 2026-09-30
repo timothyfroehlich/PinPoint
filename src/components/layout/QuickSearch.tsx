@@ -52,10 +52,20 @@ interface QuickSearchContextValue {
   retry: () => void;
 }
 
+class RateLimitError extends Error {
+  readonly retryAfterSeconds: number | null;
+  constructor(retryAfterSeconds: number | null) {
+    super("Quick search rate limit reached");
+    this.name = "RateLimitError";
+    this.retryAfterSeconds = retryAfterSeconds;
+  }
+}
+
 type SearchState =
   | { status: "idle" }
   | { status: "loading" }
   | { status: "loaded"; query: string; results: QuickSearchResults }
+  | { status: "rate-limited"; retryAfterSeconds: number | null }
   | { status: "error" };
 
 const QuickSearchContext = createContext<QuickSearchContextValue | undefined>(
@@ -149,6 +159,19 @@ export function QuickSearchProvider({
         signal: controller.signal,
       })
         .then(async (response) => {
+          if (response.status === 429) {
+            const retryAfterHeader = response.headers.get("Retry-After");
+            const parsedSeconds = retryAfterHeader
+              ? parseInt(retryAfterHeader, 10)
+              : null;
+            const retryAfterSeconds =
+              parsedSeconds !== null &&
+              Number.isFinite(parsedSeconds) &&
+              parsedSeconds > 0
+                ? parsedSeconds
+                : null;
+            throw new RateLimitError(retryAfterSeconds);
+          }
           if (!response.ok) throw new Error("Search request failed");
           return quickSearchResultsSchema.parse(await response.json());
         })
@@ -166,8 +189,15 @@ export function QuickSearchProvider({
             !controller.signal.aborted &&
             requestSequence === requestSequenceRef.current
           ) {
-            console.error("Quick search request failed", error);
-            setSearchState({ status: "error" });
+            if (error instanceof RateLimitError) {
+              setSearchState({
+                status: "rate-limited",
+                retryAfterSeconds: error.retryAfterSeconds,
+              });
+            } else {
+              console.error("Quick search request failed", error);
+              setSearchState({ status: "error" });
+            }
           }
         });
     }, SEARCH_DEBOUNCE_MS);
@@ -254,7 +284,9 @@ export function QuickSearchProvider({
             {searchState.status === "loaded" &&
             searchState.query === query.trim()
               ? `${String(resultCount)} ${resultCount === 1 ? "result" : "results"} found`
-              : ""}
+              : searchState.status === "rate-limited"
+                ? "Search rate limit reached."
+                : ""}
           </p>
         </DialogContent>
       </Dialog>
@@ -294,6 +326,25 @@ function QuickSearchContent({
         <Skeleton className="h-10 w-full" />
         <Skeleton className="h-10 w-full" />
         <Skeleton className="h-10 w-4/5" />
+      </div>
+    );
+  }
+
+  if (searchState.status === "rate-limited") {
+    const { retryAfterSeconds } = searchState;
+    const retryMessage =
+      retryAfterSeconds !== null
+        ? `Search rate limit reached. Please wait ${String(retryAfterSeconds)}s before trying again.`
+        : "Search rate limit reached. Please wait a moment before trying again.";
+
+    return (
+      <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
+        <p className="text-sm text-destructive-text" role="alert">
+          {retryMessage}
+        </p>
+        <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+          Try again
+        </Button>
       </div>
     );
   }
@@ -505,7 +556,9 @@ export function DesktopQuickSearchTrigger(): React.JSX.Element {
       <p className="sr-only" aria-live="polite" aria-atomic="true">
         {searchState.status === "loaded" && !isRefreshing
           ? `${String(resultCount)} ${resultCount === 1 ? "result" : "results"} found`
-          : ""}
+          : searchState.status === "rate-limited"
+            ? "Search rate limit reached."
+            : ""}
       </p>
     </div>
   );

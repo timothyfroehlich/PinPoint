@@ -51,6 +51,7 @@ describe("MachineViewToolbar", () => {
       ...getMachineViewPreset("machines").defaultState,
       q: "mars",
       status: ["needs_service"],
+      severity: ["major"],
       owner: ["owner-1"],
       page: 3,
     };
@@ -71,6 +72,7 @@ describe("MachineViewToolbar", () => {
       q: "",
       presence: ["on_the_floor"],
       status: [],
+      severity: [],
       owner: [],
       page: 1,
     });
@@ -81,6 +83,7 @@ describe("MachineViewToolbar", () => {
     const state: MachineViewState = {
       ...getMachineViewPreset("machines").defaultState,
       status: ["needs_service"],
+      severity: ["unplayable"],
       owner: ["owner-1"],
       page: 2,
     };
@@ -92,6 +95,15 @@ describe("MachineViewToolbar", () => {
     expect(onStateChange).toHaveBeenCalledWith({
       ...state,
       status: [],
+      page: 1,
+    });
+
+    await user.click(
+      screen.getByRole("button", { name: "Remove Unplayable severity filter" })
+    );
+    expect(onStateChange).toHaveBeenLastCalledWith({
+      ...state,
+      severity: [],
       page: 1,
     });
   });

@@ -110,22 +110,50 @@ describe("mock PinballMap client", () => {
     });
   });
 
-  it("toggleInsiderConnected flips the flag and returns the new state", async () => {
+  it("setInsiderConnected sets the requested state on an eligible title", async () => {
     const client = createMockClient();
+    const catalog = await client.fetchCatalog();
+    const eligible = new Set(
+      catalog.filter((m) => m.icEligible).map((m) => m.machineId)
+    );
     const snap = await client.fetchLocation(26454);
-    const target = snap.lmxes[0];
-    if (!target) throw new Error("fixture has no lmxes");
-    const before = target.icEnabled;
+    const target = snap.lmxes.find((l) => eligible.has(l.machineId));
+    if (!target) throw new Error("fixture has no eligible lmx");
 
-    const first = await client.toggleInsiderConnected({
-      credentials: CREDS,
-      lmxId: target.id,
-    });
-    expect(first.ok).toBe(true);
+    for (const enabled of [false, false, true]) {
+      const res = await client.setInsiderConnected({
+        credentials: CREDS,
+        lmxId: target.id,
+        enabled,
+      });
+      // A setter: repeating a value leaves it, never inverts it.
+      expect(res).toEqual({ ok: true, icEnabled: enabled });
+    }
     const after = await client.fetchLocation(26454);
-    const newState = after.lmxes.find((l) => l.id === target.id)?.icEnabled;
-    expect(newState).not.toBe(before);
-    if (first.ok) expect(first.icEnabled).toBe(newState);
+    expect(after.lmxes.find((l) => l.id === target.id)?.icEnabled).toBe(true);
+  });
+
+  it("setInsiderConnected rejects a title the catalog does not mark eligible", async () => {
+    const client = createMockClient();
+    const catalog = await client.fetchCatalog();
+    const eligible = new Set(
+      catalog.filter((m) => m.icEligible).map((m) => m.machineId)
+    );
+    const snap = await client.fetchLocation(26454);
+    const target = snap.lmxes.find((l) => !eligible.has(l.machineId));
+    if (!target) throw new Error("fixture has no ineligible lmx");
+
+    expect(
+      await client.setInsiderConnected({
+        credentials: CREDS,
+        lmxId: target.id,
+        enabled: true,
+      })
+    ).toEqual({
+      ok: false,
+      reason: "rejected",
+      message: "Could not update Insider Connected for this machine",
+    });
   });
 
   it("authDetails returns a token for creds and rejects empty input", async () => {

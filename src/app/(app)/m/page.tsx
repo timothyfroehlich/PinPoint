@@ -1,18 +1,19 @@
 import type React from "react";
 import Link from "next/link";
-import { eq } from "drizzle-orm";
-import { Plus } from "lucide-react";
+import { redirect } from "next/navigation";
+import { MapPin, Plus } from "lucide-react";
 import { MachineView } from "~/components/machines/view";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
 import { Button } from "~/components/ui/button";
 import { EmptyState } from "~/components/ui/empty-state";
+import { getViewer } from "~/lib/collections/viewer";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { loadMachineView } from "~/lib/machines/view/queries";
+import { lineupToReviewCount } from "~/lib/pinballmap/lineup-comparison";
+import { loadLineupData } from "~/lib/pinballmap/lineup-data";
 import { toMachineViewSearchParams } from "~/lib/machines/view/state";
-import { createClient } from "~/lib/supabase/server";
-import { db } from "~/server/db";
-import { userProfiles } from "~/server/db/schema";
+import { loadMachineViewSurfacePageState } from "./saved-view-surface";
 
 interface MachinesPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -25,24 +26,54 @@ interface MachinesPageProps {
 export default async function MachinesPage({
   searchParams,
 }: MachinesPageProps): Promise<React.JSX.Element> {
-  const supabase = await createClient();
-  const [{ data }, rawSearchParams] = await Promise.all([
-    supabase.auth.getUser(),
+  const [viewer, rawSearchParams] = await Promise.all([
+    getViewer(),
     searchParams,
   ]);
-  const userProfile = data.user
-    ? await db.query.userProfiles.findFirst({
-        where: eq(userProfiles.id, data.user.id),
-        columns: { role: true },
-      })
-    : null;
-  const accessLevel = getAccessLevel(userProfile?.role);
+  const accessLevel = getAccessLevel(viewer.role);
   const canCreateMachine = checkPermission("machines.create", accessLevel);
-  const result = await loadMachineView({
-    scope: { kind: "all" },
-    preset: "machines",
-    searchParams: toMachineViewSearchParams(rawSearchParams),
-  });
+  // The lineup page's own view gate (lineup spec §2.1–§2.2): the button links
+  // only viewers who can open it.
+  const canViewLineup = checkPermission(
+    "machines.pinballmap.sync",
+    accessLevel
+  );
+  const viewSearchParams = toMachineViewSearchParams(rawSearchParams);
+  const { savedViews, redirectTo } = await loadMachineViewSurfacePageState(
+    { kind: "machines" },
+    viewSearchParams
+  );
+  if (redirectTo) redirect(redirectTo);
+  const [result, lineupData] = await Promise.all([
+    loadMachineView({
+      scope: { kind: "all" },
+      preset: "machines",
+      searchParams: viewSearchParams,
+    }),
+    canViewLineup ? loadLineupData() : Promise.resolve(null),
+  ]);
+  // The "to review" count comes from the same stored-data comparison the
+  // lineup page renders, so the badge can never disagree with the page it links
+  // to (§4.1). It is zero until there is a lineup to compare (§2.4–§2.5).
+  const lineupToReview =
+    lineupData === null ? 0 : lineupToReviewCount(lineupData.comparison);
+  const lineupButton = canViewLineup ? (
+    <Button asChild variant="outline" data-testid="pinball-map-lineup-button">
+      <Link href="/m/pinball-map">
+        <MapPin className="mr-2 size-4" aria-hidden="true" />
+        Pinball Map
+        {lineupToReview > 0 ? (
+          <span
+            className="ml-2 inline-flex min-w-5 items-center justify-center rounded-full border border-error-container bg-error-container/50 px-1.5 text-xs font-semibold tabular-nums text-on-error-container"
+            data-testid="pinball-map-lineup-to-review"
+          >
+            {lineupToReview}
+            <span className="sr-only"> to review</span>
+          </span>
+        ) : null}
+      </Link>
+    </Button>
+  ) : null;
   const addMachineButton = canCreateMachine ? (
     <Button
       asChild
@@ -58,7 +89,18 @@ export default async function MachinesPage({
 
   return (
     <PageContainer size="wide">
-      <PageHeader title="Machines" actions={addMachineButton} />
+      <PageHeader
+        title="Machines"
+        actions={
+          lineupButton === null &&
+          addMachineButton === undefined ? undefined : (
+            <>
+              {lineupButton}
+              {addMachineButton}
+            </>
+          )
+        }
+      />
       {result.scopeCount === 0 ? (
         <EmptyState
           icon={Plus}
@@ -83,7 +125,11 @@ export default async function MachinesPage({
           }
         />
       ) : (
-        <MachineView result={result} preset="machines" />
+        <MachineView
+          result={result}
+          preset="machines"
+          savedViews={savedViews}
+        />
       )}
     </PageContainer>
   );

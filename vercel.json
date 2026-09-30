@@ -13,6 +13,10 @@
       "schedule": "41 7 * * *"
     },
     {
+      "path": "/api/cron/refresh-pintips",
+      "schedule": "53 7 * * *"
+    },
+    {
       "path": "/api/cron/pinballmap-sync",
       "schedule": "0 * * * *"
     },

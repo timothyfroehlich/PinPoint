@@ -23,6 +23,11 @@ import { listSurfacingAbandonedForMachine } from "~/lib/pinballmap/abandoned-lis
 import { getCatalogEntry } from "~/lib/pinballmap/catalog";
 import { getPinballMapLinkStatus } from "~/lib/pinballmap/user-credentials";
 import { PinballmapListingControl } from "~/components/machines/PinballmapListingControl";
+import {
+  deriveInsiderConnectedView,
+  withInsiderConnected,
+  type PbmIcIntent,
+} from "~/lib/pinballmap/insider-connected";
 import { PinballmapAbandonedEntries } from "~/components/machines/PinballmapAbandonedEntries";
 import { getUnifiedUsers } from "~/lib/users/queries";
 import { getMachineForLayout } from "~/app/(app)/m/[initials]/_data";
@@ -132,7 +137,9 @@ export default async function MachineEditPage({
   // Small by construction: the group is keyed on one catalog title, so it is one
   // cabinet in almost every case and a handful in the worst. Skipped for an
   // unmatched machine, which has no title to share.
-  const sameTitlePromise: Promise<PbmSiblingInput[]> =
+  const sameTitlePromise: Promise<
+    (PbmSiblingInput & { icIntent: PbmIcIntent | null })[]
+  > =
     machine.pinballmapMachineId !== null
       ? db
           .select({
@@ -140,6 +147,7 @@ export default async function MachineEditPage({
             initials: machines.initials,
             name: machines.name,
             intent: machines.pinballmapIntent,
+            icIntent: machines.pinballmapIcIntent,
           })
           .from(machines)
           .where(eq(machines.pinballmapMachineId, machine.pinballmapMachineId))
@@ -176,7 +184,7 @@ export default async function MachineEditPage({
 
   // The control's whole view is DERIVED here and handed down — nothing in it
   // discovers state by calling Pinball Map (CORE-PBM-001, PP-o355.21).
-  const listingView = derivePbmListingView({
+  const baseListingView = derivePbmListingView({
     machineId: machine.id,
     pinballmapMachineId: machine.pinballmapMachineId,
     pinballmapExcluded: machine.pinballmapExcluded,
@@ -186,6 +194,22 @@ export default async function MachineEditPage({
     snapshot,
     siblings: sameTitle,
   });
+
+  // Present for every eligible title, whatever the listing intent (spec 3.8).
+  // Eligibility is the catalog's flag, joined by the loader. A difference from
+  // Pinball Map folds into the listing view as Out of sync plus the Update push.
+  const insiderConnectedView = deriveInsiderConnectedView({
+    listing: baseListingView,
+    pinballmapMachineId: machine.pinballmapMachineId,
+    icEligible: machine.pinballmapTitle?.icEligible ?? false,
+    intent: machine.pinballmapIcIntent,
+    siblingIntents: sameTitle.map((sibling) => sibling.icIntent),
+    snapshot,
+  });
+  const listingView = withInsiderConnected(
+    baseListingView,
+    insiderConnectedView
+  );
 
   // Pushes run as the viewer, with their own linked Pinball Map account
   // (spec 8.2). Without a usable link the status row links out instead of
@@ -276,6 +300,11 @@ export default async function MachineEditPage({
               modelName={machine.modelName}
               manufacturer={machine.manufacturer}
               year={machine.year}
+              type={machine.type}
+              display={machine.display}
+              playerCount={machine.playerCount}
+              designers={machine.designers}
+              artists={machine.artists}
               iscoredGameId={machine.iscoredGameId}
             />
           </section>
@@ -327,6 +356,7 @@ export default async function MachineEditPage({
                 canRefresh={canRefresh}
                 linkStatus={pbmLinkStatus}
                 modelName={pinballmapTitleName}
+                insiderConnected={insiderConnectedView}
               />
             </PinballmapDirtyGate>
           )}

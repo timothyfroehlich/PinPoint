@@ -4,6 +4,17 @@ import { db } from "~/server/db";
 import { machines, issues } from "~/server/db/schema";
 import { CLOSED_STATUSES } from "~/lib/issues/status";
 import { getCurrentManufacturer } from "~/lib/machines/manufacturer";
+import {
+  creditsFromNames,
+  creditsFromPeople,
+  NO_CREDITS,
+  type MachineCredits,
+} from "~/lib/opdb/credits";
+import { getOpdbRecords } from "~/lib/opdb/records";
+import { opdbGroupId, pinTipsPageUrl } from "~/lib/pintips/parse";
+import { pickWeightedTipIndex } from "~/lib/pintips/pick";
+import { getPinTipsForGroup } from "~/lib/pintips/records";
+import type { PinTipForCard } from "~/lib/pintips/types";
 
 /**
  * Shared layout data for `/m/[initials]/*`.
@@ -49,6 +60,12 @@ export const getMachineForLayout = cache(async (initials: string) => {
         watchers: {
           columns: { userId: true, watchMode: true },
         },
+        // The machine's first saved card (spec apron-cards §3.8), oldest
+        // first. Selecting among several cards is not built yet.
+        apronCards: {
+          orderBy: (cards, { asc }) => [asc(cards.createdAt), asc(cards.id)],
+          limit: 1,
+        },
         // Joined rather than looked up afterwards. A second PK query would be
         // sequential — it needs the machine row to know the id — so every one
         // of the five `/m/[initials]/*` surfaces would pay a round-trip for a
@@ -61,9 +78,11 @@ export const getMachineForLayout = cache(async (initials: string) => {
             machineGroupId: true,
             groupName: true,
             manufacturer: true,
+            opdbId: true,
             opdbImageUrl: true,
             opdbImageWidth: true,
             opdbImageHeight: true,
+            icEligible: true,
           },
         },
       },
@@ -157,6 +176,72 @@ function resolveModelTitle(machine: {
     machine.pinballmapTitle?.name ??
     `Pinball Map title #${String(machine.pinballmapMachineId)}`
   );
+}
+
+/** The stored OPDB record's credits for one OPDB ID, request-deduped. */
+const getOpdbCredits = cache(
+  async (opdbId: string): Promise<MachineCredits> => {
+    const record = (await getOpdbRecords(db, [opdbId])).get(opdbId);
+    return record ? creditsFromPeople(record.people) : NO_CREDITS;
+  }
+);
+
+/**
+ * The machine's PinTips for the tip card (spec pintips §2–§3): every stored
+ * tip for its OPDB game, the index of the tip to show first — picked at
+ * random, weighted by votes, on each request (spec 3.2) — and the game's
+ * PinTips page on Match Play. Null when the machine has no tips, so the card
+ * is not rendered at all (spec 3.6): no OPDB id (spec 2.7), or none stored.
+ * Reads only the stored copy; never contacts Match Play (spec 2.5).
+ */
+export interface MachinePinTips {
+  tips: PinTipForCard[];
+  initialIndex: number;
+  href: string;
+}
+
+export const getMachinePinTips = cache(
+  async (opdbId: string | null): Promise<MachinePinTips | null> => {
+    const groupId = opdbId === null ? null : opdbGroupId(opdbId);
+    if (groupId === null) return null;
+    const tips = await getPinTipsForGroup(db, groupId);
+    if (tips.length === 0) return null;
+    return {
+      tips,
+      initialIndex: pickWeightedTipIndex(tips),
+      href: pinTipsPageUrl(groupId),
+    };
+  }
+);
+
+/**
+ * The machine's design and art credits (spec apron-cards 10.1): from the
+ * stored OPDB record of its Pinball Map catalog title, or, for an uncataloged
+ * machine, from its hand-entered designers and artists. Never contacts OPDB.
+ *
+ * A separate lookup rather than part of `getMachineForLayout`: only the Info
+ * tab and the apron card read credits, and an alias ID falls back to its
+ * machine-level record, which a relation join cannot express. No catalog
+ * title, or no OPDB record for it, reads as no credits. The two sources never
+ * both apply — `machines_manual_model_requires_excluded` keeps the hand-entered
+ * lists null on any machine that is not uncataloged.
+ *
+ * The OPDB read is `cache()`d on the ID (a string), so the Info tab and the
+ * apron panel in one request share it; the manual branch is pure.
+ */
+export function getMachineCredits(machine: {
+  pinballmapExcluded: boolean;
+  designers: readonly string[] | null;
+  artists: readonly string[] | null;
+  pinballmapTitle: { opdbId: string | null } | null;
+}): Promise<MachineCredits> {
+  if (machine.pinballmapExcluded) {
+    return Promise.resolve(
+      creditsFromNames(machine.designers, machine.artists)
+    );
+  }
+  const opdbId = machine.pinballmapTitle?.opdbId ?? null;
+  return opdbId === null ? Promise.resolve(NO_CREDITS) : getOpdbCredits(opdbId);
 }
 
 export type MachineForLayout = NonNullable<

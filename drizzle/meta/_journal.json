@@ -635,15 +635,57 @@
     {
       "idx": 90,
       "version": "7",
-      "when": 1790395083388,
-      "tag": "0090_pinballmap-user-credentials",
+      "when": 1790394616312,
+      "tag": "0090_insider-connected-intent",
       "breakpoints": true
     },
     {
       "idx": 91,
       "version": "7",
-      "when": 1790438857668,
-      "tag": "0091_retire-pinballmap-operator-credentials",
+      "when": 1790440490199,
+      "tag": "0091_apron-credit-settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 92,
+      "version": "7",
+      "when": 1790460875208,
+      "tag": "0092_machine-view-saved-views",
+      "breakpoints": true
+    },
+    {
+      "idx": 93,
+      "version": "7",
+      "when": 1790607402201,
+      "tag": "0093_manual-model-fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 94,
+      "version": "7",
+      "when": 1790632837219,
+      "tag": "0094_pintips",
+      "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "7",
+      "when": 1790656509880,
+      "tag": "0095_machine-apron-cards",
+      "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1790811414168,
+      "tag": "0096_pinballmap-user-credentials",
+      "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "7",
+      "when": 1790811429042,
+      "tag": "0097_retire-pinballmap-operator-credentials",
       "breakpoints": true
     }
   ]

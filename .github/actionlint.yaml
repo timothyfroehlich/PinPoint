@@ -1,0 +1,9 @@
+# actionlint configuration, read automatically by `pnpm run check:linters`
+# and CI's Fast Linters job.
+paths:
+  .github/workflows/**/*.{yml,yaml}:
+    ignore:
+      # actionlint does not parse GitHub's self-repository `uses: $/...` syntax
+      # yet and reports it as a missing ref. Remove this once
+      # https://github.com/rhysd/actionlint/issues/711 ships.
+      - 'specifying action "\$/[^"]*" in invalid format because ref is missing'

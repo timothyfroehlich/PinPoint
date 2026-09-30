@@ -11,7 +11,7 @@ import { log } from "~/lib/logger";
  * entity, what happened.
  */
 export interface McpToolAudit {
-  /** Tool name, e.g. `"set_machine_availability"`. */
+  /** Tool name, e.g. `"update_machine"`. */
   tool: string;
   /** Authenticated caller's UUID. */
   userId: string;

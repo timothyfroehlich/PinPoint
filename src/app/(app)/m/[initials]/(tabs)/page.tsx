@@ -14,20 +14,30 @@ import {
   canAccessMachineManage,
   type OwnershipContext,
 } from "~/lib/permissions/index";
-import { getMachineForLayout } from "../_data";
+import {
+  getMachineCredits,
+  getMachineForLayout,
+  getMachinePinTips,
+} from "../_data";
+import { PinTipCard } from "../pin-tip-card";
 import { pinballmapLocationUrl } from "~/lib/pinballmap/public-url";
 import { getPinballMapState } from "~/lib/pinballmap/state";
 import {
   derivePbmListingView,
   type PbmSiblingInput,
 } from "~/lib/pinballmap/listing-state";
+import {
+  deriveInsiderConnectedView,
+  withInsiderConnected,
+  type PbmIcIntent,
+} from "~/lib/pinballmap/insider-connected";
 import { listSurfacingAbandonedForMachine } from "~/lib/pinballmap/abandoned-listings";
 import { getTopScoresForMachine } from "~/lib/iscored";
 import { TopScoresCard } from "~/components/machines/TopScoresCard";
 import { InfoHero } from "./info-hero";
 import { InfoRail } from "./info-rail";
-import { manufacturerTagHref } from "~/lib/machines/manufacturer";
-import { getManufacturerTagForMachine } from "~/lib/tags/manufacturer";
+import { getTagsForMachine } from "~/lib/tags/tags";
+import { tagHref } from "~/lib/tags/types";
 
 /**
  * Machine Info Tab (default route for /m/[initials]/) — the QR-scanning
@@ -154,7 +164,7 @@ export default async function MachineInfoTab({
   // what separates Covered (quiet) from Lingering (out of sync), so deriving
   // without it would raise a warning on a machine whose entry a sibling covers
   // — and send the reader to a Manage tab that says everything is fine.
-  const sameTitle: PbmSiblingInput[] =
+  const sameTitle: (PbmSiblingInput & { icIntent: PbmIcIntent | null })[] =
     canDiagnose && machine.pinballmapMachineId !== null
       ? await db
           .select({
@@ -162,12 +172,13 @@ export default async function MachineInfoTab({
             initials: machines.initials,
             name: machines.name,
             intent: machines.pinballmapIntent,
+            icIntent: machines.pinballmapIcIntent,
           })
           .from(machines)
           .where(eq(machines.pinballmapMachineId, machine.pinballmapMachineId))
       : [];
 
-  const listingView = derivePbmListingView({
+  const baseListingView = derivePbmListingView({
     machineId: machine.id,
     pinballmapMachineId: machine.pinballmapMachineId,
     pinballmapExcluded: machine.pinballmapExcluded,
@@ -177,6 +188,19 @@ export default async function MachineInfoTab({
     snapshot,
     siblings: sameTitle,
   });
+  // Insider Connected differs is Out of sync too (spec 4.2), so it raises the
+  // same chip the Manage tab would explain.
+  const listingView = withInsiderConnected(
+    baseListingView,
+    deriveInsiderConnectedView({
+      listing: baseListingView,
+      pinballmapMachineId: machine.pinballmapMachineId,
+      icEligible: machine.pinballmapTitle?.icEligible ?? false,
+      intent: machine.pinballmapIcIntent,
+      siblingIntents: sameTitle.map((sibling) => sibling.icIntent),
+      snapshot,
+    })
+  );
   const configIssue =
     canDiagnose &&
     configured &&
@@ -192,11 +216,13 @@ export default async function MachineInfoTab({
   // tab layout and the route-level deep-link guard.
   const canOpenManage = canAccessMachineManage(accessLevel, ownershipContext);
 
-  const [topScores, manufacturerTag] = await Promise.all([
+  const [topScores, tags, credits, pinTips] = await Promise.all([
     machine.iscoredGameId
       ? getTopScoresForMachine(machine.iscoredGameId, 3)
       : Promise.resolve([]),
-    getManufacturerTagForMachine(undefined, machine.id),
+    getTagsForMachine(db, machine.id),
+    getMachineCredits(machine),
+    getMachinePinTips(machine.pinballmapTitle?.opdbId ?? null),
   ]);
 
   const rail = (
@@ -206,21 +232,28 @@ export default async function MachineInfoTab({
       addedAt={machine.createdAt}
       modelName={modelName}
       manufacturer={machine.currentManufacturer}
-      manufacturerTag={
-        manufacturerTag
-          ? {
-              name: manufacturerTag.name,
-              href: manufacturerTagHref(manufacturerTag.slug),
-            }
-          : null
-      }
+      tags={tags.map((tag) => ({
+        name: tag.name,
+        href: tagHref(tag.type, tag.slug),
+      }))}
       year={machine.year}
+      credits={credits}
       topScoresSlot={
         <TopScoresCard
           iscoredGameId={machine.iscoredGameId}
           scores={topScores}
           manageHref={canOpenManage ? `/m/${machine.initials}/edit` : null}
         />
+      }
+      tipSlot={
+        pinTips ? (
+          <PinTipCard
+            tips={pinTips.tips}
+            initialIndex={pinTips.initialIndex}
+            href={pinTips.href}
+            variant="rail"
+          />
+        ) : null
       }
       pinballmap={{
         locationUrl:

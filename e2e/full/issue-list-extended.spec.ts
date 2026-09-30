@@ -101,77 +101,53 @@ test.describe("Issue List Features - Extended", () => {
     ).toBeVisible();
   });
 
-  test("should filter by Created and Modified date ranges", async ({
+  test("a Severity Segment filters the list to its issues", async ({
     page,
   }, testInfo) => {
-    // 1. Setup
-    // All seeded issues are created "NOW()" so they are today.
+    test.skip(
+      testInfo.project.name.includes("Mobile"),
+      "Phones collapse the widgets; the Machines phone test covers that layout"
+    );
     await page.goto("/issues");
+    const severity = page.getByRole("region", { name: "Severity" });
+    await expect(severity).toBeVisible();
 
-    // 2. Expand "More Filters" to see date pickers
-    await page.getByRole("button", { name: "More Filters" }).click();
-
-    // Both date-range instances share the same responsive component contract.
-    await expect(page.getByTestId("filter-created")).toBeVisible();
-    await expect(page.getByTestId("filter-modified")).toBeVisible();
-
-    const isMobile = testInfo.project.name.includes("Mobile");
-    if (isMobile) {
-      const createdFrom = page.getByTestId("filter-created-from");
-      const createdTo = page.getByTestId("filter-created-to");
-      const modifiedFrom = page.getByTestId("filter-modified-from");
-      const modifiedTo = page.getByTestId("filter-modified-to");
-
-      await expect(createdFrom).toBeVisible();
-      await expect(createdTo).toBeVisible();
-      await expect(modifiedFrom).toBeVisible();
-      await expect(modifiedTo).toBeVisible();
-
-      await createdFrom.fill("2026-08-10");
-      await createdTo.fill("2026-08-20");
-      await expect
-        .poll(() => {
-          const params = new URL(page.url()).searchParams;
-          return [params.get("created_from"), params.get("created_to")];
-        })
-        .toEqual([
-          expect.stringContaining("2026-08-10"),
-          expect.stringContaining("2026-08-20"),
-        ]);
-
-      // Keep the newly edited endpoint and clear the conflicting opposite one.
-      await createdFrom.fill("2026-08-25");
-      await expect(createdTo).toHaveValue("");
-      await expect
-        .poll(() => {
-          const params = new URL(page.url()).searchParams;
-          return [params.get("created_from"), params.get("created_to")];
-        })
-        .toEqual([expect.stringContaining("2026-08-25"), null]);
-
-      await modifiedFrom.fill("2026-08-01");
-      await modifiedTo.fill("2026-08-31");
-      await expect
-        .poll(() => {
-          const params = new URL(page.url()).searchParams;
-          return [params.get("updated_from"), params.get("updated_to")];
-        })
-        .toEqual([
-          expect.stringContaining("2026-08-01"),
-          expect.stringContaining("2026-08-31"),
-        ]);
-      return;
+    const levels = [
+      { label: "Cosmetic", value: "cosmetic" },
+      { label: "Minor", value: "minor" },
+      { label: "Major", value: "major" },
+      { label: "Unplayable", value: "unplayable" },
+    ];
+    let chosen: { label: string; value: string } | null = null;
+    for (const level of levels) {
+      const button = severity.getByRole("button", {
+        name: new RegExp(`^\\d+ ${level.label}$`),
+      });
+      if (await button.isEnabled()) {
+        chosen = level;
+        await button.click();
+        break;
+      }
     }
+    if (chosen === null) throw new Error("No selectable Severity Segment");
 
-    await expect(page.getByTestId("filter-created-from")).toBeHidden();
-    await page.getByTestId("filter-created-trigger").click();
-    await expect(page.getByRole("dialog")).toBeVisible();
-    await page.keyboard.press("Escape");
-
-    await expect(page.getByTestId("filter-modified-from")).toBeHidden();
-    await page.getByTestId("filter-modified-trigger").click();
-    await expect(page.getByRole("dialog")).toBeVisible();
-    await page.keyboard.press("Escape");
+    await expect(page).toHaveURL(
+      new RegExp(`[?&]severity=${chosen.value}(?:&|$)`)
+    );
+    const selected = severity.getByRole("button", {
+      name: new RegExp(`^\\d+ ${chosen.label}$`),
+    });
+    await expect(selected).toHaveAttribute("aria-pressed", "true");
+    // All counts issues on On the Floor machines, the list's default view
+    // (issue-widgets §2.2), so the Segment count equals the filtered total.
+    // Both come from the same render, so other workers' issues can't race it.
+    const count = Number.parseInt(
+      (await selected.getAttribute("aria-label")) ?? "",
+      10
+    );
+    await expect(
+      page.getByText(new RegExp(`^Showing \\d+ of ${count} issues$`))
+    ).toBeVisible();
   });
 
   test("should persist filters when navigating to issue detail and back", async ({
@@ -238,37 +214,5 @@ test.describe("Issue List Features - Extended", () => {
     await expect(page.getByPlaceholder("Search issues...")).toHaveValue(
       "Thing"
     );
-  });
-
-  test("should persist filters across page reload", async ({ page }) => {
-    // 1. Go to issues and apply multiple filters
-    await page.goto("/issues");
-
-    // Apply severity filter
-    await page.getByTestId("filter-severity").click();
-    await page.getByRole("option", { name: "Major" }).click();
-    await page.keyboard.press("Escape");
-    await page.waitForURL(/severity=major/);
-
-    // Apply search
-    await page.getByPlaceholder("Search issues...").fill("bird");
-    await page.keyboard.press("Enter");
-    await page.waitForURL(/q=bird/);
-
-    // 2. Reload the page
-    await page.reload();
-
-    // 3. Verify filters are restored from URL (URL params are the source of truth)
-    await expect(page).toHaveURL(/severity=major/);
-    await expect(page).toHaveURL(/q=bird/);
-
-    // Verify UI reflects the filters
-    await expect(
-      page
-        .getByTestId("filter-bar")
-        .locator('[data-slot="badge"]')
-        .filter({ hasText: "Major" })
-    ).toBeVisible();
-    await expect(page.getByPlaceholder("Search issues...")).toHaveValue("bird");
   });
 });

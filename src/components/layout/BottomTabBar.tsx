@@ -15,6 +15,7 @@ import {
   Shield,
   Library,
   ListPlus,
+  MapPin,
 } from "lucide-react";
 import { cn } from "~/lib/utils";
 import {
@@ -227,6 +228,15 @@ export function BottomTabBar({
                 >
                   <Shield className="size-5 shrink-0" aria-hidden="true" />
                   <span>Integrations</span>
+                </Link>
+                <Link
+                  href="/m/pinball-map"
+                  onClick={() => setMoreOpen(false)}
+                  className={sheetItemClass}
+                  data-testid="more-sheet-admin-pinball-map"
+                >
+                  <MapPin className="size-5 shrink-0" aria-hidden="true" />
+                  <span>Pinball Map lineup</span>
                 </Link>
               </>
             )}

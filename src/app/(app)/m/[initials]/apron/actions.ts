@@ -1,9 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { db } from "~/server/db";
-import { machines, userProfiles } from "~/server/db/schema";
+import { machineApronCards, machines, userProfiles } from "~/server/db/schema";
+import { plainTextToDoc } from "~/lib/tiptap/types";
 import { createClient } from "~/lib/supabase/server";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { err, ok, type Result } from "~/lib/result";
@@ -12,6 +13,14 @@ import {
   saveApronCardSchema,
   type SaveApronCardInput,
 } from "~/app/(app)/m/[initials]/apron/schemas";
+
+/** The name a machine's first saved card gets when the editor creates it. */
+const FIRST_CARD_NAME = "Card 1";
+
+/** Card text as stored: a ProseMirror doc, or null when blank. */
+function cardDoc(text: string): ReturnType<typeof plainTextToDoc> | null {
+  return text.trim() ? plainTextToDoc(text) : null;
+}
 
 type SaveApronCardResult = Result<
   { savedAt: string },
@@ -55,18 +64,39 @@ export async function saveApronCardAction(
     }
 
     const savedAt = new Date();
-    await db
-      .update(machines)
-      .set({
-        apronSize: parsed.data.size,
-        apronUseCustomDescription: parsed.data.useCustomDescription,
-        apronDescription: parsed.data.description,
-        apronTip: parsed.data.tip,
-        apronTipEnabled: parsed.data.tipEnabled,
-        apronSavedAt: savedAt,
-        updatedAt: savedAt,
-      })
-      .where(eq(machines.id, machine.id));
+    const settings = {
+      size: parsed.data.size,
+      useCustomDescription: parsed.data.useCustomDescription,
+      description: cardDoc(parsed.data.description),
+      tip: cardDoc(parsed.data.tip),
+      tipEnabled: parsed.data.tipEnabled,
+      designEnabled: parsed.data.designEnabled,
+      artEnabled: parsed.data.artEnabled,
+      updatedAt: savedAt,
+    };
+    // Until the card switcher exists (spec apron-cards §11.6), the editor
+    // edits the machine's first saved card, creating it on first save.
+    await db.transaction(async (tx) => {
+      const [first] = await tx
+        .select({ id: machineApronCards.id })
+        .from(machineApronCards)
+        .where(eq(machineApronCards.machineId, machine.id))
+        .orderBy(asc(machineApronCards.createdAt), asc(machineApronCards.id))
+        .limit(1);
+      if (first) {
+        await tx
+          .update(machineApronCards)
+          .set(settings)
+          .where(eq(machineApronCards.id, first.id));
+      } else {
+        await tx.insert(machineApronCards).values({
+          ...settings,
+          machineId: machine.id,
+          name: FIRST_CARD_NAME,
+          createdAt: savedAt,
+        });
+      }
+    });
 
     revalidatePath(`/m/${machine.initials}/maintenance`);
     revalidatePath(`/m/${machine.initials}/edit`);

@@ -106,3 +106,11 @@ echo "::endgroup::"
   node supabase/seed-opdb.mjs
   echo "::endgroup::"
 }
+
+# PinTips copy (PP-a0be): the refresh cron is prod-only; seed placeholder tips
+# so the tip card renders on previews.
+[[ -f supabase/seed-pintips.mjs ]] && {
+  echo "::group::Seed PinTips copy"
+  node supabase/seed-pintips.mjs
+  echo "::endgroup::"
+}

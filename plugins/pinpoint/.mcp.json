@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "pinpoint": {
+      "type": "http",
+      "url": "https://pinpoint.austinpinballcollective.org/api/mcp/mcp"
+    }
+  }
+}

@@ -12,10 +12,12 @@
  * - Authenticated Issue: 20 submissions per user per 15 min
  * - MCP: 120 authenticated requests/minute and 20 mutations/minute per user+client
  * - Pinball Map account link: 5 sign-in attempts per user per 15 min
+ * - Quick Search: 60 requests/minute for anonymous requests (keyed by IP), 120 requests/minute for signed-in users (keyed by user ID)
  *
  * @see https://github.com/timothyfroehlich/PinPoint/issues/536
  * @see https://github.com/timothyfroehlich/PinPoint/issues/537
  * @see https://github.com/timothyfroehlich/PinPoint/issues/538
+ * @see PP-rw29
  */
 
 import { Ratelimit } from "@upstash/ratelimit";
@@ -270,6 +272,40 @@ function createMcpWriteLimiter(): Ratelimit | null {
 }
 
 /**
+ * Anonymous quick search rate limiter
+ * - 60 requests per minute (sliding window)
+ * - Keyed by client IP
+ */
+function createQuickSearchIpLimiter(): Ratelimit | null {
+  const redis = getRedis();
+  if (!redis) return null;
+
+  return new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(60, "1 m"),
+    prefix: "ratelimit:quick-search:ip",
+    analytics: true,
+  });
+}
+
+/**
+ * Authenticated member quick search rate limiter
+ * - 120 requests per minute (sliding window)
+ * - Keyed by user ID (hashed)
+ */
+function createQuickSearchUserLimiter(): Ratelimit | null {
+  const redis = getRedis();
+  if (!redis) return null;
+
+  return new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(120, "1 m"),
+    prefix: "ratelimit:quick-search:user",
+    analytics: true,
+  });
+}
+
+/**
  * Whether a limit bucket is keyed by client IP, account email, or user ID.
  * IP-keyed checks apply the "unknown IP" handling; email-keyed checks
  * normalize the key to lowercase and mask it in logs; user-keyed checks
@@ -375,8 +411,8 @@ function makeLimitChecker(
  * (like Vercel) that sets the `x-forwarded-for` header securely.
  * If deployed elsewhere, ensure your proxy configuration prevents header spoofing.
  */
-export async function getClientIp(): Promise<string> {
-  const headersList = await headers();
+export async function getClientIp(customHeaders?: Headers): Promise<string> {
+  const headersList = customHeaders ?? (await headers());
   // x-forwarded-for may contain multiple IPs (client, proxies)
   // Take the first one which is the original client
   const forwardedFor = headersList.get("x-forwarded-for");
@@ -481,6 +517,38 @@ export const checkMcpWriteLimit = makeLimitChecker(createMcpWriteLimiter, {
   label: "MCP write",
   keyType: "user",
 });
+
+const checkQuickSearchUserLimit = makeLimitChecker(
+  createQuickSearchUserLimiter,
+  {
+    label: "Quick search user",
+    keyType: "user",
+  }
+);
+
+const checkQuickSearchIpLimit = makeLimitChecker(createQuickSearchIpLimiter, {
+  label: "Quick search IP",
+  keyType: "ip",
+});
+
+/**
+ * Check quick search rate limit:
+ * - Authenticated requests: 120 requests/minute sliding window, keyed by user ID (hashed)
+ * - Anonymous requests: 60 requests/minute sliding window, keyed by client IP address
+ *
+ * @param ip - Client IP address
+ * @param userId - Optional authenticated user ID
+ * @returns Allow/deny result. Fails closed in production, and open in
+ *   development, when rate limiting is unavailable.
+ */
+export async function checkQuickSearchLimit(
+  ip: string,
+  userId?: string | null
+): Promise<RateLimitResult> {
+  return userId
+    ? checkQuickSearchUserLimit(userId)
+    : checkQuickSearchIpLimit(ip);
+}
 
 /**
  * Check signup rate limit (IP-based)

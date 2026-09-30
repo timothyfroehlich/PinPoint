@@ -42,6 +42,14 @@ import {
   type CatalogEdition,
   type CatalogFamily,
 } from "~/app/(app)/m/pinballmap-actions";
+import {
+  OPDB_DISPLAY_TYPES,
+  OPDB_MACHINE_TYPES,
+  type OpdbDisplayType,
+  type OpdbMachineType,
+} from "~/lib/opdb/types";
+import { displayTag, typeTag } from "~/lib/tags/opdb";
+import { NameListInput } from "./NameListInput";
 
 /**
  * PinballMapLinkField — create/edit control for linking a machine to its
@@ -74,7 +82,7 @@ import {
  * `pinballmapExcludedReason` is deliberately NOT submitted (PP-3bbr.3). The
  * field was write-only — nothing in the app ever rendered it back, only the MCP
  * tools read it — so it was dropped rather than kept as a box nobody sees the
- * output of. The column stays and `set_machine_pinballmap` still writes it.
+ * output of. The column stays and `update_machine` still writes it.
  * `updateMachineAction` calls `carryExcludedReason` precisely because this form
  * posts no control for it: unlike the model fields below, its absence here is
  * absence rather than a human emptying a box, so a save must leave it alone
@@ -90,6 +98,11 @@ interface PinballMapLinkFieldProps {
   defaultModelName?: string | null;
   defaultManufacturer?: string | null;
   defaultYear?: number | null;
+  defaultType?: OpdbMachineType | null;
+  defaultDisplay?: OpdbDisplayType | null;
+  defaultPlayerCount?: number | null;
+  defaultDesigners?: readonly string[] | null;
+  defaultArtists?: readonly string[] | null;
   /**
    * What APC calls this cabinet, shown as the Model name field's PLACEHOLDER
    * (spec 2.4). Suggested, never pre-filled: a blank model name already means
@@ -134,6 +147,110 @@ function formatMeta(manufacturer: string | null, year: number | null): string {
     .join(" · ");
 }
 
+/** Same surface as every other input on the machine form. */
+const FIELD_CLASS =
+  "border-outline bg-surface text-foreground placeholder:text-muted-foreground";
+
+/** One labelled cell of the Model Details grid; `wide` spans two columns. */
+function ModelField({
+  label,
+  htmlFor,
+  wide = false,
+  required = false,
+  className,
+  children,
+}: {
+  label: string;
+  htmlFor?: string;
+  wide?: boolean;
+  required?: boolean;
+  className?: string;
+  children: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <div
+      className={cn(
+        "flex min-w-0 flex-col gap-1.5",
+        wide && "col-span-2",
+        className
+      )}
+    >
+      <Label
+        {...(htmlFor !== undefined ? { htmlFor } : {})}
+        className="text-xs text-muted-foreground"
+      >
+        {label}
+        {required && (
+          <span aria-hidden="true" className="text-destructive-text">
+            {" "}
+            *
+          </span>
+        )}
+      </Label>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Type and Display choose from their tag vocabularies, labelled as the tags
+ * are (collections-and-tags 9.3–9.4), plus a not-set choice (machine-editing
+ * 3.4). Radix Select cannot hold an empty value, so not-set is a sentinel in
+ * the control and an empty string in the posted hidden input.
+ */
+const NOT_SET = "not-set";
+
+const TYPE_OPTIONS = OPDB_MACHINE_TYPES.map((value) => ({
+  value,
+  label: typeTag(value)?.name ?? value,
+}));
+
+const DISPLAY_OPTIONS = OPDB_DISPLAY_TYPES.map((value) => ({
+  value,
+  label: displayTag(value)?.name ?? value,
+}));
+
+function VocabularySelect<T extends string>({
+  id,
+  name,
+  value,
+  options,
+  disabled,
+  onChange,
+}: {
+  id: string;
+  name: string;
+  value: T | null;
+  options: readonly { value: T; label: string }[];
+  disabled: boolean;
+  onChange: (next: T | null) => void;
+}): React.JSX.Element {
+  return (
+    <>
+      <input type="hidden" name={name} value={value ?? ""} />
+      <Select
+        value={value ?? NOT_SET}
+        disabled={disabled}
+        onValueChange={(next) => {
+          onChange(options.find((o) => o.value === next)?.value ?? null);
+        }}
+      >
+        <SelectTrigger id={id} className={cn("w-full", FIELD_CLASS)}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={NOT_SET}>Not set</SelectItem>
+          {options.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </>
+  );
+}
+
 export function PinballMapLinkField({
   defaultMachineId = null,
   defaultName = null,
@@ -141,6 +258,11 @@ export function PinballMapLinkField({
   defaultModelName = null,
   defaultManufacturer = null,
   defaultYear = null,
+  defaultType = null,
+  defaultDisplay = null,
+  defaultPlayerCount = null,
+  defaultDesigners = null,
+  defaultArtists = null,
   machineName = "",
   disabled = false,
   onDirty,
@@ -150,6 +272,12 @@ export function PinballMapLinkField({
   const modelNameId = useId();
   const manufacturerId = useId();
   const yearId = useId();
+  const typeId = useId();
+  const displayId = useId();
+  const playerCountId = useId();
+  const designersId = useId();
+  const artistsId = useId();
+  const headingId = useId();
   const sourceLabelId = useId();
 
   const [family, setFamily] = useState<CatalogFamily | null>(null);
@@ -177,6 +305,20 @@ export function PinballMapLinkField({
         ? String(defaultYear)
         : ""
   );
+  // The rest of the hand-entered model (PP-wqit.14). Same rule as the three
+  // above: a linked machine stores none of these, so they only ever load for
+  // a machine already on Manual Entry.
+  const [type, setType] = useState<OpdbMachineType | null>(defaultType);
+  const [display, setDisplay] = useState<OpdbDisplayType | null>(
+    defaultDisplay
+  );
+  const [playerCount, setPlayerCount] = useState(
+    defaultPlayerCount !== null ? String(defaultPlayerCount) : ""
+  );
+  const [designers, setDesigners] = useState<string[]>([
+    ...(defaultDesigners ?? []),
+  ]);
+  const [artists, setArtists] = useState<string[]>([...(defaultArtists ?? [])]);
   // Nothing is auto-filled, so anything in these three fields is the user's
   // (spec 2.4). PP-3bbr.2 had to track whether the model name was seeded or
   // typed, because a seeded value would otherwise have fired the overwrite
@@ -185,7 +327,12 @@ export function PinballMapLinkField({
   const hasHandEntry =
     modelName.trim().length > 0 ||
     manufacturer.trim().length > 0 ||
-    year.trim().length > 0;
+    year.trim().length > 0 ||
+    type !== null ||
+    display !== null ||
+    playerCount.trim().length > 0 ||
+    designers.length > 0 ||
+    artists.length > 0;
 
   /**
    * A catalog pick waiting on the "you'll lose what you typed" confirm.
@@ -405,15 +552,26 @@ export function PinballMapLinkField({
       : "Search for a model…";
 
   return (
-    // The outer div carries `@container`; the inner one does the `@xl:` query.
-    // They cannot be the same element — an element never queries its own
-    // container, so a lone `@xl:` here would silently resolve against whatever
-    // ancestor container the HOST page happened to provide. That is exactly
-    // what went wrong: the Manage tab has one, `/m/new` does not, so the same
-    // component paired Model/Edition on one page and not the other. Owning the
-    // container makes the pairing a property of this field, not of its host.
-    <div className="@container">
-      <div className="space-y-1.5 @xl:grid @xl:grid-cols-2 @xl:gap-4 @xl:space-y-0">
+    // The outer div carries `@container`; the grids inside do the `@xl:`
+    // query. They cannot be the same element — an element never queries its
+    // own container, so a lone `@xl:` would resolve against whatever ancestor
+    // container the HOST page happened to provide, and the same component laid
+    // out differently on `/m/new` and the Manage tab. Owning the container
+    // makes the grid a property of this field, not of its host.
+    <div className="@container space-y-1.5">
+      {/* The title sits above the box (machine-editing 3.1), and the Source
+          choice sits inside it: it decides every field in the box. */}
+      <h3
+        id={headingId}
+        className="text-sm leading-none font-medium text-foreground"
+      >
+        Model Details
+      </h3>
+      <section
+        aria-labelledby={headingId}
+        data-testid="model-details-section"
+        className="flex flex-col gap-3.5 rounded-lg border border-outline-variant p-4"
+      >
         <input type="hidden" name="pbmLinkPresent" value="1" />
         {excluded && (
           <input type="hidden" name="pinballmapExcluded" value="on" />
@@ -429,219 +587,86 @@ export function PinballMapLinkField({
           />
         )}
 
-        {/* Model's label + trigger are wrapped so the root grid can lay Model and
-          Edition side by side once the container is wide enough. Unlike the
-          Name/Availability pairing on the form above, this one is semantic:
-          Edition is meaningless without a Model, its control only appears once
-          a Model with multiple editions is picked, and the second column is
-          otherwise a placeholder reading "Pick a model first". Keeping them on
-          one row is what makes that dependency legible. */}
-        <div className="space-y-1.5">
-          <Label
-            htmlFor={excluded ? modelNameId : triggerId}
-            className="text-foreground"
+        {/* Source gets its own line rather than riding the label row: it
+            governs the whole group, and a control tucked in beside a label
+            reads as subordinate to the thing it decides (Tim, 2026-08-27).
+            The segmented control is the same one the Pinball Map block's
+            Intent row uses below — real buttons in a radiogroup, so keyboard
+            and screen-reader users get both positions (CORE-A11Y-004). */}
+        <div className="flex items-center gap-2.5">
+          <span
+            id={sourceLabelId}
+            className="text-[13px] leading-none text-muted-foreground"
           >
-            Model Details
-          </Label>
-
-          {/* Source gets its own line rather than riding the label row: it
-              governs the whole group, and a control tucked in beside a label
-              reads as subordinate to the thing it decides (Tim, 2026-08-27).
-              The segmented control is the same one the Pinball Map block's
-              Intent row uses below — real buttons in a radiogroup, so keyboard
-              and screen-reader users get both positions (CORE-A11Y-004). */}
-          <div className="flex items-center gap-2.5">
-            <span
-              id={sourceLabelId}
-              className="text-[13px] leading-none text-muted-foreground"
-            >
-              Source:
-            </span>
-            <div
-              role="radiogroup"
-              aria-labelledby={sourceLabelId}
-              className="inline-flex overflow-hidden rounded-lg border border-outline-variant"
-              data-testid="pinballmap-source-toggle"
-            >
-              {SOURCE_OPTIONS.map((option) => {
-                const selected = option.manual === excluded;
-                return (
-                  <button
-                    key={option.testId}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    disabled={disabled}
-                    onClick={() => {
-                      handleSetSource(option.manual);
-                    }}
-                    data-testid={option.testId}
-                    className={cn(
-                      "px-3 py-1.5 text-xs whitespace-nowrap transition-colors",
-                      "border-l border-outline-variant first:border-l-0",
-                      selected
-                        ? "bg-primary/15 font-semibold text-primary"
-                        : "text-muted-foreground hover:bg-muted/50",
-                      "disabled:pointer-events-none disabled:opacity-40"
-                    )}
-                  >
-                    {option.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* One control slot, two sources. Manual Entry REPLACES the catalog
-              picker rather than leaving it live beside fields it can no longer
-              fill — a picker that still searches while the machine is on manual
-              is a control with nothing to do (PP-3bbr.3). */}
-          {excluded ? (
-            <Input
-              id={modelNameId}
-              name="modelName"
-              value={modelName}
-              onChange={(e) => {
-                setModelName(e.target.value);
-                onDirty?.();
-              }}
-              maxLength={200}
-              disabled={disabled}
-              // Suggests the cabinet's name without filling it in — blank
-              // already means "same as the name" (spec 2.4).
-              placeholder={
-                machineName.length > 0 ? machineName : "e.g. Bordertown"
-              }
-              className="border-outline bg-surface text-foreground placeholder:text-muted-foreground"
-            />
-          ) : (
-            <Popover open={open} onOpenChange={setOpen}>
-              <PopoverTrigger asChild>
-                <Button
+            Source:
+          </span>
+          <div
+            role="radiogroup"
+            aria-labelledby={sourceLabelId}
+            className="inline-flex overflow-hidden rounded-lg border border-outline-variant"
+            data-testid="pinballmap-source-toggle"
+          >
+            {SOURCE_OPTIONS.map((option) => {
+              const selected = option.manual === excluded;
+              return (
+                <button
+                  key={option.testId}
                   type="button"
-                  id={triggerId}
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={open}
-                  aria-controls={open ? `${triggerId}-listbox` : undefined}
+                  role="radio"
+                  aria-checked={selected}
                   disabled={disabled}
-                  data-testid="pinballmap-link-select"
-                  className="w-full justify-between border-outline bg-surface text-foreground font-normal"
+                  onClick={() => {
+                    handleSetSource(option.manual);
+                  }}
+                  data-testid={option.testId}
+                  className={cn(
+                    "px-3 py-1.5 text-xs whitespace-nowrap transition-colors",
+                    "border-l border-outline-variant first:border-l-0",
+                    selected
+                      ? "bg-primary/15 font-semibold text-primary"
+                      : "text-muted-foreground hover:bg-muted/50",
+                    "disabled:pointer-events-none disabled:opacity-40"
+                  )}
                 >
-                  <span
-                    className={
-                      family ? "text-foreground" : "text-muted-foreground"
-                    }
-                  >
-                    {family
-                      ? `${family.name}${familyMeta ? ` · ${familyMeta}` : ""}`
-                      : placeholderLabel}
-                  </span>
-                  <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent
-                id={`${triggerId}-listbox`}
-                className="w-(--radix-popover-trigger-width) p-0"
-                align="start"
-              >
-                {/* shouldFilter={false}: results are already filtered server-side. */}
-                <Command shouldFilter={false}>
-                  <CommandInput
-                    placeholder="e.g. Medieval Madness"
-                    value={query}
-                    onValueChange={setQuery}
-                  />
-                  <CommandList>
-                    {loading ? (
-                      <div
-                        role="status"
-                        className="px-3 py-4 text-xs text-muted-foreground"
-                      >
-                        Searching…
-                      </div>
-                    ) : query.trim().length === 0 ? (
-                      <div className="px-3 py-4 text-xs text-muted-foreground">
-                        Type a title to search Pinball Map.
-                      </div>
-                    ) : results.length > 0 ? (
-                      <CommandGroup>
-                        {results.map((r) => {
-                          const meta = formatMeta(r.manufacturer, r.year);
-                          const key =
-                            r.machineGroupId !== null
-                              ? `g${r.machineGroupId}`
-                              : `m${r.pinballmapMachineId}`;
-                          return (
-                            <CommandItem
-                              key={key}
-                              value={key}
-                              onSelect={() => handlePickFamily(r)}
-                            >
-                              <div className="flex flex-col">
-                                <span>
-                                  {r.name}
-                                  {r.editionCount > 1 && (
-                                    <span className="ml-1.5 text-[10px] text-muted-foreground">
-                                      {r.editionCount} editions
-                                    </span>
-                                  )}
-                                </span>
-                                {meta.length > 0 && (
-                                  <span className="text-[10px] text-muted-foreground">
-                                    {meta}
-                                  </span>
-                                )}
-                              </div>
-                            </CommandItem>
-                          );
-                        })}
-                      </CommandGroup>
-                    ) : (
-                      <p className="px-3 py-4 text-xs text-muted-foreground">
-                        No Pinball Map match for “{query.trim()}”.
-                      </p>
-                    )}
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-          )}
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        {/* The second column follows the source: Edition when the model comes
-          from the catalog (meaningless without one), Manufacturer and Year when
-          it is hand-entered. It is the slot the Reason box used to occupy —
-          removing that write-only field is what freed it, so the three
-          hand-entered fields fit on the Model row instead of needing a panel
-          below it, and both sources render at the same height (PP-3bbr.3).
+        {/* One control slot, two sources. Manual Entry REPLACES the catalog
+            picker rather than leaving it live beside fields it can no longer
+            fill — a picker that still searches while the machine is on manual
+            is a control with nothing to do (PP-3bbr.3). */}
 
-          `justify-end` because the left column is one row taller (it carries
-          the Source line); without it this column's control floats above its
-          neighbour instead of sitting level with it. */}
-        <div className="flex flex-col justify-end gap-1.5">
-          {/* Associate the label only with a control that actually renders: the
-            manufacturer input when hand-entered, the edition select when one is
-            needed. In the placeholder state neither exists, so the label is a
-            plain caption (no htmlFor pointing at a non-existent id). */}
-          <Label
-            {...(excluded
-              ? { htmlFor: manufacturerId }
-              : needsEdition
-                ? { htmlFor: editionId }
-                : {})}
-            className="text-xs text-muted-foreground"
-          >
-            {excluded ? "Manufacturer and year" : "Edition"}
-            {needsEdition && !excluded && (
-              <span aria-hidden="true" className="text-destructive-text">
-                {" "}
-                *
-              </span>
-            )}
-          </Label>
-          {excluded ? (
-            <div className="grid grid-cols-[minmax(0,1fr)_6rem] gap-2">
+        {/* One shared column grid for both sources, so field edges line up
+            row to row (machine-editing 3.3): four columns, two on a narrow
+            container. On the narrow grid Player count moves up beside Year —
+            the two short numbers pair, then Type and Display — via `order`,
+            which the wide grid resets. */}
+        {excluded ? (
+          <div className="grid grid-cols-2 items-start gap-3 @xl:grid-cols-4 @xl:gap-4">
+            <ModelField label="Model name" htmlFor={modelNameId} wide>
+              <Input
+                id={modelNameId}
+                name="modelName"
+                value={modelName}
+                onChange={(e) => {
+                  setModelName(e.target.value);
+                  onDirty?.();
+                }}
+                maxLength={200}
+                disabled={disabled}
+                // Suggests the cabinet's name without filling it in — blank
+                // already means "same as the name" (spec pinballmap 2.4).
+                placeholder={
+                  machineName.length > 0 ? machineName : "e.g. Bordertown"
+                }
+                className={FIELD_CLASS}
+              />
+            </ModelField>
+            <ModelField label="Manufacturer" htmlFor={manufacturerId} wide>
               <Input
                 id={manufacturerId}
                 name="manufacturer"
@@ -653,24 +678,14 @@ export function PinballMapLinkField({
                 maxLength={100}
                 disabled={disabled}
                 placeholder="e.g. Williams"
-                // Same surface treatment as every other input on this page.
-                // Without it the shared Input base (`bg-input/30 border-input`)
-                // renders dimmer than its neighbours and reads as disabled.
-                className="border-outline bg-surface text-foreground placeholder:text-muted-foreground"
+                className={FIELD_CLASS}
               />
-              {/* `inputMode="numeric"` rather than `type="number"`: a spinner is
-                useless for a four-digit year and Safari's stepper eats the
-                field's width. It also brings up the numeric keypad on mobile,
-                which is the real win.
-
-                That choice costs the browser-side range check — `min`/`max` are
-                inert on anything but `type="number"` — so `pattern` gives the
-                browser the one thing it can still enforce (four digits) and the
-                1930..next-year range stays the server's, where it was
-                authoritative anyway.
-
-                The visible label covers both inputs, so this one carries its
-                own accessible name (CORE-A11Y). */}
+            </ModelField>
+            <ModelField label="Year" htmlFor={yearId}>
+              {/* `inputMode="numeric"` rather than `type="number"`: a spinner
+                is useless for a four-digit year, and it brings up the numeric
+                keypad on a phone. `pattern` is the one check the browser can
+                still make; the 1930..next-year range stays the server's. */}
               <Input
                 id={yearId}
                 name="year"
@@ -684,66 +699,261 @@ export function PinballMapLinkField({
                 }}
                 disabled={disabled}
                 placeholder="1994"
-                aria-label="Year"
-                className="border-outline bg-surface text-foreground placeholder:text-muted-foreground"
+                className={FIELD_CLASS}
               />
-            </div>
-          ) : needsEdition ? (
-            <Select
-              name="pinballmapMachineId"
-              required
-              // Do NOT disable while editions load: a disabled control is exempt
-              // from native `required` validation, so disabling here would let the
-              // form submit with no edition (silent un-linked save). Left enabled,
-              // the empty required select blocks submit until an edition is picked.
-              disabled={disabled}
-              // Omit `value` entirely (not value={undefined}) when unset so the
-              // placeholder shows — exactOptionalPropertyTypes forbids undefined.
-              {...(selectedEditionId !== null
-                ? { value: String(selectedEditionId) }
-                : {})}
-              onValueChange={(v) => {
-                setSelectedEditionId(Number(v));
-                markUserChanged();
-                onDirty?.();
-              }}
+            </ModelField>
+            <ModelField
+              label="Type"
+              htmlFor={typeId}
+              className="order-1 @xl:order-none"
             >
-              <SelectTrigger
-                id={editionId}
-                data-testid="pinballmap-edition-select"
-                className="border-outline bg-surface text-foreground"
-              >
-                <SelectValue
-                  placeholder={
-                    editionsLoading ? "Loading editions…" : "Select an edition"
-                  }
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {editions.map((e) => {
-                  const meta = formatMeta(e.manufacturer, e.year);
-                  return (
-                    <SelectItem
-                      key={e.pinballmapMachineId}
-                      value={String(e.pinballmapMachineId)}
+              <VocabularySelect
+                id={typeId}
+                name="type"
+                value={type}
+                options={TYPE_OPTIONS}
+                disabled={disabled}
+                onChange={(next) => {
+                  setType(next);
+                  onDirty?.();
+                }}
+              />
+            </ModelField>
+            <ModelField
+              label="Display"
+              htmlFor={displayId}
+              className="order-1 @xl:order-none"
+            >
+              <VocabularySelect
+                id={displayId}
+                name="display"
+                value={display}
+                options={DISPLAY_OPTIONS}
+                disabled={disabled}
+                onChange={(next) => {
+                  setDisplay(next);
+                  onDirty?.();
+                }}
+              />
+            </ModelField>
+            <ModelField label="Player count" htmlFor={playerCountId}>
+              <Input
+                id={playerCountId}
+                name="playerCount"
+                inputMode="numeric"
+                pattern="[1-9][0-9]?"
+                maxLength={2}
+                value={playerCount}
+                onChange={(e) => {
+                  setPlayerCount(e.target.value);
+                  onDirty?.();
+                }}
+                disabled={disabled}
+                placeholder="e.g. 4"
+                className={FIELD_CLASS}
+              />
+            </ModelField>
+            <ModelField
+              label="Designers"
+              htmlFor={designersId}
+              wide
+              className="order-2 @xl:order-none"
+            >
+              <NameListInput
+                id={designersId}
+                name="designers"
+                itemLabel="designer"
+                value={designers}
+                disabled={disabled}
+                onChange={(next) => {
+                  setDesigners(next);
+                  onDirty?.();
+                }}
+              />
+            </ModelField>
+            <ModelField
+              label="Artists"
+              htmlFor={artistsId}
+              wide
+              className="order-2 @xl:order-none"
+            >
+              <NameListInput
+                id={artistsId}
+                name="artists"
+                itemLabel="artist"
+                value={artists}
+                disabled={disabled}
+                onChange={(next) => {
+                  setArtists(next);
+                  onDirty?.();
+                }}
+              />
+            </ModelField>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 items-start gap-3 @xl:grid-cols-4 @xl:gap-4">
+            <ModelField label="Model" htmlFor={triggerId} wide>
+              <Popover open={open} onOpenChange={setOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    id={triggerId}
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={open}
+                    aria-controls={open ? `${triggerId}-listbox` : undefined}
+                    disabled={disabled}
+                    data-testid="pinballmap-link-select"
+                    className="w-full justify-between border-outline bg-surface text-foreground font-normal"
+                  >
+                    <span
+                      className={
+                        family ? "text-foreground" : "text-muted-foreground"
+                      }
                     >
-                      {e.name}
-                      {meta.length > 0 ? ` · ${meta}` : ""}
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
-          ) : (
-            <div
-              data-testid="pinballmap-edition-placeholder"
-              className="flex h-9 w-full items-center rounded-md border border-outline bg-surface px-3 text-sm text-muted-foreground"
+                      {family
+                        ? `${family.name}${familyMeta ? ` · ${familyMeta}` : ""}`
+                        : placeholderLabel}
+                    </span>
+                    <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  id={`${triggerId}-listbox`}
+                  className="w-(--radix-popover-trigger-width) p-0"
+                  align="start"
+                >
+                  {/* shouldFilter={false}: results are already filtered server-side. */}
+                  <Command shouldFilter={false}>
+                    <CommandInput
+                      placeholder="e.g. Medieval Madness"
+                      value={query}
+                      onValueChange={setQuery}
+                    />
+                    <CommandList>
+                      {loading ? (
+                        <div
+                          role="status"
+                          className="px-3 py-4 text-xs text-muted-foreground"
+                        >
+                          Searching…
+                        </div>
+                      ) : query.trim().length === 0 ? (
+                        <div className="px-3 py-4 text-xs text-muted-foreground">
+                          Type a title to search Pinball Map.
+                        </div>
+                      ) : results.length > 0 ? (
+                        <CommandGroup>
+                          {results.map((r) => {
+                            const meta = formatMeta(r.manufacturer, r.year);
+                            const key =
+                              r.machineGroupId !== null
+                                ? `g${r.machineGroupId}`
+                                : `m${r.pinballmapMachineId}`;
+                            return (
+                              <CommandItem
+                                key={key}
+                                value={key}
+                                onSelect={() => handlePickFamily(r)}
+                              >
+                                <div className="flex flex-col">
+                                  <span>
+                                    {r.name}
+                                    {r.editionCount > 1 && (
+                                      <span className="ml-1.5 text-[10px] text-muted-foreground">
+                                        {r.editionCount} editions
+                                      </span>
+                                    )}
+                                  </span>
+                                  {meta.length > 0 && (
+                                    <span className="text-[10px] text-muted-foreground">
+                                      {meta}
+                                    </span>
+                                  )}
+                                </div>
+                              </CommandItem>
+                            );
+                          })}
+                        </CommandGroup>
+                      ) : (
+                        <p className="px-3 py-4 text-xs text-muted-foreground">
+                          No Pinball Map match for “{query.trim()}”.
+                        </p>
+                      )}
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </ModelField>
+            {/* Associate the label only with a control that actually renders:
+              the edition select when one is needed. In the placeholder state
+              there is none, so the label is a plain caption. */}
+            <ModelField
+              label="Edition"
+              required={needsEdition}
+              {...(needsEdition ? { htmlFor: editionId } : {})}
+              wide
             >
-              {family ? "Only one edition" : "Pick a model first"}
-            </div>
-          )}
-        </div>
-      </div>
+              {needsEdition ? (
+                <Select
+                  name="pinballmapMachineId"
+                  required
+                  // Do NOT disable while editions load: a disabled control is exempt
+                  // from native `required` validation, so disabling here would let the
+                  // form submit with no edition (silent un-linked save). Left enabled,
+                  // the empty required select blocks submit until an edition is picked.
+                  disabled={disabled}
+                  // Omit `value` entirely (not value={undefined}) when unset so the
+                  // placeholder shows — exactOptionalPropertyTypes forbids undefined.
+                  {...(selectedEditionId !== null
+                    ? { value: String(selectedEditionId) }
+                    : {})}
+                  onValueChange={(v) => {
+                    setSelectedEditionId(Number(v));
+                    markUserChanged();
+                    onDirty?.();
+                  }}
+                >
+                  <SelectTrigger
+                    id={editionId}
+                    data-testid="pinballmap-edition-select"
+                    className="border-outline bg-surface text-foreground"
+                  >
+                    <SelectValue
+                      placeholder={
+                        editionsLoading
+                          ? "Loading editions…"
+                          : "Select an edition"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {editions.map((e) => {
+                      const meta = formatMeta(e.manufacturer, e.year);
+                      return (
+                        <SelectItem
+                          key={e.pinballmapMachineId}
+                          value={String(e.pinballmapMachineId)}
+                        >
+                          {e.name}
+                          {meta.length > 0 ? ` · ${meta}` : ""}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div
+                  data-testid="pinballmap-edition-placeholder"
+                  className="flex h-9 w-full items-center rounded-md border border-outline bg-surface px-3 text-sm text-muted-foreground"
+                >
+                  {family ? "Only one edition" : "Pick a model first"}
+                </div>
+              )}
+            </ModelField>
+          </div>
+        )}
+      </section>
 
       {/* Switching to a catalog title drops everything typed above — the DB
           forbids a linked machine carrying a hand-entered model, so this is a
@@ -760,7 +970,7 @@ export function PinballMapLinkField({
             <AlertDialogTitle>Use Pinball Map&apos;s details?</AlertDialogTitle>
             <AlertDialogDescription>
               {pendingFamily
-                ? `Linking this machine to “${pendingFamily.name}” replaces the model name, manufacturer and year you entered with Pinball Map's.`
+                ? `Linking this machine to “${pendingFamily.name}” replaces the model details you entered with Pinball Map's.`
                 : ""}
             </AlertDialogDescription>
           </AlertDialogHeader>

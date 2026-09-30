@@ -259,6 +259,7 @@ async function main(): Promise<void> {
       opdb_id: m["opdb_id"] ?? null,
       ipdb_id: m["ipdb_id"] ?? null,
       machine_group_id: m["machine_group_id"] ?? null,
+      ic_eligible: m["ic_eligible"] === true,
     }));
   // Demo families last so the two-step picker always has multi-edition data,
   // deduped by id so an APC machine that's also a demo edition appears once

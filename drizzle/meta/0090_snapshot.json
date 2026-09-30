@@ -1,5 +1,5 @@
 {
-  "id": "b1fe7b27-d925-450f-a383-355ab12da895",
+  "id": "69dab03c-f179-4c3b-96e7-8dc950dc2297",
   "prevId": "0f858be8-b627-4159-b52c-09ec915562b3",
   "version": "7",
   "dialect": "postgresql",
@@ -1590,6 +1590,12 @@
           "notNull": true,
           "default": "'off'"
         },
+        "pinballmap_ic_intent": {
+          "name": "pinballmap_ic_intent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "model_name": {
           "name": "model_name",
           "type": "text",
@@ -1723,6 +1729,10 @@
         "machines_pinballmap_intent_check": {
           "name": "machines_pinballmap_intent_check",
           "value": "pinballmap_intent IN ('on', 'off', 'no_sync')"
+        },
+        "machines_pinballmap_ic_intent_check": {
+          "name": "machines_pinballmap_ic_intent_check",
+          "value": "pinballmap_ic_intent IS NULL OR pinballmap_ic_intent IN ('on', 'off')"
         },
         "machines_pinballmap_intent_requires_link": {
           "name": "machines_pinballmap_intent_requires_link",
@@ -2344,6 +2354,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "ic_eligible": {
+          "name": "ic_eligible",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "refreshed_at": {
           "name": "refreshed_at",
@@ -3115,66 +3132,6 @@
           "value": "region_alert_status IN ('not_configured', 'posting', 'cant_post', 'couldnt_check', 'needs_discord')"
         }
       },
-      "isRLSEnabled": true
-    },
-    "public.pinballmap_user_credentials": {
-      "name": "pinballmap_user_credentials",
-      "schema": "",
-      "columns": {
-        "user_id": {
-          "name": "user_id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "pbm_username": {
-          "name": "pbm_username",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "pbm_email": {
-          "name": "pbm_email",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "token_vault_id": {
-          "name": "token_vault_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "linked_at": {
-          "name": "linked_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "needs_relink_at": {
-          "name": "needs_relink_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "pinballmap_user_credentials_user_id_user_profiles_id_fk": {
-          "name": "pinballmap_user_credentials_user_id_user_profiles_id_fk",
-          "tableFrom": "pinballmap_user_credentials",
-          "tableTo": "user_profiles",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
       "isRLSEnabled": true
     },
     "public.timeline_event_people": {

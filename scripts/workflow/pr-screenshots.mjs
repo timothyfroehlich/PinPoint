@@ -1,15 +1,16 @@
 #!/usr/bin/env node
-// scripts/workflow/pr-screenshots.mjs — desktop+mobile screenshots for a PR.
+// scripts/workflow/pr-screenshots.mjs — desktop + two mobile screenshots for a PR.
 //
 // PP-wi85: UI-touching PRs must have screenshots posted before handoff to Tim
 // so he can eyeball them before the merge (which is his decision — he approves
 // the merge-pr.sh prompt, PP-wi85). This script
-// shoots a manifest of key pages at two viewports, pushes the PNGs to a
+// shoots a manifest of key pages at three viewports, pushes the PNGs to a
 // dedicated orphan `pr-screenshots` branch (repo is public, so raw.githubusercontent.com
 // URLs render inline in the PR comment), and posts/updates one sticky PR comment.
 //
 // Usage:
 //   node scripts/workflow/pr-screenshots.mjs <PR> [--pages=a,b,c] [--force-auth]
+//   node scripts/workflow/pr-screenshots.mjs <PR> --files=a.png,b.png
 //
 //   <PR>          Required. GitHub PR number — used for the screenshot storage
 //                 path and the sticky comment target.
@@ -21,6 +22,14 @@
 //                 dropping the rest, so finish with an unfiltered run.
 //   --force-auth  Regenerate e2e/.auth/*.json storage state even if present
 //                 (use when a previous session looks stale/expired).
+//   --files=a,b   Publish PNGs you already captured instead of shooting the
+//                 manifest — for UI states no manifest route reaches. Name
+//                 each `<viewport>-<id>.png` (viewport: desktop, mobile-large,
+//                 mobile-small); a page's viewports share a comment row.
+//                 Skips the dev-server check and auth setup. Like --pages, it
+//                 rebuilds the sticky comment from only these files. Use this
+//                 instead of pushing to pr-screenshots by hand. See
+//                 pr-screenshot-files.mjs.
 //
 // Browser selection (env var):
 //   PR_SHOTS_BROWSER=chromium|firefox  Force a specific renderer. When unset,
@@ -71,6 +80,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { evaluateStorageState } from "./auth-storage-state.mjs";
+import { parseShotFiles } from "./pr-screenshot-files.mjs";
 
 const { loadEnvConfig } = nextEnv;
 
@@ -87,9 +97,12 @@ const STORAGE_STATE = {
   technician: join(REPO_ROOT, "e2e/.auth/technician.json"),
 };
 
+// The review viewports from pinpoint-design-bible §4. Small mobile (320px) is
+// the layout floor: a member runs their phone zoomed in.
 const VIEWPORTS = {
-  desktop: { width: 1440, height: 900 },
-  mobile: { width: 390, height: 844 },
+  desktop: { width: 1440, height: 900, label: "Desktop (1440×900)" },
+  "mobile-large": { width: 430, height: 932, label: "Large mobile (430×932)" },
+  "mobile-small": { width: 320, height: 568, label: "Small mobile (320×568)" },
 };
 
 const SCREENSHOTS_BRANCH = "pr-screenshots";
@@ -99,10 +112,17 @@ function parseArgs(argv) {
   let pr;
   let pagesFilter;
   let forceAuth = false;
+  let files;
 
   for (const arg of argv) {
     if (arg === "--force-auth") {
       forceAuth = true;
+    } else if (arg.startsWith("--files=")) {
+      files = arg
+        .slice("--files=".length)
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
     } else if (arg.startsWith("--pages")) {
       const value = arg.includes("=") ? arg.split("=")[1] : "";
       pagesFilter = value
@@ -118,11 +138,14 @@ function parseArgs(argv) {
 
   if (!pr || !/^\d+$/.test(pr)) {
     throw new Error(
-      "Usage: node scripts/workflow/pr-screenshots.mjs <PR> [--pages=a,b,c] [--force-auth]"
+      "Usage: node scripts/workflow/pr-screenshots.mjs <PR> [--pages=a,b,c] [--force-auth] | <PR> --files=a.png,b.png"
     );
   }
+  if (files && (pagesFilter || forceAuth)) {
+    throw new Error("--files cannot be combined with --pages or --force-auth");
+  }
 
-  return { pr, pagesFilter, forceAuth };
+  return { pr, pagesFilter, forceAuth, files };
 }
 
 function loadManifest(pagesFilter) {
@@ -231,10 +254,10 @@ async function captureScreenshots(browserType, baseUrl, pages, workDir) {
 
   try {
     for (const role of rolesNeeded) {
-      for (const [vpName, vp] of Object.entries(VIEWPORTS)) {
+      for (const [vpName, { width, height }] of Object.entries(VIEWPORTS)) {
         const ctx = await browser.newContext({
           storageState: STORAGE_STATE[role],
-          viewport: vp,
+          viewport: { width, height },
           baseURL: baseUrl,
         });
         contexts.set(`${role}:${vpName}`, ctx);
@@ -420,25 +443,25 @@ function buildCommentBody(repoSlug, pr, shortSha, captured) {
   const byPage = new Map();
   for (const shot of captured) {
     if (!byPage.has(shot.id))
-      byPage.set(shot.id, { label: shot.label, desktop: null, mobile: null });
-    byPage.get(shot.id)[shot.vpName] = shot.fileName;
+      byPage.set(shot.id, { label: shot.label, files: {} });
+    byPage.get(shot.id).files[shot.vpName] = shot.fileName;
   }
 
   const rawBase = `https://raw.githubusercontent.com/${repoSlug}/${SCREENSHOTS_BRANCH}/pr-${pr}/${shortSha}`;
+  const vpNames = Object.keys(VIEWPORTS);
 
-  const sections = [...byPage.values()].map(({ label, desktop, mobile }) => {
-    const desktopCell = desktop
-      ? `![desktop](${rawBase}/${desktop})`
-      : "_capture failed_";
-    const mobileCell = mobile
-      ? `![mobile](${rawBase}/${mobile})`
-      : "_capture failed_";
+  const sections = [...byPage.values()].map(({ label, files }) => {
+    const cells = vpNames.map((vpName) =>
+      files[vpName]
+        ? `![${vpName}](${rawBase}/${files[vpName]})`
+        : "_capture failed_"
+    );
     return [
       `### ${label}`,
       "",
-      "| Desktop (1440×900) | Mobile (390×844) |",
-      "| --- | --- |",
-      `| ${desktopCell} | ${mobileCell} |`,
+      `| ${vpNames.map((vpName) => VIEWPORTS[vpName].label).join(" | ")} |`,
+      `| ${vpNames.map(() => "---").join(" | ")} |`,
+      `| ${cells.join(" | ")} |`,
       "",
     ].join("\n");
   });
@@ -497,8 +520,13 @@ function postOrUpdateStickyComment(repoSlug, pr, body) {
 }
 
 async function main() {
-  const { pr, pagesFilter, forceAuth } = parseArgs(process.argv.slice(2));
-  const pages = loadManifest(pagesFilter);
+  const { pr, pagesFilter, forceAuth, files } = parseArgs(
+    process.argv.slice(2)
+  );
+  // Validate --files before any network call, so a bad name fails fast.
+  const preCaptured = files
+    ? parseShotFiles(files, Object.keys(VIEWPORTS))
+    : undefined;
 
   const shortSha = git(["rev-parse", "--short", "HEAD"], { cwd: REPO_ROOT });
 
@@ -525,25 +553,30 @@ async function main() {
     );
   }
 
-  const baseUrl = resolveBaseUrl();
-  const healthy = await checkServerReachable(baseUrl);
-  if (!healthy) {
-    throw new Error(
-      `Dev server not reachable at ${baseUrl}/api/health. Start it first: pnpm run dev`
-    );
-  }
-
-  const rolesNeeded = [...new Set(pages.map((p) => p.authRole))];
-  ensureAuthStorageState(rolesNeeded, forceAuth);
-
   const workDir = mkdtempSync(join(tmpdir(), "pr-screenshots-capture-"));
   let captured;
   try {
-    captured = await captureWithFallback(baseUrl, pages, workDir);
-    if (captured.length === 0) {
-      throw new Error(
-        "No screenshots captured — every page failed. See errors above."
-      );
+    if (preCaptured) {
+      captured = preCaptured;
+    } else {
+      const pages = loadManifest(pagesFilter);
+      const baseUrl = resolveBaseUrl();
+      const healthy = await checkServerReachable(baseUrl);
+      if (!healthy) {
+        throw new Error(
+          `Dev server not reachable at ${baseUrl}/api/health. Start it first: pnpm run dev`
+        );
+      }
+
+      const rolesNeeded = [...new Set(pages.map((p) => p.authRole))];
+      ensureAuthStorageState(rolesNeeded, forceAuth);
+
+      captured = await captureWithFallback(baseUrl, pages, workDir);
+      if (captured.length === 0) {
+        throw new Error(
+          "No screenshots captured — every page failed. See errors above."
+        );
+      }
     }
 
     const { remotePaths, pushed } = publishScreenshots(pr, shortSha, captured);

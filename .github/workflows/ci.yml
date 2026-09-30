@@ -153,7 +153,7 @@ jobs:
 
       - name: Setup locked mise toolchain
         id: toolchain
-        uses: ./.github/actions/setup-mise
+        uses: $/.github/actions/setup-mise
         with:
           install-args: "--locked"
 
@@ -211,7 +211,7 @@ jobs:
 
       - name: Setup locked mise toolchain
         id: toolchain
-        uses: ./.github/actions/setup-mise
+        uses: $/.github/actions/setup-mise
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -243,7 +243,7 @@ jobs:
           sudo apt-get install -y yamllint shellcheck
 
       - name: Setup locked Python toolchain
-        uses: ./.github/actions/setup-mise
+        uses: $/.github/actions/setup-mise
         with:
           install-args: "--locked python ruff zizmor"
           cache-pnpm: "false"
@@ -257,6 +257,8 @@ jobs:
       - name: Check skill frontmatter
         run: python3 scripts/check_skill_frontmatter.py
 
+      # actionlint reads .github/actionlint.yaml, which ignores the
+      # self-repository `uses: $/...` references until rhysd/actionlint#711.
       - name: Action lint
         env:
           ACTIONLINT_VERSION: "1.7.11"
@@ -275,6 +277,9 @@ jobs:
 
       - name: Pytest (scripts)
         run: python3 -m pytest scripts/tests/
+
+      - name: Check E2E spec locations
+        run: python3 scripts/check_e2e_spec_locations.py
 
       - name: ShellCheck
         run: find scripts/ .claude/hooks/ -name '*.sh' -print0 | xargs -0 shellcheck
@@ -312,7 +317,7 @@ jobs:
 
       - name: Setup locked mise toolchain
         id: toolchain
-        uses: ./.github/actions/setup-mise
+        uses: $/.github/actions/setup-mise
 
       - name: Restore node_modules
         id: cache-restore
@@ -356,7 +361,7 @@ jobs:
 
       - name: Setup locked mise toolchain
         id: toolchain
-        uses: ./.github/actions/setup-mise
+        uses: $/.github/actions/setup-mise
         with:
           install-args: "--locked node pnpm supabase"
 
@@ -372,7 +377,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Setup Supabase
-        uses: ./.github/actions/setup-supabase
+        uses: $/.github/actions/setup-supabase
         with:
           seed: "false"
 
@@ -407,7 +412,7 @@ jobs:
 
       - name: Setup locked mise toolchain
         id: toolchain
-        uses: ./.github/actions/setup-mise
+        uses: $/.github/actions/setup-mise
         with:
           install-args: "--locked node pnpm supabase"
 
@@ -423,7 +428,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Setup Supabase
-        uses: ./.github/actions/setup-supabase
+        uses: $/.github/actions/setup-supabase
 
       - name: Run Supabase integration tests
         run: pnpm run test:integration:supabase
@@ -452,7 +457,7 @@ jobs:
 
       - name: Setup locked mise toolchain
         id: toolchain
-        uses: ./.github/actions/setup-mise
+        uses: $/.github/actions/setup-mise
         with:
           install-args: "--locked node pnpm supabase"
 
@@ -481,7 +486,7 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Setup Supabase
-        uses: ./.github/actions/setup-supabase
+        uses: $/.github/actions/setup-supabase
 
       - name: Run Smoke Tests (Chromium)
         env:
@@ -523,7 +528,7 @@ jobs:
 
       - name: Setup locked mise toolchain
         id: toolchain
-        uses: ./.github/actions/setup-mise
+        uses: $/.github/actions/setup-mise
         with:
           install-args: "--locked node pnpm supabase"
 
@@ -552,7 +557,7 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Setup Supabase
-        uses: ./.github/actions/setup-supabase
+        uses: $/.github/actions/setup-supabase
 
       - name: Run Smoke Tests (Mobile Chrome)
         env:
@@ -594,7 +599,7 @@ jobs:
 
       - name: Setup locked mise toolchain
         id: toolchain
-        uses: ./.github/actions/setup-mise
+        uses: $/.github/actions/setup-mise
         with:
           install-args: "--locked node pnpm supabase"
 
@@ -623,7 +628,7 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Setup Supabase
-        uses: ./.github/actions/setup-supabase
+        uses: $/.github/actions/setup-supabase
 
       - name: Run Full Tests (Chromium)
         env:
@@ -679,7 +684,7 @@ jobs:
 
       - name: Setup locked mise toolchain
         id: toolchain
-        uses: ./.github/actions/setup-mise
+        uses: $/.github/actions/setup-mise
         with:
           install-args: "--locked node pnpm supabase"
 
@@ -712,7 +717,7 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium webkit
 
       - name: Setup Supabase
-        uses: ./.github/actions/setup-supabase
+        uses: $/.github/actions/setup-supabase
 
       # Each Playwright step carries its OWN timeout-minutes, deliberately.
       # A job-level timeout cancels the job outright: the evaluate step never
@@ -883,7 +888,7 @@ jobs:
           fetch-depth: 0  # the base commit's lockfile
 
       - name: Setup locked mise toolchain
-        uses: ./.github/actions/setup-mise
+        uses: $/.github/actions/setup-mise
 
       # pnpm audit reads the lockfile only; no node_modules needed. `--dir`
       # keeps pnpm's mise shim resolving from the checkout.

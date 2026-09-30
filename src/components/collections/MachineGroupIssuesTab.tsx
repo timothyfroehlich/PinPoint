@@ -3,6 +3,7 @@ import { parseIssueFilters } from "~/lib/issues/filters";
 import { loadIssueListPage } from "~/lib/issues/list-page";
 import { IssueFilters } from "~/components/issues/IssueFilters";
 import { IssueList } from "~/components/issues/IssueList";
+import { IssueSummaryWidgets } from "~/components/issues/IssueSummaryWidgets";
 import type { CollectionMachine } from "~/lib/collections/owner";
 
 interface MachineGroupIssuesTabProps {
@@ -59,11 +60,22 @@ export async function MachineGroupIssuesTab({
   filters.machine = scoped;
 
   filters.currentUserId = viewer.userId;
-  const { issuesList, totalCount, filterUsers, assigneeUsers, page, pageSize } =
-    await loadIssueListPage(filters, { isAdmin: viewer.isAdmin });
+  const {
+    issuesList,
+    totalCount,
+    filterUsers,
+    assigneeUsers,
+    page,
+    pageSize,
+    summary,
+  } = await loadIssueListPage(filters, {
+    isAdmin: viewer.isAdmin,
+    scopeMachineInitials: groupInitials,
+  });
 
   return (
     <div className="space-y-6">
+      <IssueSummaryWidgets summary={summary} />
       <p className="text-sm text-muted-foreground">
         Showing {issuesList.length} of {totalCount} issues
       </p>

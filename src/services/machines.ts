@@ -1,4 +1,4 @@
-import { eq, and, type InferSelectModel } from "drizzle-orm";
+import { eq, and, sql, type InferSelectModel } from "drizzle-orm";
 import { db, type DbTransaction } from "~/server/db";
 import {
   machines,
@@ -40,6 +40,9 @@ import {
   INVALID_WHEN_ON,
   type PbmListingIntent,
 } from "~/lib/pinballmap/listing-state";
+import type { PbmIcIntent } from "~/lib/pinballmap/insider-connected";
+import { getCatalogEntry } from "~/lib/pinballmap/catalog";
+import type { OpdbDisplayType, OpdbMachineType } from "~/lib/opdb/types";
 
 export type Machine = InferSelectModel<typeof machines>;
 
@@ -66,6 +69,14 @@ export interface MachinePbmColumns {
   modelName: string | null;
   manufacturer: string | null;
   year: number | null;
+  // The rest of the manual model (PP-wqit.14), under its own CHECK
+  // (`machines_manual_model_requires_excluded`) with the same reason to move
+  // with the set.
+  type: OpdbMachineType | null;
+  display: OpdbDisplayType | null;
+  playerCount: number | null;
+  designers: string[] | null;
+  artists: string[] | null;
   opdbId: string | null;
   ipdbId: number | null;
 }
@@ -374,7 +385,7 @@ export interface UpdateMachineOwnerParams {
 
 /**
  * Change (or clear) a machine's owner and nothing else — the focused slice of
- * `updateMachineAction`'s owner logic, for the MCP `set_machine_owner` tool.
+ * `updateMachineAction`'s owner logic, for the MCP `update_machine` tool.
  * Atomically: (optional) guest→member promotion, the owner-column update,
  * watcher reconciliation (drop the old owner, subscribe the new), and the
  * `owner_changed` lifecycle event. Name and presence are untouched. Removed and
@@ -579,7 +590,7 @@ export async function updateMachinePresence({
 // --- PinballMap link seam (PP-u4ab.12) --------------------------------------
 //
 // One seam, two steps, shared by `updateMachineAction` (the machine edit page)
-// and the MCP `set_machine_pinballmap` tool:
+// and the MCP `update_machine` tool:
 //
 //   1. {@link planMachinePbmLink}  — decide, before any transaction opens.
 //   2. {@link applyMachinePbmLink} — write, inside the caller's transaction.
@@ -674,7 +685,18 @@ export async function applyMachinePbmLink(
   actorUserId: string,
   previousIntent?: PbmListingIntent
 ): Promise<void> {
-  await tx.update(machines).set(plan.columns).where(eq(machines.id, machineId));
+  await tx
+    .update(machines)
+    .set({
+      ...plan.columns,
+      // An Insider Connected intent is about one title's entry (spec 3.8), so a
+      // re-match clears it rather than silently asserting it for the new title
+      // — the same reason intent On does not survive a re-match (2.3).
+      // Evaluated against the row's OLD title, which is what SET's right-hand
+      // side reads.
+      pinballmapIcIntent: sql`CASE WHEN ${machines.pinballmapMachineId} IS NOT DISTINCT FROM ${plan.columns.pinballmapMachineId} THEN ${machines.pinballmapIcIntent} ELSE NULL END`,
+    })
+    .where(eq(machines.id, machineId));
 
   if (plan.abandoned) {
     await recordAbandonedListing(tx, machineId, plan.abandoned, actorUserId);
@@ -726,6 +748,11 @@ type PbmLinkBasis = StoredPbmLinkState & {
   modelName: string | null;
   manufacturer: string | null;
   year: number | null;
+  type: OpdbMachineType | null;
+  display: OpdbDisplayType | null;
+  playerCount: number | null;
+  designers: string[] | null;
+  artists: string[] | null;
 };
 
 const PBM_LINK_COLUMNS = {
@@ -741,6 +768,12 @@ const PBM_LINK_COLUMNS = {
   modelName: true,
   manufacturer: true,
   year: true,
+  // The rest of the manual model (PP-wqit.14) — same CHECK shape, same reason.
+  type: true,
+  display: true,
+  playerCount: true,
+  designers: true,
+  artists: true,
   opdbId: true,
   ipdbId: true,
 } as const;
@@ -762,8 +795,22 @@ function pbmLinkBasisUnchanged(a: PbmLinkBasis, b: PbmLinkBasis): boolean {
     a.pinballmapExcludedReason === b.pinballmapExcludedReason &&
     a.modelName === b.modelName &&
     a.manufacturer === b.manufacturer &&
-    a.year === b.year
+    a.year === b.year &&
+    a.type === b.type &&
+    a.display === b.display &&
+    a.playerCount === b.playerCount &&
+    sameNameList(a.designers, b.designers) &&
+    sameNameList(a.artists, b.artists)
   );
+}
+
+/** Credit lists compare by value: two reads of one row are distinct arrays. */
+function sameNameList(
+  a: readonly string[] | null,
+  b: readonly string[] | null
+): boolean {
+  if (a === null || b === null) return a === b;
+  return a.length === b.length && a.every((name, i) => name === b[i]);
 }
 
 /**
@@ -773,9 +820,9 @@ function pbmLinkBasisUnchanged(a: PbmLinkBasis, b: PbmLinkBasis): boolean {
  * `resolvePbmLinkColumnsForUpdate` writes each field as `value ?? null`, which
  * is right for the edit form — that form always posts all of them, so an absent
  * one means a human emptied the box. An MCP caller re-confirming an exclusion it
- * did not author has no such intent, and `set_machine_pinballmap`'s schema has
- * no field for any of the four, so it *cannot* send them. The fleet pass
- * (PP-h059) does exactly that across the whole floor:
+ * did not author has no such intent: `update_machine` has no field for the
+ * manual model columns, so it *cannot* send them, and it may omit the reason. The
+ * fleet pass (PP-h059) does exactly that across the whole floor:
  * `{ machine: "FB", pinballmapExcluded: true }` would null both
  * "homebrew — one-off cabinet" and the model identity — name, manufacturer and
  * year — on every machine it touched, flipping the Info tab's Model row to
@@ -787,13 +834,13 @@ function pbmLinkBasisUnchanged(a: PbmLinkBasis, b: PbmLinkBasis): boolean {
  * value the caller sent. Only `undefined` — the field absent from the request —
  * carries.
  *
- * The three model fields moved in with the reason (PP-3bbr shipped them into
+ * The manual model fields moved in with the reason (PP-3bbr shipped them into
  * `MachinePbmColumns`) rather than getting their own helper, because they are
  * one decision: what an omitted field means depends on the caller, not on which
  * column it is.
  *
  * The reason splits back out into {@link carryExcludedReason} for the ONE
- * caller whose answer differs per column: the edit form posts the three model
+ * caller whose answer differs per column: the edit form posts the manual model
  * fields (so a blank one is a human clearing the box, spec 2.4) but has no
  * control for the reason at all (PP-3bbr.3), so its silence there is absence,
  * not intent.
@@ -807,11 +854,16 @@ function carryExcludedFields(
     | "modelName"
     | "manufacturer"
     | "year"
+    | "type"
+    | "display"
+    | "playerCount"
+    | "designers"
+    | "artists"
   >
 ): PbmLinkSelection {
   // Only a re-statement of an exclusion that was already stored can carry —
   // turning exclusion ON for the first time has nothing to carry from, and a
-  // machine being linked to a title must clear all four (the
+  // machine being linked to a title must clear all of them (the
   // `machines_model_name_requires_excluded` CHECK makes "linked and
   // hand-entered" unrepresentable).
   if (selection.pinballmapExcluded !== true || !stored.pinballmapExcluded) {
@@ -825,6 +877,16 @@ function carryExcludedFields(
     carried.manufacturer = stored.manufacturer;
   if (selection.year === undefined && stored.year !== null)
     carried.year = stored.year;
+  if (selection.type === undefined && stored.type !== null)
+    carried.type = stored.type;
+  if (selection.display === undefined && stored.display !== null)
+    carried.display = stored.display;
+  if (selection.playerCount === undefined && stored.playerCount !== null)
+    carried.playerCount = stored.playerCount;
+  if (selection.designers === undefined && stored.designers !== null)
+    carried.designers = stored.designers;
+  if (selection.artists === undefined && stored.artists !== null)
+    carried.artists = stored.artists;
   return carried;
 }
 
@@ -837,7 +899,7 @@ function carryExcludedFields(
  * `value ?? null` is the right rule for those. It owns no control for the
  * reason: the box was write-only (nothing in the app rendered it back, only the
  * MCP tools read it) and was removed in PP-3bbr.3. Without this, saving an
- * unrelated detail on a machine `set_machine_pinballmap` had excluded would
+ * unrelated detail on a machine `update_machine` had excluded would
  * silently null "homebrew — one-off cabinet" — a forgotten argument destroying
  * stored state, which is the thing CORE-ARCH-012 forbids.
  *
@@ -861,7 +923,7 @@ export function carryExcludedReason(
 
 /**
  * Change a machine's PinballMap link and nothing else — the focused slice of
- * `updateMachineAction`'s PBM logic, for the MCP `set_machine_pinballmap` tool.
+ * `updateMachineAction`'s PBM logic, for the MCP `update_machine` tool.
  *
  * Runs the same steps the edit page runs, in the same order, over the same seam:
  * plan, then apply in a transaction. Authorization stays in the caller
@@ -984,10 +1046,16 @@ export async function updateMachinePbmLink({
           // the two shapes are not interchangeable. Keep them in step: this row
           // becomes `previous`, the pre-change record the caller compares
           // against, so a column missing here is a field that silently reads as
-          // unchanged. (PP-3bbr added `modelName`.)
+          // unchanged. (PP-3bbr added `modelName`; PP-wqit.14 the rest of the
+          // manual model.)
           modelName: machines.modelName,
           manufacturer: machines.manufacturer,
           year: machines.year,
+          type: machines.type,
+          display: machines.display,
+          playerCount: machines.playerCount,
+          designers: machines.designers,
+          artists: machines.artists,
           opdbId: machines.opdbId,
           ipdbId: machines.ipdbId,
           presenceStatus: machines.presenceStatus,
@@ -1178,4 +1246,65 @@ export async function updateMachineIscoredLink({
     iscoredGameId: normalized,
     previousIscoredGameId: current.iscoredGameId,
   };
+}
+
+export interface SetMachineIcIntentParams {
+  machineId: string;
+  /** Null clears the intent: the toggle's Don't sync position (3.8). */
+  icIntent: PbmIcIntent | null;
+}
+
+export type SetMachineIcIntentResult =
+  | { ok: true; changed: boolean; previous: PbmIcIntent | null }
+  | { ok: false; reason: "not_linked" | "ineligible"; message: string };
+
+/**
+ * Record a machine's Insider Connected intent (spec pinballmap §3.8), or clear it
+ * to Don't sync with null. Writes only to PinPoint; the push to Pinball Map is a
+ * separate, person-initiated action.
+ *
+ * The machine must be linked to a title the catalog marks eligible. The UPDATE is
+ * pinned to the title that was checked, so a re-match landing in between (which
+ * clears the intent) is reported as not linked rather than overwritten.
+ */
+export async function setMachineIcIntent({
+  machineId,
+  icIntent,
+}: SetMachineIcIntentParams): Promise<SetMachineIcIntentResult> {
+  const current = await db.query.machines.findFirst({
+    where: eq(machines.id, machineId),
+    columns: { pinballmapMachineId: true, pinballmapIcIntent: true },
+  });
+  if (!current) {
+    throw new Error(`Machine ${machineId} not found`);
+  }
+  const titleId = current.pinballmapMachineId;
+  const notLinked = {
+    ok: false,
+    reason: "not_linked",
+    message: "Machine isn't linked to a Pinball Map title yet",
+  } as const;
+  if (titleId === null) return notLinked;
+
+  const catalogEntry = await getCatalogEntry(titleId);
+  if (!catalogEntry?.icEligible) {
+    return {
+      ok: false,
+      reason: "ineligible",
+      message: "Pinball Map doesn't offer Insider Connected for this game.",
+    };
+  }
+
+  // No shortcut when the intent already matches: the title-pinned UPDATE is what
+  // notices a re-match that landed after the read above.
+  const previous = current.pinballmapIcIntent;
+  const updated = await db
+    .update(machines)
+    .set({ pinballmapIcIntent: icIntent })
+    .where(
+      and(eq(machines.id, machineId), eq(machines.pinballmapMachineId, titleId))
+    )
+    .returning({ id: machines.id });
+  if (updated.length === 0) return notLinked;
+  return { ok: true, changed: previous !== icIntent, previous };
 }

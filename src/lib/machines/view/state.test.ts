@@ -17,6 +17,9 @@ describe("machine view URL state", () => {
       page: 1,
       pageSize: 25,
       columns: ["machine", "playability", "openIssues", "lastServiced"],
+      severity: [],
+      presenceWidget: "all",
+      playabilityWidget: "all",
     });
   });
 
@@ -33,6 +36,8 @@ describe("machine view URL state", () => {
     const params = new URLSearchParams({
       presence: "all",
       status: "unplayable,operational,invalid",
+      severity: "major,bogus,cosmetic,major",
+      presenceWidget: "sideways",
       owner: "owner-2,unassigned,owner-2",
       columns: "machine,year,invalid,owner",
       pageSize: "50",
@@ -41,9 +46,20 @@ describe("machine view URL state", () => {
 
     expect(state.presence).toBe("all");
     expect(state.status).toEqual(["unplayable", "operational"]);
+    expect(state.severity).toEqual(["major", "cosmetic"]);
+    expect(state.presenceWidget).toBe("all");
     expect(state.owner).toEqual(["owner-2", "unassigned"]);
     expect(state.columns).toEqual(["machine", "year", "owner"]);
     expect(state.pageSize).toBe(50);
+  });
+
+  it("ignores a legacy issuesWidget parameter from a retired widget", () => {
+    const state = parseMachineViewState(
+      new URLSearchParams({ issuesWidget: "filtered" }),
+      "machines"
+    );
+
+    expect(state).not.toHaveProperty("issuesWidget");
   });
 
   it("ignores invalid enums, pages, page sizes, sorts, and columns", () => {
@@ -89,16 +105,18 @@ describe("machine view URL state", () => {
       q: "mars",
       presence: "all" as const,
       status: ["needs_service" as const],
+      severity: ["minor" as const, "unplayable" as const],
       owner: ["unassigned"],
       sort: "year" as const,
       dir: "desc" as const,
       page: 3,
       pageSize: 100 as const,
       columns: ["machine" as const, "year" as const],
+      presenceWidget: "filtered" as const,
     };
     const serialized = serializeMachineViewState(state, "machines");
     expect(serialized.toString()).toBe(
-      "q=mars&presence=all&status=needs_service&owner=unassigned&sort=year&dir=desc&page=3&pageSize=100&columns=machine%2Cyear"
+      "q=mars&presence=all&status=needs_service&severity=minor%2Cunplayable&owner=unassigned&sort=year&dir=desc&page=3&pageSize=100&columns=machine%2Cyear&presenceWidget=filtered"
     );
     expect(parseMachineViewState(serialized, "machines")).toEqual(state);
   });

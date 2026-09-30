@@ -16,7 +16,9 @@ import {
   addMachineToPinballMapAction,
   refreshPinballmapLineupAction,
   removeMachineFromPinballMapAction,
+  setInsiderConnectedIntentAction,
   setPinballmapIntentAction,
+  updateInsiderConnectedAction,
 } from "~/app/(app)/m/pinballmap-actions";
 import { Button } from "~/components/ui/button";
 import {
@@ -32,6 +34,11 @@ import {
 } from "~/components/ui/alert-dialog";
 import { RelativeTime } from "~/components/issues/RelativeTime";
 import { useRelativeNow } from "~/components/issues/RelativeTimeProvider";
+import type {
+  PbmIcIntent,
+  PbmInsiderConnectedSetting,
+  PbmInsiderConnectedView,
+} from "~/lib/pinballmap/insider-connected";
 import type {
   PbmListingIntent,
   PbmListingView,
@@ -103,6 +110,13 @@ export interface PinballmapListingControlProps {
   linkStatus: PinballMapLinkState;
   /** Catalog title, so a confirm names the game rather than "this machine". */
   modelName: string | null;
+  /**
+   * The Insider Connected toggle (spec 3.8), or null for an ineligible title.
+   * It sits on the intent row, so its presence never changes the control's
+   * height (4.1). Derived on the server by `deriveInsiderConnectedView`; a
+   * difference is already folded into `view` as Out of sync plus the push.
+   */
+  insiderConnected: PbmInsiderConnectedView | null;
 }
 
 const INTENT_OPTIONS: readonly { value: PbmListingIntent; label: string }[] = [
@@ -124,6 +138,7 @@ export function PinballmapListingControl({
   canRefresh,
   linkStatus,
   modelName,
+  insiderConnected,
 }: PinballmapListingControlProps): React.JSX.Element {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -209,6 +224,25 @@ export function PinballmapListingControl({
               Alert: Availability set to {view.advisoryDetail}
             </span>
           ) : null}
+          {/* The Insider Connected intent shares the intent row (4.1): it is
+              the same kind of decision, set the same way, so it needs no row of
+              its own. On a phone it wraps under the toggle. */}
+          {insiderConnected !== null ? (
+            <InsiderConnectedToggle
+              value={insiderConnected.intent}
+              pinballMap={insiderConnected.pinballMap}
+              differs={insiderConnected.differs}
+              // The intent gate, not the push gate: recording the intent needs
+              // no Pinball Map credentials (3.8, 8.1).
+              readOnly={!canSetIntent || disabled}
+              pending={pending}
+              onChange={(icIntent) => {
+                run(setInsiderConnectedIntentAction, {
+                  icIntent: icIntent ?? "no_sync",
+                });
+              }}
+            />
+          ) : null}
         </Row>
 
         <Row label="Status">
@@ -235,6 +269,13 @@ export function PinballmapListingControl({
                   showExternalFallback,
                   showExternalFallback && linkStatus === "not_linked"
                 )}
+                {insiderConnected?.differs === true ? (
+                  <InsiderConnectedDiffers
+                    view={insiderConnected}
+                    locationUrl={locationUrl}
+                    showExternalFallback={showExternalFallback}
+                  />
+                ) : null}
               </span>
             </div>
 
@@ -249,26 +290,42 @@ export function PinballmapListingControl({
                     }}
                     copy={{
                       title: "Add to Pinball Map?",
-                      body: `Adds ${game} to the location's lineup on pinballmap.com, where it will be publicly visible.`,
-                      action: "Add machine",
+                      // One push carries the Insider Connected target too
+                      // (4.3), so the confirm names it (4.5).
+                      body: `Adds ${game} to the location's lineup on pinballmap.com${icAddClause(insiderConnected)}, where it will be publicly visible.`,
+                      action: "Add",
                     }}
-                    label="Add machine to Pinball Map"
+                    label="Add to Pinball Map"
+                  />
+                ) : view.pushAction === "update" ? (
+                  <ConfirmButton
+                    testId="pbm-listing-update"
+                    pending={pending}
+                    onConfirm={() => {
+                      run(updateInsiderConnectedAction);
+                    }}
+                    copy={{
+                      title: "Update Pinball Map?",
+                      body: `Sets Insider Connected to ${insiderConnected?.target === "off" ? "Off" : "On"} for ${game} on pinballmap.com, where it is publicly visible.`,
+                      action: "Update",
+                    }}
+                    label="Update Pinball Map"
                   />
                 ) : (
                   <ConfirmButton
                     testId="pbm-listing-remove"
                     pending={pending}
                     destructive
-                    removalMachineId={machineId}
+                    removalCheck={{ machineId }}
                     onConfirm={() => {
                       run(removeMachineFromPinballMapAction);
                     }}
                     copy={{
                       title: "Remove from Pinball Map?",
                       body: `Removes ${game} from the location's lineup on pinballmap.com. It will no longer be publicly visible.`,
-                      action: "Remove machine",
+                      action: "Remove",
                     }}
-                    label="Remove machine from Pinball Map"
+                    label="Remove from Pinball Map"
                   />
                 )}
               </div>
@@ -338,43 +395,6 @@ function Header({
   pending: boolean;
   onRefresh: () => void;
 }): React.JSX.Element {
-  const spent = refreshRemaining <= 0;
-  // `null` until the shared ticker's first tick, which is also every SSR pass.
-  const now = useRelativeNow();
-  const refreshAvailableTime = refreshAvailableAt?.getTime() ?? null;
-  const hasValidRefreshTime =
-    refreshAvailableTime !== null && Number.isFinite(refreshAvailableTime);
-  const [reachedRefreshTime, setReachedRefreshTime] = useState<number | null>(
-    null
-  );
-
-  useEffect(() => {
-    if (!spent || !hasValidRefreshTime) return undefined;
-
-    const timer = window.setTimeout(
-      () => {
-        setReachedRefreshTime(refreshAvailableTime);
-      },
-      Math.max(0, refreshAvailableTime - Date.now())
-    );
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [hasValidRefreshTime, refreshAvailableTime, spent]);
-
-  const refreshDeadlineReached =
-    hasValidRefreshTime &&
-    (reachedRefreshTime === refreshAvailableTime ||
-      (now !== null && now >= refreshAvailableTime));
-  const refreshCooldownMinutes =
-    now !== null && spent && hasValidRefreshTime && !refreshDeadlineReached
-      ? Math.max(1, Math.ceil((refreshAvailableTime - now) / 60_000))
-      : null;
-  // Keep the button inert through SSR and whenever the next refill is unknown.
-  // Once the shared ticker reaches the refill instant, the server-side token
-  // bucket will refill on the next press, so the control can become live.
-  const refreshDisabled =
-    spent && (!hasValidRefreshTime || !refreshDeadlineReached);
   return (
     <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
       <h3 className="text-base font-semibold">
@@ -429,26 +449,89 @@ function Header({
         </span>
 
         {canRefresh && locationUrl !== null ? (
-          <Button
-            variant="outline"
-            size="sm"
-            loading={pending}
-            disabled={refreshDisabled}
-            onClick={onRefresh}
-            data-testid="pbm-listing-refresh"
-          >
-            {refreshCooldownMinutes === null ? (
-              <RefreshCw aria-hidden="true" className="size-3.5" />
-            ) : (
-              <Clock3 aria-hidden="true" className="size-3.5" />
-            )}
-            {refreshCooldownMinutes === null
-              ? "Refresh"
-              : `Refresh in ${String(refreshCooldownMinutes)}m`}
-          </Button>
+          <PinballmapRefreshButton
+            refreshRemaining={refreshRemaining}
+            refreshAvailableAt={refreshAvailableAt}
+            pending={pending}
+            onRefresh={onRefresh}
+          />
         ) : null}
       </div>
     </div>
+  );
+}
+
+/**
+ * The shared, throttled Refresh (spec 3.2): disabled with a countdown while the
+ * global allowance is spent. Exported for the lineup page header, which draws
+ * from the same allowance (lineup spec §3.2).
+ */
+export function PinballmapRefreshButton({
+  refreshRemaining,
+  refreshAvailableAt,
+  pending,
+  onRefresh,
+}: {
+  refreshRemaining: number;
+  refreshAvailableAt: Date | null;
+  pending: boolean;
+  onRefresh: () => void;
+}): React.JSX.Element {
+  const spent = refreshRemaining <= 0;
+  // `null` until the shared ticker's first tick, which is also every SSR pass.
+  const now = useRelativeNow();
+  const refreshAvailableTime = refreshAvailableAt?.getTime() ?? null;
+  const hasValidRefreshTime =
+    refreshAvailableTime !== null && Number.isFinite(refreshAvailableTime);
+  const [reachedRefreshTime, setReachedRefreshTime] = useState<number | null>(
+    null
+  );
+
+  useEffect(() => {
+    if (!spent || !hasValidRefreshTime) return undefined;
+
+    const timer = window.setTimeout(
+      () => {
+        setReachedRefreshTime(refreshAvailableTime);
+      },
+      Math.max(0, refreshAvailableTime - Date.now())
+    );
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [hasValidRefreshTime, refreshAvailableTime, spent]);
+
+  const refreshDeadlineReached =
+    hasValidRefreshTime &&
+    (reachedRefreshTime === refreshAvailableTime ||
+      (now !== null && now >= refreshAvailableTime));
+  const refreshCooldownMinutes =
+    now !== null && spent && hasValidRefreshTime && !refreshDeadlineReached
+      ? Math.max(1, Math.ceil((refreshAvailableTime - now) / 60_000))
+      : null;
+  // Keep the button inert through SSR and whenever the next refill is unknown.
+  // Once the shared ticker reaches the refill instant, the server-side token
+  // bucket will refill on the next press, so the control can become live.
+  const refreshDisabled =
+    spent && (!hasValidRefreshTime || !refreshDeadlineReached);
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      loading={pending}
+      disabled={refreshDisabled}
+      onClick={onRefresh}
+      data-testid="pbm-listing-refresh"
+    >
+      {refreshCooldownMinutes === null ? (
+        <RefreshCw aria-hidden="true" className="size-3.5" />
+      ) : (
+        <Clock3 aria-hidden="true" className="size-3.5" />
+      )}
+      {refreshCooldownMinutes === null
+        ? "Refresh"
+        : `Refresh in ${String(refreshCooldownMinutes)}m`}
+    </Button>
   );
 }
 
@@ -475,7 +558,7 @@ function Row({
         dimmed && "opacity-45"
       )}
       {...(dimmed ? { inert: true } : {})}
-      data-testid={`pbm-listing-row-${label.toLowerCase()}`}
+      data-testid={`pbm-listing-row-${label.toLowerCase().replace(/\s+/g, "-")}`}
     >
       <span className="w-20 shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         {label}
@@ -486,13 +569,71 @@ function Row({
 }
 
 /**
- * The tri-state toggle (4.1). A segmented control rather than three buttons or a
- * switch: the three positions are mutually exclusive settings, all three are
- * always meaningful, and the current one has to be readable at a glance.
+ * A segmented radiogroup: the shape both tri-state toggles share (4.1). A
+ * segmented control rather than three buttons or a switch: the positions are
+ * mutually exclusive settings, all always meaningful, and the current one has to
+ * be readable at a glance.
  *
  * Real `<button>` elements inside a radiogroup, so keyboard and screen-reader
- * users get the same three choices (CORE-A11Y-004).
+ * users get the same choices (CORE-A11Y-004).
  */
+function SegmentedToggle<T extends string>({
+  label,
+  options,
+  value,
+  disabled,
+  isBlocked,
+  onChange,
+  testId,
+}: {
+  label: string;
+  options: readonly { value: T; label: string }[];
+  value: T;
+  disabled: boolean;
+  /** A position that cannot be chosen right now (it stays shown if selected). */
+  isBlocked?: (option: T) => boolean;
+  onChange: (value: T) => void;
+  testId: string;
+}): React.JSX.Element {
+  return (
+    <div
+      role="radiogroup"
+      aria-label={label}
+      className="inline-flex overflow-hidden rounded-lg border border-outline-variant"
+      data-testid={testId}
+    >
+      {options.map((option) => {
+        const selected = option.value === value;
+        const blocked = isBlocked?.(option.value) ?? false;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            disabled={disabled || (blocked && !selected)}
+            onClick={() => {
+              if (!selected) onChange(option.value);
+            }}
+            data-testid={`${testId}-${option.value}`}
+            className={cn(
+              "px-3 py-1.5 text-xs whitespace-nowrap transition-colors",
+              "border-l border-outline-variant first:border-l-0",
+              selected
+                ? "bg-primary/15 font-semibold text-primary"
+                : "text-muted-foreground hover:bg-muted/50",
+              "disabled:pointer-events-none disabled:opacity-40"
+            )}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** The lineup intent's tri-state toggle (4.1). */
 function IntentToggle({
   value,
   blockedReason,
@@ -508,43 +649,18 @@ function IntentToggle({
 }): React.JSX.Element {
   return (
     <>
-      <div
-        role="radiogroup"
-        aria-label="Pinball Map lineup intent"
-        className="inline-flex overflow-hidden rounded-lg border border-outline-variant"
-        data-testid="pbm-listing-intent"
-      >
-        {INTENT_OPTIONS.map((option) => {
-          const selected = option.value === value;
-          // Only the On position is ever blocked by availability (6.2); Off and
-          // Don't sync are always reachable, which is what makes the block a
-          // guard rather than a trap.
-          const blocked = option.value === "on" && blockedReason !== null;
-          return (
-            <button
-              key={option.value}
-              type="button"
-              role="radio"
-              aria-checked={selected}
-              disabled={readOnly || pending || (blocked && !selected)}
-              onClick={() => {
-                if (!selected) onChange(option.value);
-              }}
-              data-testid={`pbm-listing-intent-${option.value}`}
-              className={cn(
-                "px-3 py-1.5 text-xs whitespace-nowrap transition-colors",
-                "border-l border-outline-variant first:border-l-0",
-                selected
-                  ? "bg-primary/15 font-semibold text-primary"
-                  : "text-muted-foreground hover:bg-muted/50",
-                "disabled:pointer-events-none disabled:opacity-40"
-              )}
-            >
-              {option.label}
-            </button>
-          );
-        })}
-      </div>
+      <SegmentedToggle
+        label="Pinball Map lineup intent"
+        options={INTENT_OPTIONS}
+        value={value}
+        disabled={readOnly || pending}
+        // Only the On position is ever blocked by availability (6.2); Off and
+        // Don't sync are always reachable, which is what makes the block a
+        // guard rather than a trap.
+        isBlocked={(option) => option === "on" && blockedReason !== null}
+        onChange={onChange}
+        testId="pbm-listing-intent"
+      />
       {blockedReason !== null && value !== "on" ? (
         <span
           className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
@@ -560,6 +676,149 @@ function IntentToggle({
       ) : null}
     </>
   );
+}
+
+const INSIDER_CONNECTED_LABEL = {
+  on: "On",
+  off: "Off",
+  not_set: "Not set",
+} as const;
+
+type IcToggleValue = PbmIcIntent | "no_sync";
+
+const IC_OPTIONS: readonly { value: IcToggleValue; label: string }[] = [
+  { value: "on", label: "On" },
+  { value: "off", label: "Off" },
+  { value: "no_sync", label: "Don't sync" },
+];
+
+export interface InsiderConnectedToggleProps {
+  /** The cabinet's intent; null is Don't sync (no intent recorded). */
+  value: PbmIcIntent | null;
+  /**
+   * Pinball Map's value for the entry, or null when the entry is not on the
+   * stored lineup. Stated beside the toggle under Don't sync.
+   */
+  pinballMap: PbmInsiderConnectedSetting | null;
+  /** The entry differs from this cabinet's target: warn beside the toggle. */
+  differs: boolean;
+  readOnly: boolean;
+  pending: boolean;
+  /** Called with the new intent; null for Don't sync. */
+  onChange: (value: PbmIcIntent | null) => void;
+}
+
+/**
+ * The Insider Connected intent as a tri-state toggle with its own small label
+ * (spec 3.8, 4.1): On / Off / Don't sync, where Don't sync records no intent.
+ * Under Don't sync, Pinball Map's value is stated beside it, because nothing
+ * else on the row says what the entry currently carries. With On or Off, a
+ * warning icon names Pinball Map's value when the entry differs, so the reason
+ * for Out of sync sits beside the toggle that causes it.
+ *
+ * Exported for the New Machine page (4.11). Controlled from stored intent here:
+ * the toggle moves when the page revalidates, not optimistically.
+ */
+export function InsiderConnectedToggle({
+  value,
+  pinballMap,
+  differs,
+  readOnly,
+  pending,
+  onChange,
+}: InsiderConnectedToggleProps): React.JSX.Element {
+  return (
+    <div
+      className="flex flex-wrap items-center gap-3 sm:ml-3"
+      data-testid="pbm-insider-connected"
+    >
+      {/* On a phone the label takes its own line in every state. Left to wrap,
+          it would drop only when the Don't sync note widens the row, and the
+          control's height would change with the state (4.1). */}
+      <span className="basis-full shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:w-20 sm:basis-auto">
+        Insider Connected
+      </span>
+      <div className="flex items-center gap-2">
+        <SegmentedToggle
+          label="Insider Connected"
+          options={IC_OPTIONS}
+          value={value ?? "no_sync"}
+          disabled={readOnly || pending}
+          onChange={(next) => {
+            onChange(next === "no_sync" ? null : next);
+          }}
+          testId="pbm-insider-connected-intent"
+        />
+        {value === null && pinballMap !== null ? (
+          <span
+            className="text-xs text-muted-foreground whitespace-nowrap"
+            data-testid="pbm-insider-connected-observed"
+          >
+            Pinball Map: {INSIDER_CONNECTED_LABEL[pinballMap]}
+          </span>
+        ) : null}
+        {differs && pinballMap !== null ? (
+          <TriangleAlert
+            role="img"
+            aria-label={`Pinball Map: ${INSIDER_CONNECTED_LABEL[pinballMap]}`}
+            className="size-4 shrink-0 text-warning"
+            data-testid="pbm-insider-connected-differs"
+          />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The status row's Insider Connected clause (4.1): Pinball Map's value in the
+ * warning colour, and for a viewer who can push but has no credentials, the
+ * link out to change it there (4.4).
+ */
+function InsiderConnectedDiffers({
+  view,
+  locationUrl,
+  showExternalFallback,
+}: {
+  view: PbmInsiderConnectedView;
+  locationUrl: string | null;
+  showExternalFallback: boolean;
+}): React.JSX.Element {
+  const clause =
+    view.pinballMap === "on"
+      ? "Insider Connected on."
+      : view.pinballMap === "off"
+        ? "Insider Connected off."
+        : "Insider Connected not set.";
+  return (
+    <>
+      {" "}
+      <span className="text-warning" data-testid="pbm-insider-connected-status">
+        {clause}
+      </span>
+      {showExternalFallback && locationUrl !== null ? (
+        <>
+          {" "}
+          <a
+            href={locationUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary underline underline-offset-2 hover:no-underline"
+          >
+            Set on Pinball Map
+          </a>
+          .
+        </>
+      ) : null}
+    </>
+  );
+}
+
+/** What Add also does to Insider Connected, for its confirm (4.3, 4.5). */
+function icAddClause(view: PbmInsiderConnectedView | null): string {
+  if (view?.target === "on") return " and marks it Insider Connected";
+  if (view?.target === "off") return " with Insider Connected off";
+  return "";
 }
 
 /**
@@ -626,7 +885,7 @@ function statusSentence(
         >
           {text}
         </a>
-        , then Refresh to update.
+        .
       </>
     );
 
@@ -753,21 +1012,31 @@ function nameSiblings(siblings: readonly PbmSibling[]): React.ReactNode {
   );
 }
 
-interface ConfirmCopy {
+export interface ConfirmCopy {
   title: string;
   body: string;
   action: string;
 }
 
-/** Pushes confirm before acting, naming the game and the public effect (4.5). */
-function ConfirmButton({
+/**
+ * Pushes confirm before acting, naming the game and the public effect (4.5).
+ * Exported for the lineup page's row actions, which follow the same rules
+ * (lineup spec §5.7).
+ *
+ * `removalCheck` names the entry a removal confirms — `{ machineId }` for a
+ * machine's own entry, `{ lmxId }` for one no machine is linked to — and makes
+ * the dialog wait for its comment count (4.6).
+ */
+export function ConfirmButton({
   copy,
   onConfirm,
   pending,
   testId,
   label,
   destructive = false,
-  removalMachineId,
+  removalCheck,
+  triggerVariant = "outline",
+  triggerClassName,
 }: {
   copy: ConfirmCopy;
   onConfirm: () => void;
@@ -775,15 +1044,17 @@ function ConfirmButton({
   testId: string;
   label: string;
   destructive?: boolean;
-  removalMachineId?: string;
+  removalCheck?: Readonly<Record<string, string>>;
+  triggerVariant?: "outline" | "default";
+  triggerClassName?: string;
 }): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const comments = useRemovalCommentCheck();
 
   function handleOpenChange(nextOpen: boolean): void {
     setOpen(nextOpen);
-    if (removalMachineId === undefined) return;
-    if (nextOpen) comments.start({ machineId: removalMachineId });
+    if (removalCheck === undefined) return;
+    if (nextOpen) comments.start(removalCheck);
     else comments.cancel();
   }
 
@@ -791,9 +1062,10 @@ function ConfirmButton({
     <AlertDialog open={open} onOpenChange={handleOpenChange}>
       <AlertDialogTrigger asChild>
         <Button
-          variant="outline"
+          variant={triggerVariant}
           size="sm"
           loading={pending}
+          className={triggerClassName}
           data-testid={testId}
         >
           {label}
@@ -804,7 +1076,7 @@ function ConfirmButton({
           <AlertDialogTitle>{copy.title}</AlertDialogTitle>
           <AlertDialogDescription>{copy.body}</AlertDialogDescription>
         </AlertDialogHeader>
-        {removalMachineId !== undefined ? (
+        {removalCheck !== undefined ? (
           <RemovalCommentNotice state={comments.state} testId={testId} />
         ) : null}
         <AlertDialogFooter>
@@ -813,7 +1085,7 @@ function ConfirmButton({
             type="button"
             variant={destructive ? "destructive" : "default"}
             disabled={
-              pending || (removalMachineId !== undefined && !comments.ready)
+              pending || (removalCheck !== undefined && !comments.ready)
             }
             onClick={onConfirm}
           >

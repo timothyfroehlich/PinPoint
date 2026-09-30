@@ -9,7 +9,7 @@
 
 import type React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 
@@ -18,8 +18,11 @@ import {
   checkRemovalCommentsAction,
   refreshPinballmapLineupAction,
   removeMachineFromPinballMapAction,
+  setInsiderConnectedIntentAction,
   setPinballmapIntentAction,
+  updateInsiderConnectedAction,
 } from "~/app/(app)/m/pinballmap-actions";
+import type { PbmInsiderConnectedView } from "~/lib/pinballmap/insider-connected";
 import type {
   PbmListingStateName,
   PbmListingView,
@@ -32,8 +35,26 @@ vi.mock("~/app/(app)/m/pinballmap-actions", () => ({
   checkRemovalCommentsAction: vi.fn(),
   refreshPinballmapLineupAction: vi.fn(),
   removeMachineFromPinballMapAction: vi.fn(),
+  setInsiderConnectedIntentAction: vi.fn(),
   setPinballmapIntentAction: vi.fn(),
+  updateInsiderConnectedAction: vi.fn(),
 }));
+
+/** An Insider Connected view; defaults to an in-sync On intent. */
+function ic(
+  overrides: Partial<PbmInsiderConnectedView> = {}
+): PbmInsiderConnectedView {
+  return {
+    intent: "on",
+    pinballMap: "on",
+    target: "on",
+    differs: false,
+    ...overrides,
+  };
+}
+
+/** Insider Connected differs, folded into the listing view as the page does. */
+const IC_DIFFERS = ic({ pinballMap: "not_set", differs: true });
 
 type Props = React.ComponentProps<typeof PinballmapListingControl>;
 
@@ -115,7 +136,7 @@ function view(
 }
 
 /**
- * An owner with a provisioned credential — every control armed.
+ * An owner with a linked Pinball Map account — every control armed.
  *
  * Wrapped in `RelativeTimeProvider` because the header reads the shared ticker:
  * relative labels here go through it rather than being computed at render, so
@@ -142,6 +163,7 @@ function renderControl(overrides: Partial<Props> = {}): {
         canRefresh={true}
         linkStatus="linked"
         modelName="Medieval Madness"
+        insiderConnected={null}
         {...overrides}
       />
     </RelativeTimeProvider>
@@ -173,6 +195,14 @@ beforeEach(() => {
   vi.mocked(setPinballmapIntentAction).mockResolvedValue({
     ok: true,
     value: { intent: "on" },
+  });
+  vi.mocked(setInsiderConnectedIntentAction).mockResolvedValue({
+    ok: true,
+    value: { icIntent: "on" },
+  });
+  vi.mocked(updateInsiderConnectedAction).mockResolvedValue({
+    ok: true,
+    value: { icEnabled: true },
   });
   vi.mocked(refreshPinballmapLineupAction).mockResolvedValue({
     ok: true,
@@ -218,6 +248,7 @@ describe("the status sentence", () => {
           canRefresh
           linkStatus="linked"
           modelName="Medieval Madness"
+          insiderConnected={ic({ intent: null, pinballMap: "not_set" })}
         />
       );
       expect(
@@ -267,7 +298,7 @@ describe("push actions", () => {
       expect(
         await screen.findByRole("link", { name: "Add it on Pinball Map" })
       ).toBeInTheDocument();
-      expect(status()).toContain("then Refresh to update");
+      expect(status()).toContain("Add it on Pinball Map.");
     }
   );
 
@@ -285,7 +316,7 @@ describe("push actions", () => {
       expect(
         screen.queryByRole("link", { name: linkName })
       ).not.toBeInTheDocument();
-      expect(status()).not.toContain("then Refresh to update");
+      expect(status()).not.toContain("on Pinball Map.");
     }
   );
 
@@ -318,9 +349,7 @@ describe("push actions", () => {
     );
     renderControl({ view: VIEWS.lingering });
     await user.click(screen.getByTestId("pbm-listing-remove"));
-    expect(
-      screen.getByRole("button", { name: "Remove machine" })
-    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Remove" })).toBeDisabled();
     await act(async () => {
       await Promise.resolve();
       finish?.({
@@ -336,9 +365,7 @@ describe("push actions", () => {
     expect(
       await screen.findByTestId("pbm-listing-remove-consequence")
     ).toHaveTextContent("No comments on this entry");
-    expect(
-      screen.getByRole("button", { name: "Remove machine" })
-    ).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Remove" })).toBeEnabled();
   });
 
   it("keeps removal blocked when the comment check fails", async () => {
@@ -356,9 +383,7 @@ describe("push actions", () => {
     expect(
       screen.queryByTestId("pbm-listing-remove-consequence")
     ).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Remove machine" })
-    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Remove" })).toBeDisabled();
   });
 
   it("marks a failed refresh count as old and offers an explicit proceed choice", async () => {
@@ -414,7 +439,7 @@ describe("push actions", () => {
     });
     renderControl({ view: VIEWS.missing });
     await user.click(screen.getByTestId("pbm-listing-add"));
-    await user.click(screen.getByRole("button", { name: "Add machine" }));
+    await user.click(screen.getByRole("button", { name: "Add" }));
 
     expect(await screen.findByTestId("pbm-listing-error")).toHaveTextContent(
       "Pinball Map rejected the change."
@@ -479,7 +504,7 @@ describe("the viewer's Pinball Map link (spec 8.2, 8.5, 8.6)", () => {
     });
     renderControl({ view: VIEWS.missing });
     await user.click(screen.getByTestId("pbm-listing-add"));
-    await user.click(screen.getByRole("button", { name: "Add machine" }));
+    await user.click(screen.getByRole("button", { name: "Add" }));
 
     await act(async () => {
       await Promise.resolve();
@@ -543,6 +568,246 @@ describe("the intent toggle", () => {
     }
     // …but Refresh stays available to them (8.3).
     expect(screen.getByTestId("pbm-listing-refresh")).toBeEnabled();
+  });
+});
+
+/** The Insider Connected toggle's position with the given label. */
+function icPosition(name: string): HTMLElement {
+  return within(
+    screen.getByRole("radiogroup", { name: "Insider Connected" })
+  ).getByRole("radio", { name });
+}
+
+describe("the Insider Connected toggle (3.8)", () => {
+  // Nothing clears mocks between tests file-wide, and these assert on the
+  // intent action's own calls.
+  beforeEach(() => {
+    vi.mocked(setInsiderConnectedIntentAction).mockClear();
+  });
+
+  it("is absent for an ineligible title", () => {
+    renderControl({ view: VIEWS.on });
+    expect(
+      screen.queryByTestId("pbm-insider-connected")
+    ).not.toBeInTheDocument();
+  });
+
+  it("sits on the intent row, so the control stays two rows (4.1)", () => {
+    renderControl({ view: VIEWS.on, insiderConnected: ic() });
+    const rows = within(screen.getByTestId("pbm-listing-rows"))
+      .getAllByTestId(/^pbm-listing-row-/)
+      .map((row) => row.getAttribute("data-testid"));
+    expect(rows).toEqual(["pbm-listing-row-intent", "pbm-listing-row-status"]);
+    expect(
+      within(screen.getByTestId("pbm-listing-row-intent")).getByTestId(
+        "pbm-insider-connected"
+      )
+    ).toBeInTheDocument();
+  });
+
+  it("stays shown when the cabinet is Off the lineup", () => {
+    renderControl({
+      view: VIEWS.off,
+      insiderConnected: ic({ pinballMap: null }),
+    });
+    expect(icPosition("On")).toBeChecked();
+  });
+
+  it.each([
+    ["on", "On"],
+    ["off", "Off"],
+    [null, "Don't sync"],
+  ] as const)("selects %s as %s", (intent, label) => {
+    renderControl({ view: VIEWS.on, insiderConnected: ic({ intent }) });
+    const radios = within(
+      screen.getByRole("radiogroup", { name: "Insider Connected" })
+    ).getAllByRole("radio");
+    expect(
+      radios.filter((radio) => radio.getAttribute("aria-checked") === "true")
+    ).toEqual([icPosition(label)]);
+  });
+
+  it.each([
+    ["on", "Pinball Map: On"],
+    ["off", "Pinball Map: Off"],
+    ["not_set", "Pinball Map: Not set"],
+  ] as const)(
+    "states Pinball Map's %s beside Don't sync, unflagged",
+    (pinballMap, text) => {
+      renderControl({
+        view: VIEWS.on,
+        insiderConnected: ic({ intent: null, pinballMap, target: null }),
+      });
+      expect(
+        screen.getByTestId("pbm-insider-connected-observed")
+      ).toHaveTextContent(text);
+      expect(
+        screen.queryByTestId("pbm-insider-connected-differs")
+      ).not.toBeInTheDocument();
+    }
+  );
+
+  it("states nothing beside Don't sync when the entry is not on the lineup", () => {
+    renderControl({
+      view: VIEWS.off,
+      insiderConnected: ic({ intent: null, pinballMap: null, target: null }),
+    });
+    expect(
+      screen.queryByTestId("pbm-insider-connected-observed")
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not state Pinball Map's value beside On or Off", () => {
+    renderControl({ view: VIEWS.on, insiderConnected: ic({ intent: "off" }) });
+    expect(
+      screen.queryByTestId("pbm-insider-connected-observed")
+    ).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["Off", "off"],
+    ["Don't sync", "no_sync"],
+  ] as const)(
+    "records %s as intent %s, acting on the click",
+    async (label, sent) => {
+      const user = userEvent.setup();
+      renderControl({ view: VIEWS.on, insiderConnected: ic() });
+      await user.click(icPosition(label));
+      const formData = vi.mocked(setInsiderConnectedIntentAction).mock
+        .calls[0]?.[1];
+      expect(formData?.get("icIntent")).toBe(sent);
+    }
+  );
+
+  it("does nothing when the selected position is clicked again", async () => {
+    const user = userEvent.setup();
+    renderControl({ view: VIEWS.on, insiderConnected: ic() });
+    await user.click(icPosition("On"));
+    expect(setInsiderConnectedIntentAction).not.toHaveBeenCalled();
+  });
+
+  it("records the new position as intent, not a Pinball Map write, without credentials", async () => {
+    // The whole point of the intent: a member without a linked account still
+    // records what they want, and someone who can push carries it out (8.6).
+    const user = userEvent.setup();
+    renderControl({
+      view: VIEWS.on,
+      linkStatus: "not_linked",
+      canPush: false,
+      insiderConnected: ic({ intent: null, pinballMap: "not_set" }),
+    });
+    await user.click(icPosition("On"));
+
+    const formData = vi.mocked(setInsiderConnectedIntentAction).mock
+      .calls[0]?.[1];
+    expect(formData?.get("machineId")).toBe("m-1");
+    expect(formData?.get("icIntent")).toBe("on");
+    expect(updateInsiderConnectedAction).not.toHaveBeenCalled();
+  });
+
+  it("is read-only without the machine-linking capability (4.9)", () => {
+    renderControl({
+      view: VIEWS.on,
+      canSetIntent: false,
+      insiderConnected: ic(),
+    });
+    for (const radio of within(
+      screen.getByRole("radiogroup", { name: "Insider Connected" })
+    ).getAllByRole("radio"))
+      expect(radio).toBeDisabled();
+  });
+
+  it("names Pinball Map's value beside the toggle and in the status row when it differs", () => {
+    renderControl({
+      view: { ...VIEWS.on, outOfSync: true, pushAction: "update" },
+      insiderConnected: IC_DIFFERS,
+    });
+    expect(
+      screen.getByRole("img", { name: "Pinball Map: Not set" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("pbm-insider-connected-status")
+    ).toHaveTextContent("Insider Connected not set.");
+    expect(screen.getByTestId("pbm-listing-out-of-sync")).toBeInTheDocument();
+  });
+
+  it("shows no warning when in sync", () => {
+    renderControl({ view: VIEWS.on, insiderConnected: ic() });
+    expect(
+      screen.queryByTestId("pbm-insider-connected-differs")
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("pbm-insider-connected-status")
+    ).not.toBeInTheDocument();
+  });
+
+  it("offers one Update push that confirms before acting (4.3, 4.5)", async () => {
+    const user = userEvent.setup();
+    renderControl({
+      view: { ...VIEWS.on, outOfSync: true, pushAction: "update" },
+      insiderConnected: IC_DIFFERS,
+    });
+    await user.click(screen.getByTestId("pbm-listing-update"));
+    expect(
+      await screen.findByText(
+        "Sets Insider Connected to On for Medieval Madness on pinballmap.com, where it is publicly visible."
+      )
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Update" }));
+
+    await waitFor(() => {
+      expect(updateInsiderConnectedAction).toHaveBeenCalledOnce();
+    });
+    expect(
+      vi
+        .mocked(updateInsiderConnectedAction)
+        .mock.calls[0]?.[1].get("machineId")
+    ).toBe("m-1");
+  });
+
+  it("names the Insider Connected target in the Add confirm", async () => {
+    const user = userEvent.setup();
+    renderControl({
+      view: VIEWS.missing,
+      insiderConnected: ic({ pinballMap: null }),
+    });
+    await user.click(screen.getByTestId("pbm-listing-add"));
+    expect(
+      await screen.findByText(
+        "Adds Medieval Madness to the location's lineup on pinballmap.com and marks it Insider Connected, where it will be publicly visible."
+      )
+    ).toBeInTheDocument();
+  });
+
+  it("links out instead of pushing without a linked account (4.4)", () => {
+    renderControl({
+      view: { ...VIEWS.on, outOfSync: true, pushAction: "update" },
+      linkStatus: "not_linked",
+      insiderConnected: IC_DIFFERS,
+    });
+    expect(screen.queryByTestId("pbm-listing-update")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Set on Pinball Map" })
+    ).toBeInTheDocument();
+  });
+
+  it("surfaces a failed Update", async () => {
+    const user = userEvent.setup();
+    vi.mocked(updateInsiderConnectedAction).mockResolvedValue({
+      ok: false,
+      code: "PBM_UNCLEAR",
+      message: "Pinball Map didn't confirm the change.",
+    });
+    renderControl({
+      view: { ...VIEWS.on, outOfSync: true, pushAction: "update" },
+      insiderConnected: IC_DIFFERS,
+    });
+    await user.click(screen.getByTestId("pbm-listing-update"));
+    await user.click(await screen.findByRole("button", { name: "Update" }));
+
+    expect(await screen.findByTestId("pbm-listing-error")).toHaveTextContent(
+      "Pinball Map didn't confirm the change."
+    );
   });
 });
 

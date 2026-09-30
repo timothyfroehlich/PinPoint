@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
   apronCardContent,
+  type ApronCardSettings,
+  type ApronMachineSource,
   apronCardPixelSize,
+  apronCreditRows,
   cardParagraphs,
   fitTitleSize,
   groupedEdition,
+  shrinkUntilFits,
 } from "~/lib/machines/apron-card";
+import { NO_CREDITS } from "~/lib/opdb/credits";
 import { qrSvgPath } from "~/lib/machines/apron-qr";
 import { plainTextToDoc } from "~/lib/tiptap/types";
 
@@ -53,18 +58,15 @@ describe("groupedEdition", () => {
 });
 
 describe("apronCardContent", () => {
-  const machine = {
+  const machine: ApronMachineSource = {
     name: "Godzilla",
     manufacturer: "Old Copy",
     pinballmapMachineId: 3416,
     pinballmapExcluded: false,
     year: 2021,
     description: plainTextToDoc("Main description"),
-    apronUseCustomDescription: false,
-    apronDescription: "Custom description",
-    apronTip: "Aim for the scoop",
-    apronTipEnabled: false,
     owner: { name: "Tim" },
+    invitedOwner: null,
     pinballmapTitle: {
       name: "Godzilla (Premium)",
       machineGroupId: 10,
@@ -73,8 +75,19 @@ describe("apronCardContent", () => {
     },
   };
 
+  const card: ApronCardSettings = {
+    useCustomDescription: false,
+    description: plainTextToDoc("Custom description"),
+    tip: plainTextToDoc("Aim for the scoop"),
+    tipEnabled: false,
+    designEnabled: true,
+    artEnabled: false,
+  };
+
+  const credits = { design: ["Keith Elwin"], art: ["Jeremy Packer"] };
+
   it("uses the main description while retaining disabled tip text", () => {
-    expect(apronCardContent(machine)).toMatchObject({
+    expect(apronCardContent(machine, card, credits, false)).toMatchObject({
       edition: "Premium Edition",
       description: "Main description",
       tip: "Aim for the scoop",
@@ -83,14 +96,149 @@ describe("apronCardContent", () => {
   });
 
   it("prints the current manufacturer rather than the stored copy", () => {
-    expect(apronCardContent(machine).manufacturer).toBe("Stern");
+    expect(apronCardContent(machine, card, credits, false).manufacturer).toBe(
+      "Stern"
+    );
   });
 
   it("uses the custom description only when selected", () => {
     expect(
-      apronCardContent({ ...machine, apronUseCustomDescription: true })
-        .description
+      apronCardContent(
+        machine,
+        { ...card, useCustomDescription: true },
+        credits,
+        false
+      ).description
     ).toBe("Custom description");
+  });
+
+  it("prints the registered owner's name", () => {
+    expect(apronCardContent(machine, card, credits, false).ownerName).toBe(
+      "Tim"
+    );
+  });
+
+  it("falls back to the invited owner's name when there is no registered owner", () => {
+    expect(
+      apronCardContent(
+        {
+          ...machine,
+          owner: null,
+          invitedOwner: { name: "Casey" },
+        },
+        card,
+        credits,
+        false
+      ).ownerName
+    ).toBe("Casey");
+  });
+
+  it("prefers the registered owner over an invited owner", () => {
+    expect(
+      apronCardContent(
+        {
+          ...machine,
+          owner: { name: "Tim" },
+          invitedOwner: { name: "Casey" },
+        },
+        card,
+        credits,
+        false
+      ).ownerName
+    ).toBe("Tim");
+  });
+
+  it("has no owner name when neither owner is set", () => {
+    expect(
+      apronCardContent(
+        { ...machine, owner: null, invitedOwner: null },
+        card,
+        credits,
+        false
+      ).ownerName
+    ).toBeNull();
+  });
+
+  it("carries the credits and each role's display setting", () => {
+    expect(apronCardContent(machine, card, credits, false)).toMatchObject({
+      credits,
+      designEnabled: true,
+      artEnabled: false,
+    });
+  });
+});
+
+describe("apronCreditRows", () => {
+  const both = { designEnabled: true, artEnabled: true };
+
+  it("shows Design then Art", () => {
+    expect(
+      apronCreditRows({
+        ...both,
+        credits: {
+          design: ["Pat Lawlor", "Larry DeMar"],
+          art: ["John Youssi"],
+        },
+      })
+    ).toEqual([
+      { label: "Design", text: "Pat Lawlor, Larry DeMar" },
+      { label: "Art", text: "John Youssi" },
+    ]);
+  });
+
+  it("limits a role to two names and counts the rest (spec 10.3)", () => {
+    const [, art] = apronCreditRows({
+      ...both,
+      credits: {
+        design: ["Steve Ritchie"],
+        art: ["Bob Stevlic", "Kevin O'Connor", "Stephen Alexander"],
+      },
+    });
+    expect(art?.text).toBe("Bob Stevlic, Kevin O'Connor +1 more");
+  });
+
+  it("shows Unknown for a role with no credits (spec 10.4)", () => {
+    expect(apronCreditRows({ ...both, credits: NO_CREDITS })).toEqual([
+      { label: "Design", text: "Unknown" },
+      { label: "Art", text: "Unknown" },
+    ]);
+  });
+
+  it("drops a role whose display setting is off (spec 10.5)", () => {
+    expect(
+      apronCreditRows({
+        designEnabled: false,
+        artEnabled: true,
+        credits: { design: ["Keith Elwin"], art: ["Jeremy Packer"] },
+      })
+    ).toEqual([{ label: "Art", text: "Jeremy Packer" }]);
+    expect(
+      apronCreditRows({
+        designEnabled: false,
+        artEnabled: false,
+        credits: NO_CREDITS,
+      })
+    ).toEqual([]);
+  });
+});
+
+describe("shrinkUntilFits", () => {
+  it("keeps the starting size when the panel already fits", () => {
+    expect(shrinkUntilFits({ startPx: 42, minPx: 24, fits: () => true })).toBe(
+      42
+    );
+  });
+
+  it("shrinks in half-pixel steps until the panel fits", () => {
+    expect(
+      shrinkUntilFits({ startPx: 42, minPx: 24, fits: (px) => px <= 33.5 })
+    ).toBe(33.5);
+  });
+
+  it("stops at the floor when nothing fits", () => {
+    expect(shrinkUntilFits({ startPx: 42, minPx: 24, fits: () => false })).toBe(
+      24
+    );
   });
 });
 
@@ -115,6 +263,16 @@ describe("fitTitleSize", () => {
     });
     expect(size).toBeLessThan(42);
     expect(size).toBeGreaterThanOrEqual(24);
+  });
+
+  it.each([
+    // Break after each ellipsis: widest word LIGHTS... (9 glyphs) → 38.5px,
+    // three lines. Without the break it is one 25-glyph word at the floor.
+    ["LIGHTS...CAMERA...ACTION!", 38.5],
+    // Break after the hyphen: widest word DAVIDSON (8 glyphs) → max size.
+    ["HARLEY-DAVIDSON", 42],
+  ])("breaks %s after hyphens and ellipses (spec §1)", (title, px) => {
+    expect(fitTitleSize({ ...base, title })).toBe(px);
   });
 
   it("stops at the floor rather than breaking a word", () => {

@@ -46,7 +46,7 @@ Use this skill when:
 8. **Baseline Widely available is the floor** (CORE-UI-005): use `<dialog>`, container queries, `:has()`, `:user-invalid`, `inert`, `aspect-ratio`, native form validation directly — no polyfills. Newly-available features (Popover API, View Transitions, anchor positioning) require a per-feature opt-in in `pinpoint-design-bible` §19; `fetchpriority` and `text-wrap: balance` are the two that have one. Never trust a cached Baseline date — look it up live (`references/browser-support.md`).
 9. **Form correctness** (CORE-FORM-001..006): right `type`, correct `autocomplete` token, `:user-invalid` styling, `aria-invalid` blur sync, visible required-field indicator, `enterkeyhint` on sequential mobile fields. Conventions are owned by `pinpoint-design-bible` §20; the code is in `references/form-correctness.md`.
 10. **Accessibility floor** (CORE-A11Y-001..006): skip link, `motion-reduce:` paired with animations, semantic `<table>` markup, real `<button>` (no `<div role="button">`), `title` is not a tooltip, `inert` background on modals. See **Accessibility** in `references/accessibility.md`.
-11. **Early UI review gate (pre-E2E)** (PP-4c4b): Present rendered screenshots to Tim for visual approval before authoring or updating Playwright/E2E specs or running preflight. Fast unit tests (`pnpm run test`) run early; heavy E2E suites wait until layout and visual hierarchy are approved.
+11. **Early UI review gate (pre-E2E)** (PP-4c4b): Present rendered screenshots at the three review viewports (desktop, large mobile 430px, small mobile 320px — `pinpoint-design-bible` §4 Review Viewports) to Tim for visual approval before authoring or updating Playwright/E2E specs or running preflight. Fast unit tests (`pnpm run test`) run early; heavy E2E suites wait until layout and visual hierarchy are approved.
 
 ## Reference Files
 
@@ -56,6 +56,7 @@ Everything below lives one hop away in `references/`. Load the file you need.
 | :--------------------------------- | :------------------------------------------------------------------------------------- |
 | `references/browser-support.md`    | How to look up a feature's Baseline status live; pointers to design-bible §19 / §22    |
 | `references/key-files.md`          | Component basics, Issue Field Display Order, Key Files Registry, Label Standards       |
+| `references/filter-conventions.md` | Filter-bar conventions: status groups, smart-badge grouping, quick-selects, mobile     |
 | `references/enums-and-props.md`    | Config-Driven Enums, discriminated-union props for multi-type components               |
 | `references/form-correctness.md`   | Form-correctness code (types, autocomplete, `:user-invalid`), native HTML primitives   |
 | `references/styling-and-shadcn.md` | Tailwind CSS v4 styling, shadcn/ui component patterns, Button variants/sizes/`loading` |

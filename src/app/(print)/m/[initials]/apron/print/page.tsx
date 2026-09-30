@@ -9,6 +9,10 @@ import { machines, userProfiles } from "~/server/db/schema";
 import { createClient } from "~/lib/supabase/server";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { apronCardContent } from "~/lib/machines/apron-card";
+import {
+  getMachineCredits,
+  getMachinePinTips,
+} from "~/app/(app)/m/[initials]/_data";
 import { buildMachineHubUrl } from "~/lib/machines/hub-url";
 import { resolveRequestUrl } from "~/lib/url";
 import { ApronCardPrintSheet } from "./ApronCardPrintSheet";
@@ -40,22 +44,31 @@ export default async function ApronCardPrintPage({
       where: eq(machines.initials, initials),
       with: {
         owner: { columns: { name: true } },
+        invitedOwner: { columns: { name: true } },
+        // The machine's first saved card (spec apron-cards §3.8), oldest
+        // first. Selecting among several cards is not built yet.
+        apronCards: {
+          orderBy: (cards, { asc }) => [asc(cards.createdAt), asc(cards.id)],
+          limit: 1,
+        },
         pinballmapTitle: {
           columns: {
             name: true,
             machineGroupId: true,
             groupName: true,
             manufacturer: true,
+            opdbId: true,
           },
         },
       },
     }),
   ]);
+  const card = machine?.apronCards[0];
   if (
     !profile ||
     !checkPermission("machines.apron.export", getAccessLevel(profile.role)) ||
-    !machine?.apronSize ||
-    !machine.apronSavedAt
+    !machine ||
+    !card
   ) {
     notFound();
   }
@@ -64,8 +77,14 @@ export default async function ApronCardPrintPage({
     <ApronCardPrintSheet
       machineName={machine.name}
       machineInitials={machine.initials}
-      content={apronCardContent(machine)}
-      size={machine.apronSize}
+      content={apronCardContent(
+        machine,
+        card,
+        await getMachineCredits(machine),
+        (await getMachinePinTips(machine.pinballmapTitle?.opdbId ?? null)) !==
+          null
+      )}
+      size={card.size}
       scanUrl={buildMachineHubUrl(
         resolveRequestUrl(await headers()),
         machine.initials

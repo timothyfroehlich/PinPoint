@@ -6,7 +6,7 @@
  * `removeMachineFromPinballMapAction` deletes that lmx and clears our columns.
  *
  * The PinballMap client is pinned at the seam (CORE-TEST-006) — never reaches
- * pinballmap.com. Credentials are stubbed at `~/lib/pinballmap/credentials`
+ * pinballmap.com. The Vault decrypt is stubbed at `~/lib/pinballmap/user-credentials`
  * rather than seeded into Vault: Vault is Supabase's, not ours, and PGlite has
  * no `vault` schema to decrypt from.
  */
@@ -23,6 +23,7 @@ import {
   timelineEvents,
   pinballmapState,
   pinballmapAbandonedListings,
+  pinballmapCatalog,
 } from "~/server/db/schema";
 import type { LocationSnapshot, PbmWriteFailure } from "~/lib/pinballmap/types";
 import type * as UserCredentialsModule from "~/lib/pinballmap/user-credentials";
@@ -862,14 +863,14 @@ describe("PinballMap outbound writes (PGlite)", () => {
   // --- the abandoned-entry path (explicit lmxId) -------------------------
   //
   // These three guard the same mistake from three sides: the submitted lmx is
-  // attacker-controlled and the operator account behind it can edit the WHOLE
+  // attacker-controlled and the Pinball Map account behind it can edit the WHOLE
   // location's lineup, so nothing may be taken on the form's word, and nothing
   // downstream may assume the entry shares the cabinet's CURRENT title.
 
   it("refuses an lmx this machine never abandoned", async () => {
     // Push is `member: "owner"`, so without the allowlist an owner of any one
     // cabinet could post any lmx on the lineup and delete a game they have
-    // nothing to do with, through the shared operator account.
+    // nothing to do with, through the pusher's Pinball Map account.
     const db = await getTestDb();
     const { removeMachineFromPinballMapAction } =
       await import("~/app/(app)/m/pinballmap-actions");
@@ -1352,4 +1353,297 @@ describe("PinballMap outbound writes (PGlite)", () => {
       expect(link?.needsRelinkAt).toBeNull();
     }
   );
+});
+
+/**
+ * The lineup page's actions on an entry no PinPoint machine is linked to
+ * (lineup spec §5.4): Remove from Pinball Map under the push gate (pinballmap
+ * §8.2), and Link under the machine-linking gate (§8.1).
+ */
+describe("Lineup page: unlinked entries (PGlite)", () => {
+  setupTestDb();
+
+  beforeEach(async () => {
+    pbm.lineup = [];
+    pbm.nextLmxId = 500;
+    pbm.addResult = null;
+    pbm.removeResult = null;
+    pbm.beforeAdd = null;
+    pbm.beforeRemove = null;
+    pbm.fetchError = null;
+    const { getLinkedPinballMapCredentials } =
+      await import("~/lib/pinballmap/user-credentials");
+    vi.mocked(getLinkedPinballMapCredentials).mockResolvedValue({
+      credentials: { email: "ops@example.com", token: "tok_123" },
+      tokenVaultId: LINKED_VAULT_ID,
+    });
+  });
+
+  function entryForm(lmxId: number): FormData {
+    const fd = new FormData();
+    fd.append("lmxId", String(lmxId));
+    return fd;
+  }
+
+  it("removes an unlinked entry from Pinball Map and the stored lineup", async () => {
+    const db = await getTestDb();
+    const { removeUnlinkedPinballmapEntryAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    pbm.lineup = [{ id: 4040, machineId: 8080 }];
+    await seedState([{ id: 4040, machineId: 8080 }]);
+    const [walkedAway] = await db
+      .insert(machines)
+      .values({ name: "Retitled", initials: "RT" })
+      .returning();
+    if (!walkedAway) throw new Error("failed to seed machine");
+    await db.insert(pinballmapAbandonedListings).values({
+      machineId: walkedAway.id,
+      lmxId: 4040,
+      pinballmapMachineId: 8080,
+      locationId: 26454,
+    });
+
+    const result = await removeUnlinkedPinballmapEntryAction(
+      undefined,
+      entryForm(4040)
+    );
+
+    expect(result).toEqual({ ok: true, value: {} });
+    expect(pbm.lineup).toEqual([]);
+    const state = await db.query.pinballmapState.findFirst();
+    expect(state?.snapshotJson?.lmxes).toEqual([]);
+    expect(await db.select().from(pinballmapAbandonedListings)).toHaveLength(0);
+  });
+
+  it("marks the remover's link Needs relink when PinballMap rejects the token", async () => {
+    const db = await getTestDb();
+    const { removeUnlinkedPinballmapEntryAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    await seedLink(admin.id);
+    pbm.lineup = [{ id: 4040, machineId: 8080 }];
+    await seedState([{ id: 4040, machineId: 8080 }]);
+    pbm.removeResult = { ok: false, reason: "unauthorized" };
+
+    const result = await removeUnlinkedPinballmapEntryAction(
+      undefined,
+      entryForm(4040)
+    );
+
+    expect(result).toMatchObject({ ok: false, code: "PBM_AUTH_FAILED" });
+    expect(pbm.lineup).toEqual([{ id: 4040, machineId: 8080 }]);
+    const link = await db.query.pinballmapUserCredentials.findFirst({
+      where: eq(pinballmapUserCredentials.userId, admin.id),
+    });
+    expect(link?.needsRelinkAt).not.toBeNull();
+  });
+
+  it("offers no removal to an admin without a linked account", async () => {
+    const { removeUnlinkedPinballmapEntryAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const { getLinkedPinballMapCredentials } =
+      await import("~/lib/pinballmap/user-credentials");
+    vi.mocked(getLinkedPinballMapCredentials).mockResolvedValue(null);
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    pbm.lineup = [{ id: 4040, machineId: 8080 }];
+    await seedState([{ id: 4040, machineId: 8080 }]);
+
+    const result = await removeUnlinkedPinballmapEntryAction(
+      undefined,
+      entryForm(4040)
+    );
+
+    expect(result).toMatchObject({ ok: false, code: "NOT_LINKED" });
+    expect(pbm.lineup).toEqual([{ id: 4040, machineId: 8080 }]);
+  });
+
+  it("refuses a member who owns no machine that walked away from the entry", async () => {
+    const { removeUnlinkedPinballmapEntryAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const member = await createUser("member");
+    await mockAuthAs(member.id);
+    pbm.lineup = [{ id: 4040, machineId: 8080 }];
+    await seedState([{ id: 4040, machineId: 8080 }]);
+
+    const result = await removeUnlinkedPinballmapEntryAction(
+      undefined,
+      entryForm(4040)
+    );
+
+    expect(result).toMatchObject({ ok: false, code: "UNAUTHORIZED" });
+    expect(pbm.lineup).toEqual([{ id: 4040, machineId: 8080 }]);
+  });
+
+  it("lets a member remove an entry their own machine walked away from", async () => {
+    const db = await getTestDb();
+    const { removeUnlinkedPinballmapEntryAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const member = await createUser("member");
+    await mockAuthAs(member.id);
+    pbm.lineup = [{ id: 4040, machineId: 8080 }];
+    await seedState([{ id: 4040, machineId: 8080 }]);
+    const [owned] = await db
+      .insert(machines)
+      .values({ name: "Mine", initials: "MINE", ownerId: member.id })
+      .returning();
+    if (!owned) throw new Error("failed to seed machine");
+    await db.insert(pinballmapAbandonedListings).values({
+      machineId: owned.id,
+      lmxId: 4040,
+      pinballmapMachineId: 8080,
+      locationId: 26454,
+    });
+
+    const result = await removeUnlinkedPinballmapEntryAction(
+      undefined,
+      entryForm(4040)
+    );
+
+    expect(result.ok).toBe(true);
+    expect(pbm.lineup).toEqual([]);
+  });
+
+  it("refuses an entry whose title a PinPoint machine is linked to", async () => {
+    const db = await getTestDb();
+    const { removeUnlinkedPinballmapEntryAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    pbm.lineup = [{ id: 4040, machineId: TITLE_ID }];
+    await seedState([{ id: 4040, machineId: TITLE_ID }]);
+    await db.insert(machines).values({
+      name: "Linked",
+      initials: "LNK",
+      pinballmapMachineId: TITLE_ID,
+      pinballmapIntent: "on",
+    });
+
+    const result = await removeUnlinkedPinballmapEntryAction(
+      undefined,
+      entryForm(4040)
+    );
+
+    expect(result).toMatchObject({ ok: false, code: "VALIDATION" });
+    expect(pbm.lineup).toEqual([{ id: 4040, machineId: TITLE_ID }]);
+  });
+
+  it("links an owner's machine to the entry's title, and refuses another owner's", async () => {
+    const db = await getTestDb();
+    const { linkMachineToPinballmapEntryAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const member = await createUser("member");
+    const other = await createUser("member");
+    await mockAuthAs(member.id);
+    await seedState([{ id: 4040, machineId: 8080 }]);
+    await db.insert(pinballmapCatalog).values({
+      pinballmapMachineId: 8080,
+      name: "Cactus Canyon",
+      manufacturer: "Bally",
+      year: 1998,
+    });
+    const [mine, theirs] = await db
+      .insert(machines)
+      .values([
+        { name: "Mine", initials: "CC", ownerId: member.id },
+        { name: "Theirs", initials: "CC2", ownerId: other.id },
+      ])
+      .returning();
+    if (!mine || !theirs) throw new Error("failed to seed machines");
+
+    const linkForm = (machineId: string): FormData => {
+      const fd = form(machineId);
+      fd.append("pinballmapMachineId", "8080");
+      return fd;
+    };
+
+    await expect(
+      linkMachineToPinballmapEntryAction(undefined, linkForm(theirs.id))
+    ).resolves.toMatchObject({ ok: false, code: "UNAUTHORIZED" });
+    await expect(
+      linkMachineToPinballmapEntryAction(undefined, linkForm(mine.id))
+    ).resolves.toEqual({
+      ok: true,
+      value: { pinballmapMachineId: 8080, intent: "on" },
+    });
+
+    const rows = await db
+      .select({
+        id: machines.id,
+        title: machines.pinballmapMachineId,
+        intent: machines.pinballmapIntent,
+      })
+      .from(machines);
+    // The entry is already on the lineup, so the match sets the machine On
+    // (pinballmap §2.3); it writes nothing to Pinball Map.
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        { id: mine.id, title: 8080, intent: "on" },
+        { id: theirs.id, title: null, intent: "off" },
+      ])
+    );
+    expect(pbm.lineup).toEqual([]);
+  });
+
+  it("keeps Don't sync, and leaves a machine whose availability forbids On Off", async () => {
+    const db = await getTestDb();
+    const { linkMachineToPinballmapEntryAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    await seedState([
+      { id: 4041, machineId: 8081 },
+      { id: 4042, machineId: 8082 },
+      { id: 4043, machineId: 8083 },
+    ]);
+    await db.insert(pinballmapCatalog).values([
+      { pinballmapMachineId: 8081, name: "Old Title" },
+      { pinballmapMachineId: 8082, name: "Arriving" },
+      { pinballmapMachineId: 8083, name: "Retargeted" },
+    ]);
+    const [skip, arriving, moved] = await db
+      .insert(machines)
+      .values([
+        {
+          name: "Skip",
+          initials: "SKP",
+          pinballmapMachineId: 8081,
+          pinballmapIntent: "no_sync",
+        },
+        {
+          name: "Arriving",
+          initials: "ARR",
+          presenceStatus: "pending_arrival",
+        },
+        {
+          name: "Moved",
+          initials: "MOV",
+          pinballmapMachineId: 8081,
+          pinballmapIntent: "off",
+        },
+      ])
+      .returning();
+    if (!skip || !arriving || !moved)
+      throw new Error("failed to seed machines");
+
+    const link = (machineId: string, title: number): FormData => {
+      const fd = form(machineId);
+      fd.append("pinballmapMachineId", String(title));
+      return fd;
+    };
+
+    await expect(
+      linkMachineToPinballmapEntryAction(undefined, link(skip.id, 8082))
+    ).resolves.toMatchObject({ ok: true, value: { intent: "no_sync" } });
+    await expect(
+      linkMachineToPinballmapEntryAction(undefined, link(arriving.id, 8083))
+    ).resolves.toMatchObject({ ok: true, value: { intent: "off" } });
+    // A re-match from another title resets to Off, then goes On (§2.3).
+    await expect(
+      linkMachineToPinballmapEntryAction(undefined, link(moved.id, 8082))
+    ).resolves.toMatchObject({ ok: true, value: { intent: "on" } });
+  });
 });

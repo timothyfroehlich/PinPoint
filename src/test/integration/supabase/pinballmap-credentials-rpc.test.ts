@@ -1,6 +1,6 @@
 /**
  * The in-body role guard on `get_pinballmap_user_credentials(uuid)` (PP-o355.6,
- * drizzle/0090).
+ * drizzle/0096).
  *
  * It is a SECURITY DEFINER function that hands back a member's decrypted Pinball
  * Map token from Vault. The REVOKE/GRANT on it is defense in depth, not the
@@ -12,7 +12,7 @@
  * shipped without it.
  *
  * `get_pinballmap_api_token()` (0057) was dropped in 0059, and the operator
- * token's `get_pinballmap_credentials()` in 0091.
+ * token's `get_pinballmap_credentials()` in 0097.
  *
  * Has to run against a real Supabase stack rather than PGlite: PGlite's schema
  * comes from `drizzle-kit export`, which knows nothing about hand-written
@@ -161,7 +161,7 @@ describe.each(RPCS)(
 // The link table holds each member's Pinball Map email and Vault reference.
 // RLS enabled with no policies is the only thing keeping PostgREST from serving
 // it to any logged-in member, so pin that a row, even the caller's own, never
-// comes back to `anon` or `authenticated` (drizzle/0090).
+// comes back to `anon` or `authenticated` (drizzle/0096).
 describe("pinballmap_user_credentials — not readable through PostgREST", () => {
   let memberUser: { id: string } | undefined;
   let memberAuthedClient: SupabaseClient;
