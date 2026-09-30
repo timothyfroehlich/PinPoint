@@ -35,8 +35,10 @@ export async function ApronCardPanel({
     getMachinePinTips(machine.pinballmapTitle?.opdbId ?? null),
   ]);
   const hasPinTips = pinTips !== null;
+  const card = machine.apronCards[0] ?? null;
   const { name, edition, manufacturer, year, ownerName } = apronCardContent(
     machine,
+    card,
     credits,
     hasPinTips
   );
@@ -57,15 +59,15 @@ export async function ApronCardPanel({
       }}
       mainDescription={docToPlainText(machine.description)}
       saved={{
-        size: machine.apronSize,
-        useCustomDescription: machine.apronUseCustomDescription,
-        customDescription: machine.apronDescription ?? "",
-        tip: machine.apronTip ?? "",
-        tipEnabled: machine.apronTipEnabled,
-        designEnabled: machine.apronDesignEnabled,
-        artEnabled: machine.apronArtEnabled,
+        size: card?.size ?? null,
+        useCustomDescription: card?.useCustomDescription ?? false,
+        customDescription: docToPlainText(card?.description),
+        tip: docToPlainText(card?.tip),
+        tipEnabled: card?.tipEnabled ?? false,
+        designEnabled: card?.designEnabled ?? true,
+        artEnabled: card?.artEnabled ?? true,
       }}
-      savedAt={machine.apronSavedAt?.toISOString() ?? null}
+      savedAt={card?.updatedAt.toISOString() ?? null}
       scanUrl={scanUrl}
       canEdit={canEdit}
       canExport={canExport}

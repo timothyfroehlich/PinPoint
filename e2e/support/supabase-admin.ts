@@ -683,16 +683,29 @@ export async function seedSavedApronCard(
   machineId: string,
   card: { description: string; tip?: string }
 ): Promise<void> {
-  const { error } = await supabaseAdmin
-    .from("machines")
-    .update({
-      apron_size: "stern",
-      apron_use_custom_description: true,
-      apron_description: card.description,
-      apron_tip: card.tip ?? null,
-      apron_tip_enabled: card.tip !== undefined,
-      apron_saved_at: new Date().toISOString(),
-    })
-    .eq("id", machineId);
+  // One paragraph per line, as the editor stores card text.
+  const doc = (text: string) => ({
+    type: "doc",
+    content: text
+      .split(/\n+/)
+      .filter((line) => line.trim())
+      .map((line) => ({
+        type: "paragraph",
+        content: [{ type: "text", text: line }],
+      })),
+  });
+  const { error } = await supabaseAdmin.from("machine_apron_cards").upsert(
+    {
+      machine_id: machineId,
+      name: "Card 1",
+      size: "stern",
+      use_custom_description: true,
+      description: doc(card.description),
+      tip: card.tip === undefined ? null : doc(card.tip),
+      tip_enabled: card.tip !== undefined,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "machine_id,name" }
+  );
   if (error) throw error;
 }
