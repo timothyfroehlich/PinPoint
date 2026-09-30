@@ -46,6 +46,12 @@ describe("parseShotFiles", () => {
     );
   });
 
+  it("rejects a name that would break the comment's image URL", () => {
+    expect(() =>
+      parseShotFiles([png("desktop-toggle on.png")], VIEWPORTS)
+    ).toThrow(/may only use/);
+  });
+
   it("rejects the same page and viewport twice", () => {
     const a = png("desktop-twice.png");
     expect(() => parseShotFiles([a, a], VIEWPORTS)).toThrow(/listed twice/);

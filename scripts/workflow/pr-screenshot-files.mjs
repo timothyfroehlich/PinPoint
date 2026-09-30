@@ -40,6 +40,13 @@ export function parseShotFiles(paths, viewportNames) {
       throw new Error(`--files: ${fileName} is not a .png`);
     }
     const stem = fileName.slice(0, -".png".length);
+    // The name lands unencoded in a Markdown image URL; a space or `)` would
+    // render the comment cell as literal text instead of an image.
+    if (!/^[A-Za-z0-9._-]+$/.test(stem)) {
+      throw new Error(
+        `--files: ${fileName} may only use letters, digits, ".", "_" and "-"`
+      );
+    }
     const vpName = byLength.find((vp) => stem.startsWith(`${vp}-`));
     if (!vpName) {
       throw new Error(
