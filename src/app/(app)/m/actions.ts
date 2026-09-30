@@ -14,6 +14,8 @@ import {
   applyMachinePbmLink,
   createMachine,
   carryExcludedReason,
+  IC_INELIGIBLE_MESSAGE,
+  isTitleIcEligible,
   planMachinePbmLink,
   updateMachinePresence,
   type Machine,
@@ -28,7 +30,6 @@ import {
 } from "~/server/db/schema";
 import { createMachineSchema, updateMachineSchema } from "./schemas";
 import { resolvePbmLinkColumnsForCreate } from "~/lib/pinballmap/link-columns";
-import { getCatalogEntry } from "~/lib/pinballmap/catalog";
 import { importPinballMapCommentsAfterCoverageChange } from "~/lib/pinballmap/comment-import";
 import type { PbmIcIntent } from "~/lib/pinballmap/insider-connected";
 import { addMachineToPinballMapAction } from "./pinballmap-actions";
@@ -286,12 +287,8 @@ async function resolveIcIntentForCreate(
       message: "Insider Connected needs a Pinball Map title.",
     };
   }
-  const entry = await getCatalogEntry(pinballmapMachineId);
-  if (!entry?.icEligible) {
-    return {
-      ok: false,
-      message: "Pinball Map doesn't offer Insider Connected for this game.",
-    };
+  if (!(await isTitleIcEligible(pinballmapMachineId))) {
+    return { ok: false, message: IC_INELIGIBLE_MESSAGE };
   }
   return { ok: true, value: requested };
 }

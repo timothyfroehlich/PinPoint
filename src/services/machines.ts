@@ -1293,6 +1293,18 @@ export type SetMachineIcIntentResult =
   | { ok: true; changed: boolean; previous: PbmIcIntent | null }
   | { ok: false; reason: "not_linked" | "ineligible"; message: string };
 
+/** Refusal copy when a title's catalog entry is not Insider Connected eligible. */
+export const IC_INELIGIBLE_MESSAGE =
+  "Pinball Map doesn't offer Insider Connected for this game.";
+
+/**
+ * Whether Pinball Map's catalog marks a title Insider Connected eligible — the
+ * rule every Insider Connected intent write is held to (pinballmap 3.8).
+ */
+export async function isTitleIcEligible(titleId: number): Promise<boolean> {
+  return (await getCatalogEntry(titleId))?.icEligible ?? false;
+}
+
 /**
  * Record a machine's Insider Connected intent (spec pinballmap §3.8), or clear it
  * to Don't sync with null. Writes only to PinPoint; the push to Pinball Map is a
@@ -1321,13 +1333,8 @@ export async function setMachineIcIntent({
   } as const;
   if (titleId === null) return notLinked;
 
-  const catalogEntry = await getCatalogEntry(titleId);
-  if (!catalogEntry?.icEligible) {
-    return {
-      ok: false,
-      reason: "ineligible",
-      message: "Pinball Map doesn't offer Insider Connected for this game.",
-    };
+  if (!(await isTitleIcEligible(titleId))) {
+    return { ok: false, reason: "ineligible", message: IC_INELIGIBLE_MESSAGE };
   }
 
   // No shortcut when the intent already matches: the title-pinned UPDATE is what
