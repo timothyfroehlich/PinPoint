@@ -274,6 +274,45 @@ describe("Insider Connected intent (PGlite)", () => {
       expect(await storedIcIntent(machineId)).toBe("off");
     });
 
+    it("clears the intent to Don't sync, and back again", async () => {
+      const { setInsiderConnectedIntentAction } =
+        await import("~/app/(app)/m/pinballmap-actions");
+      const owner = await createUser("member");
+      await mockAuthAs(owner.id);
+      const machineId = await seed({ ownerId: owner.id, icIntent: "on" });
+
+      const cleared = await setInsiderConnectedIntentAction(
+        undefined,
+        form(machineId, { icIntent: "no_sync" })
+      );
+      expect(cleared).toEqual({ ok: true, value: { icIntent: null } });
+      expect(await storedIcIntent(machineId)).toBeNull();
+
+      const reset = await setInsiderConnectedIntentAction(
+        undefined,
+        form(machineId, { icIntent: "off" })
+      );
+      expect(reset).toEqual({ ok: true, value: { icIntent: "off" } });
+      expect(await storedIcIntent(machineId)).toBe("off");
+      expect(pbm.icCalls).toEqual([]);
+    });
+
+    it("refuses an unknown setting without touching the intent", async () => {
+      const { setInsiderConnectedIntentAction } =
+        await import("~/app/(app)/m/pinballmap-actions");
+      const admin = await createUser("admin");
+      await mockAuthAs(admin.id);
+      const machineId = await seed({ icIntent: "on" });
+
+      const result = await setInsiderConnectedIntentAction(
+        undefined,
+        form(machineId, { icIntent: "" })
+      );
+
+      expect(result).toMatchObject({ ok: false, code: "VALIDATION" });
+      expect(await storedIcIntent(machineId)).toBe("on");
+    });
+
     it("refuses a title the catalog does not mark eligible", async () => {
       const { setInsiderConnectedIntentAction } =
         await import("~/app/(app)/m/pinballmap-actions");

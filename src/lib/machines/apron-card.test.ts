@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   apronCardContent,
+  type ApronCardSettings,
   type ApronMachineSource,
   apronCardPixelSize,
   apronCreditRows,
@@ -64,12 +65,6 @@ describe("apronCardContent", () => {
     pinballmapExcluded: false,
     year: 2021,
     description: plainTextToDoc("Main description"),
-    apronUseCustomDescription: false,
-    apronDescription: "Custom description",
-    apronTip: "Aim for the scoop",
-    apronTipEnabled: false,
-    apronDesignEnabled: true,
-    apronArtEnabled: false,
     owner: { name: "Tim" },
     invitedOwner: null,
     pinballmapTitle: {
@@ -80,10 +75,19 @@ describe("apronCardContent", () => {
     },
   };
 
+  const card: ApronCardSettings = {
+    useCustomDescription: false,
+    description: plainTextToDoc("Custom description"),
+    tip: plainTextToDoc("Aim for the scoop"),
+    tipEnabled: false,
+    designEnabled: true,
+    artEnabled: false,
+  };
+
   const credits = { design: ["Keith Elwin"], art: ["Jeremy Packer"] };
 
   it("uses the main description while retaining disabled tip text", () => {
-    expect(apronCardContent(machine, credits, false)).toMatchObject({
+    expect(apronCardContent(machine, card, credits, false)).toMatchObject({
       edition: "Premium Edition",
       description: "Main description",
       tip: "Aim for the scoop",
@@ -92,7 +96,7 @@ describe("apronCardContent", () => {
   });
 
   it("prints the current manufacturer rather than the stored copy", () => {
-    expect(apronCardContent(machine, credits, false).manufacturer).toBe(
+    expect(apronCardContent(machine, card, credits, false).manufacturer).toBe(
       "Stern"
     );
   });
@@ -100,7 +104,8 @@ describe("apronCardContent", () => {
   it("uses the custom description only when selected", () => {
     expect(
       apronCardContent(
-        { ...machine, apronUseCustomDescription: true },
+        machine,
+        { ...card, useCustomDescription: true },
         credits,
         false
       ).description
@@ -108,7 +113,9 @@ describe("apronCardContent", () => {
   });
 
   it("prints the registered owner's name", () => {
-    expect(apronCardContent(machine, credits, false).ownerName).toBe("Tim");
+    expect(apronCardContent(machine, card, credits, false).ownerName).toBe(
+      "Tim"
+    );
   });
 
   it("falls back to the invited owner's name when there is no registered owner", () => {
@@ -119,6 +126,7 @@ describe("apronCardContent", () => {
           owner: null,
           invitedOwner: { name: "Casey" },
         },
+        card,
         credits,
         false
       ).ownerName
@@ -133,6 +141,7 @@ describe("apronCardContent", () => {
           owner: { name: "Tim" },
           invitedOwner: { name: "Casey" },
         },
+        card,
         credits,
         false
       ).ownerName
@@ -143,6 +152,7 @@ describe("apronCardContent", () => {
     expect(
       apronCardContent(
         { ...machine, owner: null, invitedOwner: null },
+        card,
         credits,
         false
       ).ownerName
@@ -150,7 +160,7 @@ describe("apronCardContent", () => {
   });
 
   it("carries the credits and each role's display setting", () => {
-    expect(apronCardContent(machine, credits, false)).toMatchObject({
+    expect(apronCardContent(machine, card, credits, false)).toMatchObject({
       credits,
       designEnabled: true,
       artEnabled: false,
