@@ -10,6 +10,7 @@
 //
 // Usage:
 //   node scripts/workflow/pr-screenshots.mjs <PR> [--pages=a,b,c] [--force-auth]
+//   node scripts/workflow/pr-screenshots.mjs <PR> --files=a.png,b.png
 //
 //   <PR>          Required. GitHub PR number — used for the screenshot storage
 //                 path and the sticky comment target.
@@ -21,6 +22,14 @@
 //                 dropping the rest, so finish with an unfiltered run.
 //   --force-auth  Regenerate e2e/.auth/*.json storage state even if present
 //                 (use when a previous session looks stale/expired).
+//   --files=a,b   Publish PNGs you already captured instead of shooting the
+//                 manifest — for UI states no manifest route reaches. Name
+//                 each `<viewport>-<id>.png` (viewport: desktop, mobile-large,
+//                 mobile-small); a page's viewports share a comment row.
+//                 Skips the dev-server check and auth setup. Like --pages, it
+//                 rebuilds the sticky comment from only these files. Use this
+//                 instead of pushing to pr-screenshots by hand. See
+//                 pr-screenshot-files.mjs.
 //
 // Browser selection (env var):
 //   PR_SHOTS_BROWSER=chromium|firefox  Force a specific renderer. When unset,
@@ -71,6 +80,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { evaluateStorageState } from "./auth-storage-state.mjs";
+import { parseShotFiles } from "./pr-screenshot-files.mjs";
 
 const { loadEnvConfig } = nextEnv;
 
@@ -102,10 +112,17 @@ function parseArgs(argv) {
   let pr;
   let pagesFilter;
   let forceAuth = false;
+  let files;
 
   for (const arg of argv) {
     if (arg === "--force-auth") {
       forceAuth = true;
+    } else if (arg.startsWith("--files=")) {
+      files = arg
+        .slice("--files=".length)
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
     } else if (arg.startsWith("--pages")) {
       const value = arg.includes("=") ? arg.split("=")[1] : "";
       pagesFilter = value
@@ -121,11 +138,14 @@ function parseArgs(argv) {
 
   if (!pr || !/^\d+$/.test(pr)) {
     throw new Error(
-      "Usage: node scripts/workflow/pr-screenshots.mjs <PR> [--pages=a,b,c] [--force-auth]"
+      "Usage: node scripts/workflow/pr-screenshots.mjs <PR> [--pages=a,b,c] [--force-auth] | <PR> --files=a.png,b.png"
     );
   }
+  if (files && (pagesFilter || forceAuth)) {
+    throw new Error("--files cannot be combined with --pages or --force-auth");
+  }
 
-  return { pr, pagesFilter, forceAuth };
+  return { pr, pagesFilter, forceAuth, files };
 }
 
 function loadManifest(pagesFilter) {
@@ -500,8 +520,13 @@ function postOrUpdateStickyComment(repoSlug, pr, body) {
 }
 
 async function main() {
-  const { pr, pagesFilter, forceAuth } = parseArgs(process.argv.slice(2));
-  const pages = loadManifest(pagesFilter);
+  const { pr, pagesFilter, forceAuth, files } = parseArgs(
+    process.argv.slice(2)
+  );
+  // Validate --files before any network call, so a bad name fails fast.
+  const preCaptured = files
+    ? parseShotFiles(files, Object.keys(VIEWPORTS))
+    : undefined;
 
   const shortSha = git(["rev-parse", "--short", "HEAD"], { cwd: REPO_ROOT });
 
@@ -528,25 +553,30 @@ async function main() {
     );
   }
 
-  const baseUrl = resolveBaseUrl();
-  const healthy = await checkServerReachable(baseUrl);
-  if (!healthy) {
-    throw new Error(
-      `Dev server not reachable at ${baseUrl}/api/health. Start it first: pnpm run dev`
-    );
-  }
-
-  const rolesNeeded = [...new Set(pages.map((p) => p.authRole))];
-  ensureAuthStorageState(rolesNeeded, forceAuth);
-
   const workDir = mkdtempSync(join(tmpdir(), "pr-screenshots-capture-"));
   let captured;
   try {
-    captured = await captureWithFallback(baseUrl, pages, workDir);
-    if (captured.length === 0) {
-      throw new Error(
-        "No screenshots captured — every page failed. See errors above."
-      );
+    if (preCaptured) {
+      captured = preCaptured;
+    } else {
+      const pages = loadManifest(pagesFilter);
+      const baseUrl = resolveBaseUrl();
+      const healthy = await checkServerReachable(baseUrl);
+      if (!healthy) {
+        throw new Error(
+          `Dev server not reachable at ${baseUrl}/api/health. Start it first: pnpm run dev`
+        );
+      }
+
+      const rolesNeeded = [...new Set(pages.map((p) => p.authRole))];
+      ensureAuthStorageState(rolesNeeded, forceAuth);
+
+      captured = await captureWithFallback(baseUrl, pages, workDir);
+      if (captured.length === 0) {
+        throw new Error(
+          "No screenshots captured — every page failed. See errors above."
+        );
+      }
     }
 
     const { remotePaths, pushed } = publishScreenshots(pr, shortSha, captured);
