@@ -1,34 +1,80 @@
 /**
- * PinballMap client configuration: mode selection and API constants.
+ * PinballMap client configuration: mode selection, the production-only network
+ * policy, and API constants.
  *
- * Mode resolution:
- * - `PINBALLMAP_MODE=mock|live` wins when set.
- * - Otherwise: `live` only on a Vercel PRODUCTION deployment; `mock` everywhere
- *   else — previews, local dev, CI, tests.
+ * **Only a Vercel production deployment may reach pinballmap.com.** Local dev,
+ * CI, E2E, tests, and preview deployments never do: reads come from the mock
+ * client's captured fixtures, and writes land in the mock's in-memory state
+ * (CORE-PBM-001, CORE-TEST-006). Two layers enforce it, both keyed off
+ * `isPinballMapProduction()`:
  *
- * The mock default keeps the dev server and the whole test suite off the
- * network and off PBM's servers (CORE-TEST-006), with no credentials needed.
+ * 1. `getPinballMapMode()` resolves `mock` everywhere outside production, so the
+ *    app never builds a live client there.
+ * 2. The live client's single `fetch` call site refuses to run outside
+ *    production (`assertPinballMapNetworkAllowed`), so a live client that exists
+ *    anyway — constructed directly, or through a future mode bug — still cannot
+ *    send a request.
+ *
+ * Both fail closed: an unset, empty, or unrecognised `VERCEL_ENV` is
+ * non-production.
  *
  * **Why `VERCEL_ENV` and not `NODE_ENV`** (PP-o355.24): Vercel sets
  * `NODE_ENV=production` for PREVIEW builds and preview runtime too, not just
- * production — so keying off it silently resolved every preview deployment to
- * the live client. `VERCEL_ENV` is the one that actually discriminates:
- * `production` | `preview` | `development`, and undefined off-Vercel, which
- * correctly yields `mock` for local and CI.
+ * production. `VERCEL_ENV` is the one that discriminates: `production` |
+ * `preview` | `development`, and undefined off-Vercel.
  *
- * Previews reaching PBM would be unsanctioned automated traffic against a
- * conduct policy that budgets one automated call per hour (CORE-PBM-001), and
- * would do it unauthenticated — `PINBALLMAP_API_TOKEN` is scoped
- * production-only, so those calls 401 under PBM's `REQUIRE_API_TOKEN` gate.
- * Set `PINBALLMAP_MODE=live` explicitly to exercise the live client anyway.
+ * **Why there is no opt-in.** Non-production databases carry seeded fake
+ * operator credentials (`supabase/seed-pinballmap-state.ts`) so the push
+ * surfaces render. A request sent from there would be unsanctioned automated
+ * traffic against a conduct policy that budgets one automated call per hour,
+ * and a write would be a public edit to the real lineup. An earlier
+ * `PINBALLMAP_MODE=live` override allowed exactly that from any environment; it
+ * was removed rather than guarded.
+ *
+ * `PINBALLMAP_MODE=mock` is still honoured in production as a kill switch. Any
+ * other value, `live` included, changes nothing: production defaults to `live`,
+ * and everywhere else is `mock`.
  */
 
 export type PinballMapMode = "live" | "mock";
 
+/** The one place that decides whether this process may reach PinballMap. */
+export function isPinballMapProduction(): boolean {
+  return process.env["VERCEL_ENV"] === "production";
+}
+
 export function getPinballMapMode(): PinballMapMode {
-  const explicit = process.env["PINBALLMAP_MODE"];
-  if (explicit === "live" || explicit === "mock") return explicit;
-  return process.env["VERCEL_ENV"] === "production" ? "live" : "mock";
+  if (!isPinballMapProduction()) return "mock";
+  return process.env["PINBALLMAP_MODE"] === "mock" ? "mock" : "live";
+}
+
+/**
+ * Thrown when anything tries to send a request to PinballMap outside
+ * production. Reaching it is a PinPoint bug (mode resolution should have handed
+ * the caller the mock), so it throws rather than degrading into a failed-request
+ * result that would hide the bug.
+ */
+export class PinballMapNetworkBlockedError extends Error {
+  constructor(method: string, label: string) {
+    super(
+      `Refused ${method} ${label}: PinballMap is reachable only from a Vercel ` +
+        `production deployment (VERCEL_ENV=production). Use the mock client.`
+    );
+    this.name = "PinballMapNetworkBlockedError";
+  }
+}
+
+/**
+ * Throws unless this process is production. The live client calls it
+ * immediately before its only `fetch`, for every method, reads included.
+ */
+export function assertPinballMapNetworkAllowed(
+  method: string,
+  label: string
+): void {
+  if (!isPinballMapProduction()) {
+    throw new PinballMapNetworkBlockedError(method, label);
+  }
 }
 
 /** All PBM endpoints live under this base (vendored llms.txt §"Base URL"). */

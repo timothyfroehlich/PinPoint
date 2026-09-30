@@ -45,7 +45,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup locked Supabase CLI
-        uses: ./.github/actions/setup-mise
+        uses: $/.github/actions/setup-mise
         with:
           install-args: "--locked supabase"
           cache-pnpm: "false"

@@ -46,7 +46,6 @@ function ic(
 ): PbmInsiderConnectedView {
   return {
     intent: "on",
-    shown: "on",
     pinballMap: "on",
     target: "on",
     differs: false,
@@ -249,7 +248,7 @@ describe("the status sentence", () => {
           canRefresh
           writeEnabled
           modelName="Medieval Madness"
-          insiderConnected={ic({ intent: null, shown: "not_set" })}
+          insiderConnected={ic({ intent: null, pinballMap: "not_set" })}
         />
       );
       expect(
@@ -502,7 +501,20 @@ describe("the intent toggle", () => {
   });
 });
 
-describe("the Insider Connected switch (3.8)", () => {
+/** The Insider Connected toggle's position with the given label. */
+function icPosition(name: string): HTMLElement {
+  return within(
+    screen.getByRole("radiogroup", { name: "Insider Connected" })
+  ).getByRole("radio", { name });
+}
+
+describe("the Insider Connected toggle (3.8)", () => {
+  // Nothing clears mocks between tests file-wide, and these assert on the
+  // intent action's own calls.
+  beforeEach(() => {
+    vi.mocked(setInsiderConnectedIntentAction).mockClear();
+  });
+
   it("is absent for an ineligible title", () => {
     renderControl({ view: VIEWS.on });
     expect(
@@ -528,27 +540,81 @@ describe("the Insider Connected switch (3.8)", () => {
       view: VIEWS.off,
       insiderConnected: ic({ pinballMap: null }),
     });
-    expect(
-      screen.getByRole("switch", { name: "Insider Connected" })
-    ).toBeChecked();
+    expect(icPosition("On")).toBeChecked();
   });
 
   it.each([
-    ["on", true, "On"],
-    ["off", false, "Off"],
-    ["not_set", false, "Not set"],
+    ["on", "On"],
+    ["off", "Off"],
+    [null, "Don't sync"],
+  ] as const)("selects %s as %s", (intent, label) => {
+    renderControl({ view: VIEWS.on, insiderConnected: ic({ intent }) });
+    const radios = within(
+      screen.getByRole("radiogroup", { name: "Insider Connected" })
+    ).getAllByRole("radio");
+    expect(
+      radios.filter((radio) => radio.getAttribute("aria-checked") === "true")
+    ).toEqual([icPosition(label)]);
+  });
+
+  it.each([
+    ["on", "Pinball Map: On"],
+    ["off", "Pinball Map: Off"],
+    ["not_set", "Pinball Map: Not set"],
   ] as const)(
-    "shows %s as a switch that is checked=%s, labelled %s",
-    (shown, checked, label) => {
-      renderControl({ view: VIEWS.on, insiderConnected: ic({ shown }) });
-      const toggle = screen.getByRole("switch", { name: "Insider Connected" });
-      if (checked) expect(toggle).toBeChecked();
-      else expect(toggle).not.toBeChecked();
-      // The label is tied to the switch, so Not set is announced distinctly
-      // from Off even though both render unchecked.
-      expect(toggle).toHaveAccessibleDescription(label);
+    "states Pinball Map's %s beside Don't sync, unflagged",
+    (pinballMap, text) => {
+      renderControl({
+        view: VIEWS.on,
+        insiderConnected: ic({ intent: null, pinballMap, target: null }),
+      });
+      expect(
+        screen.getByTestId("pbm-insider-connected-observed")
+      ).toHaveTextContent(text);
+      expect(
+        screen.queryByTestId("pbm-insider-connected-differs")
+      ).not.toBeInTheDocument();
     }
   );
+
+  it("states nothing beside Don't sync when the entry is not on the lineup", () => {
+    renderControl({
+      view: VIEWS.off,
+      insiderConnected: ic({ intent: null, pinballMap: null, target: null }),
+    });
+    expect(
+      screen.queryByTestId("pbm-insider-connected-observed")
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not state Pinball Map's value beside On or Off", () => {
+    renderControl({ view: VIEWS.on, insiderConnected: ic({ intent: "off" }) });
+    expect(
+      screen.queryByTestId("pbm-insider-connected-observed")
+    ).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["Off", "off"],
+    ["Don't sync", "no_sync"],
+  ] as const)(
+    "records %s as intent %s, acting on the click",
+    async (label, sent) => {
+      const user = userEvent.setup();
+      renderControl({ view: VIEWS.on, insiderConnected: ic() });
+      await user.click(icPosition(label));
+      const formData = vi.mocked(setInsiderConnectedIntentAction).mock
+        .calls[0]?.[1];
+      expect(formData?.get("icIntent")).toBe(sent);
+    }
+  );
+
+  it("does nothing when the selected position is clicked again", async () => {
+    const user = userEvent.setup();
+    renderControl({ view: VIEWS.on, insiderConnected: ic() });
+    await user.click(icPosition("On"));
+    expect(setInsiderConnectedIntentAction).not.toHaveBeenCalled();
+  });
 
   it("records the new position as intent, not a Pinball Map write, without credentials", async () => {
     // The whole point of the intent: a member without a linked account still
@@ -558,9 +624,9 @@ describe("the Insider Connected switch (3.8)", () => {
       view: VIEWS.on,
       writeEnabled: false,
       canPush: false,
-      insiderConnected: ic({ intent: null, shown: "not_set" }),
+      insiderConnected: ic({ intent: null, pinballMap: "not_set" }),
     });
-    await user.click(screen.getByRole("switch", { name: "Insider Connected" }));
+    await user.click(icPosition("On"));
 
     const formData = vi.mocked(setInsiderConnectedIntentAction).mock
       .calls[0]?.[1];
@@ -575,12 +641,13 @@ describe("the Insider Connected switch (3.8)", () => {
       canSetIntent: false,
       insiderConnected: ic(),
     });
-    expect(
-      screen.getByRole("switch", { name: "Insider Connected" })
-    ).toBeDisabled();
+    for (const radio of within(
+      screen.getByRole("radiogroup", { name: "Insider Connected" })
+    ).getAllByRole("radio"))
+      expect(radio).toBeDisabled();
   });
 
-  it("names Pinball Map's value beside the switch and in the status row when it differs", () => {
+  it("names Pinball Map's value beside the toggle and in the status row when it differs", () => {
     renderControl({
       view: { ...VIEWS.on, outOfSync: true, pushAction: "update" },
       insiderConnected: IC_DIFFERS,

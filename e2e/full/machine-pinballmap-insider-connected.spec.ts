@@ -1,15 +1,15 @@
 /**
- * E2E: the Insider Connected switch on a machine's Manage tab (spec 3.8, 4.1).
+ * E2E: the Insider Connected toggle on a machine's Manage tab (spec 3.8, 4.1).
  *
  * What only this layer sees is the join: eligibility lives on the catalog row,
  * Pinball Map's value on the stored lineup entry, the intent on the machine
- * row, and the switch appears only when the loader carries the catalog flag
+ * row, and the toggle appears only when the loader carries the catalog flag
  * through to the control. Unit tests
  * render the control with a view handed to them, and integration tests stop at
  * the action; dropping `icEligible` from the loader would pass both.
  *
  * The E2E database has no operator credential, which is the case the intent
- * exists for: the switch still records the intent, and the difference shows as
+ * exists for: the toggle still records the intent, and the difference shows as
  * Out of sync. How the control renders that is the unit tests' job, and the
  * push path is `src/test/integration/pinballmap-insider-connected.test.ts`.
  *
@@ -31,14 +31,14 @@ import {
   removeLmxFromStoredLineup,
 } from "../support/supabase-admin.js";
 
-test.describe("Pinball Map Insider Connected switch (PP-o355.59)", () => {
+test.describe("Pinball Map Insider Connected toggle (PP-o355.59, PP-o355.67)", () => {
   test.use({ storageState: STORAGE_STATE.technician });
 
   for (const { icEligible, rowCount } of [
     { icEligible: true, rowCount: 1 },
     { icEligible: false, rowCount: 0 },
   ]) {
-    test(`${icEligible ? "shows" : "hides"} the switch for an ${icEligible ? "eligible" : "ineligible"} title`, async ({
+    test(`${icEligible ? "shows" : "hides"} the toggle for an ${icEligible ? "eligible" : "ineligible"} title`, async ({
       page,
       request,
     }) => {
@@ -72,19 +72,31 @@ test.describe("Pinball Map Insider Connected switch (PP-o355.59)", () => {
         );
         if (!icEligible) return;
 
-        // No intent yet: the switch shows Pinball Map's value, unflagged.
-        const toggle = page.getByRole("switch", { name: "Insider Connected" });
-        await expect(toggle).toBeChecked();
-        await expect(page.getByTestId("pbm-listing-out-of-sync")).toHaveCount(
-          0
-        );
+        const toggle = page.getByRole("radiogroup", {
+          name: "Insider Connected",
+        });
+        const dontSync = toggle.getByRole("radio", { name: "Don't sync" });
+        const off = toggle.getByRole("radio", { name: "Off" });
+        const outOfSync = page.getByTestId("pbm-listing-out-of-sync");
+
+        // No intent yet: Don't sync, stating Pinball Map's value, unflagged.
+        await expect(dontSync).toBeChecked();
+        await expect(
+          page.getByTestId("pbm-insider-connected-observed")
+        ).toHaveText("Pinball Map: On");
+        await expect(outOfSync).toHaveCount(0);
 
         // Recording Off needs no credential (3.8). After revalidation the
         // loader derives the difference from the stored intent and lineup; how
         // the control renders it is the unit tests' job.
-        await toggle.click();
-        await expect(toggle).not.toBeChecked();
-        await expect(page.getByTestId("pbm-listing-out-of-sync")).toBeVisible();
+        await off.click();
+        await expect(off).toBeChecked();
+        await expect(outOfSync).toBeVisible();
+
+        // Back to Don't sync clears the stored intent, and with it the flag.
+        await dontSync.click();
+        await expect(dontSync).toBeChecked();
+        await expect(outOfSync).toHaveCount(0);
       } finally {
         await cleanupTestEntities(request, { machineInitials: [initials] });
         await deletePinballMapCatalogEntries([titleId]);

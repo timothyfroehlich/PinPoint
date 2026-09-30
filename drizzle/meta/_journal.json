@@ -666,6 +666,13 @@
       "when": 1790632837219,
       "tag": "0094_pintips",
       "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "7",
+      "when": 1790656509880,
+      "tag": "0095_machine-apron-cards",
+      "breakpoints": true
     }
   ]
 }

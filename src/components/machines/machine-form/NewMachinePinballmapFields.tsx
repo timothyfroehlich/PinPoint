@@ -4,8 +4,10 @@ import type React from "react";
 import { useEffect, useId, useState } from "react";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Label } from "~/components/ui/label";
-import { Switch } from "~/components/ui/switch";
-import { IntentToggle } from "~/components/machines/PinballmapListingControl";
+import {
+  InsiderConnectedToggle,
+  IntentToggle,
+} from "~/components/machines/PinballmapListingControl";
 import { getPinballMapTitleIcEligibleAction } from "~/app/(app)/m/pinballmap-actions";
 import {
   getMachinePresenceLabel,
@@ -15,6 +17,7 @@ import {
   INVALID_WHEN_ON,
   type PbmListingIntent,
 } from "~/lib/pinballmap/listing-state";
+import type { PbmIcIntent } from "~/lib/pinballmap/insider-connected";
 
 export interface NewMachinePinballmapFieldsProps {
   /** The catalog title chosen in Model Details, or null while none is. */
@@ -48,7 +51,7 @@ export interface NewMachinePinballmapFieldsProps {
 /**
  * The New Machine page's Pinball Map choices (pinballmap 4.11), inside
  * Integrations: the lineup intent toggle and, for an eligible title, the
- * Insider Connected switch, both starting Off (intent starts On when the page
+ * Insider Connected toggle, both starting Off (intent starts On when the page
  * was opened from a lineup entry). With intent On, a title not already on the
  * lineup, and a person who can push, "Add to Pinball Map after creating" — ticked by default, and
  * ticking it is the 4.5 confirmation for the add push the create then runs.
@@ -69,10 +72,10 @@ export function NewMachinePinballmapFields({
   lineupTitleIds,
   initialIntent = "off",
 }: NewMachinePinballmapFieldsProps): React.JSX.Element {
-  const icLabelId = useId();
   const addId = useId();
   const [intent, setIntent] = useState<PbmListingIntent>(initialIntent);
-  const [icOn, setIcOn] = useState(false);
+  // Null is Don't sync: no intent recorded (3.8).
+  const [icIntent, setIcIntent] = useState<PbmIcIntent | null>("off");
   const [addAfterCreate, setAddAfterCreate] = useState(true);
   // Eligibility of the chosen title, keyed by id so a stale answer for a
   // previous pick never shows the switch for the current one.
@@ -141,12 +144,9 @@ export function NewMachinePinballmapFields({
               value={effectiveIntent}
             />
           ) : null}
-          {/* Insider Connected records only an explicit On. Left untouched
-              it stores nothing — no intent — so the entry keeps Pinball Map's
-              own value (pinballmap 3.8; Tim, PP-wqit.14.2 review). Kept to
-              this one input so the three-position control can replace it. */}
-          {canSetIntent && icEligible && icOn ? (
-            <input type="hidden" name="pinballmapIcIntent" value="on" />
+          {/* Don't sync posts nothing, so no intent is stored (3.8). */}
+          {canSetIntent && icEligible && icIntent !== null ? (
+            <input type="hidden" name="pinballmapIcIntent" value={icIntent} />
           ) : null}
           {offerAdd && addAfterCreate ? (
             <input type="hidden" name="pbmAddAfterCreate" value="1" />
@@ -163,19 +163,17 @@ export function NewMachinePinballmapFields({
               />
             </div>
             {icEligible ? (
-              <div
-                className="flex items-center gap-2.5"
-                data-testid="new-machine-pbm-ic"
-              >
-                <Switch
-                  checked={icOn}
-                  onCheckedChange={setIcOn}
-                  disabled={!canSetIntent}
-                  aria-labelledby={icLabelId}
+              <div data-testid="new-machine-pbm-ic">
+                {/* A new machine has no entry yet, so there is no Pinball Map
+                    value to state or differ from. */}
+                <InsiderConnectedToggle
+                  value={icIntent}
+                  pinballMap={null}
+                  differs={false}
+                  readOnly={!canSetIntent}
+                  pending={false}
+                  onChange={setIcIntent}
                 />
-                <span id={icLabelId} className="text-sm text-foreground">
-                  Insider Connected
-                </span>
               </div>
             ) : null}
           </div>

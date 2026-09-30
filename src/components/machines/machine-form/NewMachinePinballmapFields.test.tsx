@@ -2,7 +2,7 @@
  * The New Machine page's lineup choice (pinballmap 4.11): what it offers, and
  * what it posts for `createMachineAction` to re-check.
  */
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getPinballMapTitleIcEligibleAction } from "~/app/(app)/m/pinballmap-actions";
@@ -111,20 +111,23 @@ describe("NewMachinePinballmapFields", () => {
     expect(posted("pbmAddAfterCreate")).toBeNull();
   });
 
-  it("shows Insider Connected only for an eligible title, recording only On", async () => {
+  it("shows Insider Connected only for an eligible title, starting Off", async () => {
     vi.mocked(getPinballMapTitleIcEligibleAction).mockResolvedValue(true);
     const user = userEvent.setup();
     render(<NewMachinePinballmapFields {...base} />);
 
-    const ic = await screen.findByRole("switch", {
+    const ic = await screen.findByRole("radiogroup", {
       name: "Insider Connected",
     });
-    expect(ic).not.toBeChecked();
-    // Untouched records no intent at all, not Off.
-    expect(posted("pinballmapIcIntent")).toBeNull();
+    expect(within(ic).getByRole("radio", { name: "Off" })).toBeChecked();
+    expect(posted("pinballmapIcIntent")).toBe("off");
 
-    await user.click(ic);
+    await user.click(within(ic).getByRole("radio", { name: "On" }));
     expect(posted("pinballmapIcIntent")).toBe("on");
+
+    // Don't sync records no intent at all (3.8).
+    await user.click(within(ic).getByRole("radio", { name: "Don't sync" }));
+    expect(posted("pinballmapIcIntent")).toBeNull();
   });
 
   it("posts no Insider Connected choice for an ineligible title", async () => {
@@ -134,7 +137,7 @@ describe("NewMachinePinballmapFields", () => {
       expect(getPinballMapTitleIcEligibleAction).toHaveBeenCalledWith(77);
     });
     expect(
-      screen.queryByRole("switch", { name: "Insider Connected" })
+      screen.queryByRole("radiogroup", { name: "Insider Connected" })
     ).not.toBeInTheDocument();
     expect(posted("pinballmapIcIntent")).toBeNull();
   });

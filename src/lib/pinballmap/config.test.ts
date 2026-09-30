@@ -36,6 +36,11 @@ describe("getPinballMapMode", () => {
       expect(getPinballMapMode()).toBe("mock");
     });
 
+    it("is mock when VERCEL_ENV is an unrecognised value — fails closed", () => {
+      vi.stubEnv("VERCEL_ENV", "Production");
+      expect(getPinballMapMode()).toBe("mock");
+    });
+
     it("is mock off Vercel entirely, where VERCEL_ENV is unset (local, CI)", () => {
       vi.stubEnv("VERCEL_ENV", undefined);
       expect(getPinballMapMode()).toBe("mock");
@@ -50,20 +55,36 @@ describe("getPinballMapMode", () => {
     });
   });
 
-  describe("explicit PINBALLMAP_MODE override", () => {
-    it("forces live in a preview — the deliberate opt-in", () => {
-      vi.stubEnv("PINBALLMAP_MODE", "live");
-      vi.stubEnv("VERCEL_ENV", "preview");
-      expect(getPinballMapMode()).toBe("live");
-    });
+  describe("PINBALLMAP_MODE", () => {
+    it.each([
+      ["preview", "preview"],
+      ["development", "development"],
+      ["unset", undefined],
+      ["unrecognised", "staging"],
+    ])(
+      "cannot turn the live client on outside production (VERCEL_ENV %s)",
+      (_name, vercelEnv) => {
+        // The removed opt-in: `live` used to win in any environment, which let
+        // a preview or a laptop reach pinballmap.com with seeded credentials.
+        vi.stubEnv("PINBALLMAP_MODE", "live");
+        vi.stubEnv("VERCEL_ENV", vercelEnv);
+        expect(getPinballMapMode()).toBe("mock");
+      }
+    );
 
-    it("forces mock even on a production deployment", () => {
+    it("forces mock on a production deployment — the kill switch", () => {
       vi.stubEnv("PINBALLMAP_MODE", "mock");
       vi.stubEnv("VERCEL_ENV", "production");
       expect(getPinballMapMode()).toBe("mock");
     });
 
-    it("ignores an unrecognised value and falls through to VERCEL_ENV", () => {
+    it("leaves production live when set to live", () => {
+      vi.stubEnv("PINBALLMAP_MODE", "live");
+      vi.stubEnv("VERCEL_ENV", "production");
+      expect(getPinballMapMode()).toBe("live");
+    });
+
+    it("ignores an unrecognised value and stays live in production", () => {
       vi.stubEnv("PINBALLMAP_MODE", "staging");
       vi.stubEnv("VERCEL_ENV", "production");
       expect(getPinballMapMode()).toBe("live");

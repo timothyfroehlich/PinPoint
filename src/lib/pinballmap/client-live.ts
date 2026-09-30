@@ -7,7 +7,11 @@ import {
 } from "@streamparser/json";
 import { log } from "~/lib/logger";
 import { assertNotInTransaction } from "~/server/db/transaction-context";
-import { PBM_API_BASE, PBM_USER_AGENT } from "./config";
+import {
+  PBM_API_BASE,
+  PBM_USER_AGENT,
+  assertPinballMapNetworkAllowed,
+} from "./config";
 import {
   parseCatalog,
   parseLocation,
@@ -100,13 +104,21 @@ function credsQuery(
   };
 }
 
-/** Fetch wrapper that never throws and never logs credentialed URLs. */
+/**
+ * The only `fetch` that can reach PinballMap. Never logs credentialed URLs, and
+ * turns network failures into a 599 response rather than a throw. The one thing
+ * it throws for is being called outside production, which is a PinPoint bug,
+ * not a network condition (see `assertPinballMapNetworkAllowed`).
+ */
 async function safeFetch(
   url: string,
   init: RequestInit,
   label: string,
   apiToken: string | null
 ): Promise<Response> {
+  // Outside the try on purpose: the catch below turns errors into a 599, and
+  // this refusal must not read as a flaky network.
+  assertPinballMapNetworkAllowed(init.method ?? "GET", label);
   try {
     return await fetch(url, {
       ...init,

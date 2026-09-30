@@ -75,10 +75,10 @@ export const updateMachineSchema = z
       .optional()
       .describe("Lineup sync intent for Pinball Map."),
     insiderConnected: z
-      .enum(["on", "off"])
+      .enum(["on", "off", "no_sync"])
       .optional()
       .describe(
-        "Insider Connected intent for the machine's Pinball Map entry. Only for a title Pinball Map marks Insider Connected eligible (get_machine: pinballmap.insiderConnected.eligible). Records the intent in PinPoint; Pinball Map changes when a person pushes Update. Applied after any pinballmapMachineId change, which clears it."
+        'Insider Connected intent for the machine\'s Pinball Map entry. Only for a title Pinball Map marks Insider Connected eligible (get_machine: pinballmap.insiderConnected.eligible). "no_sync" clears the intent (get_machine then reports intent null): the machine is never flagged and nothing is pushed for it. Records the intent in PinPoint; Pinball Map changes when a person pushes Update. Applied after any pinballmapMachineId change, which clears it.'
       ),
     iscoredGameId: z
       .string()
@@ -428,12 +428,14 @@ export async function runUpdateMachine(
   // 5. setMachineIcIntent — after the link step, because re-matching a title
   // clears the intent and eligibility belongs to the title the link ends on.
   if (cleanArgs.insiderConnected !== undefined) {
+    // Don't sync is stored as no intent (spec 3.8).
+    const icIntent =
+      cleanArgs.insiderConnected === "no_sync"
+        ? null
+        : cleanArgs.insiderConnected;
     let set: Awaited<ReturnType<typeof setMachineIcIntent>>;
     try {
-      set = await setMachineIcIntent({
-        machineId: machine.id,
-        icIntent: cleanArgs.insiderConnected,
-      });
+      set = await setMachineIcIntent({ machineId: machine.id, icIntent });
     } catch (error) {
       return handleFailure(
         "insiderConnected",
@@ -448,7 +450,7 @@ export async function runUpdateMachine(
     applied.push({
       field: "insiderConnected",
       from: set.previous,
-      to: cleanArgs.insiderConnected,
+      to: icIntent,
       changed: set.changed,
     });
   }

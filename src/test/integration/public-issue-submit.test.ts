@@ -116,6 +116,8 @@ const { submitPublicIssueAction } = await import("~/app/(app)/report/actions");
 function makeFormData(opts: {
   machineId: string;
   assignedTo?: string;
+  status?: string;
+  priority?: string;
 }): FormData {
   const fd = new FormData();
   fd.set("machineId", opts.machineId);
@@ -124,6 +126,12 @@ function makeFormData(opts: {
   fd.set("frequency", "intermittent");
   if (opts.assignedTo !== undefined) {
     fd.set("assignedTo", opts.assignedTo);
+  }
+  if (opts.status !== undefined) {
+    fd.set("status", opts.status);
+  }
+  if (opts.priority !== undefined) {
+    fd.set("priority", opts.priority);
   }
   return fd;
 }
@@ -291,5 +299,69 @@ describe("submitPublicIssueAction — assignedTo permission handling (integratio
 
     const assignedTo = await getPersistedAssignedTo(machine.initials);
     expect(assignedTo).toBeNull();
+  });
+});
+
+async function getPersistedStatusAndPriority(
+  machineInitials: string
+): Promise<{ status?: string; priority?: string }> {
+  const db = await getTestDb();
+  const row = await db.query.issues.findFirst({
+    where: eq(issues.machineInitials, machineInitials),
+    columns: { status: true, priority: true },
+  });
+  return { status: row?.status, priority: row?.priority };
+}
+
+describe("submitPublicIssueAction — anonymous and guest status/priority enforcement (integration)", () => {
+  setupTestDb();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Default: unauthenticated
+    mockGetUser.mockResolvedValue({ data: { user: null } });
+  });
+
+  it("anonymous submission forces status to 'new' and priority to 'medium' regardless of form values", async () => {
+    const owner = await seedUser("member");
+    const machine = await seedMachine(owner.id);
+
+    // Default mock: user = null (anonymous, set in beforeEach)
+    // Send status="in_progress" and priority="high"; anonymous branch forces "new" and "medium".
+    await submitPublicIssueAction(
+      { error: "" },
+      makeFormData({
+        machineId: machine.id,
+        status: "in_progress",
+        priority: "high",
+      })
+    );
+
+    const persisted = await getPersistedStatusAndPriority(machine.initials);
+    expect(persisted.status).toBe("new");
+    expect(persisted.priority).toBe("medium");
+  });
+
+  it("authenticated guest user status is forced to 'new'", async () => {
+    const reporter = await seedUser("guest");
+    const machine = await seedMachine(reporter.id);
+
+    mockGetUser.mockResolvedValue({ data: { user: { id: reporter.id } } });
+
+    // Guest has no issues.report.status permission; forces status to "new".
+    const result = await submitPublicIssueAction(
+      { error: "" },
+      makeFormData({
+        machineId: machine.id,
+        status: "in_progress",
+        priority: "high",
+      })
+    );
+
+    expect(result).toMatchObject({ success: true });
+
+    const persisted = await getPersistedStatusAndPriority(machine.initials);
+    expect(persisted.status).toBe("new");
+    expect(persisted.priority).toBe("medium");
   });
 });

@@ -1402,15 +1402,16 @@ export async function linkMachineToPinballmapEntryAction(
 }
 
 export type SetInsiderConnectedIntentResult = Result<
-  { icIntent: PbmIcIntent },
+  { icIntent: PbmIcIntent | null },
   "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND"
 >;
 
 /**
- * Record whether this cabinet should be Insider Connected (spec 3.8). Writes
- * only to PinPoint, like the listing intent toggle: no credentials needed, no
- * confirmation, instantly reversible. A difference from Pinball Map shows as
- * Out of sync and is pushed by the status row (4.3).
+ * Record whether this cabinet should be Insider Connected (spec 3.8), or clear
+ * the intent with `no_sync` (the toggle's Don't sync position, stored NULL).
+ * Writes only to PinPoint, like the listing intent toggle: no credentials
+ * needed, no confirmation, instantly reversible. A difference from Pinball Map
+ * shows as Out of sync and is pushed by the status row (4.3).
  *
  * Refused for a title Pinball Map's catalog does not mark eligible, since the
  * switch is not shown there and the push could never carry it.
@@ -1420,9 +1421,9 @@ export async function setInsiderConnectedIntentAction(
   formData: FormData
 ): Promise<SetInsiderConnectedIntentResult> {
   const raw = formData.get("icIntent");
-  const icIntent = raw === "on" || raw === "off" ? raw : null;
-  if (icIntent === null)
+  if (raw !== "on" && raw !== "off" && raw !== "no_sync")
     return err("VALIDATION", "Unknown Insider Connected setting");
+  const icIntent = raw === "no_sync" ? null : raw;
 
   const authed = await authorizeListingAction(
     formData,

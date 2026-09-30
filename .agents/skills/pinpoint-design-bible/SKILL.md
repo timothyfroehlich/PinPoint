@@ -159,6 +159,18 @@ Use container queries when the decision depends on the component's available wid
 "Component internal layout?" → Container query (@lg: / @xl:) if variable-width parent, else viewport
 ```
 
+### Review Viewports
+
+Every UI screenshot set shown to Tim — design options, prototype before/after, the Early UI Review gate, and PR screenshots — covers all three sizes:
+
+| Name         | Size     | Stands for                                                                  |
+| :----------- | :------- | :-------------------------------------------------------------------------- |
+| Desktop      | 1440×900 | Laptop / desktop browser                                                    |
+| Large mobile | 430×932  | Current large phone (iPhone Pro Max class)                                  |
+| Small mobile | 320×568  | The layout floor: a small phone, or a large phone with display/text zoom on |
+
+**Small mobile is a real user, not an edge case.** At least one active member runs their phone zoomed in, so 320px CSS is the width PinPoint actually renders at for them (it is also the WCAG 1.4.10 reflow width). Design at 320 on purpose: every primary action reachable without horizontal scroll, labels wrapping or truncating deliberately rather than clipping, touch targets kept at full size. A layout that only works at 430 is unfinished.
+
 ### z-index Hierarchy
 
 | Element        | Value |

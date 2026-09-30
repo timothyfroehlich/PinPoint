@@ -100,19 +100,18 @@ describe("deriveInsiderConnectedView", () => {
     [false, "off"],
     [null, "not_set"],
   ] as const)(
-    "with no intent, shows Pinball Map's %s as %s and never flags it",
-    (icEnabled, shown) => {
+    "under Don't sync, reports Pinball Map's %s as %s and never flags it",
+    (icEnabled, pinballMap) => {
       const { ic, listing } = derive({ icEnabled });
-      expect(ic).toMatchObject({ intent: null, shown, differs: false });
+      expect(ic).toMatchObject({ intent: null, pinballMap, differs: false });
       expect(listing.outOfSync).toBe(false);
       expect(listing.pushAction).toBeNull();
     }
   );
 
-  it("shows the recorded intent over Pinball Map's value", () => {
+  it("reports the recorded intent beside Pinball Map's value", () => {
     expect(derive({ icEnabled: false, icIntent: "on" }).ic).toMatchObject({
       intent: "on",
-      shown: "on",
       pinballMap: "off",
     });
   });
@@ -139,30 +138,47 @@ describe("deriveInsiderConnectedView", () => {
     expect(listing.outOfSync).toBe(false);
   });
 
-  it("takes the target from a sibling when this cabinet has no intent", () => {
-    const { ic } = derive({
+  it("reports a sibling's target but never flags a Don't sync cabinet", () => {
+    const { ic, listing } = derive({
       icEnabled: false,
       icIntent: null,
       siblingIntents: [null, "on"],
     });
     expect(ic).toMatchObject({
       intent: null,
-      shown: "off",
+      pinballMap: "off",
       target: "on",
-      differs: true,
+      differs: false,
     });
+    expect(listing.outOfSync).toBe(false);
+    expect(listing.pushAction).toBeNull();
+  });
+
+  it("flags an Off cabinet whose sibling's On makes the entry differ", () => {
+    // The entry's target is On (On wins), so every cabinet with an opinion
+    // sees the difference and can push it.
+    const { ic } = derive({
+      icEnabled: false,
+      icIntent: "off",
+      siblingIntents: ["off", "on"],
+    });
+    expect(ic).toMatchObject({ target: "on", differs: true });
   });
 
   it("stays shown, without a Pinball Map value, when the entry is Missing", () => {
     // Missing owns the push (Add, which also applies the target).
     const { ic, listing } = derive({ present: false, icIntent: "on" });
-    expect(ic).toMatchObject({ shown: "on", pinballMap: null, differs: false });
+    expect(ic).toMatchObject({
+      intent: "on",
+      pinballMap: null,
+      differs: false,
+    });
     expect(listing.pushAction).toBe("add");
   });
 
   it("stays shown when the cabinet is Off the lineup", () => {
     const { ic } = derive({ intent: "off", present: false, icIntent: "on" });
-    expect(ic).toMatchObject({ shown: "on", differs: false });
+    expect(ic).toMatchObject({ intent: "on", differs: false });
   });
 
   it("does not flag under Don't sync", () => {
@@ -188,6 +204,6 @@ describe("deriveInsiderConnectedView", () => {
   it("reads no Pinball Map value while the integration is not configured", () => {
     expect(
       derive({ icEnabled: true, icIntent: "on", configured: false }).ic
-    ).toMatchObject({ shown: "on", pinballMap: null, differs: false });
+    ).toMatchObject({ intent: "on", pinballMap: null, differs: false });
   });
 });
