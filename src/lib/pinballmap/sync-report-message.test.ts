@@ -256,4 +256,32 @@ describe("formatSyncReportMessage", () => {
     expect(message).toContain("**Out of sync: 30**");
     expect(message?.endsWith(FOOTER)).toBe(true);
   });
+
+  it("keeps the attribution footer even when titles are pathologically long", () => {
+    const huge = (i: number): string => `${"X".repeat(500)} ${String(i)}`;
+    const many = Array.from({ length: 40 }, (_, i) => huge(i));
+    const message = format(
+      ready({
+        sections: {
+          out_of_sync: many.map((n) => outOfSync(n, "to_add")),
+          pinpoint_only: many.map((n) => ({
+            section: "pinpoint_only" as const,
+            key: n,
+            machine: cabinet(n),
+          })),
+          pinball_map_only: many.map(pinballMapOnly),
+          availability_conflict: many.map((n) => ({
+            section: "availability_conflict" as const,
+            key: `ac-${n}`,
+            tag: "alert" as const,
+            title: title(n),
+            machine: cabinet(n, "removed"),
+            commentCount: null,
+          })),
+        },
+      })
+    );
+    expect(message?.length).toBeLessThanOrEqual(2000);
+    expect(message?.endsWith(FOOTER)).toBe(true);
+  });
 });

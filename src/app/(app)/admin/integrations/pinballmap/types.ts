@@ -46,7 +46,7 @@ import type { PinballMapRegion } from "~/lib/pinballmap/types";
 
 import type { DiscordChannelStatus } from "~/lib/discord/channel-check";
 
-export type RegionAlertChannelStatus = DiscordChannelStatus;
+export type { DiscordChannelStatus };
 
 export interface PinballMapAdminViewState {
   configuredLocationId: number | null;
@@ -58,11 +58,11 @@ export interface PinballMapAdminViewState {
   configuredRegion: string;
   availableRegions: PinballMapRegion[];
   alertChannelId: string | null;
-  alertChannelStatus: RegionAlertChannelStatus;
+  alertChannelStatus: DiscordChannelStatus;
   alertChannelStatusDetail: string | null;
   alertLastPostAtIso: string | null;
   syncReportChannelId: string | null;
-  syncReportStatus: RegionAlertChannelStatus;
+  syncReportStatus: DiscordChannelStatus;
   syncReportStatusDetail: string | null;
   syncReportLastPostAtIso: string | null;
 }
@@ -139,10 +139,10 @@ export type SyncPinballMapNowActionResult =
       allowance?: PinballMapAllowanceView;
     };
 
-export type SaveRegionAlertConfigActionResult =
+export type SaveDiscordChannelActionResult =
   | {
       ok: true;
-      status: RegionAlertChannelStatus;
+      status: DiscordChannelStatus;
       statusDetail: string | null;
     }
   | {
@@ -151,7 +151,7 @@ export type SaveRegionAlertConfigActionResult =
       message?: string;
     };
 
-export type SendRegionAlertTestActionResult =
+export type SendDiscordChannelTestActionResult =
   | {
       ok: true;
       channelName?: string;

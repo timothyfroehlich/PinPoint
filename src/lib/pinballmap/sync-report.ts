@@ -52,15 +52,16 @@ export type SyncReportRun =
 export async function runSyncReport(
   opts: { now?: Date } = {}
 ): Promise<SyncReportRun> {
-  const now = opts.now ?? new Date();
+  // The schedule needs no data, so the slot that is not 6 PM Central stops
+  // before touching the database.
+  const week = syncReportWeekAt(opts.now ?? new Date());
+  if (week === null) return { outcome: "skipped", reason: "off_schedule" };
+
   const state = await getPinballMapState();
   const channelId = state?.syncReportChannelId?.trim() ?? "";
   if (channelId.length === 0) {
     return { outcome: "skipped", reason: "no_channel" };
   }
-
-  const week = syncReportWeekAt(now);
-  if (week === null) return { outcome: "skipped", reason: "off_schedule" };
 
   // Not configured posts nothing (§4.7); Waiting still posts its one line.
   if (state?.locationId == null) {

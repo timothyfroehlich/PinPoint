@@ -1,4 +1,8 @@
-import { sanitizeDiscordText } from "~/lib/discord/messages";
+import {
+  DISCORD_MAX_MESSAGE_LENGTH,
+  sanitizeDiscordText,
+  truncateDiscordLabel,
+} from "~/lib/discord/messages";
 import { pinballmapLocationUrl } from "./public-url";
 
 /**
@@ -20,8 +24,6 @@ import { pinballmapLocationUrl } from "./public-url";
  *   all of it goes through `sanitizeDiscordText` (mention + Markdown neutering).
  *   The only unsanitized text is our own literals and the URL we build ourselves.
  */
-
-const DISCORD_MAX_MESSAGE_LENGTH = 2000;
 
 /** Most entries listed individually; the rest collapse into a count. */
 export const REGION_ALERT_MAX_LINES = 10;
@@ -151,8 +153,8 @@ export function formatRegionAlertMessage(
   if (first !== undefined) {
     const compacted: RegionAlertEntry = {
       ...first,
-      locationName: truncateName(first.locationName),
-      machineName: truncateName(first.machineName),
+      locationName: truncateDiscordLabel(first.locationName, 80),
+      machineName: truncateDiscordLabel(first.machineName, 80),
     };
     const content = renderMessage([compacted], entries.length, regionLabel);
     if (content.length <= DISCORD_MAX_MESSAGE_LENGTH) {
@@ -164,11 +166,4 @@ export function formatRegionAlertMessage(
   }
 
   return null;
-}
-
-/** Bound untrusted labels without splitting a Unicode code point. */
-function truncateName(name: string, maxCodePoints = 80): string {
-  const codePoints = [...name];
-  if (codePoints.length <= maxCodePoints) return name;
-  return `${codePoints.slice(0, maxCodePoints - 1).join("")}…`;
 }

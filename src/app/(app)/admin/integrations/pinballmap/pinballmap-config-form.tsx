@@ -46,7 +46,7 @@ import type {
   PinballMapAdminViewState,
   PinballMapAllowanceView,
   PinballMapLocationPreview,
-  RegionAlertChannelStatus,
+  DiscordChannelStatus,
   SyncPinballMapNowActionResult,
 } from "./types";
 
@@ -1484,7 +1484,7 @@ function ChannelStatusReadout({
   lastPostAtIso,
   postNoun,
 }: {
-  status: RegionAlertChannelStatus;
+  status: DiscordChannelStatus;
   statusDetail: string | null;
   lastPostAtIso: string | null;
   /** What a real post is called in "Last …" — "alert" or "report". */

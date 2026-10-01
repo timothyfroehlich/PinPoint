@@ -1,4 +1,8 @@
-import { sanitizeDiscordText } from "~/lib/discord/messages";
+import {
+  DISCORD_MAX_MESSAGE_LENGTH,
+  sanitizeDiscordText,
+  truncateDiscordLabel,
+} from "~/lib/discord/messages";
 import { getMachinePresenceLabel } from "~/lib/machines/presence";
 import type {
   LineupComparison,
@@ -16,8 +20,6 @@ import { pinballmapLocationUrl } from "./public-url";
  * Map titles are typed by strangers, and the report never mentions anyone
  * (§4.10). The only unsanitized text is our own literals and the URLs we build.
  */
-
-const DISCORD_MAX_MESSAGE_LENGTH = 2000;
 
 /** Most names a list shows before collapsing the rest into a count (§4.4). */
 export const SYNC_REPORT_MAX_LIST_ITEMS = 10;
@@ -84,11 +86,14 @@ export function formatSyncReportMessage(
     if (content.length <= DISCORD_MAX_MESSAGE_LENGTH) return content;
   }
   // Only pathologically long titles reach here; trim each name so the report
-  // still posts rather than failing every week.
-  return render(comparison, stale, footer, 1, true).slice(
-    0,
-    DISCORD_MAX_MESSAGE_LENGTH
-  );
+  // still posts rather than failing every week. If even that is too long, cut
+  // the body — never the footer, which carries the attribution (§4.8).
+  const full = render(comparison, stale, footer, 1, true);
+  if (full.length <= DISCORD_MAX_MESSAGE_LENGTH) return full;
+  const separator = "\n\n";
+  const body = full.slice(0, full.length - footer.length - separator.length);
+  const room = DISCORD_MAX_MESSAGE_LENGTH - footer.length - separator.length;
+  return `${body.slice(0, room - 1)}…${separator}${footer}`;
 }
 
 function render(
@@ -99,7 +104,9 @@ function render(
   truncate: boolean
 ): string {
   const name = (raw: string): string =>
-    sanitizeDiscordText(truncate ? truncateName(raw) : raw);
+    sanitizeDiscordText(
+      truncate ? truncateDiscordLabel(raw, TRUNCATED_NAME_CODE_POINTS) : raw
+    );
   const intro = [HEADING, ...(stale === null ? [] : [stale])];
 
   if (comparison.toReview === 0) {
@@ -181,11 +188,4 @@ function inlineList(names: string[], cap: number): string {
 function lineList(lines: string[], cap: number): string[] {
   if (lines.length <= cap) return lines;
   return [...lines.slice(0, cap), `… and ${String(lines.length - cap)} more`];
-}
-
-/** Bound an untrusted label without splitting a Unicode code point. */
-function truncateName(value: string): string {
-  const codePoints = [...value];
-  if (codePoints.length <= TRUNCATED_NAME_CODE_POINTS) return value;
-  return `${codePoints.slice(0, TRUNCATED_NAME_CODE_POINTS - 1).join("")}…`;
 }

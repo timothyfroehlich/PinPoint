@@ -44,9 +44,9 @@ import type {
   ClearPinballMapLocationActionResult,
   CommitCheckedPinballMapLocationActionResult,
   PinballMapAllowanceView,
-  RegionAlertChannelStatus,
-  SaveRegionAlertConfigActionResult,
-  SendRegionAlertTestActionResult,
+  DiscordChannelStatus,
+  SaveDiscordChannelActionResult,
+  SendDiscordChannelTestActionResult,
   SyncPinballMapNowActionResult,
 } from "./types";
 
@@ -227,7 +227,7 @@ export async function syncPinballMapNowAction(
 export async function saveRegionAlertConfigAction(
   first: unknown,
   second?: unknown
-): Promise<SaveRegionAlertConfigActionResult> {
+): Promise<SaveDiscordChannelActionResult> {
   try {
     const authorization = await authorizeIntegrationsAdmin();
     if (!authorization.ok) return { ok: false, reason: "unauthorized" };
@@ -273,7 +273,7 @@ export async function saveRegionAlertConfigAction(
       return { ok: false, reason: "invalid" };
     }
 
-    let status: RegionAlertChannelStatus = "not_configured";
+    let status: DiscordChannelStatus = "not_configured";
     let statusDetail: string | null = null;
     if (alertChannelId !== null) {
       ({ status, statusDetail } = await checkDiscordChannel(
@@ -371,7 +371,7 @@ function storedChannelId(
 
 function channelStatusSet(
   kind: ChannelKind,
-  status: RegionAlertChannelStatus,
+  status: DiscordChannelStatus,
   statusDetail: string | null,
   lastPostAt?: Date
 ): Partial<typeof pinballmapState.$inferInsert> {
@@ -407,7 +407,7 @@ async function sendChannelTest(
   kind: ChannelKind,
   first: unknown,
   second: unknown
-): Promise<SendRegionAlertTestActionResult> {
+): Promise<SendDiscordChannelTestActionResult> {
   const action =
     kind === "region_alert"
       ? "sendRegionAlertTestAction"
@@ -456,7 +456,7 @@ async function sendChannelTest(
     // unsaved edit says nothing about the channel the feature posts to.
     const testsSavedChannel = savedChannelId === channelId;
     const recordStatus = async (
-      status: RegionAlertChannelStatus,
+      status: DiscordChannelStatus,
       statusDetail: string | null,
       lastPostAt?: Date
     ): Promise<void> => {
@@ -521,14 +521,14 @@ async function sendChannelTest(
 export async function sendRegionAlertTestAction(
   first: unknown,
   second?: unknown
-): Promise<SendRegionAlertTestActionResult> {
+): Promise<SendDiscordChannelTestActionResult> {
   return sendChannelTest("region_alert", first, second);
 }
 
 export async function sendSyncReportTestAction(
   first: unknown,
   second?: unknown
-): Promise<SendRegionAlertTestActionResult> {
+): Promise<SendDiscordChannelTestActionResult> {
   return sendChannelTest("sync_report", first, second);
 }
 
@@ -539,7 +539,7 @@ export async function sendSyncReportTestAction(
 export async function saveSyncReportConfigAction(
   first: unknown,
   second?: unknown
-): Promise<SaveRegionAlertConfigActionResult> {
+): Promise<SaveDiscordChannelActionResult> {
   try {
     const authorization = await authorizeIntegrationsAdmin();
     if (!authorization.ok) return { ok: false, reason: "unauthorized" };
@@ -560,7 +560,7 @@ export async function saveSyncReportConfigAction(
     const trimmed = parsed.data.channelId?.trim();
     const channelId = trimmed && trimmed.length > 0 ? trimmed : null;
 
-    let status: RegionAlertChannelStatus = "not_configured";
+    let status: DiscordChannelStatus = "not_configured";
     let statusDetail: string | null = null;
     if (channelId !== null) {
       ({ status, statusDetail } = await checkDiscordChannel(
