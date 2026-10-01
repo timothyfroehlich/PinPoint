@@ -73,7 +73,7 @@ The control's states (§4) are comparisons across these: _in sync_ means the lin
 - **4.5** Pushes confirm before acting, naming the game and the public consequence, including any Insider Connected change. The remove direction is styled destructive.
 - **4.6** The remove confirmation shows the entry's comment count and states the consequence accurately: recoverable only by re-adding the game within Pinball Map's 7-day window (7.2), permanently lost after. If the stored lineup is over 5 minutes old, a fresh refresh runs and confirmation is blocked until the current count shows; if it fails, the last-known count and its age are shown and the person may proceed or cancel.
 - **4.7** Same-title cabinets: every cabinet set On the lineup shows the entry as its own (**Shared**, naming the others); a cabinet set Off the lineup whose siblings cover the entry shows **Covered**, quiet, with the covering cabinets linked. Sibling names always link to their machine pages.
-- **4.8** User-facing vocabulary: "listing" never appears — the object is an "entry", the set is the "lineup" (Pinball Map's word), comments are "comments", the read is "Refresh". "Sync" survives only in the relationship senses (Don't sync, Out of sync). The tri-state is the "lineup setting" and its Insider Connected counterpart the "Insider Connected setting"; "intent" never appears. What Pinball Map reports is its "value", so PinPoint's setting and Pinball Map's value never read alike.
+- **4.8** User-facing vocabulary: "listing" never appears — the object is an "entry", the set is the "lineup" (Pinball Map's word), comments are "comments", the read is "Refresh". "Sync" survives only in the relationship senses (Don't sync, Out of sync). The tri-state is the "lineup setting" and its Insider Connected counterpart the "Insider Connected setting"; "intent" never appears. What Pinball Map reports is its "value", so PinPoint's setting and Pinball Map's value never read alike. The service is always written "Pinball Map"; the abbreviation "PBM" never appears.
 - **4.9** A signed-in member without the machine-linking capability sees the header and both rows, never the status row's push actions; the lineup toggle and the Insider Connected toggle render read-only. The header Refresh stays available to them (8.3).
 - **4.10** In dense summary and table views (such as the lineup page, `docs/feature-specs/pinballmap-lineup.md`), listing and sync states render as compact diagnostic badges:
   - **In sync**: green styling for `On`, `Off`, `Shared`, or `Covered`.
@@ -193,6 +193,7 @@ Changes to this document. Divergence-table rows are working state and are not lo
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-01 | §4.8: the service is always written "Pinball Map"; the abbreviation "PBM" never appears in user-facing copy. |
 | 2026-10-01 | §4.10 cites the lineup page as its dense-view example; `fleet.md` is retired. |
 | 2026-09-30 | §10 preamble names the sync-report channel the Pinball Map section hosts (`pinballmap-sync-report.md`). |
 | 2026-09-30 | Renamed listing intent to lineup setting (and Insider Connected intent to Insider Connected setting) throughout; Pinball Map's side is its "value". §4.8 bans "intent" in user-facing copy. §4.10 says "Pinball Map" for the former "PBM" abbreviation. No behavior change. |
