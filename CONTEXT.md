@@ -36,6 +36,11 @@ establish whether the problem is intermittent, frequent, or constant.
 The current operating condition of a machine, inferred from its open issues
 rather than managed as a separate fact.
 
+**Availability**:
+Whether the machine is at the venue and available for play: On the Floor, Off
+the Floor, On Loan, Pending Arrival, or Removed. Independent of machine status.
+_Avoid_: Presence, location
+
 ## People and access
 
 **User**:
@@ -55,6 +60,11 @@ A user-created grouping of machines, owned and managed by a user.
 **Integration**:
 A third-party service PinPoint connects to for a defined purpose, such as
 Discord notifications or Pinball Map synchronization.
+
+**Lineup setting**:
+PinPoint's choice of whether a machine belongs on the tracked Pinball Map
+location's lineup: On the lineup, Off the lineup, or Don't sync.
+_Avoid_: Intent, listing intent
 
 **iScored game**:
 A game record tracked in the location's iScored gameroom, identified by a numeric game ID.

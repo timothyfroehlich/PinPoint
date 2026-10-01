@@ -36,7 +36,7 @@
 ## 4. Saving
 
 - **4.1** On the Manage tab, one Save action saves every field in the form. Cancel discards unsaved changes after confirming.
-- **4.2** Pinball Map intent, Insider Connected, pushes, Refresh, and owner transfer act immediately, as their own requirements state, and are unavailable while the form has unsaved changes, with a note saying why.
+- **4.2** The Pinball Map lineup setting, the Insider Connected setting, pushes, Refresh, and owner transfer act immediately, as their own requirements state, and are unavailable while the form has unsaved changes, with a note saying why.
 - **4.3** The New Machine page creates the machine with every value entered, in one action.
 - **4.4** On a phone, Cancel and Save (or Create) stay pinned to the bottom of the screen, above the app's tab bar.
 
@@ -63,4 +63,5 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-30 | Renamed listing intent to lineup setting (and Insider Connected intent to Insider Connected setting) throughout; `pinballmap.md` §4.8 bans "intent" in user-facing copy. No behavior change. |
 | 2026-09-27 | Created: one machine form shared by the New Machine page and the Manage tab, with Model Details, Integrations, and Apron card sections, one Save on the Manage tab, pinned phone buttons, and a section list. |
