@@ -9,20 +9,10 @@ import {
   useCallback,
   useMemo,
 } from "react";
-import { useRouter } from "next/navigation";
+import { useUnsavedChangesGuard } from "~/hooks/use-unsaved-changes-guard";
 import { SaveCancelButtons } from "~/components/save-cancel-buttons";
 import { Switch } from "~/components/ui/switch";
 import { Label } from "~/components/ui/label";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "~/components/ui/alert-dialog";
 import {
   updateNotificationPreferencesAction,
   type UpdatePreferencesResult,
@@ -128,7 +118,6 @@ export function NotificationPreferencesForm({
   discordIntegrationEnabled = false,
   userHasDiscord = false,
 }: NotificationPreferencesFormProps): React.JSX.Element {
-  const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, isPending] = useActionState<
     UpdatePreferencesResult | undefined,
@@ -144,8 +133,6 @@ export function NotificationPreferencesForm({
   const [baselinePreferences, setBaselinePreferences] =
     useState<NotificationPreferencesData>(preferences);
   const submittedValuesRef = useRef<NotificationPreferencesData | null>(null);
-
-  const [pendingHref, setPendingHref] = useState<string | null>(null);
 
   const showDiscord = discordIntegrationEnabled;
 
@@ -202,68 +189,13 @@ export function NotificationPreferencesForm({
     }
   }, [state]);
 
-  // beforeunload guard: disallows silent data loss on tab close, reload, or full navigation
-  useEffect(() => {
-    if (!isDirty) return;
-    const handleBeforeUnload = (event: BeforeUnloadEvent): void => {
-      event.preventDefault();
-      event.returnValue = "";
-    };
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-    };
-  }, [isDirty]);
-
-  // In-app navigation guard: intercepts links leaving /settings while dirty.
-  //
-  // KNOWN LIMITATION:
-  // Programmatic client navigation (such as QuickSearch router.push) and in-app
-  // browser Back button (popstate) are not intercepted by this click guard without
-  // disruptive history-sentinel hacks. Hard navigations, reloads, and tab-close
-  // are covered by beforeunload above.
-  useEffect(() => {
-    if (!isDirty) return;
-    const handleClick = (event: MouseEvent): void => {
-      if (
-        event.defaultPrevented ||
-        event.button !== 0 ||
-        event.metaKey ||
-        event.ctrlKey ||
-        event.shiftKey ||
-        event.altKey
-      ) {
-        return;
-      }
-      const target = event.target;
-      if (!(target instanceof Element)) return;
-      const anchor = target.closest("a[href]");
-      if (!(anchor instanceof HTMLAnchorElement)) return;
-      if (anchor.target !== "" && anchor.target !== "_self") return;
-      if (anchor.hasAttribute("download")) return;
-
-      const destination = new URL(anchor.href, window.location.href);
-      if (destination.origin !== window.location.origin) return;
-      if (
-        destination.pathname === window.location.pathname &&
-        destination.search === window.location.search
-      ) {
-        return;
-      }
-
-      event.preventDefault();
-      // Do not stopPropagation so component-level React onClick handlers
-      // (like closing drawers or dropdown menus) still execute before navigation.
-      setPendingHref(
-        `${destination.pathname}${destination.search}${destination.hash}`
-      );
-    };
-
-    document.addEventListener("click", handleClick, true);
-    return () => {
-      document.removeEventListener("click", handleClick, true);
-    };
-  }, [isDirty]);
+  const { dialog: unsavedChangesDialog } = useUnsavedChangesGuard({
+    isDirty,
+    onDiscard: () => {
+      setFormValues(baselinePreferences);
+      setShowFeedback(false);
+    },
+  });
 
   const updatePreference = useCallback(
     (key: keyof NotificationPreferencesData, value: boolean): void => {
@@ -271,16 +203,6 @@ export function NotificationPreferencesForm({
     },
     []
   );
-
-  const handleDiscardAndLeave = (): void => {
-    const href = pendingHref;
-    setPendingHref(null);
-    setFormValues(baselinePreferences);
-    setShowFeedback(false);
-    if (href) {
-      router.push(href);
-    }
-  };
 
   const handleCancel = (): void => {
     setFormValues(baselinePreferences);
@@ -596,31 +518,7 @@ export function NotificationPreferencesForm({
         </div>
       </form>
 
-      <AlertDialog
-        open={pendingHref !== null}
-        onOpenChange={(open) => {
-          if (!open) setPendingHref(null);
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
-            <AlertDialogDescription>
-              You have unsaved changes on this page. If you leave now, those
-              changes will be lost.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Stay on page</AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              onClick={handleDiscardAndLeave}
-            >
-              Discard and leave
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {unsavedChangesDialog}
     </>
   );
 }

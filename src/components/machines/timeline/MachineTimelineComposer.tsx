@@ -1,8 +1,9 @@
 "use client";
 
 import type React from "react";
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 
+import { UnsavedChangesGuard } from "~/hooks/use-unsaved-changes-guard";
 import { addMachineCommentAction } from "~/app/(app)/m/[initials]/(tabs)/timeline/actions";
 import { RichTextEditor } from "~/components/editor/RichTextEditor";
 import { TagSelect } from "~/components/machines/timeline/TagSelect";
@@ -60,21 +61,6 @@ export function MachineTimelineComposer({
   const isDirty = hasBody || tag !== "note" || fullMode;
   const canPost = hasBody && !pending;
 
-  // Tab-close / reload guard. Will NOT fire for in-app Link clicks — that's
-  // a Next App Router limitation, not a bug here.
-  useEffect(() => {
-    if (!isDirty) return undefined;
-    const handler = (e: BeforeUnloadEvent): void => {
-      e.preventDefault();
-      // Legacy browsers require returnValue to be set.
-      e.returnValue = "";
-    };
-    window.addEventListener("beforeunload", handler);
-    return () => {
-      window.removeEventListener("beforeunload", handler);
-    };
-  }, [isDirty]);
-
   const handlePost = (): void => {
     if (!hasBody || pending) return;
     setError(null);
@@ -118,6 +104,7 @@ export function MachineTimelineComposer({
       className="@container rounded-md border bg-card p-3"
       onKeyDown={handleKeyDown}
     >
+      <UnsavedChangesGuard isDirty={isDirty} />
       <RichTextEditor
         content={doc}
         onChange={setDoc}

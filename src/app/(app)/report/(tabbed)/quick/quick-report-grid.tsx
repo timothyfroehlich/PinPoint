@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { UnsavedChangesGuard } from "~/hooks/use-unsaved-changes-guard";
 import { cn } from "~/lib/utils";
 import { formatIssueId } from "~/lib/issues/utils";
 import { Button } from "~/components/ui/button";
@@ -161,15 +162,6 @@ export function QuickReportGrid(): React.JSX.Element {
   // localStorage now, so this is belt-and-suspenders against an accidental
   // back/close.)
   const hasUnsaved = entries.some(entryHasContent);
-  React.useEffect(() => {
-    if (!hasUnsaved) return;
-    const handler = (e: BeforeUnloadEvent): void => {
-      e.preventDefault();
-      e.returnValue = "";
-    };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [hasUnsaved]);
 
   async function submitOne(entry: SharedEntry): Promise<void> {
     const key = entry.idempotencyKey;
@@ -263,6 +255,7 @@ export function QuickReportGrid(): React.JSX.Element {
 
   return (
     <div data-testid="quick-report-grid">
+      <UnsavedChangesGuard isDirty={hasUnsaved} />
       <div className="space-y-2">
         {entries.map((e) => (
           <QuickRow
