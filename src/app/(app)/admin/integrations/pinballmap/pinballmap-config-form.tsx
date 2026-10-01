@@ -1076,8 +1076,8 @@ export function PinballMapConfigForm({
                 id="pinballmap-sync-report-channel-hint"
                 className="text-muted-foreground text-xs text-pretty"
               >
-                · Posts what needs review every Monday at 6 PM Central. Clear it
-                to turn the report off.
+                · Posts Mondays at 6 PM Central. Clear it to turn the report
+                off.
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
