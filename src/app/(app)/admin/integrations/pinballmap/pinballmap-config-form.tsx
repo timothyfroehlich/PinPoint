@@ -125,7 +125,7 @@ export function PinballMapConfigForm({
   const [alertFeedback, setAlertFeedback] = React.useState<Feedback | null>(
     null
   );
-  const [isSavingAlert, startAlertSaveTransition] = React.useTransition();
+  const [isSavingChannels, startChannelSaveTransition] = React.useTransition();
   const [isTestingAlert, startAlertTestTransition] = React.useTransition();
   const [reportChannelValue, setReportChannelValue] = React.useState(
     initialState.syncReportChannelId ?? ""
@@ -133,7 +133,6 @@ export function PinballMapConfigForm({
   const [reportFeedback, setReportFeedback] = React.useState<Feedback | null>(
     null
   );
-  const [isSavingReport, startReportSaveTransition] = React.useTransition();
   const [isTestingReport, startReportTestTransition] = React.useTransition();
   const reportBaselineRef = React.useRef(
     initialState.syncReportChannelId ?? ""
@@ -167,9 +166,8 @@ export function PinballMapConfigForm({
     commitPending ||
     clearPending ||
     syncPending ||
-    isSavingAlert ||
+    isSavingChannels ||
     isTestingAlert ||
-    isSavingReport ||
     isTestingReport;
 
   React.useEffect(() => {
@@ -572,32 +570,6 @@ export function PinballMapConfigForm({
     React.startTransition(() => dispatchCheck(formData));
   }
 
-  function saveAlertConfig(): void {
-    startAlertSaveTransition(async () => {
-      const res = await saveRegionAlertConfigAction({
-        region: regionValue,
-        alertChannelId:
-          normalizedChannelValue.length > 0 ? normalizedChannelValue : null,
-      });
-      if (res.ok) {
-        setAnnouncement({
-          tone: "success",
-          message: "Pinball Map settings saved.",
-        });
-        setAlertFeedback(null);
-        router.refresh();
-      } else {
-        setAnnouncement({
-          tone: "error",
-          message:
-            res.reason === "unauthorized"
-              ? "You no longer have permission to manage integrations."
-              : "PinPoint couldn't save region alert configuration. Try again.",
-        });
-      }
-    });
-  }
-
   function handleSendTest(): void {
     if (!normalizedChannelValue || isTestingAlert || anyPending) return;
     setAlertFeedback(null);
@@ -625,33 +597,6 @@ export function PinballMapConfigForm({
         setAlertFeedback({
           tone: "error",
           message: msg,
-        });
-      }
-    });
-  }
-
-  function saveReportConfig(): void {
-    startReportSaveTransition(async () => {
-      const res = await saveSyncReportConfigAction({
-        channelId:
-          normalizedReportChannelValue.length > 0
-            ? normalizedReportChannelValue
-            : null,
-      });
-      if (res.ok) {
-        setAnnouncement({
-          tone: "success",
-          message: "Pinball Map settings saved.",
-        });
-        setReportFeedback(null);
-        router.refresh();
-      } else {
-        setAnnouncement({
-          tone: "error",
-          message:
-            res.reason === "unauthorized"
-              ? "You no longer have permission to manage integrations."
-              : "PinPoint couldn't save the sync report channel. Try again.",
         });
       }
     });
@@ -686,10 +631,59 @@ export function PinballMapConfigForm({
     });
   }
 
-  /** Save whichever Discord channel settings changed alongside a location save. */
+  /**
+   * Save whichever Discord channel settings changed, as one step with one
+   * announcement, so a success on one channel never covers a failure on the
+   * other.
+   */
   function saveChannelConfigs(): void {
-    if (isRegionAlertDirty) saveAlertConfig();
-    if (isSyncReportDirty) saveReportConfig();
+    if (!isRegionAlertDirty && !isSyncReportDirty) return;
+    startChannelSaveTransition(async () => {
+      const [alertRes, reportRes] = await Promise.all([
+        isRegionAlertDirty
+          ? saveRegionAlertConfigAction({
+              region: regionValue,
+              alertChannelId:
+                normalizedChannelValue.length > 0
+                  ? normalizedChannelValue
+                  : null,
+            })
+          : null,
+        isSyncReportDirty
+          ? saveSyncReportConfigAction({
+              channelId:
+                normalizedReportChannelValue.length > 0
+                  ? normalizedReportChannelValue
+                  : null,
+            })
+          : null,
+      ]);
+      if (alertRes?.ok) setAlertFeedback(null);
+      if (reportRes?.ok) setReportFeedback(null);
+      if (alertRes?.ok || reportRes?.ok) router.refresh();
+
+      const alertFailed = alertRes !== null && !alertRes.ok;
+      const reportFailed = reportRes !== null && !reportRes.ok;
+      const unauthorized =
+        (alertRes?.ok === false && alertRes.reason === "unauthorized") ||
+        (reportRes?.ok === false && reportRes.reason === "unauthorized");
+      let message = "Pinball Map settings saved.";
+      if (unauthorized) {
+        message = "You no longer have permission to manage integrations.";
+      } else if (alertFailed && reportFailed) {
+        message =
+          "PinPoint couldn't save the Discord channel settings. Try again.";
+      } else if (alertFailed) {
+        message =
+          "PinPoint couldn't save region alert configuration. Try again.";
+      } else if (reportFailed) {
+        message = "PinPoint couldn't save the sync report channel. Try again.";
+      }
+      setAnnouncement({
+        tone: alertFailed || reportFailed ? "error" : "success",
+        message,
+      });
+    });
   }
 
   function commitCandidate(): void {
@@ -1152,9 +1146,7 @@ export function PinballMapConfigForm({
             <Button
               ref={saveButtonRef}
               type="button"
-              loading={
-                commitPending || clearPending || isSavingAlert || isSavingReport
-              }
+              loading={commitPending || clearPending || isSavingChannels}
               disabled={!canSave || anyPending}
               onClick={handleSave}
             >

@@ -911,6 +911,36 @@ describe("PinballMapConfigForm", () => {
       ).toBeInTheDocument();
     });
 
+    it("reports a failed region alert save even when the sync report save succeeds", async () => {
+      const user = userEvent.setup();
+      saveAlertActionMock.mockResolvedValue({
+        ok: false,
+        reason: "server_error",
+      });
+      renderForm();
+
+      await user.type(
+        screen.getByLabelText(/Alert channel/i),
+        "111111111111111111"
+      );
+      await user.type(
+        screen.getByLabelText(/Sync report channel/i),
+        "222222222222222222"
+      );
+      await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+      expect(saveAlertActionMock).toHaveBeenCalledTimes(1);
+      expect(saveReportActionMock).toHaveBeenCalledTimes(1);
+      expect(
+        await screen.findByText(
+          "PinPoint couldn't save region alert configuration. Try again."
+        )
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText("Pinball Map settings saved.")
+      ).not.toBeInTheDocument();
+    });
+
     it("sends its test message to the typed channel and reports where it went", async () => {
       const user = userEvent.setup();
       renderForm();
