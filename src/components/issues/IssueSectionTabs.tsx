@@ -49,15 +49,65 @@ export function IssueSections({
   children: React.ReactNode;
 }): React.JSX.Element {
   const [active, setActive] = React.useState<IssueSection>("issue");
+  // The comment or event an in-page link asked for, waiting for the Issue
+  // tab to show it.
+  const [target, setTarget] = React.useState<string | null>(null);
 
-  // A link to a comment or event lives on the Issue tab (§2.5–§2.6).
+  // A link to a comment or event lives on the Issue tab (§2.5–§2.6). A plain
+  // anchor fires `hashchange`; a Next <Link> to the same page changes the
+  // hash with pushState, which fires nothing, so in-page link clicks are
+  // read directly.
   React.useEffect(() => {
-    const onHashChange = (): void => {
-      if (window.location.hash.startsWith("#comment-")) setActive("issue");
+    const reveal = (hash: string): void => {
+      if (!hash.startsWith("#comment-")) return;
+      setActive("issue");
+      setTarget(decodeURIComponent(hash.slice(1)));
+    };
+    const onHashChange = (): void => reveal(window.location.hash);
+    const onClick = (event: MouseEvent): void => {
+      if (
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      ) {
+        return;
+      }
+      const anchor =
+        event.target instanceof Element
+          ? event.target.closest("a[href]")
+          : null;
+      if (!(anchor instanceof HTMLAnchorElement)) return;
+      const url = new URL(anchor.href);
+      if (
+        url.origin === window.location.origin &&
+        url.pathname === window.location.pathname
+      ) {
+        reveal(url.hash);
+      }
     };
     window.addEventListener("hashchange", onHashChange);
-    return () => window.removeEventListener("hashchange", onHashChange);
+    document.addEventListener("click", onClick, true);
+    return () => {
+      window.removeEventListener("hashchange", onHashChange);
+      document.removeEventListener("click", onClick, true);
+    };
   }, []);
+
+  // Once the Issue tab shows, bring the target into view and move focus to
+  // it, so the next Tab continues from the comment rather than the old tab.
+  React.useEffect(() => {
+    if (target === null || active !== "issue") return;
+    setTarget(null);
+    const element = document.getElementById(target);
+    if (!element) return;
+    element.scrollIntoView({ block: "start" });
+    if (!element.hasAttribute("tabindex")) {
+      element.setAttribute("tabindex", "-1");
+    }
+    element.focus({ preventScroll: true });
+  }, [target, active]);
 
   const value = React.useMemo(() => ({ active, setActive }), [active]);
   return (
