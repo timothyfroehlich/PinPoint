@@ -74,8 +74,7 @@ Every concept in `pinballmap.md` §1 applies unchanged — match, uncataloged, l
 ## Known divergences (code vs spec)
 
 | Spec | Code today | Resolution |
-| :-- | :-- | :-- |
-| 3.4 Confirm lineup | The header has no Confirm lineup on Pinball Map action | PP-o355.58 |
+| :--- | :--------- | :--------- |
 
 ---
 

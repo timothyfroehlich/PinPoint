@@ -505,6 +505,21 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         },
       },
       {
+        id: "machines.pinballmap.confirm",
+        label: "Confirm the Pinball Map lineup",
+        description:
+          "Tell Pinball Map the location's whole lineup is accurate as of today, from the lineup page header, as your own linked Pinball Map account",
+        access: {
+          unauthenticated: false,
+          guest: false,
+          // A venue-level statement about every entry (pinballmap spec 3.7),
+          // so there is no machine for a member's ownership to scope it to.
+          member: false,
+          technician: true,
+          admin: true,
+        },
+      },
+      {
         id: "machines.pinballmap.sync",
         label: "Refresh the Pinball Map lineup",
         description:

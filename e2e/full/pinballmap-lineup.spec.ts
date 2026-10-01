@@ -3,11 +3,13 @@
  * docs/feature-specs/pinballmap-lineup.md).
  *
  * What only a browser sees: the entry points (the /m header button and the
- * admin menu item), the page assembling stored state into sections, and the
- * row links carrying the right query and machine into /m/new and /edit. The
+ * admin menu item), the page assembling stored state into sections, the row
+ * links carrying the right query and machine into /m/new and /edit, and the
+ * header's Confirm lineup dialog end to end against the mock client. The
  * comparison rules are unit-tested (`lineup-comparison.test.ts`) and the
- * push/link actions are integration-tested; no outbound write is exercised
- * here and nothing reaches pinballmap.com (CORE-PBM-001 / CORE-TEST-006).
+ * push/link/confirm actions are integration-tested. Confirm is the one write
+ * exercised here, through the mock client; nothing reaches pinballmap.com
+ * (CORE-PBM-001 / CORE-TEST-006).
  *
  * Catalog rows, the stored-lineup entry and the machines are seeded directly.
  * The stored lineup is shared, so assertions target this run's own rows and
@@ -24,6 +26,7 @@ import {
   createTestMachine,
   deletePinballMapCatalogEntries,
   getProfileIdByEmail,
+  markStoredLineupFresh,
   removeLmxFromStoredLineup,
   seedPinballMapCatalogEntry,
   setMachinePinballMapTitle,
@@ -165,6 +168,51 @@ test.describe("Pinball Map lineup page (PP-o355.65)", () => {
     });
   });
 
+  test.describe("Confirm lineup as admin", () => {
+    test.use({ storageState: STORAGE_STATE.admin });
+
+    test("confirms from the header after warning about an unlinked entry", async ({
+      page,
+    }) => {
+      const base = Math.floor(Math.random() * 9_000_000) * 10;
+      const entryTitleId = 930_000_000 + base;
+      const entryLmxId = 830_000_000 + base;
+      const entryName = `Zz E2E Confirm Entry ${String(base)}`;
+
+      try {
+        await seedPinballMapCatalogEntry({
+          pinballmapMachineId: entryTitleId,
+          name: entryName,
+        });
+        await addLmxToStoredLineup({
+          pinballmapMachineId: entryTitleId,
+          pinballmapLmxId: entryLmxId,
+        });
+        await markStoredLineupFresh();
+
+        await page.goto("/m/pinball-map");
+        await page
+          .getByRole("button", { name: "Confirm lineup on Pinball Map" })
+          .click();
+        const dialog = page.getByTestId("pbm-confirm-lineup-dialog");
+        const entry = dialog
+          .getByTestId("pbm-confirm-lineup-entries")
+          .getByRole("listitem")
+          .filter({ hasText: entryName });
+        await expect(entry).toContainText("Not linked");
+
+        await dialog.getByRole("button", { name: "Confirm anyway" }).click();
+        await expect(dialog).toBeHidden();
+        await expect(
+          page.getByText("Lineup confirmed on Pinball Map")
+        ).toBeVisible();
+      } finally {
+        await deletePinballMapCatalogEntries([entryTitleId]);
+        await removeLmxFromStoredLineup([entryLmxId]);
+      }
+    });
+  });
+
   test.describe("as member", () => {
     test.use({ storageState: STORAGE_STATE.member });
 
@@ -177,6 +225,9 @@ test.describe("Pinball Map lineup page (PP-o355.65)", () => {
       await expect(
         page.getByRole("heading", { name: "Pinball Map lineup" })
       ).toBeVisible();
+      // Confirming vouches for the whole venue: technicians and admins only.
+      await expect(page.getByTestId("pbm-lineup-header")).toBeVisible();
+      await expect(page.getByTestId("pbm-confirm-lineup")).toHaveCount(0);
     });
   });
 });

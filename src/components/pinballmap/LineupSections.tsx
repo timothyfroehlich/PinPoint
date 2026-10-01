@@ -3,6 +3,11 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 
 import { Button, buttonVariants } from "~/components/ui/button";
+import {
+  LINEUP_TONE,
+  LineupTag,
+  type LineupTone,
+} from "~/components/pinballmap/LineupTag";
 import { getMachinePresenceLabel } from "~/lib/machines/presence";
 import type {
   LineupCabinet,
@@ -50,23 +55,9 @@ export interface LineupViewContext {
   canCreate: boolean;
 }
 
-type Tone = "destructive" | "success" | "warning" | "secondary" | "note";
-
-const TONE: Record<Tone, string> = {
-  destructive:
-    "border-error-container bg-error-container/40 text-on-error-container",
-  success:
-    "border-success-container bg-success-container/40 text-on-success-container",
-  warning:
-    "border-warning-container bg-warning-container/40 text-on-warning-container",
-  secondary:
-    "border-secondary-container bg-secondary-container/40 text-on-secondary-container",
-  note: "border-outline-variant bg-transparent text-foreground",
-};
-
 const SECTION: Record<
   LineupSectionKey,
-  { name: string; desc: string; glyph: string; tone: Tone; badge: string }
+  { name: string; desc: string; glyph: string; tone: LineupTone; badge: string }
 > = {
   out_of_sync: {
     name: "Out of sync",
@@ -100,7 +91,7 @@ const SECTION: Record<
 
 const OUT_OF_SYNC_TAG: Record<
   LineupOutOfSyncTag,
-  { label: string; tone: Tone; reason: string }
+  { label: string; tone: LineupTone; reason: string }
 > = {
   to_add: { label: "To add", tone: "success", reason: "Not on Pinball Map" },
   to_remove: {
@@ -115,7 +106,10 @@ const OUT_OF_SYNC_TAG: Record<
   },
 };
 
-const CONFLICT_TAG: Record<LineupConflictTag, { label: string; tone: Tone }> = {
+const CONFLICT_TAG: Record<
+  LineupConflictTag,
+  { label: string; tone: LineupTone }
+> = {
   alert: { label: "Alert", tone: "destructive" },
   note: { label: "Note", tone: "note" },
 };
@@ -143,7 +137,7 @@ function Glyph({
   className,
 }: {
   children: React.ReactNode;
-  tone: Tone;
+  tone: LineupTone;
   className?: string;
 }): React.JSX.Element {
   return (
@@ -151,30 +145,11 @@ function Glyph({
       aria-hidden="true"
       className={cn(
         "inline-flex size-7 shrink-0 items-center justify-center rounded-md border text-base font-extrabold",
-        TONE[tone],
+        LINEUP_TONE[tone],
         className
       )}
     >
       {children}
-    </span>
-  );
-}
-
-function Tag({
-  label,
-  tone,
-}: {
-  label: string;
-  tone: Tone;
-}): React.JSX.Element {
-  return (
-    <span
-      className={cn(
-        "mr-2 inline-flex h-5 shrink-0 items-center rounded-[5px] border px-1.5 text-[11px] font-bold whitespace-nowrap",
-        TONE[tone]
-      )}
-    >
-      {label}
     </span>
   );
 }
@@ -302,7 +277,7 @@ function SectionRows({
                 sub={<CabinetLines cabinets={row.cabinets} />}
                 reason={
                   <>
-                    <Tag label={tag.label} tone={tag.tone} />
+                    <LineupTag label={tag.label} tone={tag.tone} />
                     <span>{tag.reason}</span>
                   </>
                 }
@@ -389,7 +364,7 @@ function SectionRows({
                 }
                 reason={
                   <>
-                    <Tag label={tag.label} tone={tag.tone} />
+                    <LineupTag label={tag.label} tone={tag.tone} />
                     <span>
                       {getMachinePresenceLabel(row.machine.presenceStatus)}
                     </span>
@@ -450,7 +425,7 @@ export function LineupSections({
               key={key}
               className={cn(
                 "inline-flex h-[22px] items-center rounded-full border px-2.5 text-xs font-semibold whitespace-nowrap",
-                TONE[SECTION[key].tone]
+                LINEUP_TONE[SECTION[key].tone]
               )}
             >
               {comparison.sections[key].length}{" "}

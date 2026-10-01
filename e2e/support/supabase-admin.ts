@@ -600,6 +600,19 @@ export async function addLmxToStoredLineup(entry: {
   if (writeError) throw writeError;
 }
 
+/**
+ * Stamp the stored lineup as just refreshed, so opening Confirm lineup does not
+ * refresh it first (pinballmap spec 3.7). A refresh would replace the shared
+ * stored lineup with the mock client's, dropping entries other workers seeded.
+ */
+export async function markStoredLineupFresh() {
+  const { error } = await supabaseAdmin
+    .from("pinballmap_state")
+    .update({ last_synced_at: new Date().toISOString() })
+    .eq("id", "singleton");
+  if (error) throw error;
+}
+
 /** Undo {@link addLmxToStoredLineup}, so a run does not leak into the next. */
 export async function removeLmxFromStoredLineup(lmxIds: number[]) {
   const { data, error } = await supabaseAdmin

@@ -31,6 +31,7 @@ import {
 } from "~/lib/pinballmap/abandoned-listings";
 import {
   getLinkedPinballMapCredentials,
+  getPinballMapLinkStatus,
   markPinballMapLinkNeedsRelink,
   type LinkedPinballMapCredentials,
 } from "~/lib/pinballmap/user-credentials";
@@ -77,6 +78,7 @@ import {
 import { type Result, ok, err } from "~/lib/result";
 import type { PinballmapRuntimeState } from "~/lib/types";
 import { setMachineIcIntent, updateMachinePbmLink } from "~/services/machines";
+import { loadLineupData } from "~/lib/pinballmap/lineup-data";
 
 export type { CatalogEdition, CatalogFamily } from "~/lib/pinballmap/catalog";
 
@@ -1925,5 +1927,224 @@ export async function refreshPinballmapLineupAction(
   } catch (error: unknown) {
     log.error({ err: error }, "Manual PinballMap refresh failed");
     return err("SERVER", "Pinball Map refresh failed. Please try again.");
+  }
+}
+
+/** A stored lineup older than this is refreshed before confirming (spec 3.7). */
+const CONFIRM_FRESH_MS = 5 * 60 * 1000;
+
+/** An entry the Confirm lineup dialog warns about (spec 3.7). */
+export interface ConfirmLineupEntry {
+  key: string;
+  name: string;
+  /** To add (Missing), To remove (Lingering), or an unmatched entry. */
+  kind: "to_add" | "to_remove" | "not_linked";
+}
+
+export type CheckConfirmLineupResult = Result<
+  {
+    entryCount: number;
+    /** The snapshot the list was built from; ISO string. */
+    lastRefreshedAt: string | null;
+    /** The pre-confirm refresh was needed and did not succeed. */
+    refreshFailed: boolean;
+    entries: ConfirmLineupEntry[];
+  },
+  "UNAUTHORIZED" | "NOT_LINKED" | "SERVER"
+>;
+
+export type ConfirmLineupResult = Result<
+  Record<string, never>,
+  | "UNAUTHORIZED"
+  | "VALIDATION"
+  | "NOT_LINKED"
+  | "PBM_REJECTED"
+  | "PBM_AUTH_FAILED"
+  | "SERVER"
+>;
+
+async function authorizeConfirmLineup(): Promise<
+  | { ok: true; userId: string }
+  | { ok: false; result: Result<never, "UNAUTHORIZED"> }
+> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user)
+    return { ok: false, result: err("UNAUTHORIZED", "Sign in required") };
+  const profile = await db.query.userProfiles.findFirst({
+    where: eq(userProfiles.id, user.id),
+    columns: { role: true },
+  });
+  if (
+    !checkPermission(
+      "machines.pinballmap.confirm",
+      getAccessLevel(profile?.role)
+    )
+  )
+    return { ok: false, result: err("UNAUTHORIZED", "Not allowed") };
+  return { ok: true, userId: user.id };
+}
+
+/**
+ * Open the Confirm lineup dialog (spec 3.7): refresh a stored lineup over five
+ * minutes old, then list what is out of sync or unmatched.
+ *
+ * The refresh is an ordinary manual one, through the shared allowance
+ * (CORE-PBM-001). When it is throttled or fails, the dialog still opens on the
+ * last good snapshot and says how old it is, so the person decides whether to
+ * proceed.
+ */
+export async function checkConfirmLineupAction(): Promise<CheckConfirmLineupResult> {
+  const authed = await authorizeConfirmLineup();
+  if (!authed.ok) return authed.result;
+
+  const state = await getPinballMapState();
+  if (state?.locationId == null || !state.snapshotJson)
+    return err("SERVER", "Pinball Map hasn't been refreshed yet.");
+  // The confirmation runs as the person's own linked account (spec 3.7, 8.4).
+  const link = await getPinballMapLinkStatus(authed.userId);
+  if (link.status !== "linked") return err("NOT_LINKED", NOT_LINKED_MESSAGE);
+
+  let refreshFailed = false;
+  const age =
+    state.lastSyncedAt === null
+      ? Infinity
+      : Date.now() - state.lastSyncedAt.getTime();
+  if (age > CONFIRM_FRESH_MS) {
+    try {
+      const result = await syncLocationSnapshot({
+        updatedBy: authed.userId,
+        trigger: "manual",
+      });
+      if (result.ok) {
+        await reconcileAfterSync();
+        revalidatePath("/m", "layout");
+      } else if (
+        result.reason === "superseded" ||
+        result.reason === "not_configured"
+      ) {
+        revalidatePath("/m", "layout");
+        return err(
+          "SERVER",
+          "The tracked Pinball Map location changed. Reload the page."
+        );
+      } else {
+        // A throttled attempt still spent a token and a failure recorded its
+        // status, so the header is stale either way (as in the Refresh action).
+        revalidatePath("/m", "layout");
+        refreshFailed = true;
+      }
+    } catch (error: unknown) {
+      log.error({ err: error }, "Pre-confirm PinballMap refresh failed");
+      revalidatePath("/m", "layout");
+      refreshFailed = true;
+    }
+  }
+
+  const { state: current, comparison } = await loadLineupData();
+  if (comparison.status !== "ready" || !current?.snapshotJson)
+    return err("SERVER", "Pinball Map hasn't been refreshed yet.");
+
+  const entries: ConfirmLineupEntry[] = [];
+  for (const row of comparison.sections.out_of_sync) {
+    if (row.tag === "to_update") continue;
+    entries.push({ key: row.key, name: row.title.name, kind: row.tag });
+  }
+  for (const row of comparison.sections.pinball_map_only)
+    entries.push({ key: row.key, name: row.title.name, kind: "not_linked" });
+
+  return ok({
+    entryCount: current.snapshotJson.lmxes.length,
+    lastRefreshedAt: current.lastSyncedAt?.toISOString() ?? null,
+    refreshFailed,
+    entries,
+  });
+}
+
+/** `YYYY-MM-DD` within a day of the server's UTC date. */
+function isPlausibleToday(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = Date.parse(`${value}T12:00:00Z`);
+  return (
+    !Number.isNaN(parsed) &&
+    Math.abs(parsed - Date.now()) <= 36 * 60 * 60 * 1000
+  );
+}
+
+/**
+ * Tell Pinball Map the tracked location's whole lineup is accurate as of today
+ * (spec 3.7). A venue-level statement: it adds, removes, and refreshes nothing.
+ *
+ * On success the stored snapshot's last-updated date moves to `today`, the
+ * confirming person's local date, so the header reflects the confirmation
+ * before the next refresh reads Pinball Map's own value.
+ */
+export async function confirmPinballmapLineupAction(
+  _prev: ConfirmLineupResult | undefined,
+  formData: FormData
+): Promise<ConfirmLineupResult> {
+  const authed = await authorizeConfirmLineup();
+  if (!authed.ok) return authed.result;
+
+  const todayRaw = formData.get("today");
+  const today = typeof todayRaw === "string" ? todayRaw : "";
+  if (!isPlausibleToday(today)) return err("VALIDATION", "Invalid date");
+
+  const state = await getPinballMapState();
+  if (state?.locationId == null || !state.snapshotJson)
+    return err("SERVER", "Pinball Map hasn't been refreshed yet.");
+  const locationId = state.locationId;
+
+  const linked = await getLinkedPinballMapCredentials(authed.userId);
+  if (!linked) return err("NOT_LINKED", NOT_LINKED_MESSAGE);
+
+  const lease = await claimPinballMapMutationLease(
+    locationId,
+    state.configurationGeneration
+  );
+  if (!lease)
+    return err(
+      "SERVER",
+      "The tracked Pinball Map location is being changed. Reload the page and try again."
+    );
+
+  try {
+    const client = await getPinballMapClient();
+    const written = await client.confirmLineup({
+      credentials: linked.credentials,
+      locationId,
+    });
+    if (!written.ok) {
+      log.error(
+        { reason: written.reason, action: "pinballmap.confirmLineup" },
+        "PinballMap lineup confirmation rejected"
+      );
+      // The shared message names an entry; this call is about the location.
+      if (written.reason === "not_found")
+        return err(
+          "PBM_REJECTED",
+          "Pinball Map couldn't find the tracked location."
+        );
+      return await pushRejected(authed.userId, linked, written);
+    }
+    log.info(
+      { userId: authed.userId, locationId, action: "pinballmap.confirmLineup" },
+      "Confirmed the Pinball Map lineup"
+    );
+
+    await db.transaction(async (tx) => {
+      if (!(await mutationLeaseOwnsLocation(tx, lease))) return;
+      await editStoredSnapshot(tx, locationId, (snapshot) => ({
+        ...snapshot,
+        dateLastUpdated: today,
+      }));
+    });
+
+    revalidatePath("/m", "layout");
+    return ok({});
+  } finally {
+    await releasePinballMapMutationLease(lease.id);
   }
 }
