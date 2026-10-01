@@ -75,7 +75,7 @@ The control's states (§4) are comparisons across these: _in sync_ means intent 
 - **4.7** Same-title cabinets: every intent-On cabinet shows the entry as its own (**Shared**, naming the others); an intent-Off cabinet whose siblings cover the entry shows **Covered**, quiet, with the covering cabinets linked. Sibling names always link to their machine pages.
 - **4.8** User-facing vocabulary: "listing" never appears — the object is an "entry", the set is the "lineup" (Pinball Map's word), comments are "comments", the read is "Refresh". "Sync" survives only in the relationship senses (Don't sync, Out of sync).
 - **4.9** A signed-in member without the machine-linking capability sees the header and both rows, never the status row's push actions; the intent toggle and the Insider Connected toggle render read-only. The header Refresh stays available to them (8.3).
-- **4.10** In dense summary and table views (such as the fleet dashboard, `docs/feature-specs/fleet.md`), listing and sync states render as compact diagnostic badges:
+- **4.10** In dense summary and table views (such as the lineup page, `docs/feature-specs/pinballmap-lineup.md`), listing and sync states render as compact diagnostic badges:
   - **In sync**: green styling for `On`, `Off`, `Shared`, or `Covered`.
   - **Out of sync**: error/warning styling for `Missing` (intent On, absent from lineup), `Lingering` (intent Off, present on lineup), or `Insider Connected differs`.
   - **Advisory**: warning-styled badge for `Alert` (invalid availability) or note-styled badge for `Flag` (on loan / off floor).
@@ -193,6 +193,7 @@ Changes to this document. Divergence-table rows are working state and are not lo
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-01 | §4.10 cites the lineup page as its dense-view example; `fleet.md` is retired. |
 | 2026-09-30 | §3.7: Confirm lineup requires the person's own linked Pinball Map account (8.4) rather than operator credentials. §4.3: the push action is offered to a person who can push (8.2), replacing "with operator credentials". |
 | 2026-09-30 | §4.11: when the chosen title is already on the lineup, the New Machine page's Insider Connected toggle starts at the entry's value (Off when Pinball Map reports neither). |
 | 2026-09-30 | §3.7: the Confirm lineup dialog also lists unmatched entries, since confirming vouches for every entry on the lineup. |
