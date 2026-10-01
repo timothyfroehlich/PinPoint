@@ -4,6 +4,7 @@ import type React from "react";
 import {
   useState,
   useActionState,
+  useCallback,
   useEffect,
   useRef,
   startTransition,
@@ -18,6 +19,19 @@ import {
 import type { Result } from "~/lib/result";
 
 type FieldActionResult = Result<{ issueId: string }, string>;
+
+/** A save whose request never completed (offline, dropped connection). */
+export interface TransportFailure {
+  ok: false;
+  code: "TRANSPORT";
+  message: string;
+}
+
+export const TRANSPORT_FAILURE: TransportFailure = {
+  ok: false,
+  code: "TRANSPORT",
+  message: "Not saved. Check your connection and try again.",
+};
 
 interface IssueFieldRowFormProps<
   T extends string,
@@ -43,6 +57,10 @@ interface IssueFieldRowFormProps<
  * Dispatches the action with a hand-built `FormData` and never renders a
  * `<form>`: React 19 auto-resets a form after its action settles, which once
  * replayed a stale value through a Radix Select (PP-0fvr).
+ *
+ * A request that throws (the connection dropped) is a failed save like any
+ * other — the row rolls back and the error shows — rather than an exception
+ * that would take the whole page to the error boundary.
  */
 export function IssueFieldRowForm<
   T extends string,
@@ -58,10 +76,26 @@ export function IssueFieldRowForm<
   testId,
 }: IssueFieldRowFormProps<T, R>): React.JSX.Element {
   const [selected, setSelected] = useState<T>(value);
+  const saveAction = useCallback(
+    async (
+      _previous: R | TransportFailure | undefined,
+      formData: FormData
+    ): Promise<R | TransportFailure> => {
+      try {
+        // The field actions don't read their previous state.
+        return await action(undefined, formData);
+      } catch {
+        // A fresh object, so a second failure in a row still re-runs the
+        // result effect.
+        return { ...TRANSPORT_FAILURE };
+      }
+    },
+    [action]
+  );
   const [state, formAction, isPending] = useActionState<
-    R | undefined,
+    R | TransportFailure | undefined,
     FormData
-  >(action, undefined);
+  >(saveAction, undefined);
   const [announcement, setAnnouncement] = useState("");
   const [error, setError] = useState<string | null>(null);
   // The label of the value the in-flight save is writing.

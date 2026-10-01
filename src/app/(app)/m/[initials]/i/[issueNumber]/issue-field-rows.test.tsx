@@ -11,6 +11,7 @@ import type React from "react";
 import { toast } from "sonner";
 import { TooltipProvider } from "~/components/ui/tooltip";
 import {
+  assignIssueAction,
   updateIssueStatusAction,
   updateIssuePriorityAction,
   updateIssueSeverityAction,
@@ -22,12 +23,14 @@ import { UpdateIssueStatusForm } from "./update-issue-status-form";
 import { UpdateIssuePriorityForm } from "./update-issue-priority-form";
 import { UpdateIssueSeverityForm } from "./update-issue-severity-form";
 import { UpdateIssueFrequencyForm } from "./update-issue-frequency-form";
+import { AssignIssueForm } from "./assign-issue-form";
 
 vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn() },
 }));
 
 vi.mock("~/app/(app)/issues/actions", () => ({
+  assignIssueAction: vi.fn(),
   updateIssueStatusAction: vi.fn(),
   updateIssuePriorityAction: vi.fn(),
   updateIssueSeverityAction: vi.fn(),
@@ -194,6 +197,58 @@ describe("issue Details field rows", () => {
       expect(screen.queryByRole("button")).not.toBeInTheDocument();
     });
   }
+
+  it("a dropped connection is a failed save, every time, not an error page", async () => {
+    const status = cases[0];
+    if (!status) throw new Error("missing Status case");
+    // The action's request throws, as fetch does when the network drops.
+    status.action.mockRejectedValue(new TypeError("Failed to fetch"));
+    renderRow(status.render("member", reporter));
+
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      await choose(status);
+      expect(
+        await screen.findByRole("button", {
+          name: `${status.label}: ${status.fromLabel}`,
+        })
+      ).not.toHaveAttribute("aria-busy");
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Not saved. Check your connection and try again."
+      );
+      expect(toast.error).toHaveBeenCalledTimes(attempt);
+    }
+  });
+
+  it("Assignee: a dropped connection shows the failure inline and as a toast", async () => {
+    vi.mocked(assignIssueAction).mockRejectedValue(
+      new TypeError("Failed to fetch")
+    );
+    const user = userEvent.setup();
+    renderRow(
+      <AssignIssueForm
+        issueId="issue-1"
+        assignedToId={null}
+        users={[{ id: "user-2", name: "Pat Tech" }]}
+        accessLevel="member"
+        ownershipContext={reporter}
+      />
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "Assignee: Unassigned" })
+    );
+    await user.click(await screen.findByRole("option", { name: /Pat Tech/ }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Not saved. Check your connection and try again."
+    );
+    expect(toast.error).toHaveBeenCalledWith(
+      "Not saved. Check your connection and try again."
+    );
+    expect(
+      screen.getByRole("button", { name: "Assignee: Unassigned" })
+    ).toBeInTheDocument();
+  });
 
   it("a guest can change status on their own issue but not on someone else's", () => {
     const { unmount } = render(

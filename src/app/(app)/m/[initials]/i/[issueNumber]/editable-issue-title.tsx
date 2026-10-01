@@ -26,6 +26,22 @@ import { useIsMobile } from "~/hooks/use-is-mobile";
 import { cn } from "~/lib/utils";
 import { ISSUE_TITLE_MAX, ISSUE_TITLE_MAX_MESSAGE } from "~/lib/issues/title";
 import { ReassignMachineForm } from "./reassign-machine-form";
+import {
+  TRANSPORT_FAILURE,
+  type TransportFailure,
+} from "./issue-field-row-form";
+
+/** A save whose request throws shows as a failed save, not an error page. */
+async function updateTitleOrFail(
+  _previous: UpdateIssueTitleResult | TransportFailure | undefined,
+  formData: FormData
+): Promise<UpdateIssueTitleResult | TransportFailure> {
+  try {
+    return await updateIssueTitleAction(undefined, formData);
+  } catch {
+    return { ...TRANSPORT_FAILURE };
+  }
+}
 
 interface EditableIssueTitleProps {
   issueId: string;
@@ -84,9 +100,12 @@ export function EditableIssueTitle({
   const restoreFocusRef = useRef(false);
 
   const [state, formAction, isPending] = useActionState<
-    UpdateIssueTitleResult | undefined,
+    UpdateIssueTitleResult | TransportFailure | undefined,
     FormData
-  >(updateIssueTitleAction, undefined);
+  >(updateTitleOrFail, undefined);
+  // Why the last save didn't happen, shown under the field until the next
+  // keystroke or edit.
+  const [error, setError] = useState<string | null>(null);
 
   // The blur handler runs in a timeout, after the render it was created in;
   // a ref gives it the current pending state rather than a stale one.
@@ -158,6 +177,7 @@ export function EditableIssueTitle({
 
   const closeEditor = (): void => {
     restoreFocusRef.current = focusIsInEditor();
+    setError(null);
     setIsEditing(false);
   };
 
@@ -170,8 +190,10 @@ export function EditableIssueTitle({
         active === null ||
         active === document.body ||
         (formRef.current?.contains(active) ?? false);
+      setError(null);
       setIsEditing(false);
     } else if (state?.ok === false) {
+      setError(state.message);
       toast.error(state.message);
     }
   }, [state]);
@@ -189,6 +211,7 @@ export function EditableIssueTitle({
       return;
     }
     if (trimmed.length > ISSUE_TITLE_MAX) {
+      setError(ISSUE_TITLE_MAX_MESSAGE);
       toast.error(ISSUE_TITLE_MAX_MESSAGE);
       return;
     }
@@ -215,8 +238,11 @@ export function EditableIssueTitle({
 
   if (isEditing) {
     const length = editValue.trim().length;
+    const atLimit = length >= ISSUE_TITLE_MAX;
     return (
       <form ref={formRef} action={formAction} className="space-y-1">
+        {/* The page keeps its h1 while the title is being edited. */}
+        <h1 className="sr-only">{title}</h1>
         <input type="hidden" name="issueId" value={issueId} />
         <div className="flex items-center gap-2">
           <Textarea
@@ -227,9 +253,10 @@ export function EditableIssueTitle({
             // and pasted line breaks become spaces.
             rows={1}
             value={editValue}
-            onChange={(e) =>
-              setEditValue(e.target.value.replace(/\r?\n/g, " "))
-            }
+            onChange={(e) => {
+              setEditValue(e.target.value.replace(/\r?\n/g, " "));
+              setError(null);
+            }}
             onKeyDown={handleKeyDown}
             onBlur={() => {
               // On mobile, leaving the field never cancels: Save and Cancel
@@ -260,7 +287,11 @@ export function EditableIssueTitle({
               titleTypeClassName
             )}
             aria-label="Edit issue title"
-            aria-describedby="issue-title-length issue-title-edit-help"
+            aria-describedby={cn(
+              error && "issue-title-error",
+              "issue-title-length issue-title-edit-help"
+            )}
+            aria-invalid={error ? true : undefined}
             // Read-only, not disabled, while saving: a disabled input drops
             // focus to <body>.
             readOnly={isPending}
@@ -273,6 +304,19 @@ export function EditableIssueTitle({
             />
           )}
         </div>
+        {error ? (
+          <p
+            id="issue-title-error"
+            role="alert"
+            className="text-sm text-destructive-text"
+          >
+            {error}
+          </p>
+        ) : null}
+        {/* Reaching the limit is announced; every keystroke is not. */}
+        <span className="sr-only" aria-live="polite">
+          {atLimit ? `${length} of ${ISSUE_TITLE_MAX} characters` : ""}
+        </span>
         <span id="issue-title-edit-help" className="sr-only">
           {isMobile
             ? "Done or Save saves. Cancel discards the edit."
@@ -283,9 +327,7 @@ export function EditableIssueTitle({
             id="issue-title-length"
             className={cn(
               "text-xs",
-              length > ISSUE_TITLE_MAX
-                ? "text-destructive-text"
-                : "text-muted-foreground"
+              atLimit ? "text-destructive-text" : "text-muted-foreground"
             )}
           >
             {length}/{ISSUE_TITLE_MAX}

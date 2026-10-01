@@ -26,6 +26,25 @@ import {
   type OwnershipContext,
 } from "~/lib/permissions/helpers";
 import { type AccessLevel } from "~/lib/permissions/matrix";
+import {
+  TRANSPORT_FAILURE,
+  type TransportFailure,
+} from "./issue-field-row-form";
+
+/**
+ * A request that throws (the connection dropped) is a failed save, not an
+ * exception for the route's error boundary.
+ */
+async function assignOrFail(
+  _previous: AssignIssueResult | TransportFailure | undefined,
+  formData: FormData
+): Promise<AssignIssueResult | TransportFailure> {
+  try {
+    return await assignIssueAction(undefined, formData);
+  } catch {
+    return { ...TRANSPORT_FAILURE };
+  }
+}
 
 interface AssignIssueFormProps {
   issueId: string;
@@ -50,9 +69,9 @@ export function AssignIssueForm({
   ownershipContext,
 }: AssignIssueFormProps): React.JSX.Element {
   const [state, formAction, isPending] = useActionState<
-    AssignIssueResult | undefined,
+    AssignIssueResult | TransportFailure | undefined,
     FormData
-  >(assignIssueAction, undefined);
+  >(assignOrFail, undefined);
   const [announcement, setAnnouncement] = useState("");
   const [error, setError] = useState<string | null>(null);
   // Who the in-flight save assigns, as the announcement words it.

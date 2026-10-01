@@ -64,6 +64,42 @@ describe("EditableIssueTitle", () => {
     const inputAfter = screen.getByLabelText("Edit issue title");
     expect(inputAfter).toBeInTheDocument();
     expect(inputAfter).toHaveValue("New typed text");
+    // The failure shows under the field and is tied to it, not only a toast.
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("Save failed");
+    expect(inputAfter).toHaveAttribute("aria-invalid", "true");
+    expect(inputAfter).toHaveAccessibleDescription(/^Save failed/);
+
+    // Typing again clears it.
+    await user.type(inputAfter, "!");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(inputAfter).not.toHaveAttribute("aria-invalid");
+  });
+
+  it("keeps the page's h1 while editing and announces reaching the limit", async () => {
+    const user = userEvent.setup();
+    render(
+      <EditableIssueTitle
+        issueId="issue-1"
+        title="Original Title"
+        canEdit={true}
+      />
+    );
+
+    await user.click(screen.getByLabelText("Edit title"));
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Original Title" })
+    ).toBeInTheDocument();
+
+    const input = screen.getByLabelText("Edit issue title");
+    await user.clear(input);
+    await user.type(input, "x".repeat(59));
+    expect(screen.queryByText("59 of 60 characters")).not.toBeInTheDocument();
+    await user.type(input, "x");
+    expect(screen.getByText("60 of 60 characters")).toHaveAttribute(
+      "aria-live",
+      "polite"
+    );
   });
 
   it("cancels on blur when no submission has errored", async () => {
