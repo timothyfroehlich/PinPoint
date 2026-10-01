@@ -32,6 +32,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "~/components/ui/alert-dialog";
+import { HelpLink } from "~/components/help/HelpLink";
 import { RelativeTime } from "~/components/issues/RelativeTime";
 import { useRelativeNow } from "~/components/issues/RelativeTimeProvider";
 import type {
@@ -460,6 +461,12 @@ function Header({
             onRefresh={onRefresh}
           />
         ) : null}
+
+        <HelpLink
+          href="/help/pinball-map"
+          topic="Pinball Map"
+          className="text-xs"
+        />
       </div>
     </div>
   );

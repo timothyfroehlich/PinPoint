@@ -1,11 +1,10 @@
 import type React from "react";
-import Link from "next/link";
-import { HelpCircle } from "lucide-react";
 import { eq } from "drizzle-orm";
 import { db } from "~/server/db";
 import { discordIntegrationConfig } from "~/server/db/schema";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
+import { HelpLink } from "~/components/help/HelpLink";
 import {
   Card,
   CardAction,
@@ -43,13 +42,11 @@ export default async function AdminIntegrationsPage(): Promise<React.JSX.Element
               <CardTitle>Discord</CardTitle>
               <CardDescription>Bot notifications.</CardDescription>
               <CardAction>
-                <Link
+                <HelpLink
                   href="/help/discord"
-                  className="flex items-center gap-1.5 text-sm text-link"
-                >
-                  <HelpCircle aria-hidden />
-                  <span>Help</span>
-                </Link>
+                  topic="Discord"
+                  className="text-sm"
+                />
               </CardAction>
             </CardHeader>
             <CardContent>
@@ -68,6 +65,13 @@ export default async function AdminIntegrationsPage(): Promise<React.JSX.Element
                 Syncs the tracked location&apos;s lineup and watches a region
                 for new machines.
               </CardDescription>
+              <CardAction>
+                <HelpLink
+                  href="/help/pinball-map"
+                  topic="Pinball Map"
+                  className="text-sm"
+                />
+              </CardAction>
             </CardHeader>
             <CardContent>
               <PinballMapConfigForm initialState={pinballMapState} />

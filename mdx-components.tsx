@@ -1,4 +1,4 @@
-import type React from "react";
+import React from "react";
 import Link from "next/link";
 
 type MDXComponents = Record<
@@ -6,27 +6,61 @@ type MDXComponents = Record<
   React.ComponentType<React.PropsWithChildren<Record<string, unknown>>>
 >;
 
+/** The plain text of a heading's children, for its fragment id. */
+function textOf(node: React.ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(textOf).join("");
+  if (React.isValidElement<{ children?: React.ReactNode }>(node)) {
+    return textOf(node.props.children);
+  }
+  return "";
+}
+
+/** "Link your Pinball Map account" → "link-your-pinball-map-account". */
+function headingId(children: React.ReactNode): string {
+  return textOf(children)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
 export function useMDXComponents(components: MDXComponents): MDXComponents {
   return {
     h1: ({ children }: React.PropsWithChildren) => (
       <h1 className="text-xl font-semibold mt-10 first:mt-0">{children}</h1>
     ),
+    // Help articles: ## is a part of the article, ### a section within it,
+    // #### a subsection. Parts and sections carry fragment ids so the
+    // "On this page" navigation (HelpPage `toc`) can link to them.
     h2: ({ children }: React.PropsWithChildren) => (
-      <h2 className="text-lg font-semibold mt-8 first:mt-0">{children}</h2>
+      <h2
+        id={headingId(children)}
+        className="mt-12 scroll-mt-16 border-t border-border pt-8 text-2xl font-bold tracking-tight first:mt-0 first:border-t-0 first:pt-0"
+      >
+        {children}
+      </h2>
     ),
     h3: ({ children }: React.PropsWithChildren) => (
-      <h3 className="text-base font-semibold mt-4">{children}</h3>
+      <h3
+        id={headingId(children)}
+        className="mt-8 scroll-mt-16 text-lg font-semibold"
+      >
+        {children}
+      </h3>
+    ),
+    h4: ({ children }: React.PropsWithChildren) => (
+      <h4 className="mt-6 text-base font-semibold">{children}</h4>
     ),
     p: ({ children }: React.PropsWithChildren) => (
       <p className="text-sm text-muted-foreground mt-3">{children}</p>
     ),
     ul: ({ children }: React.PropsWithChildren) => (
-      <ul className="space-y-2 text-sm text-muted-foreground mt-3">
+      <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground mt-3">
         {children}
       </ul>
     ),
     ol: ({ children }: React.PropsWithChildren) => (
-      <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground mt-3">
+      <ol className="list-decimal space-y-1 pl-5 text-sm text-muted-foreground mt-3">
         {children}
       </ol>
     ),
