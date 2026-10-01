@@ -122,6 +122,21 @@ interface PinballMapLinkFieldProps {
    * effect, which is initialization rather than an edit.
    */
   onDirty?: (() => void) | undefined;
+  /**
+   * Reports the live Source and link on every change, including the initial
+   * one (PP-wqit.14.2). The New Machine page needs it: its Pinball Map intent
+   * controls exist only for a catalog title, and read as unavailable on Manual
+   * Entry (machine-editing 3.6, pinballmap 4.11). `pinballmapMachineId` is the
+   * id the form will submit — null while a multi-edition family has no edition
+   * chosen.
+   */
+  onSelectionChange?: ((selection: PbmLinkFieldSelection) => void) | undefined;
+}
+
+/** What {@link PinballMapLinkFieldProps.onSelectionChange} reports. */
+export interface PbmLinkFieldSelection {
+  manual: boolean;
+  pinballmapMachineId: number | null;
 }
 
 /**
@@ -266,6 +281,7 @@ export function PinballMapLinkField({
   machineName = "",
   disabled = false,
   onDirty,
+  onSelectionChange,
 }: PinballMapLinkFieldProps): React.JSX.Element {
   const triggerId = useId();
   const editionId = useId();
@@ -535,6 +551,20 @@ export function PinballMapLinkField({
    * the honest failure (CORE-ARCH-012) rather than a silent wipe.
    */
   const submittedId = userChanged ? resolvedId : defaultMachineId;
+
+  // Held in a ref so a parent passing an inline callback does not re-fire the
+  // report on every render — only a real change in what is submitted does.
+  const onSelectionChangeRef = useRef(onSelectionChange);
+  useEffect(() => {
+    onSelectionChangeRef.current = onSelectionChange;
+  });
+  const reportedId = excluded ? null : submittedId;
+  useEffect(() => {
+    onSelectionChangeRef.current?.({
+      manual: excluded,
+      pinballmapMachineId: reportedId,
+    });
+  }, [excluded, reportedId]);
 
   const familyMeta = family ? formatMeta(family.manufacturer, family.year) : "";
   // While an existing link resolves on edit, show its known name; otherwise

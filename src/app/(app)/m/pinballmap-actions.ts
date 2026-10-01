@@ -29,7 +29,12 @@ import {
   recordAbandonedListing,
   retireAbandonmentForLmx,
 } from "~/lib/pinballmap/abandoned-listings";
-import { getPinballMapWriteCredentials } from "~/lib/pinballmap/credentials";
+import {
+  getLinkedPinballMapCredentials,
+  getPinballMapLinkStatus,
+  markPinballMapLinkNeedsRelink,
+  type LinkedPinballMapCredentials,
+} from "~/lib/pinballmap/user-credentials";
 import {
   withLmxAdded,
   withLmxIcEnabled,
@@ -38,6 +43,7 @@ import {
 import { getPinballMapClient } from "~/lib/pinballmap/client";
 import type {
   LocationSnapshot,
+  PbmCredentials,
   PbmLmx,
   PbmWriteFailure,
 } from "~/lib/pinballmap/types";
@@ -72,6 +78,7 @@ import {
 import { type Result, ok, err } from "~/lib/result";
 import type { PinballmapRuntimeState } from "~/lib/types";
 import { setMachineIcIntent, updateMachinePbmLink } from "~/services/machines";
+import { loadLineupData } from "~/lib/pinballmap/lineup-data";
 
 export type { CatalogEdition, CatalogFamily } from "~/lib/pinballmap/catalog";
 
@@ -158,6 +165,20 @@ export async function resolvePinballMapLinkAction(
     editions: single ? [] : editions,
     pinballmapMachineId: entry.pinballmapMachineId,
   };
+}
+
+/**
+ * Whether Pinball Map's catalog marks a title Insider Connected eligible — the
+ * New Machine page shows the switch only for one that is (pinballmap 3.8,
+ * 4.11). Public catalog data, so the same read gate as the picker; false for a
+ * guest or an id no longer in the mirror.
+ */
+export async function getPinballMapTitleIcEligibleAction(
+  pinballmapMachineId: number
+): Promise<boolean> {
+  if (!(await canReadCatalog())) return false;
+  const entry = await getCatalogEntry(pinballmapMachineId);
+  return entry?.icEligible ?? false;
 }
 
 /**
@@ -430,7 +451,9 @@ function pbmWriteFailureMessage(failure: PbmWriteFailure): string {
     case "rate_limited":
       return "Pinball Map is rate-limiting us. Try again in a few minutes.";
     case "unauthorized":
-      return "Pinball Map rejected our operator account. An admin needs to re-provision it.";
+      return "Pinball Map authentication failed. Reconnect your account in Settings.";
+    case "api_token":
+      return "Pinball Map refused PinPoint's API access. An admin needs to check the integration.";
     case "not_found":
       return "Pinball Map couldn't find that entry. It may already be gone.";
     case "rejected":
@@ -438,6 +461,35 @@ function pbmWriteFailureMessage(failure: PbmWriteFailure): string {
     case "transient":
       return "Pinball Map didn't respond properly. Try again.";
   }
+}
+
+/** Returned when the pushing member has no usable Pinball Map link (8.2). */
+const NOT_LINKED_MESSAGE =
+  "Link your Pinball Map account in Settings to change the lineup from here.";
+
+/**
+ * Turn a rejected push into the action's error. When Pinball Map refused the
+ * token itself, the member's link is marked failed (spec 8.5) — that rejection
+ * is the only time PinPoint learns a token is dead; it never polls — and the
+ * error carries its own code, because the machine page then shows a standing
+ * "authentication failed" note and a second, transient copy would repeat it.
+ */
+async function pushRejected(
+  userId: string,
+  linked: LinkedPinballMapCredentials,
+  failure: PbmWriteFailure
+): Promise<Result<never, "PBM_REJECTED" | "PBM_AUTH_FAILED">> {
+  if (failure.reason === "unauthorized") {
+    await markPinballMapLinkNeedsRelink(userId, linked.tokenVaultId);
+    revalidatePath("/settings");
+    // The link status decides the push buttons on every machine page and the
+    // lineup page, as on link/unlink. The machine page's control also hides
+    // the transient error for this code and relies on re-rendering into its
+    // standing note.
+    revalidatePath("/m", "layout");
+    return err("PBM_AUTH_FAILED", pbmWriteFailureMessage(failure));
+  }
+  return err("PBM_REJECTED", pbmWriteFailureMessage(failure));
 }
 
 /**
@@ -528,8 +580,9 @@ export type ListPinballmapResult = Result<
   // Availability forbids being on the lineup (6.2) — the same refusal the
   // intent toggle gives, on the push that would otherwise get there anyway.
   | "BLOCKED"
-  | "NOT_PROVISIONED"
+  | "NOT_LINKED"
   | "PBM_REJECTED"
+  | "PBM_AUTH_FAILED"
   | "SERVER"
 >;
 
@@ -542,11 +595,11 @@ export type ListPinballmapResult = Result<
  * of the two-line control: the toggle says what should be true, the push makes
  * Pinball Map match, and neither silently performs the other.
  *
- * Gated on `machines.pinballmap.push` plus provisioned credentials (spec 8.2,
- * CORE-ARCH-008).
+ * Gated on `machines.pinballmap.push` plus the member's linked Pinball Map
+ * account (spec 8.2, CORE-ARCH-008).
  *
  * **Ordering is a hard requirement, not a style choice** (CORE-ARCH-011). Two
- * non-transactional effects run first — decrypting the operator credential and
+ * non-transactional effects run first — decrypting the member's credential and
  * the PBM HTTP call — and only their results enter the transaction. A tripwire
  * throws `SideEffectInTransactionError` if either is moved inside it.
  *
@@ -626,12 +679,8 @@ export async function addMachineToPinballMapAction(
   }
 
   // --- non-transactional effects, both BEFORE the transaction ---
-  const credentials = await getPinballMapWriteCredentials();
-  if (!credentials)
-    return err(
-      "NOT_PROVISIONED",
-      "No Pinball Map operator account is set up yet, so PinPoint can't write to Pinball Map."
-    );
+  const linked = await getLinkedPinballMapCredentials(userId);
+  if (!linked) return err("NOT_LINKED", NOT_LINKED_MESSAGE);
 
   const lease = await claimPinballMapMutationLease(
     locationId,
@@ -648,7 +697,7 @@ export async function addMachineToPinballMapAction(
   try {
     const client = await getPinballMapClient();
     const written = await client.addMachine({
-      credentials,
+      credentials: linked.credentials,
       locationId,
       machineId: titleId,
     });
@@ -657,7 +706,7 @@ export async function addMachineToPinballMapAction(
         { reason: written.reason, action: "pinballmap.addMachine" },
         "PinballMap add rejected"
       );
-      return err("PBM_REJECTED", pbmWriteFailureMessage(written));
+      return await pushRejected(userId, linked, written);
     }
     const lmxId = written.lmxId;
     // --- transaction: local state only ---
@@ -713,7 +762,7 @@ export async function addMachineToPinballMapAction(
       : null;
     if (icTarget !== null) {
       const icOutcome = await pushInsiderConnected({
-        credentials,
+        credentials: linked.credentials,
         lease,
         locationId,
         lmxId,
@@ -741,8 +790,9 @@ export type UnlistPinballmapResult = Result<
   | "VALIDATION"
   | "UNAUTHORIZED"
   | "NOT_FOUND"
-  | "NOT_PROVISIONED"
+  | "NOT_LINKED"
   | "PBM_REJECTED"
+  | "PBM_AUTH_FAILED"
   | "SERVER"
 >;
 
@@ -820,8 +870,9 @@ export async function removeMachineFromPinballMapAction(
     );
 
   try {
-    // The submitted id is attacker-controlled, and the operator account it would
-    // act through can edit the WHOLE location's lineup. Push is `member: "owner"`,
+    // The submitted id is attacker-controlled, and the member's linked Pinball
+    // Map account it would act through can edit the WHOLE location's lineup
+    // (Pinball Map is publicly editable). Push is `member: "owner"`,
     // so without this an owner of any one cabinet could post any lmx on the
     // lineup and delete a game they have nothing to do with. The abandonment
     // records are the allowlist: an entry is this machine's business only if this
@@ -873,12 +924,9 @@ export async function removeMachineFromPinballMapAction(
       );
 
     // --- non-transactional effects, both BEFORE the transaction ---
-    const credentials = await getPinballMapWriteCredentials();
-    if (!credentials)
-      return err(
-        "NOT_PROVISIONED",
-        "No Pinball Map operator account is set up yet, so PinPoint can't write to Pinball Map."
-      );
+    const linked = await getLinkedPinballMapCredentials(userId);
+    if (!linked) return err("NOT_LINKED", NOT_LINKED_MESSAGE);
+    const { credentials } = linked;
 
     const client = await getPinballMapClient();
     let deletedLmxId = liveLmxId;
@@ -892,7 +940,7 @@ export async function removeMachineFromPinballMapAction(
         { reason: written.reason, action: "pinballmap.removeMachine" },
         "PinballMap remove rejected"
       );
-      return err("PBM_REJECTED", pbmWriteFailureMessage(written));
+      return await pushRejected(userId, linked, written);
     }
 
     // `not_found` is ambiguous — already gone, or our handle was stale and the
@@ -969,7 +1017,7 @@ export async function removeMachineFromPinballMapAction(
             { reason: written.reason, action: "pinballmap.removeMachine" },
             "PinballMap remove rejected on the re-resolved lmx"
           );
-          return err("PBM_REJECTED", pbmWriteFailureMessage(written));
+          return await pushRejected(userId, linked, written);
         }
       } else {
         // Confirmed absent from a lineup we just re-fetched. Finish the job
@@ -1162,8 +1210,9 @@ export type RemoveUnlinkedEntryResult = Result<
   | "VALIDATION"
   | "UNAUTHORIZED"
   | "NOT_FOUND"
-  | "NOT_PROVISIONED"
+  | "NOT_LINKED"
   | "PBM_REJECTED"
+  | "PBM_AUTH_FAILED"
   | "SERVER"
 >;
 
@@ -1172,8 +1221,8 @@ export type RemoveUnlinkedEntryResult = Result<
  * (lineup spec §5.4). The same push as the machine page's removal (pinballmap
  * §4.3), for an entry with no machine to act through.
  *
- * Gated by {@link authorizeUnlinkedEntryAction} plus provisioned credentials
- * (pinballmap §8.2); the caller confirms first with the entry's comment count
+ * Gated by {@link authorizeUnlinkedEntryAction} plus the member's linked
+ * account (pinballmap §8.2); the caller confirms first with the entry's comment count
  * (§4.5, §4.6). Credential decrypt and the PBM call run before the transaction
  * (CORE-ARCH-011).
  *
@@ -1192,12 +1241,9 @@ export async function removeUnlinkedPinballmapEntryAction(
   const titleId = lmx.machineId;
 
   // --- non-transactional effects, all BEFORE the transaction ---
-  const credentials = await getPinballMapWriteCredentials();
-  if (!credentials)
-    return err(
-      "NOT_PROVISIONED",
-      "No Pinball Map operator account is set up yet, so PinPoint can't write to Pinball Map."
-    );
+  const linked = await getLinkedPinballMapCredentials(userId);
+  if (!linked) return err("NOT_LINKED", NOT_LINKED_MESSAGE);
+  const { credentials } = linked;
 
   const lease = await claimPinballMapMutationLease(
     state.locationId,
@@ -1235,7 +1281,7 @@ export async function removeUnlinkedPinballmapEntryAction(
         { reason: written.reason, action: "pinballmap.removeUnlinkedEntry" },
         "PinballMap remove rejected"
       );
-      return err("PBM_REJECTED", pbmWriteFailureMessage(written));
+      return await pushRejected(userId, linked, written);
     }
 
     if (!written.ok) {
@@ -1267,7 +1313,7 @@ export async function removeUnlinkedPinballmapEntryAction(
             },
             "PinballMap remove rejected on the re-resolved lmx"
           );
-          return err("PBM_REJECTED", pbmWriteFailureMessage(written));
+          return await pushRejected(userId, linked, written);
         }
       }
       // `gone`: confirmed absent from a lineup just re-fetched — finish locally.
@@ -1443,7 +1489,7 @@ async function entryIcTarget(titleId: number): Promise<PbmIcIntent | null> {
 
 type IcPushOutcome =
   | { kind: "applied" }
-  | { kind: "rejected"; message: string }
+  | { kind: "rejected"; failure: PbmWriteFailure }
   | { kind: "unclear" }
   | { kind: "lease_lost" };
 
@@ -1462,9 +1508,7 @@ type IcPushOutcome =
  * the caller re-reads the lineup instead of retrying (3.8).
  */
 async function pushInsiderConnected(args: {
-  credentials: NonNullable<
-    Awaited<ReturnType<typeof getPinballMapWriteCredentials>>
-  >;
+  credentials: PbmCredentials;
   lease: NonNullable<Awaited<ReturnType<typeof claimPinballMapMutationLease>>>;
   locationId: number;
   lmxId: number;
@@ -1483,7 +1527,7 @@ async function pushInsiderConnected(args: {
       { reason: written.reason, action: "pinballmap.setInsiderConnected" },
       "PinballMap Insider Connected change rejected"
     );
-    return { kind: "rejected", message: pbmWriteFailureMessage(written) };
+    return { kind: "rejected", failure: written };
   }
   if (!written.ok || written.icEnabled === null) {
     log.warn(
@@ -1525,8 +1569,9 @@ export type UpdateInsiderConnectedResult = Result<
   | "VALIDATION"
   | "UNAUTHORIZED"
   | "NOT_FOUND"
-  | "NOT_PROVISIONED"
+  | "NOT_LINKED"
   | "PBM_REJECTED"
+  | "PBM_AUTH_FAILED"
   // The write may or may not have landed. Not retried; the lineup is re-read
   // so the page shows what Pinball Map actually has (spec 3.8).
   | "PBM_UNCLEAR"
@@ -1539,7 +1584,7 @@ export type UpdateInsiderConnectedResult = Result<
  * (On wins across same-title cabinets), never from the request, so a stale
  * page cannot send the wrong value.
  *
- * Needs the push capability plus credentials (8.2); the entry must be on the
+ * Needs the push capability plus the member's linked account (8.2); the entry must be on the
  * lineup and the title eligible. Each is re-checked here against stored state.
  */
 export async function updateInsiderConnectedAction(
@@ -1584,12 +1629,8 @@ export async function updateInsiderConnectedAction(
     );
 
   // --- non-transactional effects, both BEFORE the transaction ---
-  const credentials = await getPinballMapWriteCredentials();
-  if (!credentials)
-    return err(
-      "NOT_PROVISIONED",
-      "No Pinball Map operator account is set up yet, so PinPoint can't write to Pinball Map."
-    );
+  const linked = await getLinkedPinballMapCredentials(userId);
+  if (!linked) return err("NOT_LINKED", NOT_LINKED_MESSAGE);
 
   const lease = await claimPinballMapMutationLease(
     locationId,
@@ -1604,7 +1645,7 @@ export async function updateInsiderConnectedAction(
   let outcome: IcPushOutcome;
   try {
     outcome = await pushInsiderConnected({
-      credentials,
+      credentials: linked.credentials,
       lease,
       locationId,
       lmxId: lmx.id,
@@ -1620,7 +1661,7 @@ export async function updateInsiderConnectedAction(
       revalidatePath("/m", "layout");
       return ok({ icEnabled: target === "on" });
     case "rejected":
-      return err("PBM_REJECTED", outcome.message);
+      return await pushRejected(userId, linked, outcome.failure);
     case "lease_lost":
       return err(
         "SERVER",
@@ -1886,5 +1927,224 @@ export async function refreshPinballmapLineupAction(
   } catch (error: unknown) {
     log.error({ err: error }, "Manual PinballMap refresh failed");
     return err("SERVER", "Pinball Map refresh failed. Please try again.");
+  }
+}
+
+/** A stored lineup older than this is refreshed before confirming (spec 3.7). */
+const CONFIRM_FRESH_MS = 5 * 60 * 1000;
+
+/** An entry the Confirm lineup dialog warns about (spec 3.7). */
+export interface ConfirmLineupEntry {
+  key: string;
+  name: string;
+  /** To add (Missing), To remove (Lingering), or an unmatched entry. */
+  kind: "to_add" | "to_remove" | "not_linked";
+}
+
+export type CheckConfirmLineupResult = Result<
+  {
+    entryCount: number;
+    /** The snapshot the list was built from; ISO string. */
+    lastRefreshedAt: string | null;
+    /** The pre-confirm refresh was needed and did not succeed. */
+    refreshFailed: boolean;
+    entries: ConfirmLineupEntry[];
+  },
+  "UNAUTHORIZED" | "NOT_LINKED" | "SERVER"
+>;
+
+export type ConfirmLineupResult = Result<
+  Record<string, never>,
+  | "UNAUTHORIZED"
+  | "VALIDATION"
+  | "NOT_LINKED"
+  | "PBM_REJECTED"
+  | "PBM_AUTH_FAILED"
+  | "SERVER"
+>;
+
+async function authorizeConfirmLineup(): Promise<
+  | { ok: true; userId: string }
+  | { ok: false; result: Result<never, "UNAUTHORIZED"> }
+> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user)
+    return { ok: false, result: err("UNAUTHORIZED", "Sign in required") };
+  const profile = await db.query.userProfiles.findFirst({
+    where: eq(userProfiles.id, user.id),
+    columns: { role: true },
+  });
+  if (
+    !checkPermission(
+      "machines.pinballmap.confirm",
+      getAccessLevel(profile?.role)
+    )
+  )
+    return { ok: false, result: err("UNAUTHORIZED", "Not allowed") };
+  return { ok: true, userId: user.id };
+}
+
+/**
+ * Open the Confirm lineup dialog (spec 3.7): refresh a stored lineup over five
+ * minutes old, then list what is out of sync or unmatched.
+ *
+ * The refresh is an ordinary manual one, through the shared allowance
+ * (CORE-PBM-001). When it is throttled or fails, the dialog still opens on the
+ * last good snapshot and says how old it is, so the person decides whether to
+ * proceed.
+ */
+export async function checkConfirmLineupAction(): Promise<CheckConfirmLineupResult> {
+  const authed = await authorizeConfirmLineup();
+  if (!authed.ok) return authed.result;
+
+  const state = await getPinballMapState();
+  if (state?.locationId == null || !state.snapshotJson)
+    return err("SERVER", "Pinball Map hasn't been refreshed yet.");
+  // The confirmation runs as the person's own linked account (spec 3.7, 8.4).
+  const link = await getPinballMapLinkStatus(authed.userId);
+  if (link.status !== "linked") return err("NOT_LINKED", NOT_LINKED_MESSAGE);
+
+  let refreshFailed = false;
+  const age =
+    state.lastSyncedAt === null
+      ? Infinity
+      : Date.now() - state.lastSyncedAt.getTime();
+  if (age > CONFIRM_FRESH_MS) {
+    try {
+      const result = await syncLocationSnapshot({
+        updatedBy: authed.userId,
+        trigger: "manual",
+      });
+      if (result.ok) {
+        await reconcileAfterSync();
+        revalidatePath("/m", "layout");
+      } else if (
+        result.reason === "superseded" ||
+        result.reason === "not_configured"
+      ) {
+        revalidatePath("/m", "layout");
+        return err(
+          "SERVER",
+          "The tracked Pinball Map location changed. Reload the page."
+        );
+      } else {
+        // A throttled attempt still spent a token and a failure recorded its
+        // status, so the header is stale either way (as in the Refresh action).
+        revalidatePath("/m", "layout");
+        refreshFailed = true;
+      }
+    } catch (error: unknown) {
+      log.error({ err: error }, "Pre-confirm PinballMap refresh failed");
+      revalidatePath("/m", "layout");
+      refreshFailed = true;
+    }
+  }
+
+  const { state: current, comparison } = await loadLineupData();
+  if (comparison.status !== "ready" || !current?.snapshotJson)
+    return err("SERVER", "Pinball Map hasn't been refreshed yet.");
+
+  const entries: ConfirmLineupEntry[] = [];
+  for (const row of comparison.sections.out_of_sync) {
+    if (row.tag === "to_update") continue;
+    entries.push({ key: row.key, name: row.title.name, kind: row.tag });
+  }
+  for (const row of comparison.sections.pinball_map_only)
+    entries.push({ key: row.key, name: row.title.name, kind: "not_linked" });
+
+  return ok({
+    entryCount: current.snapshotJson.lmxes.length,
+    lastRefreshedAt: current.lastSyncedAt?.toISOString() ?? null,
+    refreshFailed,
+    entries,
+  });
+}
+
+/** `YYYY-MM-DD` within a day of the server's UTC date. */
+function isPlausibleToday(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = Date.parse(`${value}T12:00:00Z`);
+  return (
+    !Number.isNaN(parsed) &&
+    Math.abs(parsed - Date.now()) <= 36 * 60 * 60 * 1000
+  );
+}
+
+/**
+ * Tell Pinball Map the tracked location's whole lineup is accurate as of today
+ * (spec 3.7). A venue-level statement: it adds, removes, and refreshes nothing.
+ *
+ * On success the stored snapshot's last-updated date moves to `today`, the
+ * confirming person's local date, so the header reflects the confirmation
+ * before the next refresh reads Pinball Map's own value.
+ */
+export async function confirmPinballmapLineupAction(
+  _prev: ConfirmLineupResult | undefined,
+  formData: FormData
+): Promise<ConfirmLineupResult> {
+  const authed = await authorizeConfirmLineup();
+  if (!authed.ok) return authed.result;
+
+  const todayRaw = formData.get("today");
+  const today = typeof todayRaw === "string" ? todayRaw : "";
+  if (!isPlausibleToday(today)) return err("VALIDATION", "Invalid date");
+
+  const state = await getPinballMapState();
+  if (state?.locationId == null || !state.snapshotJson)
+    return err("SERVER", "Pinball Map hasn't been refreshed yet.");
+  const locationId = state.locationId;
+
+  const linked = await getLinkedPinballMapCredentials(authed.userId);
+  if (!linked) return err("NOT_LINKED", NOT_LINKED_MESSAGE);
+
+  const lease = await claimPinballMapMutationLease(
+    locationId,
+    state.configurationGeneration
+  );
+  if (!lease)
+    return err(
+      "SERVER",
+      "The tracked Pinball Map location is being changed. Reload the page and try again."
+    );
+
+  try {
+    const client = await getPinballMapClient();
+    const written = await client.confirmLineup({
+      credentials: linked.credentials,
+      locationId,
+    });
+    if (!written.ok) {
+      log.error(
+        { reason: written.reason, action: "pinballmap.confirmLineup" },
+        "PinballMap lineup confirmation rejected"
+      );
+      // The shared message names an entry; this call is about the location.
+      if (written.reason === "not_found")
+        return err(
+          "PBM_REJECTED",
+          "Pinball Map couldn't find the tracked location."
+        );
+      return await pushRejected(authed.userId, linked, written);
+    }
+    log.info(
+      { userId: authed.userId, locationId, action: "pinballmap.confirmLineup" },
+      "Confirmed the Pinball Map lineup"
+    );
+
+    await db.transaction(async (tx) => {
+      if (!(await mutationLeaseOwnsLocation(tx, lease))) return;
+      await editStoredSnapshot(tx, locationId, (snapshot) => ({
+        ...snapshot,
+        dateLastUpdated: today,
+      }));
+    });
+
+    revalidatePath("/m", "layout");
+    return ok({});
+  } finally {
+    await releasePinballMapMutationLease(lease.id);
   }
 }

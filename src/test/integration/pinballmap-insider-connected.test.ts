@@ -8,8 +8,8 @@
  * the target — On wins across same-title cabinets — never a flip, and an
  * unclear outcome is re-read, not retried.
  *
- * The PinballMap client is pinned at the seam (CORE-TEST-006) and credentials
- * are stubbed, as in `pinballmap-outbound-write.test.ts`.
+ * The PinballMap client is pinned at the seam (CORE-TEST-006) and the member's
+ * Vault decrypt is stubbed, as in `pinballmap-outbound-write.test.ts`.
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -22,8 +22,10 @@ import {
   authUsers,
   pinballmapState,
   pinballmapCatalog,
+  pinballmapUserCredentials,
 } from "~/server/db/schema";
 import type { LocationSnapshot, PbmWriteFailure } from "~/lib/pinballmap/types";
+import type * as UserCredentialsModule from "~/lib/pinballmap/user-credentials";
 
 vi.mock("~/server/db", async () => {
   const { getTestDb } = await import("~/test/setup/pglite");
@@ -36,9 +38,14 @@ vi.mock("~/lib/logger", () => ({
   log: { error: vi.fn(), info: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }));
 
-vi.mock("~/lib/pinballmap/credentials", () => ({
-  getPinballMapWriteCredentials: vi.fn(),
+// Only the Vault decrypt is stubbed; marking a link Needs relink runs for real
+// against PGlite so the tests assert the stored row (spec 8.5).
+vi.mock("~/lib/pinballmap/user-credentials", async (importOriginal) => ({
+  ...(await importOriginal<typeof UserCredentialsModule>()),
+  getLinkedPinballMapCredentials: vi.fn(),
 }));
+
+const LINKED_VAULT_ID = "00000000-0000-4000-8000-000000000001";
 
 const LMX_ID = 300;
 const TITLE_ID = 7;
@@ -228,11 +235,11 @@ describe("Insider Connected intent (PGlite)", () => {
     pbm.icCalls = [];
     pbm.icResult = null;
     pbm.applyBeforeFailing = false;
-    const { getPinballMapWriteCredentials } =
-      await import("~/lib/pinballmap/credentials");
-    vi.mocked(getPinballMapWriteCredentials).mockResolvedValue({
-      email: "ops@example.com",
-      token: "tok_123",
+    const { getLinkedPinballMapCredentials } =
+      await import("~/lib/pinballmap/user-credentials");
+    vi.mocked(getLinkedPinballMapCredentials).mockResolvedValue({
+      credentials: { email: "ops@example.com", token: "tok_123" },
+      tokenVaultId: LINKED_VAULT_ID,
     });
   });
 
@@ -240,9 +247,9 @@ describe("Insider Connected intent (PGlite)", () => {
     it("lets the owner record an intent without any Pinball Map credential", async () => {
       const { setInsiderConnectedIntentAction } =
         await import("~/app/(app)/m/pinballmap-actions");
-      const { getPinballMapWriteCredentials } =
-        await import("~/lib/pinballmap/credentials");
-      vi.mocked(getPinballMapWriteCredentials).mockResolvedValue(null);
+      const { getLinkedPinballMapCredentials } =
+        await import("~/lib/pinballmap/user-credentials");
+      vi.mocked(getLinkedPinballMapCredentials).mockResolvedValue(null);
       const owner = await createUser("member");
       await mockAuthAs(owner.id);
       const machineId = await seed({ ownerId: owner.id });
@@ -445,6 +452,53 @@ describe("Insider Connected intent (PGlite)", () => {
         message: "Could not update Insider Connected for this machine",
       });
       expect(await storedIcEnabled()).toBeNull();
+    });
+
+    it("marks the pusher's link Needs relink when Pinball Map rejects the token", async () => {
+      const db = await getTestDb();
+      const { updateInsiderConnectedAction } =
+        await import("~/app/(app)/m/pinballmap-actions");
+      const admin = await createUser("admin");
+      await mockAuthAs(admin.id);
+      await db.insert(pinballmapUserCredentials).values({
+        userId: admin.id,
+        pbmUsername: "ssw",
+        pbmEmail: "ops@example.com",
+        tokenVaultId: LINKED_VAULT_ID,
+      });
+      const machineId = await seed({ icIntent: "on" });
+      pbm.icResult = { ok: false, reason: "unauthorized" };
+
+      const result = await updateInsiderConnectedAction(
+        undefined,
+        form(machineId)
+      );
+
+      expect(result).toMatchObject({ ok: false, code: "PBM_AUTH_FAILED" });
+      const link = await db.query.pinballmapUserCredentials.findFirst({
+        where: eq(pinballmapUserCredentials.userId, admin.id),
+      });
+      expect(link?.needsRelinkAt).not.toBeNull();
+      expect(await storedIcEnabled()).toBeNull();
+    });
+
+    it("sends nothing for a member without a linked account", async () => {
+      const { updateInsiderConnectedAction } =
+        await import("~/app/(app)/m/pinballmap-actions");
+      const { getLinkedPinballMapCredentials } =
+        await import("~/lib/pinballmap/user-credentials");
+      vi.mocked(getLinkedPinballMapCredentials).mockResolvedValue(null);
+      const admin = await createUser("admin");
+      await mockAuthAs(admin.id);
+      const machineId = await seed({ icIntent: "on" });
+
+      const result = await updateInsiderConnectedAction(
+        undefined,
+        form(machineId)
+      );
+
+      expect(result).toMatchObject({ ok: false, code: "NOT_LINKED" });
+      expect(pbm.icCalls).toEqual([]);
     });
 
     it("does not retry an unclear outcome and re-reads the actual setting", async () => {

@@ -13,9 +13,9 @@ Before changing the integration, read `docs/external/README.md` and the relevant
 
 ## Use the single server-side seam
 
-All PinballMap access goes through `~/lib/pinballmap` and `getPinballMapClient`. Do not add raw `fetch`, browser calls, per-page reads, or hand-built API URLs. Only the live client makes real HTTP, and only on a Vercel production deployment: elsewhere `getPinballMapMode()` always resolves the mock, and the live client's single `fetch` throws `PinballMapNetworkBlockedError` (`assertPinballMapNetworkAllowed` in `config.ts`). There is no opt-in; keep any new request path behind that one `fetch`. Local and E2E databases carry seeded fake operator credentials so push surfaces render; they are safe only because of that guard.
+All PinballMap access goes through `~/lib/pinballmap` and `getPinballMapClient`. Do not add raw `fetch`, browser calls, per-page reads, or hand-built API URLs. Only the live client makes real HTTP, and only on a Vercel production deployment: elsewhere `getPinballMapMode()` always resolves the mock, and the live client's single `fetch` throws `PinballMapNetworkBlockedError` (`assertPinballMapNetworkAllowed` in `config.ts`). There is no opt-in; keep any new request path behind that one `fetch`. Local and E2E databases link the seeded admin to a fake Pinball Map account so push surfaces render; they are safe only because of that guard.
 
-Keep API and operator credentials server-side, use the existing Vault-backed paths for write credentials, and never log credentialed URLs. Do not perform external HTTP inside a database transaction.
+Keep the API token and members' linked tokens server-side, use the existing Vault-backed path for write credentials (`~/lib/pinballmap/user-credentials`), and never log credentialed URLs. Do not perform external HTTP inside a database transaction.
 
 ## Keep traffic polite and bounded
 

@@ -1,6 +1,6 @@
 # Machine & PinballMap Status Dashboard — Feature Spec
 
-**Status: approved.**
+**Status: retired 2026-10-01.** `/fleet` was dropped. Fleet-wide Pinball Map views live on the lineup page (`pinballmap-lineup.md`), per-machine Pinball Map state in the machine page's listing control (`pinballmap.md` §4), and fleet counts in the machine list's Summary Widgets (`machine-widgets.md`). Kept so older citations resolve; nothing here is a requirement.
 
 **What this document is.** The requirements for PinPoint's Machine & PinballMap Status Dashboard at `/fleet` — the single fleet-wide audit surface for managing 100+ collection machines, ops status, and Pinball Map synchronization status. It describes the intended final state only; what the code does or used to do lives solely in the Known divergences table. Each requirement is numbered for citation. When code and spec disagree, either the code is wrong or this document gets amended — never silently neither.
 
@@ -98,5 +98,6 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-01 | Retired: `/fleet` was dropped in favour of the lineup page, the machine page's listing control, and the machine list's Summary Widgets. |
 | 2026-09-06 | Clarify strictly two-line machine identity column (§3.2), lean column defaults and Last Serviced positioning (§3.3), View Options control (§3.7), canonical PBM KPI formulas and empty/inactive states (§1, §2.4), and unified search/multi-select filter toolbar and sort parameter divergence (§4.1–§4.5). |
 | 2026-09-05 | Created. Establishes requirements for member+ status table at `/fleet` (§2–§3), URL-driven filter presets (§4), PBM column group & edition near-misses (§5), desktop side-pane / mobile bottom-sheet inspection surface (§6), and permissions (§7). |

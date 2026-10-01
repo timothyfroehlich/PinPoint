@@ -55,7 +55,7 @@
 
 | Requirement | Divergence | Resolution |
 | :-- | :-- | :-- |
-| §2–§5 | The New Machine page and the Manage tab use separate forms with different fields; no sections, section list, or pinned phone buttons exist; apron card settings are edited in a separate dialog. | PP-wqit.14 |
+| §2–§5 | Apron card settings are edited in a separate dialog, not a section of the Manage tab. | PP-wqit.14 |
 
 ---
 

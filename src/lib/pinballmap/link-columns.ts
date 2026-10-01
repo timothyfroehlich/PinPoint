@@ -86,18 +86,28 @@ export type ResolvePbmLinkUpdateResult =
 /**
  * Resolve PBM columns for a machine being CREATED.
  *
- * Takes no listing state, because a machine that does not exist yet cannot
- * already be on the public map. The hazard the old shared signature carried —
- * omitting listing state and silently unlisting — is removed by construction
- * here rather than by a caller remembering a rule.
+ * Takes no stored listing state, because a machine that does not exist yet
+ * cannot already be on the public map. The hazard the old shared signature
+ * carried — omitting listing state and silently unlisting — is removed by
+ * construction here rather than by a caller remembering a rule.
+ *
+ * `input.intent` is the New Machine page's lineup choice (pinballmap 4.11).
+ * Absent means Off. It is held to the same rules as the Manage tab's toggle:
+ * it needs a catalog title, never lands on a Manual Entry machine, and On is
+ * refused while `presenceStatus` forbids it (6.2).
  */
 export async function resolvePbmLinkColumnsForCreate(
-  input: PbmLinkSelection
+  input: PbmLinkSelection,
+  presenceStatus?: MachinePresenceStatus
 ): Promise<ResolvePbmLinkResult> {
-  return resolveCore(input, {
-    pinballmapMachineId: null,
-    pinballmapIntent: "off",
-  }).then((result) =>
+  return resolveCore(
+    input,
+    {
+      pinballmapMachineId: null,
+      pinballmapIntent: "off",
+    },
+    presenceStatus
+  ).then((result) =>
     result.ok ? { ok: true, columns: result.columns } : result
   );
 }

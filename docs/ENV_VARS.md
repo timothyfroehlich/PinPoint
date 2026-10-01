@@ -108,8 +108,6 @@ the degradation is a known, documented choice — not an oversight.
 | `MCP_BEARER_TOKEN`                               | 🔴    | ⚪                  | `src/lib/mcp/verify-token.ts`             | MCP auth fails closed — `/api/mcp/mcp` 401s, warns `reason: "not_configured"`. Rest of PinPoint unaffected.                                                                                                                                                                                                                                                                                                                                                          |
 | `MCP_ADMIN_USER_ID`                              | 🔴    | ⚪                  | `src/lib/mcp/verify-token.ts`             | as above                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `MCP_OAUTH_DCR_CANARY`                           | 🟢    | ⚪                  | `src/lib/mcp/verify-token.ts`             | unset/false keeps the final client-allowlist + resource-audience gate; `true` temporarily accepts Tim's DCR client with Supabase's default `authenticated` audience during the documented OAuth canary. Never leave enabled after pinning the client.                                                                                                                                                                                                                |
-| `PINBALLMAP_OUTBOUND_EMAIL`                      | 🟢    | ⚪                  | `supabase/seed-pinballmap-creds.mjs`      | **Seed-time only, never read at runtime.** Absent → outbound list/unlist stays unprovisioned and both actions return `NOT_PROVISIONED`.                                                                                                                                                                                                                                                                                                                              |
-| `PINBALLMAP_OUTBOUND_TOKEN`                      | 🔴    | ⚪                  | `supabase/seed-pinballmap-creds.mjs`      | as above; the value lands in Supabase Vault, not in a column.                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `DISCORD_PBM_ALERT_CHANNEL_ID`                   | 🟢    | ⚪                  | `src/lib/pinballmap/region-alerts.ts`     | region machine-change alerts are off: the hourly cron makes **no** PBM call and records nothing, so nothing is queued and nothing floods when it is later set. Not a secret (a channel snowflake), but never `NEXT_PUBLIC_`.                                                                                                                                                                                                                                         |
 | `ISCORED_USER`                                   | 🟢    | ⚪                  | `src/lib/iscored/config.ts`               | on a Vercel production deployment: iScored integration disabled; leaderboard cards render quiet empty states. Everywhere else: the committed fixture gameroom (`src/lib/iscored/fixture.ts`) serves scores and the game picker, so local dev, CI, and previews render every iScored surface without calling iscored.info; `supabase/seed-users.mjs` links seeded machines to it. Public gameroom username (e.g. `Apcscore`), not a secret, but never `NEXT_PUBLIC_`. |
 
@@ -120,13 +118,13 @@ the degradation is a known, documented choice — not an oversight.
 > than Supabase Vault (migration 0059 dropped the Vault pointer column on
 > `pinballmap_state` and the service-role read RPC that decrypted it, both added
 > by migration 0057). Deliberately **not** symmetric with the
-> per-operator write creds (`outbound_email` / `outbound_token_vault_id`), which
+> members' linked Pinball Map tokens (`pinballmap_user_credentials`), which
 > correctly stay in Vault: those are per-user identity arriving at runtime through
-> a connect flow. Set it in Vercel production only —
+> the settings link flow. Set it in Vercel production only —
 > `vercel env add PINBALLMAP_API_TOKEN production --no-sensitive` (non-sensitive
 > so the value stays readable back — Vercel's default sensitive type is
 > write-only). The token alone cannot authorize a write: PBM writes additionally
-> require the per-operator `user_email` + `user_token`, so the blast radius of a
+> require a member's own `user_email` + `user_token`, so the blast radius of a
 > leak is quota abuse against our shared 120/min limit and traffic attributed to
 > us, not data modification. **Deliberately not
 > build-gated:** without it PBM sync degrades and every other surface works, so it
@@ -172,35 +170,21 @@ the degradation is a known, documented choice — not an oversight.
 > with the vars simply not yet set — an optional feature taking prod deploys
 > down with it. Don't put them back (PP-ogzs).
 >
-> **PinballMap per-operator write creds (PP-o355.30).** `PINBALLMAP_OUTBOUND_EMAIL`
-> and `PINBALLMAP_OUTBOUND_TOKEN` are consumed **once**, by
-> `supabase/seed-pinballmap-creds.mjs`, and never read at runtime. The script
-> writes the token into Supabase Vault and stores the returned UUID on
-> `pinballmap_state.outbound_token_vault_id`; the email is a plain column. From
-> then on the DB row is the source of truth, decrypted through the
-> `get_pinballmap_credentials()` RPC (migration 0061, service_role only).
+> **PinballMap write identity (PP-o355.6).** No env var: each member links their
+> own Pinball Map account from Settings, and pushes run as that account. The
+> token lands in Supabase Vault, pointed at by `pinballmap_user_credentials`, and
+> is decrypted through `get_pinballmap_user_credentials()` (service_role only).
+> The shared operator credential and its `PINBALLMAP_OUTBOUND_*` seed variables
+> were retired in migration 0097.
 >
 > Distinct from `PINBALLMAP_API_TOKEN` above and not interchangeable with it: the
-> api_token is a platform capability that gates API **access**, these identify
-> **who** is writing, and PinballMap attributes the edit to that account. Both
-> are required for a write.
+> api_token is a platform capability that gates API **access**, the member's
+> token identifies **who** is writing, and PinballMap attributes the edit to that
+> account. Both are required for a write.
 >
-> **Deliberately not build-gated.** Unset → `listMachineOnPinballMapAction` and
-> `unlistMachineFromPinballMapAction` return `NOT_PROVISIONED` and say so; every
-> other surface, including PBM sync and the read-side listing controls, is
-> untouched. That is the §4.1 test failing, so they belong here.
->
-> Because these are seed-time only, setting them in Vercel does nothing. Provision
-> production by running the script against the prod database with its explicit
-> opt-in token:
-> `SEED_PINBALLMAP_CREDS_FORCE_PRODUCTION=1 POSTGRES_URL=<prod> PINBALLMAP_OUTBOUND_EMAIL=… PINBALLMAP_OUTBOUND_TOKEN=… node supabase/seed-pinballmap-creds.mjs`.
-> The script refuses a production target without that token, and refuses to
-> overwrite a credential that is already provisioned.
->
-> Local and E2E databases do not need it: `supabase/seed-pinballmap-state.ts`
-> (in the `db:reset` chain) seeds a fake operator
-> (`fake-pinballmap-operator@example.invalid`, a Vault secret named
-> `pinballmap_outbound_token_fake_local`) so the push surfaces render. Nothing
+> Local and E2E databases link `admin@test.com` to a fake Pinball Map account
+> (`supabase/seed-pinballmap-state.ts`, a Vault secret named
+> `pinballmap_user_token_fake_local`) so the push surfaces render. Nothing
 > outside a Vercel production deployment can reach Pinball Map with it:
 > `PINBALLMAP_MODE` resolves to the mock client there, and the live client's
 > single `fetch` throws `PinballMapNetworkBlockedError` unless
@@ -244,9 +228,8 @@ the degradation is a known, documented choice — not an oversight.
 | `SUPABASE_TELEMETRY_DISABLED`                                                                        | 🟢            | Internal | `scripts/worktree_cleanup.py`                                                          | Forced to `1` only for cleanup-owned `supabase stop`; process-local, not user-configurable or deployment-gated                             |
 
 > **`*_FORCE_PRODUCTION` accepts `1` or `true`, and nothing else.**
-> `DRIZZLE_FORCE_PRODUCTION`, `MARK_MIGRATION_FORCE_PRODUCTION` and
-> `SEED_PINBALLMAP_CREDS_FORCE_PRODUCTION` all read through
-> `isForceProductionEnabled()` in `scripts/lib/db-target.mjs`. They used to test
+> `DRIZZLE_FORCE_PRODUCTION` and `MARK_MIGRATION_FORCE_PRODUCTION` both read
+> through `isForceProductionEnabled()` in `scripts/lib/db-target.mjs`. They used to test
 > the raw value for truthiness, which meant `=0` and `=false` — the two spellings
 > you reach for to turn a flag off — **enabled** the prod bypass (PP-rnup).
 > Anything that is not `1`/`true` now reads as disabled, so the failure direction

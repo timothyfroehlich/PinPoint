@@ -83,13 +83,11 @@ export function describeTarget(value) {
 /**
  * Does this `FORCE_PRODUCTION`-style env value mean "yes, I meant it"?
  *
- * The three prod opt-ins (`DRIZZLE_FORCE_PRODUCTION`,
- * `MARK_MIGRATION_FORCE_PRODUCTION`, `SEED_PINBALLMAP_CREDS_FORCE_PRODUCTION`)
- * each read their variable for truthiness, which is backwards for a guard: JS
- * truthiness makes `=0` and `=false` — the two spellings an operator reaches for
- * to TURN A FLAG OFF — enable the bypass. On the PinballMap seed that means
- * `SEED_PINBALLMAP_CREDS_FORCE_PRODUCTION=0` writes an operator token into
- * prod's Vault (PP-rnup).
+ * The prod opt-ins (`DRIZZLE_FORCE_PRODUCTION`,
+ * `MARK_MIGRATION_FORCE_PRODUCTION`) each read their variable for truthiness,
+ * which is backwards for a guard: JS truthiness makes `=0` and `=false` — the
+ * two spellings an operator reaches for to TURN A FLAG OFF — enable the bypass
+ * (PP-rnup).
  *
  * Only the documented `=1`, and `=true` as its obvious synonym, count. Anything
  * else — `0`, `false`, `yes`, a typo, an empty string — reads as disabled, which

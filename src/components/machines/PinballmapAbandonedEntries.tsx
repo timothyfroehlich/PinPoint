@@ -56,14 +56,17 @@ export function PinballmapAbandonedEntries({
   machineId,
   entries,
   canPush,
-  writeEnabled,
+  accountLinked,
 }: {
   machineId: string;
   entries: readonly AbandonedEntry[];
   /** Viewer holds the push capability; false keeps the alert status-only. */
   canPush: boolean;
-  /** An operator credential exists, allowing PinPoint to perform the write. */
-  writeEnabled: boolean;
+  /**
+   * The viewer has a usable linked Pinball Map account, which the removal runs
+   * as (spec 8.2). Without one the alert links out instead (4.4).
+   */
+  accountLinked: boolean;
 }): React.JSX.Element {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -101,7 +104,7 @@ export function PinballmapAbandonedEntries({
                 : `“${entry.title}”`}{" "}
               — this machine&apos;s model changed.
             </span>
-            {canPush && writeEnabled ? (
+            {canPush && accountLinked ? (
               <RemoveEntryButton
                 machineId={machineId}
                 entry={entry}

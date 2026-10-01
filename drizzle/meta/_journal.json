@@ -673,6 +673,20 @@
       "when": 1790656509880,
       "tag": "0095_machine-apron-cards",
       "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1790811414168,
+      "tag": "0096_pinballmap-user-credentials",
+      "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "7",
+      "when": 1790811429042,
+      "tag": "0097_retire-pinballmap-operator-credentials",
+      "breakpoints": true
     }
   ]
 }

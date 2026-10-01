@@ -600,6 +600,19 @@ export async function addLmxToStoredLineup(entry: {
   if (writeError) throw writeError;
 }
 
+/**
+ * Stamp the stored lineup as just refreshed, so opening Confirm lineup does not
+ * refresh it first (pinballmap spec 3.7). A refresh would replace the shared
+ * stored lineup with the mock client's, dropping entries other workers seeded.
+ */
+export async function markStoredLineupFresh() {
+  const { error } = await supabaseAdmin
+    .from("pinballmap_state")
+    .update({ last_synced_at: new Date().toISOString() })
+    .eq("id", "singleton");
+  if (error) throw error;
+}
+
 /** Undo {@link addLmxToStoredLineup}, so a run does not leak into the next. */
 export async function removeLmxFromStoredLineup(lmxIds: number[]) {
   const { data, error } = await supabaseAdmin
@@ -708,4 +721,34 @@ export async function seedSavedApronCard(
     { onConflict: "machine_id,name" }
   );
   if (error) throw error;
+}
+
+/**
+ * Drop a user's Pinball Map account link (pinballmap spec 8.4), so a test that
+ * links the shared role account leaves it unlinked for the next spec. Deletes
+ * the Vault secret with the row, as Unlink does; vault.* needs a direct
+ * postgres connection, like `configureDiscordIntegrationForTest`.
+ */
+export async function deletePinballMapLink(userId: string): Promise<void> {
+  const postgresUrl =
+    process.env["POSTGRES_URL_NON_POOLING"] ?? process.env["POSTGRES_URL"];
+  if (!postgresUrl) {
+    throw new Error(
+      "POSTGRES_URL_NON_POOLING / POSTGRES_URL not set. Check .env.local."
+    );
+  }
+
+  const sql = postgres(postgresUrl, { connect_timeout: 3, max: 1 });
+  try {
+    await sql`
+      WITH gone AS (
+        DELETE FROM pinballmap_user_credentials
+        WHERE user_id = ${userId}::uuid
+        RETURNING token_vault_id
+      )
+      DELETE FROM vault.secrets WHERE id IN (SELECT token_vault_id FROM gone)
+    `;
+  } finally {
+    await sql.end();
+  }
 }

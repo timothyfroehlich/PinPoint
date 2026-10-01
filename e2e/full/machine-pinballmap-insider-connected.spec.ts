@@ -8,7 +8,7 @@
  * render the control with a view handed to them, and integration tests stop at
  * the action; dropping `icEligible` from the loader would pass both.
  *
- * The E2E database has no operator credential, which is the case the intent
+ * The E2E technician has no linked Pinball Map account, which is the case the intent
  * exists for: the toggle still records the intent, and the difference shows as
  * Out of sync. How the control renders that is the unit tests' job, and the
  * push path is `src/test/integration/pinballmap-insider-connected.test.ts`.

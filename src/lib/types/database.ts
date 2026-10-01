@@ -120,8 +120,6 @@ export type PinballmapRuntimeState = Pick<
   | "lastSyncError"
   | "refreshTokens"
   | "refreshTokensAt"
-  | "outboundEmail"
-  | "outboundTokenVaultId"
   | "regionAlertRegion"
   | "regionAlertChannelId"
   | "regionAlertStatus"

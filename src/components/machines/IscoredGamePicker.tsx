@@ -28,6 +28,12 @@ export interface IscoredGamePickerProps {
   machineName?: string;
   disabled?: boolean;
   onDirty?: () => void;
+  /**
+   * Rendered as a field inside a section box (the machine form's
+   * Integrations): the small muted label and help text every boxed field
+   * uses, matching Model Details (machine-editing 3.1).
+   */
+  boxed?: boolean;
 }
 
 /**
@@ -126,6 +132,7 @@ export function IscoredGamePicker({
   machineName,
   disabled = false,
   onDirty,
+  boxed = false,
 }: IscoredGamePickerProps): React.JSX.Element {
   const triggerId = useId();
   const [open, setOpen] = useState(false);
@@ -214,6 +221,14 @@ export function IscoredGamePicker({
     onDirty?.();
   };
 
+  // Boxed fields use the Model Details grid's label and help style; the
+  // help is a <span> because a <p> picks up the prose margin from globals.
+  const wrapperClass = boxed ? "flex min-w-0 flex-col gap-1.5" : "space-y-1.5";
+  const labelClass = boxed
+    ? "text-xs text-muted-foreground"
+    : "text-foreground";
+  const helpClass = "block text-xs leading-4 text-muted-foreground";
+
   const handleClear = (): void => {
     setSelectedGameId("");
     onDirty?.();
@@ -222,8 +237,8 @@ export function IscoredGamePicker({
   // Fallback to text input if upstream fetch failed or is unconfigured
   if (fetchFailed) {
     return (
-      <div className="space-y-1.5">
-        <Label htmlFor={triggerId} className="text-foreground">
+      <div className={wrapperClass}>
+        <Label htmlFor={triggerId} className={labelClass}>
           iScored Game ID
         </Label>
         <Input
@@ -241,22 +256,22 @@ export function IscoredGamePicker({
           className="border-outline bg-surface text-foreground placeholder:text-muted-foreground"
           data-testid="edit-machine-iscored-game-id"
         />
-        <p className="text-xs text-muted-foreground">
+        <span className={helpClass}>
           Game identifier on iScored.info. Leave blank to unlink.
-        </p>
+        </span>
       </div>
     );
   }
 
   return (
-    <div className="space-y-1.5">
+    <div className={wrapperClass}>
       <input
         type="hidden"
         name="iscoredGameId"
         value={selectedGameId}
         data-testid="edit-machine-iscored-game-id"
       />
-      <Label htmlFor={triggerId} className="text-foreground">
+      <Label htmlFor={triggerId} className={labelClass}>
         iScored Game
       </Label>
       <div className="flex items-center gap-2">
@@ -350,10 +365,10 @@ export function IscoredGamePicker({
           </Button>
         )}
       </div>
-      <p className="text-xs text-muted-foreground">
+      <span className={helpClass}>
         Link this machine to its iScored scoreboard game. Leave unselected to
         unlink.
-      </p>
+      </span>
     </div>
   );
 }

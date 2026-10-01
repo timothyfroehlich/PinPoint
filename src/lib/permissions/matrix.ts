@@ -475,7 +475,7 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         id: "machines.pinballmap.push",
         label: "Add or remove entries on Pinball Map",
         description:
-          "Add a machine to the location's public Pinball Map lineup, or remove it, using the shared operator account",
+          "Add a machine to the location's public Pinball Map lineup, or remove it, as your own linked Pinball Map account",
         access: {
           unauthenticated: false,
           guest: false,
@@ -484,6 +484,37 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
           // tighter than our own bookkeeping bought nothing — it just meant an
           // owner who could set the intent had to find an admin to act on it.
           member: "owner",
+          technician: true,
+          admin: true,
+        },
+      },
+      {
+        id: "machines.pinballmap.account",
+        label: "Link a Pinball Map account",
+        description:
+          "Link your own Pinball Map account in Settings, so edits you push to Pinball Map are credited to you",
+        access: {
+          unauthenticated: false,
+          guest: false,
+          // Any member (spec 8.4). Pushing still needs the push permission,
+          // which members hold for their own machines; a member may link before
+          // they own one.
+          member: true,
+          technician: true,
+          admin: true,
+        },
+      },
+      {
+        id: "machines.pinballmap.confirm",
+        label: "Confirm the Pinball Map lineup",
+        description:
+          "Tell Pinball Map the location's whole lineup is accurate as of today, from the lineup page header, as your own linked Pinball Map account",
+        access: {
+          unauthenticated: false,
+          guest: false,
+          // A venue-level statement about every entry (pinballmap spec 3.7),
+          // so there is no machine for a member's ownership to scope it to.
+          member: false,
           technician: true,
           admin: true,
         },
