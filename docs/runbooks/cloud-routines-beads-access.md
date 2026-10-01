@@ -137,6 +137,20 @@ version guard in `scripts/beads-cloud-init.sh`, which refuses to touch the DB
 unless both the installed `bd` and `dolt` equal their pins in
 `scripts/beads-compatibility.json`.
 
+**Stale environment snapshots self-heal.** Cloud sessions start from a cached
+snapshot of the environment, and the setup script does not re-run when a later
+commit bumps the pins. On 2026-09-29 the nightly routine started from a
+2026-09-24 snapshot holding `bd` 1.2.2 / `dolt` 2.3.1, three days after #2271
+bumped the pins to 1.3.0 / 2.3.5, and every routine refused at the guard. So on
+a mismatch (or a missing binary) `beads-cloud-init.sh` now re-runs
+`beads-cloud-setup.sh` once, then re-checks. That keeps the exact-pin safety: setup
+installs only the pinned versions and verifies each archive against its approved
+digest before installing anything, so it cannot pull in an unpinned newer `bd`.
+If setup fails or the versions still differ, init refuses as before. A pin bump
+therefore needs nothing done to the claude.ai environment. Setup fetches all three
+pinned archives before installing any, so a wrong `gh` pin or digest also blocks
+the `bd`/`dolt` repair (loudly).
+
 An upgrade is a paired rollout: validate the newer tools against the local
 embedded database, bump this manifest and its archive digests, then update
 the dotfiles mise pins to match.
