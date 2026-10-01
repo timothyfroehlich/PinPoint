@@ -480,7 +480,7 @@
 - **Do:** Use Tailwind breakpoint classes or container queries
 - **Don't:** `window.innerWidth`, `window.matchMedia`, `useMediaQuery` hooks
 - **Boundary:** Component-local geometry observation with `ResizeObserver` is allowed when JavaScript must derive behavior or semantic DOM state that CSS cannot expose (for example, which links belong in an overflow menu). It must not be used to restyle a component based on viewport-like breakpoints; CSS still owns presentation.
-- **Sanctioned exceptions** (behavior swaps CSS can't express, not styling): `use-table-responsive-columns` (PP-rs9); `use-is-mobile` (PP-43q3) — two consumers: it swaps inline cell editing for a bottom-sheet editor, and swaps the arm/confirm-tap delete affordance for a modal confirm in `ConfirmingDeleteButton`
+- **Sanctioned exceptions** (behavior swaps CSS can't express, not styling): `use-table-responsive-columns` (PP-rs9); `use-is-mobile` (PP-43q3). Its consumers: machine settings swap inline cell editing for a bottom-sheet editor; `ConfirmingDeleteButton` swaps the arm/confirm-tap delete for a modal confirm; on the issue detail page (read once in `IssueSections` via `IsMobileProvider`), `IssueFieldRow` swaps the anchored field menu for a bottom-sheet picker, `AssigneePicker` swaps its popover for a bottom sheet, `IssueSectionPanel` carries `tabpanel` roles only while the mobile tabs exist, and `EditableIssueTitle` swaps blur-to-cancel for explicit Save and Cancel
 
 **CORE-RESP-003:** sm: is padding only
 

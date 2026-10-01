@@ -19,11 +19,13 @@ Use `<EmptyState>` whenever a list, collection, or section has zero items to dis
 | `description` | Optional body text. Explain what would populate this section.        |
 | `action`      | Optional CTA — typically a `<Button>` or `<Link>` styled as such.    |
 | `variant`     | `"card"` (default, wraps in `<Card>`) or `"bare"` (plain container). |
+| `size`        | `"default"` or `"compact"`: a small icon, no circle, tight padding.  |
 
 **When to use each variant:**
 
 - `variant="card"` — the empty state IS the content of the section. Dashboard widgets, standalone "no results" pages.
 - `variant="bare"` — the empty state is rendered inside a list that's already wrapped in a `Card` or container. No double-border effect.
+- `size="compact"` — an empty section that sits among other content (an activity feed, a sidebar list), where a 96px icon circle would outweigh the page around it. The issue detail page's Activity and Other issues use it.
 
 **Rules:**
 

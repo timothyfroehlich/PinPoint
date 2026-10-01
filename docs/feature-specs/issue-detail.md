@@ -184,6 +184,8 @@ None.
 | §5.4 | The report's photos include every photo on the issue, so a comment's photos also appear in the initial report. | PP-buwx |
 | §2.2 | A number with trailing characters (`/i/1abc`, `/i/1.5`) is read as its leading digits and shows issue 1 instead of Issue not found. | PP-xlod |
 | §2.5–§2.6 | Email and in-app notification links are the bare issue URL; only Discord links add the comment's anchor, and field-change notifications carry no system event id to anchor to. | PP-4g43 |
+| §4.4 | On mobile, title editing shows Save and Cancel buttons under the input; the keyboard's Done key saves, and leaving the field does not cancel (Tim's design-review decision D2, 2026-10-01). | Spec amendment to §4.4 pending Tim's approval of the exact diff. |
+| §8.3 | The floating Comment button shows on the Issue tab only, not on Details or Other issues (Tim's design-review decision D1, 2026-10-01). | Spec amendment to §8.3 pending Tim's approval of the exact diff. |
 
 ---
 
