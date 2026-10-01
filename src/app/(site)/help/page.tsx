@@ -77,7 +77,7 @@ const referenceCards = [
     href: "/help/pinball-map",
     icon: MapPin,
     description:
-      "Matching machines, lineup intent, and pushing changes to Pinball Map",
+      "Matching machines, lineup setting, and pushing changes to Pinball Map",
   },
   {
     title: "Discord Integration",
