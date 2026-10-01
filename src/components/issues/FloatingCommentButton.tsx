@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { MessageSquarePlus } from "lucide-react";
 import {
   Sheet,
@@ -36,6 +36,14 @@ export function FloatingCommentButton({
 }: FloatingCommentButtonProps): React.JSX.Element | null {
   const [open, setOpen] = useState(false);
   const section = useActiveIssueSection();
+  // The comment just posted, to bring into view once the sheet closes.
+  const postedIdRef = useRef<string | null>(null);
+
+  // Stable, so the composer's success effect never re-runs for one post.
+  const handlePosted = useCallback((commentId: string) => {
+    postedIdRef.current = commentId;
+    setOpen(false);
+  }, []);
 
   if (section !== "issue") return null;
 
@@ -60,6 +68,22 @@ export function FloatingCommentButton({
           className="max-h-[80dvh] gap-0 overflow-y-auto"
           // A 44px close target (spec §13.2), centered on the title line.
           closeClassName="top-1.5 right-1.5 flex size-11 items-center justify-center rounded-md"
+          // After a post, show the new comment and move focus to it, rather
+          // than back to the Comment button.
+          onCloseAutoFocus={(event) => {
+            const postedId = postedIdRef.current;
+            postedIdRef.current = null;
+            const posted = postedId
+              ? document.getElementById(`comment-${postedId}`)
+              : null;
+            if (!posted) return;
+            event.preventDefault();
+            posted.scrollIntoView({ block: "center" });
+            if (!posted.hasAttribute("tabindex")) {
+              posted.setAttribute("tabindex", "-1");
+            }
+            posted.focus({ preventScroll: true });
+          }}
         >
           <SheetHeader className="pb-2">
             <SheetTitle className="text-base">Add a comment</SheetTitle>
@@ -72,9 +96,7 @@ export function FloatingCommentButton({
             <AddCommentForm
               issueId={issueId}
               quick
-              onSubmitSuccess={() => {
-                setOpen(false);
-              }}
+              onSubmitSuccess={handlePosted}
             />
           </div>
         </SheetContent>

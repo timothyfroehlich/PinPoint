@@ -97,7 +97,7 @@ export type AssignIssueResult = Result<
 >;
 
 export type AddCommentResult = Result<
-  { issueId: string },
+  { issueId: string; commentId: string },
   "VALIDATION" | "UNAUTHORIZED" | "SERVER"
 >;
 
@@ -673,14 +673,16 @@ export async function addCommentAction(
     );
   }
 
+  let commentId: string;
   try {
-    const { deliveryPlan } = await addIssueComment({
+    const { comment: posted, deliveryPlan } = await addIssueComment({
       issueId,
       content: comment,
       userId: user.id,
       imagesMetadata,
       idempotencyKey: idempotencyKey ?? null,
     });
+    commentId = posted.id;
     // Deliver post-commit, after the response (PP-2053.3).
     after(() => dispatchNotification(deliveryPlan));
   } catch (error) {
@@ -699,7 +701,7 @@ export async function addCommentAction(
   if (issue) {
     revalidatePath(`/m/${issue.machineInitials}/i/${issue.issueNumber}`);
   }
-  return ok({ issueId });
+  return ok({ issueId, commentId });
 }
 
 /**

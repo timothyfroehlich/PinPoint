@@ -21,7 +21,8 @@ import { type ProseMirrorDoc } from "~/lib/tiptap/types";
 
 interface AddCommentFormProps {
   issueId: string;
-  onSubmitSuccess?: () => void;
+  /** Called once per posted comment, with the new comment's id. */
+  onSubmitSuccess?: (commentId: string) => void;
   /**
    * Composer quick mode (design-bible §17), for the mobile comment sheet: the
    * editor opens focused as a compact jot with its toolbar hidden, an "Aa"
@@ -54,8 +55,14 @@ export function AddCommentForm({
     crypto.randomUUID()
   );
 
+  // The result this form has already acted on. The effect below also re-runs
+  // when `onSubmitSuccess` or `quick` change identity, and must not toast,
+  // reset, or mint a new idempotency key twice for one post.
+  const handledStateRef = useRef<AddCommentResult | undefined>(undefined);
+
   useEffect(() => {
-    if (state?.ok) {
+    if (state?.ok && handledStateRef.current !== state) {
+      handledStateRef.current = state;
       toast.success("Comment added");
       formRef.current?.reset();
       setUploadedImages([]);
@@ -65,7 +72,7 @@ export function AddCommentForm({
       // Fresh key — the next comment is a new logical submission.
       setIdempotencyKey(crypto.randomUUID());
       // Container handles focus / sheet-close / next-action.
-      onSubmitSuccess?.();
+      onSubmitSuccess?.(state.value.commentId);
     }
   }, [state, onSubmitSuccess, quick]);
 

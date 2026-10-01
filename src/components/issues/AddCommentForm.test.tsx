@@ -94,7 +94,11 @@ describe("AddCommentForm", () => {
   });
 
   it("calls toast on success", async () => {
-    mockUseActionState.mockReturnValue([{ ok: true }, vi.fn(), false]);
+    mockUseActionState.mockReturnValue([
+      { ok: true, value: { issueId: "123", commentId: "c-1" } },
+      vi.fn(),
+      false,
+    ]);
     render(<AddCommentForm issueId="123" />);
 
     await waitFor(() => {
@@ -102,11 +106,42 @@ describe("AddCommentForm", () => {
     });
   });
 
+  it("acts on one post once, even when the parent passes a new callback", async () => {
+    // The same result object across renders, as useActionState returns it.
+    const posted = { ok: true, value: { issueId: "123", commentId: "c-1" } };
+    mockUseActionState.mockReturnValue([posted, vi.fn(), false]);
+    const first = vi.fn();
+    const { rerender } = render(
+      <AddCommentForm issueId="123" onSubmitSuccess={first} />
+    );
+    await waitFor(() => {
+      expect(first).toHaveBeenCalledWith("c-1");
+    });
+
+    // The mobile sheet re-renders its parent as it closes; an inline
+    // callback is a new function each time.
+    const second = vi.fn();
+    rerender(<AddCommentForm issueId="123" onSubmitSuccess={second} />);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(toast.success).toHaveBeenCalledTimes(1);
+    expect(first).toHaveBeenCalledTimes(1);
+    expect(second).not.toHaveBeenCalled();
+    // One reset: the idempotency key changed once, not again.
+    expect(
+      editorClearMocks.filter((m) => m.mock.calls.length > 0)
+    ).toHaveLength(1);
+  });
+
   it("clears the rich text editor after a successful submit (PP-8mq)", async () => {
     // The form action returns ok:true, mirroring the post-submit re-render
     // produced by useActionState in production. The AddCommentForm useEffect
     // should call editorRef.current.clear() to wipe the editor body.
-    mockUseActionState.mockReturnValue([{ ok: true }, vi.fn(), false]);
+    mockUseActionState.mockReturnValue([
+      { ok: true, value: { issueId: "123", commentId: "c-1" } },
+      vi.fn(),
+      false,
+    ]);
     render(<AddCommentForm issueId="123" />);
 
     // The toast firing in the same useEffect proves the effect ran; once that

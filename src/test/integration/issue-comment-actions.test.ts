@@ -475,6 +475,11 @@ describe("addCommentAction — integration (PP-x4li.1.4)", () => {
     expect(rows[0].authorId).toBe(MEMBER_ID);
     expect(rows[0].isSystem).toBe(false);
     expect(rows[0].content).toMatchObject(validCommentDoc);
+    // The new comment's id comes back, so the composer can bring it into view.
+    expect(result).toEqual({
+      ok: true,
+      value: { issueId, commentId: rows[0].id },
+    });
   });
 });
 
