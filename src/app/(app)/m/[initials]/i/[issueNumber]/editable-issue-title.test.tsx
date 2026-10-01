@@ -165,6 +165,21 @@ describe("EditableIssueTitle", () => {
     expect(screen.getByRole("button", { name: "Edit title" })).toHaveFocus();
   });
 
+  it("edits in a wrapping field that keeps the title on one logical line", async () => {
+    const user = userEvent.setup();
+    render(
+      <EditableIssueTitle issueId="issue-1" title="Flipper" canEdit={true} />
+    );
+
+    await user.click(screen.getByLabelText("Edit title"));
+    const input = screen.getByLabelText("Edit issue title");
+    // A wrapping field, so a long title stays visible at 320px (§4.2).
+    expect(input.tagName).toBe("TEXTAREA");
+
+    fireEvent.change(input, { target: { value: "Left\nflipper weak" } });
+    expect(input).toHaveValue("Left flipper weak");
+  });
+
   it("does not save on the Enter that confirms an IME composition", async () => {
     const user = userEvent.setup();
     render(

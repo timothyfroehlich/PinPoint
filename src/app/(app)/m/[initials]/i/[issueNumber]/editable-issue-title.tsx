@@ -1,7 +1,13 @@
 "use client";
 
 import type React from "react";
-import { useState, useRef, useEffect, useActionState } from "react";
+import {
+  useState,
+  useRef,
+  useEffect,
+  useLayoutEffect,
+  useActionState,
+} from "react";
 import { ArrowLeftRight, Loader2, MoreHorizontal, Pencil } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import {
@@ -10,7 +16,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
-import { Input } from "~/components/ui/input";
+import { Textarea } from "~/components/ui/textarea";
 import { toast } from "sonner";
 import {
   updateIssueTitleAction,
@@ -69,7 +75,7 @@ export function EditableIssueTitle({
   // blur — and so cancel — a fresh title edit.
   const menuChoiceRef = useRef(false);
   const [editValue, setEditValue] = useState(title);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const editButtonRef = useRef<HTMLButtonElement>(null);
   const moveButtonRef = useRef<HTMLButtonElement>(null);
@@ -108,6 +114,15 @@ export function EditableIssueTitle({
       }
     }
   }, [isEditing]);
+
+  // Grow the field to fit its text. `field-sizing: content` does this where
+  // supported; setting the height covers browsers without it.
+  useLayoutEffect(() => {
+    const input = inputRef.current;
+    if (!isEditing || !input) return;
+    input.style.height = "auto";
+    input.style.height = `${input.scrollHeight}px`;
+  }, [isEditing, editValue]);
 
   // Return focus to the control that opened the editor once it closes.
   useEffect(() => {
@@ -180,7 +195,7 @@ export function EditableIssueTitle({
     formRef.current?.requestSubmit();
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>): void => {
     if (e.key === "Escape") {
       e.preventDefault();
       handleCancel();
@@ -204,11 +219,17 @@ export function EditableIssueTitle({
       <form ref={formRef} action={formAction} className="space-y-1">
         <input type="hidden" name="issueId" value={issueId} />
         <div className="flex items-center gap-2">
-          <Input
+          <Textarea
             ref={inputRef}
             name="title"
+            // One logical line that wraps like the heading it replaces, so a
+            // long title stays fully visible while it's edited. Enter saves,
+            // and pasted line breaks become spaces.
+            rows={1}
             value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
+            onChange={(e) =>
+              setEditValue(e.target.value.replace(/\r?\n/g, " "))
+            }
             onKeyDown={handleKeyDown}
             onBlur={() => {
               // On mobile, leaving the field never cancels: Save and Cancel
@@ -234,7 +255,10 @@ export function EditableIssueTitle({
             // be edited down.
             maxLength={ISSUE_TITLE_MAX}
             enterKeyHint="done"
-            className={cn("h-auto px-2 py-0.5", titleTypeClassName)}
+            className={cn(
+              "min-h-0 resize-none overflow-hidden px-2 py-0.5",
+              titleTypeClassName
+            )}
             aria-label="Edit issue title"
             aria-describedby="issue-title-length issue-title-edit-help"
             // Read-only, not disabled, while saving: a disabled input drops
