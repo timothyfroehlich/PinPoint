@@ -31,12 +31,10 @@ import {
   unlinkPinballMapAccountAction,
   type LinkPinballMapActionResult,
 } from "~/app/(app)/settings/pinballmap/actions";
-import type { PinballMapLinkState } from "~/lib/pinballmap/types";
+import type { PinballMapLinkStatus } from "~/lib/pinballmap/types";
 
 interface PinballMapAccountRowProps {
-  status: PinballMapLinkState;
-  /** The Pinball Map username the link was made as; null when not linked. */
-  username: string | null;
+  link: PinballMapLinkStatus;
   /**
    * Whether the viewer may link (and so reconnect). Someone without it sees
    * only Unlink, so they can still remove a token saved before they lost it.
@@ -52,10 +50,10 @@ interface PinballMapAccountRowProps {
  * Reconnect, the same sign-in dialog as Link.
  */
 export function PinballMapAccountRow({
-  status,
-  username,
+  link,
   canLink,
 }: PinballMapAccountRowProps): React.JSX.Element {
+  const { status } = link;
   const [dialogOpen, setDialogOpen] = useState(false);
   // Bumped on every open. Keying the dialog on it remounts the form, so a
   // failed attempt's login, password, and error never greet the next open.
@@ -75,12 +73,12 @@ export function PinballMapAccountRow({
             className="flex items-center gap-1.5 text-sm text-muted-foreground"
             data-testid="pinballmap-account-status"
           >
-            {status === "not_linked" ? (
+            {link.status === "not_linked" ? (
               "Not linked"
-            ) : status === "linked" ? (
+            ) : link.status === "linked" ? (
               <>
                 Linked as{" "}
-                <span className="text-foreground">{username ?? "—"}</span>
+                <span className="text-foreground">{link.username}</span>
               </>
             ) : (
               <>
@@ -94,9 +92,9 @@ export function PinballMapAccountRow({
               </>
             )}
           </div>
-          {status === "needs_relink" && username !== null ? (
+          {link.status === "needs_relink" ? (
             <div className="mt-0.5 text-xs text-muted-foreground">
-              Was linked as {username}.
+              Was linked as {link.username}.
             </div>
           ) : null}
         </div>

@@ -2001,7 +2001,7 @@ export const pinballmapLocationChecks = pgTable(
  * row holds the Vault reference, never the token, and the password is never
  * stored anywhere.
  *
- * `pbmEmail` is what writes send as `user_email`: Pinball Map resolves the
+ * `pbmEmail` is what writes send as `X-User-Email`: Pinball Map resolves the
  * writer by email, so it is kept as Pinball Map reported it at link time, not
  * as the member typed their login.
  *

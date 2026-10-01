@@ -214,7 +214,8 @@ function createAuthenticatedIssueLimiter(): Ratelimit | null {
  * - User-based: 5 sign-in attempts per 15 minutes (fixed window)
  *
  * Each attempt forwards a login and password to Pinball Map's auth_details,
- * which Pinball Map itself caps at 40 per 5 minutes for our whole API token.
+ * which Pinball Map itself caps at 10 per minute for our whole API token,
+ * shared with its signup and password-reset endpoints.
  * Without a per-member cap, PinPoint would be an unthrottled password-guessing
  * proxy against Pinball Map accounts, and one member could spend the shared
  * allowance for everyone. Same shape as the login account limiter.

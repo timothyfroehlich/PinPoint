@@ -461,15 +461,16 @@ const NOT_LINKED_MESSAGE =
 async function pushRejected(
   userId: string,
   linked: LinkedPinballMapCredentials,
-  failure: PbmWriteFailure,
-  pagePath: string
+  failure: PbmWriteFailure
 ): Promise<Result<never, "PBM_REJECTED" | "PBM_AUTH_FAILED">> {
   if (failure.reason === "unauthorized") {
     await markPinballMapLinkNeedsRelink(userId, linked.tokenVaultId);
     revalidatePath("/settings");
-    // The control hides the transient error for this code and relies on the
-    // page re-rendering into its standing note, so the page must re-render.
-    revalidatePath(pagePath);
+    // The link status decides the push buttons on every machine page and the
+    // lineup page, as on link/unlink. The machine page's control also hides
+    // the transient error for this code and relies on re-rendering into its
+    // standing note.
+    revalidatePath("/m", "layout");
     return err("PBM_AUTH_FAILED", pbmWriteFailureMessage(failure));
   }
   return err("PBM_REJECTED", pbmWriteFailureMessage(failure));
@@ -689,12 +690,7 @@ export async function addMachineToPinballMapAction(
         { reason: written.reason, action: "pinballmap.addMachine" },
         "PinballMap add rejected"
       );
-      return await pushRejected(
-        userId,
-        linked,
-        written,
-        `/m/${machine.initials}`
-      );
+      return await pushRejected(userId, linked, written);
     }
     const lmxId = written.lmxId;
     // --- transaction: local state only ---
@@ -928,12 +924,7 @@ export async function removeMachineFromPinballMapAction(
         { reason: written.reason, action: "pinballmap.removeMachine" },
         "PinballMap remove rejected"
       );
-      return await pushRejected(
-        userId,
-        linked,
-        written,
-        `/m/${machine.initials}`
-      );
+      return await pushRejected(userId, linked, written);
     }
 
     // `not_found` is ambiguous — already gone, or our handle was stale and the
@@ -1010,12 +1001,7 @@ export async function removeMachineFromPinballMapAction(
             { reason: written.reason, action: "pinballmap.removeMachine" },
             "PinballMap remove rejected on the re-resolved lmx"
           );
-          return await pushRejected(
-            userId,
-            linked,
-            written,
-            `/m/${machine.initials}`
-          );
+          return await pushRejected(userId, linked, written);
         }
       } else {
         // Confirmed absent from a lineup we just re-fetched. Finish the job
@@ -1279,7 +1265,7 @@ export async function removeUnlinkedPinballmapEntryAction(
         { reason: written.reason, action: "pinballmap.removeUnlinkedEntry" },
         "PinballMap remove rejected"
       );
-      return await pushRejected(userId, linked, written, "/m/pinball-map");
+      return await pushRejected(userId, linked, written);
     }
 
     if (!written.ok) {
@@ -1311,7 +1297,7 @@ export async function removeUnlinkedPinballmapEntryAction(
             },
             "PinballMap remove rejected on the re-resolved lmx"
           );
-          return await pushRejected(userId, linked, written, "/m/pinball-map");
+          return await pushRejected(userId, linked, written);
         }
       }
       // `gone`: confirmed absent from a lineup just re-fetched — finish locally.
@@ -1659,12 +1645,7 @@ export async function updateInsiderConnectedAction(
       revalidatePath("/m", "layout");
       return ok({ icEnabled: target === "on" });
     case "rejected":
-      return await pushRejected(
-        userId,
-        linked,
-        outcome.failure,
-        `/m/${machine.initials}`
-      );
+      return await pushRejected(userId, linked, outcome.failure);
     case "lease_lost":
       return err(
         "SERVER",

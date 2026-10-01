@@ -64,15 +64,7 @@ export async function ConnectedAccountsSection(): Promise<React.JSX.Element> {
   );
   const pinballMapRow =
     canLinkPinballMap || pinballMapLink.status !== "not_linked" ? (
-      <PinballMapAccountRow
-        status={pinballMapLink.status}
-        username={
-          pinballMapLink.status === "not_linked"
-            ? null
-            : pinballMapLink.username
-        }
-        canLink={canLinkPinballMap}
-      />
+      <PinballMapAccountRow link={pinballMapLink} canLink={canLinkPinballMap} />
     ) : null;
 
   const header = (

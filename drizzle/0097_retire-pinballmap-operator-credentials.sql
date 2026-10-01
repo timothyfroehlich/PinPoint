@@ -3,10 +3,12 @@
 -- nothing reads the operator token, and a decryptable write credential with no
 -- consumer is attack surface for no benefit.
 --
--- Expand/contract, like 0085: this migration removes the secret and its decrypt
--- RPC but keeps the two pointer columns, because the deployment still serving
--- while this one builds selects them by name. A follow-up contract migration
--- drops outbound_email and outbound_token_vault_id.
+-- Expand/contract, like 0085: this migration removes the secret but keeps the
+-- two pointer columns and the decrypt RPC, because the deployment still serving
+-- while this one builds selects the columns by name and calls the RPC on every
+-- push. With the secret gone the RPC returns no token, so it can no longer
+-- decrypt anything. A follow-up contract migration (PP-o355.64) drops
+-- outbound_email, outbound_token_vault_id, and get_pinballmap_credentials().
 
 -- 1. Delete the operator's Vault secret while the pointer still names it.
 --    Wrapped like 0059: Postgres checks the table ACL at execution time, not
@@ -30,8 +32,4 @@ UPDATE pinballmap_state
    SET outbound_email = NULL,
        outbound_token_vault_id = NULL
  WHERE outbound_email IS NOT NULL
-    OR outbound_token_vault_id IS NOT NULL;--> statement-breakpoint
-
--- 3. Drop the SECURITY DEFINER decrypt RPC (0061/0062). The member-token RPC
---    from 0096 is the only credential RPC left.
-DROP FUNCTION IF EXISTS public.get_pinballmap_credentials();
+    OR outbound_token_vault_id IS NOT NULL;

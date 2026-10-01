@@ -645,7 +645,7 @@ export function createLiveClient(apiToken: string | null): PinballMapClient {
       const token = user?.["authentication_token"];
       const email = user?.["email"];
       // A success body missing the token or the email cannot be written with:
-      // writes identify the author by `user_email`. Report it as a failed
+      // writes identify the author by `X-User-Email`. Report it as a failed
       // exchange rather than storing half a credential.
       if (typeof token !== "string" || token.length === 0) {
         return { ok: false, reason: "transient" };

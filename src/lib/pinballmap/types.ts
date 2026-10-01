@@ -229,13 +229,17 @@ export type PbmInsiderConnectedResult =
 /**
  * A member's Pinball Map account link (spec 8.4–8.5): not linked, linked, or
  * marked Needs relink after Pinball Map rejected its token as unauthorized.
+ * Read off the link row; it never carries secret material.
  */
-export type PinballMapLinkState = "not_linked" | "linked" | "needs_relink";
+export type PinballMapLinkStatus =
+  | { status: "not_linked" }
+  | { status: "linked"; username: string }
+  | { status: "needs_relink"; username: string };
 
 /**
  * Result of exchanging a login+password for an API token (spec 8.4, PP-o355.6).
  *
- * `email` is what later writes send as `user_email`: Pinball Map resolves the
+ * `email` is what later writes send as `X-User-Email`: Pinball Map resolves the
  * writer by email, never by username, so the login a member typed (which may be
  * a username) is not enough to write with.
  */

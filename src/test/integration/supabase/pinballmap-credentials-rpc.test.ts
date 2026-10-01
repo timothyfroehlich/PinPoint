@@ -11,8 +11,9 @@
  * function body — the fix 0062 made to the operator-token RPC after 0061
  * shipped without it.
  *
- * `get_pinballmap_api_token()` (0057) was dropped in 0059, and the operator
- * token's `get_pinballmap_credentials()` in 0097.
+ * `get_pinballmap_api_token()` (0057) was dropped in 0059. The operator
+ * token's `get_pinballmap_credentials()` has no secret left to return since
+ * 0097 and is dropped by its contract migration (PP-o355.64).
  *
  * Has to run against a real Supabase stack rather than PGlite: PGlite's schema
  * comes from `drizzle-kit export`, which knows nothing about hand-written

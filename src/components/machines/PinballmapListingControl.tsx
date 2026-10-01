@@ -44,7 +44,7 @@ import type {
   PbmListingView,
   PbmSibling,
 } from "~/lib/pinballmap/listing-state";
-import type { PinballMapLinkState } from "~/lib/pinballmap/types";
+import type { PinballMapLinkStatus } from "~/lib/pinballmap/types";
 import type { Result } from "~/lib/result";
 import { cn } from "~/lib/utils";
 import {
@@ -107,7 +107,7 @@ export interface PinballmapListingControlProps {
    * showing a button that would fail (4.4, CORE-ARCH-012). Read off the link
    * row — the token is never decrypted to answer this.
    */
-  linkStatus: PinballMapLinkState;
+  linkStatus: PinballMapLinkStatus["status"];
   /** Catalog title, so a confirm names the game rather than "this machine". */
   modelName: string | null;
   /**
@@ -171,6 +171,9 @@ export function PinballmapListingControl({
   const linked = linkStatus === "linked";
   const canWriteOut = canPush && linked && locationUrl !== null;
   const showExternalFallback = canPush && !linked && locationUrl !== null;
+  // Spec 8.6: a pusher with no link at all is also told they could push from
+  // here; one whose link failed gets the standing note below instead.
+  const promptToLink = showExternalFallback && linkStatus === "not_linked";
   const disabled = view.disabled !== null;
 
   return (
@@ -267,13 +270,14 @@ export function PinballmapListingControl({
                   view,
                   locationUrl,
                   showExternalFallback,
-                  showExternalFallback && linkStatus === "not_linked"
+                  promptToLink
                 )}
                 {insiderConnected?.differs === true ? (
                   <InsiderConnectedDiffers
                     view={insiderConnected}
                     locationUrl={locationUrl}
                     showExternalFallback={showExternalFallback}
+                    promptToLink={promptToLink}
                   />
                 ) : null}
               </span>
@@ -779,10 +783,12 @@ function InsiderConnectedDiffers({
   view,
   locationUrl,
   showExternalFallback,
+  promptToLink,
 }: {
   view: PbmInsiderConnectedView;
   locationUrl: string | null;
   showExternalFallback: boolean;
+  promptToLink: boolean;
 }): React.JSX.Element {
   const clause =
     view.pinballMap === "on"
@@ -810,7 +816,28 @@ function InsiderConnectedDiffers({
           .
         </>
       ) : null}
+      {promptToLink ? <LinkAccountPrompt verb="set" /> : null}
     </>
+  );
+}
+
+/**
+ * Spec 8.6: an unlinked member who can push gets the link-out AND a way to
+ * push from here next time.
+ */
+function LinkAccountPrompt({ verb }: { verb: string }): React.JSX.Element {
+  return (
+    <span className="text-muted-foreground">
+      {" "}
+      Or{" "}
+      <Link
+        href="/settings#pinball-map"
+        className="underline underline-offset-2 hover:no-underline"
+      >
+        link your Pinball Map account
+      </Link>{" "}
+      to {verb} it from here.
+    </span>
   );
 }
 
@@ -889,22 +916,8 @@ function statusSentence(
       </>
     );
 
-  // Spec 8.6: an unlinked member who can push gets the link-out AND a way to
-  // push from here next time.
   const linkPrompt = (verb: string): React.JSX.Element | null =>
-    promptToLink ? (
-      <span className="text-muted-foreground">
-        {" "}
-        Or{" "}
-        <Link
-          href="/settings#pinball-map"
-          className="underline underline-offset-2 hover:no-underline"
-        >
-          link your Pinball Map account
-        </Link>{" "}
-        to {verb} it from here.
-      </span>
-    ) : null;
+    promptToLink ? <LinkAccountPrompt verb={verb} /> : null;
 
   switch (view.name) {
     case "not_configured":

@@ -6,9 +6,13 @@ import { createAdminClient } from "~/lib/supabase/admin";
 import { db } from "~/server/db";
 import { pinballmapUserCredentials } from "~/server/db/schema";
 import { assertNotInTransaction } from "~/server/db/transaction-context";
-import { createVaultSecret } from "~/server/db/vault";
+import { createVaultSecret, deleteVaultSecret } from "~/server/db/vault";
 import { getPinballMapClient } from "./client";
-import type { PbmAuthFailureReason, PbmCredentials } from "./types";
+import type {
+  PbmAuthFailureReason,
+  PbmCredentials,
+  PinballMapLinkStatus,
+} from "./types";
 
 /**
  * A member's linked Pinball Map account (pinballmap spec 8.4–8.5, PP-o355.6).
@@ -24,12 +28,6 @@ import type { PbmAuthFailureReason, PbmCredentials } from "./types";
  * by a failed swap is deleted best-effort, the same shape as the Discord bot
  * token save.
  */
-
-/** What the settings page and the listing control need; no secret material. */
-export type PinballMapLinkStatus =
-  | { status: "not_linked" }
-  | { status: "linked"; username: string }
-  | { status: "needs_relink"; username: string };
 
 /** Read the viewer's link state off the row. Never decrypts the token. */
 export async function getPinballMapLinkStatus(
@@ -245,23 +243,4 @@ export async function unlinkPinballMapAccount(userId: string): Promise<void> {
     .returning({ tokenVaultId: pinballmapUserCredentials.tokenVaultId });
   const vaultId = deleted[0]?.tokenVaultId;
   if (vaultId) await deleteVaultSecret(vaultId, "pinballmap.unlinkAccount");
-}
-
-/**
- * Best-effort delete of one Vault secret. supabase_vault 0.3.1 has no delete
- * helper, so this is a plain row DELETE, the same form drizzle/0059 and the
- * Discord token save use. A failure leaves a stray encrypted secret that no row
- * references; it is reported, not thrown.
- */
-async function deleteVaultSecret(
-  vaultId: string,
-  action: string
-): Promise<void> {
-  try {
-    await db.execute(
-      sql`DELETE FROM vault.secrets WHERE id = ${vaultId}::uuid`
-    );
-  } catch (error) {
-    reportError(error, { action, bestEffort: true, vaultId });
-  }
 }

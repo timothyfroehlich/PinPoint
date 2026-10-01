@@ -204,7 +204,8 @@ export function createMockClient(): PinballMapClient {
       return Promise.resolve({ ok: true });
     },
 
-    postCondition({ lmxId, comment }): Promise<PbmWriteResult> {
+    postCondition({ credentials, lmxId, comment }): Promise<PbmWriteResult> {
+      if (isRevokedToken(credentials.token)) return Promise.resolve(REVOKED);
       const lmx = lmxes.find((l) => l.id === lmxId);
       if (!lmx) {
         return Promise.resolve({
@@ -225,9 +226,11 @@ export function createMockClient(): PinballMapClient {
     },
 
     setInsiderConnected({
+      credentials,
       lmxId,
       enabled,
     }): Promise<PbmInsiderConnectedResult> {
+      if (isRevokedToken(credentials.token)) return Promise.resolve(REVOKED);
       const lmx = lmxes.find((l) => l.id === lmxId);
       if (!lmx) {
         return Promise.resolve({
@@ -248,7 +251,8 @@ export function createMockClient(): PinballMapClient {
       return Promise.resolve({ ok: true, icEnabled: lmx.icEnabled });
     },
 
-    confirmLineup(): Promise<PbmWriteResult> {
+    confirmLineup({ credentials }): Promise<PbmWriteResult> {
+      if (isRevokedToken(credentials.token)) return Promise.resolve(REVOKED);
       return Promise.resolve({ ok: true });
     },
   };

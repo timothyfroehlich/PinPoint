@@ -21,9 +21,7 @@ beforeEach(() => {
 
 describe("PinballMapAccountRow (pinballmap spec 8.4–8.5)", () => {
   it("offers Link when not linked, and no Unlink", () => {
-    render(
-      <PinballMapAccountRow status="not_linked" username={null} canLink />
-    );
+    render(<PinballMapAccountRow link={{ status: "not_linked" }} canLink />);
     expect(screen.getByText("Not linked")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Link Pinball Map" })
@@ -34,7 +32,12 @@ describe("PinballMapAccountRow (pinballmap spec 8.4–8.5)", () => {
   });
 
   it("shows the linked username with Unlink only", () => {
-    render(<PinballMapAccountRow status="linked" username="ssw" canLink />);
+    render(
+      <PinballMapAccountRow
+        link={{ status: "linked", username: "ssw" }}
+        canLink
+      />
+    );
     expect(screen.getByTestId("pinballmap-account-status")).toHaveTextContent(
       "Linked as ssw"
     );
@@ -46,7 +49,10 @@ describe("PinballMapAccountRow (pinballmap spec 8.4–8.5)", () => {
 
   it("shows Authentication failed with Reconnect and Unlink", () => {
     render(
-      <PinballMapAccountRow status="needs_relink" username="ssw" canLink />
+      <PinballMapAccountRow
+        link={{ status: "needs_relink", username: "ssw" }}
+        canLink
+      />
     );
     expect(screen.getByTestId("pinballmap-account-status")).toHaveTextContent(
       "Authentication failed"
@@ -61,8 +67,7 @@ describe("PinballMapAccountRow (pinballmap spec 8.4–8.5)", () => {
   it("offers only Unlink to someone who can no longer link", () => {
     render(
       <PinballMapAccountRow
-        status="needs_relink"
-        username="ssw"
+        link={{ status: "needs_relink", username: "ssw" }}
         canLink={false}
       />
     );
@@ -79,9 +84,7 @@ describe("PinballMapAccountRow (pinballmap spec 8.4–8.5)", () => {
       code: "INVALID_CREDENTIALS",
       message: "Incorrect password",
     });
-    render(
-      <PinballMapAccountRow status="not_linked" username={null} canLink />
-    );
+    render(<PinballMapAccountRow link={{ status: "not_linked" }} canLink />);
 
     await user.click(screen.getByRole("button", { name: "Link Pinball Map" }));
     await user.type(screen.getByLabelText("Username or email"), "ssw");
@@ -104,9 +107,7 @@ describe("PinballMapAccountRow (pinballmap spec 8.4–8.5)", () => {
       code: "INVALID_CREDENTIALS",
       message: "Incorrect password",
     });
-    render(
-      <PinballMapAccountRow status="not_linked" username={null} canLink />
-    );
+    render(<PinballMapAccountRow link={{ status: "not_linked" }} canLink />);
 
     await user.click(screen.getByRole("button", { name: "Link Pinball Map" }));
     await user.type(screen.getByLabelText("Username or email"), "ssw");
@@ -123,7 +124,12 @@ describe("PinballMapAccountRow (pinballmap spec 8.4–8.5)", () => {
   it("confirms Unlink with the cannot-revoke caveat before calling the action", async () => {
     const user = userEvent.setup();
     actions.unlink.mockResolvedValue({ ok: true, value: {} });
-    render(<PinballMapAccountRow status="linked" username="ssw" canLink />);
+    render(
+      <PinballMapAccountRow
+        link={{ status: "linked", username: "ssw" }}
+        canLink
+      />
+    );
 
     await user.click(screen.getByRole("button", { name: "Unlink" }));
     expect(

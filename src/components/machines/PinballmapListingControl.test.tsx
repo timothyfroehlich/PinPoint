@@ -789,6 +789,11 @@ describe("the Insider Connected toggle (3.8)", () => {
     expect(
       screen.getByRole("link", { name: "Set on Pinball Map" })
     ).toBeInTheDocument();
+    // Spec 8.6: the same prompt to link as the lineup differences get.
+    expect(
+      screen.getByRole("link", { name: "link your Pinball Map account" })
+    ).toBeInTheDocument();
+    expect(status()).toContain("to set it from here");
   });
 
   it("surfaces a failed Update", async () => {

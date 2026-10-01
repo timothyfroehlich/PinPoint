@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { log } from "~/lib/logger";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
@@ -11,10 +10,8 @@ import {
 } from "~/lib/pinballmap/user-credentials";
 import { checkPinballMapLinkLimit } from "~/lib/rate-limit";
 import { type Result, err, ok } from "~/lib/result";
-import { createClient } from "~/lib/supabase/server";
+import { getViewer } from "~/lib/collections/viewer";
 import { serverActionError } from "~/lib/observability/report-error";
-import { db } from "~/server/db";
-import { userProfiles } from "~/server/db/schema";
 
 /**
  * Link and unlink a member's own Pinball Map account (pinballmap spec 8.4).
@@ -50,23 +47,11 @@ export type LinkPinballMapActionResult = Result<
 async function authorizeMember(): Promise<
   { ok: true; userId: string } | { ok: false }
 > {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false };
-  const profile = await db.query.userProfiles.findFirst({
-    where: eq(userProfiles.id, user.id),
-    columns: { role: true },
-  });
-  if (
-    !checkPermission(
-      "machines.pinballmap.account",
-      getAccessLevel(profile?.role)
-    )
-  )
+  const { userId, role } = await getViewer();
+  if (userId === undefined) return { ok: false };
+  if (!checkPermission("machines.pinballmap.account", getAccessLevel(role)))
     return { ok: false };
-  return { ok: true, userId: user.id };
+  return { ok: true, userId };
 }
 
 export async function linkPinballMapAccountAction(
@@ -163,17 +148,15 @@ export type UnlinkPinballMapActionResult = Result<
  * permission: someone demoted after linking must still be able to remove it.
  */
 export async function unlinkPinballMapAccountAction(): Promise<UnlinkPinballMapActionResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return err("UNAUTHORIZED", "Sign in to unlink Pinball Map.");
+  const { userId } = await getViewer();
+  if (userId === undefined)
+    return err("UNAUTHORIZED", "Sign in to unlink Pinball Map.");
 
   try {
-    await unlinkPinballMapAccount(user.id);
+    await unlinkPinballMapAccount(userId);
   } catch (error) {
     return serverActionError(error, "SERVER", "Could not unlink. Try again.", {
-      userId: user.id,
+      userId,
       action: "unlinkPinballMapAccountAction",
     });
   }
