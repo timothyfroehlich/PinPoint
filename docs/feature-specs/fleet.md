@@ -18,7 +18,7 @@
   - **On Floor**: count of machines with `on_the_floor` presence, and percentage of total collection machines (`on_the_floor / total`).
   - **Operational**: count of operational machines among on-floor machines, and percentage of on-floor machines (`operational / on_the_floor`).
   - **Open Issues**: total open issues count across all machines, and count of machines with at least one open issue.
-  - **In Sync with PBM**: count of machines with listing intent On whose lineup observation matches intent without availability contradiction (canonical states `on`, `shared`, and `flag`), and percentage of all machines with listing intent On (`in_sync_intent_on / total_intent_on`). Empty and inactive state behavior is defined in §2.4.
+  - **In Sync with PBM**: count of machines with lineup setting On whose lineup observation matches the setting without availability contradiction (canonical states `on`, `shared`, and `flag`), and percentage of all machines with lineup setting On (`in_sync_intent_on / total_intent_on`). Empty and inactive state behavior is defined in §2.4.
   - **Discrepancies**: count of unique machines requiring operator action: playability `needs_service` or `unplayable`, Pinball Map lineup out-of-sync (canonical states `missing` and `lingering`), or Pinball Map availability contradiction (canonical state `alert`).
 - **Last Serviced** — the recency of the most recent maintenance-tagged timeline event or service touch recorded on a machine. Machines with no recorded service history display "Never".
 - **Per-Machine Inspection Surface** — a contextual detail pane for the selected machine. On desktop and tablet viewports (`≥768px` / `md:`), it renders as a side-by-side pane alongside the table without obscuring pinned columns. On mobile viewports (`<768px`), it transitions to a bottom drawer (`Drawer`) overlay with swipe/drag dismissibility and thumb-friendly action targets.
@@ -39,7 +39,7 @@
 
 - **3.1** The header row remains sticky at the top of the container during vertical scrolling.
 - **3.2** The first column (Machine Identity) remains sticky on the left during horizontal scrolling. It displays strictly two lines: Line 1 renders the machine title and uppercase initials badge; Line 2 renders manufacturer, year, and owner (`[Manufacturer] · [Year] · [Owner]`).
-- **3.3** Default column visibility is curated and lean: Machine (pinned), Presence, Playability, Open Issues, Last Serviced (positioned immediately adjacent to Open Issues), and Pinball Map Status default to visible. The Owner column defaults to off as an independent column since owner identity is surfaced on Line 2 of the Machine Identity column. Additional toggleable columns (Manufacturer, Year, PBM Intent) default to off.
+- **3.3** Default column visibility is curated and lean: Machine (pinned), Presence, Playability, Open Issues, Last Serviced (positioned immediately adjacent to Open Issues), and Pinball Map Status default to visible. The Owner column defaults to off as an independent column since owner identity is surfaced on Line 2 of the Machine Identity column. Additional toggleable columns (Manufacturer, Year, PBM Lineup Setting) default to off.
 - **3.4** Sorting is client-side URL-driven: clicking column headers updates `sort` and `dir` URL search parameters via soft client navigation without triggering a page refresh, and applies accessible `aria-sort` attributes.
 - **3.5** Column display adheres to accessibility standard `CORE-A11Y-003` with `<th scope="col">` and accessible table labeling.
 - **3.6** The table does not hide columns responsively on narrower viewports (`CORE-RESP-001`); instead, it allows horizontal scrolling while keeping the first column pinned.
@@ -98,5 +98,6 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-30 | Renamed listing intent to lineup setting (and Insider Connected intent to Insider Connected setting) throughout, including the PBM Intent column to PBM Lineup Setting; `pinballmap.md` §4.8 bans "intent" in user-facing copy. No behavior change. |
 | 2026-09-06 | Clarify strictly two-line machine identity column (§3.2), lean column defaults and Last Serviced positioning (§3.3), View Options control (§3.7), canonical PBM KPI formulas and empty/inactive states (§1, §2.4), and unified search/multi-select filter toolbar and sort parameter divergence (§4.1–§4.5). |
 | 2026-09-05 | Created. Establishes requirements for member+ status table at `/fleet` (§2–§3), URL-driven filter presets (§4), PBM column group & edition near-misses (§5), desktop side-pane / mobile bottom-sheet inspection surface (§6), and permissions (§7). |
