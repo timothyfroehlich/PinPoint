@@ -29,6 +29,12 @@ interface ReassignMachineFormProps {
   machines: ReassignMachineCandidate[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /**
+   * Where focus goes when the dialog closes. The dialog has no trigger of its
+   * own (it opens from a button or a menu item), so without this focus falls
+   * to `<body>`.
+   */
+  returnFocusTo?: () => HTMLElement | null;
 }
 
 export function ReassignMachineForm({
@@ -37,6 +43,7 @@ export function ReassignMachineForm({
   machines,
   open,
   onOpenChange,
+  returnFocusTo,
 }: ReassignMachineFormProps): React.JSX.Element {
   const [state, formAction, isPending] = useActionState<
     ReassignIssueMachineResult | undefined,
@@ -69,7 +76,16 @@ export function ReassignMachineForm({
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="max-w-md">
+      <AlertDialogContent
+        className="max-w-md"
+        onCloseAutoFocus={(event) => {
+          const target = returnFocusTo?.();
+          if (target) {
+            event.preventDefault();
+            target.focus();
+          }
+        }}
+      >
         <AlertDialogHeader>
           <AlertDialogTitle>Move issue to another machine</AlertDialogTitle>
           <AlertDialogDescription>
