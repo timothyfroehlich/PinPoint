@@ -53,6 +53,9 @@ const pbm = vi.hoisted(() => ({
   beforeRemove: null as null | ((lmxId: number) => Promise<void>),
   /** Set to make a live re-fetch fail, as an unreachable PBM would. */
   fetchError: null as string | null,
+  /** Locations Confirm lineup reached PinballMap for, in order. */
+  confirmed: [] as number[],
+  confirmResult: null as PbmWriteFailure | null,
 }));
 
 // Hoisted because the client mock's `fetchLocation` needs it, and a mock
@@ -106,6 +109,11 @@ vi.mock("~/lib/pinballmap/client", () => ({
         pbm.lineup.splice(idx, 1);
         return Promise.resolve({ ok: true });
       },
+      confirmLineup: ({ locationId }: { locationId: number }) => {
+        if (pbm.confirmResult) return Promise.resolve(pbm.confirmResult);
+        pbm.confirmed.push(locationId);
+        return Promise.resolve({ ok: true });
+      },
     }),
 }));
 
@@ -113,7 +121,9 @@ const TITLE_ID = 7;
 
 const snapshotOf = snapshotBuilder;
 
-async function createUser(role: "admin" | "member"): Promise<{ id: string }> {
+async function createUser(
+  role: "admin" | "technician" | "member"
+): Promise<{ id: string }> {
   const db = await getTestDb();
   const id = randomUUID();
   await db.insert(authUsers).values({ id, email: `${id}@example.com` });
@@ -1477,5 +1487,207 @@ describe("Lineup page: unlinked entries (PGlite)", () => {
     await expect(
       linkMachineToPinballmapEntryAction(undefined, link(moved.id, 8082))
     ).resolves.toMatchObject({ ok: true, value: { intent: "on" } });
+  });
+});
+
+describe("Lineup page: Confirm lineup (PGlite)", () => {
+  setupTestDb();
+
+  const STALE = new Date(Date.now() - 60 * 60 * 1000);
+
+  beforeEach(async () => {
+    pbm.lineup = [];
+    pbm.fetchError = null;
+    pbm.confirmed = [];
+    pbm.confirmResult = null;
+    const { getPinballMapWriteCredentials } =
+      await import("~/lib/pinballmap/credentials");
+    vi.mocked(getPinballMapWriteCredentials).mockResolvedValue({
+      email: "ops@example.com",
+      token: "tok_123",
+    });
+  });
+
+  /** A configured location with an operator credential (spec 3.7). */
+  async function seedConfirmable(
+    rows: { id: number; machineId: number }[],
+    lastSyncedAt: Date
+  ): Promise<void> {
+    const db = await getTestDb();
+    await db.insert(pinballmapState).values({
+      id: "singleton",
+      locationId: 26454,
+      snapshotJson: snapshotOf(rows),
+      lastSyncStatus: "ok",
+      lastSyncedAt,
+      outboundEmail: "ops@example.com",
+      outboundTokenVaultId: randomUUID(),
+    });
+  }
+
+  /**
+   * One Missing title (On, absent), one Lingering title (Off, present), and
+   * one unmatched entry — the three kinds the dialog warns about.
+   */
+  async function seedThreeKinds(): Promise<void> {
+    const db = await getTestDb();
+    await db.insert(pinballmapCatalog).values([
+      { pinballmapMachineId: 9001, name: "Missing Game" },
+      { pinballmapMachineId: 9002, name: "Lingering Game" },
+      { pinballmapMachineId: 9003, name: "Unmatched Game" },
+    ]);
+    await db.insert(machines).values([
+      {
+        name: "Missing Game",
+        initials: "MG",
+        pinballmapMachineId: 9001,
+        pinballmapIntent: "on",
+      },
+      {
+        name: "Lingering Game",
+        initials: "LG",
+        pinballmapMachineId: 9002,
+        pinballmapIntent: "off",
+      },
+    ]);
+  }
+
+  it("refreshes a stale lineup, then lists what is out of sync or unmatched", async () => {
+    const { checkConfirmLineupAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const tech = await createUser("technician");
+    await mockAuthAs(tech.id);
+    await seedThreeKinds();
+    // The stored lineup predates the unmatched entry; only a refresh shows it.
+    await seedConfirmable([{ id: 2, machineId: 9002 }], STALE);
+    pbm.lineup = [
+      { id: 2, machineId: 9002 },
+      { id: 3, machineId: 9003 },
+    ];
+
+    const result = await checkConfirmLineupAction();
+
+    if (!result.ok) throw new Error(result.message);
+    expect(result.value.refreshFailed).toBe(false);
+    expect(result.value.entryCount).toBe(2);
+    expect(result.value.entries.map((e) => [e.name, e.kind]).sort()).toEqual([
+      ["Lingering Game", "to_remove"],
+      ["Missing Game", "to_add"],
+      ["Unmatched Game", "not_linked"],
+    ]);
+  });
+
+  it("opens on the last good lineup when the refresh fails", async () => {
+    const { checkConfirmLineupAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    await seedThreeKinds();
+    await seedConfirmable([{ id: 2, machineId: 9002 }], STALE);
+    pbm.fetchError = "Pinball Map is down";
+
+    const result = await checkConfirmLineupAction();
+
+    if (!result.ok) throw new Error(result.message);
+    expect(result.value.refreshFailed).toBe(true);
+    expect(result.value.lastRefreshedAt).toBe(STALE.toISOString());
+    expect(result.value.entries.map((e) => e.kind).sort()).toEqual([
+      "to_add",
+      "to_remove",
+    ]);
+  });
+
+  it("does not refresh a lineup under five minutes old", async () => {
+    const { checkConfirmLineupAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    await seedConfirmable([], new Date());
+    // A fetch would fail; a fresh lineup never makes one.
+    pbm.fetchError = "should not be fetched";
+
+    const result = await checkConfirmLineupAction();
+
+    if (!result.ok) throw new Error(result.message);
+    expect(result.value.refreshFailed).toBe(false);
+    expect(result.value.entries).toEqual([]);
+  });
+
+  it("confirms on Pinball Map and moves the stored last-updated date", async () => {
+    const db = await getTestDb();
+    const { confirmPinballmapLineupAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    await seedConfirmable([], new Date());
+    const today = new Date().toISOString().slice(0, 10);
+    const fd = new FormData();
+    fd.set("today", today);
+
+    const result = await confirmPinballmapLineupAction(undefined, fd);
+
+    expect(result).toEqual({ ok: true, value: {} });
+    expect(pbm.confirmed).toEqual([26454]);
+    const state = await db.query.pinballmapState.findFirst();
+    expect(state?.snapshotJson?.dateLastUpdated).toBe(today);
+  });
+
+  it("refuses a member, even one who owns machines, before calling Pinball Map", async () => {
+    const db = await getTestDb();
+    const { checkConfirmLineupAction, confirmPinballmapLineupAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const member = await createUser("member");
+    await mockAuthAs(member.id);
+    await db
+      .insert(machines)
+      .values({ name: "Mine", initials: "MINE", ownerId: member.id });
+    await seedConfirmable([], new Date());
+    const fd = new FormData();
+    fd.set("today", new Date().toISOString().slice(0, 10));
+
+    expect((await checkConfirmLineupAction()).ok).toBe(false);
+    const result = await confirmPinballmapLineupAction(undefined, fd);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe("UNAUTHORIZED");
+    expect(pbm.confirmed).toEqual([]);
+  });
+
+  it("leaves the stored date alone when Pinball Map rejects the confirmation", async () => {
+    const db = await getTestDb();
+    const { confirmPinballmapLineupAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    await seedConfirmable([], new Date());
+    pbm.confirmResult = { ok: false, reason: "unauthorized" };
+    const fd = new FormData();
+    fd.set("today", new Date().toISOString().slice(0, 10));
+
+    const result = await confirmPinballmapLineupAction(undefined, fd);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe("PBM_REJECTED");
+    const state = await db.query.pinballmapState.findFirst();
+    expect(state?.snapshotJson?.dateLastUpdated).toBeNull();
+  });
+
+  it("refuses without an operator credential", async () => {
+    const { confirmPinballmapLineupAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const { getPinballMapWriteCredentials } =
+      await import("~/lib/pinballmap/credentials");
+    vi.mocked(getPinballMapWriteCredentials).mockResolvedValue(null);
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    await seedConfirmable([], new Date());
+    const fd = new FormData();
+    fd.set("today", new Date().toISOString().slice(0, 10));
+
+    const result = await confirmPinballmapLineupAction(undefined, fd);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe("NOT_PROVISIONED");
+    expect(pbm.confirmed).toEqual([]);
   });
 });

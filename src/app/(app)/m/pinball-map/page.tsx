@@ -93,6 +93,10 @@ export default async function PinballMapLineupPage(): Promise<React.JSX.Element>
   const snapshot = state.snapshotJson ?? null;
   const locationUrl = pinballmapLocationUrl(state.locationId);
   const lastRefreshFailed = state.lastSyncStatus === "error";
+  // Whether an operator credential exists, read off the state row's columns
+  // and never by decrypting the token — the listing control's own test.
+  const writeEnabled =
+    state.outboundEmail != null && state.outboundTokenVaultId != null;
   const lineupHeader = (
     <LineupHeader
       locationName={snapshot?.name ?? null}
@@ -107,6 +111,11 @@ export default async function PinballMapLineupPage(): Promise<React.JSX.Element>
       lastRefreshFailed={lastRefreshFailed}
       refreshRemaining={allowance.remaining}
       refreshAvailableAt={allowance.nextRefillAt}
+      canConfirm={
+        comparison.status === "ready" &&
+        writeEnabled &&
+        checkPermission("machines.pinballmap.confirm", accessLevel)
+      }
     />
   );
 
@@ -180,10 +189,7 @@ export default async function PinballMapLineupPage(): Promise<React.JSX.Element>
     }));
 
   const context: LineupViewContext = {
-    // Whether an operator credential exists, read off the state row's columns
-    // and never by decrypting the token — the listing control's own test.
-    writeEnabled:
-      state.outboundEmail != null && state.outboundTokenVaultId != null,
+    writeEnabled,
     locationUrl,
     pushActor: (row) => {
       // The cabinet whose own listing control offers the same push.

@@ -468,6 +468,22 @@ describe("Specific permission rules from design", () => {
       expect(getPermission("machines.pinballmap.push", "admin")).toBe(true);
     });
 
+    it("should let only technicians and admins confirm the Pinball Map lineup", () => {
+      // Spec 3.7: confirming vouches for every entry at the venue, so a
+      // member's ownership of one machine cannot scope it.
+      expect(
+        getPermission("machines.pinballmap.confirm", "unauthenticated")
+      ).toBe(false);
+      expect(getPermission("machines.pinballmap.confirm", "guest")).toBe(false);
+      expect(getPermission("machines.pinballmap.confirm", "member")).toBe(
+        false
+      );
+      expect(getPermission("machines.pinballmap.confirm", "technician")).toBe(
+        true
+      );
+      expect(getPermission("machines.pinballmap.confirm", "admin")).toBe(true);
+    });
+
     it("should let any member refresh the Pinball Map lineup", () => {
       // Spec 8.3: reading needs only page access. Safe to widen because the
       // rate limit is global rather than per-caller (spec 3.2), so a bigger

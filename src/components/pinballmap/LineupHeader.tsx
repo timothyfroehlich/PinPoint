@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { ExternalLink, TriangleAlert } from "lucide-react";
 
 import { refreshPinballmapLineupAction } from "~/app/(app)/m/pinballmap-actions";
+import { ConfirmLineupButton } from "~/components/pinballmap/ConfirmLineupButton";
 import { RelativeTime } from "~/components/issues/RelativeTime";
 import { PinballmapRefreshButton } from "~/components/machines/PinballmapListingControl";
 import { cn } from "~/lib/utils";
@@ -13,7 +14,8 @@ import { cn } from "~/lib/utils";
  * The lineup page header card (lineup spec §3): the tracked location linked to
  * its Pinball Map page — the attribution link-back (pinballmap §9.1) — the
  * entry count, when PinPoint last refreshed, the shared throttled Refresh, and,
- * right-aligned, the date Pinball Map last recorded an update to the location.
+ * right-aligned, the date Pinball Map last recorded an update to the location
+ * and, for those allowed, Confirm lineup on Pinball Map (§3.4, pinballmap §3.7).
  *
  * Rendered only while configured (§2.4). While Waiting (§2.5) the name, count
  * and date are unknown, so the location link, the refresh state with its error
@@ -28,6 +30,7 @@ export function LineupHeader({
   lastRefreshFailed,
   refreshRemaining,
   refreshAvailableAt,
+  canConfirm,
 }: {
   /** Pinball Map's name for the venue; null before a first refresh. */
   locationName: string | null;
@@ -42,6 +45,11 @@ export function LineupHeader({
   lastRefreshFailed: boolean;
   refreshRemaining: number;
   refreshAvailableAt: Date | null;
+  /**
+   * Offer Confirm lineup: technician or admin, an operator credential, and a
+   * compared lineup (pinballmap §3.7).
+   */
+  canConfirm: boolean;
 }): React.JSX.Element {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -120,14 +128,22 @@ export function LineupHeader({
           onRefresh={refresh}
         />
 
-        {pinballMapUpdated !== null ? (
-          <span
-            className="ml-auto text-muted-foreground"
-            data-testid="pbm-lineup-pbm-updated"
-          >
-            Pinball Map last updated {pinballMapUpdated}
-          </span>
-        ) : null}
+        <div className="ml-auto flex items-center gap-5">
+          {pinballMapUpdated !== null ? (
+            <span
+              className="text-muted-foreground"
+              data-testid="pbm-lineup-pbm-updated"
+            >
+              Pinball Map last updated {pinballMapUpdated}
+            </span>
+          ) : null}
+          {canConfirm && entryCount !== null ? (
+            <ConfirmLineupButton
+              locationName={locationName ?? "the tracked location"}
+              entryCount={entryCount}
+            />
+          ) : null}
+        </div>
       </div>
 
       {error !== null ? (
