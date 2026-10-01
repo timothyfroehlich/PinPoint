@@ -124,15 +124,17 @@ cleanup() {
 trap cleanup EXIT
 
 # Download every exact-tag asset before extracting or installing any of them.
+# Bounded timeouts: beads-cloud-init.sh also runs this at routine start (stale
+# snapshot self-heal), where a stalled download would hang an unattended run.
 # This ensures a mismatch in any archive performs no privileged installation.
 log "downloading dolt $DOLT_VER + bd $BD_VER + gh $GH_VER for $CLOUD_PLATFORM"
 DOLT_TAG="v${DOLT_VER}"
-curl -fsSL -o "$WORK_DIR/dolt.tgz" \
+curl -fsSL --connect-timeout 20 --max-time 300 -o "$WORK_DIR/dolt.tgz" \
   "https://github.com/dolthub/dolt/releases/download/${DOLT_TAG}/dolt-linux-amd64.tar.gz"
 BD_TAG="v${BD_VER}"
-curl -fsSL -o "$WORK_DIR/bd.tgz" \
+curl -fsSL --connect-timeout 20 --max-time 300 -o "$WORK_DIR/bd.tgz" \
   "https://github.com/steveyegge/beads/releases/download/${BD_TAG}/beads_${BD_VER}_linux_amd64.tar.gz"
-curl -fsSL -o "$WORK_DIR/gh.tgz" \
+curl -fsSL --connect-timeout 20 --max-time 300 -o "$WORK_DIR/gh.tgz" \
   "https://github.com/cli/cli/releases/download/v${GH_VER}/gh_${GH_VER}_linux_amd64.tar.gz"
 
 log "verifying approved release-asset digests"

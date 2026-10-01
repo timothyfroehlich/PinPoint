@@ -3832,7 +3832,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
           ).rejects.toMatchObject({
             reason: "invalid",
             message:
-              "A machine must be linked to a Pinball Map title to set lineup intent.",
+              "A machine must be linked to a Pinball Map title to set its lineup setting.",
           });
         }
       });
@@ -3847,7 +3847,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
           },
         });
         const message =
-          "Uncataloged (excluded) machines do not participate in Pinball Map sync and cannot have a sync intent.";
+          "Uncataloged (excluded) machines do not participate in Pinball Map sync and cannot have a lineup setting.";
 
         await expect(
           runUpdateMachine(
@@ -3899,7 +3899,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
         ).rejects.toMatchObject({
           reason: "invalid",
           message:
-            "Retargeting a machine to a different title resets intent to 'off'. Setting intent to 'on' requires a separate action.",
+            "Retargeting a machine to a different title resets its lineup setting to 'off'. Setting it to 'on' requires a separate action.",
         });
       });
 

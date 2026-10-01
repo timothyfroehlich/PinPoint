@@ -204,7 +204,7 @@ export function PinballmapListingControl({
           readers outright. The row heights are fixed either way, so 4.1 is
           unaffected. */}
       <div className="space-y-2" data-testid="pbm-listing-rows">
-        <Row label="Intent" dimmed={disabled}>
+        <Row label="Lineup" testId="pbm-listing-row-intent" dimmed={disabled}>
           <IntentToggle
             value={view.intent}
             blockedReason={view.onPositionBlockedReason}
@@ -558,10 +558,13 @@ export function PinballmapRefreshButton({
  */
 function Row({
   label,
+  testId,
   dimmed = false,
   children,
 }: {
   label: string;
+  /** Overrides the label-derived test id, so a copy change keeps it stable. */
+  testId?: string;
   dimmed?: boolean;
   children: React.ReactNode;
 }): React.JSX.Element {
@@ -572,7 +575,9 @@ function Row({
         dimmed && "opacity-45"
       )}
       {...(dimmed ? { inert: true } : {})}
-      data-testid={`pbm-listing-row-${label.toLowerCase().replace(/\s+/g, "-")}`}
+      data-testid={
+        testId ?? `pbm-listing-row-${label.toLowerCase().replace(/\s+/g, "-")}`
+      }
     >
       <span className="w-20 shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         {label}
@@ -647,7 +652,7 @@ export function SegmentedToggle<T extends string>({
   );
 }
 
-/** The lineup intent's tri-state toggle (4.1). */
+/** The lineup setting's tri-state toggle (4.1). */
 export function IntentToggle({
   value,
   blockedReason,
@@ -664,7 +669,7 @@ export function IntentToggle({
   return (
     <>
       <SegmentedToggle
-        label="Pinball Map lineup intent"
+        label="Pinball Map lineup setting"
         options={INTENT_OPTIONS}
         value={value}
         disabled={readOnly || pending}

@@ -32,10 +32,10 @@ update_machine(machine: "MM", pinballmapMachineId: 1234)
 This is PERMANENT (SKILL.md §2):
 
 - No tool can return the machine to "not linked" afterwards.
-- If the machine was linked to a **different** title with intent `on`, intent goes back to `off`, and Insider Connected is cleared. Setting intent `on` again is a second call.
+- If the machine was linked to a **different** title with its lineup setting (the `intent` parameter) `on`, the lineup setting goes back to `off`, and Insider Connected is cleared. Setting it `on` again is a second call.
 - Only if `get_machine` shows `pinballmap.status: "excluded"`: the machine was marked "not on Pinball Map", and its hand-entered model details (manufacturer, year, designers, artists) are erased and the catalog's details replace them. No tool can re-enter them. Say this in the preview.
 
-## Intent
+## Lineup setting (the `intent` parameter)
 
 ```text
 update_machine(machine: "MM", intent: "on")
@@ -48,7 +48,7 @@ update_machine(machine: "MM", intent: "on")
 
 After setting `on`, tell the user in these words: "PinPoint now wants <initials> listed on Pinball Map. It is not listed until someone pushes the update from the machine's page in the PinPoint web app." Do not say the machine is listed.
 
-Several machines of the same title may all have intent `on`.
+Several machines of the same title may all have their lineup setting `on`.
 
 ## Marking a machine as not on Pinball Map
 
@@ -60,7 +60,7 @@ update_machine(machine: "XX", pinballmapExcluded: true, pinballmapExcludedReason
 
 - `pinballmapMachineId` and `pinballmapExcluded` cannot be sent together.
 - `pinballmapExcluded` only accepts `true`. The only way back is linking the machine to a title.
-- An excluded machine cannot have an intent.
+- An excluded machine cannot have a lineup setting.
 
 ## Insider Connected
 
