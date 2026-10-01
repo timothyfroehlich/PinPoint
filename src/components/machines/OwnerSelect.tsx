@@ -166,11 +166,14 @@ export function OwnerSelect({
   };
 
   return (
-    <div className="space-y-2">
+    <div className="flex min-w-0 flex-col gap-1.5">
       {/* Hidden input for native form submission — server actions read formData.get("ownerId") */}
       <input type="hidden" name="ownerId" value={selectedId} />
 
-      <div className="flex items-center justify-between">
+      {/* The label row is exactly a plain label's height, so Owner lines up
+          with whatever field it sits beside (Initials on New Machine).
+          Invite New is a text-height link-style button, not a h-8 one. */}
+      <div className="flex h-3.5 items-center justify-between">
         <Label htmlFor="owner-trigger" className="text-foreground">
           Machine Owner
         </Label>
@@ -179,7 +182,7 @@ export function OwnerSelect({
             type="button"
             variant="ghost"
             size="sm"
-            className="h-8 px-2 text-xs text-primary"
+            className="h-auto px-0 py-0 text-xs leading-none text-primary hover:bg-transparent hover:underline"
             onClick={() => setInviteDialogOpen(true)}
           >
             <Plus className="mr-1 size-3" />

@@ -146,6 +146,8 @@ const baseProps: MachineDetailsFormProps = {
   designers: null,
   artists: null,
   iscoredGameId: null,
+  ownerRequirements: null,
+  canViewOwnerRequirements: true,
 };
 
 /**
@@ -158,6 +160,16 @@ function renderForm(overrides: Partial<MachineDetailsFormProps> = {}): void {
     <DetailsDirtyProvider>
       <MachineDetailsForm {...baseProps} {...overrides} />
     </DetailsDirtyProvider>
+  );
+}
+
+/** Cancel on a dirty form confirms first (machine-editing 4.1). */
+async function cancelAndDiscard(
+  user: ReturnType<typeof userEvent.setup>
+): Promise<void> {
+  await user.click(screen.getByRole("button", { name: "Cancel" }));
+  await user.click(
+    await screen.findByRole("button", { name: "Discard changes" })
   );
 }
 
@@ -205,7 +217,7 @@ describe("MachineDetailsForm", () => {
     renderForm();
 
     await user.type(screen.getByLabelText(/Machine Name/), "!");
-    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await cancelAndDiscard(user);
 
     expect(beforeUnloadWasBlocked()).toBe(false);
   });
@@ -258,7 +270,7 @@ describe("MachineDetailsForm", () => {
     await user.type(screen.getByLabelText("Machine description"), "draft");
     expect(hiddenDescription().value).not.toBe("");
 
-    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await cancelAndDiscard(user);
 
     expect(screen.getByLabelText(/Machine Name/)).toHaveValue(
       "Godzilla (Premium)"
@@ -292,7 +304,7 @@ describe("MachineDetailsForm", () => {
 
     // Cancel remounts the input to its defaultValue without firing `change`,
     // so the mirror has to be restored explicitly or it keeps the stale name.
-    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await cancelAndDiscard(user);
     expect(screen.getByTestId("pbm-machine-name")).toHaveTextContent(
       "Godzilla (Premium)"
     );
@@ -409,7 +421,7 @@ describe("MachineDetailsForm", () => {
     await user.click(screen.getByRole("button", { name: "Save details" }));
     await screen.findByRole("alert");
 
-    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await cancelAndDiscard(user);
 
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.getByTestId("details-dirty-note")).toHaveTextContent(
@@ -458,6 +470,82 @@ describe("MachineDetailsForm", () => {
 
     expect(screen.getByTestId("details-dirty-note")).toHaveTextContent(
       "Unsaved changes"
+    );
+  });
+
+  it("disables Cancel until there is something to discard", async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+
+    await user.type(screen.getByLabelText(/Machine Name/), "!");
+
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
+  });
+
+  it("keeps the edits when Cancel's confirmation is declined", async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.type(screen.getByLabelText(/Machine Name/), "!");
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Keep editing" })
+    );
+
+    expect(screen.getByLabelText(/Machine Name/)).toHaveValue(
+      "Godzilla (Premium)!"
+    );
+    expect(screen.getByTestId("details-dirty-note")).toHaveTextContent(
+      "Unsaved changes"
+    );
+  });
+
+  it("serializes Owner's Requirements with the rest of the form", async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.type(screen.getByLabelText("Owner's requirements"), "No tilt");
+
+    const field = document.querySelector<HTMLInputElement>(
+      'input[name="ownerRequirements"]'
+    );
+    expect(JSON.parse(field?.value ?? "")).toMatchObject({ type: "doc" });
+    expect(screen.getByTestId("details-dirty-note")).toHaveTextContent(
+      "Unsaved changes"
+    );
+  });
+
+  it("leaves Owner's Requirements out for a viewer not permitted to see it", () => {
+    renderForm({ canViewOwnerRequirements: false });
+
+    expect(
+      screen.queryByLabelText("Owner's requirements")
+    ).not.toBeInTheDocument();
+    // Absent, not blank: a blank field would clear the stored value on save.
+    expect(
+      document.querySelector('input[name="ownerRequirements"]')
+    ).toBeNull();
+  });
+
+  it("renders the Pinball Map controls inside Integrations", () => {
+    renderForm({
+      pinballmap: <div data-testid="stub-listing-control" />,
+    });
+
+    expect(
+      screen
+        .getByTestId("integrations-section")
+        .contains(screen.getByTestId("stub-listing-control"))
+    ).toBe(true);
+  });
+
+  it("says why Pinball Map is unavailable on a Manual Entry machine", () => {
+    renderForm({ pinballmapMachineId: null, pinballmapExcluded: true });
+
+    expect(screen.getByTestId("pbm-listing-collapsed")).toHaveTextContent(
+      "Disabled. Requires a model listed in their catalog."
     );
   });
 

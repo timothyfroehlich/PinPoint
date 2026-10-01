@@ -112,8 +112,33 @@ describe("PinballmapDirtyGate", () => {
     // The note names why everything below it is unavailable, so it has to
     // survive the same treatment it is describing.
     expect(screen.getByRole("status")).toHaveTextContent(
-      "Unsaved model selection"
+      "Unavailable — unsaved changes"
     );
+  });
+
+  it("keeps input events from its controls out of the surrounding form", async () => {
+    // The controls sit inside the machine form, which marks itself dirty on
+    // any bubbling `input` — Radix's Switch fires one. Letting it through
+    // would gate the switch that was just flipped (machine-editing 4.2).
+    const user = userEvent.setup();
+    let formSawInput = false;
+    render(
+      <DetailsDirtyProvider>
+        <form
+          onInput={() => {
+            formSawInput = true;
+          }}
+        >
+          <PinballmapDirtyGate>
+            <input aria-label="Inside the gate" />
+          </PinballmapDirtyGate>
+        </form>
+      </DetailsDirtyProvider>
+    );
+
+    await user.type(screen.getByLabelText("Inside the gate"), "x");
+
+    expect(formSawInput).toBe(false);
   });
 
   it("throws rather than silently defaulting to clean outside the provider", () => {
