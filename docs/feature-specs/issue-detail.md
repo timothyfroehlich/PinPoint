@@ -12,7 +12,7 @@
 
 - **Issue detail page** — the page for one issue. One per issue, at the issue's own URL.
 - **Issue ID** — the machine's initials plus the issue's number on that machine (GDZ-02). It identifies the issue in copy and in its URL; moving the issue to another machine gives it a new ID.
-- **Header** — the block at the top of the page: Issue ID, machine name, title, the title and move actions, and the summary line. It is the same at every size except that the Move button carries a label on desktop and is icon-only on mobile (§4.5).
+- **Header** — the block at the top of the page: Issue ID, machine name, title, the title and move actions, and the summary line. It is the same at every size except that on mobile Edit title and Move sit together in a ⋯ menu (§4.5).
 - **Summary line** — a read-only line under the title stating the issue's status, severity, and priority.
 - **Initial report** — what the reporter submitted: who reported it and when, the description, the frequency, and the photos attached at report time.
 - **Activity** — everything that happened after the report, oldest first: comments and system events.
@@ -46,7 +46,7 @@
 - **3.4** Commenting and watching require being signed in.
 - **3.5** Only a comment's author can edit it.
 - **3.6** A comment's author can delete it, and an admin can delete any comment. System events and the initial report can be neither edited nor deleted.
-- **3.7** A control the viewer lacks the capability for is not offered: the Edit title and Move buttons are absent, and a field row shows its value without the › chevron, opens no picker, and gives no reason text.
+- **3.7** A control the viewer lacks the capability for is not offered: the Edit title and Move actions are absent (on mobile, so is the ⋯ menu when neither is available), and a field row shows its value without the › chevron, opens no picker, and gives no reason text.
 - **3.8** The list of people who can be assigned is sent only to viewers with the triage capability.
 - **3.9** People appear by name only — never by email (CORE-SEC-007). A report from someone without an account shows the name they gave, or Anonymous.
 
@@ -56,9 +56,9 @@
 
 - **4.1** The header's first row is the Issue ID chip followed by the machine's name, which links to the machine page.
 - **4.2** The title follows, as the page's heading, shown in full and wrapping onto as many lines as it needs. No title is cut off, including older titles longer than the current limit.
-- **4.3** An Edit title button sits beside the title and is always visible, at every size and on touch screens — never revealed only on hover.
+- **4.3** On desktop an Edit title button sits beside the title and is always visible — never revealed only on hover. On mobile, Edit title is in the ⋯ menu (§4.5).
 - **4.4** Edit title edits the title in place. Enter saves, Escape cancels, and leaving the field cancels unless the save just failed. An empty or unchanged title saves nothing. A title holds at most 60 characters, the same limit as when the issue is reported. An older title over 60 characters is never shortened automatically; it saves only once edited down to 60 or fewer.
-- **4.5** A dedicated Move to another machine button sits beside Edit title. On desktop it carries a Move label; on mobile it is an icon button. There is no overflow (⋯) menu.
+- **4.5** On desktop a labeled Move button sits beside Edit title. On mobile a ⋯ menu beside the title holds Edit title and Move to another machine, offering only the actions the viewer can use.
 - **4.6** Move opens a dialog that lists every other machine, warns that the issue's URL will change, and on confirmation moves the issue and opens it at its new URL. The issue takes the next number on the destination machine; its old number is not reused.
 - **4.7** The summary line sits under the title and states status, severity, and priority, each with its icon, with priority worded as "<level> priority". It is read-only.
 - **4.8** Frequency is not in the header.
@@ -181,8 +181,8 @@ None.
 
 | Requirement | Code today | Resolution |
 | :-- | :-- | :-- |
-| §4.3, §13.2 | The Edit title button is revealed only on hover or keyboard focus, so touch users never see it; it is 32px. | PP-t4h1 |
-| §4.5, §13.2 | Move is the only item in a ⋯ More actions menu (32px trigger); there is no dedicated Move button. | PP-t4h1 |
+| §4.3, §13.2 | The Edit title button is revealed only on hover or keyboard focus at every size, so desktop users must hover to find it and touch users never see it; it is 32px. | PP-t4h1 |
+| §4.5, §13.2 | At every size Move is the only item in a ⋯ More actions menu (32px trigger): desktop has no labeled Move button, and the mobile menu lacks Edit title. | PP-t4h1 |
 | §4.2 | Titles longer than 60 characters are cut to 60 with "...", and the full title is only in a hover tooltip, which touch screens never show. | PP-t4h1 |
 | §4.4 | Editing a title allows up to 100 characters (`editable-issue-title.tsx`, `issues/schemas.ts`), while reporting allows 60. | PP-t4h1 |
 | §4.7 | No summary line; status, severity, and priority appear only as controls in the metadata grid. | PP-t4h1 |
@@ -219,6 +219,7 @@ Changes to this document. Divergence-table rows are working state and are not lo
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-01 | §1 Header, §3.7, §4.3, and §4.5: on mobile, Edit title and Move share a ⋯ menu beside the title; desktop keeps the always-visible Edit title button and a labeled Move button. |
 | 2026-09-30 | Review fixes: §6.4 added (the callout's title does not name the machine); the Updated row joins §1 Context rows, §11.4, and §12.3, and desktop Details shows the same context rows as mobile (§12.4); §1 Header names the Move label exception; §1 Field rows open a picker only when the viewer can change the field; §13.1 always wraps titles; §11.7 and §12.5 state their requirement without describing the bible. |
 | 2026-09-30 | Resolved open questions: §1 and §11.7 make the section tabs in-page state, a deliberate departure from the design bible's URL-driven tabs; §2.6 and §11.2 open every arrival, notifications included, on the Issue tab; §10.1, §10.3, §10.5, §10.6, and §11.1 define open, See all with only the machine filter (every status, off-floor machines included), the five newest first, and the empty state; §5.3 shows Not specified; §3.7 drops the chevron and reason text on fields the viewer can't change; §7.3 resets Comments only on every visit.; §4.2 shows the full title, wrapped; §4.4 sets the edit limit to 60 to match reporting; §9.7 adds an Updated row to Details; §13.2 holds the Comments only toggle and comment actions to 44px. |
 | 2026-09-30 | Initial draft: route and access, capabilities, header with always-visible Edit title and a dedicated Move button, plain-text initial report with a frequency line, owner's requirements, Activity with a Comments only toggle, commenting, Details as field and context rows, Other issues, mobile section tabs, a two-pane desktop layout, and the 320px floor and 44px touch targets. |
