@@ -141,7 +141,7 @@ The control's states (§4) are comparisons across these: _in sync_ means the lin
 
 ## 10. Admin configuration
 
-The Pinball Map section of the Admin Integrations page (`docs/feature-specs/admin-integrations.md`) configures the integration's PinPoint-wide state: the tracked location (§1), its sync health, and an on-demand refresh. It is a configuration surface only — it does not show per-machine listing state or the listing control (those live on the machine edit page, §4), or fleet-wide Pinball Map views (those live on the lineup page, `docs/feature-specs/pinballmap-lineup.md`). The region-alert channel that shares the section is its own feature (`docs/feature-specs/pinballmap-region-alerts.md`).
+The Pinball Map section of the Admin Integrations page (`docs/feature-specs/admin-integrations.md`) configures the integration's PinPoint-wide state: the tracked location (§1), its sync health, and an on-demand refresh. It is a configuration surface only — it does not show per-machine listing state or the listing control (those live on the machine edit page, §4), or fleet-wide Pinball Map views (those live on the lineup page, `docs/feature-specs/pinballmap-lineup.md`). The region-alert channel and the sync-report channel that share the section are their own features (`docs/feature-specs/pinballmap-region-alerts.md`, `docs/feature-specs/pinballmap-sync-report.md`).
 
 ### The section
 
@@ -194,6 +194,7 @@ Changes to this document. Divergence-table rows are working state and are not lo
 | Date | Change |
 | :-- | :-- |
 | 2026-10-01 | §4.10 cites the lineup page as its dense-view example; `fleet.md` is retired. |
+| 2026-09-30 | §10 preamble names the sync-report channel the Pinball Map section hosts (`pinballmap-sync-report.md`). |
 | 2026-09-30 | Renamed listing intent to lineup setting (and Insider Connected intent to Insider Connected setting) throughout; Pinball Map's side is its "value". §4.8 bans "intent" in user-facing copy. §4.10 says "Pinball Map" for the former "PBM" abbreviation. No behavior change. |
 | 2026-09-30 | §1: Availability is defined as whether the machine is at the venue and available for play, replacing "where the machine physically is". |
 | 2026-09-30 | §3.7: Confirm lineup requires the person's own linked Pinball Map account (8.4) rather than operator credentials. §4.3: the push action is offered to a person who can push (8.2), replacing "with operator credentials". |
