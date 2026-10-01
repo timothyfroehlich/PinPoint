@@ -377,14 +377,15 @@ const SHEET_OPEN_TIMEOUT = process.env["CI"] ? 10_000 : 3_000;
  * mobile sheet when that is the branch in play.
  *
  * Both branches are in the DOM at once: the inline `issue-comment-form` carries
- * `hidden md:flex`, and below `md` a StickyCommentComposer button opens the same
- * form inside a Sheet. So a test has to work out which one is live.
+ * `hidden md:block`, and below `md` the floating "Comment" button opens the same
+ * form inside a Sheet titled "Add a comment". So a test has to work out which
+ * one is live.
  *
  * It has to *know*, not sample. Two specs used to decide with
  * `sheetTrigger.isVisible({ timeout: 3000 })`, which reads like a 3s wait and is
  * not one — `isVisible()` never retries, and its `timeout` option is deprecated
  * and ignored. The check therefore fired at whatever instant the Server Action
- * redirect happened to land on, so a sticky composer that had not hydrated yet
+ * redirect happened to land on, so a mobile composer that had not hydrated yet
  * would read as "desktop" and send the test at the inline form that is
  * `display: none` on mobile. Deciding on viewport width removes the sampling:
  * it is the same input the CSS uses, and it cannot be raced.
@@ -405,7 +406,10 @@ export async function openIssueCommentForm(
     return { form: page.getByTestId("issue-comment-form"), isSheet: false };
   }
 
-  const sheetTrigger = page.getByRole("button", { name: "Add a comment" });
+  const sheetTrigger = page.getByRole("button", {
+    name: "Comment",
+    exact: true,
+  });
   await sheetTrigger.waitFor({ state: "visible", timeout: 15000 });
 
   const dialog = page.getByRole("dialog", { name: "Add a comment" });

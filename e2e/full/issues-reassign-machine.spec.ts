@@ -1,8 +1,8 @@
 /**
  * E2E Tests for Issue Machine Reassignment (PP-3hb)
  *
- * Verifies the "Move to another machine" kebab action on the issue detail
- * page. NN #11 — every clickable element gets clicked in an E2E test.
+ * Verifies the "Move to another machine" action on the issue detail page —
+ * the header's Move button from `md` up, the ⋯ "Issue actions" menu below it. NN #11 — every clickable element gets clicked in an E2E test.
  */
 
 import { test, expect, type Page, type TestInfo } from "../support/fixtures.js";
@@ -13,7 +13,11 @@ import {
   submitFormAndWaitForRedirect,
 } from "../support/page-helpers.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
-import { openDropdownMenu } from "../support/actions.js";
+import {
+  hasIssueSectionTabs,
+  openDropdownMenu,
+  openMoveIssueDialog,
+} from "../support/actions.js";
 
 // Stem shared across all tests in this file. Cleanup matches on title rather
 // than URL because issues live at /m/<initials>/i/<number>, not
@@ -82,13 +86,12 @@ test.describe("Issue reassignment", () => {
 
       await createIssueOnMachine(page, fromInitials, issueTitle);
 
-      // Open the kebab menu in the page header using the retry-on-race helper.
-      await openDropdownMenu(page.getByTestId("issue-actions-menu-trigger"));
-      await page.getByTestId("issue-actions-menu-reassign").click();
+      // Move button on desktop, ⋯ menu on mobile — the helper picks and
+      // retries a click lost to hydration.
+      await openMoveIssueDialog(page);
 
       // Pick the destination machine in the AlertDialog combobox.
       const dialog = page.getByRole("alertdialog");
-      await expect(dialog).toBeVisible();
       await dialog
         .getByPlaceholder("Search machines…")
         .fill(seededMachines.humptyDumpty.initials);
@@ -113,14 +116,17 @@ test.describe("Issue reassignment", () => {
         `/m/${toInitials}`
       );
 
-      // The timeline records the move with both formatted IDs and machine
-      // names (the exact text mirrors formatTimelineEvent).
+      // Activity records the move with both formatted IDs and machine names
+      // (the exact text mirrors formatTimelineEventAction).
       await expect(
-        page.getByText(
-          new RegExp(
-            `Moved from ${fromInitials}-[0-9]+ \\(.*\\) to ${toInitials}-[0-9]+ \\(${toName}\\)`
-          )
-        )
+        page
+          .getByTestId("issue-timeline")
+          .getByTestId("system-event-text")
+          .filter({
+            hasText: new RegExp(
+              `moved this from ${fromInitials}-[0-9]+ \\(.*\\) → ${toInitials}-[0-9]+ \\(${toName}\\)`
+            ),
+          })
       ).toBeVisible();
     });
   });
@@ -131,17 +137,37 @@ test.describe("Issue reassignment", () => {
     test("does not expose the reassign action when the member does not own the machine", async ({
       page,
     }, testInfo) => {
-      // Member is not the owner of TAF in the seed data, so the page omits
-      // the `actions` prop on PageHeader (userCanReassign is false), and
-      // IssueActionsMenu is never rendered.
+      // Member is not the owner of TAF in the seed data, so userCanReassign
+      // is false and the page renders no Move action. As the reporter the
+      // member can still edit the title, so on mobile the ⋯ menu exists but
+      // offers only "Edit title".
       const fromInitials = seededMachines.addamsFamily.initials;
       const issueTitle = uniqueTitle(testInfo, "Member view");
 
       await createIssueOnMachine(page, fromInitials, issueTitle);
 
-      await expect(page.getByTestId("issue-actions-menu-trigger")).toHaveCount(
-        0
-      );
+      await expect(
+        page.getByRole("heading", { level: 1, name: issueTitle })
+      ).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Move to another machine" })
+      ).toHaveCount(0);
+
+      if (hasIssueSectionTabs(page)) {
+        await openDropdownMenu(
+          page.getByRole("button", { name: "Issue actions" })
+        );
+        await expect(
+          page.getByRole("menuitem", { name: "Edit title" })
+        ).toBeVisible();
+        await expect(
+          page.getByRole("menuitem", { name: "Move to another machine" })
+        ).toHaveCount(0);
+      } else {
+        await expect(
+          page.getByRole("button", { name: "Edit title" })
+        ).toBeVisible();
+      }
     });
   });
 });
