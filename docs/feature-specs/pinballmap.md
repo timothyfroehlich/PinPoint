@@ -17,7 +17,7 @@ Six independent facts. No one of them ever implies another.
 - **Listing intent** — whether this machine should appear on the location's public Pinball Map lineup. An operator decision, per machine, owned by PinPoint, expressed as a tri-state: **On the lineup / Off the lineup / Don't sync** (the third position is sync participation, below).
 - **Lineup** — what Pinball Map currently shows for the location: which titles, and each entry's condition comments. An observed external fact, per title — Pinball Map shows at most one entry per title per location.
 - **Coverage** — a lineup entry is _covered_ when at least one same-title cabinet has intent On. There is no claiming and no single holder: every intent-On cabinet relates to the entry equally, and comments fan out to all of them (§7.1). Which cabinets cover a title is decided entirely by their intent toggles. _(Replaced the former "holding/claiming" concept, 2026-08-15.)_
-- **Availability** — where the machine physically is (on the floor, on loan, removed, …). Never drives listing intent or the lineup automatically.
+- **Availability** — whether the machine is at the venue and available for play: On the Floor, Off the Floor, On Loan, Pending Arrival, or Removed. Never drives listing intent or the lineup automatically.
 - **Edition near-miss** — a candidate match relationship where a local machine and a Pinball Map lineup entry share a title family (`machineGroupId`), but differ in edition (e.g., Pro on Pinball Map vs. Premium in PinPoint). It will not auto-link automatically and surfaces as a candidate match for operator confirmation rather than an unrelated missing machine.
 
 **Sync participation** is the intent tri-state's third position: a machine set to Don't sync is exempt from alerts, reconciliation, and comment import — but its observed status stays visible, because the location-level refresh keeps recording the lineup while Pinball Map is configured. Uncataloged and unmatched machines never participate.
@@ -193,6 +193,7 @@ Changes to this document. Divergence-table rows are working state and are not lo
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-30 | §1: Availability is defined as whether the machine is at the venue and available for play, replacing "where the machine physically is". |
 | 2026-09-30 | §3.7: Confirm lineup requires the person's own linked Pinball Map account (8.4) rather than operator credentials. §4.3: the push action is offered to a person who can push (8.2), replacing "with operator credentials". |
 | 2026-09-30 | §4.11: when the chosen title is already on the lineup, the New Machine page's Insider Connected toggle starts at the entry's value (Off when Pinball Map reports neither). |
 | 2026-09-30 | §3.7: the Confirm lineup dialog also lists unmatched entries, since confirming vouches for every entry on the lineup. |
