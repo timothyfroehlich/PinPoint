@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { User } from "lucide-react";
+import { Check, User } from "lucide-react";
 import { FieldRowButton } from "~/components/issues/fields/IssueFieldRow";
 import {
   FieldDrawerHeader,
@@ -40,6 +40,10 @@ import { cn } from "~/lib/utils";
  * - Alphabetical user list also includes the current user (under their real
  *   name), so searching by name finds them even though they already appear
  *   as "Me"
+ * - The current assignee's row (or Unassigned) carries a check mark and is
+ *   where the list's highlight starts, so the highlight never suggests a
+ *   different person is assigned
+ * - Filtering announces how many people match
  * - `onAssign(userId | null)` fires on selection; `null` means unassigned
  * - While `isPending` the row shows a spinner and won't open
  * - Viewers without the triage capability get a read-only row instead
@@ -86,10 +90,24 @@ export function AssigneeCommand({
   }, [query, users]);
 
   const itemClassName = cn(touch && "min-h-11");
+  // The highlight starts on whoever is assigned now.
+  const defaultValue =
+    assignedToId === null
+      ? "unassigned"
+      : assignedToId === currentUser?.id
+        ? `me-${currentUser.id}`
+        : assignedToId;
+  const trimmedQuery = query.trim();
+  const resultAnnouncement = trimmedQuery
+    ? filteredUsers.length === 0
+      ? "No matches"
+      : `${filteredUsers.length} ${filteredUsers.length === 1 ? "match" : "matches"}`
+    : "";
 
   return (
     <Command
       shouldFilter={false}
+      defaultValue={defaultValue}
       // In the sheet the search stays put while the list scrolls.
       className={cn(touch && "min-h-0 flex-1 bg-transparent")}
     >
@@ -102,6 +120,9 @@ export function AssigneeCommand({
         value={query}
         onValueChange={setQuery}
       />
+      <p role="status" className="sr-only">
+        {resultAnnouncement}
+      </p>
       <CommandList
         aria-label="Assignee options"
         className={cn(touch && "max-h-none min-h-0 flex-1")}
@@ -125,6 +146,7 @@ export function AssigneeCommand({
                 aria-hidden="true"
               />
               <span className="font-medium text-primary">Me</span>
+              <CurrentMark show={assignedToId === currentUser.id} />
             </CommandItem>
           ) : null}
           <CommandItem
@@ -142,6 +164,7 @@ export function AssigneeCommand({
               ?
             </span>
             <span className="font-medium">Unassigned</span>
+            <CurrentMark show={assignedToId === null} />
           </CommandItem>
         </CommandGroup>
         {/* The divider is a border, not a CommandSeparator: a separator
@@ -169,12 +192,24 @@ export function AssigneeCommand({
                   {user.name.slice(0, 1).toUpperCase()}
                 </span>
                 <span className="font-medium leading-none">{user.name}</span>
+                <CurrentMark show={user.id === assignedToId} />
               </CommandItem>
             ))
           )}
         </CommandGroup>
       </CommandList>
     </Command>
+  );
+}
+
+/** The check that marks the current assignee's row. */
+function CurrentMark({ show }: { show: boolean }): React.JSX.Element | null {
+  if (!show) return null;
+  return (
+    <Check
+      className="ml-auto size-4 shrink-0 text-primary"
+      aria-hidden="true"
+    />
   );
 }
 

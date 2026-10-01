@@ -236,6 +236,62 @@ describe("AssigneePicker — Me quick-select", () => {
   });
 });
 
+describe("AssigneePicker — current assignee", () => {
+  function open(assignedToId: string | null): HTMLElement {
+    render(
+      <AssigneePicker
+        assignedToId={assignedToId}
+        users={mockUsers}
+        isPending={false}
+        onAssign={vi.fn()}
+        currentUserId="1"
+      />
+    );
+    fireEvent.click(screen.getByTestId("assignee-picker-trigger"));
+    return screen.getByRole("listbox");
+  }
+
+  it.each([
+    ["Bob", "2", "assignee-option-2"],
+    ["Unassigned", null, "assignee-option-unassigned"],
+    ["Me", "1", "assignee-option-me"],
+  ] as const)(
+    "starts the highlight on the current assignee (%s), not the first row",
+    async (_label, assignedToId, testId) => {
+      const listbox = open(assignedToId);
+      await waitFor(() => {
+        expect(
+          within(listbox)
+            .getAllByRole("option")
+            .filter((option) => option.getAttribute("aria-selected") === "true")
+            .map((option) => option.getAttribute("data-testid"))
+        ).toEqual([testId]);
+      });
+    }
+  );
+
+  it("marks only the current assignee's rows with a check", () => {
+    const listbox = open("2");
+    const checked = within(listbox)
+      .getAllByRole("option")
+      .filter((option) => option.querySelector("svg.lucide-check"))
+      .map((option) => option.getAttribute("data-testid"));
+    expect(checked).toEqual(["assignee-option-2"]);
+  });
+
+  it("announces how many people match the filter", () => {
+    open(null);
+    const search = screen.getByTestId("assignee-search-input");
+
+    fireEvent.change(search, { target: { value: "o" } });
+    expect(screen.getByRole("status")).toHaveTextContent("2 matches");
+    fireEvent.change(search, { target: { value: "car" } });
+    expect(screen.getByRole("status")).toHaveTextContent("1 match");
+    fireEvent.change(search, { target: { value: "zed" } });
+    expect(screen.getByRole("status")).toHaveTextContent("No matches");
+  });
+});
+
 describe("AssigneePicker — phones (spec issue-detail §9.4, §13.2)", () => {
   let restoreViewport: (() => void) | undefined;
   afterEach(() => {
