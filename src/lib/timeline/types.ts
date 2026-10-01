@@ -56,7 +56,7 @@ export function formatTimelineEvent(event: TimelineEventData): string {
       return `Frequency changed from ${frequencyLabel(event.from)} to ${frequencyLabel(event.to)}`;
     case "comment_deleted":
       return event.deletedBy === "author"
-        ? "User deleted their comment"
+        ? "Comment deleted by author"
         : "Comment removed by admin";
     case "title_changed":
       return `Title changed from "${event.from}" to "${event.to}"`;

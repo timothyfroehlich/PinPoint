@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderToString } from "react-dom/server";
 import type { ReactElement } from "react";
@@ -7,6 +7,7 @@ import type { IssueWithAllRelations } from "~/lib/types";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 import { IssueActivity } from "~/components/issues/IssueActivity";
 import { IssueDetails } from "~/components/issues/IssueDetails";
+import { deleteCommentAction } from "~/app/(app)/issues/actions";
 import { TooltipProvider } from "~/components/ui/tooltip";
 
 // Wrap renders in TooltipProvider since the global provider lives in the root
@@ -16,6 +17,8 @@ function renderWithProviders(ui: ReactElement) {
 }
 
 vi.mock("~/app/(app)/issues/actions", () => ({
+  deleteCommentAction: vi.fn(),
+  editCommentAction: vi.fn(),
   assignIssueAction: vi.fn(),
   updateIssueStatusAction: vi.fn(),
   updateIssueSeverityAction: vi.fn(),
@@ -25,6 +28,19 @@ vi.mock("~/app/(app)/issues/actions", () => ({
 
 vi.mock("~/app/(app)/issues/watcher-actions", () => ({
   toggleWatcherAction: vi.fn(),
+}));
+
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+
+// The real editor is a lazy TipTap bundle; a textarea stands in for it.
+vi.mock("~/components/editor/RichTextEditorDynamic", () => ({
+  RichTextEditor: ({
+    ariaLabel,
+    autoFocus,
+  }: {
+    ariaLabel?: string;
+    autoFocus?: boolean;
+  }) => <textarea aria-label={ariaLabel} autoFocus={autoFocus} />,
 }));
 
 vi.mock("~/components/issues/AddCommentForm", () => ({
@@ -349,5 +365,100 @@ describe("Issue detail Activity (spec §7–§8)", () => {
       "role",
       "status"
     );
+  });
+
+  it("lists entries in order and offers Comments only only when there are entries", () => {
+    const { unmount } = renderWithProviders(
+      <IssueActivity
+        issue={createIssue(withComments(systemEvent, comment))}
+        currentUserId={null}
+        currentUserRole="unauthenticated"
+      />
+    );
+    const list = screen.getByRole("list");
+    expect(list.tagName).toBe("OL");
+    expect(within(list).getAllByRole("listitem")).toHaveLength(2);
+    unmount();
+
+    renderWithProviders(
+      <IssueActivity
+        issue={createIssue()}
+        currentUserId={null}
+        currentUserRole="unauthenticated"
+      />
+    );
+    expect(
+      screen.queryByRole("button", { name: "Comments only" })
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("No comments yet")).toBeInTheDocument();
+  });
+
+  describe("comment actions keep focus on the page", () => {
+    function renderOwnComment() {
+      renderWithProviders(
+        <IssueActivity
+          issue={createIssue(withComments(comment))}
+          currentUserId="member-1"
+          currentUserRole="member"
+        />
+      );
+      return screen.getByRole("button", { name: "Comment actions" });
+    }
+
+    it("says which comment the actions button belongs to", () => {
+      const trigger = renderOwnComment();
+      expect(trigger).toHaveAccessibleDescription(/^Member User/);
+    });
+
+    it("Edit focuses the editor; Cancel returns focus to the actions button", async () => {
+      const user = userEvent.setup();
+      const trigger = renderOwnComment();
+
+      await user.click(trigger);
+      await user.click(await screen.findByRole("menuitem", { name: "Edit" }));
+      await waitFor(() => {
+        expect(
+          screen.getByRole("textbox", { name: "Edit comment" })
+        ).toHaveFocus();
+      });
+
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+      await waitFor(() => {
+        expect(trigger).toHaveFocus();
+      });
+    });
+
+    it("canceling a delete returns focus to the actions button", async () => {
+      const user = userEvent.setup();
+      const trigger = renderOwnComment();
+
+      await user.click(trigger);
+      await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
+      const dialog = await screen.findByRole("alertdialog");
+      await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+      await waitFor(() => {
+        expect(trigger).toHaveFocus();
+      });
+      expect(deleteCommentAction).not.toHaveBeenCalled();
+    });
+
+    it("a completed delete moves focus to the Activity heading", async () => {
+      vi.mocked(deleteCommentAction).mockResolvedValue({
+        ok: true,
+        value: { commentId: "comment-1" },
+      });
+      const user = userEvent.setup();
+      const trigger = renderOwnComment();
+
+      await user.click(trigger);
+      await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
+      const dialog = await screen.findByRole("alertdialog");
+      await user.click(within(dialog).getByRole("button", { name: "Delete" }));
+
+      await waitFor(() => {
+        expect(screen.getByRole("heading", { name: "Activity" })).toHaveFocus();
+      });
+    });
   });
 });

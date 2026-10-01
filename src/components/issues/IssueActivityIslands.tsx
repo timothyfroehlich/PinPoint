@@ -30,6 +30,7 @@ import {
 } from "~/components/ui/dropdown-menu";
 import { type ProseMirrorDoc } from "~/lib/tiptap/types";
 import { cn } from "~/lib/utils";
+import { ACTIVITY_HEADING_ID } from "~/components/issues/activity-ids";
 
 /**
  * The interactive parts of Activity (spec issue-detail §7). `IssueActivity`
@@ -52,7 +53,9 @@ export interface ActivityFeedItem {
 /**
  * The Activity heading row and list. Comments only hides system events
  * (§7.3) — it starts off on every visit and is never remembered — and the
- * resulting count is announced politely.
+ * resulting count is announced politely. With no entries there is nothing to
+ * filter, so the toggle is not offered. Entries are an ordered list: the
+ * order is the history.
  */
 export function ActivityFeed({
   items,
@@ -84,31 +87,35 @@ export function ActivityFeed({
     <>
       <div className="flex items-center justify-between gap-2">
         {heading}
-        <button
-          type="button"
-          aria-pressed={commentsOnly}
-          onClick={toggle}
-          className={cn(
-            "inline-flex min-h-11 items-center rounded-full border px-3 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8",
-            commentsOnly
-              ? "border-primary/40 bg-primary/10 text-primary"
-              : "border-outline-variant text-foreground hover:bg-muted/40"
-          )}
-          data-testid="comments-only-toggle"
-        >
-          Comments only
-        </button>
+        {items.length > 0 ? (
+          <button
+            type="button"
+            aria-pressed={commentsOnly}
+            onClick={toggle}
+            className={cn(
+              "inline-flex min-h-11 items-center rounded-full border px-3 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8",
+              commentsOnly
+                ? "border-primary/40 bg-primary/10 text-primary"
+                : "border-outline-variant text-foreground hover:bg-muted/40"
+            )}
+            data-testid="comments-only-toggle"
+          >
+            Comments only
+          </button>
+        ) : null}
       </div>
       <p role="status" className="sr-only">
         {announcement}
       </p>
 
-      <div className="flex flex-col gap-3">
-        {visible.map((item) => (
-          <React.Fragment key={item.id}>{item.node}</React.Fragment>
-        ))}
-        {commentCount === 0 ? empty : null}
-      </div>
+      {visible.length > 0 ? (
+        <ol className="flex flex-col gap-3">
+          {visible.map((item) => (
+            <li key={item.id}>{item.node}</li>
+          ))}
+        </ol>
+      ) : null}
+      {commentCount === 0 ? empty : null}
     </>
   );
 }
@@ -129,11 +136,12 @@ function CommentEditFormButtons({
 function CommentEditForm({
   commentId,
   initialContent,
-  onCancel,
+  onDone,
 }: {
   commentId: string;
   initialContent: ProseMirrorDoc;
-  onCancel: () => void;
+  /** Saved or canceled: the editor closes. */
+  onDone: () => void;
 }): React.JSX.Element {
   const [state, formAction] = useActionState<
     EditCommentResult | undefined,
@@ -146,11 +154,11 @@ function CommentEditForm({
   React.useEffect(() => {
     if (state?.ok) {
       toast.success("Comment updated");
-      onCancel();
+      onDone();
     } else if (state?.ok === false) {
       toast.error(state.message);
     }
-  }, [state, onCancel]);
+  }, [state, onDone]);
 
   return (
     <form action={formAction} className="space-y-4">
@@ -160,6 +168,9 @@ function CommentEditForm({
         onChange={setContent}
         mentionsEnabled={true}
         ariaLabel="Edit comment"
+        // Edit was just chosen from the comment's menu.
+        // eslint-disable-next-line jsx-a11y/no-autofocus -- focus follows the Edit choice
+        autoFocus
         className="min-h-32"
       />
       <input
@@ -167,7 +178,7 @@ function CommentEditForm({
         name="comment"
         value={content ? JSON.stringify(content) : ""}
       />
-      <CommentEditFormButtons onCancel={onCancel} />
+      <CommentEditFormButtons onCancel={onDone} />
     </form>
   );
 }
@@ -176,12 +187,18 @@ function DeleteCommentDialog({
   commentId,
   isOpen,
   onOpenChange,
+  returnFocusTo,
 }: {
   commentId: string;
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
+  /** Where focus goes when the dialog closes without deleting. */
+  returnFocusTo: () => HTMLElement | null;
 }): React.JSX.Element {
   const [isPending, startTransition] = useTransition();
+  // Set once the delete succeeds: the comment (and its ⋯ button) is about to
+  // become a system event, so focus moves to the Activity heading instead.
+  const deletedRef = React.useRef(false);
 
   const handleDelete = (): void => {
     startTransition(async () => {
@@ -189,6 +206,7 @@ function DeleteCommentDialog({
       formData.append("commentId", commentId);
       const result = await deleteCommentAction(undefined, formData);
       if (result.ok) {
+        deletedRef.current = true;
         toast.success("Comment deleted");
         onOpenChange(false);
       } else {
@@ -199,7 +217,19 @@ function DeleteCommentDialog({
 
   return (
     <AlertDialog open={isOpen} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
+      <AlertDialogContent
+        // Radix calls this on close and also when the dialog unmounts with
+        // its comment, so it covers a delete that re-renders Activity first.
+        onCloseAutoFocus={(event) => {
+          const target = deletedRef.current
+            ? document.getElementById(ACTIVITY_HEADING_ID)
+            : returnFocusTo();
+          if (target) {
+            event.preventDefault();
+            target.focus();
+          }
+        }}
+      >
         <AlertDialogHeader>
           <AlertDialogTitle>Delete comment?</AlertDialogTitle>
           <AlertDialogDescription>
@@ -208,9 +238,12 @@ function DeleteCommentDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={isPending} className="max-md:min-h-11">
+            Cancel
+          </AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"
+            className="max-md:min-h-11"
             onClick={(event) => {
               // Stay open until the delete settles; success closes it.
               event.preventDefault();
@@ -230,6 +263,10 @@ function DeleteCommentDialog({
  * A comment's `<article>`, named by its author and time. Its header and body
  * are rendered on the server; this island adds the actions menu (§7.9), the
  * in-place editor (§7.10), and the delete confirmation (§7.11).
+ *
+ * Focus never falls to `<body>`: choosing Edit focuses the editor, Save and
+ * Cancel return to the ⋯ button, a canceled delete returns to the ⋯ button,
+ * and a completed delete moves to the Activity heading.
  */
 export function CommentShell({
   commentId,
@@ -253,10 +290,36 @@ export function CommentShell({
 }): React.JSX.Element {
   const [isEditing, setIsEditing] = React.useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
-  const stopEditing = React.useCallback(() => setIsEditing(false), []);
+  const articleRef = React.useRef<HTMLElement>(null);
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
+  // A menu choice moves focus itself (into the editor or the dialog), so the
+  // menu must not pull it back to the ⋯ button as it closes. The editor opens
+  // only once the menu has let go of focus, so its autofocus sticks.
+  const menuChoiceRef = React.useRef<"edit" | "delete" | null>(null);
+  // Set when the editor closes while focus is in it (or already lost).
+  const restoreFocusRef = React.useRef(false);
+
+  const stopEditing = React.useCallback(() => {
+    const active = document.activeElement;
+    restoreFocusRef.current =
+      active === null ||
+      active === document.body ||
+      (articleRef.current?.contains(active) ?? false);
+    setIsEditing(false);
+  }, []);
+
+  React.useEffect(() => {
+    if (isEditing || !restoreFocusRef.current) return;
+    restoreFocusRef.current = false;
+    // The shorter body replaces the editor; keep the comment in view without
+    // jumping the page to put the button at an edge.
+    triggerRef.current?.focus({ preventScroll: true });
+    articleRef.current?.scrollIntoView({ block: "nearest" });
+  }, [isEditing]);
 
   return (
     <article
+      ref={articleRef}
       id={`comment-${commentId}`}
       aria-labelledby={labelledBy}
       className="rounded-lg border border-outline-variant bg-card p-3 md:p-4"
@@ -271,27 +334,53 @@ export function CommentShell({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
+                ref={triggerRef}
                 variant="ghost"
                 size="icon"
                 className="-my-2.5 -mr-2.5 size-11 text-muted-foreground md:-my-1.5 md:-mr-1.5 md:size-8"
                 aria-label="Comment actions"
+                // Which comment, for a screen reader moving by buttons.
+                aria-describedby={labelledBy}
               >
                 <MoreHorizontal className="size-4" aria-hidden="true" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent
+              align="end"
+              onCloseAutoFocus={(event) => {
+                const choice = menuChoiceRef.current;
+                if (!choice) return;
+                event.preventDefault();
+                menuChoiceRef.current = null;
+                if (choice === "edit") setIsEditing(true);
+              }}
+            >
               {canEdit ? (
-                <DropdownMenuItem onSelect={() => setIsEditing(true)}>
+                <DropdownMenuItem
+                  className="max-md:min-h-11"
+                  onSelect={() => {
+                    menuChoiceRef.current = "edit";
+                  }}
+                >
                   <Pencil className="mr-2 size-4" aria-hidden="true" />
                   <span>Edit</span>
                 </DropdownMenuItem>
               ) : null}
               {canDelete ? (
                 <DropdownMenuItem
-                  className="text-destructive-text focus:bg-destructive/10 focus:text-destructive-text"
-                  onSelect={() => setIsDeleteDialogOpen(true)}
+                  // Red text on the popover (4.8:1); highlighted, the text
+                  // turns light on a red tint (16:1), where red text would
+                  // fall under 4.5:1.
+                  className="text-destructive-text focus:bg-destructive/10 focus:text-foreground max-md:min-h-11"
+                  onSelect={() => {
+                    menuChoiceRef.current = "delete";
+                    setIsDeleteDialogOpen(true);
+                  }}
                 >
-                  <Trash2 className="mr-2 size-4" aria-hidden="true" />
+                  <Trash2
+                    className="mr-2 size-4 text-destructive-text"
+                    aria-hidden="true"
+                  />
                   <span>Delete</span>
                 </DropdownMenuItem>
               ) : null}
@@ -306,7 +395,7 @@ export function CommentShell({
           initialContent={
             editContent ?? { type: "doc", content: [{ type: "paragraph" }] }
           }
-          onCancel={stopEditing}
+          onDone={stopEditing}
         />
       ) : (
         children
@@ -317,6 +406,7 @@ export function CommentShell({
           commentId={commentId}
           isOpen={isDeleteDialogOpen}
           onOpenChange={setIsDeleteDialogOpen}
+          returnFocusTo={() => triggerRef.current}
         />
       ) : null}
     </article>

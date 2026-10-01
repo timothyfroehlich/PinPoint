@@ -9,6 +9,7 @@ import {
   type ActivityFeedItem,
 } from "~/components/issues/IssueActivityIslands";
 import { OwnerBadge } from "~/components/issues/OwnerBadge";
+import { ACTIVITY_HEADING_ID } from "~/components/issues/activity-ids";
 import { RichTextDisplay } from "~/components/editor/RichTextDisplay";
 import { ImageGallery } from "~/components/images/ImageGallery";
 import { PersonHoverCard } from "~/components/people/PersonHoverCard";
@@ -205,7 +206,7 @@ export function IssueActivity({
 
   return (
     <section
-      aria-labelledby="issue-activity-heading"
+      aria-labelledby={ACTIVITY_HEADING_ID}
       className="space-y-3"
       data-testid="issue-timeline"
     >
@@ -213,8 +214,10 @@ export function IssueActivity({
         items={items}
         heading={
           <h2
-            id="issue-activity-heading"
-            className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+            id={ACTIVITY_HEADING_ID}
+            // Focus lands here after a comment is deleted.
+            tabIndex={-1}
+            className="rounded-sm text-xs font-semibold uppercase tracking-wider text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             Activity
           </h2>

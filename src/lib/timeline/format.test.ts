@@ -65,7 +65,7 @@ describe("formatTimelineEvent", () => {
       type: "comment_deleted",
       deletedBy: "author",
     };
-    expect(formatTimelineEvent(event)).toBe("User deleted their comment");
+    expect(formatTimelineEvent(event)).toBe("Comment deleted by author");
   });
 
   it("formats comment_deleted by admin", () => {
