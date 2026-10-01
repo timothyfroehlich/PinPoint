@@ -16,17 +16,19 @@ When building a new page, pick the closest archetype and follow its pattern.
 
 ### Detail Page with Sidebar (machine detail)
 
-`grid md:grid-cols-[minmax(0,1fr)_320px]` -- Sidebar `hidden md:block`, collapses to inline strips on mobile.
-**Note:** Issue detail migrated off this archetype (see "Detail Page with Inline Metadata" below). Machine and Location detail still use this pattern.
+`grid md:grid-cols-[minmax(0,1fr)_320px]` -- Sidebar `hidden md:block`, collapses to inline strips on mobile. Machine and Location detail use this pattern.
 
-### Detail Page with Inline Metadata (issue detail)
+### Issue Detail (two panes on desktop, section tabs on mobile)
 
-`max-w-3xl` (PageContainer `size="narrow"`) single-column main flow. Metadata uses `IssueMetadata` (container query reflows 1-col → 2-col at `@xl:`). Mobile sticky comment composer opens a `Sheet`. Reading-content-shaped pages prefer `narrow` over `standard` — issue detail is text + form rows, not a dashboard.
-**Note:** Replaces "Detail Page with Sidebar" for issue detail; eliminates desktop/mobile divergence. Use for new detail pages; migrate existing sidebar pages opportunistically.
+Spec: `docs/feature-specs/issue-detail.md`. `PageContainer size="wide"` capped at `max-w-[1120px]`; from `md:` a `grid-cols-[minmax(0,1fr)_320px]` pair of panes. The main pane holds the header (Issue ID chip + machine link, the full wrapped title, a read-only status/severity/priority summary line), the initial report as plain text, the owner's requirements callout, and Activity with the inline comment box. The right column holds Details — field rows (tappable rows that open a picker) and context rows — then Other issues as compact `IssueCard`s.
+
+- **Mobile**: one column; under the header, three section tabs — Issue, Details, Other issues — and a floating Comment button above the tab bar that opens the composer in a `Sheet`. Edit title and Move share a ⋯ menu beside the title; desktop shows the pencil and a labeled Move button instead.
+- **Section tabs are in-page state, not routes** — a deliberate exception to the Tabbed Detail rule below. Every arrival opens on Issue (where comment and event links point), and the panes are one rendered tree that CSS shows as tabs below `md:` and as columns above it, so nothing is mounted twice. Built in `IssueSectionTabs` (`role="tablist"`, arrow-key navigation), not shadcn `<Tabs>`.
+- **Field pickers**: a bottom sheet of 44px two-column tiles on phones, an anchored menu on desktop (`useIsMobile`, the sanctioned interaction-behavior exception).
 
 ### Tabbed Detail Page (machine detail, multi-tab)
 
-`PageContainer size="standard"` wrapping a persistent header zone + URL-driven tab strip + tab content. Each tab is a real route, not client state — deep-linkable and back-button-friendly. Reference implementation: `src/app/(app)/m/[initials]/` (`layout.tsx` renders header + `MachineTabStrip`; sibling `page.tsx` and `{slug}/page.tsx` files render per-tab content).
+`PageContainer size="standard"` wrapping a persistent header zone + URL-driven tab strip + tab content. Each tab is a real route, not client state — deep-linkable and back-button-friendly. The one exception is issue detail's mobile section tabs (above). Reference implementation: `src/app/(app)/m/[initials]/` (`layout.tsx` renders header + `MachineTabStrip`; sibling `page.tsx` and `{slug}/page.tsx` files render per-tab content).
 
 - **Persistent header**: identity-only — `[initials chip] [game name (truncates)]`. No status badge, no presence badge, no owner display, no primary action button. Not sticky on scroll. The rationale: identity stays in one place across tab navigation; everything else (status, owner, actions) moves into the tab content where it belongs to that tab's context.
 - **Per-tab status badge**: open-issue count + machine-status color render as a small colored pill appended to the relevant tab label (e.g., `Service [3]` in amber for `needs_service`). Hidden when count is 0. This single element carries both the urgency (color, from status) and the scale (number, from open-issue count) — replaces the persistent header's status display.
