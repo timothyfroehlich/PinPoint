@@ -2,9 +2,9 @@
  * Smoke: Issue detail page renders for an unauthenticated visitor.
  *
  * Coverage goal: D-class — "page loads without 500" for the unauthenticated
- * path. Authenticated render is already covered by e2e/smoke/issues-crud.spec.ts
- * (which uses STORAGE_STATE.member). All permission-enforcement assertions
- * (E-class) live in:
+ * path, plus unauthenticated comment trigger gating. Authenticated render is
+ * already covered by e2e/smoke/issues-crud.spec.ts (which uses STORAGE_STATE.member).
+ * All permission-enforcement assertions (E-class) live in:
  *   src/test/integration/issue-detail-permissions.test.ts
  * All UI-state assertions (H-class) live in:
  *   src/test/unit/components/issues/issue-detail-permissions.test.tsx
@@ -38,5 +38,12 @@ test.describe("Issue detail smoke — unauthenticated render", () => {
     ).toBeVisible();
 
     await assertNoA11yViolations(page);
+
+    // The StickyCommentComposer is gated server-side: unauthenticated visitors
+    // must not see the "Add a comment" trigger. (Consolidated from
+    // issue-detail-sticky-composer.spec.ts mobile signed-out test.)
+    await expect(
+      page.getByRole("button", { name: "Add a comment" })
+    ).not.toBeAttached();
   });
 });

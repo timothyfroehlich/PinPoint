@@ -74,7 +74,8 @@ Data mode: <seed record | existing local fixture | existing read-only loader | t
 ## Evidence
 
 - Before — desktop: <state, data/fixture, viewport, chrome mode>
-- Before — 390×844: <state, data/fixture, viewport, chrome mode>
+- Before — 430×932: <state, data/fixture, viewport, chrome mode>
+- Before — 320×568: <state, data/fixture, viewport, chrome mode>
 - Comparisons: <source and rendered evidence at matching state/viewport>
 
 ## Prototype-only controls
@@ -95,8 +96,9 @@ selection discipline with the environment's available equivalents when it is
 not installed:
 
 - For an existing screen, capture its relevant state with the browser-control
-  capability available in the active agent environment at desktop and
-  `390×844` **before changing it**. Record both captures.
+  capability available in the active agent environment at the three review
+  viewports (`pinpoint-design-bible` §4: desktop, `430×932`, `320×568`)
+  **before changing it**. Record all three captures.
 - For a live URL, use `product-design:url-to-code`'s source-capture and visual
   comparison discipline when that skill is available. Otherwise capture the
   source with the supported browser capability and compare it against the
@@ -114,9 +116,10 @@ not installed:
   browser is available, keep using the one Tim already chose or ask him to
   choose. Do not fall back to the Playwright CLI or another browser behind his
   back; if the environment has no browser-control capability, stop and ask.
-- `/dev/preview` fixes the mobile width at 390px, not its height. Use a direct
-  browser viewport for the exact `390×844` capture and record whether preview
-  chrome is visible or hidden.
+- `/dev/preview` fixes the mobile width at 390px, not its height, so it covers
+  neither mobile review size. Use a direct browser viewport for the exact
+  `430×932` and `320×568` captures and record whether preview chrome is
+  visible or hidden.
 
 ## Reuse before writing
 
@@ -206,7 +209,8 @@ for a commit/PR.
 5. Repay the ledger, then remove `.prototype-mode`.
 6. Run `pnpm run check:prototype-clean`, the tests appropriate to the retained
    production changes, and the normal PinPoint checks.
-7. Verify the real destination route in the browser at desktop and `390×844`.
+7. Verify the real destination route in the browser at desktop, `430×932`, and
+   `320×568`.
 
 Do not silently discard the ledger. If Tim abandons the design, confirm that
 choice, delete the disposable route, record the decision in the Bead, and then

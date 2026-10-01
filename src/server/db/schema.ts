@@ -210,8 +210,10 @@ export const machines = pgTable(
       .notNull()
       .defaultNow(),
     description: jsonb("description").$type<ProseMirrorDoc>(),
-    // The card's layout is selected explicitly per cabinet. Description and
-    // tip are independent of size; a disabled tip keeps its saved text.
+    // Retired: apron cards live in machine_apron_cards (PP-o23o). Nothing
+    // reads or writes these; they stay until a follow-up migration drops them,
+    // so the deployment serving while the next one builds can still query
+    // machines (migrations run before the build).
     apronSize: text("apron_size", { enum: ["stern", "wpc"] }),
     apronUseCustomDescription: boolean("apron_use_custom_description")
       .notNull()
@@ -219,9 +221,6 @@ export const machines = pgTable(
     apronDescription: text("apron_description"),
     apronTip: text("apron_tip"),
     apronTipEnabled: boolean("apron_tip_enabled").notNull().default(false),
-    // Whether the card shows its Design and Art credit rows (spec
-    // apron-cards 10.5). On by default, even for a machine with no credits,
-    // whose rows then read "Unknown".
     apronDesignEnabled: boolean("apron_design_enabled").notNull().default(true),
     apronArtEnabled: boolean("apron_art_enabled").notNull().default(true),
     apronSavedAt: timestamp("apron_saved_at", { withTimezone: true }),
@@ -383,6 +382,54 @@ export const machines = pgTable(
     nameIdx: index("idx_machines_name").on(t.name),
   })
 );
+
+/**
+ * A machine's saved apron cards (spec apron-cards §11): zero or more complete,
+ * named sets of card settings, listed oldest first. Each card carries its own
+ * size, text, tip, and credit display settings; a disabled tip keeps its text.
+ */
+export const machineApronCards = pgTable(
+  "machine_apron_cards",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    machineId: uuid("machine_id")
+      .notNull()
+      .references(() => machines.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    // Every saved card has a size (§4.3).
+    size: text("size", { enum: ["stern", "wpc"] }).notNull(),
+    useCustomDescription: boolean("use_custom_description")
+      .notNull()
+      .default(false),
+    description: jsonb("description").$type<ProseMirrorDoc>(),
+    tip: jsonb("tip").$type<ProseMirrorDoc>(),
+    tipEnabled: boolean("tip_enabled").notNull().default(false),
+    // Whether the card shows its Design and Art credit rows (§10.5). On by
+    // default, even for a machine with no credits, whose rows then read
+    // "Unknown".
+    designEnabled: boolean("design_enabled").notNull().default(true),
+    artEnabled: boolean("art_enabled").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    // No Drizzle $onUpdate — every UPDATE sets this explicitly in the action.
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    nameNotBlank: check(
+      "machine_apron_cards_name_not_blank",
+      sql`length(btrim(${t.name})) > 0`
+    ),
+    // §11.2: names are unique within a machine. This index also serves
+    // lookups of a machine's cards.
+    nameUnique: uniqueIndex("uq_machine_apron_cards_machine_name").on(
+      t.machineId,
+      t.name
+    ),
+  })
+).enableRLS();
 
 /**
  * Local mirror of PinballMap's canonical machine catalog (machine *titles*, not
@@ -1564,11 +1611,22 @@ export const machinesRelations = relations(machines, ({ many, one }) => ({
   // just orphan a match — so this is a Drizzle-level relation only, and a null
   // `pinballmapTitle` on a machine with a non-null `pinballmapMachineId` is a
   // reachable state that callers must handle (PP-3bbr.1).
+  apronCards: many(machineApronCards),
   pinballmapTitle: one(pinballmapCatalog, {
     fields: [machines.pinballmapMachineId],
     references: [pinballmapCatalog.pinballmapMachineId],
   }),
 }));
+
+export const machineApronCardsRelations = relations(
+  machineApronCards,
+  ({ one }) => ({
+    machine: one(machines, {
+      fields: [machineApronCards.machineId],
+      references: [machines.id],
+    }),
+  })
+);
 
 export const machineSettingsSetsRelations = relations(
   machineSettingsSets,

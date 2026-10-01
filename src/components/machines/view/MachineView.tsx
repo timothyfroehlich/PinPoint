@@ -19,6 +19,7 @@ import type {
 import { cn } from "~/lib/utils";
 import { MachineSummaryWidgets } from "./MachineSummaryWidgets";
 import { MachineViewCompactList } from "./MachineViewCompactList";
+import { MachineViewPageControls } from "./MachineViewPageControls";
 import { MachineViewTable } from "./MachineViewTable";
 import {
   MachineViewSavedViewsMenu,
@@ -47,6 +48,7 @@ export function MachineView({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = React.useTransition();
+  const rootRef = React.useRef<HTMLDivElement>(null);
   const [state, setState] = React.useState(result.state);
   const [searchValue, setSearchValue] = React.useState(result.state.q);
   const requestedQuery = React.useRef(result.state.q);
@@ -145,8 +147,15 @@ export function MachineView({
     });
   }
 
+  // Paging from the bottom controls returns the reader to the top of the list;
+  // navigation itself keeps scroll position (`scroll: false`).
+  function navigateFromBottom(page: number): void {
+    navigate({ ...state, page });
+    rootRef.current?.scrollIntoView({ block: "start" });
+  }
+
   return (
-    <div className="space-y-4" aria-busy={isPending}>
+    <div ref={rootRef} className="space-y-4" aria-busy={isPending}>
       <MachineSummaryWidgets
         summary={result.summary}
         state={state}
@@ -211,6 +220,21 @@ export function MachineView({
               }}
               onMachineSelect={onMachineSelect}
             />
+            {/* Phone: a floating bar held just above the tab bar while the
+                list scrolls. Desktop: a plain row after the last machine. */}
+            <div className="sticky bottom-[calc(64px+env(safe-area-inset-bottom))] z-10 mt-3 flex justify-end rounded-xl border border-outline-variant bg-card/95 px-3 py-1.5 shadow-lg backdrop-blur-sm md:static md:rounded-none md:border-0 md:bg-transparent md:px-0 md:py-0 md:shadow-none md:backdrop-blur-none">
+              <MachineViewPageControls
+                state={state}
+                permittedFields={result.permittedFields}
+                totalCount={result.totalCount}
+                mobileMode={mobileMode}
+                onStateChange={navigate}
+                onMobileModeChange={changeMobileMode}
+                onNavigate={navigateFromBottom}
+                testIdPrefix="machine-view-bottom"
+                touchSized
+              />
+            </div>
           </>
         )}
       </div>

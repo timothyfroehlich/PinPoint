@@ -355,3 +355,55 @@ describe("MultiSelect quick-select actions", () => {
     expect(options).toHaveLength(3);
   });
 });
+
+describe("MultiSelect group toggling", () => {
+  it("selects all options in a group when group header is clicked while partially selected", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+
+    render(
+      <MultiSelect
+        groups={testGroups}
+        value={["apple"]} // partially selected (apple in fruits, banana not)
+        onChange={onChange}
+        data-testid="filter-fruits"
+      />
+    );
+
+    await user.click(screen.getByRole("combobox"));
+
+    const groupHeader = screen.getByTestId("filter-fruits-group-fruits");
+    const checkbox = groupHeader.querySelector('[role="checkbox"]')!;
+    expect(checkbox).toHaveAttribute("data-state", "indeterminate");
+
+    // Click checkbox to select all in group
+    await user.click(checkbox);
+
+    expect(onChange).toHaveBeenCalledWith(["apple", "banana"]);
+  });
+
+  it("deselects all options in a group when group header is clicked while all group options are selected", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+
+    render(
+      <MultiSelect
+        groups={testGroups}
+        value={["apple", "banana", "carrot"]} // all fruits selected, plus carrot from vegetables
+        onChange={onChange}
+        data-testid="filter-fruits"
+      />
+    );
+
+    await user.click(screen.getByRole("combobox"));
+
+    const groupHeader = screen.getByTestId("filter-fruits-group-fruits");
+    const checkbox = groupHeader.querySelector('[role="checkbox"]')!;
+    expect(checkbox).toHaveAttribute("data-state", "checked");
+
+    // Click checkbox to deselect all fruits
+    await user.click(checkbox);
+
+    expect(onChange).toHaveBeenCalledWith(["carrot"]);
+  });
+});

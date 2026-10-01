@@ -1,11 +1,13 @@
 /**
- * Smoke Test: Public Machine Access
+ * E2E: Public Machine Access
  *
- * Tests that unauthenticated users can view the machines list.
- * Verifies the "Add Machine" button is NOT visible to unauthenticated users.
+ * Tests that unauthenticated users can view the machines list,
+ * machine detail pages, and interact with summary widgets.
  *
- * This test ensures the public routes for machines are working correctly
- * per the permission model: machines.view is public, machines.create is admin-only.
+ * Server Action permission enforcement (createMachineAction requires admin/technician;
+ * unauthenticated callers rejected) is covered in machine-actions.test.ts.
+ * Note: The page UI link gate (`canCreateMachine` at src/app/(app)/m/page.tsx) is a
+ * presentational conditional render, while the server action gate is the security boundary.
  */
 
 import { test, expect } from "../support/fixtures.js";
@@ -28,21 +30,6 @@ test.describe("Machines Public Access", () => {
         exact: true,
       })
     ).toBeVisible();
-  });
-
-  test("unauthenticated user does NOT see Add Machine button", async ({
-    page,
-  }) => {
-    await page.goto("/m");
-
-    // Verify the "Add Machine" button is NOT visible to unauthenticated users
-    await expect(
-      page.getByRole("link", { name: /Add Machine/i })
-    ).not.toBeVisible();
-
-    // Verify no button exists in the page (not just hidden)
-    const addButton = page.getByRole("link", { name: /Add Machine/i });
-    expect(await addButton.count()).toBe(0);
   });
 
   test("unauthenticated user can view machine detail page", async ({

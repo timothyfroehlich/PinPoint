@@ -1,0 +1,11 @@
+{
+  "name": "pinpoint",
+  "displayName": "PinPoint",
+  "version": "1.0.0",
+  "description": "Connector and operating guide for PinPoint, the Austin Pinball Collective's pinball machine and issue tracker.",
+  "author": { "name": "Tim Froehlich" },
+  "homepage": "https://pinpoint.austinpinballcollective.org",
+  "repository": "https://github.com/timothyfroehlich/PinPoint",
+  "license": "Apache-2.0",
+  "keywords": ["pinball", "issue-tracker", "mcp"]
+}

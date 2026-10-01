@@ -3037,6 +3037,23 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
         ]);
       });
 
+      it("clears the intent with no_sync", async () => {
+        await seedIcCatalog();
+        const admin = await makeUser("admin");
+        const machine = await seedMachine({
+          pbm: { pinballmapMachineId: IC_TITLE, pinballmapIcIntent: "on" },
+        });
+
+        const outcome = await runUpdateMachine(
+          { machine: machine.initials, insiderConnected: "no_sync" },
+          ctx("admin", admin)
+        );
+        expect(outcome.applied).toEqual([
+          { field: "insiderConnected", from: "on", to: null, changed: true },
+        ]);
+        expect(await storedIcIntent(machine.id)).toBeNull();
+      });
+
       it("refuses a title the catalog does not mark eligible", async () => {
         await seedIcCatalog();
         const admin = await makeUser("admin");

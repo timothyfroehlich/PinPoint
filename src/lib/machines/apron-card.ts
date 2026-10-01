@@ -46,12 +46,6 @@ export interface ApronMachineSource extends MachineManufacturerSource {
   name: string;
   year: number | null;
   description: ProseMirrorDoc | null;
-  apronUseCustomDescription: boolean;
-  apronDescription: string | null;
-  apronTip: string | null;
-  apronTipEnabled: boolean;
-  apronDesignEnabled: boolean;
-  apronArtEnabled: boolean;
   owner: { name: string } | null;
   invitedOwner: { name: string } | null;
   pinballmapTitle: {
@@ -60,6 +54,16 @@ export interface ApronMachineSource extends MachineManufacturerSource {
     groupName: string | null;
     manufacturer: string | null;
   } | null;
+}
+
+/** The card settings a saved card carries (spec §11). */
+export interface ApronCardSettings {
+  useCustomDescription: boolean;
+  description: ProseMirrorDoc | null;
+  tip: ProseMirrorDoc | null;
+  tipEnabled: boolean;
+  designEnabled: boolean;
+  artEnabled: boolean;
 }
 
 /** Only grouped Pinball Map families supply edition metadata. */
@@ -88,6 +92,7 @@ export function groupedEdition(
 
 export function apronCardContent(
   machine: ApronMachineSource,
+  card: ApronCardSettings | null,
   credits: MachineCredits,
   hasPinTips: boolean
 ): ApronCardContent {
@@ -103,14 +108,14 @@ export function apronCardContent(
     // the "(invited)" status marker the in-app owner block shows is an
     // internal-workflow detail, not something the physical card carries.
     ownerName: machine.owner?.name ?? machine.invitedOwner?.name ?? null,
-    description: machine.apronUseCustomDescription
-      ? (machine.apronDescription ?? "")
-      : docToPlainText(machine.description),
-    tip: machine.apronTip ?? "",
-    tipEnabled: machine.apronTipEnabled,
+    description: docToPlainText(
+      card?.useCustomDescription ? card.description : machine.description
+    ),
+    tip: docToPlainText(card?.tip),
+    tipEnabled: card?.tipEnabled ?? false,
     credits,
-    designEnabled: machine.apronDesignEnabled,
-    artEnabled: machine.apronArtEnabled,
+    designEnabled: card?.designEnabled ?? true,
+    artEnabled: card?.artEnabled ?? true,
     hasPinTips,
   };
 }

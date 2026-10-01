@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useEffect, useId, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   CheckCircle2,
@@ -21,7 +21,6 @@ import {
   updateInsiderConnectedAction,
 } from "~/app/(app)/m/pinballmap-actions";
 import { Button } from "~/components/ui/button";
-import { Switch } from "~/components/ui/switch";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,7 +34,11 @@ import {
 } from "~/components/ui/alert-dialog";
 import { RelativeTime } from "~/components/issues/RelativeTime";
 import { useRelativeNow } from "~/components/issues/RelativeTimeProvider";
-import type { PbmInsiderConnectedView } from "~/lib/pinballmap/insider-connected";
+import type {
+  PbmIcIntent,
+  PbmInsiderConnectedSetting,
+  PbmInsiderConnectedView,
+} from "~/lib/pinballmap/insider-connected";
 import type {
   PbmListingIntent,
   PbmListingView,
@@ -107,7 +110,7 @@ export interface PinballmapListingControlProps {
   /** Catalog title, so a confirm names the game rather than "this machine". */
   modelName: string | null;
   /**
-   * The Insider Connected switch (spec 3.8), or null for an ineligible title.
+   * The Insider Connected toggle (spec 3.8), or null for an ineligible title.
    * It sits on the intent row, so its presence never changes the control's
    * height (4.1). Derived on the server by `deriveInsiderConnectedView`; a
    * difference is already folded into `view` as Out of sync plus the push.
@@ -220,15 +223,17 @@ export function PinballmapListingControl({
               the same kind of decision, set the same way, so it needs no row of
               its own. On a phone it wraps under the toggle. */}
           {insiderConnected !== null ? (
-            <InsiderConnectedSwitch
-              view={insiderConnected}
+            <InsiderConnectedToggle
+              value={insiderConnected.intent}
+              pinballMap={insiderConnected.pinballMap}
+              differs={insiderConnected.differs}
               // The intent gate, not the push gate: recording the intent needs
               // no Pinball Map credentials (3.8, 8.1).
               readOnly={!canSetIntent || disabled}
               pending={pending}
-              onChange={(on) => {
+              onChange={(icIntent) => {
                 run(setInsiderConnectedIntentAction, {
-                  icIntent: on ? "on" : "off",
+                  icIntent: icIntent ?? "no_sync",
                 });
               }}
             />
@@ -532,13 +537,71 @@ function Row({
 }
 
 /**
- * The tri-state toggle (4.1). A segmented control rather than three buttons or a
- * switch: the three positions are mutually exclusive settings, all three are
- * always meaningful, and the current one has to be readable at a glance.
+ * A segmented radiogroup: the shape both tri-state toggles share (4.1). A
+ * segmented control rather than three buttons or a switch: the positions are
+ * mutually exclusive settings, all always meaningful, and the current one has to
+ * be readable at a glance.
  *
  * Real `<button>` elements inside a radiogroup, so keyboard and screen-reader
- * users get the same three choices (CORE-A11Y-004).
+ * users get the same choices (CORE-A11Y-004).
  */
+function SegmentedToggle<T extends string>({
+  label,
+  options,
+  value,
+  disabled,
+  isBlocked,
+  onChange,
+  testId,
+}: {
+  label: string;
+  options: readonly { value: T; label: string }[];
+  value: T;
+  disabled: boolean;
+  /** A position that cannot be chosen right now (it stays shown if selected). */
+  isBlocked?: (option: T) => boolean;
+  onChange: (value: T) => void;
+  testId: string;
+}): React.JSX.Element {
+  return (
+    <div
+      role="radiogroup"
+      aria-label={label}
+      className="inline-flex overflow-hidden rounded-lg border border-outline-variant"
+      data-testid={testId}
+    >
+      {options.map((option) => {
+        const selected = option.value === value;
+        const blocked = isBlocked?.(option.value) ?? false;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            disabled={disabled || (blocked && !selected)}
+            onClick={() => {
+              if (!selected) onChange(option.value);
+            }}
+            data-testid={`${testId}-${option.value}`}
+            className={cn(
+              "px-3 py-1.5 text-xs whitespace-nowrap transition-colors",
+              "border-l border-outline-variant first:border-l-0",
+              selected
+                ? "bg-primary/15 font-semibold text-primary"
+                : "text-muted-foreground hover:bg-muted/50",
+              "disabled:pointer-events-none disabled:opacity-40"
+            )}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** The lineup intent's tri-state toggle (4.1). */
 function IntentToggle({
   value,
   blockedReason,
@@ -554,43 +617,18 @@ function IntentToggle({
 }): React.JSX.Element {
   return (
     <>
-      <div
-        role="radiogroup"
-        aria-label="Pinball Map lineup intent"
-        className="inline-flex overflow-hidden rounded-lg border border-outline-variant"
-        data-testid="pbm-listing-intent"
-      >
-        {INTENT_OPTIONS.map((option) => {
-          const selected = option.value === value;
-          // Only the On position is ever blocked by availability (6.2); Off and
-          // Don't sync are always reachable, which is what makes the block a
-          // guard rather than a trap.
-          const blocked = option.value === "on" && blockedReason !== null;
-          return (
-            <button
-              key={option.value}
-              type="button"
-              role="radio"
-              aria-checked={selected}
-              disabled={readOnly || pending || (blocked && !selected)}
-              onClick={() => {
-                if (!selected) onChange(option.value);
-              }}
-              data-testid={`pbm-listing-intent-${option.value}`}
-              className={cn(
-                "px-3 py-1.5 text-xs whitespace-nowrap transition-colors",
-                "border-l border-outline-variant first:border-l-0",
-                selected
-                  ? "bg-primary/15 font-semibold text-primary"
-                  : "text-muted-foreground hover:bg-muted/50",
-                "disabled:pointer-events-none disabled:opacity-40"
-              )}
-            >
-              {option.label}
-            </button>
-          );
-        })}
-      </div>
+      <SegmentedToggle
+        label="Pinball Map lineup intent"
+        options={INTENT_OPTIONS}
+        value={value}
+        disabled={readOnly || pending}
+        // Only the On position is ever blocked by availability (6.2); Off and
+        // Don't sync are always reachable, which is what makes the block a
+        // guard rather than a trap.
+        isBlocked={(option) => option === "on" && blockedReason !== null}
+        onChange={onChange}
+        testId="pbm-listing-intent"
+      />
       {blockedReason !== null && value !== "on" ? (
         <span
           className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
@@ -614,60 +652,83 @@ const INSIDER_CONNECTED_LABEL = {
   not_set: "Not set",
 } as const;
 
+type IcToggleValue = PbmIcIntent | "no_sync";
+
+const IC_OPTIONS: readonly { value: IcToggleValue; label: string }[] = [
+  { value: "on", label: "On" },
+  { value: "off", label: "Off" },
+  { value: "no_sync", label: "Don't sync" },
+];
+
+export interface InsiderConnectedToggleProps {
+  /** The cabinet's intent; null is Don't sync (no intent recorded). */
+  value: PbmIcIntent | null;
+  /**
+   * Pinball Map's value for the entry, or null when the entry is not on the
+   * stored lineup. Stated beside the toggle under Don't sync.
+   */
+  pinballMap: PbmInsiderConnectedSetting | null;
+  /** The entry differs from this cabinet's target: warn beside the toggle. */
+  differs: boolean;
+  readOnly: boolean;
+  pending: boolean;
+  /** Called with the new intent; null for Don't sync. */
+  onChange: (value: PbmIcIntent | null) => void;
+}
+
 /**
- * The Insider Connected intent as a switch on the intent row (spec 3.8), with
- * its own small label. Shows the recorded intent, or Pinball Map's value while
- * none is recorded. A warning icon names Pinball Map's value when the entry
- * differs, so the reason for Out of sync sits beside the switch that causes it.
+ * The Insider Connected intent as a tri-state toggle with its own small label
+ * (spec 3.8, 4.1): On / Off / Don't sync, where Don't sync records no intent.
+ * Under Don't sync, Pinball Map's value is stated beside it, because nothing
+ * else on the row says what the entry currently carries. With On or Off, a
+ * warning icon names Pinball Map's value when the entry differs, so the reason
+ * for Out of sync sits beside the toggle that causes it.
  *
- * Controlled from stored intent: the switch moves when the page revalidates,
- * not optimistically.
+ * Exported for the New Machine page (4.11). Controlled from stored intent here:
+ * the toggle moves when the page revalidates, not optimistically.
  */
-function InsiderConnectedSwitch({
-  view,
+export function InsiderConnectedToggle({
+  value,
+  pinballMap,
+  differs,
   readOnly,
   pending,
   onChange,
-}: {
-  view: PbmInsiderConnectedView;
-  readOnly: boolean;
-  pending: boolean;
-  onChange: (on: boolean) => void;
-}): React.JSX.Element {
-  const settingId = useId();
+}: InsiderConnectedToggleProps): React.JSX.Element {
   return (
     <div
-      className="flex items-center gap-3 sm:ml-3"
+      className="flex flex-wrap items-center gap-3 sm:ml-3"
       data-testid="pbm-insider-connected"
     >
-      <span className="w-20 shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      {/* On a phone the label takes its own line in every state. Left to wrap,
+          it would drop only when the Don't sync note widens the row, and the
+          control's height would change with the state (4.1). */}
+      <span className="basis-full shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:w-20 sm:basis-auto">
         Insider Connected
       </span>
       <div className="flex items-center gap-2">
-        <Switch
-          checked={view.shown === "on"}
-          onCheckedChange={onChange}
+        <SegmentedToggle
+          label="Insider Connected"
+          options={IC_OPTIONS}
+          value={value ?? "no_sync"}
           disabled={readOnly || pending}
-          aria-label="Insider Connected"
-          aria-describedby={settingId}
-          data-testid="pbm-insider-connected-switch"
+          onChange={(next) => {
+            onChange(next === "no_sync" ? null : next);
+          }}
+          testId="pbm-insider-connected-intent"
         />
-        <span
-          id={settingId}
-          className={cn(
-            "text-sm",
-            view.shown === "not_set"
-              ? "text-muted-foreground"
-              : "text-foreground"
-          )}
-          data-testid="pbm-insider-connected-setting"
-        >
-          {INSIDER_CONNECTED_LABEL[view.shown]}
-        </span>
-        {view.differs && view.pinballMap !== null ? (
+        {value === null && pinballMap !== null ? (
+          <span
+            className="text-xs text-muted-foreground whitespace-nowrap"
+            data-testid="pbm-insider-connected-observed"
+          >
+            Pinball Map: {INSIDER_CONNECTED_LABEL[pinballMap]}
+          </span>
+        ) : null}
+        {differs && pinballMap !== null ? (
           <TriangleAlert
             role="img"
-            aria-label={`Pinball Map: ${INSIDER_CONNECTED_LABEL[view.pinballMap]}`}
+            aria-label={`Pinball Map: ${INSIDER_CONNECTED_LABEL[pinballMap]}`}
             className="size-4 shrink-0 text-warning"
             data-testid="pbm-insider-connected-differs"
           />
