@@ -112,9 +112,9 @@ test.describe("Pinball Map lineup page (PP-o355.65)", () => {
         await expect(addRow).toContainText(toAddName);
         await expect(addRow).toContainText("To add");
         // The row offers the one push its tag names: the confirm button,
-        // because the reset chain seeds a fake operator credential
-        // (seed-pinballmap-state.ts). Without one it would link out to the
-        // location instead. The page never writes on its own (5.7, 5.8).
+        // because the reset chain links the admin to a fake Pinball Map
+        // account (seed-pinballmap-state.ts). Without one it would link out to
+        // the location instead. The page never writes on its own (5.7, 5.8).
         await expect(
           addRow.getByRole("button", { name: "Add to Pinball Map" })
         ).toBeVisible();

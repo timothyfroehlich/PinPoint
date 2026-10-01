@@ -61,8 +61,7 @@ if (!POSTGRES_URL) {
   process.exit(1);
 }
 
-// Refuses production outright rather than taking a force flag, unlike
-// seed-pinballmap-creds.mjs. Prod's snapshot is live data from the cron;
+// Refuses production outright rather than taking a force flag. Prod's snapshot is live data from the cron;
 // overwriting it with a fixture capture would make every machine's derived
 // listing state wrong at once, and the only repair would be waiting for the
 // next cron. There is no legitimate reason to point this at prod.
@@ -375,11 +374,13 @@ const MACHINE_PLAN: MachinePlan[] = [
 ];
 
 /**
- * Fake per-operator write credentials, so every "can push" surface renders
- * locally and in E2E: the Manage tab's listing control, the lineup page's push
- * buttons, and the New Machine form's "Add to Pinball Map" option. Without
- * them `writeEnabled` is false and each of those shows only its link-out
- * fallback.
+ * A fake linked Pinball Map account for the seeded admin, so every "can push"
+ * surface renders locally and in E2E: the Manage tab's listing control and the
+ * lineup page's push buttons. Pushes run as the viewer's own linked account
+ * (pinballmap spec 8.2), so without a link each of those shows only its
+ * link-out fallback. Only the admin gets one: the technician is the account
+ * the linking E2E spec links and unlinks from scratch, and the member cannot
+ * push.
  *
  * Obviously fake on purpose: an `.invalid` address (RFC 2606 reserves the TLD,
  * so it can never be delivered) and a token that says what it is. They can
@@ -387,14 +388,15 @@ const MACHINE_PLAN: MachinePlan[] = [
  * production the app uses the mock client, whose writes accept any credential,
  * and the live client refuses to send (`assertPinballMapNetworkAllowed`).
  *
- * The token lives in Vault like the real one, under a fixed name so a re-run
+ * The token lives in Vault like a real one, under a fixed name so a re-run
  * reuses the secret instead of piling up new ones: Vault names are unique, and
- * the reset chain truncates `pinballmap_state` but never `vault.secrets`.
+ * the reset chain drops the link table but never `vault.secrets`.
  */
-const FAKE_OPERATOR_EMAIL = "fake-pinballmap-operator@example.invalid";
-const FAKE_OPERATOR_TOKEN =
-  "FAKE-pinballmap-operator-token-not-a-real-credential";
-const FAKE_TOKEN_SECRET_NAME = "pinballmap_outbound_token_fake_local";
+const FAKE_LINK_USER_EMAIL = "admin@test.com";
+const FAKE_PBM_USERNAME = "fake-pinballmap-admin";
+const FAKE_PBM_EMAIL = "fake-pinballmap-admin@example.invalid";
+const FAKE_PBM_TOKEN = "FAKE-pinballmap-member-token-not-a-real-credential";
+const FAKE_TOKEN_SECRET_NAME = "pinballmap_user_token_fake_local";
 
 const sql = createScriptClient(POSTGRES_URL);
 try {
@@ -448,17 +450,24 @@ try {
     );
   }
 
-  // Fake operator credentials (see FAKE_OPERATOR_EMAIL). A row that already
-  // carries both halves is left alone, so a hand-provisioned local credential
-  // survives a re-run of this step on its own.
-  const [provisioned] = await sql<
-    { outbound_email: string | null; outbound_token_vault_id: string | null }[]
-  >`
-    SELECT outbound_email, outbound_token_vault_id
-    FROM pinballmap_state WHERE id = 'singleton'
+  // Fake linked account (see FAKE_LINK_USER_EMAIL). An existing link is left
+  // alone, so a hand-made local link survives a re-run of this step on its own.
+  const [linkUser] = await sql<{ id: string }[]>`
+    SELECT id FROM auth.users WHERE email = ${FAKE_LINK_USER_EMAIL}
   `;
-  if (provisioned?.outbound_email && provisioned.outbound_token_vault_id) {
-    console.log("   operator credentials already set — left untouched");
+  if (linkUser === undefined) {
+    throw new Error(
+      `${FAKE_LINK_USER_EMAIL} not found — run the seed-users step first`
+    );
+  }
+  const [existingLink] = await sql<{ pbm_username: string }[]>`
+    SELECT pbm_username FROM pinballmap_user_credentials
+    WHERE user_id = ${linkUser.id}::uuid
+  `;
+  if (existingLink) {
+    console.log(
+      `   ${FAKE_LINK_USER_EMAIL} Pinball Map link already set — left untouched`
+    );
   } else {
     const [existingSecret] = await sql<{ id: string }[]>`
       SELECT id FROM vault.secrets WHERE name = ${FAKE_TOKEN_SECRET_NAME}
@@ -467,27 +476,29 @@ try {
     if (vaultId === undefined) {
       const [created] = await sql<{ id: string }[]>`
         SELECT vault.create_secret(
-          ${FAKE_OPERATOR_TOKEN},
+          ${FAKE_PBM_TOKEN},
           ${FAKE_TOKEN_SECRET_NAME},
-          'FAKE PinballMap operator token for local dev and E2E — not a real credential'
+          'FAKE Pinball Map account token for local dev and E2E — not a real credential'
         ) AS id
       `;
       vaultId = created?.id;
     } else {
       // Reset the value too, so the secret under this name is always the fake.
-      await sql`SELECT vault.update_secret(${vaultId}::uuid, ${FAKE_OPERATOR_TOKEN})`;
+      await sql`SELECT vault.update_secret(${vaultId}::uuid, ${FAKE_PBM_TOKEN})`;
     }
     if (vaultId === undefined) {
       throw new Error("vault.create_secret returned no id");
     }
     await sql`
-      UPDATE pinballmap_state
-      SET outbound_email = ${FAKE_OPERATOR_EMAIL},
-          outbound_token_vault_id = ${vaultId}::uuid,
-          updated_at = now()
-      WHERE id = 'singleton'
+      INSERT INTO pinballmap_user_credentials
+        (user_id, pbm_username, pbm_email, token_vault_id)
+      VALUES
+        (${linkUser.id}::uuid, ${FAKE_PBM_USERNAME}, ${FAKE_PBM_EMAIL},
+         ${vaultId}::uuid)
     `;
-    console.log(`   operator credentials → fake (${FAKE_OPERATOR_EMAIL})`);
+    console.log(
+      `   ${FAKE_LINK_USER_EMAIL} → linked to fake Pinball Map account ${FAKE_PBM_USERNAME}`
+    );
   }
 
   // Catalog metadata for every title the plan links to, read once.

@@ -14,6 +14,7 @@ import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { getUnifiedUsers } from "~/lib/users/queries";
 import { isIscoredConfigured } from "~/lib/iscored/config";
 import { getPinballMapState } from "~/lib/pinballmap/state";
+import { getPinballMapLinkStatus } from "~/lib/pinballmap/user-credentials";
 import { insiderConnectedSetting } from "~/lib/pinballmap/insider-connected";
 
 /**
@@ -82,20 +83,21 @@ export default async function NewMachinePage({
   // What the lineup choice needs (pinballmap 4.11). The creator owns no
   // machine yet, so these are the role-level capabilities — the same ones the
   // create action and the add push re-check on the server.
-  const pbmState = await getPinballMapState();
+  const canPush = checkPermission("machines.pinballmap.push", accessLevel);
+  const [pbmState, pbmLink] = await Promise.all([
+    getPinballMapState(),
+    // The add runs as the creator's own linked account (8.2), read off the
+    // link row without decrypting it — the Manage tab's test (CORE-ARCH-012).
+    canPush
+      ? getPinballMapLinkStatus(user.id)
+      : Promise.resolve({ status: "not_linked" } as const),
+  ]);
   const configured = pbmState?.locationId != null;
-  // Whether an operator credential exists, read off the state row without
-  // decrypting it — the same test the Manage tab uses (CORE-ARCH-012).
-  const writeEnabled =
-    configured &&
-    pbmState.outboundEmail != null &&
-    pbmState.outboundTokenVaultId != null;
   const pinballmap = {
     configured,
     locationName: configured ? (pbmState.snapshotJson?.name ?? null) : null,
     canSetIntent: checkPermission("machines.pinballmap.link", accessLevel),
-    canAddAfterCreate:
-      writeEnabled && checkPermission("machines.pinballmap.push", accessLevel),
+    canAddAfterCreate: configured && canPush && pbmLink.status === "linked",
     // The lineup's entries: a title already on it is not offered the add,
     // and starts Insider Connected at the entry's value (4.11).
     lineup: configured

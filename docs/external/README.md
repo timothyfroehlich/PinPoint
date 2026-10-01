@@ -6,9 +6,21 @@ read before touching the PinballMap integration (`src/lib/pinballmap/`).
 
 | File                      | What                                                                                   | Provenance                                                             |
 | :------------------------ | :------------------------------------------------------------------------------------- | :--------------------------------------------------------------------- |
-| `pinballmap-llms.txt`     | PBM's own API guidance for AI assistants — auth, rate limits, anti-patterns, endpoints | Fetched verbatim from `https://pinballmap.com/llms.txt` (2026-08-09)   |
+| `pinballmap-llms.txt`     | PBM's own API guidance for AI assistants — auth, rate limits, anti-patterns, endpoints | Fetched verbatim from `https://pinballmap.com/llms.txt` (2026-09-30)   |
 | `pinballmap-robots.txt`   | PBM's robots policy — blocks AI crawlers from the site                                 | Fetched verbatim from `https://pinballmap.com/robots.txt` (2026-07-18) |
 | `pinballmap-api-terms.md` | Our distilled conduct + attribution notes, with sources                                | Authored by us, cites llms.txt + FAQ                                   |
+
+> **2026-09-30 refresh — credentials move out of URLs.** PBM's `llms.txt`
+> (`Last updated: 2026-09-28`, pbm commit `e0e1ca7217`, added at our request)
+> now documents: (a) **`POST /users/auth_details`** with `login` and `password`
+> in the request body — the old GET with the password in the query string is
+> deprecated; (b) **header auth as the preferred form** — `X-Api-Token` for the
+> platform token and `X-User-Email` / `X-User-Token` for a member's write
+> identity, with the query-param forms still accepted; (c) an overall limit of
+> 120 requests per minute per API token, and the sign-in, signup, and password
+> endpoints now share **10 per minute**. **We comply** as of PP-o355.6: the live
+> client POSTs the sign-in and sends every credential in a header, so none
+> rides in a URL. `robots.txt` unchanged since 2026-07-18.
 
 > **2026-08-09 refresh — attribution must name the specific location.** PBM's
 > `llms.txt` (`Last updated: 2026-08-06`) gained an **`## Attribution`** section.

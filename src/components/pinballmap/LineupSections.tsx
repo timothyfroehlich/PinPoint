@@ -42,7 +42,7 @@ import {
 
 /** What the viewer may do, decided on the server (lineup spec §8.2). */
 export interface LineupViewContext {
-  /** An operator credential exists; without one, pushes link out (§4.4). */
+  /** The viewer has a linked Pinball Map account; without one, pushes link out (§4.4). */
   writeEnabled: boolean;
   locationUrl: string;
   /** The cabinet an Out of sync row's push acts through, or null. */

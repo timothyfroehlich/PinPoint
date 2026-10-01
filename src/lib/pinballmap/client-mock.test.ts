@@ -162,11 +162,39 @@ describe("mock PinballMap client", () => {
       ok: true,
       token: "mock-token-tim",
       username: "tim",
+      email: "tim@example.com",
     });
-    expect(await client.authDetails("tim", "")).toEqual({
+    expect(await client.authDetails("tim", "")).toMatchObject({
       ok: false,
       reason: "invalid_credentials",
     });
+    expect(await client.authDetails("tim", "wrong")).toEqual({
+      ok: false,
+      reason: "invalid_credentials",
+      message: "Incorrect password",
+    });
+    expect(await client.authDetails("disabled", "pw")).toMatchObject({
+      ok: false,
+      reason: "account_disabled",
+    });
+  });
+
+  it("refuses writes carrying the revoked login's token", async () => {
+    const client = createMockClient();
+    const auth = await client.authDetails("revoked", "pw");
+    if (!auth.ok) throw new Error("expected the revoked login to link");
+    const credentials = { email: auth.email, token: auth.token };
+    // Every write, so each push path can reach Authentication failed in dev.
+    const results = await Promise.all([
+      client.addMachine({ credentials, locationId: 26454, machineId: 10 }),
+      client.removeMachine({ credentials, lmxId: 1 }),
+      client.postCondition({ credentials, lmxId: 1, comment: "x" }),
+      client.setInsiderConnected({ credentials, lmxId: 1, enabled: true }),
+      client.confirmLineup({ credentials, locationId: 26454 }),
+    ]);
+    for (const res of results) {
+      expect(res).toMatchObject({ ok: false, reason: "unauthorized" });
+    }
   });
 
   it("instances are isolated", async () => {

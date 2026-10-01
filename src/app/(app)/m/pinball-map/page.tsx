@@ -23,6 +23,7 @@ import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { loadLineupData } from "~/lib/pinballmap/lineup-data";
 import { pinballmapLocationUrl } from "~/lib/pinballmap/public-url";
 import { getRefreshAllowance } from "~/lib/pinballmap/state";
+import { getPinballMapLinkStatus } from "~/lib/pinballmap/user-credentials";
 import { getLoginUrl } from "~/lib/url";
 
 export const metadata: Metadata = {
@@ -57,8 +58,15 @@ export default async function PinballMapLineupPage(): Promise<React.JSX.Element>
     return <Forbidden role={viewer.role} backUrl="/m" />;
   }
 
-  const [{ state, comparison, machines, catalog, abandoned }, allowance] =
-    await Promise.all([loadLineupData(), getRefreshAllowance()]);
+  const [
+    { state, comparison, machines, catalog, abandoned },
+    allowance,
+    pbmLink,
+  ] = await Promise.all([
+    loadLineupData(),
+    getRefreshAllowance(),
+    getPinballMapLinkStatus(userId),
+  ]);
 
   const header = <PageHeader title="Pinball Map lineup" />;
 
@@ -93,10 +101,11 @@ export default async function PinballMapLineupPage(): Promise<React.JSX.Element>
   const snapshot = state.snapshotJson ?? null;
   const locationUrl = pinballmapLocationUrl(state.locationId);
   const lastRefreshFailed = state.lastSyncStatus === "error";
-  // Whether an operator credential exists, read off the state row's columns
-  // and never by decrypting the token — the listing control's own test.
-  const writeEnabled =
-    state.outboundEmail != null && state.outboundTokenVaultId != null;
+  // Pushes and Confirm lineup run as the viewer's own linked Pinball Map
+  // account (pinballmap §8.2, §3.7), read off the link row and never by
+  // decrypting the token — the listing control's own test. Without one, rows
+  // link out instead (§4.4) and Confirm lineup is not offered.
+  const writeEnabled = pbmLink.status === "linked";
   const lineupHeader = (
     <LineupHeader
       locationName={snapshot?.name ?? null}

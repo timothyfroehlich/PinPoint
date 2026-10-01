@@ -23,8 +23,8 @@
  * production. `VERCEL_ENV` is the one that discriminates: `production` |
  * `preview` | `development`, and undefined off-Vercel.
  *
- * **Why there is no opt-in.** Non-production databases carry seeded fake
- * operator credentials (`supabase/seed-pinballmap-state.ts`) so the push
+ * **Why there is no opt-in.** Non-production databases link the seeded admin
+ * to a fake Pinball Map account (`supabase/seed-pinballmap-state.ts`) so the push
  * surfaces render. A request sent from there would be unsanctioned automated
  * traffic against a conduct policy that budgets one automated call per hour,
  * and a write would be a public edit to the real lineup. An earlier

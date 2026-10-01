@@ -431,50 +431,6 @@ describe("mark-migration-applied.ts — production confirmation gate", () => {
   });
 });
 
-describe("seed-pinballmap-creds.mjs — prod-capable behind an explicit opt-in", () => {
-  const script = "supabase/seed-pinballmap-creds.mjs";
-  // No credentials in the env: the guard runs first, and on the paths that get
-  // past it the script exits at the "not both set" skip — BEFORE it opens a
-  // client. Nothing here can reach a real PinballMap or prod endpoint.
-
-  it("refuses the production project with no opt-in", () => {
-    const { status, stderr } = runScript(script, {
-      POSTGRES_URL: PROD_POOLER_URL,
-    });
-    expect(status).toBe(1);
-    expect(stderr).toContain("Refusing to write PinballMap credentials");
-    expect(stderr).toContain("SEED_PINBALLMAP_CREDS_FORCE_PRODUCTION=1");
-    expect(stderr).not.toContain(":pw@");
-  });
-
-  it("still refuses when the opt-in is set to a falsey STRING", () => {
-    // PP-rnup, and the sharpest instance of it: this script writes an operator
-    // token into prod's Vault, so `=0` meaning "yes" pushes a DEV credential
-    // into production.
-    const { status, stderr } = runScript(script, {
-      POSTGRES_URL: PROD_POOLER_URL,
-      SEED_PINBALLMAP_CREDS_FORCE_PRODUCTION: "0",
-    });
-    expect(status).toBe(1);
-    expect(stderr).toContain("Refusing to write PinballMap credentials");
-  });
-
-  it("permits the prod path once the opt-in is really set", () => {
-    const { status, stderr } = runScript(script, {
-      POSTGRES_URL: PROD_POOLER_URL,
-      SEED_PINBALLMAP_CREDS_FORCE_PRODUCTION: "1",
-    });
-    expect(stderr).not.toContain("Refusing to write PinballMap credentials");
-    // Past the gate, then out at the no-credentials skip without connecting.
-    expect(status).toBe(0);
-  });
-
-  it("does not gate a localhost target at all", () => {
-    const { stderr } = runScript(script, { POSTGRES_URL: LOCAL_URL });
-    expect(stderr).not.toContain("Refusing to write PinballMap credentials");
-  });
-});
-
 describe("wiring — drizzle.config.ts uses the shared helper", () => {
   it("imports isCloudDatabaseUrl instead of re-inlining the host regex", async () => {
     const { readFile } = await import("node:fs/promises");
