@@ -9,15 +9,19 @@
 
 import { after } from "next/server";
 import { createClient } from "~/lib/supabase/server";
-import { db } from "~/server/db";
+import { db, type DbTransaction } from "~/server/db";
 import {
   applyMachinePbmLink,
   createMachine,
   carryExcludedReason,
+  IC_INELIGIBLE_MESSAGE,
+  isTitleIcEligible,
   planMachinePbmLink,
   updateMachinePresence,
+  type Machine,
   type MachinePbmLinkPlan,
 } from "~/services/machines";
+import { PBM_ADD_FAILED_PARAM } from "~/lib/pinballmap/create-flow";
 import {
   machines,
   machineWatchers,
@@ -26,6 +30,9 @@ import {
 } from "~/server/db/schema";
 import { createMachineSchema, updateMachineSchema } from "./schemas";
 import { resolvePbmLinkColumnsForCreate } from "~/lib/pinballmap/link-columns";
+import { importPinballMapCommentsAfterCoverageChange } from "~/lib/pinballmap/comment-import";
+import type { PbmIcIntent } from "~/lib/pinballmap/insider-connected";
+import { addMachineToPinballMapAction } from "./pinballmap-actions";
 import { type Result, ok, err } from "~/lib/result";
 import { z } from "zod";
 import { eq, and, exists } from "drizzle-orm";
@@ -97,6 +104,24 @@ function canonicalJson(value: unknown): string {
     }
     return val;
   });
+}
+
+/** The `owner_requirements_updated` marker event, inside the caller's tx. */
+async function emitOwnerRequirementsUpdated(
+  tx: DbTransaction,
+  machineId: string,
+  actorId: string
+): Promise<void> {
+  await createMachineTimelineEvent(
+    machineId,
+    {
+      sourceType: "lifecycle",
+      tag: "lifecycle",
+      eventData: { kind: "owner_requirements_updated" },
+      actorId,
+    },
+    tx
+  );
 }
 
 const NEXT_REDIRECT_DIGEST_PREFIX = "NEXT_REDIRECT;";
@@ -232,6 +257,96 @@ function readPbmLinkFormFields(formData: FormData): {
   };
 }
 
+/** A trimmed, non-empty string form value, or undefined. */
+function optionalFormString(
+  formData: FormData,
+  key: string
+): string | undefined {
+  const raw = formData.get(key);
+  return typeof raw === "string" && raw.trim().length > 0
+    ? raw.trim()
+    : undefined;
+}
+
+/**
+ * The New Machine page's Insider Connected choice, checked the way
+ * `setMachineIcIntent` checks the Manage tab's switch: only a catalog title
+ * Pinball Map marks eligible carries one (pinballmap 3.8). Absent is "not
+ * recorded".
+ */
+async function resolveIcIntentForCreate(
+  requested: PbmIcIntent | undefined,
+  pinballmapMachineId: number | null
+): Promise<
+  { ok: true; value: PbmIcIntent | null } | { ok: false; message: string }
+> {
+  if (requested === undefined) return { ok: true, value: null };
+  if (pinballmapMachineId === null) {
+    return {
+      ok: false,
+      message: "Insider Connected needs a Pinball Map title.",
+    };
+  }
+  if (!(await isTitleIcEligible(pinballmapMachineId))) {
+    return { ok: false, message: IC_INELIGIBLE_MESSAGE };
+  }
+  return { ok: true, value: requested };
+}
+
+/**
+ * What a create with intent On owes afterwards (pinballmap 4.11), and where
+ * the person lands.
+ *
+ * Intent On makes the new cabinet a covering one, owed its entry's comments —
+ * the same import the Manage tab's toggle runs (7.1). When the person ticked
+ * "Add to Pinball Map after creating", the add push runs through the very
+ * action the Manage tab's Add button calls, so it re-checks the push
+ * capability, the credential, and availability itself.
+ *
+ * Neither can undo the create. The machine exists whatever Pinball Map says;
+ * a failed add sends the person to the Manage tab, where the machine reads as
+ * out of sync with Add offered again, and a note says the add failed.
+ */
+async function applyPinballmapAfterCreate(
+  machine: Pick<Machine, "id" | "initials" | "pinballmapIntent">,
+  addAfterCreate: boolean
+): Promise<string> {
+  const infoPath = `/m/${machine.initials}`;
+  if (machine.pinballmapIntent !== "on") return infoPath;
+
+  try {
+    await importPinballMapCommentsAfterCoverageChange();
+  } catch (error: unknown) {
+    reportError(error, {
+      action: "createMachinePinballmapImport",
+      bestEffort: true,
+      machineId: machine.id,
+    });
+  }
+  // Coverage is a property of the whole same-title group (4.7).
+  revalidatePath("/m", "layout");
+
+  if (!addAfterCreate) return infoPath;
+
+  const addForm = new FormData();
+  addForm.set("machineId", machine.id);
+  try {
+    const added = await addMachineToPinballMapAction(undefined, addForm);
+    if (added.ok) return infoPath;
+    log.warn(
+      { machineId: machine.id, code: added.code },
+      "Add to Pinball Map after create failed"
+    );
+  } catch (error: unknown) {
+    reportError(error, {
+      action: "createMachinePinballmapAdd",
+      bestEffort: true,
+      machineId: machine.id,
+    });
+  }
+  return `/m/${machine.initials}/edit?${PBM_ADD_FAILED_PARAM}=1`;
+}
+
 /**
  * Create Machine Action
  *
@@ -308,15 +423,30 @@ export async function createMachineAction(
       return null;
     })(),
     ...readPbmLinkFormFields(formData),
+    // The New Machine page's Pinball Map choices (pinballmap 4.11). Absent
+    // means Off / not recorded.
+    pinballmapIntent: optionalFormString(formData, "pinballmapIntent"),
+    pinballmapIcIntent: optionalFormString(formData, "pinballmapIcIntent"),
   };
 
-  // Description carried by the create form's rich text editor, same
-  // hidden-field + JSON pattern as the edit form (bead C parity pass).
-  const descriptionResult = parseDescriptionFormField(formData);
+  // Description and Owner's Requirements carried by the create form's rich
+  // text editors, same hidden-field + JSON pattern as the edit form.
+  const descriptionResult = parseProseFormField(formData, "description");
   if (!descriptionResult.ok) {
     return err("VALIDATION", descriptionResult.message);
   }
   const descriptionColumn = descriptionResult.value;
+  const ownerRequirementsResult = parseProseFormField(
+    formData,
+    "ownerRequirements"
+  );
+  if (!ownerRequirementsResult.ok) {
+    return err("VALIDATION", ownerRequirementsResult.message);
+  }
+  const ownerRequirementsColumn = ownerRequirementsResult.value;
+  // Ticking "Add to Pinball Map after creating" is the 4.5 confirmation for
+  // the add push. It means nothing unless intent is On, checked below.
+  const addToPinballmapAfterCreate = formData.get("pbmAddAfterCreate") === "1";
 
   // Validate input (CORE-SEC-002)
   const validation = createMachineSchema.safeParse(rawData);
@@ -337,8 +467,13 @@ export async function createMachineAction(
   // Resolve PinballMap link columns (mutual-exclusion + catalog-derived metadata).
   // Creators are tech/admin (machines.create), who always hold the link
   // permission; the explicit check keeps this honest if that ever changes.
+  //
+  // Intent and Insider Connected ride the same gate: setting either is the
+  // machine-linking capability (pinballmap 8.1).
   if (
-    wantsPbmLinkChange(validation.data) &&
+    (wantsPbmLinkChange(validation.data) ||
+      validation.data.pinballmapIntent !== undefined ||
+      validation.data.pinballmapIcIntent !== undefined) &&
     !checkPermission("machines.pinballmap.link", accessLevel)
   ) {
     return err(
@@ -346,9 +481,17 @@ export async function createMachineAction(
       "You do not have permission to link machines to Pinball Map."
     );
   }
-  const pbm = await resolvePbmLinkColumnsForCreate(validation.data);
+  const pbm = await resolvePbmLinkColumnsForCreate(
+    { ...validation.data, intent: validation.data.pinballmapIntent },
+    validation.data.presenceStatus
+  );
   if (!pbm.ok) return err("VALIDATION", pbm.message);
   const pbmColumns = pbm.columns;
+  const icIntent = await resolveIcIntentForCreate(
+    validation.data.pinballmapIcIntent,
+    pbmColumns.pinballmapMachineId
+  );
+  if (!icIntent.ok) return err("VALIDATION", icIntent.message);
 
   // Handle forcePromoteUserId path: gate, validate, then wrap in transaction
   if (forcePromoteUserId !== undefined) {
@@ -394,7 +537,9 @@ export async function createMachineAction(
         invitedOwnerId: targetInvited ? forcePromoteUserId : null,
         presenceStatus,
         description: descriptionColumn,
+        ownerRequirements: ownerRequirementsColumn,
         pbmColumns,
+        pinballmapIcIntent: icIntent.value,
         iscoredGameId,
         promoteGuest: {
           userId: forcePromoteUserId,
@@ -407,7 +552,10 @@ export async function createMachineAction(
       revalidatePath("/m");
       return ok({
         machineId: machine.id,
-        redirectTo: `/m/${machine.initials}`,
+        redirectTo: await applyPinballmapAfterCreate(
+          machine,
+          addToPinballmapAfterCreate
+        ),
       });
     } catch (error: unknown) {
       // `initials` is the only unique constraint create can violate. The other
@@ -496,7 +644,9 @@ export async function createMachineAction(
       invitedOwnerId: finalInvitedOwnerId,
       presenceStatus,
       description: descriptionColumn,
+      ownerRequirements: ownerRequirementsColumn,
       pbmColumns,
+      pinballmapIcIntent: icIntent.value,
       iscoredGameId,
     });
 
@@ -504,7 +654,10 @@ export async function createMachineAction(
 
     return ok({
       machineId: machine.id,
-      redirectTo: `/m/${machine.initials}`,
+      redirectTo: await applyPinballmapAfterCreate(
+        machine,
+        addToPinballmapAfterCreate
+      ),
     });
   } catch (error: unknown) {
     // Initials is the only unique constraint reachable here — see the
@@ -524,7 +677,7 @@ export async function createMachineAction(
 
 /**
  * Shared ProseMirror payload validation for the machine text columns. Both the
- * dialog's `parseDescriptionFormField` and the inline `updateMachineTextField`
+ * form's `parseProseFormField` and the inline `updateMachineTextField`
  * call this so the two edit surfaces can't drift on what counts as a
  * valid/oversized/empty doc. Returns a discriminant the caller maps to its own
  * error shape and copy. Size caps: 10k plaintext / 100k serialized JSON.
@@ -557,21 +710,30 @@ function validateProseMirrorDoc(value: unknown): ProseMirrorValidation {
   return { status: "ok", doc };
 }
 
+/** What a prose form field is called in its error messages. */
+const PROSE_FIELD_LABEL: Record<"description" | "ownerRequirements", string> = {
+  description: "Description",
+  ownerRequirements: "Owner's Requirements",
+};
+
 /**
- * Parse the optional machine `description` carried by the Edit Machine dialog
- * as a serialized ProseMirror doc (same hidden-field + JSON pattern as the
- * report form). Presence of the field is the marker: absent → leave the column
- * untouched; empty (or semantically-empty) → clear to null; otherwise the
- * validated doc. Size caps match the description column's inline-edit path
- * (`updateMachineTextField`): 10k plaintext / 100k serialized JSON.
+ * Parse an optional machine prose column — `description` or
+ * `ownerRequirements` — carried by the machine form as a serialized
+ * ProseMirror doc (same hidden-field + JSON pattern as the report form).
+ * Presence of the field is the marker: absent → leave the column untouched;
+ * empty (or semantically-empty) → clear to null; otherwise the validated doc.
+ * Size caps match the inline-edit path (`updateMachineTextField`): 10k
+ * plaintext / 100k serialized JSON.
  */
-function parseDescriptionFormField(
-  formData: FormData
+function parseProseFormField(
+  formData: FormData,
+  field: "description" | "ownerRequirements"
 ):
   | { ok: true; value: ProseMirrorDoc | null | undefined }
   | { ok: false; message: string } {
-  const raw = formData.get("description");
-  // Field absent — this edit surface doesn't own the description column.
+  const label = PROSE_FIELD_LABEL[field];
+  const raw = formData.get(field);
+  // Field absent — this edit surface doesn't own the column.
   if (raw === null) {
     return { ok: true, value: undefined };
   }
@@ -580,7 +742,7 @@ function parseDescriptionFormField(
   // column. An empty string is the intended "clear to null" signal: the hidden
   // field submits "" when the editor is empty.
   if (typeof raw !== "string") {
-    return { ok: false, message: "Invalid description format." };
+    return { ok: false, message: `Invalid ${label} format.` };
   }
   if (raw.length === 0) {
     return { ok: true, value: null };
@@ -590,20 +752,20 @@ function parseDescriptionFormField(
   // (validateProseMirrorDoc re-checks the cap for the inline-edit path, which
   // receives an already-parsed doc rather than a raw string.)
   if (raw.length > 100_000) {
-    return { ok: false, message: "Description is too long." };
+    return { ok: false, message: `${label} is too long.` };
   }
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
-    return { ok: false, message: "Invalid description format." };
+    return { ok: false, message: `Invalid ${label} format.` };
   }
   const result = validateProseMirrorDoc(parsed);
   if (result.status === "invalid") {
-    return { ok: false, message: "Invalid description format." };
+    return { ok: false, message: `Invalid ${label} format.` };
   }
   if (result.status === "too-long") {
-    return { ok: false, message: "Description is too long." };
+    return { ok: false, message: `${label} is too long.` };
   }
   // Normalize a whitespace-only doc to null so the DB stores NULL rather than a
   // semantically-empty JSON blob.
@@ -683,13 +845,22 @@ export async function updateMachineAction(
   // surfaces (e.g. inline field saves) omit it so they never touch link columns.
   const pbmFormPresent = formData.get("pbmLinkPresent") === "1";
 
-  // Description is carried by the Edit Machine dialog only; `undefined` means
-  // "leave the column untouched" so other edit surfaces never clear it.
-  const descriptionResult = parseDescriptionFormField(formData);
+  // Description and Owner's Requirements are carried by the Manage tab's
+  // machine form only; `undefined` means "leave the column untouched" so
+  // other edit surfaces never clear them.
+  const descriptionResult = parseProseFormField(formData, "description");
   if (!descriptionResult.ok) {
     return err("VALIDATION", descriptionResult.message);
   }
   const descriptionColumn = descriptionResult.value;
+  const ownerRequirementsResult = parseProseFormField(
+    formData,
+    "ownerRequirements"
+  );
+  if (!ownerRequirementsResult.ok) {
+    return err("VALIDATION", ownerRequirementsResult.message);
+  }
+  const ownerRequirementsColumn = ownerRequirementsResult.value;
 
   const validation = updateMachineSchema.safeParse(rawData);
   if (!validation.success) {
@@ -723,12 +894,22 @@ export async function updateMachineAction(
         // intent carry-over at the `resolvePbmLinkColumnsForUpdate` call.
         pinballmapMachineId: true,
         pinballmapIntent: true,
+        // Compared against the submitted value so an unchanged save does not
+        // put an "owner's requirements updated" row on the timeline.
+        ownerRequirements: true,
       },
     });
 
     if (!currentMachine) {
       return err("NOT_FOUND", "Machine not found.");
     }
+
+    // The same marker event the inline editor emits, and on the same rule:
+    // only when the normalized value actually changed (PP-0x98).
+    const ownerRequirementsChanged =
+      ownerRequirementsColumn !== undefined &&
+      canonicalJson(currentMachine.ownerRequirements) !==
+        canonicalJson(ownerRequirementsColumn);
 
     // Permission check via matrix
     if (
@@ -853,6 +1034,9 @@ export async function updateMachineAction(
             ...(descriptionColumn !== undefined && {
               description: descriptionColumn,
             }),
+            ...(ownerRequirementsColumn !== undefined && {
+              ownerRequirements: ownerRequirementsColumn,
+            }),
             ...(iscoredGameId !== undefined && { iscoredGameId }),
           })
           .where(eq(machines.id, id))
@@ -860,6 +1044,10 @@ export async function updateMachineAction(
 
         if (!updatedMachine) {
           throw new Error("Machine update failed");
+        }
+
+        if (ownerRequirementsChanged) {
+          await emitOwnerRequirementsUpdated(tx, id, user.id);
         }
 
         if (pbmPlan) {
@@ -1074,6 +1262,9 @@ export async function updateMachineAction(
       ...(descriptionColumn !== undefined && {
         description: descriptionColumn,
       }),
+      ...(ownerRequirementsColumn !== undefined && {
+        ownerRequirements: ownerRequirementsColumn,
+      }),
       ...(iscoredGameId !== undefined && { iscoredGameId }),
     };
 
@@ -1099,6 +1290,10 @@ export async function updateMachineAction(
 
       if (!updatedMachine) {
         throw new MachineNotFoundError();
+      }
+
+      if (ownerRequirementsChanged) {
+        await emitOwnerRequirementsUpdated(tx, id, user.id);
       }
 
       if (pbmPlan) {

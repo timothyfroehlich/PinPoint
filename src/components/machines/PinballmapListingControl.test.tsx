@@ -960,3 +960,46 @@ describe("same-title coverage (4.7)", () => {
     expect(screen.getByRole("link", { name: "AFM" })).toBeInTheDocument();
   });
 });
+
+describe("inside the machine form", () => {
+  it("never submits the form around it", async () => {
+    // The control lives in the Manage tab's Integrations section, inside the
+    // machine form (machine-editing 3.6). An untyped button in it is a submit
+    // button for that form: clicking Refresh would save the form.
+    const onSubmit = vi.fn((event: React.FormEvent) => {
+      event.preventDefault();
+    });
+    const user = userEvent.setup();
+    render(
+      <RelativeTimeProvider>
+        <form onSubmit={onSubmit}>
+          <PinballmapListingControl
+            machineId="m-1"
+            view={VIEWS.missing}
+            locationName="Austin Pinball Collective"
+            locationUrl="https://pinballmap.com/map/?by_location_id=26454"
+            lastRefreshedAt={new Date(Date.now() - 12 * 60 * 1000)}
+            refreshRemaining={3}
+            refreshAvailableAt={null}
+            canSetIntent={true}
+            canPush={true}
+            canRefresh={true}
+            linkStatus="linked"
+            modelName="Medieval Madness"
+            insiderConnected={null}
+          />
+        </form>
+      </RelativeTimeProvider>
+    );
+
+    for (const button of screen.getAllByRole("button")) {
+      if (!button.hasAttribute("disabled")) await user.click(button);
+      await user.keyboard("{Escape}");
+    }
+    for (const radio of screen.getAllByRole("radio")) {
+      if (!radio.hasAttribute("disabled")) await user.click(radio);
+    }
+
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+});

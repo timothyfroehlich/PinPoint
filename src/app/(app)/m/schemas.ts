@@ -121,6 +121,16 @@ export const createMachineSchema = z.object({
     .optional()
     .nullable(),
   ...pinballmapLinkFields,
+  /**
+   * The New Machine page's Pinball Map choices (pinballmap 4.11). Accepted on
+   * CREATE only, where no listing exists yet for the request to misstate: the
+   * resolver refuses intent without a catalog title and On against a blocking
+   * availability, exactly as the Manage tab's toggle does. The update schema
+   * still takes neither — there, the toggle's own action is the only writer
+   * (PP-o355.29).
+   */
+  pinballmapIntent: z.enum(["on", "off", "no_sync"]).optional(),
+  pinballmapIcIntent: z.enum(["on", "off"]).optional(),
 });
 
 export type CreateMachineInput = z.infer<typeof createMachineSchema>;

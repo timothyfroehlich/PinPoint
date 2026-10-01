@@ -36,6 +36,14 @@ import { MachineDetailsForm } from "./machine-details-form";
 import { DetailsDirtyProvider } from "./details-dirty";
 import { PinballmapDirtyGate } from "./pinballmap-dirty-gate";
 import { MachineOwnerTransfer } from "./machine-owner-transfer";
+import { SectionNavLayout } from "~/components/machines/machine-form/SectionNav";
+import { SectionAnchor } from "~/components/machines/machine-form/SectionAnchor";
+import { PinnedActionBarSpacer } from "~/components/machines/machine-form/MachineFormActionBar";
+import {
+  MACHINE_FORM_SECTION_IDS,
+  type SectionNavItem,
+} from "~/components/machines/machine-form/sections";
+import { PBM_ADD_FAILED_PARAM } from "~/lib/pinballmap/create-flow";
 
 /**
  * Machine Manage tab (/m/[initials]/edit) — PP-o355.19.
@@ -62,10 +70,16 @@ import { MachineOwnerTransfer } from "./machine-owner-transfer";
  */
 export default async function MachineEditPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ initials: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }): Promise<React.JSX.Element> {
   const { initials } = await params;
+  // Set by the New Machine page when "Add to Pinball Map after creating" did
+  // not go through (pinballmap 4.11): the machine exists and reads Out of
+  // sync below; this names why.
+  const pbmAddFailed = (await searchParams)[PBM_ADD_FAILED_PARAM] === "1";
 
   const supabase = await createClient();
   const {
@@ -98,6 +112,10 @@ export default async function MachineEditPage({
     "machines.edit",
     accessLevel,
     ownershipContext
+  );
+  const canViewOwnerRequirements = checkPermission(
+    "machines.view.ownerRequirements",
+    accessLevel
   );
 
   // The three Pinball Map capabilities, spec 8.1 / 8.2 / 8.3. `link` and `push`
@@ -258,26 +276,118 @@ export default async function MachineEditPage({
       ? pinballmapLocationUrl(pbmState.locationId)
       : null;
 
-  return (
-    // Capped at 4xl rather than filling the tab strip's width: these are form
-    // fields, and a full-width text input on a wide monitor is a worse target
-    // than a measured column. `@container` is what lets the fields inside pair
-    // up two-up at `@xl` — they respond to THIS panel's width, not the
-    // viewport's (CORE-RESP-001..004), so the pairing behaves the same whether
-    // or not a future layout puts something beside it.
-    <div className="@container max-w-4xl space-y-5">
-      {/* Details and Pinball Map share one dirty flag. They are separate saves,
-          but not separate subjects: the Details form owns the Pinball Map link,
-          so while it has unsaved edits the controls below are acting on a link
-          that is about to move (PP-3bbr.3). Danger zone stays outside — nothing
-          in it depends on the model.
+  // The Pinball Map block inside Integrations. Manual Entry has no control —
+  // the Integrations box says why instead (machine-editing 3.6) — but the
+  // abandoned-entry alert still surfaces: the machine that just switched away
+  // from a catalog title is exactly the one that may have left an entry on the
+  // public lineup (PP-3bbr.3, pinballmap 4.2 Uncataloged).
+  const listingControl = machine.pinballmapExcluded ? null : (
+    <PinballmapDirtyGate>
+      <PinballmapListingControl
+        machineId={machine.id}
+        view={listingView}
+        locationName={snapshot?.name ?? null}
+        locationUrl={locationUrl}
+        lastRefreshedAt={pbmState?.lastSyncedAt ?? null}
+        refreshRemaining={allowance.remaining}
+        refreshAvailableAt={allowance.nextRefillAt}
+        canSetIntent={canSetIntent}
+        canPush={canPush}
+        canRefresh={canRefresh}
+        linkStatus={pbmLinkStatus}
+        modelName={pinballmapTitleName}
+        insiderConnected={insiderConnectedView}
+      />
+    </PinballmapDirtyGate>
+  );
+  const abandonedEntries =
+    locationUrl !== null && abandoned.length > 0 ? (
+      <PinballmapAbandonedEntries
+        machineId={machine.id}
+        entries={abandoned}
+        canPush={canPush}
+        accountLinked={pbmLinkStatus === "linked"}
+      />
+    ) : null;
+  const addFailedNote = pbmAddFailed ? (
+    <div
+      className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive-text"
+      role="status"
+      data-testid="pbm-add-after-create-failed"
+    >
+      Add to Pinball Map failed during creation
+    </div>
+  ) : null;
+  const pinballmapBlock =
+    listingControl === null &&
+    abandonedEntries === null &&
+    addFailedNote === null ? null : (
+      <div className="space-y-3">
+        {addFailedNote}
+        {listingControl}
+        {abandonedEntries}
+      </div>
+    );
 
-          PP-53ns removes the save bar entirely, at which point there is no
-          unsaved state and this provider goes with it. */}
+  // The section list beside the form (machine-editing 5.1), in page order.
+  // Data-driven: the Apron card section joins between Integrations and Danger
+  // zone in PP-wqit.14.3.
+  const sections: SectionNavItem[] = [
+    { id: MACHINE_FORM_SECTION_IDS.details, label: "Details" },
+    ...(canSetIntent
+      ? [{ id: MACHINE_FORM_SECTION_IDS.modelDetails, label: "Model Details" }]
+      : []),
+    { id: MACHINE_FORM_SECTION_IDS.integrations, label: "Integrations" },
+    { id: MACHINE_FORM_SECTION_IDS.dangerZone, label: "Danger zone" },
+  ];
+
+  // A member without `machines.edit` may still open the tab for the read-only
+  // Pinball Map control (pinballmap 4.9): no form, no Danger zone, and so no
+  // section list. The provider stays: the Pinball Map block reads it, and
+  // with no form it never reports unsaved changes.
+  if (!canEdit) {
+    return (
       <DetailsDirtyProvider>
-        {/* Details — these fields save together. */}
-        {canEdit ? (
+        <div className="@container max-w-4xl space-y-5">
+          <section className="space-y-4" aria-labelledby="section-pinballmap">
+            <h2 id="section-pinballmap" className="sr-only">
+              Pinball Map
+            </h2>
+            {machine.pinballmapExcluded ? (
+              <p
+                className="text-sm text-muted-foreground"
+                data-testid="pbm-listing-collapsed"
+              >
+                <span className="font-semibold text-foreground">
+                  Pinball Map
+                </span>{" "}
+                — integration disabled. Requires a model listed in their
+                catalog.
+              </p>
+            ) : null}
+            {pinballmapBlock}
+          </section>
+          <ApronCardPanel
+            machine={machine}
+            variant="row"
+            canEdit={canEdit}
+            canExport={checkPermission("machines.apron.export", accessLevel)}
+          />
+        </div>
+      </DetailsDirtyProvider>
+    );
+  }
+
+  return (
+    // The form and the immediate-acting controls share one dirty flag: while
+    // the form has unsaved edits, Pinball Map and owner transfer are held
+    // inert with a note saying why (machine-editing 4.2, PP-3bbr.3).
+    <DetailsDirtyProvider>
+      <SectionNavLayout sections={sections}>
+        <div className="space-y-6">
+          {/* Details — every field of the machine form, one Save (4.1). */}
           <section className="space-y-4" aria-labelledby="section-details">
+            <SectionAnchor id={MACHINE_FORM_SECTION_IDS.details} />
             <h2 id="section-details" className="text-base font-semibold">
               Details
             </h2>
@@ -286,17 +396,15 @@ export default async function MachineEditPage({
               name={machine.name}
               presenceStatus={machine.presenceStatus}
               description={machine.description}
+              ownerRequirements={machine.ownerRequirements}
+              canViewOwnerRequirements={canViewOwnerRequirements}
               canLink={canSetIntent}
               pinballmapMachineId={machine.pinballmapMachineId}
               pinballmapExcluded={machine.pinballmapExcluded}
               pinballmapTitleName={pinballmapTitleName}
-              // Straight off the row. These used to come from a second query,
-              // because `getMachineForLayout` nulled `manufacturer` and `year`
-              // via `PBM_METADATA_PLACEHOLDER` and the hand-entry panel would
-              // have opened blank on a machine that had them — then written the
-              // nulls back on save. PP-3bbr.1 took those two fields out of the
-              // placeholder, so the loader carries the real values and the
-              // extra round-trip was pure cost.
+              // Straight off the row: the loader carries the real hand-entered
+              // values (PP-3bbr.1), so the form never opens blank on a machine
+              // that has them and then writes the nulls back on save.
               modelName={machine.modelName}
               manufacturer={machine.manufacturer}
               year={machine.year}
@@ -306,112 +414,50 @@ export default async function MachineEditPage({
               designers={machine.designers}
               artists={machine.artists}
               iscoredGameId={machine.iscoredGameId}
+              pinballmap={pinballmapBlock}
             />
           </section>
-        ) : null}
 
-        {/* Pinball Map — no save bar: every control here acts on its own, and
-          the section heading lives inside the control (its header carries the
-          location name, the refresh state and the out-of-sync alert). */}
-        <section
-          className={
-            canEdit
-              ? "space-y-4 border-t border-outline-variant pt-6"
-              : "space-y-4"
-          }
-          aria-labelledby="section-pinballmap"
-        >
-          <h2 id="section-pinballmap" className="sr-only">
-            Pinball Map
-          </h2>
+          {/* Apron card — still edited in its own dialog, the same one the
+              Service tab opens (apron-cards spec §3.1), until PP-wqit.14.3
+              brings it into the form. */}
+          <ApronCardPanel
+            machine={machine}
+            variant="row"
+            canEdit={canEdit}
+            canExport={checkPermission("machines.apron.export", accessLevel)}
+          />
 
-          {/* Manual Entry collapses this section to one line (Tim, 2026-08-27).
-            A hand-entered model has no catalog title, so intent has nothing to
-            act on and the refresh has nothing to refresh FOR — and a stale
-            snapshot is harmless here precisely because nothing on the page
-            reads it. The section keeps its position rather than disappearing:
-            the abandoned-entry alert below lives in it, and the machine that
-            just switched away from a catalog title is exactly the one that may
-            have left an entry on the public lineup (PP-3bbr.3). */}
-          {machine.pinballmapExcluded ? (
-            <p
-              className="text-sm text-muted-foreground"
-              data-testid="pbm-listing-collapsed"
-            >
-              <span className="font-semibold text-foreground">Pinball Map</span>{" "}
-              — integration disabled. Requires a model listed in their catalog.
-            </p>
-          ) : (
-            <PinballmapDirtyGate>
-              <PinballmapListingControl
-                machineId={machine.id}
-                view={listingView}
-                locationName={snapshot?.name ?? null}
-                locationUrl={locationUrl}
-                lastRefreshedAt={pbmState?.lastSyncedAt ?? null}
-                refreshRemaining={allowance.remaining}
-                refreshAvailableAt={allowance.nextRefillAt}
-                canSetIntent={canSetIntent}
-                canPush={canPush}
-                canRefresh={canRefresh}
-                linkStatus={pbmLinkStatus}
-                modelName={pinballmapTitleName}
-                insiderConnected={insiderConnectedView}
-              />
+          {/* Danger zone — applies immediately, so it waits while the form has
+              unsaved changes (4.2). Machine deletion joins this section in
+              PP-o355.25. */}
+          <section
+            className="space-y-4 border-t border-outline-variant pt-6"
+            aria-labelledby="section-danger"
+          >
+            <SectionAnchor id={MACHINE_FORM_SECTION_IDS.dangerZone} />
+            <h2 id="section-danger" className="text-base font-semibold">
+              Danger zone
+            </h2>
+            <PinballmapDirtyGate testId="owner-transfer-gated">
+              <div className="rounded-lg border border-destructive/35 px-4 py-2">
+                <MachineOwnerTransfer
+                  machineId={machine.id}
+                  machineName={machine.name}
+                  ownerId={machine.ownerId}
+                  invitedOwnerId={machine.invitedOwnerId}
+                  ownerName={machine.owner?.name ?? null}
+                  invitedOwnerName={machine.invitedOwner?.name ?? null}
+                  allUsers={allUsers}
+                  canEditAnyMachine={canEditAnyMachine}
+                  isOwner={isOwner}
+                />
+              </div>
             </PinballmapDirtyGate>
-          )}
-
-          {/* Entries this machine walked away from that are still live on the
-            public map (PP-l81u). Spec 2.5 routes them here only once NO cabinet
-            carries the old title any more — while one does, the entry is that
-            title's ordinary business and shows through those cabinets' own
-            states. The Info tab's "Config issue" warning links here, so this is
-            where that trail has to end. */}
-          {locationUrl !== null && abandoned.length > 0 ? (
-            <PinballmapAbandonedEntries
-              machineId={machine.id}
-              entries={abandoned}
-              canPush={canPush}
-              accountLinked={pbmLinkStatus === "linked"}
-            />
-          ) : null}
-        </section>
-      </DetailsDirtyProvider>
-
-      {/* Apron card — edited in its own dialog, the same one the Service tab
-          opens (apron-cards spec §3.1). */}
-      <ApronCardPanel
-        machine={machine}
-        variant="row"
-        canEdit={canEdit}
-        canExport={checkPermission("machines.apron.export", accessLevel)}
-      />
-
-      {/* Danger zone — applies immediately. Machine deletion joins this
-          section in PP-o355.25. */}
-      {canEdit ? (
-        <section
-          className="space-y-4 border-t border-outline-variant pt-6"
-          aria-labelledby="section-danger"
-        >
-          <h2 id="section-danger" className="text-base font-semibold">
-            Danger zone
-          </h2>
-          <div className="rounded-lg border border-destructive/35 px-4 py-2">
-            <MachineOwnerTransfer
-              machineId={machine.id}
-              machineName={machine.name}
-              ownerId={machine.ownerId}
-              invitedOwnerId={machine.invitedOwnerId}
-              ownerName={machine.owner?.name ?? null}
-              invitedOwnerName={machine.invitedOwner?.name ?? null}
-              allUsers={allUsers}
-              canEditAnyMachine={canEditAnyMachine}
-              isOwner={isOwner}
-            />
-          </div>
-        </section>
-      ) : null}
-    </div>
+          </section>
+          <PinnedActionBarSpacer />
+        </div>
+      </SectionNavLayout>
+    </DetailsDirtyProvider>
   );
 }

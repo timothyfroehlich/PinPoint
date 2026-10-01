@@ -182,7 +182,6 @@ Replacing the tracked location is a rare, near-never operation — PinPoint trac
 
 | Spec | Code today | Resolution |
 | :-- | :-- | :-- |
-| 4.11 New Machine intent | The New Machine page has no intent toggle, Insider Connected switch, or add-after-creating option; a lineup entry's Create in PinPoint preselects only the title | PP-wqit.14 |
 | 2.7 catalog corrections | Manufacturer and year are copied when a machine is matched and never refreshed | PP-o355.46 |
 | 3.6–3.7 lineup confirmation | The client method exists, but the lineup page header offers no Confirm lineup on Pinball Map | PP-o355.58; condition-comment posting deferred (PP-o355.57) |
 | 9.4 update-listing invitation | The Info tab shows the Pinball Map link with no invitation line | PP-2h1b |
