@@ -34,6 +34,8 @@ import {
   commitCheckedPinballMapLocationAction,
   saveRegionAlertConfigAction,
   sendRegionAlertTestAction,
+  saveSyncReportConfigAction,
+  sendSyncReportTestAction,
   syncPinballMapNowAction,
 } from "./actions";
 import type {
@@ -125,6 +127,17 @@ export function PinballMapConfigForm({
   );
   const [isSavingAlert, startAlertSaveTransition] = React.useTransition();
   const [isTestingAlert, startAlertTestTransition] = React.useTransition();
+  const [reportChannelValue, setReportChannelValue] = React.useState(
+    initialState.syncReportChannelId ?? ""
+  );
+  const [reportFeedback, setReportFeedback] = React.useState<Feedback | null>(
+    null
+  );
+  const [isSavingReport, startReportSaveTransition] = React.useTransition();
+  const [isTestingReport, startReportTestTransition] = React.useTransition();
+  const reportBaselineRef = React.useRef(
+    initialState.syncReportChannelId ?? ""
+  );
   const regionBaselineRef = React.useRef(initialState.configuredRegion);
   const channelBaselineRef = React.useRef(initialState.alertChannelId ?? "");
 
@@ -155,7 +168,9 @@ export function PinballMapConfigForm({
     clearPending ||
     syncPending ||
     isSavingAlert ||
-    isTestingAlert;
+    isTestingAlert ||
+    isSavingReport ||
+    isTestingReport;
 
   React.useEffect(() => {
     if (regionBaselineRef.current !== initialState.configuredRegion) {
@@ -166,7 +181,17 @@ export function PinballMapConfigForm({
       channelBaselineRef.current = initialState.alertChannelId ?? "";
       setChannelValue(initialState.alertChannelId ?? "");
     }
-  }, [initialState.configuredRegion, initialState.alertChannelId]);
+    if (
+      reportBaselineRef.current !== (initialState.syncReportChannelId ?? "")
+    ) {
+      reportBaselineRef.current = initialState.syncReportChannelId ?? "";
+      setReportChannelValue(initialState.syncReportChannelId ?? "");
+    }
+  }, [
+    initialState.configuredRegion,
+    initialState.alertChannelId,
+    initialState.syncReportChannelId,
+  ]);
 
   const applyAllowance = React.useCallback(
     (next: PinballMapAllowanceView): void => {
@@ -475,13 +500,17 @@ export function PinballMapConfigForm({
   const baselineChannel = initialState.alertChannelId ?? "";
   const normalizedInput = inputValue.trim();
   const normalizedChannelValue = channelValue.trim();
+  const baselineReportChannel = initialState.syncReportChannelId ?? "";
+  const normalizedReportChannelValue = reportChannelValue.trim();
   const inputLocationId = locationIdFromInput(inputValue);
 
   const isLocationDirty = inputValue !== baselineValue;
   const isRegionAlertDirty =
     regionValue !== baselineRegion ||
     normalizedChannelValue !== baselineChannel;
-  const isDirty = isLocationDirty || isRegionAlertDirty;
+  const isSyncReportDirty =
+    normalizedReportChannelValue !== baselineReportChannel;
+  const isDirty = isLocationDirty || isRegionAlertDirty || isSyncReportDirty;
 
   const candidateMatches = candidate?.locationId === inputLocationId;
   const locationCanClear =
@@ -492,7 +521,7 @@ export function PinballMapConfigForm({
 
   const canSave =
     (isLocationDirty && locationCanSave) ||
-    (!isLocationDirty && isRegionAlertDirty);
+    (!isLocationDirty && (isRegionAlertDirty || isSyncReportDirty));
 
   const deadlineMs = allowance.nextRefillAtIso
     ? Date.parse(allowance.nextRefillAtIso)
@@ -510,7 +539,8 @@ export function PinballMapConfigForm({
     isDirty ||
     candidate !== null ||
     feedback !== null ||
-    alertFeedback !== null;
+    alertFeedback !== null ||
+    reportFeedback !== null;
 
   useIntegrationDirtyState("pinballmap", isDirty);
 
@@ -600,6 +630,68 @@ export function PinballMapConfigForm({
     });
   }
 
+  function saveReportConfig(): void {
+    startReportSaveTransition(async () => {
+      const res = await saveSyncReportConfigAction({
+        channelId:
+          normalizedReportChannelValue.length > 0
+            ? normalizedReportChannelValue
+            : null,
+      });
+      if (res.ok) {
+        setAnnouncement({
+          tone: "success",
+          message: "Pinball Map settings saved.",
+        });
+        setReportFeedback(null);
+        router.refresh();
+      } else {
+        setAnnouncement({
+          tone: "error",
+          message:
+            res.reason === "unauthorized"
+              ? "You no longer have permission to manage integrations."
+              : "PinPoint couldn't save the sync report channel. Try again.",
+        });
+      }
+    });
+  }
+
+  function handleSendReportTest(): void {
+    if (!normalizedReportChannelValue || anyPending) return;
+    setReportFeedback(null);
+    startReportTestTransition(async () => {
+      const res = await sendSyncReportTestAction({
+        channelId: normalizedReportChannelValue,
+      });
+      if (res.ok) {
+        setReportFeedback({
+          tone: "success",
+          message: res.channelName
+            ? `Test message sent to #${res.channelName}.`
+            : "Test message sent to Discord.",
+        });
+        router.refresh();
+      } else {
+        let msg = "Failed to send test message.";
+        if (res.reason === "needs_discord") {
+          msg = "Discord bot token is not configured.";
+        } else if (res.reason === "unauthorized") {
+          msg = "You no longer have permission to manage integrations.";
+        } else if (res.message) {
+          msg = res.message;
+        }
+        setReportFeedback({ tone: "error", message: msg });
+      }
+    });
+  }
+
+  /** Save whichever Discord channel settings changed alongside a location save. */
+  function saveChannelConfigs(): void {
+    if (isRegionAlertDirty) saveAlertConfig();
+    if (isSyncReportDirty) saveReportConfig();
+  }
+
   function commitCandidate(): void {
     if (!candidateMatches) return;
     setConfirmation(null);
@@ -608,9 +700,7 @@ export function PinballMapConfigForm({
     formData.set("checkId", candidate.checkId);
     React.startTransition(() => {
       dispatchCommit(formData);
-      if (isRegionAlertDirty) {
-        saveAlertConfig();
-      }
+      saveChannelConfigs();
     });
   }
 
@@ -629,9 +719,7 @@ export function PinballMapConfigForm({
     );
     React.startTransition(() => {
       dispatchClear(formData);
-      if (isRegionAlertDirty) {
-        saveAlertConfig();
-      }
+      saveChannelConfigs();
     });
   }
 
@@ -654,9 +742,7 @@ export function PinballMapConfigForm({
       }
     }
 
-    if (isRegionAlertDirty) {
-      saveAlertConfig();
-    }
+    saveChannelConfigs();
   }
 
   function handleReset(): void {
@@ -667,6 +753,8 @@ export function PinballMapConfigForm({
     setRegionValue(baselineRegion);
     setChannelValue(baselineChannel);
     setAlertFeedback(null);
+    setReportChannelValue(baselineReportChannel);
+    setReportFeedback(null);
   }
 
   function handleSync(): void {
@@ -965,13 +1053,86 @@ export function PinballMapConfigForm({
                 {alertFeedback ? (
                   <FeedbackMessage feedback={alertFeedback} />
                 ) : (
-                  <RegionAlertStatusReadout
+                  <ChannelStatusReadout
                     status={initialState.alertChannelStatus}
                     statusDetail={initialState.alertChannelStatusDetail}
                     lastPostAtIso={initialState.alertLastPostAtIso}
+                    postNoun="alert"
                   />
                 )}
               </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="space-y-4" aria-labelledby="pinballmap-sync-report">
+          <h3 id="pinballmap-sync-report" className="font-medium">
+            Sync report
+          </h3>
+
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-baseline gap-2">
+              <Label htmlFor="pinballmap-sync-report-channel-id">
+                Sync report channel{" "}
+                <span className="text-muted-foreground font-normal">
+                  (optional)
+                </span>
+              </Label>
+              <span
+                id="pinballmap-sync-report-channel-hint"
+                className="text-muted-foreground text-xs text-pretty"
+              >
+                · Posts what needs review every Monday at 6 PM Central. Clear it
+                to turn the report off.
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                id="pinballmap-sync-report-channel-id"
+                name="syncReportChannelId"
+                type="text"
+                autoComplete="off"
+                placeholder="Channel ID (e.g. 123456789012345678)"
+                value={reportChannelValue}
+                onChange={(e) => {
+                  setReportChannelValue(e.target.value);
+                  setReportFeedback(null);
+                }}
+                disabled={anyPending}
+                aria-describedby="pinballmap-sync-report-channel-hint pinballmap-sync-report-status"
+                className="min-w-0 max-w-[360px] flex-1"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                loading={isTestingReport}
+                disabled={
+                  normalizedReportChannelValue.length === 0 || anyPending
+                }
+                onClick={handleSendReportTest}
+              >
+                Send test message
+              </Button>
+            </div>
+
+            <div
+              id="pinballmap-sync-report-status"
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+              className="min-h-5 space-y-1"
+            >
+              {reportFeedback ? (
+                <FeedbackMessage feedback={reportFeedback} />
+              ) : (
+                <ChannelStatusReadout
+                  status={initialState.syncReportStatus}
+                  statusDetail={initialState.syncReportStatusDetail}
+                  lastPostAtIso={initialState.syncReportLastPostAtIso}
+                  postNoun="report"
+                />
+              )}
             </div>
           </div>
         </section>
@@ -991,7 +1152,9 @@ export function PinballMapConfigForm({
             <Button
               ref={saveButtonRef}
               type="button"
-              loading={commitPending || clearPending || isSavingAlert}
+              loading={
+                commitPending || clearPending || isSavingAlert || isSavingReport
+              }
               disabled={!canSave || anyPending}
               onClick={handleSave}
             >
@@ -1315,14 +1478,17 @@ function ReplacementConfirmation({
   );
 }
 
-function RegionAlertStatusReadout({
+function ChannelStatusReadout({
   status,
   statusDetail,
   lastPostAtIso,
+  postNoun,
 }: {
   status: RegionAlertChannelStatus;
   statusDetail: string | null;
   lastPostAtIso: string | null;
+  /** What a real post is called in "Last …" — "alert" or "report". */
+  postNoun: "alert" | "report";
 }): React.JSX.Element | null {
   switch (status) {
     case "posting": {
@@ -1336,7 +1502,7 @@ function RegionAlertStatusReadout({
               </>
             ) : lastPostAtIso ? (
               <>
-                Posting · Last alert <RelativeTime value={lastPostAtIso} />
+                Posting · Last {postNoun} <RelativeTime value={lastPostAtIso} />
                 {statusDetail ? ` (${statusDetail})` : ""}.
               </>
             ) : (

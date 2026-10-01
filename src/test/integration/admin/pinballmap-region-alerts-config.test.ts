@@ -1,7 +1,9 @@
 /**
  * Integration Test: Pinball Map Region Alerts Admin Configuration (PP-o355.51.7)
+ * and the sync report channel that shares its save/test rules (PP-5qwx).
  *
- * Real PGlite testing for saveRegionAlertConfigAction and sendRegionAlertTestAction.
+ * Real PGlite testing for saveRegionAlertConfigAction, sendRegionAlertTestAction,
+ * saveSyncReportConfigAction, and sendSyncReportTestAction.
  * Validates permission checks, input validation, Discord channel permission validation,
  * silent region bootstrapping, state persistence (CORE-ARCH-012), and test alert delivery.
  */
@@ -39,6 +41,7 @@ vi.mock("~/lib/discord/config", () => ({
   getDiscordBotToken: getDiscordBotTokenMock,
 }));
 vi.mock("~/lib/discord/client", () => ({
+  DISCORD_MESSAGE_FLAGS: { SUPPRESS_EMBEDS: 1 << 2 },
   postChannelMessage: postChannelMessageMock,
 }));
 vi.mock("~/lib/pinballmap/region-alerts", async () => {
@@ -58,7 +61,9 @@ vi.mock("~/server/db", async () => {
 
 import {
   saveRegionAlertConfigAction,
+  saveSyncReportConfigAction,
   sendRegionAlertTestAction,
+  sendSyncReportTestAction,
 } from "~/app/(app)/admin/integrations/pinballmap/actions";
 
 describe("Pinball Map Region Alerts Admin Configuration", () => {
@@ -77,6 +82,10 @@ describe("Pinball Map Region Alerts Admin Configuration", () => {
         regionAlertStatus: "not_configured",
         regionAlertLastPostAt: null,
         regionAlertLastStatusDetail: null,
+        syncReportChannelId: null,
+        syncReportStatus: "not_configured",
+        syncReportLastPostAt: null,
+        syncReportLastStatusDetail: null,
       })
       .onConflictDoUpdate({
         target: pinballmapState.id,
@@ -86,6 +95,10 @@ describe("Pinball Map Region Alerts Admin Configuration", () => {
           regionAlertStatus: "not_configured",
           regionAlertLastPostAt: null,
           regionAlertLastStatusDetail: null,
+          syncReportChannelId: null,
+          syncReportStatus: "not_configured",
+          syncReportLastPostAt: null,
+          syncReportLastStatusDetail: null,
         },
       });
 
@@ -617,6 +630,122 @@ describe("Pinball Map Region Alerts Admin Configuration", () => {
         reason: "not_configured",
         message: "No alert channel configured to test.",
       });
+    });
+  });
+
+  describe("Sync report channel", () => {
+    const REPORT_CHANNEL = "222222222222222222";
+
+    async function stored(): Promise<typeof pinballmapState.$inferSelect> {
+      const db = await getTestDb();
+      const [row] = await db
+        .select()
+        .from(pinballmapState)
+        .where(eq(pinballmapState.id, "singleton"));
+      if (!row) throw new Error("no state row");
+      return row;
+    }
+
+    it("rejects non-admin users for save and test", async () => {
+      getUserAccessLevelMock.mockResolvedValue("member");
+
+      expect(
+        await saveSyncReportConfigAction({ channelId: REPORT_CHANNEL })
+      ).toEqual({ ok: false, reason: "unauthorized" });
+      expect(
+        await sendSyncReportTestAction({ channelId: REPORT_CHANNEL })
+      ).toEqual({ ok: false, reason: "unauthorized" });
+      expect((await stored()).syncReportChannelId).toBeNull();
+    });
+
+    it("saves the channel with its checked status and leaves region alerts alone", async () => {
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(JSON.stringify({ type: 0, permissions: "2048" }), {
+          status: 200,
+        })
+      );
+
+      const res = await saveSyncReportConfigAction({
+        channelId: REPORT_CHANNEL,
+      });
+
+      expect(res).toEqual({ ok: true, status: "posting", statusDetail: null });
+      const row = await stored();
+      expect(row.syncReportChannelId).toBe(REPORT_CHANNEL);
+      expect(row.syncReportStatus).toBe("posting");
+      expect(row.regionAlertChannelId).toBeNull();
+      expect(row.regionAlertStatus).toBe("not_configured");
+      fetchSpy.mockRestore();
+    });
+
+    it("persists the entered channel even when Discord rejects it (CORE-ARCH-012)", async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValueOnce(new Response("{}", { status: 404 }));
+
+      const res = await saveSyncReportConfigAction({
+        channelId: REPORT_CHANNEL,
+      });
+
+      expect(res).toEqual({
+        ok: true,
+        status: "cant_post",
+        statusDetail: "Channel not found or bot lacks access",
+      });
+      expect((await stored()).syncReportChannelId).toBe(REPORT_CHANNEL);
+      fetchSpy.mockRestore();
+    });
+
+    it("clearing the channel turns the report off", async () => {
+      const db = await getTestDb();
+      await db
+        .update(pinballmapState)
+        .set({
+          syncReportChannelId: REPORT_CHANNEL,
+          syncReportStatus: "posting",
+        })
+        .where(eq(pinballmapState.id, "singleton"));
+
+      const res = await saveSyncReportConfigAction({ channelId: "" });
+
+      expect(res).toEqual({
+        ok: true,
+        status: "not_configured",
+        statusDetail: null,
+      });
+      const row = await stored();
+      expect(row.syncReportChannelId).toBeNull();
+      expect(row.syncReportStatus).toBe("not_configured");
+    });
+
+    it("a test post to the saved channel suppresses previews and confirms Posting", async () => {
+      const db = await getTestDb();
+      await db
+        .update(pinballmapState)
+        .set({ syncReportChannelId: REPORT_CHANNEL })
+        .where(eq(pinballmapState.id, "singleton"));
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ name: "pinball-ops" }), { status: 200 })
+        );
+
+      const res = await sendSyncReportTestAction({});
+
+      expect(res).toEqual({ ok: true, channelName: "pinball-ops" });
+      expect(postChannelMessageMock).toHaveBeenCalledWith({
+        botToken: "mock-bot-token",
+        channelId: REPORT_CHANNEL,
+        content: expect.stringContaining(
+          "sync report will post to #pinball-ops"
+        ),
+        flags: 1 << 2,
+      });
+      const row = await stored();
+      expect(row.syncReportStatus).toBe("posting");
+      expect(row.syncReportLastPostAt).not.toBeNull();
+      expect(row.regionAlertStatus).toBe("not_configured");
+      fetchSpy.mockRestore();
     });
   });
 });

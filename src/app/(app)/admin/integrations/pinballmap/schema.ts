@@ -39,6 +39,17 @@ export const saveRegionAlertConfigSchema = z.object({
     .optional(),
 });
 
+export const saveSyncReportConfigSchema = z.object({
+  channelId: z
+    .string()
+    .trim()
+    .refine((val) => val.length === 0 || discordSnowflakeRegex.test(val), {
+      message: "Channel ID must be a valid Discord snowflake",
+    })
+    .nullable()
+    .optional(),
+});
+
 export const sendRegionAlertTestSchema = z.object({
   channelId: z
     .string()

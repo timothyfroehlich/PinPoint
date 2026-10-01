@@ -687,6 +687,13 @@
       "when": 1790811429042,
       "tag": "0097_retire-pinballmap-operator-credentials",
       "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1790856441939,
+      "tag": "0098_pinballmap-sync-report",
+      "breakpoints": true
     }
   ]
 }

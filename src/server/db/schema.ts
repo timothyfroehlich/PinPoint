@@ -14,6 +14,7 @@ import {
   bigserial,
   check,
   unique,
+  date,
 } from "drizzle-orm/pg-core";
 import { citext } from "~/server/db/citext";
 import {
@@ -1931,6 +1932,28 @@ export const pinballmapState = pgTable(
       withTimezone: true,
     }),
     regionAlertLastStatusDetail: text("region_alert_last_status_detail"),
+    // Weekly sync report configuration and delivery health (PP-5qwx,
+    // pinballmap-sync-report spec). Same status vocabulary as region alerts.
+    syncReportChannelId: text("sync_report_channel_id"),
+    syncReportStatus: text("sync_report_status", {
+      enum: [
+        "not_configured",
+        "posting",
+        "cant_post",
+        "couldnt_check",
+        "needs_discord",
+      ],
+    })
+      .notNull()
+      .default("not_configured"),
+    syncReportLastPostAt: timestamp("sync_report_last_post_at", {
+      withTimezone: true,
+    }),
+    syncReportLastStatusDetail: text("sync_report_last_status_detail"),
+    // The Central-time Monday (YYYY-MM-DD) of the last report a run claimed.
+    // A run claims its week before posting, so a duplicate cron delivery or
+    // the second daylight-saving slot finds it taken (spec 3.3).
+    syncReportLastWeek: date("sync_report_last_week", { mode: "string" }),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -1955,6 +1978,10 @@ export const pinballmapState = pgTable(
     regionAlertStatusCheck: check(
       "pinballmap_state_region_alert_status_check",
       sql`region_alert_status IN ('not_configured', 'posting', 'cant_post', 'couldnt_check', 'needs_discord')`
+    ),
+    syncReportStatusCheck: check(
+      "pinballmap_state_sync_report_status_check",
+      sql`sync_report_status IN ('not_configured', 'posting', 'cant_post', 'couldnt_check', 'needs_discord')`
     ),
   })
 ).enableRLS();

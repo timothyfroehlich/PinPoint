@@ -1,5 +1,5 @@
 import * as React from "react";
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { IntegrationsDirtyStateProvider } from "../integrations-dirty-state";
@@ -16,6 +16,8 @@ const {
   refreshMock,
   saveAlertActionMock,
   sendTestActionMock,
+  saveReportActionMock,
+  sendReportTestActionMock,
   syncActionMock,
 } = vi.hoisted(() => ({
   checkActionMock: vi.fn(),
@@ -24,6 +26,8 @@ const {
   refreshMock: vi.fn(),
   saveAlertActionMock: vi.fn(),
   sendTestActionMock: vi.fn(),
+  saveReportActionMock: vi.fn(),
+  sendReportTestActionMock: vi.fn(),
   syncActionMock: vi.fn(),
 }));
 
@@ -37,6 +41,8 @@ vi.mock("./actions", () => ({
   commitCheckedPinballMapLocationAction: commitActionMock,
   saveRegionAlertConfigAction: saveAlertActionMock,
   sendRegionAlertTestAction: sendTestActionMock,
+  saveSyncReportConfigAction: saveReportActionMock,
+  sendSyncReportTestAction: sendReportTestActionMock,
   syncPinballMapNowAction: syncActionMock,
 }));
 
@@ -89,6 +95,10 @@ const CONFIGURED: PinballMapAdminViewState = {
   alertChannelStatus: "not_configured",
   alertChannelStatusDetail: null,
   alertLastPostAtIso: null,
+  syncReportChannelId: null,
+  syncReportStatus: "not_configured",
+  syncReportStatusDetail: null,
+  syncReportLastPostAtIso: null,
 };
 
 function renderForm(initialState: PinballMapAdminViewState = CONFIGURED) {
@@ -737,6 +747,9 @@ describe("PinballMapConfigForm", () => {
   });
 
   describe("Region alerts section", () => {
+    const regionAlerts = (): HTMLElement =>
+      screen.getByRole("region", { name: "Region alerts" });
+
     it("renders region selector and alert channel input with hints", () => {
       renderForm();
 
@@ -752,9 +765,13 @@ describe("PinballMapConfigForm", () => {
         )
       ).toBeInTheDocument();
       expect(
-        screen.getByRole("button", { name: "Send test message" })
+        within(regionAlerts()).getByRole("button", {
+          name: "Send test message",
+        })
       ).toBeDisabled();
-      expect(screen.getByText("Not configured")).toBeInTheDocument();
+      expect(
+        within(regionAlerts()).getByText("Not configured")
+      ).toBeInTheDocument();
     });
 
     it("enables Save changes when alert channel is entered and saves it", async () => {
@@ -785,7 +802,7 @@ describe("PinballMapConfigForm", () => {
       const channelInput = screen.getByLabelText(/Alert channel/i);
       await user.type(channelInput, "1234567890");
 
-      const testButton = screen.getByRole("button", {
+      const testButton = within(regionAlerts()).getByRole("button", {
         name: "Send test message",
       });
       expect(testButton).toBeEnabled();
@@ -857,5 +874,77 @@ describe("PinballMapConfigForm", () => {
         expect(screen.getByText(expected)).toBeInTheDocument();
       }
     );
+  });
+
+  describe("Sync report section", () => {
+    const syncReport = (): HTMLElement =>
+      screen.getByRole("region", { name: "Sync report" });
+
+    beforeEach(() => {
+      saveReportActionMock.mockResolvedValue({
+        ok: true,
+        status: "posting",
+        statusDetail: null,
+      });
+      sendReportTestActionMock.mockResolvedValue({
+        ok: true,
+        channelName: "pinball-ops",
+      });
+    });
+
+    it("saves only the sync report channel when only it changed", async () => {
+      const user = userEvent.setup();
+      renderForm();
+
+      await user.type(
+        screen.getByLabelText(/Sync report channel/i),
+        " 222222222222222222 "
+      );
+      await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+      expect(saveReportActionMock).toHaveBeenCalledWith({
+        channelId: "222222222222222222",
+      });
+      expect(saveAlertActionMock).not.toHaveBeenCalled();
+      expect(
+        await screen.findByText("Pinball Map settings saved.")
+      ).toBeInTheDocument();
+    });
+
+    it("sends its test message to the typed channel and reports where it went", async () => {
+      const user = userEvent.setup();
+      renderForm();
+
+      await user.type(
+        screen.getByLabelText(/Sync report channel/i),
+        "222222222222222222"
+      );
+      await user.click(
+        within(syncReport()).getByRole("button", { name: "Send test message" })
+      );
+
+      expect(sendReportTestActionMock).toHaveBeenCalledWith({
+        channelId: "222222222222222222",
+      });
+      expect(sendTestActionMock).not.toHaveBeenCalled();
+      expect(
+        await within(syncReport()).findByText(
+          "Test message sent to #pinball-ops."
+        )
+      ).toBeInTheDocument();
+    });
+
+    it("shows the last report time while Posting", () => {
+      renderForm({
+        ...CONFIGURED,
+        syncReportChannelId: "222222222222222222",
+        syncReportStatus: "posting",
+        syncReportLastPostAtIso: "2026-09-28T23:00:00.000Z",
+      });
+
+      expect(
+        within(syncReport()).getByText(/Posting · Last report 4 minutes ago/)
+      ).toBeInTheDocument();
+    });
   });
 });

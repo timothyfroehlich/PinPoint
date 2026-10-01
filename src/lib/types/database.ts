@@ -125,6 +125,11 @@ export type PinballmapRuntimeState = Pick<
   | "regionAlertStatus"
   | "regionAlertLastPostAt"
   | "regionAlertLastStatusDetail"
+  | "syncReportChannelId"
+  | "syncReportStatus"
+  | "syncReportLastPostAt"
+  | "syncReportLastStatusDetail"
+  | "syncReportLastWeek"
   | "updatedAt"
   | "updatedBy"
 >;

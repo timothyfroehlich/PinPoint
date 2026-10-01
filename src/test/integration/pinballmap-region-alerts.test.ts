@@ -1292,6 +1292,11 @@ describe("GET /api/cron/pinballmap-region-alerts", () => {
           regionAlertStatus: "not_configured",
           regionAlertLastPostAt: null,
           regionAlertLastStatusDetail: null,
+          syncReportChannelId: null,
+          syncReportStatus: "not_configured",
+          syncReportLastPostAt: null,
+          syncReportLastStatusDetail: null,
+          syncReportLastWeek: null,
           updatedAt: new Date(),
           updatedBy: null,
         })

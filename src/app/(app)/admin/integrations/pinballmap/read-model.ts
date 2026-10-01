@@ -94,6 +94,12 @@ export async function getPinballMapAdminViewState(): Promise<PinballMapAdminView
     ? null
     : (state?.regionAlertLastPostAt?.toISOString() ?? null);
 
+  const rawReportChannelId = state?.syncReportChannelId?.trim();
+  const syncReportChannelId =
+    rawReportChannelId && rawReportChannelId.length > 0
+      ? rawReportChannelId
+      : null;
+
   const regionAlertFields = {
     configuredRegion,
     availableRegions,
@@ -101,6 +107,16 @@ export async function getPinballMapAdminViewState(): Promise<PinballMapAdminView
     alertChannelStatus,
     alertChannelStatusDetail,
     alertLastPostAtIso,
+    syncReportChannelId,
+    syncReportStatus: !syncReportChannelId
+      ? ("not_configured" as const)
+      : (state?.syncReportStatus ?? "not_configured"),
+    syncReportStatusDetail: !syncReportChannelId
+      ? null
+      : (state?.syncReportLastStatusDetail ?? null),
+    syncReportLastPostAtIso: !syncReportChannelId
+      ? null
+      : (state?.syncReportLastPostAt?.toISOString() ?? null),
   };
 
   if (configuredLocationId === null) {

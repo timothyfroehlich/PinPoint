@@ -17,7 +17,14 @@ import { db } from "~/server/db";
 import { pinballmapState } from "~/server/db/schema";
 import { log } from "~/lib/logger";
 import { getDiscordBotToken } from "~/lib/discord/config";
-import { postChannelMessage } from "~/lib/discord/client";
+import {
+  DISCORD_MESSAGE_FLAGS,
+  postChannelMessage,
+} from "~/lib/discord/client";
+import {
+  checkDiscordChannel,
+  fetchDiscordChannelName,
+} from "~/lib/discord/channel-check";
 import { getPinballMapState } from "~/lib/pinballmap/state";
 import { normalizeRegion } from "~/lib/pinballmap/config";
 import { bootstrapRegion } from "~/lib/pinballmap/region-alerts";
@@ -29,6 +36,7 @@ import {
   commitCheckedPinballMapLocationSchema,
   discordSnowflakeRegex,
   saveRegionAlertConfigSchema,
+  saveSyncReportConfigSchema,
   sendRegionAlertTestSchema,
 } from "./schema";
 import type {
@@ -267,70 +275,11 @@ export async function saveRegionAlertConfigAction(
 
     let status: RegionAlertChannelStatus = "not_configured";
     let statusDetail: string | null = null;
-
-    if (alertChannelId === null) {
-      status = "not_configured";
-      statusDetail = null;
-    } else {
-      const botToken = await getDiscordBotToken();
-      if (!botToken) {
-        status = "needs_discord";
-        statusDetail = "Discord bot token not configured";
-      } else {
-        try {
-          const res = await fetch(
-            `https://discord.com/api/v10/channels/${alertChannelId}`,
-            {
-              headers: { Authorization: `Bot ${botToken}` },
-            }
-          );
-          if (res.status === 401) {
-            status = "needs_discord";
-            statusDetail = "Discord bot token is invalid";
-          } else if (res.status === 403 || res.status === 404) {
-            status = "cant_post";
-            statusDetail = "Channel not found or bot lacks access";
-          } else if (res.status === 429 || res.status >= 500) {
-            status = "couldnt_check";
-            statusDetail = "Discord was unreachable";
-          } else if (res.ok) {
-            const body = (await res.json()) as {
-              permissions?: string;
-              type?: number;
-            };
-            if (body.type === 4 || body.type === 15) {
-              status = "cant_post";
-              statusDetail =
-                "Selected channel cannot receive direct text messages";
-            } else if (body.permissions !== undefined) {
-              const perms = BigInt(body.permissions);
-              // SEND_MESSAGES is bit 11 (2048)
-              const canSend = (perms & BigInt(2048)) !== 0n;
-              if (!canSend) {
-                status = "cant_post";
-                statusDetail =
-                  "Bot missing Send Messages permission in this channel";
-              } else {
-                status = "posting";
-                statusDetail = null;
-              }
-            } else {
-              status = "posting";
-              statusDetail = null;
-            }
-          } else {
-            status = "couldnt_check";
-            statusDetail = "Discord returned an unexpected response";
-          }
-        } catch (err) {
-          log.warn(
-            { err, action: "saveRegionAlertConfigAction.validateChannel" },
-            "Discord channel check failed"
-          );
-          status = "couldnt_check";
-          statusDetail = "Discord was unreachable";
-        }
-      }
+    if (alertChannelId !== null) {
+      ({ status, statusDetail } = await checkDiscordChannel(
+        await getDiscordBotToken(),
+        alertChannelId
+      ));
     }
 
     const currentState = await getPinballMapState();
@@ -396,10 +345,73 @@ export async function saveRegionAlertConfigAction(
   }
 }
 
-export async function sendRegionAlertTestAction(
+/**
+ * The two admin-configured Pinball Map Discord channels. Each stores its own
+ * id and status; the save check, test send, and status rules are shared
+ * (region alerts §2.3–§3.3, sync report §2.3–§2.4).
+ */
+type ChannelKind = "region_alert" | "sync_report";
+
+const CHANNEL_LABEL: Record<ChannelKind, string> = {
+  region_alert: "alert channel",
+  sync_report: "sync report channel",
+};
+
+function storedChannelId(
+  state: Awaited<ReturnType<typeof getPinballMapState>>,
+  kind: ChannelKind
+): string | null {
+  const raw =
+    kind === "region_alert"
+      ? state?.regionAlertChannelId
+      : state?.syncReportChannelId;
+  const trimmed = raw?.trim();
+  return trimmed && trimmed.length > 0 ? trimmed : null;
+}
+
+function channelStatusSet(
+  kind: ChannelKind,
+  status: RegionAlertChannelStatus,
+  statusDetail: string | null,
+  lastPostAt?: Date
+): Partial<typeof pinballmapState.$inferInsert> {
+  if (kind === "region_alert") {
+    return {
+      regionAlertStatus: status,
+      regionAlertLastStatusDetail: statusDetail,
+      ...(lastPostAt ? { regionAlertLastPostAt: lastPostAt } : {}),
+    };
+  }
+  return {
+    syncReportStatus: status,
+    syncReportLastStatusDetail: statusDetail,
+    ...(lastPostAt ? { syncReportLastPostAt: lastPostAt } : {}),
+  };
+}
+
+function testMessage(
+  kind: ChannelKind,
+  channelName: string | undefined
+): string {
+  if (kind === "region_alert") {
+    return channelName
+      ? `[PinPoint] Test alert: Region alerts are connected to #${channelName}.\nData from Pinball Map (CC BY-SA 4.0).`
+      : `[PinPoint] Test alert: Region alerts are connected to this channel.\nData from Pinball Map (CC BY-SA 4.0).`;
+  }
+  return channelName
+    ? `[PinPoint] Test message: The weekly Pinball Map sync report will post to #${channelName}.`
+    : `[PinPoint] Test message: The weekly Pinball Map sync report will post to this channel.`;
+}
+
+async function sendChannelTest(
+  kind: ChannelKind,
   first: unknown,
-  second?: unknown
+  second: unknown
 ): Promise<SendRegionAlertTestActionResult> {
+  const action =
+    kind === "region_alert"
+      ? "sendRegionAlertTestAction"
+      : "sendSyncReportTestAction";
   try {
     const authorization = await authorizeIntegrationsAdmin();
     if (!authorization.ok) return { ok: false, reason: "unauthorized" };
@@ -420,17 +432,15 @@ export async function sendRegionAlertTestAction(
     if (!parsed.success) return { ok: false, reason: "invalid" };
 
     const currentState = await getPinballMapState();
-    const channelId =
-      parsed.data.channelId ??
-      (currentState?.regionAlertChannelId?.trim().length
-        ? currentState.regionAlertChannelId.trim()
-        : undefined);
+    const savedChannelId = storedChannelId(currentState, kind);
+    const channelId = parsed.data.channelId ?? savedChannelId ?? undefined;
+    const label = CHANNEL_LABEL[kind];
 
     if (!channelId) {
       return {
         ok: false,
         reason: "not_configured",
-        message: "No alert channel configured to test.",
+        message: `No ${label} configured to test.`,
       };
     }
 
@@ -438,23 +448,32 @@ export async function sendRegionAlertTestAction(
       return {
         ok: false,
         reason: "not_configured",
-        message: "No valid alert channel configured to test.",
+        message: `No valid ${label} configured to test.`,
       };
     }
 
+    // Only a test of the saved channel moves its stored status; testing an
+    // unsaved edit says nothing about the channel the feature posts to.
+    const testsSavedChannel = savedChannelId === channelId;
+    const recordStatus = async (
+      status: RegionAlertChannelStatus,
+      statusDetail: string | null,
+      lastPostAt?: Date
+    ): Promise<void> => {
+      if (!testsSavedChannel) return;
+      await db
+        .update(pinballmapState)
+        .set({
+          ...channelStatusSet(kind, status, statusDetail, lastPostAt),
+          updatedAt: new Date(),
+          updatedBy: authorization.userId,
+        })
+        .where(eq(pinballmapState.id, "singleton"));
+    };
+
     const botToken = await getDiscordBotToken();
     if (!botToken) {
-      if (currentState?.regionAlertChannelId === channelId) {
-        await db
-          .update(pinballmapState)
-          .set({
-            regionAlertStatus: "needs_discord",
-            regionAlertLastStatusDetail: "Discord bot token not configured",
-            updatedAt: new Date(),
-            updatedBy: authorization.userId,
-          })
-          .where(eq(pinballmapState.id, "singleton"));
-      }
+      await recordStatus("needs_discord", "Discord bot token not configured");
       revalidatePath(INTEGRATIONS_PATH);
       return {
         ok: false,
@@ -463,46 +482,18 @@ export async function sendRegionAlertTestAction(
       };
     }
 
-    let channelName: string | undefined;
-    try {
-      const res = await fetch(
-        `https://discord.com/api/v10/channels/${channelId}`,
-        {
-          headers: { Authorization: `Bot ${botToken}` },
-        }
-      );
-      if (res.ok) {
-        const body = (await res.json()) as { name?: string };
-        if (body.name) channelName = body.name;
-      }
-    } catch {
-      // Best-effort channel name lookup
-    }
-
-    const content = channelName
-      ? `[PinPoint] Test alert: Region alerts are connected to #${channelName}.\nData from Pinball Map (CC BY-SA 4.0).`
-      : `[PinPoint] Test alert: Region alerts are connected to this channel.\nData from Pinball Map (CC BY-SA 4.0).`;
-
+    const channelName = await fetchDiscordChannelName(botToken, channelId);
     const sent = await postChannelMessage({
       botToken,
       channelId,
-      content,
+      content: testMessage(kind, channelName),
+      ...(kind === "sync_report"
+        ? { flags: DISCORD_MESSAGE_FLAGS.SUPPRESS_EMBEDS }
+        : {}),
     });
 
     if (sent.ok) {
-      if (currentState?.regionAlertChannelId === channelId) {
-        await db
-          .update(pinballmapState)
-          .set({
-            regionAlertStatus: "posting",
-            regionAlertLastPostAt: new Date(),
-            regionAlertLastStatusDetail: "Test message delivered",
-            updatedAt: new Date(),
-            updatedBy: authorization.userId,
-          })
-          .where(eq(pinballmapState.id, "singleton"));
-      }
-
+      await recordStatus("posting", "Test message delivered", new Date());
       revalidatePath(INTEGRATIONS_PATH);
       return channelName !== undefined
         ? { ok: true, channelName }
@@ -516,23 +507,84 @@ export async function sendRegionAlertTestAction(
         ? "Channel unreachable or bot missing permissions"
         : "Discord was unreachable";
 
-    if (currentState?.regionAlertChannelId === channelId) {
-      await db
-        .update(pinballmapState)
-        .set({
-          regionAlertStatus: newStatus,
-          regionAlertLastStatusDetail: statusDetail,
-          updatedAt: new Date(),
-          updatedBy: authorization.userId,
-        })
-        .where(eq(pinballmapState.id, "singleton"));
-    }
+    await recordStatus(newStatus, statusDetail);
     revalidatePath(INTEGRATIONS_PATH);
 
     return { ok: false, reason: newStatus, message: statusDetail };
   } catch (error) {
+    reportError(error, { action, bestEffort: false });
+    revalidatePath(INTEGRATIONS_PATH);
+    return { ok: false, reason: "server_error" };
+  }
+}
+
+export async function sendRegionAlertTestAction(
+  first: unknown,
+  second?: unknown
+): Promise<SendRegionAlertTestActionResult> {
+  return sendChannelTest("region_alert", first, second);
+}
+
+export async function sendSyncReportTestAction(
+  first: unknown,
+  second?: unknown
+): Promise<SendRegionAlertTestActionResult> {
+  return sendChannelTest("sync_report", first, second);
+}
+
+/**
+ * Save the sync report channel (sync report spec §2.1–§2.3). The entered
+ * value always persists, even when the Discord check fails (CORE-ARCH-012).
+ */
+export async function saveSyncReportConfigAction(
+  first: unknown,
+  second?: unknown
+): Promise<SaveRegionAlertConfigActionResult> {
+  try {
+    const authorization = await authorizeIntegrationsAdmin();
+    if (!authorization.ok) return { ok: false, reason: "unauthorized" };
+
+    const rawInput = second !== undefined ? second : first;
+    let rawChannelId: unknown;
+    if (rawInput instanceof FormData) {
+      rawChannelId = rawInput.get("channelId");
+    } else if (typeof rawInput === "object" && rawInput !== null) {
+      rawChannelId = (rawInput as Record<string, unknown>)["channelId"];
+    }
+
+    const parsed = saveSyncReportConfigSchema.safeParse({
+      channelId: rawChannelId,
+    });
+    if (!parsed.success) return { ok: false, reason: "invalid" };
+
+    const trimmed = parsed.data.channelId?.trim();
+    const channelId = trimmed && trimmed.length > 0 ? trimmed : null;
+
+    let status: RegionAlertChannelStatus = "not_configured";
+    let statusDetail: string | null = null;
+    if (channelId !== null) {
+      ({ status, statusDetail } = await checkDiscordChannel(
+        await getDiscordBotToken(),
+        channelId
+      ));
+    }
+
+    const fields = {
+      syncReportChannelId: channelId,
+      ...channelStatusSet("sync_report", status, statusDetail),
+      updatedAt: new Date(),
+      updatedBy: authorization.userId,
+    };
+    await db
+      .insert(pinballmapState)
+      .values({ id: "singleton", ...fields })
+      .onConflictDoUpdate({ target: pinballmapState.id, set: fields });
+
+    revalidatePath(INTEGRATIONS_PATH);
+    return { ok: true, status, statusDetail };
+  } catch (error) {
     reportError(error, {
-      action: "sendRegionAlertTestAction",
+      action: "saveSyncReportConfigAction",
       bestEffort: false,
     });
     revalidatePath(INTEGRATIONS_PATH);

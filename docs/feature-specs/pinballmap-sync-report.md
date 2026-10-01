@@ -51,9 +51,7 @@ Every concept in `pinballmap.md` §1 and `pinballmap-lineup.md` §1 applies unch
 
 ## Known divergences (code vs spec)
 
-| Spec  | Code today | Resolution |
-| :---- | :--------- | :--------- |
-| §2–§5 | Not built  | PP-5qwx    |
+_None — the current implementation matches this spec._
 
 ---
 
