@@ -7,7 +7,7 @@ import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SectionNavLayout } from "./SectionNav";
-import { SectionAnchor } from "./SectionAnchor";
+import { SectionAnchor } from "~/components/machines/machine-form/SectionAnchor";
 
 type ObserverCallback = (entries: IntersectionObserverEntry[]) => void;
 

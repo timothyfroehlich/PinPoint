@@ -1,0 +1,498 @@
+import { HelpPage } from "~/components/help/HelpPage";
+import { HelpScreenshot } from "~/components/help/HelpScreenshot";
+
+export const metadata = {
+  title: "Pinball Map | PinPoint",
+};
+
+<HelpPage toc breadcrumb="Pinball Map" title="Pinball Map" description="Keep the venue's Pinball Map lineup accurate from PinPoint: match machines to Pinball Map titles, record which belong on the lineup, push the differences, and read Pinball Map comments on each machine's timeline.">
+
+## How the integration works
+
+PinPoint tracks one Pinball Map location, the venue. It reads that location's
+lineup every hour and stores what it saw; every PinPoint page renders from that
+stored copy, so opening a page never contacts Pinball Map.
+
+PinPoint never writes to Pinball Map on its own. Every change to the public
+lineup is a person pressing a button and confirming it, and Pinball Map records
+the change under that person's own Pinball Map account.
+
+Four facts about each machine are kept separately, and none of them changes
+another automatically:
+
+- **Model** — which Pinball Map catalog title the machine is.
+- **Lineup setting** — whether PinPoint says the machine belongs on the lineup.
+- **Lineup** — what Pinball Map currently shows for the venue.
+- **Availability** — whether the machine is at the venue and available for
+  play: On the Floor, Off the Floor, On Loan, Pending Arrival, or Removed.
+
+When the lineup setting and the lineup disagree, the machine is **Out of sync** until
+someone pushes the change to Pinball Map or changes the lineup setting.
+
+### Link your Pinball Map account
+
+Pushing changes to Pinball Map runs as your own Pinball Map account. Link it
+once from [Settings](/settings#pinball-map) → **Connected Accounts** →
+**Link Pinball Map**, signing in with your Pinball Map username or email and
+password. PinPoint keeps the account's API token and never stores your
+password.
+
+<HelpScreenshot src="/help/pinball-map/account-linked.png" alt="The Pinball Map row in Connected accounts, reading Linked as a username, with an Unlink button" width={792} height={93} />
+
+- **Without a linked account** you can still change the lineup setting. Instead of a push
+  button, the status row tells you what to change and links to the venue's
+  Pinball Map page. The machine stays Out of sync, and any member with a linked
+  account can push it.
+- **Authentication failed** means Pinball Map rejected your saved token. Use
+  **Reconnect** in Settings to sign in again.
+- **Unlink** deletes PinPoint's copy of the token. Pinball Map offers no way to
+  revoke the token itself.
+
+### Who can do what
+
+<div className="overflow-x-auto mt-3">
+  <table className="w-full text-sm border-collapse">
+    <thead>
+      <tr className="border-b">
+        <th className="text-left p-2 font-medium text-foreground">Action</th>
+        <th className="text-left p-2 font-medium text-foreground">Who</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr className="border-b">
+        <td className="p-2 text-muted-foreground">See a machine's Pinball Map status, open the lineup page, refresh Pinball Map's lineup</td>
+        <td className="p-2 text-muted-foreground">Any signed-in member</td>
+      </tr>
+      <tr className="border-b">
+        <td className="p-2 text-muted-foreground">Match a machine to a title, change the lineup setting and Insider Connected setting</td>
+        <td className="p-2 text-muted-foreground">The machine's owner, technicians, and admins</td>
+      </tr>
+      <tr className="border-b">
+        <td className="p-2 text-muted-foreground">Add, remove, or update an entry on Pinball Map</td>
+        <td className="p-2 text-muted-foreground">The same people, with a linked Pinball Map account</td>
+      </tr>
+      <tr className="border-b">
+        <td className="p-2 text-muted-foreground">Confirm lineup on Pinball Map</td>
+        <td className="p-2 text-muted-foreground">Technicians and admins, with a linked Pinball Map account</td>
+      </tr>
+      <tr className="border-b">
+        <td className="p-2 text-muted-foreground">Set the tracked location</td>
+        <td className="p-2 text-muted-foreground">Admins</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+### Refreshing and Pinball Map's API
+
+PinPoint reads the lineup automatically once an hour. **Refresh** reads it now.
+
+Pinball Map is a community-run service, and PinPoint keeps its traffic to their
+API low on purpose. Pages show PinPoint's stored copy of the lineup and never
+call Pinball Map when they open. Refreshes are capped for everyone combined,
+across the Manage tab, the lineup page, and the admin page: three can run back
+to back, then one becomes available every three minutes, up to 20 an hour. A
+failed refresh still counts. While none is available, the button shows a
+countdown. Press Refresh only when you need something newer than the last
+hourly read, such as checking a change you just made on pinballmap.com.
+
+## Machines
+
+### Match a machine to a Pinball Map title
+
+A machine's Pinball Map title is set under **Model Details** on its **Manage**
+tab. With **Source** set to **Pinball Map**, choose the **Model**, then the
+**Edition** when the title comes in several (Pro, Premium, LE). Save with the
+form's **Save** button.
+
+<HelpScreenshot src="/help/pinball-map/model-details.png" alt="Model Details with Source set to Pinball Map, Model set to Attack from Mars, Bally, 1995, and Edition reading Only one edition" width={920} height={180} />
+
+- A matched machine's manufacturer and year come from Pinball Map's catalog and
+  cannot be edited.
+- Use **Manual Entry** for a game Pinball Map's catalog does not carry: a
+  homebrew, a flipperless game, or a title too old or obscure for the catalog.
+  You enter its model details by hand, and it has no lineup controls.
+- Changing or clearing the match resets the lineup setting to **Off the lineup** (a
+  **Don't sync** setting is kept). It does not remove the old title's entry
+  from Pinball Map. If no other machine uses the old title, the leftover entry
+  appears on this machine's Manage tab with its own **Remove** action.
+- While the form has unsaved changes, the Pinball Map controls below it wait
+  until you save or discard.
+
+### The Pinball Map box on the Manage tab
+
+Each matched machine's **Manage** tab has a Pinball Map box under
+**Integrations**. The header links to the venue's Pinball Map page and shows
+when the lineup was last refreshed, with **Refresh** and **Help**. An
+**Out of sync** badge appears when the lineup setting and the lineup disagree.
+
+<HelpScreenshot src="/help/pinball-map/listing-control-in-sync.png" alt="The Pinball Map box for Attack from Mars: Lineup set to On the lineup, Status reading On the location's lineup" width={886} height={156} caption="In sync: the lineup setting is On the lineup and Pinball Map lists the game." />
+
+#### Lineup setting
+
+- **On the lineup** — the machine belongs on the venue's public lineup.
+- **Off the lineup** — it does not.
+- **Don't sync** — PinPoint leaves this machine alone. Its status is still
+  shown, but it is never flagged Out of sync, never appears on the lineup
+  page's review lists, and does not receive Pinball Map comments.
+
+Changing the lineup setting writes only to PinPoint. It takes effect immediately, needs no
+confirmation, and can be changed back at any time.
+
+#### Insider Connected
+
+Titles that Pinball Map marks as Insider Connected eligible get a second
+toggle: **On**, **Off**, or **Don't sync**. With **Don't sync**, PinPoint shows
+Pinball Map's current value beside the toggle and never flags a difference.
+With **On** or **Off**, a difference from Pinball Map makes the machine Out of
+sync and offers **Update Pinball Map**. Titles that are not eligible show no
+Insider Connected toggle.
+
+#### Push the change to Pinball Map
+
+When a machine is Out of sync, the status row offers the one action that makes
+Pinball Map match: **Add to Pinball Map**, **Remove from Pinball Map**, or
+**Update Pinball Map** when only Insider Connected differs. Adding also applies
+the Insider Connected setting. Each action asks for confirmation and names the
+public change.
+
+<HelpScreenshot src="/help/pinball-map/listing-control-missing.png" alt="The Pinball Map box for Medieval Madness: Out of sync badge, lineup setting On the lineup, status Not on the location's lineup, and an Add to Pinball Map button" width={886} height={156} caption="Missing: the lineup setting is On the lineup, but Pinball Map does not list the game." />
+
+<HelpScreenshot src="/help/pinball-map/listing-control-lingering.png" alt="The Pinball Map box for Black Knight: Out of sync badge, lineup setting Off the lineup, status Still on the location's lineup, and a Remove from Pinball Map button" width={886} height={156} caption="Lingering: the lineup setting is Off the lineup, but Pinball Map still lists the game." />
+
+Without a linked Pinball Map account, the status row shows no push button. It
+links to the venue's Pinball Map page so you can make the change there, and
+offers to link your account so you can push from PinPoint next time.
+
+<HelpScreenshot src="/help/pinball-map/listing-control-no-account.png" alt="The Pinball Map box for Medieval Madness as seen without a linked account: status reads Not on the location's lineup, with links Add it on Pinball Map and link your Pinball Map account" width={886} height={156} caption="Missing, without a linked account: change it on Pinball Map, or link your account." />
+
+#### Removing an entry
+
+Pinball Map hides a removed entry rather than deleting it. Re-adding the same
+game at the venue within **7 days** restores the entry with all its comments.
+After 7 days the entry and its comment history cannot be restored. The remove
+confirmation shows how many comments the entry has. If PinPoint's copy of the
+lineup is more than 5 minutes old, it refreshes before you can confirm, so the
+count is current.
+
+<HelpScreenshot src="/help/pinball-map/remove-confirm.png" alt="The Remove from Pinball Map confirmation for Black Knight, with Cancel and Remove buttons" width={512} height={260} />
+
+#### Status reference
+
+<div className="overflow-x-auto mt-3">
+  <table className="w-full text-sm border-collapse">
+    <thead>
+      <tr className="border-b">
+        <th className="text-left p-2 font-medium text-foreground">State</th>
+        <th className="text-left p-2 font-medium text-foreground">Meaning</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr className="border-b">
+        <td className="p-2 font-medium text-foreground align-top">In sync</td>
+        <td className="p-2 text-muted-foreground">The lineup setting and the lineup agree.</td>
+      </tr>
+      <tr className="border-b">
+        <td className="p-2 font-medium text-foreground align-top">Missing</td>
+        <td className="p-2 text-muted-foreground">On the lineup in PinPoint, not listed on Pinball Map. <span className="text-foreground">Add to Pinball Map, or set the lineup setting to Off the lineup.</span></td>
+      </tr>
+      <tr className="border-b">
+        <td className="p-2 font-medium text-foreground align-top">Lingering</td>
+        <td className="p-2 text-muted-foreground">Off the lineup on every cabinet of the title, still listed on Pinball Map. <span className="text-foreground">Remove from Pinball Map, or set the lineup setting to On the lineup.</span></td>
+      </tr>
+      <tr className="border-b">
+        <td className="p-2 font-medium text-foreground align-top">Insider Connected differs</td>
+        <td className="p-2 text-muted-foreground">Listed, but Pinball Map's Insider Connected setting differs from PinPoint's. <span className="text-foreground">Update Pinball Map, or change the toggle.</span></td>
+      </tr>
+      <tr className="border-b">
+        <td className="p-2 font-medium text-foreground align-top">Shared</td>
+        <td className="p-2 text-muted-foreground">Listed, with another cabinet of the same title also On the lineup.</td>
+      </tr>
+      <tr className="border-b">
+        <td className="p-2 font-medium text-foreground align-top">Covered</td>
+        <td className="p-2 text-muted-foreground">Off the lineup, but listed because a same-title cabinet is On.</td>
+      </tr>
+      <tr className="border-b">
+        <td className="p-2 font-medium text-foreground align-top">Blocked</td>
+        <td className="p-2 text-muted-foreground">Availability is Pending Arrival or Removed, so On the lineup is disabled. <span className="text-foreground">Change Availability once the game is on site.</span></td>
+      </tr>
+      <tr className="border-b">
+        <td className="p-2 font-medium text-foreground align-top">Alert</td>
+        <td className="p-2 text-muted-foreground">On the lineup while Availability is Pending Arrival or Removed. <span className="text-foreground">Set the lineup setting to Off the lineup and remove the entry, or correct Availability.</span></td>
+      </tr>
+      <tr className="border-b">
+        <td className="p-2 font-medium text-foreground align-top">Note</td>
+        <td className="p-2 text-muted-foreground">On the lineup while Availability is On Loan or Off the Floor. <span className="text-foreground">Remove it if it will be away more than a week.</span></td>
+      </tr>
+      <tr className="border-b">
+        <td className="p-2 font-medium text-foreground align-top">Sync off</td>
+        <td className="p-2 text-muted-foreground">The lineup setting is Don't sync.</td>
+      </tr>
+      <tr className="border-b">
+        <td className="p-2 font-medium text-foreground align-top">No model</td>
+        <td className="p-2 text-muted-foreground">No Pinball Map title is set. <span className="text-foreground">Choose one in Model Details.</span></td>
+      </tr>
+      <tr className="border-b">
+        <td className="p-2 font-medium text-foreground align-top">Waiting</td>
+        <td className="p-2 text-muted-foreground">A location is set but PinPoint has not read it yet. <span className="text-foreground">Press Refresh.</span></td>
+      </tr>
+      <tr className="border-b">
+        <td className="p-2 font-medium text-foreground align-top">Not configured</td>
+        <td className="p-2 text-muted-foreground">No tracked location is set. <span className="text-foreground">An admin sets one (see below).</span></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+### Several cabinets of the same title
+
+Pinball Map lists a title at most once per location, so cabinets sharing a
+title share one entry. The title is listed when at least one of its cabinets is
+**On the lineup**; it is Lingering only when every cabinet is **Off the
+lineup**. Each cabinet that is On shows the entry as **Shared** and names the
+others. A cabinet that is Off while a sibling keeps the title listed shows
+**Covered**.
+
+<HelpScreenshot src="/help/pinball-map/listing-control-shared.png" alt="The Pinball Map box for Godzilla GDZ: lineup setting On the lineup, Insider Connected set to Don't sync with Pinball Map: On, status Shared with GDZ2" width={886} height={156} caption="Shared: GDZ and GDZ2 are both On the lineup and share Godzilla's entry." />
+
+<HelpScreenshot src="/help/pinball-map/listing-control-covered.png" alt="The Pinball Map box for Godzilla GDZ3: lineup setting Off the lineup, status On the location's lineup via GDZ2 and GDZ" width={886} height={156} caption="Covered: GDZ3 is Off the lineup, and its siblings keep the title listed." />
+
+For Insider Connected, the shared entry is set On when any cabinet wants On,
+otherwise Off when any wants Off.
+
+### Availability and the lineup
+
+Changing a machine's Availability never changes its lineup setting, and the lineup setting never
+changes Availability. The combination decides what the box shows:
+
+<div className="overflow-x-auto mt-3">
+  <table className="w-full text-sm border-collapse">
+    <thead>
+      <tr className="border-b">
+        <th className="text-left p-2 font-medium text-foreground">Availability</th>
+        <th className="text-left p-2 font-medium text-foreground">Effect on the lineup</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr className="border-b">
+        <td className="p-2 font-medium text-foreground align-top">On the Floor</td>
+        <td className="p-2 text-muted-foreground">No restriction</td>
+      </tr>
+      <tr className="border-b">
+        <td className="p-2 font-medium text-foreground align-top">On Loan, Off the Floor</td>
+        <td className="p-2 text-muted-foreground">Allowed; a Note suggests removing the entry for absences longer than a week</td>
+      </tr>
+      <tr className="border-b">
+        <td className="p-2 font-medium text-foreground align-top">Pending Arrival, Removed</td>
+        <td className="p-2 text-muted-foreground">On the lineup is disabled; a machine already On shows an Alert</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<HelpScreenshot src="/help/pinball-map/listing-control-blocked.png" alt="The Pinball Map box with On the lineup disabled and the note Blocked by Availability: Removed" width={886} height={156} caption="Blocked: Availability is Removed, so On the lineup cannot be chosen." />
+
+<HelpScreenshot src="/help/pinball-map/listing-control-alert.png" alt="The Pinball Map box with lineup setting On the lineup and the warning Alert: Availability set to Removed" width={886} height={156} caption="Alert: the machine is On the lineup but its Availability is Removed." />
+
+Pinball Map only allows entries for games that are present, and its admins
+remove entries for games that are not there yet.
+
+### Adding a new machine
+
+On the **New Machine** page, choosing a Pinball Map model shows the Pinball Map
+choices for the new machine:
+
+<HelpScreenshot src="/help/pinball-map/new-machine.png" alt="The New Machine page's Pinball Map block with the lineup setting toggle set to On the lineup" width={886} height={86} />
+
+- **Lineup setting** starts at **Off the lineup**, or **On the lineup** when you came
+  from **Create in PinPoint** on the lineup page.
+- **Insider Connected** appears for eligible titles. When the title is already
+  on the lineup, it starts at Pinball Map's current value.
+- **Add to Pinball Map after creating** appears when the lineup setting is On the lineup,
+  the title is not already listed, and you can push. It is ticked by default.
+  If the add fails, the machine is still created, and its Manage tab shows the
+  failure and the Out of sync state.
+
+### Comments from Pinball Map
+
+Comments on a listed entry are copied into the **Timeline** of every cabinet
+of that title that is **On the lineup**. A shared entry's comments appear on
+each covering cabinet, marked with the other cabinets that have them.
+Watchers of those machines are notified when a new comment arrives. Machines
+set to Don't sync receive no comments.
+
+<HelpScreenshot src="/help/pinball-map/timeline-comment.png" alt="A Pinball Map comment on the Godzilla timeline, marked Shared entry, also on GDZ2, with a Convert to issue button" width={784} height={155} />
+
+- **Convert to issue** creates a PinPoint issue from the comment. PinPoint
+  never does this on its own. Each comment becomes at most one issue; after
+  conversion, every copy links to it. If the issue landed on the wrong
+  cabinet, move it to another machine.
+- **via Pinball Map** opens the venue's Pinball Map page.
+- PinPoint does not post comments to Pinball Map. Post them on Pinball Map
+  directly.
+
+## The lineup page
+
+The lineup page compares, title by title, what PinPoint says the lineup should
+be with what Pinball Map shows, and lists every difference by the action that
+fixes it. Open it from the **Pinball Map** button on the Machines list, which
+shows the number of rows to review, or from **Pinball Map lineup** in the admin
+menu. The page is laid out for a desktop screen.
+
+<HelpScreenshot src="/help/pinball-map/lineup-page.png" alt="The Pinball Map lineup page: header with location, entry count, Refresh, and Confirm lineup on Pinball Map; review counts; and the Out of sync, In PinPoint, not linked, and On Pinball Map, not linked sections" width={1280} height={780} />
+
+The header shows the venue, the number of entries, when PinPoint last
+refreshed, the date Pinball Map last recorded an update to the location, and
+**Confirm lineup on Pinball Map**. Below it, a summary counts the rows to
+review in each section. Machines marked Removed are left out of the
+comparison except where they still affect the lineup.
+
+### Sections
+
+- **Out of sync** — titles where PinPoint and Pinball Map disagree, each tagged
+  with its fix: **To add**, **To remove**, or **To update** (Insider
+  Connected). Each row has the matching push button.
+- **In PinPoint, not linked to Pinball Map** — machines with no Pinball Map
+  title that are not Manual Entry and not set to Don't sync. **Edit Machine**
+  opens the machine to match it.
+- **On Pinball Map, not linked to a PinPoint machine** — entries on the lineup
+  that no PinPoint machine is matched to. Each row offers:
+  - **Link to PinPoint** — match the entry to an existing machine. That
+    machine is set On the lineup.
+  - **Create in PinPoint** — open the New Machine page with the title chosen
+    and the lineup setting On the lineup.
+  - **Remove from Pinball Map** — take the entry off the lineup.
+
+  When a PinPoint machine is a different edition of the same game (Pro on
+  Pinball Map, Premium in PinPoint), the row names it as a possible match.
+  Nothing is linked until you choose.
+- **Availability conflict** — machines On the lineup that are not on the
+  floor, tagged **Alert** (Removed or Pending Arrival) or **Note** (On Loan or
+  Off the Floor). **Edit Machine** opens the machine.
+
+<HelpScreenshot src="/help/pinball-map/lineup-not-linked.png" alt="The On Pinball Map, not linked to a PinPoint machine section, with Remove from Pinball Map, Create in PinPoint, and Link to PinPoint buttons on each row" width={1224} height={354} />
+
+<HelpScreenshot src="/help/pinball-map/lineup-link-dialog.png" alt="The Link to a PinPoint machine dialog, with a searchable list of machines and a Link button" width={512} height={522} caption="Link to PinPoint: choose the machine that is this entry." />
+
+Titles that are in sync collapse to a count you can expand. A footer counts
+what the page does not compare: Manual Entry machines, titles set to Don't
+sync, and Removed machines. Every action on the page acts on one entry at a
+time, with the same confirmations as the Manage tab.
+
+### Confirm lineup on Pinball Map
+
+**Confirm lineup on Pinball Map** tells Pinball Map that the venue's whole
+lineup is accurate as of today. If PinPoint's copy is more than 5 minutes old,
+it refreshes first. When entries are Out of sync or not linked to a PinPoint
+machine, the dialog lists them, and you can confirm anyway or cancel.
+Confirming changes no entries.
+
+## For admins
+
+### The tracked location
+
+The tracked location is set under **Admin** → **Integrations** →
+**Pinball Map**.
+
+<HelpScreenshot src="/help/pinball-map/admin-integration.png" alt="The Pinball Map card on Admin Integrations: Location ID with Check ID, the resolved Austin Pinball Collective location, and Sync health with Sync now" width={792} height={464} />
+
+- **Location ID** is the number in the location's Pinball Map URL. **Check ID**
+  looks the location up and shows its name; **Save** is available only after a
+  successful check.
+- **Sync health** shows the last successful sync, the last attempt and its
+  result, and how many machines the stored lineup holds. **Sync now** uses the
+  same shared allowance as Refresh.
+- **Clearing the location** stops all automatic and manual refreshes. Machine
+  matches, lineup settings, and imported comments are kept, and setting the same
+  location again resumes where it left off.
+- **Changing to a different location** keeps every machine's match and lineup setting.
+  Machines On the lineup whose titles are not at the new location show as
+  Missing, and machines Off the lineup whose titles are already there show as
+  Lingering, until someone pushes the changes.
+
+### Region alerts
+
+Region alerts post to a Discord channel when a machine is added to, or removed
+from, any location in a Pinball Map region, such as Austin. They watch the
+whole region, not just the venue, and are independent of the tracked location.
+They are set in the same Pinball Map card on **Admin** → **Integrations** and
+use the Discord bot set up under **Discord** on that page.
+
+<HelpScreenshot src="/help/pinball-map/admin-region-alerts.png" alt="The Region alerts section: a Region dropdown set to Austin, an empty Alert channel field with Send test message, and the status Not configured" width={742} height={236} />
+
+- **Region** — the Pinball Map region to watch, picked from Pinball Map's list
+  of regions. One region at a time.
+- **Alert channel** — the Discord channel id to post to. Alerts are on when a
+  region and a channel are set and the Discord bot is working. Clear the channel
+  to turn them off.
+- **Saving** checks that the bot can see the channel and appears to have
+  permission to post, and always saves what you entered, even when the check
+  fails.
+- **Send test message** posts a test line to the channel. A successful post is
+  the only proof the bot can post there.
+
+The status under the channel field reads:
+
+<div className="overflow-x-auto mt-3">
+  <table className="w-full text-sm border-collapse">
+    <thead>
+      <tr className="border-b">
+        <th className="text-left p-2 font-medium text-foreground">Status</th>
+        <th className="text-left p-2 font-medium text-foreground">Meaning</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr className="border-b">
+        <td className="p-2 font-medium text-foreground align-top">Posting</td>
+        <td className="p-2 text-muted-foreground">The bot can post to the channel. Shows when it last posted.</td>
+      </tr>
+      <tr className="border-b">
+        <td className="p-2 font-medium text-foreground align-top">Can't post</td>
+        <td className="p-2 text-muted-foreground">The bot lacks permission in the channel, or cannot find or see it. <span className="text-foreground">Fix the channel's permissions or the channel id.</span></td>
+      </tr>
+      <tr className="border-b">
+        <td className="p-2 font-medium text-foreground align-top">Couldn't check</td>
+        <td className="p-2 text-muted-foreground">Discord was unreachable; the setup may be fine. <span className="text-foreground">Send a test message later.</span></td>
+      </tr>
+      <tr className="border-b">
+        <td className="p-2 font-medium text-foreground align-top">Needs Discord</td>
+        <td className="p-2 text-muted-foreground">The Discord bot token is missing or invalid. <span className="text-foreground">Fix it in the Discord card first.</span></td>
+      </tr>
+      <tr className="border-b">
+        <td className="p-2 font-medium text-foreground align-top">Not configured</td>
+        <td className="p-2 text-muted-foreground">No region or no alert channel is set.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+How the alerts behave:
+
+- PinPoint checks the region once an hour. There is no way to run a check on
+  demand; Send test message is the only manual post.
+- Only machines added to or removed from a location are announced. Condition
+  comments, high scores, new locations, and photos are not.
+- Each alert names the machine and the location, links to the location's
+  Pinball Map page, and credits Pinball Map.
+- Each change is announced once. A post that fails is retried on the next
+  hourly check.
+- The first check after alerts are turned on, or after the region changes,
+  records the region's current machines without posting, so the channel is not
+  flooded with everything already there.
+- A machine swapped for another edition, or a game swapped for another, posts
+  the removal and the addition together.
+
+## Troubleshooting
+
+- **No Add or Remove button.** Link your Pinball Map account in Settings. The
+  buttons also require being the machine's owner, a technician, or an admin.
+- **Still Out of sync after changing the lineup setting.** The lineup setting records what PinPoint
+  wants; the lineup changes only when someone pushes the change.
+- **Refresh is disabled with a countdown.** The shared allowance is used up.
+  Wait for the countdown; the hourly refresh still runs.
+- **The status says Waiting.** PinPoint has not read the location yet. Press
+  Refresh.
+- **The box is greyed out.** The machine has no Pinball Map title, or no
+  tracked location is set. The status line says which.
+
+</HelpPage>
