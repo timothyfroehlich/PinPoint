@@ -82,7 +82,7 @@ The control's states (§4) are comparisons across these: _in sync_ means the lin
   - **Blocked**: quiet/muted styling for `Blocked` (lineup setting Off, availability disallows adding to lineup).
   - **Sync off**: neutral badge indicating the machine is excluded from sync.
   - **Unlinked / Uncataloged**: neutral badge indicating no catalog model is linked (`No model`) or the machine is uncataloged (`Uncataloged`).
-  - **Integration inactive**: when the integration is `Not configured` or `Waiting` for its first snapshot, the PBM column group surfaces the integration-level status rather than per-row evaluation.
+  - **Integration inactive**: when the integration is `Not configured` or `Waiting` for its first snapshot, the Pinball Map column group surfaces the integration-level status rather than per-row evaluation.
 - **4.11** When a machine is created with a catalog title, the New Machine page offers the lineup toggle and, for an eligible title, the Insider Connected toggle, both starting Off. The lineup toggle starts On instead when the page is opened from a lineup entry (`pinballmap-lineup.md` §5.4). When the chosen title is already on the lineup, the Insider Connected toggle starts at the entry's value instead: On or Off as Pinball Map reports it, and Off when Pinball Map reports neither. When the lineup setting is On, the title is not already on the lineup, and the person can push (8.2), it also offers **Add to Pinball Map after creating**, ticked by default. Ticking it stands as the 4.5 confirmation: creating the machine then runs the add push (4.3). If that push fails, the machine is still created, and its Manage tab shows the resulting out-of-sync state with the failure.
 
 ## 5. Automatic behavior
@@ -194,7 +194,7 @@ Changes to this document. Divergence-table rows are working state and are not lo
 | Date | Change |
 | :-- | :-- |
 | 2026-10-01 | §4.10 cites the lineup page as its dense-view example; `fleet.md` is retired. |
-| 2026-09-30 | Renamed listing intent to lineup setting (and Insider Connected intent to Insider Connected setting) throughout; Pinball Map's side is its "value". §4.8 bans "intent" in user-facing copy. No behavior change. |
+| 2026-09-30 | Renamed listing intent to lineup setting (and Insider Connected intent to Insider Connected setting) throughout; Pinball Map's side is its "value". §4.8 bans "intent" in user-facing copy. §4.10 says "Pinball Map" for the former "PBM" abbreviation. No behavior change. |
 | 2026-09-30 | §3.7: Confirm lineup requires the person's own linked Pinball Map account (8.4) rather than operator credentials. §4.3: the push action is offered to a person who can push (8.2), replacing "with operator credentials". |
 | 2026-09-30 | §4.11: when the chosen title is already on the lineup, the New Machine page's Insider Connected toggle starts at the entry's value (Off when Pinball Map reports neither). |
 | 2026-09-30 | §3.7: the Confirm lineup dialog also lists unmatched entries, since confirming vouches for every entry on the lineup. |
