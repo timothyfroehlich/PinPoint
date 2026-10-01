@@ -51,7 +51,7 @@ export type NewMachinePinballmapContext = Pick<
   | "locationName"
   | "canSetIntent"
   | "canAddAfterCreate"
-  | "lineupTitleIds"
+  | "lineup"
 >;
 
 interface CreateMachineFormProps {
@@ -71,7 +71,7 @@ const NO_PINBALLMAP: NewMachinePinballmapContext = {
   locationName: null,
   canSetIntent: false,
   canAddAfterCreate: false,
-  lineupTitleIds: [],
+  lineup: [],
 };
 
 /**

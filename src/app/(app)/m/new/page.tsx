@@ -14,6 +14,7 @@ import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { getUnifiedUsers } from "~/lib/users/queries";
 import { isIscoredConfigured } from "~/lib/iscored/config";
 import { getPinballMapState } from "~/lib/pinballmap/state";
+import { insiderConnectedSetting } from "~/lib/pinballmap/insider-connected";
 
 /**
  * Create Machine Page (Protected Route)
@@ -95,10 +96,13 @@ export default async function NewMachinePage({
     canSetIntent: checkPermission("machines.pinballmap.link", accessLevel),
     canAddAfterCreate:
       writeEnabled && checkPermission("machines.pinballmap.push", accessLevel),
-    // Titles already on the lineup: adding one of those has nothing to add,
-    // so the add-after-creating option is not offered for them (4.11).
-    lineupTitleIds: configured
-      ? (pbmState.snapshotJson?.lmxes.map((lmx) => lmx.machineId) ?? [])
+    // The lineup's entries: a title already on it is not offered the add,
+    // and starts Insider Connected at the entry's value (4.11).
+    lineup: configured
+      ? (pbmState.snapshotJson?.lmxes.map((lmx) => ({
+          titleId: lmx.machineId,
+          insiderConnected: insiderConnectedSetting(lmx.icEnabled),
+        })) ?? [])
       : [],
   };
 

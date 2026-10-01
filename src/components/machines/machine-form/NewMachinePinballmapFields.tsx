@@ -17,7 +17,18 @@ import {
   INVALID_WHEN_ON,
   type PbmListingIntent,
 } from "~/lib/pinballmap/listing-state";
-import type { PbmIcIntent } from "~/lib/pinballmap/insider-connected";
+import type {
+  PbmIcIntent,
+  PbmInsiderConnectedSetting,
+} from "~/lib/pinballmap/insider-connected";
+
+/** One entry on the tracked location's lineup, as the New Machine page needs it. */
+export interface NewMachineLineupEntry {
+  /** The entry's catalog title. */
+  titleId: number;
+  /** Pinball Map's Insider Connected value for the entry (3.8). */
+  insiderConnected: PbmInsiderConnectedSetting;
+}
 
 export interface NewMachinePinballmapFieldsProps {
   /** The catalog title chosen in Model Details, or null while none is. */
@@ -37,10 +48,11 @@ export interface NewMachinePinballmapFieldsProps {
    */
   canAddAfterCreate: boolean;
   /**
-   * Catalog titles already on the location's lineup. Adding one has nothing
-   * to add, so "Add to Pinball Map after creating" is not offered (4.11).
+   * The location's lineup entries. For a title already on it, "Add to Pinball
+   * Map after creating" is not offered (there is nothing to add) and Insider
+   * Connected starts at the entry's value (4.11).
    */
-  lineupTitleIds: readonly number[];
+  lineup: readonly NewMachineLineupEntry[];
   /**
    * Where the intent toggle starts: On when the page was opened from a lineup
    * entry (4.11, pinballmap-lineup 5.4), otherwise Off.
@@ -69,13 +81,18 @@ export function NewMachinePinballmapFields({
   locationName,
   canSetIntent,
   canAddAfterCreate,
-  lineupTitleIds,
+  lineup,
   initialIntent = "off",
 }: NewMachinePinballmapFieldsProps): React.JSX.Element {
   const addId = useId();
   const [intent, setIntent] = useState<PbmListingIntent>(initialIntent);
-  // Null is Don't sync: no intent recorded (3.8).
-  const [icIntent, setIcIntent] = useState<PbmIcIntent | null>("off");
+  // The person's Insider Connected choice, held per title: picking another
+  // title starts again from that title's own starting value (4.11). Null is
+  // Don't sync: no intent recorded (3.8).
+  const [icChoice, setIcChoice] = useState<{
+    titleId: number;
+    value: PbmIcIntent | null;
+  } | null>(null);
   const [addAfterCreate, setAddAfterCreate] = useState(true);
   // Eligibility of the chosen title, keyed by id so a stale answer for a
   // previous pick never shows the switch for the current one.
@@ -114,9 +131,22 @@ export function NewMachinePinballmapFields({
   // is the form following its own inputs, not an automatic intent change.
   const effectiveIntent: PbmListingIntent =
     intent === "on" && blockedReason !== null ? "off" : intent;
-  const alreadyOnLineup =
-    pinballmapMachineId !== null &&
-    lineupTitleIds.includes(pinballmapMachineId);
+  const lineupEntry =
+    pinballmapMachineId === null
+      ? undefined
+      : lineup.find((entry) => entry.titleId === pinballmapMachineId);
+  const alreadyOnLineup = lineupEntry !== undefined;
+  // Pinball Map's value for the entry, or null when the title is not on the
+  // lineup. A title on the lineup starts at it; "not set" starts Off (4.11).
+  const pinballMapIc = lineupEntry?.insiderConnected ?? null;
+  const icIntent: PbmIcIntent | null =
+    icChoice?.titleId === pinballmapMachineId
+      ? icChoice.value
+      : pinballMapIc === "on"
+        ? "on"
+        : "off";
+  const icDiffers =
+    icIntent !== null && pinballMapIc !== null && pinballMapIc !== icIntent;
   const offerAdd =
     effectiveIntent === "on" && canAddAfterCreate && !alreadyOnLineup;
 
@@ -164,15 +194,15 @@ export function NewMachinePinballmapFields({
             </div>
             {icEligible ? (
               <div data-testid="new-machine-pbm-ic">
-                {/* A new machine has no entry yet, so there is no Pinball Map
-                    value to state or differ from. */}
                 <InsiderConnectedToggle
                   value={icIntent}
-                  pinballMap={null}
-                  differs={false}
+                  pinballMap={pinballMapIc}
+                  differs={icDiffers}
                   readOnly={!canSetIntent}
                   pending={false}
-                  onChange={setIcIntent}
+                  onChange={(value) => {
+                    setIcChoice({ titleId: pinballmapMachineId, value });
+                  }}
                 />
               </div>
             ) : null}

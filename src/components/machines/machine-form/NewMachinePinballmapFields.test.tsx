@@ -16,7 +16,7 @@ vi.mock("~/app/(app)/m/pinballmap-actions", () => ({
 }));
 
 const base: NewMachinePinballmapFieldsProps = {
-  lineupTitleIds: [],
+  lineup: [],
   pinballmapMachineId: 77,
   presenceStatus: "on_the_floor",
   configured: true,
@@ -88,7 +88,7 @@ describe("NewMachinePinballmapFields", () => {
       <NewMachinePinballmapFields
         {...base}
         initialIntent="on"
-        lineupTitleIds={[77]}
+        lineup={[{ titleId: 77, insiderConnected: "not_set" }]}
       />
     );
 
@@ -128,6 +128,69 @@ describe("NewMachinePinballmapFields", () => {
     // Don't sync records no intent at all (3.8).
     await user.click(within(ic).getByRole("radio", { name: "Don't sync" }));
     expect(posted("pinballmapIcIntent")).toBeNull();
+  });
+
+  it("starts Insider Connected at the lineup entry's value", async () => {
+    vi.mocked(getPinballMapTitleIcEligibleAction).mockResolvedValue(true);
+    render(
+      <NewMachinePinballmapFields
+        {...base}
+        lineup={[{ titleId: 77, insiderConnected: "on" }]}
+      />
+    );
+
+    const ic = await screen.findByRole("radiogroup", {
+      name: "Insider Connected",
+    });
+    expect(within(ic).getByRole("radio", { name: "On" })).toBeChecked();
+    expect(posted("pinballmapIcIntent")).toBe("on");
+  });
+
+  it("starts Off for a lineup entry Pinball Map reports neither way", async () => {
+    vi.mocked(getPinballMapTitleIcEligibleAction).mockResolvedValue(true);
+    render(
+      <NewMachinePinballmapFields
+        {...base}
+        lineup={[{ titleId: 77, insiderConnected: "not_set" }]}
+      />
+    );
+
+    const ic = await screen.findByRole("radiogroup", {
+      name: "Insider Connected",
+    });
+    expect(within(ic).getByRole("radio", { name: "Off" })).toBeChecked();
+    expect(posted("pinballmapIcIntent")).toBe("off");
+  });
+
+  it("starts again from the new title's value when the title changes", async () => {
+    vi.mocked(getPinballMapTitleIcEligibleAction).mockResolvedValue(true);
+    const user = userEvent.setup();
+    const lineup = [
+      { titleId: 77, insiderConnected: "off" as const },
+      { titleId: 88, insiderConnected: "on" as const },
+    ];
+    const { rerender } = render(
+      <NewMachinePinballmapFields {...base} lineup={lineup} />
+    );
+
+    const ic = await screen.findByRole("radiogroup", {
+      name: "Insider Connected",
+    });
+    await user.click(within(ic).getByRole("radio", { name: "Don't sync" }));
+    expect(posted("pinballmapIcIntent")).toBeNull();
+
+    rerender(
+      <NewMachinePinballmapFields
+        {...base}
+        lineup={lineup}
+        pinballmapMachineId={88}
+      />
+    );
+    const next = await screen.findByRole("radiogroup", {
+      name: "Insider Connected",
+    });
+    expect(within(next).getByRole("radio", { name: "On" })).toBeChecked();
+    expect(posted("pinballmapIcIntent")).toBe("on");
   });
 
   it("posts no Insider Connected choice for an ineligible title", async () => {

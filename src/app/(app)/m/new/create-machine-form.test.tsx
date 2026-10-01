@@ -140,7 +140,7 @@ describe("CreateMachineForm — opened from a lineup entry (pinballmap 4.11)", (
     locationName: "Austin Pinball Collective",
     canSetIntent: true,
     canAddAfterCreate: true,
-    lineupTitleIds: [],
+    lineup: [],
   };
 
   it("prefills the name and title, and starts the lineup intent On", async () => {
