@@ -4,7 +4,7 @@
 
 **What this document is.** The requirements for the Pinball Map lineup page at `/m/pinball-map`: one page that compares, title by title, what PinPoint says the venue's Pinball Map lineup should be with what Pinball Map currently shows, and groups every difference by the action that resolves it. It describes the intended final state only; what the code does or used to do lives solely in the Known divergences table. Each requirement is numbered for citation. When code and spec disagree, either the code is wrong or this document gets amended — never silently neither.
 
-**Related records.** `docs/feature-specs/pinballmap.md` (the integration's concepts, the per-machine listing control, outbound actions, and permissions — this page reuses them and never redefines them), `docs/feature-specs/machine-views.md` (the machines list this page sits under), `docs/feature-specs/fleet.md`.
+**Related records.** `docs/feature-specs/pinballmap.md` (the integration's concepts, the per-machine listing control, outbound actions, and permissions — this page reuses them and never redefines them), `docs/feature-specs/machine-views.md` (the machines list this page sits under).
 
 ---
 

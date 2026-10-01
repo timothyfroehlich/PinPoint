@@ -4,7 +4,7 @@
 
 **What this document is.** The requirements for PinPoint's iScored integration: what the system does and what users can do. No implementation detail — design records and code carry that. It describes the intended final state only; what the code does or used to do lives solely in the Known divergences table. Each requirement is numbered for citation. When code and spec disagree, either the code is wrong or this document gets amended — never silently neither.
 
-**Related records.** `docs/research/2026-09-15-iscored-api.md`, `docs/feature-specs/admin-integrations.md`, `docs/feature-specs/fleet.md`, `docs/ENV_VARS.md`.
+**Related records.** `docs/research/2026-09-15-iscored-api.md`, `docs/feature-specs/admin-integrations.md`, `docs/ENV_VARS.md`.
 
 ---
 
@@ -56,15 +56,14 @@ Removed 2026-09-16. The Info tab card's "View all on iScored" link replaces it: 
 
 ## 6. Fleet overview
 
-- **6.1** The fleet dashboard (`/fleet`) displays each machine's iScored link status to identify unlinked machines across the collection.
+- **6.1** _Retired 2026-10-01._ It placed iScored link status on the `/fleet` dashboard, which was dropped. Number kept so older citations don't dangle.
 
 ---
 
 ## Known divergences (code vs spec)
 
-| Spec                       | Code today       | Resolution |
-| :------------------------- | :--------------- | :--------- |
-| §6.1 Fleet overview column | Not yet rendered | PP-h2bu.5  |
+| Spec | Code today | Resolution |
+| :--- | :--------- | :--------- |
 
 ---
 
@@ -72,6 +71,7 @@ Removed 2026-09-16. The Info tab card's "View all on iScored" link replaces it: 
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-01 | Retired §6.1 (iScored link status on `/fleet`), since `/fleet` was dropped. |
 | 2026-09-26 | §2.3 names `update_machine`'s `iscoredGameId` field, replacing the removed `set_machine_iscored` tool (PP-u4ab.23); divergence row dropped. |
 | 2026-09-19 | Define Game link concept: public gameroom deep-link pattern (scrollTo={gameID}) used for "View all on iScored" and the card logo, distinct from the mobile score entry link. |
 | 2026-09-17 | §4.3 clarified: the iScored logo is a link only when the machine is linked; unlinked it is a plain image (CodeRabbit finding on #2134). |
