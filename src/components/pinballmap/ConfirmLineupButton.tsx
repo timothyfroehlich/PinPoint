@@ -21,6 +21,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "~/components/ui/alert-dialog";
 import { Button } from "~/components/ui/button";
 
@@ -118,16 +119,17 @@ export function ConfirmLineupButton({
 
   return (
     <AlertDialog open={open} onOpenChange={handleOpenChange}>
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={() => handleOpenChange(true)}
-        data-testid="pbm-confirm-lineup"
-      >
-        <Check aria-hidden="true" />
-        Confirm lineup on Pinball Map
-      </Button>
+      <AlertDialogTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          data-testid="pbm-confirm-lineup"
+        >
+          <Check aria-hidden="true" />
+          Confirm lineup on Pinball Map
+        </Button>
+      </AlertDialogTrigger>
       <AlertDialogContent data-testid="pbm-confirm-lineup-dialog">
         <AlertDialogHeader>
           <AlertDialogTitle>Confirm lineup on Pinball Map?</AlertDialogTitle>

@@ -2002,10 +2002,14 @@ export async function checkConfirmLineupAction(): Promise<CheckConfirmLineupResu
           "The tracked Pinball Map location changed. Reload the page."
         );
       } else {
+        // A throttled attempt still spent a token and a failure recorded its
+        // status, so the header is stale either way (as in the Refresh action).
+        revalidatePath("/m", "layout");
         refreshFailed = true;
       }
     } catch (error: unknown) {
       log.error({ err: error }, "Pre-confirm PinballMap refresh failed");
+      revalidatePath("/m", "layout");
       refreshFailed = true;
     }
   }
@@ -2089,7 +2093,13 @@ export async function confirmPinballmapLineupAction(
         { reason: written.reason, action: "pinballmap.confirmLineup" },
         "PinballMap lineup confirmation rejected"
       );
-      return err("PBM_REJECTED", pbmWriteFailureMessage(written));
+      return err(
+        "PBM_REJECTED",
+        // The shared message names an entry; this call is about the location.
+        written.reason === "not_found"
+          ? "Pinball Map couldn't find the tracked location."
+          : pbmWriteFailureMessage(written)
+      );
     }
     log.info(
       { userId: authed.userId, locationId, action: "pinballmap.confirmLineup" },
