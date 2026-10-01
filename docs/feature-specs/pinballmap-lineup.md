@@ -76,7 +76,6 @@ Every concept in `pinballmap.md` §1 applies unchanged — match, uncataloged, l
 | Spec | Code today | Resolution |
 | :-- | :-- | :-- |
 | 3.4 Confirm lineup | The header has no Confirm lineup on Pinball Map action | PP-o355.58 |
-| 5.7 linked-account gate | Pushes and removals use the one admin-provisioned operator credential, as on the machine page, not the person's own linked account | PP-o355.6 |
 
 ---
 

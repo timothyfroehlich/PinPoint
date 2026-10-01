@@ -4,7 +4,8 @@ import { randomUUID } from "node:crypto";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { discordIntegrationConfig } from "~/server/db/schema";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { createVaultSecret, deleteVaultSecret } from "~/server/db/vault";
+import { and, eq, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { saveDiscordConfigSchema, validateServerIdSchema } from "./schema";
 import { log } from "~/lib/logger";
@@ -379,17 +380,15 @@ export async function saveDiscordConfig(
     if (hasTypedNewToken) {
       const newToken = validated.newToken ?? "";
       const vaultName = `discord_bot_token_${randomUUID()}`;
-      const rows = (await db.execute(
-        sql`SELECT vault.create_secret(${newToken}, ${vaultName}, 'Discord bot token (saved via UI)') AS id`
-      )) as { id: string }[];
-      const createdId = rows[0]?.id;
-      if (!createdId) {
-        // Residual we cannot compensate: if create_secret succeeded
-        // server-side but this result read rejected/returned no id, we have no
-        // id to delete. Throwing still preserves the structured failure and
-        // Sentry signal.
-        throw new Error("Vault create_secret returned no id");
-      }
+      // Residual we cannot compensate: if create_secret succeeded server-side
+      // but its result read rejected or returned no id, we have no id to
+      // delete. The throw still preserves the structured failure and the
+      // Sentry signal, without the token (see createVaultSecret).
+      const createdId = await createVaultSecret(
+        newToken,
+        vaultName,
+        "Discord bot token (saved via UI)"
+      );
       newVaultId = createdId;
       orphanGuard.vaultId = createdId;
     }
@@ -453,36 +452,13 @@ export async function saveDiscordConfig(
     // A fresh secret created before a failed pointer swap is unreferenced.
     // Delete only that exact orphan; the previous pointer remains authoritative.
     if (orphanGuard.vaultId) {
-      try {
-        // supabase_vault (0.3.1, the version running locally and in prod)
-        // exposes exactly two public functions — create_secret and
-        // update_secret. There is NO delete_secret at any version we run, so
-        // deletion is a plain row DELETE against vault.secrets, the same form
-        // migration 0059 uses. Scoped to the single id we just created: the
-        // singleton's own (referenced) secret must never be touched.
-        // Best-effort — a failure here just leaves a stray encrypted secret
-        // in vault.secrets; the singleton row already isn't pointing at it.
-        await db.execute(
-          sql`DELETE FROM vault.secrets WHERE id = ${orphanGuard.vaultId}::uuid`
-        );
-      } catch (cleanupErr) {
-        log.error(
-          {
-            action: "saveDiscordConfig.vaultCleanup",
-            vaultId: orphanGuard.vaultId,
-            err: cleanupErr,
-          },
-          "Failed to clean up orphaned vault secret"
-        );
-        // Orphaned vault secret is a separate-and-worse incident than the
-        // original save failure — flag it explicitly so it doesn't get
-        // lost in the noise.
-        reportError(cleanupErr, {
-          action: "saveDiscordConfig.vaultCleanup",
-          bestEffort: true,
-          vaultId: orphanGuard.vaultId,
-        });
-      }
+      // Scoped to the single id we just created: the singleton's own
+      // (referenced) secret must never be touched. An orphan left behind is a
+      // separate-and-worse incident than the save failure, so it is reported.
+      await deleteVaultSecret(
+        orphanGuard.vaultId,
+        "saveDiscordConfig.vaultCleanup"
+      );
     }
 
     return {
@@ -497,25 +473,10 @@ export async function saveDiscordConfig(
   }
 
   if (replacedVaultId) {
-    try {
-      await db.execute(
-        sql`DELETE FROM vault.secrets WHERE id = ${replacedVaultId}::uuid`
-      );
-    } catch (cleanupErr) {
-      log.error(
-        {
-          action: "saveDiscordConfig.replacedTokenCleanup",
-          vaultId: replacedVaultId,
-          err: cleanupErr,
-        },
-        "Discord token rotated but old Vault cleanup failed"
-      );
-      reportError(cleanupErr, {
-        action: "saveDiscordConfig.replacedTokenCleanup",
-        bestEffort: true,
-        vaultId: replacedVaultId,
-      });
-    }
+    await deleteVaultSecret(
+      replacedVaultId,
+      "saveDiscordConfig.replacedTokenCleanup"
+    );
   }
 
   revalidatePath("/admin/integrations");
@@ -609,21 +570,7 @@ export async function clearDiscordBotTokenAction(): Promise<ClearDiscordBotToken
     return { ok: false, message: "Failed to remove the token. Try again." };
   }
 
-  try {
-    await db.execute(
-      sql`DELETE FROM vault.secrets WHERE id = ${vaultId}::uuid`
-    );
-  } catch (error) {
-    log.error(
-      { action: "clearDiscordBotToken.vaultCleanup", vaultId, err: error },
-      "Discord bot token was unlinked but Vault cleanup failed"
-    );
-    reportError(error, {
-      action: "clearDiscordBotToken.vaultCleanup",
-      bestEffort: true,
-      vaultId,
-    });
-  }
+  await deleteVaultSecret(vaultId, "clearDiscordBotToken.vaultCleanup");
 
   revalidatePath("/admin/integrations");
   return { ok: true };

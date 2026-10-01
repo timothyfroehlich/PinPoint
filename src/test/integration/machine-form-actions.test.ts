@@ -27,6 +27,7 @@ import {
 } from "~/server/db/schema";
 import type { LocationSnapshot, PbmWriteFailure } from "~/lib/pinballmap/types";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
+import type * as UserCredentialsModule from "~/lib/pinballmap/user-credentials";
 
 vi.mock("~/server/db", async () => {
   const { getTestDb } = await import("~/test/setup/pglite");
@@ -43,8 +44,11 @@ vi.mock("~/lib/notifications", () => ({
 vi.mock("~/lib/logger", () => ({
   log: { error: vi.fn(), info: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }));
-vi.mock("~/lib/pinballmap/credentials", () => ({
-  getPinballMapWriteCredentials: vi.fn(),
+// The creator's linked Pinball Map account (spec 8.2), with the Vault decrypt
+// stubbed: PGlite has no vault schema.
+vi.mock("~/lib/pinballmap/user-credentials", async (importOriginal) => ({
+  ...(await importOriginal<typeof UserCredentialsModule>()),
+  getLinkedPinballMapCredentials: vi.fn(),
 }));
 
 // What Pinball Map currently shows; `addMachine` mutates it as the real
@@ -179,11 +183,11 @@ describe("createMachineAction — Pinball Map lineup choice (PGlite)", () => {
     pbm.lineup = [];
     pbm.nextLmxId = 500;
     pbm.addResult = null;
-    const { getPinballMapWriteCredentials } =
-      await import("~/lib/pinballmap/credentials");
-    vi.mocked(getPinballMapWriteCredentials).mockResolvedValue({
-      email: "ops@example.com",
-      token: "tok_123",
+    const { getLinkedPinballMapCredentials } =
+      await import("~/lib/pinballmap/user-credentials");
+    vi.mocked(getLinkedPinballMapCredentials).mockResolvedValue({
+      credentials: { email: "ops@example.com", token: "tok_123" },
+      tokenVaultId: "00000000-0000-4000-8000-000000000001",
     });
   });
 

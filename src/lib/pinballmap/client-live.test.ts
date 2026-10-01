@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { log } from "~/lib/logger";
 import { createLiveClient } from "./client-live";
 import { PinballMapNetworkBlockedError } from "./config";
 import { MAX_REGION_ENTRIES, PinballMapReadError } from "./types";
@@ -433,15 +434,81 @@ describe("live client — a 200 carrying an error body is a FAILED read", () => 
 });
 
 describe("live client — auth", () => {
-  it("authDetails returns token+username on success", async () => {
+  // Shapes from pinballmap/pbm UsersController#auth_details: success nests the
+  // fields under a `user` root, and a disabled account is 403.
+  it("authDetails reads token, username and email from the `user` root", async () => {
     installFetchMock(() =>
-      json({ authentication_token: "abc", username: "tim" })
+      json({
+        user: {
+          id: 1,
+          username: "ssw",
+          email: "yeah@ok.com",
+          authentication_token: "abc123",
+        },
+      })
     );
-    const res = await createLiveClient(null).authDetails(
-      "tim@example.com",
-      "pw"
+    const res = await createLiveClient(null).authDetails("ssw", "pw");
+    expect(res).toEqual({
+      ok: true,
+      token: "abc123",
+      username: "ssw",
+      email: "yeah@ok.com",
+    });
+  });
+
+  it("authDetails does not read a token from the top level", async () => {
+    installFetchMock(() =>
+      json({ authentication_token: "abc", username: "tim", email: "t@x.com" })
     );
-    expect(res).toEqual({ ok: true, token: "abc", username: "tim" });
+    expect(await createLiveClient(null).authDetails("tim", "pw")).toEqual({
+      ok: false,
+      reason: "transient",
+    });
+  });
+
+  it("authDetails refuses a success body without an email", async () => {
+    // Writes identify the author by user_email, so a token alone is unusable.
+    installFetchMock(() =>
+      json({ user: { username: "ssw", authentication_token: "abc123" } })
+    );
+    expect(await createLiveClient(null).authDetails("ssw", "pw")).toEqual({
+      ok: false,
+      reason: "transient",
+    });
+  });
+
+  it("authDetails POSTs the login and password in the body, never the URL", async () => {
+    const calls = installFetchMock(() =>
+      json({
+        user: {
+          username: "ssw",
+          email: "yeah@ok.com",
+          authentication_token: "t",
+        },
+      })
+    );
+    await createLiveClient(null).authDetails("ssw", "hunter2");
+    expect(calls[0]?.init?.method).toBe("POST");
+    expect(calls[0]?.url).not.toContain("hunter2");
+    expect(new URL(calls[0]?.url ?? "").search).toBe("");
+    const body = calls[0]?.init?.body;
+    expect(body).toBeInstanceOf(URLSearchParams);
+    if (body instanceof URLSearchParams) {
+      expect(body.get("login")).toBe("ssw");
+      expect(body.get("password")).toBe("hunter2");
+    }
+  });
+
+  it("authDetails keeps the password out of every log line", async () => {
+    const warn = vi.spyOn(log, "warn").mockImplementation(() => undefined);
+    installFetchMock(() => {
+      throw new Error("network down");
+    });
+    const res = await createLiveClient(null).authDetails("ssw", "hunter2");
+    expect(res).toEqual({ ok: false, reason: "transient" });
+    expect(warn).toHaveBeenCalled();
+    expect(JSON.stringify(warn.mock.calls)).not.toContain("hunter2");
+    warn.mockRestore();
   });
 
   it("authDetails maps a 200 errors body to invalid_credentials + message", async () => {
@@ -454,9 +521,21 @@ describe("live client — auth", () => {
     });
   });
 
-  it("authDetails maps the 401 account_disabled body to account_disabled", async () => {
-    // The one status-based case: disabled accounts return 401 + {error}.
-    installFetchMock(() => json({ error: "account_disabled" }, 401));
+  it("authDetails reports a 401 as the platform API token refused, not the account", async () => {
+    installFetchMock(() =>
+      json({ error: "A valid api_token is required for this endpoint." }, 401)
+    );
+    expect(await createLiveClient(null).authDetails("ssw", "pw")).toMatchObject(
+      {
+        ok: false,
+        reason: "api_token",
+      }
+    );
+  });
+
+  it("authDetails maps the 403 account_disabled body to account_disabled", async () => {
+    // The one status-based case: disabled accounts return 403 + {error}.
+    installFetchMock(() => json({ error: "account_disabled" }, 403));
     expect(await createLiveClient(null).authDetails("x", "y")).toEqual({
       ok: false,
       reason: "account_disabled",
@@ -480,8 +559,13 @@ describe("live client — writes", () => {
     const url = new URL(calls[0]?.url ?? "");
     expect(calls[0]?.init?.method).toBe("POST");
     expect(url.pathname).toContain("/location_machine_xrefs.json");
-    expect(url.searchParams.get("user_email")).toBe(CREDS.email);
-    expect(url.searchParams.get("user_token")).toBe(CREDS.token);
+    // The member's identity rides in headers, never the URL (llms.txt).
+    expect(calls[0]?.init?.headers).toMatchObject({
+      "X-User-Email": CREDS.email,
+      "X-User-Token": CREDS.token,
+    });
+    expect(calls[0]?.url).not.toContain(CREDS.token);
+    expect(calls[0]?.url).not.toContain("user_email");
     expect(url.searchParams.get("location_id")).toBe("26454");
     expect(url.searchParams.get("machine_id")).toBe("10");
   });
@@ -606,6 +690,44 @@ describe("live client — writes", () => {
       message: "Authentication is required for this action.",
     });
 
+    // PinPoint's platform X-Api-Token refused (401): not the writer's fault,
+    // so it must not read as their token being dead (spec 8.5).
+    installFetchMock(() =>
+      json(
+        {
+          error:
+            "A valid api_token is required for this endpoint. Visit https://pinballmap.com/api_token to request one.",
+        },
+        401
+      )
+    );
+    expect(
+      await createLiveClient(null).removeMachine({
+        credentials: CREDS,
+        lmxId: 1,
+      })
+    ).toMatchObject({ ok: false, reason: "api_token" });
+
+    // disabled writer (403) → unauthorized
+    installFetchMock(() => json({ error: "account_disabled" }, 403));
+    expect(
+      await createLiveClient(null).removeMachine({
+        credentials: CREDS,
+        lmxId: 1,
+      })
+    ).toMatchObject({ ok: false, reason: "unauthorized" });
+
+    // an ownership rule is a rejection, not an identity failure
+    installFetchMock(() =>
+      json({ errors: "You can only delete machine conditions that you own" })
+    );
+    expect(
+      await createLiveClient(null).removeMachine({
+        credentials: CREDS,
+        lmxId: 1,
+      })
+    ).toMatchObject({ ok: false, reason: "rejected" });
+
     // network error → transient
     installFetchMock(() => {
       throw new Error("ECONNREFUSED");
@@ -671,7 +793,7 @@ describe("live client — api token gate (X-Api-Token)", () => {
     expect(calls[0]?.init?.headers).toMatchObject({ "X-Api-Token": API_TOKEN });
   });
 
-  it("attaches X-Api-Token on writes (alongside the operator creds)", async () => {
+  it("attaches X-Api-Token on writes (alongside the member's creds)", async () => {
     const calls = installFetchMock(() =>
       json({ location_machine: { id: 1 } }, 201)
     );
@@ -680,11 +802,12 @@ describe("live client — api token gate (X-Api-Token)", () => {
       locationId: 26454,
       machineId: 10,
     });
-    // The blanket access gate rides in the header; the operator identity still
-    // rides in the query string — two distinct auth layers.
-    expect(calls[0]?.init?.headers).toMatchObject({ "X-Api-Token": API_TOKEN });
-    const url = new URL(calls[0]?.url ?? "");
-    expect(url.searchParams.get("user_token")).toBe(CREDS.token);
+    // Two distinct auth layers, both in headers: the blanket access gate and
+    // the member's identity.
+    expect(calls[0]?.init?.headers).toMatchObject({
+      "X-Api-Token": API_TOKEN,
+      "X-User-Token": CREDS.token,
+    });
   });
 
   it("omits X-Api-Token entirely when unprovisioned (token null)", async () => {

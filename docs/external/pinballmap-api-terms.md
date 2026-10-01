@@ -18,8 +18,11 @@ read-only GETs, which were previously public. (Lone exception:
   documents an `api_token=` query param, and their source accepts both; we use
   the header to keep the credential out of URLs and logs.
 - **Writes need a second, separate credential** on top of the `api_token`: the
-  `user_email` + `user_token` identity (obtained once via `auth_details`, then
-  stored — never re-fetched per request). So a write carries **both** layers.
+  member's `user_email` + `user_token` identity (obtained once via
+  `POST /users/auth_details` with the password in the body, then stored — never
+  re-fetched per request). So a write carries **both** layers. We send it as the
+  `X-User-Email` / `X-User-Token` headers, PBM's preferred form since
+  2026-09-28, so no token lands in a URL.
 - Store the `api_token` in Vault; it is app-level and revocable.
 
 → Obtaining + wiring the token is tracked in bead **PP-uusr** (blocks the prod
@@ -74,9 +77,10 @@ Relevant to our writes:
 | :---------------------------------------------------- | :------------------ |
 | `POST /location_machine_xrefs` (add machine)          | no controller limit |
 | `PUT /location_machine_xrefs/:id` (update condition)  | 50 / 10 min         |
-| `DELETE /location_machine_xrefs/:id` (remove machine) | 100 / 10 min        |
+| `DELETE /location_machine_xrefs/:id` (remove machine) | 100 / 5 min         |
 | `PUT /machine_conditions/:id`                         | 50 / 5 min          |
-| `GET /users/auth_details`                             | 40 / 5 min          |
+| `POST /users/auth_details` (shared with signup etc.)  | 10 / min            |
+| All `/api/v1/` requests, per API token                | 120 / min           |
 
 → The live client serializes writes and backs off on 429 within a small budget,
 then reports `rate_limited`. We are nowhere near these limits in normal use.
