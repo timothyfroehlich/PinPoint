@@ -9,6 +9,55 @@ import {
   unconfigureDiscordIntegrationForTest,
 } from "../support/supabase-admin.js";
 
+test.describe("Discord DM preferences", () => {
+  let memberEmail: string;
+  let memberId: string;
+
+  test.beforeAll(async () => {
+    const ts = Date.now();
+    memberEmail = `member_discord_dm_${ts}@example.com`;
+    const user = await createTestUser(memberEmail);
+    memberId = user.id;
+    await updateUserRole(memberId, "member");
+  });
+
+  test.afterAll(async () => {
+    await deleteTestUser(memberId);
+    // Belt-and-suspenders: ensure global state isn't dirty for other suites.
+    await unconfigureDiscordIntegrationForTest().catch(() => {
+      // Tolerable if singleton row state already matches.
+    });
+  });
+
+  test("Discord column is hidden when integration is unconfigured", async ({
+    page,
+  }, testInfo) => {
+    await loginAs(page, testInfo, {
+      email: memberEmail,
+      password: "TestPassword123",
+    });
+    await page.goto("/settings");
+
+    // Notification Preferences section should render the email/in-app columns
+    // but NOT the Discord column when getDiscordConfig() returns null.
+    await expect(
+      page.getByRole("heading", { name: "Notification Preferences" })
+    ).toBeVisible();
+    await expect(page.getByLabel("Email Notifications")).toBeVisible();
+    await expect(page.getByLabel("In-App Notifications")).toBeVisible();
+
+    // Discord switch must NOT be present in this state.
+    await expect(page.getByLabel("Discord Notifications")).not.toBeAttached();
+  });
+
+  // "Linked user without a configured integration still sees no Discord column"
+  // deleted (row 24): this block duplicates "Discord column is hidden when
+  // integration is unconfigured" — both assert `not.toBeAttached()` when
+  // getDiscordConfig() returns null. The integration column visibility is driven
+  // entirely by the integration config, not the user's linked state, so the linked
+  // variant adds no additional coverage.
+});
+
 test.describe("Discord DM preferences (integration configured)", () => {
   let memberEmail: string;
   let memberId: string;
