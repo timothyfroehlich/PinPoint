@@ -119,6 +119,27 @@ describe("IssueFilters", () => {
     );
   });
 
+  it("clears all active filters when global Clear button is clicked", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <IssueFilters
+        {...defaultProps}
+        filters={{ q: "bird", severity: ["major"] }}
+      />
+    );
+
+    const clearButton = screen.getByRole("button", { name: "Clear" });
+    await user.click(clearButton);
+
+    expect(pushMock).toHaveBeenCalledWith(
+      expect.stringContaining("status=all")
+    );
+    expect(pushMock).toHaveBeenCalledWith(expect.not.stringContaining("q="));
+    expect(pushMock).toHaveBeenCalledWith(
+      expect.not.stringContaining("severity=")
+    );
+  });
+
   it("reflects pre-populated filters prop (q and severity badge)", async () => {
     renderWithProviders(
       <IssueFilters

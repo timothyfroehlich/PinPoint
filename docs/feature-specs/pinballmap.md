@@ -83,7 +83,7 @@ The control's states (§4) are comparisons across these: _in sync_ means intent 
   - **Sync off**: neutral badge indicating the machine is excluded from sync.
   - **Unlinked / Uncataloged**: neutral badge indicating no catalog model is linked (`No model`) or the machine is uncataloged (`Uncataloged`).
   - **Integration inactive**: when the integration is `Not configured` or `Waiting` for its first snapshot, the PBM column group surfaces the integration-level status rather than per-row evaluation.
-- **4.11** When a machine is created with a catalog title, the New Machine page offers the intent toggle and, for an eligible title, the Insider Connected toggle, both starting Off. The intent toggle starts On instead when the page is opened from a lineup entry (`pinballmap-lineup.md` §5.4). When intent is On, the title is not already on the lineup, and the person can push (8.2), it also offers **Add to Pinball Map after creating**, ticked by default. Ticking it stands as the 4.5 confirmation: creating the machine then runs the add push (4.3). If that push fails, the machine is still created, and its Manage tab shows the resulting out-of-sync state with the failure.
+- **4.11** When a machine is created with a catalog title, the New Machine page offers the intent toggle and, for an eligible title, the Insider Connected toggle, both starting Off. The intent toggle starts On instead when the page is opened from a lineup entry (`pinballmap-lineup.md` §5.4). When the chosen title is already on the lineup, the Insider Connected toggle starts at the entry's value instead: On or Off as Pinball Map reports it, and Off when Pinball Map reports neither. When intent is On, the title is not already on the lineup, and the person can push (8.2), it also offers **Add to Pinball Map after creating**, ticked by default. Ticking it stands as the 4.5 confirmation: creating the machine then runs the add push (4.3). If that push fails, the machine is still created, and its Manage tab shows the resulting out-of-sync state with the failure.
 
 ## 5. Automatic behavior
 
@@ -195,6 +195,7 @@ Changes to this document. Divergence-table rows are working state and are not lo
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-30 | §4.11: when the chosen title is already on the lineup, the New Machine page's Insider Connected toggle starts at the entry's value (Off when Pinball Map reports neither). |
 | 2026-09-28 | §3.8, §4.1: Insider Connected is a tri-state toggle like the lineup intent — On / Off / Don't sync — so a person can see and choose "no intent" and return a cabinet to it. Don't sync shows Pinball Map's value beside the toggle and never flags the cabinet, even when a sibling's intent makes the shared entry differ. §4.9, §4.11, §8.1 say "toggle" for the former switch. |
 | 2026-09-28 | §2.3: matching a machine to an entry from the lineup page sets intent On (unless Don't sync or availability forbids it). §4.11: the intent toggle starts On when the New Machine page is opened from a lineup entry, and Add to Pinball Map after creating is offered only when the title is not already on the lineup. |
 | 2026-09-27 | Added type, display, player count, designers, and artists to the manual model (§2.4). Added §4.11: the New Machine page sets intent and Insider Connected, and can add the machine to Pinball Map as part of creating it. |
