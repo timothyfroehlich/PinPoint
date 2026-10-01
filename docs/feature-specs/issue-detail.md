@@ -57,7 +57,7 @@
 - **4.1** The header's first row is the Issue ID chip followed by the machine's name, which links to the machine page.
 - **4.2** The title follows, as the page's heading, shown in full and wrapping onto as many lines as it needs. No title is cut off, including older titles longer than the current limit.
 - **4.3** On desktop an Edit title button sits beside the title and is always visible — never revealed only on hover. On mobile, Edit title is in the ⋯ menu (§4.5).
-- **4.4** Edit title edits the title in place. Enter saves, Escape cancels, and leaving the field cancels unless the save just failed. An empty or unchanged title saves nothing. A title holds at most 60 characters, the same limit as when the issue is reported. An older title over 60 characters is never shortened automatically; it saves only once edited down to 60 or fewer.
+- **4.4** Edit title edits the title in place. On desktop, Enter saves, Escape cancels, and leaving the field cancels unless the save just failed. On mobile, Save and Cancel buttons sit under the field, the keyboard's Done key saves, and leaving the field keeps the edit open. An empty or unchanged title saves nothing. A title holds at most 60 characters, the same limit as when the issue is reported. An older title over 60 characters is never shortened automatically; it saves only once edited down to 60 or fewer.
 - **4.5** On desktop a labeled Move button sits beside Edit title. On mobile a ⋯ menu beside the title holds Edit title and Move to another machine, offering only the actions the viewer can use.
 - **4.6** Move opens a dialog that lists every other machine, warns that the issue's URL will change, and on confirmation moves the issue and opens it at its new URL. The issue takes the next number on the destination machine; its old number is not reused.
 - **4.7** The summary line sits under the title and states status, severity, and priority, each with its icon, with priority worded as "<level> priority". It is read-only.
@@ -69,7 +69,7 @@
 
 ## 5. Initial report
 
-- **5.1** The initial report opens with the reporter's name, an owner badge when the reporter is the machine's owner, and "reported <relative time>", with the exact time available.
+- **5.1** The initial report opens with the reporter's name, an owner badge when the reporter is the machine's owner, and "reported <relative time>", with the exact time available on hover and on tap.
 - **5.2** The description follows as plain body text — not inside a card, and without an "Initial report" label.
 - **5.3** A frequency line follows the description: the word Frequency, the frequency's icon, and its value. With no frequency given, the line shows Not specified.
 - **5.4** The photos attached at report time follow the frequency line. A comment's photos appear only with that comment.
@@ -91,7 +91,7 @@
 - **7.1** Activity follows the owner's requirements (or the initial report when there are none), under an Activity heading at every size.
 - **7.2** Activity lists comments and system events together, oldest first.
 - **7.3** A Comments only toggle beside the heading hides system events while on. It starts off on every visit; the page never remembers it.
-- **7.4** A comment shows its author's name, an owner badge when the author is the machine's owner, its relative time with the exact time available, an edited marker when it has been edited, its rich-text body, and its photos.
+- **7.4** A comment shows its author's name, an owner badge when the author is the machine's owner, its relative time with the exact time available on hover and on tap, an edited marker when it has been edited, its rich-text body, and its photos.
 - **7.5** A system event is one line: who made the change, what changed (from → to where there is a before and after), and when.
 - **7.6** System events are recorded for: assigning and unassigning; status, severity, priority, frequency, and title changes; moving the issue (from which Issue ID and machine to which); and a comment's deletion (by its author or by an admin).
 - **7.7** Activity shows no avatars and no connecting line between entries.
@@ -106,7 +106,7 @@
 
 - **8.1** A signed-in viewer can comment with rich text, @mentions, and up to four photos.
 - **8.2** On desktop the comment box sits inline at the end of Activity.
-- **8.3** On mobile a floating Comment button sits above the bottom tab bar, on every section tab. It opens the comment composer in a sheet, which closes when the comment posts.
+- **8.3** On mobile a floating Comment button sits above the bottom tab bar on the Issue tab only. It opens the comment composer in a sheet, which closes when the comment posts.
 - **8.4** A signed-out visitor sees no comment box and no Comment button; a prompt to log in to comment takes the comment box's place at the end of Activity.
 - **8.5** Posting a comment makes its author a watcher.
 - **8.6** A retried submission of the same comment never posts it twice.
@@ -138,7 +138,7 @@
 
 ## 11. Mobile layout (below 768px)
 
-- **11.1** The section tabs sit directly under the header: **Issue**, **Details**, **Other issues** followed by the count of other open issues, shown as (0) when there are none. A tab label never includes the machine's name. The Other issues tab is always present.
+- **11.1** The section tabs sit directly under the header: **Issue**, **Details**, **Other issues** followed by a count badge of other open issues, shown at 0 when there are none. A tab label never includes the machine's name. The Other issues tab is always present.
 - **11.2** Issue is the default tab. Every arrival at the page — a typed or shared URL, a link within PinPoint, or a notification (§2.6) — opens the Issue tab.
 - **11.3** The Issue tab shows the initial report (§5), the owner's requirements (§6), and Activity (§7).
 - **11.4** The Details tab shows two cards: the field rows (§9.1), then the context rows Machine, Owner, Reported, Updated, and Watching.
@@ -161,7 +161,7 @@
 ## 13. Fit & touch
 
 - **13.1** 320px wide is the layout floor: every control is reachable without horizontal scrolling, names wrap or truncate deliberately rather than clip, and titles always wrap (§4.2).
-- **13.2** On mobile every tappable control has a touch target at least 44px in each dimension, the Comments only toggle and each comment's actions button included.
+- **13.2** On mobile every tappable control has a touch target at least 44px in each dimension, the Comments only toggle, each comment's actions button, and each relative time included. A link inside a line of text, such as a person's or machine's name, is exempt, as WCAG 2.5.8 allows.
 
 ---
 
@@ -185,6 +185,8 @@ None.
 | §4.5, §13.2 | At every size Move is the only item in a ⋯ More actions menu (32px trigger): desktop has no labeled Move button, and the mobile menu lacks Edit title. | PP-t4h1 |
 | §4.2 | Titles longer than 60 characters are cut to 60 with "...", and the full title is only in a hover tooltip, which touch screens never show. | PP-t4h1 |
 | §4.4 | Editing a title allows up to 100 characters (`editable-issue-title.tsx`, `issues/schemas.ts`), while reporting allows 60. | PP-t4h1 |
+| §4.4 | Title editing has no Save or Cancel buttons on mobile, and leaving the field cancels the edit at every size. | PP-t4h1 |
+| §5.1, §7.4 | The exact time is only in a hover tooltip, so tapping a relative time shows nothing. | PP-t4h1 |
 | §4.7 | No summary line; status, severity, and priority appear only as controls in the metadata grid. | PP-t4h1 |
 | §4.9 | The identity row also shows "Game Owner: <name>", and a subtitle line shows "by <reporter>" with owner badge, "Updated <time>", "<N> watching", and an icon-only Watch toggle. | PP-t4h1 |
 | §4.10 | Mobile shows a Back to Issues link above the header, returning to the last-visited issue list. | PP-t4h1 |
@@ -219,6 +221,7 @@ Changes to this document. Divergence-table rows are working state and are not lo
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-01 | Design-review decisions: §4.4 gives mobile Save and Cancel buttons and keeps the edit open when the field loses focus; §5.1 and §7.4 make the exact time available on tap; §8.3 shows the Comment button on the Issue tab only; §11.1 shows the Other issues count as a badge; §13.2 adds relative times and exempts links inside a line of text. |
 | 2026-10-01 | §1 Header, §3.7, §4.3, and §4.5: on mobile, Edit title and Move share a ⋯ menu beside the title; desktop keeps the always-visible Edit title button and a labeled Move button. |
 | 2026-09-30 | Review fixes: §6.4 added (the callout's title does not name the machine); the Updated row joins §1 Context rows, §11.4, and §12.3, and desktop Details shows the same context rows as mobile (§12.4); §1 Header names the Move label exception; §1 Field rows open a picker only when the viewer can change the field; §13.1 always wraps titles; §11.7 and §12.5 state their requirement without describing the bible. |
 | 2026-09-30 | Resolved open questions: §1 and §11.7 make the section tabs in-page state, a deliberate departure from the design bible's URL-driven tabs; §2.6 and §11.2 open every arrival, notifications included, on the Issue tab; §10.1, §10.3, §10.5, §10.6, and §11.1 define open, See all with only the machine filter (every status, off-floor machines included), the five newest first, and the empty state; §5.3 shows Not specified; §3.7 drops the chevron and reason text on fields the viewer can't change; §7.3 resets Comments only on every visit.; §4.2 shows the full title, wrapped; §4.4 sets the edit limit to 60 to match reporting; §9.7 adds an Updated row to Details; §13.2 holds the Comments only toggle and comment actions to 44px. |
