@@ -36,6 +36,11 @@ establish whether the problem is intermittent, frequent, or constant.
 The current operating condition of a machine, inferred from its open issues
 rather than managed as a separate fact.
 
+**Availability**:
+Whether the machine is at the venue and available for play: On the Floor, Off
+the Floor, On Loan, Pending Arrival, or Removed. Independent of machine status.
+_Avoid_: Presence, location
+
 ## People and access
 
 **User**:
