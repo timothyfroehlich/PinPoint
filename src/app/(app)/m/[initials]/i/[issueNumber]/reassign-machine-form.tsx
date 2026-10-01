@@ -77,7 +77,10 @@ export function ReassignMachineForm({
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent
-        className="max-w-md"
+        // Never taller than the viewport: the machine list gives up height
+        // first, then the dialog scrolls, so every control stays reachable
+        // on a short or zoomed screen (WCAG 1.4.10).
+        className="flex max-h-[calc(100dvh-2rem)] max-w-md flex-col overflow-y-auto"
         onCloseAutoFocus={(event) => {
           const target = returnFocusTo?.();
           if (target) {
@@ -102,7 +105,10 @@ export function ReassignMachineForm({
           }))}
           selectedValue={selectedInitials}
           onSelect={setSelectedInitials}
-          className="rounded-md border"
+          className="h-auto min-h-32 shrink rounded-md border"
+          listClassName="min-h-0"
+          // 44px rows on phones (spec issue-detail §13.2).
+          itemClassName="max-md:min-h-11"
           commandTestId="reassign-command"
           optionTestId={(machine) => `reassign-option-${machine.initials}`}
           emptyText="No matching machines."
@@ -113,8 +119,11 @@ export function ReassignMachineForm({
         )}
 
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={isPending} className="max-md:min-h-11">
+            Cancel
+          </AlertDialogCancel>
           <AlertDialogAction
+            className="max-md:min-h-11"
             onClick={(e) => {
               e.preventDefault();
               handleConfirm();
