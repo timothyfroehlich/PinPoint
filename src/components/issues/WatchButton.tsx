@@ -19,10 +19,11 @@ interface WatchButtonProps {
  * Watch toggle. The count follows the toggle immediately rather than waiting
  * for the page to revalidate, and the new count is announced politely.
  *
- * Toggle model (APG button pattern): a toggle button keeps one accessible
- * name, "Watch", and reports its state with `aria-pressed`. The visible text
- * reads Watch / Watching. While a toggle is in flight the button is
- * `aria-disabled` (a disabled button would drop focus to `<body>`).
+ * The button names the action it takes — Watch or Unwatch — and that visible
+ * text is its whole accessible name (WCAG 2.5.3), so it carries no
+ * `aria-pressed`: a pressed state on a name that changes would read twice.
+ * While a toggle is in flight the button is `aria-disabled` (a disabled
+ * button would drop focus to `<body>`).
  */
 export function WatchButton({
   issueId,
@@ -73,8 +74,6 @@ export function WatchButton({
             onClick={handleToggle}
             aria-disabled={isPending || undefined}
             aria-busy={isPending || undefined}
-            aria-pressed={isWatching}
-            aria-label="Watch"
             className="-my-2 inline-flex min-h-11 items-center gap-1.5 rounded-sm px-1 font-semibold text-primary transition-colors duration-150 hover:text-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring aria-disabled:cursor-wait md:min-h-0"
           >
             {isPending ? (
@@ -83,7 +82,7 @@ export function WatchButton({
                 aria-hidden="true"
               />
             ) : null}
-            {isWatching ? "Watching" : "Watch"}
+            {isWatching ? "Unwatch" : "Watch"}
           </button>
           <span role="status" className="sr-only">
             {announcement}

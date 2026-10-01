@@ -25,10 +25,10 @@ describe("WatchButton (Details › Watching, spec §9.6)", () => {
       />
     );
     expect(screen.getByTestId("watcher-count")).toHaveTextContent("2");
-    expect(screen.getByRole("button", { name: "Watch" })).toHaveAttribute(
-      "aria-pressed",
-      "false"
-    );
+    const toggle = screen.getByRole("button", { name: "Watch" });
+    // The visible text is the whole name (WCAG 2.5.3): no aria-label.
+    expect(toggle).not.toHaveAttribute("aria-label");
+    expect(toggle).not.toHaveAttribute("aria-pressed");
   });
 
   it("shows the count only for a signed-out visitor", () => {
@@ -62,13 +62,10 @@ describe("WatchButton (Details › Watching, spec §9.6)", () => {
     const toggle = screen.getByRole("button", { name: "Watch" });
     await user.click(toggle);
 
-    // One toggle model (APG): the name stays "Watch"; the state is
-    // aria-pressed, and the visible text reads Watching.
+    // The button now offers the opposite action, by its visible text.
     await waitFor(() => {
-      expect(toggle).toHaveAttribute("aria-pressed", "true");
+      expect(toggle).toHaveAccessibleName("Unwatch");
     });
-    expect(toggle).toHaveAccessibleName("Watch");
-    expect(toggle).toHaveTextContent("Watching");
     // Saving never disables the button, which would drop focus to <body>.
     expect(toggle).toHaveFocus();
     expect(screen.getByTestId("watcher-count")).toHaveTextContent("3");
@@ -87,14 +84,13 @@ describe("WatchButton (Details › Watching, spec §9.6)", () => {
       <WatchButton issueId="123" watcherCount={3} initialIsWatching canWatch />
     );
 
-    const toggle = screen.getByRole("button", { name: "Watch" });
-    expect(toggle).toHaveAttribute("aria-pressed", "true");
+    const toggle = screen.getByRole("button", { name: "Unwatch" });
     fireEvent.click(toggle);
 
     await waitFor(() => {
       expect(screen.getByTestId("watcher-count")).toHaveTextContent("2");
     });
-    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    expect(toggle).toHaveAccessibleName("Watch");
     expect(screen.getByRole("status")).toHaveTextContent(
       "Not watching. 2 watchers"
     );
