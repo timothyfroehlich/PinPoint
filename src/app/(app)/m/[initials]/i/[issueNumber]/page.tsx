@@ -243,89 +243,88 @@ export default async function IssueDetailPage({
   );
 
   return (
-    <>
-      <PageContainer size="wide" className="max-w-[1120px] pb-28 md:pb-10">
-        <IssueSections>
-          <div className="md:grid md:grid-cols-[minmax(0,1fr)_320px] md:gap-10">
-            <div className="min-w-0 space-y-5">
-              <header className="space-y-2 md:border-b md:border-outline-variant md:pb-5">
-                <div className="flex flex-wrap items-center gap-2 text-sm">
-                  <span className="inline-flex rounded-full border border-outline-variant bg-muted/40 px-2.5 py-0.5 font-mono text-xs font-bold text-muted-foreground">
-                    {formatIssueId(initials, issue.issueNumber)}
-                  </span>
-                  <Link
-                    href={`/m/${initials}`}
-                    data-testid="machine-link"
-                    className="font-semibold text-foreground transition-colors duration-150 hover:text-primary"
-                  >
-                    {issue.machine.name}
-                  </Link>
-                </div>
-                <EditableIssueTitle
-                  issueId={issue.id}
-                  title={issue.title}
-                  canEdit={userCanEditTitle}
-                  {...(userCanReassign
-                    ? {
-                        move: {
-                          currentInitials: initials,
-                          machines: allMachines,
-                        },
-                      }
-                    : {})}
-                />
-                <IssueSummaryLine
-                  status={issue.status}
-                  severity={issue.severity}
-                  priority={issue.priority}
-                />
-              </header>
+    // pb-10 on top of the shell's own bottom padding lets the last content
+    // scroll clear of the floating Comment button on mobile.
+    <PageContainer size="wide" className="max-w-[1120px] pb-10">
+      <IssueSections>
+        <div className="md:grid md:grid-cols-[minmax(0,1fr)_320px] md:gap-10">
+          <div className="min-w-0 space-y-5">
+            <header className="space-y-2 md:border-b md:border-outline-variant md:pb-5">
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="inline-flex rounded-full border border-outline-variant bg-muted/40 px-2.5 py-0.5 font-mono text-xs font-bold text-muted-foreground">
+                  {formatIssueId(initials, issue.issueNumber)}
+                </span>
+                <Link
+                  href={`/m/${initials}`}
+                  data-testid="machine-link"
+                  className="font-semibold text-foreground transition-colors duration-150 hover:text-primary"
+                >
+                  {issue.machine.name}
+                </Link>
+              </div>
+              <EditableIssueTitle
+                issueId={issue.id}
+                title={issue.title}
+                canEdit={userCanEditTitle}
+                {...(userCanReassign
+                  ? {
+                      move: {
+                        currentInitials: initials,
+                        machines: allMachines,
+                      },
+                    }
+                  : {})}
+              />
+              <IssueSummaryLine
+                status={issue.status}
+                severity={issue.severity}
+                priority={issue.priority}
+              />
+            </header>
 
-              <IssueSectionTabList otherIssuesCount={otherIssuesCount} />
+            <IssueSectionTabList otherIssuesCount={otherIssuesCount} />
 
-              <IssueSectionPanel section="issue" className="space-y-6">
-                <InitialReport issue={issueWithRelations} />
-                {ownerRequirements && (
-                  <OwnerRequirementsCallout
-                    ownerRequirements={ownerRequirements}
-                  />
-                )}
-                <IssueActivity
-                  issue={issueWithRelations}
-                  currentUserId={user?.id ?? null}
-                  currentUserRole={accessLevel}
+            <IssueSectionPanel section="issue" className="space-y-6">
+              <InitialReport issue={issueWithRelations} />
+              {ownerRequirements && (
+                <OwnerRequirementsCallout
+                  ownerRequirements={ownerRequirements}
                 />
-              </IssueSectionPanel>
-            </div>
-
-            <div className="min-w-0 space-y-6 max-md:mt-5">
-              <IssueSectionPanel section="details" className="space-y-3">
-                <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground max-md:sr-only">
-                  Details
-                </h2>
-                <IssueDetails
-                  issue={issueWithRelations}
-                  allUsers={allUsers}
-                  currentUserId={user?.id ?? null}
-                  accessLevel={accessLevel}
-                  ownershipContext={ownershipContext}
-                />
-              </IssueSectionPanel>
-              <IssueSectionPanel section="other">
-                <OtherIssues
-                  issues={otherIssues}
-                  machineName={issue.machine.name}
-                  machineInitials={initials}
-                />
-              </IssueSectionPanel>
-            </div>
+              )}
+              <IssueActivity
+                issue={issueWithRelations}
+                currentUserId={user?.id ?? null}
+                currentUserRole={accessLevel}
+              />
+            </IssueSectionPanel>
           </div>
-        </IssueSections>
-      </PageContainer>
 
-      {accessLevel !== "unauthenticated" && (
-        <FloatingCommentButton issueId={issue.id} />
-      )}
-    </>
+          <div className="min-w-0 space-y-6 max-md:mt-5">
+            <IssueSectionPanel section="details" className="space-y-3">
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground max-md:sr-only">
+                Details
+              </h2>
+              <IssueDetails
+                issue={issueWithRelations}
+                allUsers={allUsers}
+                currentUserId={user?.id ?? null}
+                accessLevel={accessLevel}
+                ownershipContext={ownershipContext}
+              />
+            </IssueSectionPanel>
+            <IssueSectionPanel section="other">
+              <OtherIssues
+                issues={otherIssues}
+                machineName={issue.machine.name}
+                machineInitials={initials}
+              />
+            </IssueSectionPanel>
+          </div>
+        </div>
+        {accessLevel !== "unauthenticated" && (
+          <FloatingCommentButton issueId={issue.id} />
+        )}
+      </IssueSections>
+    </PageContainer>
   );
 }

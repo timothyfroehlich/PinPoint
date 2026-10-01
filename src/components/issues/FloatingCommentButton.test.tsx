@@ -1,28 +1,67 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import { FloatingCommentButton } from "./FloatingCommentButton";
+import {
+  IssueSectionTabList,
+  IssueSections,
+} from "~/components/issues/IssueSectionTabs";
 
 // Stub AddCommentForm to avoid jsdom + ProseMirror fragility. Surface
-// `issueId` so a dropped or empty prop fails the open test.
+// `issueId` and `quick` so a dropped prop fails the open test.
 vi.mock("~/components/issues/AddCommentForm", () => ({
-  AddCommentForm: vi.fn(({ issueId }: { issueId: string }) => (
-    <div data-testid="mock-add-comment-form" data-issue-id={issueId} />
-  )),
+  AddCommentForm: vi.fn(
+    ({ issueId, quick }: { issueId: string; quick?: boolean }) => (
+      <div
+        data-testid="mock-add-comment-form"
+        data-issue-id={issueId}
+        data-quick={String(quick)}
+      />
+    )
+  ),
 }));
+
+function renderOnIssuePage(): void {
+  render(
+    <IssueSections>
+      <IssueSectionTabList otherIssuesCount={0} />
+      <FloatingCommentButton issueId="test-issue-123" />
+    </IssueSections>
+  );
+}
 
 describe("FloatingCommentButton (spec issue-detail §8.3)", () => {
   it("is mobile-only: hidden from md: up, where the comment box is inline", () => {
-    const { container } = render(<FloatingCommentButton issueId="issue-1" />);
-    expect(container.firstChild).toHaveClass("md:hidden");
+    renderOnIssuePage();
+    expect(
+      screen.getByTestId("floating-comment-button").parentElement
+    ).toHaveClass("md:hidden");
   });
 
-  it("opens the composer in a sheet for this issue", async () => {
-    render(<FloatingCommentButton issueId="test-issue-123" />);
+  it("shows on the Issue tab only", () => {
+    renderOnIssuePage();
+    expect(screen.getByRole("button", { name: "Comment" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Details" }));
+    expect(
+      screen.queryByRole("button", { name: "Comment" })
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: /Other issues/ }));
+    expect(
+      screen.queryByRole("button", { name: "Comment" })
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Issue" }));
+    expect(screen.getByRole("button", { name: "Comment" })).toBeInTheDocument();
+  });
+
+  it("opens the quick composer in a sheet for this issue", async () => {
+    renderOnIssuePage();
     fireEvent.click(screen.getByRole("button", { name: "Comment" }));
 
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
-    expect(
-      screen.getByTestId("mock-add-comment-form").getAttribute("data-issue-id")
-    ).toBe("test-issue-123");
+    const form = screen.getByTestId("mock-add-comment-form");
+    expect(form.getAttribute("data-issue-id")).toBe("test-issue-123");
+    expect(form.getAttribute("data-quick")).toBe("true");
   });
 });

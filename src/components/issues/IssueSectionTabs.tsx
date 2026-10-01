@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useIsMobile } from "~/hooks/use-is-mobile";
+import { IsMobileProvider, useIsMobile } from "~/hooks/use-is-mobile";
 import { cn } from "~/lib/utils";
 
 /**
@@ -9,6 +9,10 @@ import { cn } from "~/lib/utils";
  * Details, Other issues. In-page state, never a route — the URL never names a
  * tab, and every arrival opens on Issue (§11.2, §11.7). From `md:` up there
  * are no tabs and every panel shows in the two-pane layout (§12.4).
+ *
+ * `IssueSections` also reads the viewport flag once for the whole page
+ * (`IsMobileProvider`), so the pickers and the title editor below it share
+ * one media-query subscription.
  */
 
 export type IssueSection = "issue" | "details" | "other";
@@ -34,6 +38,11 @@ function useSectionContext(): NonNullable<
   return context;
 }
 
+/** The section tab showing on mobile. */
+export function useActiveIssueSection(): IssueSection {
+  return useSectionContext().active;
+}
+
 export function IssueSections({
   children,
 }: {
@@ -52,7 +61,11 @@ export function IssueSections({
 
   const value = React.useMemo(() => ({ active, setActive }), [active]);
   return (
-    <SectionContext.Provider value={value}>{children}</SectionContext.Provider>
+    <IsMobileProvider>
+      <SectionContext.Provider value={value}>
+        {children}
+      </SectionContext.Provider>
+    </IsMobileProvider>
   );
 }
 
@@ -72,27 +85,45 @@ export function IssueSectionTabList({
       list.querySelector<HTMLButtonElement>(`#issue-tab-${section}`)?.focus();
     }
     // After a long Activity, a shorter tab would open scrolled past its top.
-    if (list.getBoundingClientRect().top < 0) {
+    // The shell scrolls `<main>`, which starts below the app header.
+    const scrollerTop = list.closest("main")?.getBoundingClientRect().top ?? 0;
+    if (list.getBoundingClientRect().top < scrollerTop) {
       list.scrollIntoView({ block: "start" });
     }
   };
 
   const onKeyDown = (event: React.KeyboardEvent): void => {
     const index = SECTIONS.findIndex((section) => section.id === active);
-    const step =
-      event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
-    if (step === 0) return;
+    let nextIndex: number;
+    switch (event.key) {
+      case "ArrowRight":
+        nextIndex = (index + 1) % SECTIONS.length;
+        break;
+      case "ArrowLeft":
+        nextIndex = (index - 1 + SECTIONS.length) % SECTIONS.length;
+        break;
+      case "Home":
+        nextIndex = 0;
+        break;
+      case "End":
+        nextIndex = SECTIONS.length - 1;
+        break;
+      default:
+        return;
+    }
     event.preventDefault();
-    const next = SECTIONS[(index + step + SECTIONS.length) % SECTIONS.length];
+    const next = SECTIONS[nextIndex];
     if (next) select(next.id, true);
   };
 
   return (
+    // Hidden from `md:` up, which also removes the tab roles from the
+    // accessibility tree on desktop.
     <div
       ref={listRef}
       role="tablist"
       aria-label="Issue sections"
-      className="-mx-4 flex scroll-mt-16 border-b border-outline-variant px-1 md:hidden"
+      className="-mx-4 flex border-b border-outline-variant px-1 sm:-mx-8 md:hidden"
       data-testid="issue-section-tabs"
     >
       {SECTIONS.map((section) => {
@@ -111,7 +142,7 @@ export function IssueSectionTabList({
             className={cn(
               "-mb-px inline-flex min-h-11 items-center gap-1.5 border-b-2 px-3 text-sm font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
               isActive
-                ? "border-primary text-foreground"
+                ? "border-primary text-primary"
                 : "border-transparent text-muted-foreground hover:text-foreground"
             )}
           >

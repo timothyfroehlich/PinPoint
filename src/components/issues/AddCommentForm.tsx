@@ -4,6 +4,7 @@ import type React from "react";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "~/components/ui/button";
+import { Toggle } from "~/components/ui/toggle";
 import {
   addCommentAction,
   type AddCommentResult,
@@ -21,12 +22,22 @@ import { type ProseMirrorDoc } from "~/lib/tiptap/types";
 interface AddCommentFormProps {
   issueId: string;
   onSubmitSuccess?: () => void;
+  /**
+   * Composer quick mode (design-bible §17), for the mobile comment sheet: the
+   * editor opens focused as a compact jot with its toolbar hidden, an "Aa"
+   * toggle reveals the toolbar (two-way, lossless), Cmd/Ctrl+Enter posts, and
+   * the Post row sticks to the bottom of the sheet so it stays reachable above
+   * the on-screen keyboard.
+   */
+  quick?: boolean;
 }
 
 export function AddCommentForm({
   issueId,
   onSubmitSuccess,
+  quick = false,
 }: AddCommentFormProps): React.JSX.Element {
+  const [showFormatting, setShowFormatting] = useState(!quick);
   const formRef = useRef<HTMLFormElement>(null);
   const editorRef = useRef<RichTextEditorHandle>(null);
   const [state, formAction, isPending] = useActionState<
@@ -50,19 +61,45 @@ export function AddCommentForm({
       setUploadedImages([]);
       setComment(null);
       editorRef.current?.clear();
+      if (quick) setShowFormatting(false);
       // Fresh key — the next comment is a new logical submission.
       setIdempotencyKey(crypto.randomUUID());
       // Container handles focus / sheet-close / next-action.
       onSubmitSuccess?.();
     }
-  }, [state, onSubmitSuccess]);
+  }, [state, onSubmitSuccess, quick]);
 
   const handleUploadComplete = (imageData: ImageMetadata): void => {
     setUploadedImages((prev) => [...prev, imageData]);
   };
 
+  // Cmd/Ctrl+Enter posts — expected by anyone who has used a chat composer.
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLFormElement>): void => {
+    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+      event.preventDefault();
+      if (!isPending) formRef.current?.requestSubmit();
+    }
+  };
+
+  const submitButton = (
+    <Button
+      type="submit"
+      size="sm"
+      loading={isPending}
+      className={quick ? "min-h-11 px-4" : undefined}
+    >
+      Add Comment
+    </Button>
+  );
+
   return (
-    <form action={formAction} ref={formRef} className="space-y-4">
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- Cmd/Ctrl+Enter shortcut on the composer form, as in MachineTimelineComposer
+    <form
+      action={formAction}
+      ref={formRef}
+      className="space-y-4"
+      onKeyDown={quick ? handleKeyDown : undefined}
+    >
       <input type="hidden" name="issueId" value={issueId} />
       <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
       <input
@@ -78,7 +115,11 @@ export function AddCommentForm({
         placeholder="Leave a comment..."
         ariaLabel="Comment"
         disabled={isPending}
-        className="min-h-[100px]"
+        showToolbar={showFormatting}
+        compact={!showFormatting}
+        // eslint-disable-next-line jsx-a11y/no-autofocus -- the quick composer opens in a sheet the author just asked for
+        autoFocus={quick}
+        className={quick ? undefined : "min-h-[100px]"}
       />
       <input
         type="hidden"
@@ -98,8 +139,8 @@ export function AddCommentForm({
         </div>
       )}
 
-      <div className="flex flex-col gap-3 @xl:flex-row @xl:items-center @xl:justify-between @xl:gap-4">
-        <div className="min-w-0 @xl:max-w-[200px]">
+      {quick ? (
+        <>
           <ImageUploadButton
             issueId={issueId}
             currentCount={uploadedImages.length}
@@ -107,14 +148,48 @@ export function AddCommentForm({
             onUploadComplete={handleUploadComplete}
             disabled={isPending}
           />
-        </div>
+          {state && !state.ok && (
+            <p className="text-sm text-destructive-text">{state.message}</p>
+          )}
+          {/* Sticky so Post stays in view above the keyboard while the
+              sheet's content scrolls. */}
+          <div className="sticky bottom-0 -mx-4 flex items-center gap-2 border-t border-outline-variant bg-background px-4 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
+            <Toggle
+              pressed={showFormatting}
+              onPressedChange={setShowFormatting}
+              disabled={isPending}
+              aria-label="Formatting"
+              className="min-h-11 min-w-11 text-muted-foreground data-[state=on]:text-foreground"
+            >
+              <span
+                className="text-base font-semibold leading-none tracking-tight"
+                aria-hidden="true"
+              >
+                Aa
+              </span>
+            </Toggle>
+            <div className="ml-auto">{submitButton}</div>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="flex flex-col gap-3 @xl:flex-row @xl:items-center @xl:justify-between @xl:gap-4">
+            <div className="min-w-0 @xl:max-w-[200px]">
+              <ImageUploadButton
+                issueId={issueId}
+                currentCount={uploadedImages.length}
+                maxCount={BLOB_CONFIG.LIMITS.COMMENT_MAX}
+                onUploadComplete={handleUploadComplete}
+                disabled={isPending}
+              />
+            </div>
 
-        <Button type="submit" size="sm" loading={isPending}>
-          Add Comment
-        </Button>
-      </div>
-      {state && !state.ok && (
-        <p className="text-sm text-destructive-text">{state.message}</p>
+            {submitButton}
+          </div>
+          {state && !state.ok && (
+            <p className="text-sm text-destructive-text">{state.message}</p>
+          )}
+        </>
       )}
     </form>
   );
