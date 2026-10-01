@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { MetadataDrawer } from "~/components/issues/fields/MetadataDrawer";
+import { groupOptions } from "~/components/issues/fields/group-options";
 import { useIsMobile } from "~/hooks/use-is-mobile";
 import { cn } from "~/lib/utils";
 
@@ -254,19 +255,4 @@ export function FieldOptionPicker<T extends string>({
       </DropdownMenuContent>
     </DropdownMenu>
   );
-}
-
-export function groupOptions<T extends string>(
-  options: FieldOption<T>[]
-): { group: string | undefined; items: FieldOption<T>[] }[] {
-  const groups: { group: string | undefined; items: FieldOption<T>[] }[] = [];
-  for (const option of options) {
-    const last = groups.at(-1);
-    if (last && last.group === option.group) {
-      last.items.push(option);
-    } else {
-      groups.push({ group: option.group, items: [option] });
-    }
-  }
-  return groups;
 }

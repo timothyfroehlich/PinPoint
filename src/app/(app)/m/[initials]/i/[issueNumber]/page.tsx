@@ -24,7 +24,6 @@ import { CLOSED_STATUSES } from "~/lib/issues/status";
 import { formatIssueId } from "~/lib/issues/utils";
 import type { IssueWithAllRelations } from "~/lib/types";
 import { EditableIssueTitle } from "./editable-issue-title";
-import { MoveIssueButton } from "./move-issue-button";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { OwnerRequirementsCallout } from "~/components/machines/OwnerRequirementsCallout";
 import {
@@ -266,15 +265,14 @@ export default async function IssueDetailPage({
                   issueId={issue.id}
                   title={issue.title}
                   canEdit={userCanEditTitle}
-                  actions={
-                    userCanReassign ? (
-                      <MoveIssueButton
-                        issueId={issue.id}
-                        currentInitials={initials}
-                        machines={allMachines}
-                      />
-                    ) : undefined
-                  }
+                  {...(userCanReassign
+                    ? {
+                        move: {
+                          currentInitials: initials,
+                          machines: allMachines,
+                        },
+                      }
+                    : {})}
                 />
                 <IssueSummaryLine
                   status={issue.status}

@@ -2,8 +2,14 @@
 
 import type React from "react";
 import { useState, useRef, useEffect, useActionState } from "react";
-import { Pencil, Loader2 } from "lucide-react";
+import { ArrowLeftRight, Loader2, MoreVertical, Pencil } from "lucide-react";
 import { Button } from "~/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "~/components/ui/dropdown-menu";
 import { Input } from "~/components/ui/input";
 import { toast } from "sonner";
 import {
@@ -12,13 +18,17 @@ import {
 } from "~/app/(app)/issues/actions";
 import { cn } from "~/lib/utils";
 import { ISSUE_TITLE_MAX, ISSUE_TITLE_MAX_MESSAGE } from "~/lib/issues/title";
+import { ReassignMachineForm } from "./reassign-machine-form";
 
 interface EditableIssueTitleProps {
   issueId: string;
   title: string;
   canEdit: boolean;
-  /** Controls after Edit title, e.g. the Move button. */
-  actions?: React.ReactNode;
+  /** Present when the viewer can move the issue to another machine. */
+  move?: {
+    currentInitials: string;
+    machines: { initials: string; name: string }[];
+  };
 }
 
 const titleClassName =
@@ -28,9 +38,14 @@ export function EditableIssueTitle({
   issueId,
   title,
   canEdit,
-  actions,
+  move,
 }: EditableIssueTitleProps): React.JSX.Element {
   const [isEditing, setIsEditing] = useState(false);
+  const [moveOpen, setMoveOpen] = useState(false);
+  // A menu choice keeps focus where the choice put it (the title input or
+  // the move dialog) instead of returning it to the ⋯ trigger, which would
+  // blur — and so cancel — a fresh title edit.
+  const menuChoiceRef = useRef(false);
   const [editValue, setEditValue] = useState(title);
   const inputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -168,26 +183,104 @@ export function EditableIssueTitle({
     );
   }
 
+  const moveDialog = move ? (
+    <ReassignMachineForm
+      issueId={issueId}
+      currentInitials={move.currentInitials}
+      machines={move.machines}
+      open={moveOpen}
+      onOpenChange={setMoveOpen}
+    />
+  ) : null;
+
+  if (!canEdit && !move) {
+    return <div className="flex items-start gap-1">{heading}</div>;
+  }
+
   return (
     <div className="flex items-start gap-1">
       {heading}
-      {canEdit || actions ? (
-        <div className="-mr-2 flex shrink-0 items-center gap-1 md:mr-0 md:gap-2">
+
+      {/* Desktop: Edit title and a labeled Move button (spec §4.3, §4.5). */}
+      <div className="hidden shrink-0 items-center gap-2 md:flex">
+        {canEdit ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-9 text-muted-foreground hover:text-foreground"
+            onClick={() => setIsEditing(true)}
+            aria-label="Edit title"
+            data-testid="issue-edit-title"
+          >
+            <Pencil className="size-4" />
+          </Button>
+        ) : null}
+        {move ? (
+          <Button
+            type="button"
+            variant="outline"
+            className="h-9 gap-2 px-3"
+            onClick={() => setMoveOpen(true)}
+            aria-label="Move to another machine"
+            data-testid="issue-move-button"
+          >
+            <ArrowLeftRight className="size-4" aria-hidden="true" />
+            Move
+          </Button>
+        ) : null}
+      </div>
+
+      {/* Mobile: both actions behind one ⋯ menu. */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="-mr-2 size-11 shrink-0 text-muted-foreground hover:text-foreground md:hidden"
+            aria-label="Issue actions"
+            data-testid="issue-actions-menu-trigger"
+          >
+            <MoreVertical className="size-5" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="end"
+          onCloseAutoFocus={(event) => {
+            if (menuChoiceRef.current) {
+              event.preventDefault();
+              menuChoiceRef.current = false;
+            }
+          }}
+        >
           {canEdit ? (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-11 text-muted-foreground hover:text-foreground md:size-9"
-              onClick={() => setIsEditing(true)}
-              aria-label="Edit title"
-              data-testid="issue-edit-title"
+            <DropdownMenuItem
+              className="min-h-11"
+              onSelect={() => {
+                menuChoiceRef.current = true;
+                setIsEditing(true);
+              }}
             >
-              <Pencil className="size-4" />
-            </Button>
+              <Pencil className="size-4" aria-hidden="true" />
+              Edit title
+            </DropdownMenuItem>
           ) : null}
-          {actions}
-        </div>
-      ) : null}
+          {move ? (
+            <DropdownMenuItem
+              className="min-h-11"
+              onSelect={() => {
+                menuChoiceRef.current = true;
+                setMoveOpen(true);
+              }}
+              data-testid="issue-actions-menu-reassign"
+            >
+              <ArrowLeftRight className="size-4" aria-hidden="true" />
+              Move to another machine
+            </DropdownMenuItem>
+          ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {moveDialog}
     </div>
   );
 }

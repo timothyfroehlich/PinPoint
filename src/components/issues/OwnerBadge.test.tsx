@@ -8,7 +8,7 @@ describe("OwnerBadge", () => {
 
     const badge = screen.getByTestId("owner-badge");
     expect(badge).toBeInTheDocument();
-    expect(badge).toHaveTextContent("Game Owner");
+    expect(badge).toHaveTextContent(/^Owner$/);
   });
 
   it("renders with default size", () => {
@@ -41,7 +41,7 @@ describe("OwnerBadge", () => {
       render(<OwnerBadge tone="inline" />);
 
       const badge = screen.getByTestId("owner-badge");
-      expect(badge).toHaveTextContent("Game Owner");
+      expect(badge).toHaveTextContent(/^Owner$/);
     });
 
     it("renders no filled pill — no background, border, or uppercasing", () => {

@@ -1,18 +1,17 @@
 "use client";
 
 import React from "react";
-import { Check } from "lucide-react";
+import { X } from "lucide-react";
 import {
   Drawer,
   DrawerClose,
   DrawerContent,
   DrawerDescription,
-  DrawerFooter,
   DrawerHeader,
   DrawerTitle,
   DrawerTrigger,
 } from "~/components/ui/drawer";
-import { Button } from "~/components/ui/button";
+import { groupOptions } from "~/components/issues/fields/group-options";
 import { cn } from "~/lib/utils";
 
 interface MetadataDrawerOption<T extends string> {
@@ -35,6 +34,11 @@ interface MetadataDrawerProps<T extends string> {
   disabled?: boolean;
 }
 
+/**
+ * Bottom-sheet picker for an issue field on phones. Built to fit a 320×568
+ * screen without scrolling: a one-line header, small group labels, and the
+ * options as a two-column grid of 44px tiles (spec issue-detail §13.2).
+ */
 export function MetadataDrawer<T extends string>({
   title,
   options,
@@ -49,87 +53,65 @@ export function MetadataDrawer<T extends string>({
         {trigger}
       </DrawerTrigger>
       <DrawerContent className="mx-auto max-h-[85vh] w-full max-w-md">
-        <DrawerHeader className="space-y-2 text-left">
-          <DrawerTitle className="text-lg">{title}</DrawerTitle>
+        <DrawerHeader className="flex flex-row items-center justify-between gap-2 px-4 py-0 text-left">
+          <DrawerTitle className="text-base">{title}</DrawerTitle>
           <DrawerDescription className="sr-only">
             Choose a new {title.toLowerCase()} value.
           </DrawerDescription>
-        </DrawerHeader>
-        <div className="space-y-2 overflow-y-auto px-4 pb-4">
-          {options.map((option, index) => {
-            const Icon = option.icon;
-            const isSelected = option.value === currentValue;
-
-            const startsGroup =
-              option.group !== undefined &&
-              option.group !== options[index - 1]?.group;
-
-            return (
-              <React.Fragment key={option.value}>
-                {startsGroup ? (
-                  <p className="px-1 pt-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    {option.group}
-                  </p>
-                ) : null}
-                <DrawerClose asChild>
-                  <button
-                    type="button"
-                    data-testid={option.testId}
-                    className={cn(
-                      "flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors duration-150",
-                      "hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                      isSelected
-                        ? "border-primary bg-primary/5"
-                        : "border-border bg-background"
-                    )}
-                    onClick={() => onSelect(option.value)}
-                  >
-                    <div
-                      className={cn(
-                        "flex size-10 shrink-0 items-center justify-center rounded-full bg-muted",
-                        isSelected && "bg-primary/10"
-                      )}
-                    >
-                      {Icon ? (
-                        <Icon
-                          className={cn(
-                            "size-4",
-                            option.iconColor,
-                            isSelected && "text-primary"
-                          )}
-                        />
-                      ) : null}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="font-medium text-foreground">
-                        {option.label}
-                      </div>
-                      {option.description ? (
-                        <p className="text-sm text-muted-foreground">
-                          {option.description}
-                        </p>
-                      ) : null}
-                    </div>
-                    <Check
-                      className={cn(
-                        "size-4 shrink-0 text-primary transition-opacity duration-150",
-                        isSelected ? "opacity-100" : "opacity-0"
-                      )}
-                      aria-hidden="true"
-                    />
-                  </button>
-                </DrawerClose>
-              </React.Fragment>
-            );
-          })}
-        </div>
-        <DrawerFooter>
           <DrawerClose asChild>
-            <Button type="button" variant="outline" className="w-full">
-              Cancel
-            </Button>
+            <button
+              type="button"
+              aria-label="Close"
+              className="-mr-3 flex size-11 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <X className="size-5" aria-hidden="true" />
+            </button>
           </DrawerClose>
-        </DrawerFooter>
+        </DrawerHeader>
+        <div className="space-y-2.5 overflow-y-auto px-4 pb-4">
+          {groupOptions(options).map(({ group, items }) => (
+            <div key={group ?? "options"} className="space-y-1">
+              {group ? (
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  {group}
+                </div>
+              ) : null}
+              <div className="grid grid-cols-2 gap-1.5">
+                {items.map((option) => {
+                  const Icon = option.icon;
+                  const isSelected = option.value === currentValue;
+                  return (
+                    <DrawerClose asChild key={option.value}>
+                      <button
+                        type="button"
+                        data-testid={option.testId}
+                        aria-pressed={isSelected}
+                        className={cn(
+                          "flex min-h-11 min-w-0 items-center gap-1.5 rounded-lg border px-2.5 py-1 text-left text-sm font-medium leading-tight transition-colors duration-150",
+                          "hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                          isSelected
+                            ? "border-primary bg-primary/10 text-foreground"
+                            : "border-outline-variant bg-background text-foreground"
+                        )}
+                        onClick={() => onSelect(option.value)}
+                      >
+                        {Icon ? (
+                          <Icon
+                            className={cn("size-4 shrink-0", option.iconColor)}
+                            aria-hidden="true"
+                          />
+                        ) : null}
+                        <span className="min-w-0 break-words">
+                          {option.label}
+                        </span>
+                      </button>
+                    </DrawerClose>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
       </DrawerContent>
     </Drawer>
   );
