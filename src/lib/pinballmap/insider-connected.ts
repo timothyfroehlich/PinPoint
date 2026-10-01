@@ -14,6 +14,13 @@ export type PbmIcIntent = "on" | "off";
  */
 export type PbmInsiderConnectedSetting = "on" | "off" | "not_set";
 
+/** Pinball Map's `ic_enabled` for an entry, as a setting. */
+export function insiderConnectedSetting(
+  icEnabled: boolean | null
+): PbmInsiderConnectedSetting {
+  return icEnabled === null ? "not_set" : icEnabled ? "on" : "off";
+}
+
 export interface PbmInsiderConnectedView {
   /** This cabinet's own intent; null is Don't sync (none recorded). */
   intent: PbmIcIntent | null;
@@ -68,13 +75,7 @@ export function deriveInsiderConnectedView(args: {
       ? findLmxForMachine(snapshot, pinballmapMachineId)
       : null;
   const pinballMap: PbmInsiderConnectedSetting | null =
-    lmx === null
-      ? null
-      : lmx.icEnabled === null
-        ? "not_set"
-        : lmx.icEnabled
-          ? "on"
-          : "off";
+    lmx === null ? null : insiderConnectedSetting(lmx.icEnabled);
 
   const target = insiderConnectedTarget(args.siblingIntents);
   // Flagged only where the lineup itself is in sync with the entry present:

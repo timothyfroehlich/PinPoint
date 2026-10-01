@@ -2,7 +2,7 @@ import type React from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "~/lib/supabase/server";
 import { getLoginUrl } from "~/lib/url";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { PageHeader } from "~/components/layout/PageHeader";
 import { CreateMachineForm } from "./create-machine-form";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { db } from "~/server/db";
@@ -13,6 +13,8 @@ import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 
 import { getUnifiedUsers } from "~/lib/users/queries";
 import { isIscoredConfigured } from "~/lib/iscored/config";
+import { getPinballMapState } from "~/lib/pinballmap/state";
+import { insiderConnectedSetting } from "~/lib/pinballmap/insider-connected";
 
 /**
  * Create Machine Page (Protected Route)
@@ -75,30 +77,61 @@ export default async function NewMachinePage({
         where: eq(pinballmapCatalog.pinballmapMachineId, pbmId),
       })
     : undefined;
+  const accessLevel = getAccessLevel(currentUserProfile?.role);
+
+  // What the lineup choice needs (pinballmap 4.11). The creator owns no
+  // machine yet, so these are the role-level capabilities — the same ones the
+  // create action and the add push re-check on the server.
+  const pbmState = await getPinballMapState();
+  const configured = pbmState?.locationId != null;
+  // Whether an operator credential exists, read off the state row without
+  // decrypting it — the same test the Manage tab uses (CORE-ARCH-012).
+  const writeEnabled =
+    configured &&
+    pbmState.outboundEmail != null &&
+    pbmState.outboundTokenVaultId != null;
+  const pinballmap = {
+    configured,
+    locationName: configured ? (pbmState.snapshotJson?.name ?? null) : null,
+    canSetIntent: checkPermission("machines.pinballmap.link", accessLevel),
+    canAddAfterCreate:
+      writeEnabled && checkPermission("machines.pinballmap.push", accessLevel),
+    // The lineup's entries: a title already on it is not offered the add,
+    // and starts Insider Connected at the entry's value (4.11).
+    lineup: configured
+      ? (pbmState.snapshotJson?.lmxes.map((lmx) => ({
+          titleId: lmx.machineId,
+          insiderConnected: insiderConnectedSetting(lmx.icEnabled),
+        })) ?? [])
+      : [],
+  };
 
   return (
+    // No card around the form: it sits on the page as the Manage tab's form
+    // does, under the page title (Tim, PP-wqit.14.2 review).
     <PageContainer size="standard" className="pt-4 pb-8">
-      <Card className="max-w-2xl gap-3 border-outline-variant">
-        <CardHeader className="px-4 pt-4 pb-0 sm:px-6">
-          <CardTitle className="text-xl text-foreground">New Machine</CardTitle>
-        </CardHeader>
-        <CardContent className="px-4 pb-4 sm:px-6">
-          <CreateMachineForm
-            allUsers={allUsers}
-            canSelectOwner={canCreateMachine}
-            iscoredConfigured={iscoredConfigured}
-            initialName={typeof title === "string" ? title : undefined}
-            initialPinballmap={
-              initialPinballmap
-                ? {
-                    id: initialPinballmap.pinballmapMachineId,
-                    name: initialPinballmap.name,
-                  }
-                : undefined
-            }
-          />
-        </CardContent>
-      </Card>
+      <div className="max-w-4xl space-y-6">
+        <PageHeader title="New Machine" />
+        <CreateMachineForm
+          allUsers={allUsers}
+          canSelectOwner={canCreateMachine}
+          iscoredConfigured={iscoredConfigured}
+          canViewOwnerRequirements={checkPermission(
+            "machines.view.ownerRequirements",
+            accessLevel
+          )}
+          pinballmap={pinballmap}
+          initialName={typeof title === "string" ? title : undefined}
+          initialPinballmap={
+            initialPinballmap
+              ? {
+                  id: initialPinballmap.pinballmapMachineId,
+                  name: initialPinballmap.name,
+                }
+              : undefined
+          }
+        />
+      </div>
     </PageContainer>
   );
 }

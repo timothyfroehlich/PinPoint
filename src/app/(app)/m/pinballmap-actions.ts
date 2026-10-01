@@ -162,6 +162,20 @@ export async function resolvePinballMapLinkAction(
 }
 
 /**
+ * Whether Pinball Map's catalog marks a title Insider Connected eligible — the
+ * New Machine page shows the switch only for one that is (pinballmap 3.8,
+ * 4.11). Public catalog data, so the same read gate as the picker; false for a
+ * guest or an id no longer in the mirror.
+ */
+export async function getPinballMapTitleIcEligibleAction(
+  pinballmapMachineId: number
+): Promise<boolean> {
+  if (!(await canReadCatalog())) return false;
+  const entry = await getCatalogEntry(pinballmapMachineId);
+  return entry?.icEligible ?? false;
+}
+
+/**
  * Shared preamble for every listing action: authenticate, load the target
  * machine, and confirm the caller holds `permission` on it. Returns the machine
  * row when permitted, or a failed Result to short-circuit the caller.
