@@ -33,6 +33,28 @@ test.describe("Discord DM preferences (integration configured)", () => {
     await deleteTestUser(memberId);
   });
 
+  test("Unlinked user sees Discord column with Link CTA and disabled main switch", async ({
+    page,
+  }, testInfo) => {
+    // discord_user_id stays null for this test — the column should render
+    // (the integration is configured) but the main switch is disabled with
+    // a Link CTA pointing at Connected Accounts.
+    await loginAs(page, testInfo, {
+      email: memberEmail,
+      password: "TestPassword123",
+    });
+    await page.goto("/settings");
+
+    const discordMainSwitch = page.getByLabel("Discord Notifications");
+    await expect(discordMainSwitch).toBeVisible();
+    await expect(discordMainSwitch).toBeDisabled();
+
+    // The "Link Discord" anchor sits in the same MainSwitchItem as the CTA.
+    await expect(
+      page.getByRole("link", { name: "Link Discord" })
+    ).toBeVisible();
+  });
+
   test("Linked user toggles Discord per-event preference and value persists across reload", async ({
     page,
   }, testInfo) => {

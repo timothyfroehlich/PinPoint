@@ -47,50 +47,97 @@ describe("/api/unsubscribe", () => {
     verifyTokenMock.mockReturnValue(true);
   });
 
-  it("GET returns 400 when uid or token is missing", async () => {
+  async function seedPreferences(): Promise<{ userId: string }> {
+    const db = await getTestDb();
+    const userId = crypto.randomUUID();
+    await db
+      .insert(userProfiles)
+      .values(createTestUser({ id: userId }))
+      .returning();
+
+    await db.insert(notificationPreferences).values({
+      userId,
+      emailEnabled: true,
+      emailNotifyOnAssigned: true,
+      emailNotifyOnStatusChange: true,
+      emailNotifyOnNewComment: true,
+      emailNotifyOnNewIssue: true,
+      emailWatchNewIssuesGlobal: true,
+      emailNotifyOnPinballMapComment: true,
+    });
+
+    return { userId };
+  }
+
+  async function assertPreferencesUnmutated(userId: string): Promise<void> {
+    const db = await getTestDb();
+    const row = await db.query.notificationPreferences.findFirst({
+      where: eq(notificationPreferences.userId, userId),
+    });
+    expect(row).toBeDefined();
+    expect(row?.emailEnabled).toBe(true);
+    expect(row?.emailNotifyOnAssigned).toBe(true);
+    expect(row?.emailNotifyOnStatusChange).toBe(true);
+    expect(row?.emailNotifyOnNewComment).toBe(true);
+    expect(row?.emailNotifyOnNewIssue).toBe(true);
+    expect(row?.emailWatchNewIssuesGlobal).toBe(true);
+    expect(row?.emailNotifyOnPinballMapComment).toBe(true);
+  }
+
+  it("GET returns 400 when uid or token is missing and does not mutate", async () => {
+    const { userId } = await seedPreferences();
     const response = GET(buildGetRequest(""));
     const html = await response.text();
 
     expect(response.status).toBe(400);
     expect(html).toContain("Invalid unsubscribe link.");
     expect(verifyTokenMock).not.toHaveBeenCalled();
+    await assertPreferencesUnmutated(userId);
   });
 
-  it("GET returns 403 when token verification fails", async () => {
+  it("GET returns 403 when token verification fails and does not mutate", async () => {
+    const { userId } = await seedPreferences();
     verifyTokenMock.mockReturnValue(false);
 
-    const response = GET(buildGetRequest("?uid=user-1&token=bad"));
+    const response = GET(buildGetRequest(`?uid=${userId}&token=bad`));
     const html = await response.text();
 
     expect(response.status).toBe(403);
     expect(html).toContain("Invalid or expired unsubscribe link.");
+    await assertPreferencesUnmutated(userId);
   });
 
   it("GET returns confirmation page and does not mutate preferences", async () => {
-    const response = GET(buildGetRequest("?uid=user-1&token=valid-token"));
+    const { userId } = await seedPreferences();
+    const response = GET(buildGetRequest(`?uid=${userId}&token=valid-token`));
     const html = await response.text();
 
     expect(response.status).toBe(200);
     expect(html).toContain("Confirm unsubscribe");
     expect(html).toContain('<form method="post" action="/api/unsubscribe">');
+    await assertPreferencesUnmutated(userId);
   });
 
-  it("POST returns 400 when uid or token is missing", async () => {
-    const response = await POST(buildPostRequest("user-1"));
+  it("POST returns 400 when uid or token is missing and does not mutate", async () => {
+    const { userId } = await seedPreferences();
+    const response = await POST(buildPostRequest(userId));
     const html = await response.text();
 
     expect(response.status).toBe(400);
     expect(html).toContain("Invalid unsubscribe request.");
+    await assertPreferencesUnmutated(userId);
   });
 
-  it("POST returns 403 when token verification fails", async () => {
+  it("POST returns 403 when token verification fails and does not mutate", async () => {
+    const { userId } = await seedPreferences();
     verifyTokenMock.mockReturnValue(false);
 
-    const response = await POST(buildPostRequest("user-1", "bad-token"));
+    const response = await POST(buildPostRequest(userId, "bad-token"));
     const html = await response.text();
 
     expect(response.status).toBe(403);
     expect(html).toContain("Invalid or expired unsubscribe link.");
+    await assertPreferencesUnmutated(userId);
   });
 
   it("POST returns 404 when user preferences are missing", async () => {
@@ -103,25 +150,9 @@ describe("/api/unsubscribe", () => {
   });
 
   it("POST unsubscribes user from all email notifications", async () => {
-    const db = await getTestDb();
-    const userId = crypto.randomUUID();
-    const [user] = await db
-      .insert(userProfiles)
-      .values(createTestUser({ id: userId }))
-      .returning();
+    const { userId } = await seedPreferences();
 
-    await db.insert(notificationPreferences).values({
-      userId: user.id,
-      emailEnabled: true,
-      emailNotifyOnAssigned: true,
-      emailNotifyOnStatusChange: true,
-      emailNotifyOnNewComment: true,
-      emailNotifyOnNewIssue: true,
-      emailWatchNewIssuesGlobal: true,
-      emailNotifyOnPinballMapComment: true,
-    });
-
-    const response = await POST(buildPostRequest(user.id, "valid-token"));
+    const response = await POST(buildPostRequest(userId, "valid-token"));
     const html = await response.text();
 
     expect(response.status).toBe(200);
@@ -129,8 +160,9 @@ describe("/api/unsubscribe", () => {
       "You have been unsubscribed from all PinPoint email notifications."
     );
 
+    const db = await getTestDb();
     const updated = await db.query.notificationPreferences.findFirst({
-      where: eq(notificationPreferences.userId, user.id),
+      where: eq(notificationPreferences.userId, userId),
     });
 
     expect(updated).toBeDefined();

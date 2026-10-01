@@ -300,6 +300,20 @@ describe("saveDiscordConfig Vault orphan compensation (real SQL, PGlite)", () =>
     );
   });
 
+  it("harness self-check: the Vault stand-in has no delete helper, so the old compensation SQL fails here", async () => {
+    const db = await getTestDb();
+    const id = await seedVaultSecret("some-secret");
+
+    // This is the statement that shipped and could never succeed. It must
+    // blow up against the stub exactly as it does against supabase_vault.
+    await expect(
+      db.execute(sql`SELECT vault.delete_secret(${id}::uuid)`)
+    ).rejects.toThrow(/delete_secret/);
+
+    // ...and the row is, of course, still there.
+    expect(await readVaultSecrets()).toHaveLength(1);
+  });
+
   it("create path: a rolled-back save deletes the secret it just created, and only that one", async () => {
     // Stand in for prod's single live secret: already stored, and about to be
     // claimed by a competing admin write. The compensation must not touch it.
