@@ -4,7 +4,7 @@
 
 **What this document is.** The requirements for PinPoint's shared machine-list experience on `/m`, standard Collections, and owner Collections. It describes the intended final state only; what the code does or used to do lives solely in the Known divergences table. Each requirement is numbered for citation. When code and spec disagree, either the code is wrong or this document gets amended — never silently neither.
 
-**Related records.** `docs/feature-specs/fleet.md` (the existing Fleet and Pinball Map dashboard requirements; unchanged by this spec), `docs/feature-specs/collections-and-tags.md` (Collection, Owner Collection, and Tag membership and access), `docs/feature-specs/widgets.md` and `docs/feature-specs/machine-widgets.md` (the Summary Widgets on Machine View).
+**Related records.** `docs/feature-specs/collections-and-tags.md` (Collection, Owner Collection, and Tag membership and access), `docs/feature-specs/widgets.md` and `docs/feature-specs/machine-widgets.md` (the Summary Widgets on Machine View).
 
 ---
 
