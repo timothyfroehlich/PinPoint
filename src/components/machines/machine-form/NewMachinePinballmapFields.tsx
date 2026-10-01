@@ -4,6 +4,7 @@ import type React from "react";
 import { useEffect, useId, useState } from "react";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Label } from "~/components/ui/label";
+import { HelpLink } from "~/components/help/HelpLink";
 import {
   InsiderConnectedToggle,
   IntentToggle,
@@ -155,7 +156,14 @@ export function NewMachinePinballmapFields({
 
   return (
     <div className="flex flex-col gap-3" data-testid="new-machine-pbm">
-      <span className="text-sm font-semibold text-foreground">{title}</span>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-sm font-semibold text-foreground">{title}</span>
+        <HelpLink
+          href="/help/pinball-map"
+          topic="Pinball Map"
+          className="text-xs"
+        />
+      </div>
 
       {!configured ? (
         <span className="text-sm text-muted-foreground">
