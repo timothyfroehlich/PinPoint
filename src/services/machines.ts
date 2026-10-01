@@ -1032,7 +1032,7 @@ export async function updateMachinePbmLink({
           ok: false,
           reason: "invalid",
           message:
-            "Uncataloged (excluded) machines do not participate in Pinball Map sync and cannot have a sync intent.",
+            "Uncataloged (excluded) machines do not participate in Pinball Map sync and cannot have a lineup setting.",
         };
       }
       if (basisRow.pinballmapMachineId === null) {
@@ -1040,7 +1040,7 @@ export async function updateMachinePbmLink({
           ok: false,
           reason: "invalid",
           message:
-            "A machine must be linked to a Pinball Map title to set lineup intent.",
+            "A machine must be linked to a Pinball Map title to set its lineup setting.",
         };
       }
       if (

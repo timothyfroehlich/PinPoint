@@ -73,12 +73,12 @@ export const updateMachineSchema = z
     intent: z
       .enum(["on", "off", "no_sync"])
       .optional()
-      .describe("Lineup sync intent for Pinball Map."),
+      .describe("Pinball Map lineup setting."),
     insiderConnected: z
       .enum(["on", "off", "no_sync"])
       .optional()
       .describe(
-        'Insider Connected intent for the machine\'s Pinball Map entry. Only for a title Pinball Map marks Insider Connected eligible (get_machine: pinballmap.insiderConnected.eligible). "no_sync" clears the intent (get_machine then reports intent null): the machine is never flagged and nothing is pushed for it. Records the intent in PinPoint; Pinball Map changes when a person pushes Update. Applied after any pinballmapMachineId change, which clears it.'
+        'Insider Connected setting for the machine\'s Pinball Map entry. Only for a title Pinball Map marks Insider Connected eligible (get_machine: pinballmap.insiderConnected.eligible). "no_sync" clears the setting (get_machine then reports insiderConnected.intent null): the machine is never flagged and nothing is pushed for it. Records the setting in PinPoint; Pinball Map changes when a person pushes Update. Applied after any pinballmapMachineId change, which clears it.'
       ),
     iscoredGameId: z
       .string()
@@ -497,7 +497,7 @@ export function registerUpdateMachine(server: McpServer): void {
     {
       title: "Update a machine",
       description:
-        "Update one or more fields on a machine: name, availability (presenceStatus), owner, Pinball Map link/intent, Insider Connected intent, or iScored link. Supply machine (initials or UUID) and at least one field to change. Returns applied changes.",
+        "Update one or more fields on a machine: name, availability (presenceStatus), owner, Pinball Map link and lineup setting (intent), Insider Connected setting, or iScored link. Supply machine (initials or UUID) and at least one field to change. Returns applied changes.",
       inputSchema: updateMachineSchema,
       annotations: WRITE_TOOL_ANNOTATIONS,
     },
