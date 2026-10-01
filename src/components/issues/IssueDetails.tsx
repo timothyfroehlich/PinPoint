@@ -30,8 +30,12 @@ interface IssueDetailsProps {
 
 const cardClassName =
   "divide-y divide-outline-variant/40 overflow-hidden rounded-lg border border-outline-variant bg-card";
+// A row's link is the row's whole value, not a link inside a line of text, so
+// on phones it gets a 44px target (spec §13.2); the negative margin keeps the
+// row its usual height. The name truncates in an inner span, since a flex
+// container can't ellipsize its own text.
 const linkClassName =
-  "truncate font-medium text-foreground transition-colors duration-150 hover:text-primary";
+  "inline-flex min-w-0 max-w-full items-center rounded-sm font-medium text-foreground transition-colors duration-150 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring max-md:-my-2 max-md:min-h-11";
 
 /**
  * Details (spec issue-detail §9): the field rows, then the context rows. The
@@ -96,13 +100,13 @@ export function IssueDetails({
             className={linkClassName}
             data-testid="details-machine-link"
           >
-            {issue.machine.name}
+            <span className="truncate">{issue.machine.name}</span>
           </Link>
         </ContextRow>
         <ContextRow label="Owner" testId="details-owner">
           {ownerName && ownerId ? (
             <Link href={`/issues?owner=${ownerId}`} className={linkClassName}>
-              {ownerName}
+              <span className="truncate">{ownerName}</span>
             </Link>
           ) : (
             <span

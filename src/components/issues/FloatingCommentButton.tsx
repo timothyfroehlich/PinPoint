@@ -58,6 +58,8 @@ export function FloatingCommentButton({
         <SheetContent
           side="bottom"
           className="max-h-[80dvh] gap-0 overflow-y-auto"
+          // A 44px close target (spec §13.2), centered on the title line.
+          closeClassName="top-1.5 right-1.5 flex size-11 items-center justify-center rounded-md"
         >
           <SheetHeader className="pb-2">
             <SheetTitle className="text-base">Add a comment</SheetTitle>

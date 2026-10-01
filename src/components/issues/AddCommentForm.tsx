@@ -147,6 +147,8 @@ export function AddCommentForm({
             maxCount={BLOB_CONFIG.LIMITS.COMMENT_MAX}
             onUploadComplete={handleUploadComplete}
             disabled={isPending}
+            buttonClassName="max-md:min-h-11"
+            successMessage="Photo uploaded"
           />
           {state && !state.ok && (
             <p className="text-sm text-destructive-text">{state.message}</p>
@@ -181,6 +183,8 @@ export function AddCommentForm({
                 maxCount={BLOB_CONFIG.LIMITS.COMMENT_MAX}
                 onUploadComplete={handleUploadComplete}
                 disabled={isPending}
+                buttonClassName="max-md:min-h-11"
+                successMessage="Photo uploaded"
               />
             </div>
 
