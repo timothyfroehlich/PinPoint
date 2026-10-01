@@ -234,8 +234,16 @@ export interface CreateMachineParams {
   invitedOwnerId?: string | null | undefined;
   presenceStatus?: MachinePresenceStatus | undefined;
   description?: ProseMirrorDoc | null | undefined;
+  /** Owner's Requirements, entered on the New Machine page (machine-editing 2.5). */
+  ownerRequirements?: ProseMirrorDoc | null | undefined;
   /** Resolved PinballMap columns to apply, or null to leave them at defaults. */
   pbmColumns?: MachinePbmColumns | null | undefined;
+  /**
+   * Insider Connected intent for an eligible catalog title (pinballmap 3.8,
+   * 4.11). Callers check eligibility; it must travel with a linked
+   * `pbmColumns`, since the intent means nothing without a title.
+   */
+  pinballmapIcIntent?: PbmIcIntent | null | undefined;
   /**
    * When set, promote this guest to `member` inside the same transaction before
    * the insert. Callers gate this on `admin.users.promote.guestToMember`.
@@ -261,7 +269,9 @@ export async function createMachine({
   invitedOwnerId,
   presenceStatus,
   description,
+  ownerRequirements,
   pbmColumns,
+  pinballmapIcIntent,
   promoteGuest,
   iscoredGameId,
 }: CreateMachineParams): Promise<{
@@ -299,8 +309,14 @@ export async function createMachine({
         ...(presenceStatus !== undefined && { presenceStatus }),
         ...(description !== undefined &&
           description !== null && { description }),
+        ...(ownerRequirements !== undefined &&
+          ownerRequirements !== null && { ownerRequirements }),
         ...(iscoredGameId !== undefined && { iscoredGameId }),
         ...(pbmColumns ?? {}),
+        ...(pbmColumns?.pinballmapMachineId !== undefined &&
+          pbmColumns.pinballmapMachineId !== null &&
+          pinballmapIcIntent !== undefined &&
+          pinballmapIcIntent !== null && { pinballmapIcIntent }),
       })
       .returning();
 
@@ -333,6 +349,25 @@ export async function createMachine({
       },
       actorUserId
     );
+
+    // A lineup choice made on the New Machine page is the same operator
+    // decision the Manage tab's toggle records, so it lands on the timeline the
+    // same way (pinballmap 4.11). Off is the default and says nothing.
+    if (machine.pinballmapIntent !== "off") {
+      await createMachineTimelineEvent(
+        machine.id,
+        {
+          sourceType: "lifecycle",
+          tag: "lifecycle",
+          eventData: {
+            kind: "pinballmap_intent",
+            intent: machine.pinballmapIntent,
+          },
+          actorId: actorUserId,
+        },
+        tx
+      );
+    }
 
     // Notify a newly promoted active owner. Best-effort inside the tx (a
     // planning failure must not roll back the committed machine), mirroring the
@@ -1258,6 +1293,18 @@ export type SetMachineIcIntentResult =
   | { ok: true; changed: boolean; previous: PbmIcIntent | null }
   | { ok: false; reason: "not_linked" | "ineligible"; message: string };
 
+/** Refusal copy when a title's catalog entry is not Insider Connected eligible. */
+export const IC_INELIGIBLE_MESSAGE =
+  "Pinball Map doesn't offer Insider Connected for this game.";
+
+/**
+ * Whether Pinball Map's catalog marks a title Insider Connected eligible — the
+ * rule every Insider Connected intent write is held to (pinballmap 3.8).
+ */
+export async function isTitleIcEligible(titleId: number): Promise<boolean> {
+  return (await getCatalogEntry(titleId))?.icEligible ?? false;
+}
+
 /**
  * Record a machine's Insider Connected intent (spec pinballmap §3.8), or clear it
  * to Don't sync with null. Writes only to PinPoint; the push to Pinball Map is a
@@ -1286,13 +1333,8 @@ export async function setMachineIcIntent({
   } as const;
   if (titleId === null) return notLinked;
 
-  const catalogEntry = await getCatalogEntry(titleId);
-  if (!catalogEntry?.icEligible) {
-    return {
-      ok: false,
-      reason: "ineligible",
-      message: "Pinball Map doesn't offer Insider Connected for this game.",
-    };
+  if (!(await isTitleIcEligible(titleId))) {
+    return { ok: false, reason: "ineligible", message: IC_INELIGIBLE_MESSAGE };
   }
 
   // No shortcut when the intent already matches: the title-pinned UPDATE is what

@@ -484,6 +484,9 @@ export function PinballmapRefreshButton({
     spent && (!hasValidRefreshTime || !refreshDeadlineReached);
   return (
     <Button
+      // The control sits inside the Manage tab's machine form (Integrations),
+      // so an untyped button would submit that form.
+      type="button"
       variant="outline"
       size="sm"
       loading={pending}
@@ -545,7 +548,7 @@ function Row({
  * Real `<button>` elements inside a radiogroup, so keyboard and screen-reader
  * users get the same choices (CORE-A11Y-004).
  */
-function SegmentedToggle<T extends string>({
+export function SegmentedToggle<T extends string>({
   label,
   options,
   value,
@@ -602,7 +605,7 @@ function SegmentedToggle<T extends string>({
 }
 
 /** The lineup intent's tri-state toggle (4.1). */
-function IntentToggle({
+export function IntentToggle({
   value,
   blockedReason,
   readOnly,

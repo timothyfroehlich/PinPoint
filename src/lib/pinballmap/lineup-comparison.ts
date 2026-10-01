@@ -2,6 +2,7 @@ import type { MachinePresenceStatus } from "~/lib/machines/presence";
 
 import {
   deriveInsiderConnectedView,
+  insiderConnectedSetting,
   insiderConnectedTarget,
   type PbmIcIntent,
   type PbmInsiderConnectedSetting,
@@ -292,9 +293,7 @@ export function compareLineup(args: {
   const noteUnsetInsiderConnected = (lmx: PbmLmx): void => {
     if (catalogById.get(lmx.machineId)?.icEligible !== true) return;
     icSummary.titles += 1;
-    const setting: PbmInsiderConnectedSetting =
-      lmx.icEnabled === null ? "not_set" : lmx.icEnabled ? "on" : "off";
-    icSummary.onPinballMap[setting] += 1;
+    icSummary.onPinballMap[insiderConnectedSetting(lmx.icEnabled)] += 1;
   };
 
   for (const [titleId, cabinetsIn] of byTitle) {
