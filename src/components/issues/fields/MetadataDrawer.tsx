@@ -73,7 +73,13 @@ export const fieldDrawerContentClassName =
  * screen without scrolling: a one-line header, small group labels, and the
  * options as a two-column grid of 44px tiles (spec issue-detail §13.2).
  *
- * Each group is a radio group; opening the sheet focuses the current value.
+ * One radio group per field (APG radio group): Status's Open / In Progress /
+ * Closed runs are labeled groups inside it. Only the checked option is in the
+ * Tab order; the arrow keys move through every option, across groups, and
+ * check the one they land on. Space, Enter, or a tap applies the checked
+ * option — the sheet closes and the field saves — so arrowing through never
+ * saves a value on the way. Choosing the current value closes the sheet
+ * without saving. Opening the sheet focuses the current value.
  */
 export function MetadataDrawer<T extends string>({
   title,
@@ -84,14 +90,40 @@ export function MetadataDrawer<T extends string>({
   disabled = false,
 }: MetadataDrawerProps<T>): React.JSX.Element {
   const [open, setOpen] = React.useState(false);
-  const selectedRef = React.useRef<HTMLButtonElement>(null);
+  // The option the arrow keys have checked; applied on Space, Enter, or tap.
+  const [checked, setChecked] = React.useState<T>(currentValue);
+  const optionRefs = React.useRef(new Map<T, HTMLButtonElement>());
   const idPrefix = React.useId();
+
+  const choose = (value: T): void => {
+    setOpen(false);
+    // Re-choosing the current value is not a change.
+    if (value !== currentValue) onSelect(value);
+  };
+
+  const onKeyDown = (event: React.KeyboardEvent, value: T): void => {
+    const step =
+      event.key === "ArrowDown" || event.key === "ArrowRight"
+        ? 1
+        : event.key === "ArrowUp" || event.key === "ArrowLeft"
+          ? -1
+          : 0;
+    if (step === 0) return;
+    event.preventDefault();
+    const index = options.findIndex((option) => option.value === value);
+    const next = options[(index + step + options.length) % options.length];
+    if (!next) return;
+    setChecked(next.value);
+    optionRefs.current.get(next.value)?.focus();
+  };
 
   return (
     <Drawer
       open={open}
       onOpenChange={(next) => {
         if (next && disabled) return;
+        // Every open starts from the saved value.
+        if (next) setChecked(currentValue);
         setOpen(next);
       }}
     >
@@ -101,9 +133,10 @@ export function MetadataDrawer<T extends string>({
         // vaul doesn't move focus into a drawer by default; start on the
         // current value.
         onOpenAutoFocus={(event) => {
-          if (selectedRef.current) {
+          const current = optionRefs.current.get(currentValue);
+          if (current) {
             event.preventDefault();
-            selectedRef.current.focus();
+            current.focus();
           }
         }}
       >
@@ -111,62 +144,75 @@ export function MetadataDrawer<T extends string>({
           title={title}
           description={`Choose a new ${title.toLowerCase()} value.`}
         />
-        <div className="space-y-2.5 overflow-y-auto px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+        <div
+          role="radiogroup"
+          aria-label={title}
+          className="space-y-2.5 overflow-y-auto px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
+        >
           {groupOptions(options).map(({ group, items }, index) => {
             const labelId = `${idPrefix}-group-${index}`;
+            const tiles = (
+              <div className="grid grid-cols-2 gap-1.5">
+                {items.map((option) => {
+                  const Icon = option.icon;
+                  const isChecked = option.value === checked;
+                  return (
+                    <button
+                      key={option.value}
+                      ref={(element) => {
+                        if (element) {
+                          optionRefs.current.set(option.value, element);
+                        } else {
+                          optionRefs.current.delete(option.value);
+                        }
+                      }}
+                      type="button"
+                      role="radio"
+                      aria-checked={isChecked}
+                      // Roving tabindex: only the checked option is a Tab stop.
+                      tabIndex={isChecked ? 0 : -1}
+                      data-testid={option.testId}
+                      className={cn(
+                        "flex min-h-11 min-w-0 items-center gap-1.5 rounded-lg border px-2.5 py-1 text-left text-sm font-medium leading-tight transition-colors duration-150",
+                        "hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                        isChecked
+                          ? "border-primary bg-primary/10 text-foreground"
+                          : "border-outline-variant bg-background text-foreground"
+                      )}
+                      onKeyDown={(event) => onKeyDown(event, option.value)}
+                      onClick={() => choose(option.value)}
+                    >
+                      {Icon ? (
+                        <Icon
+                          className={cn("size-4 shrink-0", option.iconColor)}
+                          aria-hidden="true"
+                        />
+                      ) : null}
+                      <span className="min-w-0 break-words">
+                        {option.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            );
+            if (!group) {
+              return <React.Fragment key="options">{tiles}</React.Fragment>;
+            }
             return (
-              <div key={group ?? "options"} className="space-y-1">
-                {group ? (
-                  <div
-                    id={labelId}
-                    className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-                  >
-                    {group}
-                  </div>
-                ) : null}
+              <div
+                key={group}
+                role="group"
+                aria-labelledby={labelId}
+                className="space-y-1"
+              >
                 <div
-                  role="radiogroup"
-                  {...(group
-                    ? { "aria-labelledby": labelId }
-                    : { "aria-label": title })}
-                  className="grid grid-cols-2 gap-1.5"
+                  id={labelId}
+                  className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
                 >
-                  {items.map((option) => {
-                    const Icon = option.icon;
-                    const isSelected = option.value === currentValue;
-                    return (
-                      <button
-                        key={option.value}
-                        ref={isSelected ? selectedRef : undefined}
-                        type="button"
-                        role="radio"
-                        aria-checked={isSelected}
-                        data-testid={option.testId}
-                        className={cn(
-                          "flex min-h-11 min-w-0 items-center gap-1.5 rounded-lg border px-2.5 py-1 text-left text-sm font-medium leading-tight transition-colors duration-150",
-                          "hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                          isSelected
-                            ? "border-primary bg-primary/10 text-foreground"
-                            : "border-outline-variant bg-background text-foreground"
-                        )}
-                        onClick={() => {
-                          setOpen(false);
-                          onSelect(option.value);
-                        }}
-                      >
-                        {Icon ? (
-                          <Icon
-                            className={cn("size-4 shrink-0", option.iconColor)}
-                            aria-hidden="true"
-                          />
-                        ) : null}
-                        <span className="min-w-0 break-words">
-                          {option.label}
-                        </span>
-                      </button>
-                    );
-                  })}
+                  {group}
                 </div>
+                {tiles}
               </div>
             );
           })}
