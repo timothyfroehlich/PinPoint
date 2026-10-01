@@ -201,7 +201,10 @@ describe("Issue detail Activity (spec §7–§8)", () => {
       />
     );
 
-    expect(screen.getByText("Log in to comment")).toBeInTheDocument();
+    // A link to log in that comes back to this issue.
+    expect(
+      screen.getByRole("link", { name: "Log in to comment" })
+    ).toHaveAttribute("href", "/login?next=%2Fm%2FAFM%2Fi%2F1");
     expect(
       screen.queryByTestId("mock-add-comment-form")
     ).not.toBeInTheDocument();
@@ -270,13 +273,12 @@ describe("Issue detail Activity (spec §7–§8)", () => {
     expect(screen.getByTestId("timeline-item-comment-1")).toBeInTheDocument();
   });
 
-  it("names the timestamp triggers without a zone-dependent SSR attribute", () => {
-    // Regression (PP-h490). The buttons need an accessible name while
-    // `<RelativeTime>` is still empty (axe `button-name`), and that name must
-    // not be `formatDateTime(...)` evaluated during SSR: it resolves the
-    // runtime's zone, and React never patches a mismatched attribute. The
-    // server snapshot of the shared ticker is `null`, so this asserts the
-    // pre-tick label.
+  it("names the timestamp triggers before hydration without a zone-dependent attribute", () => {
+    // Regression (PP-h490). Server HTML must not carry `formatDateTime(...)`
+    // in an attribute: it resolves the runtime's zone (UTC on Vercel), and
+    // React never patches a mismatched attribute on hydration. The triggers
+    // are named by their visible text — the server-built fallback until the
+    // ticker mounts — with no aria-label replacing it (WCAG 2.5.3).
     const html = renderToString(
       <TooltipProvider>
         <IssueActivity
@@ -286,14 +288,66 @@ describe("Issue detail Activity (spec §7–§8)", () => {
         />
       </TooltipProvider>
     );
+    const container = document.createElement("div");
+    container.innerHTML = html;
 
-    const labels = [...html.matchAll(/aria-label="([^"]*)"/g)].map((m) => m[1]);
-    // One for the system event, one for the comment. If this drops, the
-    // fixture stopped covering a row and the assertion below isn't watching.
-    expect(labels.filter((l) => l === "Show exact time")).toHaveLength(2);
-    // "2:30 PM" is the shape `formatDateTime` produces.
-    for (const label of labels) {
-      expect(label).not.toMatch(/\d{1,2}:\d{2}\s?(AM|PM)/i);
+    const triggers = [...container.querySelectorAll("button")].filter(
+      (button) => button.querySelector("time") !== null
+    );
+    // The system event, the comment, and its edited marker. If this drops,
+    // the fixture stopped covering a row and the checks below aren't watching.
+    expect(triggers).toHaveLength(3);
+    for (const trigger of triggers) {
+      expect(trigger.textContent?.trim()).not.toBe("");
+      expect(trigger).not.toHaveAttribute("aria-label");
     }
+    expect(container.querySelector("time")).toHaveAttribute(
+      "datetime",
+      systemEvent.createdAt.toISOString()
+    );
+
+    // "2:30 PM" is the shape `formatDateTime` produces.
+    for (const element of container.querySelectorAll("*")) {
+      for (const attribute of element.attributes) {
+        expect(attribute.value).not.toMatch(/\d{1,2}:\d{2}\s?(AM|PM)/i);
+      }
+    }
+  });
+
+  it("names each comment by its author and time", () => {
+    renderWithProviders(
+      <IssueActivity
+        issue={createIssue(withComments(comment))}
+        currentUserId={null}
+        currentUserRole="unauthenticated"
+      />
+    );
+    expect(
+      screen.getByRole("article", { name: /^Member User/ })
+    ).toBeInTheDocument();
+  });
+
+  it("announces what Comments only leaves showing", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <IssueActivity
+        issue={createIssue(withComments(systemEvent, comment))}
+        currentUserId={null}
+        currentUserRole="unauthenticated"
+      />
+    );
+    const toggle = screen.getByRole("button", { name: "Comments only" });
+
+    await user.click(toggle);
+    expect(screen.getByText("Showing 1 comment")).toHaveAttribute(
+      "role",
+      "status"
+    );
+
+    await user.click(toggle);
+    expect(screen.getByText("Showing all activity")).toHaveAttribute(
+      "role",
+      "status"
+    );
   });
 });

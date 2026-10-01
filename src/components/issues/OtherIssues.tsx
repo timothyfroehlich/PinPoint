@@ -1,6 +1,7 @@
 import type React from "react";
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, ListChecks } from "lucide-react";
+import { EmptyState } from "~/components/ui/empty-state";
 import { IssueCard, type IssueCardIssue } from "~/components/issues/IssueCard";
 
 /** How many of the machine's other open issues the list shows (§10.5). */
@@ -49,11 +50,12 @@ export function OtherIssues({
       </div>
 
       {issues.length === 0 ? (
-        <div
-          className="rounded-lg border border-dashed border-outline-variant px-4 py-3 text-sm text-muted-foreground"
-          data-testid="other-issues-empty"
-        >
-          No other open issues
+        <div data-testid="other-issues-empty">
+          <EmptyState
+            icon={ListChecks}
+            title="No other open issues"
+            size="compact"
+          />
         </div>
       ) : (
         <div className="space-y-3">
@@ -66,6 +68,7 @@ export function OtherIssues({
               badgeLayout="strip"
               showMachineName={false}
               capNarrowBadges
+              titleAs="h3"
             />
           ))}
         </div>

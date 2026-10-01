@@ -186,6 +186,10 @@ export const RichTextEditor = forwardRef<
           // it also drops the tall paragraph margins.
           compact ? "min-h-[40px] [&_p]:!my-1" : "min-h-[100px]"
         ),
+        // aria-label is prohibited on a role-less div (axe
+        // aria-prohibited-attr); the editable surface is a multi-line textbox.
+        role: "textbox",
+        "aria-multiline": "true",
         "aria-label": ariaLabel ?? placeholder,
       },
     },

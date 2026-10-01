@@ -29,18 +29,22 @@ export function IssueSummaryLine({
     icon: LucideIcon;
     color: string;
     text: string;
+    /** Names the field for screen readers; the icon does that visually. */
+    srPrefix?: string;
   }[] = [
     {
       key: "status",
       icon: STATUS_CONFIG[status].icon,
       color: STATUS_CONFIG[status].iconColor,
       text: STATUS_CONFIG[status].label,
+      srPrefix: "Status:",
     },
     {
       key: "severity",
       icon: SEVERITY_CONFIG[severity].icon,
       color: SEVERITY_CONFIG[severity].iconColor,
       text: SEVERITY_CONFIG[severity].label,
+      srPrefix: "Severity:",
     },
     {
       key: "priority",
@@ -55,10 +59,13 @@ export function IssueSummaryLine({
       className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-foreground"
       data-testid="issue-summary-line"
     >
-      {items.map(({ key, icon: Icon, color, text }) => (
+      {items.map(({ key, icon: Icon, color, text, srPrefix }) => (
         <span key={key} className="inline-flex items-center gap-1.5">
           <Icon className={cn("size-4 shrink-0", color)} aria-hidden="true" />
-          {text}
+          <span>
+            {srPrefix ? <span className="sr-only">{srPrefix} </span> : null}
+            {text}
+          </span>
         </span>
       ))}
     </div>
