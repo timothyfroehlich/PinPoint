@@ -3,6 +3,7 @@ import "server-only";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { after } from "next/server";
 import { z } from "zod";
+import { ISSUE_TITLE_MAX } from "~/lib/issues/title";
 
 import { ISSUE_STATUS_VALUES } from "~/lib/issues/status";
 import { dispatchNotification, type DeliveryPlan } from "~/lib/notifications";
@@ -94,9 +95,11 @@ const updateIssueSchema = z.object({
     .string()
     .trim()
     .min(1)
-    .max(255)
+    .max(ISSUE_TITLE_MAX)
     .optional()
-    .describe("New title for the issue."),
+    .describe(
+      `New title for the issue, at most ${ISSUE_TITLE_MAX} characters.`
+    ),
   status: z
     .enum(ISSUE_STATUS_VALUES)
     .optional()

@@ -1,14 +1,12 @@
 import { formatDate } from "~/lib/dates";
 import type { ProseMirrorDoc, ProseMirrorNode } from "~/lib/tiptap/types";
+import { ISSUE_TITLE_MAX } from "~/lib/issues/title";
 import { pinballmapLocationUrl } from "./public-url";
 
 /**
  * Pure helpers for converting an imported Pinball Map comment to an issue
  * (pinballmap spec 7.5; PP-o355.4).
  */
-
-/** Issue titles are capped at 60 characters (`publicIssueSchema`). */
-export const ISSUE_TITLE_MAX = 60;
 
 /**
  * Suggest an issue title from a comment: its first line, cut at a word

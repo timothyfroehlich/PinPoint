@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   formatTimelineEvent,
+  formatTimelineEventAction,
   type TimelineEventData,
 } from "~/lib/timeline/types";
 
@@ -110,5 +111,36 @@ describe("formatTimelineEvent", () => {
     expect(formatTimelineEvent(event)).toBe(
       "Status changed from unknown_val to New"
     );
+  });
+});
+
+describe("formatTimelineEventAction (follows the actor's name)", () => {
+  it.each<[TimelineEventData, string]>([
+    [{ type: "assigned", assigneeName: "Tim" }, "assigned Tim"],
+    [{ type: "unassigned" }, "unassigned the issue"],
+    [
+      { type: "status_changed", from: "new", to: "in_progress" },
+      "changed status New → In Progress",
+    ],
+    [
+      { type: "priority_changed", from: "medium", to: "high" },
+      "changed priority Medium → High",
+    ],
+    [{ type: "comment_deleted", deletedBy: "author" }, "deleted their comment"],
+    [{ type: "comment_deleted", deletedBy: "admin" }, "removed a comment"],
+    [
+      {
+        type: "machine_reassigned",
+        fromInitials: "GDZ",
+        fromIssueNumber: 2,
+        fromMachineName: "Godzilla",
+        toInitials: "AFM",
+        toIssueNumber: 7,
+        toMachineName: "Attack from Mars",
+      },
+      "moved this from GDZ-02 (Godzilla) → AFM-07 (Attack from Mars)",
+    ],
+  ])("%j", (event, expected) => {
+    expect(formatTimelineEventAction(event)).toBe(expected);
   });
 });

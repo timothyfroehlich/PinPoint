@@ -1,6 +1,6 @@
 "use client";
 
-import type React from "react";
+import React from "react";
 import { Check } from "lucide-react";
 import {
   Drawer,
@@ -21,6 +21,8 @@ interface MetadataDrawerOption<T extends string> {
   description?: string;
   icon?: React.ElementType;
   iconColor?: string;
+  /** Options sharing a group render under one heading, in order. */
+  group?: string;
   testId?: string;
 }
 
@@ -54,59 +56,70 @@ export function MetadataDrawer<T extends string>({
           </DrawerDescription>
         </DrawerHeader>
         <div className="space-y-2 overflow-y-auto px-4 pb-4">
-          {options.map((option) => {
+          {options.map((option, index) => {
             const Icon = option.icon;
             const isSelected = option.value === currentValue;
 
+            const startsGroup =
+              option.group !== undefined &&
+              option.group !== options[index - 1]?.group;
+
             return (
-              <DrawerClose asChild key={option.value}>
-                <button
-                  type="button"
-                  data-testid={option.testId}
-                  className={cn(
-                    "flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors duration-150",
-                    "hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    isSelected
-                      ? "border-primary bg-primary/5"
-                      : "border-border bg-background"
-                  )}
-                  onClick={() => onSelect(option.value)}
-                >
-                  <div
+              <React.Fragment key={option.value}>
+                {startsGroup ? (
+                  <p className="px-1 pt-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {option.group}
+                  </p>
+                ) : null}
+                <DrawerClose asChild>
+                  <button
+                    type="button"
+                    data-testid={option.testId}
                     className={cn(
-                      "flex size-10 shrink-0 items-center justify-center rounded-full bg-muted",
-                      isSelected && "bg-primary/10"
+                      "flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors duration-150",
+                      "hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      isSelected
+                        ? "border-primary bg-primary/5"
+                        : "border-border bg-background"
                     )}
+                    onClick={() => onSelect(option.value)}
                   >
-                    {Icon ? (
-                      <Icon
-                        className={cn(
-                          "size-4",
-                          option.iconColor,
-                          isSelected && "text-primary"
-                        )}
-                      />
-                    ) : null}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="font-medium text-foreground">
-                      {option.label}
+                    <div
+                      className={cn(
+                        "flex size-10 shrink-0 items-center justify-center rounded-full bg-muted",
+                        isSelected && "bg-primary/10"
+                      )}
+                    >
+                      {Icon ? (
+                        <Icon
+                          className={cn(
+                            "size-4",
+                            option.iconColor,
+                            isSelected && "text-primary"
+                          )}
+                        />
+                      ) : null}
                     </div>
-                    {option.description ? (
-                      <p className="text-sm text-muted-foreground">
-                        {option.description}
-                      </p>
-                    ) : null}
-                  </div>
-                  <Check
-                    className={cn(
-                      "size-4 shrink-0 text-primary transition-opacity duration-150",
-                      isSelected ? "opacity-100" : "opacity-0"
-                    )}
-                    aria-hidden="true"
-                  />
-                </button>
-              </DrawerClose>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium text-foreground">
+                        {option.label}
+                      </div>
+                      {option.description ? (
+                        <p className="text-sm text-muted-foreground">
+                          {option.description}
+                        </p>
+                      ) : null}
+                    </div>
+                    <Check
+                      className={cn(
+                        "size-4 shrink-0 text-primary transition-opacity duration-150",
+                        isSelected ? "opacity-100" : "opacity-0"
+                      )}
+                      aria-hidden="true"
+                    />
+                  </button>
+                </DrawerClose>
+              </React.Fragment>
             );
           })}
         </div>

@@ -79,14 +79,9 @@ describe("AssigneePicker Accessibility", () => {
       />
     );
 
-    const trigger = screen.getByTestId("assignee-picker-trigger");
+    // The row stays named for its value while it saves, and can't reopen.
+    const trigger = screen.getByRole("button", { name: "Assignee: Alice" });
     expect(trigger).toBeDisabled();
-
-    // Ensure loader is present and accessible
-    const loader = screen.getByTestId("assignee-picker-loader");
-    expect(loader).toBeInTheDocument();
-    expect(loader).toHaveAttribute("aria-hidden", "true");
-    expect(loader).toHaveClass("animate-spin");
   });
 });
 

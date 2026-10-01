@@ -24,6 +24,8 @@ export function useIsMobile(): boolean {
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
+    // Environments without media queries (jsdom) keep the desktop tree.
+    if (typeof window.matchMedia !== "function") return;
     const mql = window.matchMedia(QUERY);
     setIsMobile(mql.matches);
     const onChange = (e: MediaQueryListEvent): void => {

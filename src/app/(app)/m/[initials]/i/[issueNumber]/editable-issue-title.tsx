@@ -11,19 +11,24 @@ import {
   type UpdateIssueTitleResult,
 } from "~/app/(app)/issues/actions";
 import { cn } from "~/lib/utils";
+import { ISSUE_TITLE_MAX, ISSUE_TITLE_MAX_MESSAGE } from "~/lib/issues/title";
 
 interface EditableIssueTitleProps {
   issueId: string;
   title: string;
   canEdit: boolean;
-  className?: string;
+  /** Controls after Edit title, e.g. the Move button. */
+  actions?: React.ReactNode;
 }
+
+const titleClassName =
+  "min-w-0 flex-1 text-balance break-words text-2xl font-bold tracking-tight md:text-3xl";
 
 export function EditableIssueTitle({
   issueId,
   title,
   canEdit,
-  className,
+  actions,
 }: EditableIssueTitleProps): React.JSX.Element {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(title);
@@ -93,89 +98,96 @@ export function EditableIssueTitle({
         handleCancel();
         return;
       }
+      if (trimmed.length > ISSUE_TITLE_MAX) {
+        toast.error(ISSUE_TITLE_MAX_MESSAGE);
+        return;
+      }
       formRef.current?.requestSubmit();
     }
   };
 
-  if (!canEdit) {
-    return (
-      <h1
-        className={cn(
-          "text-balance font-extrabold tracking-tight",
-          className ?? "text-3xl @3xl:text-4xl"
-        )}
-        title={title.length > 60 ? title : undefined}
-      >
-        {title.length > 60 ? `${title.slice(0, 60)}...` : title}
-      </h1>
-    );
-  }
+  const heading = (
+    <h1 className={titleClassName} data-testid="issue-title">
+      {title}
+    </h1>
+  );
 
   if (isEditing) {
+    const length = editValue.trim().length;
     return (
-      <form
-        ref={formRef}
-        action={formAction}
-        className="flex items-center gap-2"
-      >
+      <form ref={formRef} action={formAction} className="space-y-1">
         <input type="hidden" name="issueId" value={issueId} />
-        <Input
-          ref={inputRef}
-          name="title"
-          value={editValue}
-          onChange={(e) => setEditValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onBlur={() => {
-            // Small delay to allow form submit to fire first
-            window.setTimeout(() => {
-              // Skip cancel if THIS edit session's submission errored —
-              // the user's typed edit would otherwise be silently
-              // discarded when they move focus to read the error toast.
-              // Press Escape to explicitly abandon a failed edit. The
-              // session-counter check ensures a stale error from a
-              // previous session doesn't block a fresh session's cancel.
-              const currentSessionErrored =
-                erroredSessionRef.current === editSessionRef.current;
-              if (!isPending && !currentSessionErrored) {
-                handleCancel();
-              }
-            }, 200);
-          }}
-          maxLength={100}
-          className={cn(
-            "h-auto py-1 font-extrabold tracking-tight",
-            className ?? "text-2xl @3xl:text-3xl"
+        <div className="flex items-center gap-2">
+          <Input
+            ref={inputRef}
+            name="title"
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onBlur={() => {
+              // Small delay to allow form submit to fire first
+              window.setTimeout(() => {
+                // Skip cancel if THIS edit session's submission errored —
+                // the user's typed edit would otherwise be silently
+                // discarded when they move focus to read the error toast.
+                // Press Escape to explicitly abandon a failed edit. The
+                // session-counter check ensures a stale error from a
+                // previous session doesn't block a fresh session's cancel.
+                const currentSessionErrored =
+                  erroredSessionRef.current === editSessionRef.current;
+                if (!isPending && !currentSessionErrored) {
+                  handleCancel();
+                }
+              }, 200);
+            }}
+            // An older title may already exceed the limit (§4.4): the browser
+            // keeps an over-long value but blocks typing more, so it can only
+            // be edited down.
+            maxLength={ISSUE_TITLE_MAX}
+            className="h-auto py-1 text-xl font-bold tracking-tight md:text-2xl"
+            aria-label="Edit issue title"
+            aria-describedby="issue-title-length"
+            disabled={isPending}
+          />
+          {isPending && (
+            <Loader2 className="size-5 shrink-0 animate-spin text-muted-foreground motion-reduce:animate-none" />
           )}
-          aria-label="Edit issue title"
-          disabled={isPending}
-        />
-        {isPending && (
-          <Loader2 className="size-5 animate-spin motion-reduce:animate-none text-muted-foreground shrink-0" />
-        )}
+        </div>
+        <div
+          id="issue-title-length"
+          className={cn(
+            "text-xs",
+            length > ISSUE_TITLE_MAX
+              ? "text-destructive-text"
+              : "text-muted-foreground"
+          )}
+        >
+          {length}/{ISSUE_TITLE_MAX}
+        </div>
       </form>
     );
   }
 
   return (
-    <div className="group/title flex items-center gap-2">
-      <h1
-        className={cn(
-          "text-balance font-extrabold tracking-tight",
-          className ?? "text-3xl @3xl:text-4xl"
-        )}
-        title={title.length > 60 ? title : undefined}
-      >
-        {title.length > 60 ? `${title.slice(0, 60)}...` : title}
-      </h1>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        className="opacity-0 group-hover/title:opacity-100 focus-visible:opacity-100 transition-opacity duration-150 shrink-0"
-        onClick={() => setIsEditing(true)}
-        aria-label="Edit title"
-      >
-        <Pencil className="size-4" />
-      </Button>
+    <div className="flex items-start gap-1">
+      {heading}
+      {canEdit || actions ? (
+        <div className="-mr-2 flex shrink-0 items-center gap-1 md:mr-0 md:gap-2">
+          {canEdit ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-11 text-muted-foreground hover:text-foreground md:size-9"
+              onClick={() => setIsEditing(true)}
+              aria-label="Edit title"
+              data-testid="issue-edit-title"
+            >
+              <Pencil className="size-4" />
+            </Button>
+          ) : null}
+          {actions}
+        </div>
+      ) : null}
     </div>
   );
 }

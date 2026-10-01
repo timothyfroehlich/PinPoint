@@ -1,23 +1,22 @@
 "use client";
 
 import type React from "react";
-import { useActionState, startTransition } from "react";
+import { useActionState, useEffect, startTransition } from "react";
+import { toast } from "sonner";
 import {
   assignIssueAction,
   type AssignIssueResult,
 } from "~/app/(app)/issues/actions";
-import { AssigneePicker } from "~/components/issues/AssigneePicker";
 import {
-  getPermissionDeniedReason,
-  getPermissionState,
+  AssigneeInitial,
+  AssigneePicker,
+} from "~/components/issues/AssigneePicker";
+import { FieldRowStatic } from "~/components/issues/fields/IssueFieldRow";
+import {
+  checkPermission,
   type OwnershipContext,
 } from "~/lib/permissions/helpers";
 import { type AccessLevel } from "~/lib/permissions/matrix";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "~/components/ui/tooltip";
 
 interface AssignIssueFormProps {
   issueId: string;
@@ -28,6 +27,7 @@ interface AssignIssueFormProps {
   ownershipContext: OwnershipContext;
 }
 
+/** The Assignee row in the issue's Details (spec issue-detail §9.4). */
 export function AssignIssueForm({
   issueId,
   assignedToId,
@@ -40,43 +40,41 @@ export function AssignIssueForm({
     AssignIssueResult | undefined,
     FormData
   >(assignIssueAction, undefined);
-  const permissionState = getPermissionState(
+
+  useEffect(() => {
+    if (state && !state.ok) {
+      toast.error(state.message);
+    }
+  }, [state]);
+
+  const canAssign = checkPermission(
     "issues.update.triage",
     accessLevel,
     ownershipContext
   );
-  const deniedReason = permissionState.allowed
-    ? null
-    : getPermissionDeniedReason(
-        "issues.update.triage",
-        accessLevel,
-        ownershipContext
-      );
-  const assignedUserName =
-    users.find((user) => user.id === assignedToId)?.name ?? "Unassigned";
 
-  if (
-    !permissionState.allowed &&
-    permissionState.reason === "unauthenticated"
-  ) {
+  if (!canAssign) {
+    const assignedName =
+      users.find((user) => user.id === assignedToId)?.name ?? null;
     return (
-      <div
-        className="rounded-md border border-input bg-muted/40 px-3 py-2 text-sm text-muted-foreground"
-        data-testid="assignee-readonly"
-      >
-        {assignedUserName}
-      </div>
+      <FieldRowStatic
+        label="Assignee"
+        value={{
+          label: assignedName ?? "Unassigned",
+          muted: assignedName === null,
+          leading: <AssigneeInitial name={assignedName} />,
+        }}
+        testId="assignee-readonly"
+      />
     );
   }
 
-  const picker = (
+  return (
     <AssigneePicker
       assignedToId={assignedToId}
       users={users}
       currentUserId={currentUserId}
       isPending={isPending}
-      disabled={!permissionState.allowed}
-      disabledReason={deniedReason}
       onAssign={(userId) => {
         const formData = new FormData();
         formData.append("issueId", issueId);
@@ -86,21 +84,5 @@ export function AssignIssueForm({
         });
       }}
     />
-  );
-
-  return (
-    <div>
-      {permissionState.allowed ? (
-        picker
-      ) : (
-        <Tooltip>
-          <TooltipTrigger asChild>{picker}</TooltipTrigger>
-          <TooltipContent>{deniedReason}</TooltipContent>
-        </Tooltip>
-      )}
-      {state && !state.ok && (
-        <p className="text-sm text-destructive-text">{state.message}</p>
-      )}
-    </div>
   );
 }
