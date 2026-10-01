@@ -82,7 +82,13 @@ type FieldRowButtonProps = Omit<
   isPending?: boolean;
 };
 
-/** An editable row. Forwards its ref so pickers can use it as their trigger. */
+/**
+ * An editable row. Forwards its ref so pickers can use it as their trigger.
+ *
+ * While its save is in flight the row is `aria-disabled`, not `disabled`: a
+ * disabled button drops keyboard focus to `<body>`. The pickers refuse to
+ * open while `isPending`.
+ */
 export const FieldRowButton = React.forwardRef<
   HTMLButtonElement,
   FieldRowButtonProps
@@ -97,10 +103,11 @@ export const FieldRowButton = React.forwardRef<
       aria-label={`${label}: ${value.label}`}
       className={cn(
         rowClassName,
-        "transition-colors duration-150 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:cursor-wait",
+        "transition-colors duration-150 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring aria-disabled:cursor-wait",
         className
       )}
-      disabled={isPending}
+      aria-disabled={isPending || undefined}
+      aria-busy={isPending || undefined}
       {...props}
     >
       <span className={labelClassName}>{label}</span>
@@ -175,7 +182,8 @@ interface FieldOptionPickerProps<T extends string> {
  * An editable enum row. Opens a bottom sheet on phones — large tap targets,
  * thumb-reachable — and an anchored menu on desktop. Two component trees, not
  * two stylings of one, which is why this branches on `useIsMobile` (see the
- * hook's note on the CORE-RESP exception).
+ * hook's note on the CORE-RESP exception). Neither opens while a save is in
+ * flight.
  */
 export function FieldOptionPicker<T extends string>({
   label,
@@ -186,6 +194,7 @@ export function FieldOptionPicker<T extends string>({
   testId,
 }: FieldOptionPickerProps<T>): React.JSX.Element {
   const isMobile = useIsMobile();
+  const [menuOpen, setMenuOpen] = React.useState(false);
   const current = options.find((option) => option.value === value);
   const trigger = (
     <FieldRowButton
@@ -215,7 +224,13 @@ export function FieldOptionPicker<T extends string>({
 
   const groups = groupOptions(options);
   return (
-    <DropdownMenu>
+    <DropdownMenu
+      open={menuOpen}
+      onOpenChange={(next) => {
+        if (next && isPending) return;
+        setMenuOpen(next);
+      }}
+    >
       <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-48">
         <DropdownMenuRadioGroup
@@ -254,5 +269,36 @@ export function FieldOptionPicker<T extends string>({
         </DropdownMenuRadioGroup>
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+/**
+ * A field row's save feedback, wrapped with the row so the Details card's
+ * dividers stay between rows. Success is announced politely from a visually
+ * hidden status region; a failure also shows inline under the row as an alert
+ * (the toast alone is too easy to miss).
+ */
+export function FieldRowWithFeedback({
+  announcement,
+  error,
+  children,
+}: {
+  /** e.g. "Status changed to Fixed"; empty until a save succeeds. */
+  announcement: string;
+  error: string | null;
+  children: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <div>
+      {children}
+      {error ? (
+        <p role="alert" className="px-3 pb-2 text-sm text-destructive-text">
+          {error}
+        </p>
+      ) : null}
+      <p role="status" className="sr-only">
+        {announcement}
+      </p>
+    </div>
   );
 }

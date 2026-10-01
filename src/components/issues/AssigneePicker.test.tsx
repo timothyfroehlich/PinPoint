@@ -1,10 +1,14 @@
-import { render, screen, fireEvent } from "@testing-library/react";
-import { describe, it, expect, vi } from "vitest";
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { AssigneePicker } from "./AssigneePicker";
 import React from "react";
-
-// Mock dependencies if any
-// (AssigneePicker only uses local state and Lucide icons which are SVG, so simple render is fine)
+import { mockMobileViewport } from "~/test/helpers/viewport";
 
 const mockUsers = [
   { id: "1", name: "Alice" },
@@ -25,7 +29,7 @@ describe("AssigneePicker Accessibility", () => {
     );
 
     const trigger = screen.getByTestId("assignee-picker-trigger");
-    expect(trigger).toHaveAttribute("aria-haspopup", "listbox");
+    expect(trigger).toHaveAttribute("aria-haspopup", "dialog");
 
     // Check hidden SVG
     const svg = trigger.querySelector("svg");
@@ -46,8 +50,12 @@ describe("AssigneePicker Accessibility", () => {
     const trigger = screen.getByTestId("assignee-picker-trigger");
     fireEvent.click(trigger);
 
-    const listbox = screen.getByRole("listbox");
+    // The popup is a named dialog holding the search box and the listbox.
+    const popup = screen.getByRole("dialog", { name: "Assignee" });
+    const listbox = within(popup).getByRole("listbox");
     expect(listbox).toBeInTheDocument();
+    // A listbox may own only options and groups (axe aria-required-children).
+    expect(listbox.querySelector('[role="separator"]')).toBeNull();
 
     const searchInput = screen.getByTestId("assignee-search-input");
     expect(searchInput).toHaveAttribute("aria-label", "Filter users");
@@ -80,8 +88,12 @@ describe("AssigneePicker Accessibility", () => {
     );
 
     // The row stays named for its value while it saves, and can't reopen.
+    // It is aria-disabled rather than disabled so it keeps keyboard focus.
     const trigger = screen.getByRole("button", { name: "Assignee: Alice" });
-    expect(trigger).toBeDisabled();
+    expect(trigger).toHaveAttribute("aria-disabled", "true");
+    expect(trigger).not.toBeDisabled();
+    fireEvent.click(trigger);
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
   });
 });
 
@@ -221,5 +233,45 @@ describe("AssigneePicker — Me quick-select", () => {
     fireEvent.click(screen.getByTestId("assignee-picker-trigger"));
 
     expect(screen.queryByTestId("assignee-option-me")).not.toBeInTheDocument();
+  });
+});
+
+describe("AssigneePicker — phones (spec issue-detail §9.4, §13.2)", () => {
+  let restoreViewport: (() => void) | undefined;
+  afterEach(() => {
+    restoreViewport?.();
+  });
+
+  it("opens a bottom sheet with the search box first", async () => {
+    restoreViewport = mockMobileViewport(true);
+    const onAssign = vi.fn();
+    render(
+      <AssigneePicker
+        assignedToId={null}
+        users={mockUsers}
+        isPending={false}
+        onAssign={onAssign}
+        currentUserId="1"
+      />
+    );
+
+    fireEvent.click(screen.getByTestId("assignee-picker-trigger"));
+
+    const sheet = await screen.findByTestId("assignee-drawer");
+    expect(
+      within(sheet).getByRole("heading", { name: "Assignee" })
+    ).toBeInTheDocument();
+    const search = within(sheet).getByTestId("assignee-search-input");
+    const listbox = within(sheet).getByRole("listbox");
+    // The search box comes before the list.
+    expect(
+      search.compareDocumentPosition(listbox) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    await waitFor(() => {
+      expect(search).toHaveFocus();
+    });
+
+    fireEvent.click(within(sheet).getByTestId("assignee-option-me"));
+    expect(onAssign).toHaveBeenCalledWith("1");
   });
 });

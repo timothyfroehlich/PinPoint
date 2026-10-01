@@ -152,11 +152,16 @@ describe("issue Details field rows", () => {
 
       await choose(tc);
 
+      // The save is announced politely once it lands.
       await waitFor(() => {
-        expect(
-          screen.getByRole("button", { name: `${tc.label}: ${tc.toLabel}` })
-        ).not.toBeDisabled();
+        expect(screen.getByRole("status")).toHaveTextContent(
+          `${tc.label} changed to ${tc.toLabel}`
+        );
       });
+      const row = screen.getByRole("button", {
+        name: `${tc.label}: ${tc.toLabel}`,
+      });
+      expect(row).not.toHaveAttribute("aria-busy");
       // Let any straggling reset-driven second submit land (PP-0fvr).
       await new Promise((resolve) => setTimeout(resolve, 50));
       expect(submittedValues(tc)).toEqual([tc.toValue]);
@@ -178,6 +183,8 @@ describe("issue Details field rows", () => {
         })
       ).toBeInTheDocument();
       expect(toast.error).toHaveBeenCalledWith("Could not save");
+      // A toast alone is easy to miss: the error also shows under the row.
+      expect(screen.getByRole("alert")).toHaveTextContent("Could not save");
     });
 
     it(`${tc.label}: a signed-out viewer sees the value with no control`, () => {

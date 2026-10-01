@@ -1,5 +1,6 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import userEvent from "@testing-library/user-event";
 import { WatchButton } from "~/components/issues/WatchButton";
 import { toggleWatcherAction } from "~/app/(app)/issues/watcher-actions";
 
@@ -57,12 +58,23 @@ describe("WatchButton (Details › Watching, spec §9.6)", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Watch" }));
+    const user = userEvent.setup();
+    const toggle = screen.getByRole("button", { name: "Watch" });
+    await user.click(toggle);
 
-    expect(
-      await screen.findByRole("button", { name: "Unwatch" })
-    ).toHaveAttribute("aria-pressed", "true");
+    // One toggle model (APG): the name stays "Watch"; the state is
+    // aria-pressed, and the visible text reads Watching.
+    await waitFor(() => {
+      expect(toggle).toHaveAttribute("aria-pressed", "true");
+    });
+    expect(toggle).toHaveAccessibleName("Watch");
+    expect(toggle).toHaveTextContent("Watching");
+    // Saving never disables the button, which would drop focus to <body>.
+    expect(toggle).toHaveFocus();
     expect(screen.getByTestId("watcher-count")).toHaveTextContent("3");
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Watching. 3 watchers"
+    );
     expect(toggleWatcherAction).toHaveBeenCalledWith("123");
   });
 
@@ -75,10 +87,16 @@ describe("WatchButton (Details › Watching, spec §9.6)", () => {
       <WatchButton issueId="123" watcherCount={3} initialIsWatching canWatch />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Unwatch" }));
+    const toggle = screen.getByRole("button", { name: "Watch" });
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(toggle);
 
     await waitFor(() => {
       expect(screen.getByTestId("watcher-count")).toHaveTextContent("2");
     });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Not watching. 2 watchers"
+    );
   });
 });

@@ -16,8 +16,13 @@ interface WatchButtonProps {
 
 /**
  * The Watching row's value: the watcher count and, for signed-in viewers, a
- * Watch / Unwatch toggle. The count follows the toggle immediately rather than
- * waiting for the page to revalidate.
+ * Watch toggle. The count follows the toggle immediately rather than waiting
+ * for the page to revalidate, and the new count is announced politely.
+ *
+ * Toggle model (APG button pattern): a toggle button keeps one accessible
+ * name, "Watch", and reports its state with `aria-pressed`. The visible text
+ * reads Watch / Watching. While a toggle is in flight the button is
+ * `aria-disabled` (a disabled button would drop focus to `<body>`).
  */
 export function WatchButton({
   issueId,
@@ -27,14 +32,25 @@ export function WatchButton({
 }: WatchButtonProps): React.JSX.Element {
   const [isWatching, setIsWatching] = useState(initialIsWatching);
   const [isPending, startTransition] = useTransition();
+  const [announcement, setAnnouncement] = useState("");
   const count =
     watcherCount + (isWatching ? 1 : 0) - (initialIsWatching ? 1 : 0);
 
   const handleToggle = (): void => {
+    if (isPending) return;
+    setAnnouncement("");
     startTransition(async () => {
       const result = await toggleWatcherAction(issueId);
       if (result.ok) {
-        setIsWatching(result.value.isWatching);
+        const nowWatching = result.value.isWatching;
+        setIsWatching(nowWatching);
+        const nextCount =
+          watcherCount + (nowWatching ? 1 : 0) - (initialIsWatching ? 1 : 0);
+        setAnnouncement(
+          `${nowWatching ? "Watching" : "Not watching"}. ${nextCount} ${
+            nextCount === 1 ? "watcher" : "watchers"
+          }`
+        );
       } else {
         toast.error(result.message);
       }
@@ -55,9 +71,11 @@ export function WatchButton({
           <button
             type="button"
             onClick={handleToggle}
-            disabled={isPending}
+            aria-disabled={isPending || undefined}
+            aria-busy={isPending || undefined}
             aria-pressed={isWatching}
-            className="-my-2 inline-flex min-h-11 items-center gap-1.5 rounded-sm px-1 font-semibold text-primary transition-colors duration-150 hover:text-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait md:min-h-0"
+            aria-label="Watch"
+            className="-my-2 inline-flex min-h-11 items-center gap-1.5 rounded-sm px-1 font-semibold text-primary transition-colors duration-150 hover:text-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring aria-disabled:cursor-wait md:min-h-0"
           >
             {isPending ? (
               <Loader2
@@ -65,8 +83,11 @@ export function WatchButton({
                 aria-hidden="true"
               />
             ) : null}
-            {isWatching ? "Unwatch" : "Watch"}
+            {isWatching ? "Watching" : "Watch"}
           </button>
+          <span role="status" className="sr-only">
+            {announcement}
+          </span>
         </>
       ) : null}
     </>

@@ -1,7 +1,13 @@
 "use client";
 
 import type React from "react";
-import { useActionState, useEffect, startTransition } from "react";
+import {
+  useActionState,
+  useEffect,
+  useRef,
+  useState,
+  startTransition,
+} from "react";
 import { toast } from "sonner";
 import {
   assignIssueAction,
@@ -11,7 +17,10 @@ import {
   AssigneeInitial,
   AssigneePicker,
 } from "~/components/issues/AssigneePicker";
-import { FieldRowStatic } from "~/components/issues/fields/IssueFieldRow";
+import {
+  FieldRowStatic,
+  FieldRowWithFeedback,
+} from "~/components/issues/fields/IssueFieldRow";
 import {
   checkPermission,
   type OwnershipContext,
@@ -27,7 +36,11 @@ interface AssignIssueFormProps {
   ownershipContext: OwnershipContext;
 }
 
-/** The Assignee row in the issue's Details (spec issue-detail §9.4). */
+/**
+ * The Assignee row in the issue's Details (spec issue-detail §9.4). A failed
+ * save shows as a toast and inline under the row; a successful one is
+ * announced to screen readers.
+ */
 export function AssignIssueForm({
   issueId,
   assignedToId,
@@ -40,11 +53,22 @@ export function AssignIssueForm({
     AssignIssueResult | undefined,
     FormData
   >(assignIssueAction, undefined);
+  const [announcement, setAnnouncement] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  // Who the in-flight save assigns, as the announcement words it.
+  const savingNameRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (state && !state.ok) {
+    if (!state) return;
+    if (state.ok) {
+      if (savingNameRef.current) {
+        setAnnouncement(`Assignee changed to ${savingNameRef.current}`);
+      }
+    } else {
+      setError(state.message);
       toast.error(state.message);
     }
+    savingNameRef.current = null;
   }, [state]);
 
   const canAssign = checkPermission(
@@ -70,19 +94,28 @@ export function AssignIssueForm({
   }
 
   return (
-    <AssigneePicker
-      assignedToId={assignedToId}
-      users={users}
-      currentUserId={currentUserId}
-      isPending={isPending}
-      onAssign={(userId) => {
-        const formData = new FormData();
-        formData.append("issueId", issueId);
-        formData.append("assignedTo", userId ?? "");
-        startTransition(() => {
-          formAction(formData);
-        });
-      }}
-    />
+    <FieldRowWithFeedback announcement={announcement} error={error}>
+      <AssigneePicker
+        assignedToId={assignedToId}
+        users={users}
+        currentUserId={currentUserId}
+        isPending={isPending}
+        onAssign={(userId) => {
+          if (isPending) return;
+          setError(null);
+          setAnnouncement("");
+          savingNameRef.current =
+            userId === null
+              ? "Unassigned"
+              : (users.find((user) => user.id === userId)?.name ?? null);
+          const formData = new FormData();
+          formData.append("issueId", issueId);
+          formData.append("assignedTo", userId ?? "");
+          startTransition(() => {
+            formAction(formData);
+          });
+        }}
+      />
+    </FieldRowWithFeedback>
   );
 }
