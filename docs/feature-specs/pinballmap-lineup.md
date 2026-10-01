@@ -10,11 +10,11 @@
 
 ## 1. Concepts
 
-Every concept in `pinballmap.md` §1 applies unchanged — match, uncataloged, listing intent, lineup, coverage, availability, edition near-miss, sync participation, tracked location. This page adds only the ones below.
+Every concept in `pinballmap.md` §1 applies unchanged — match, uncataloged, lineup setting, lineup, coverage, availability, edition near-miss, sync participation, tracked location. This page adds only the ones below.
 
 - **Lineup page** — the page at `/m/pinball-map`. A read-and-reconcile surface for the tracked location; it configures nothing (configuration is `pinballmap.md` §10).
 - **Title** — one Pinball Map catalog title. The page compares titles, not cabinets, because the lineup carries at most one entry per title (`pinballmap.md` §1, Lineup).
-- **Title intent** — PinPoint's position on one title, derived from the listing intent of every cabinet matched to it: **On** when at least one cabinet is On the lineup; **Off** when none is On and at least one is Off the lineup; **Don't sync** when every cabinet is set to Don't sync. A title no PinPoint machine is matched to has no title intent.
+- **Title lineup setting** — PinPoint's position on one title, derived from the lineup setting of every cabinet matched to it: **On** when at least one cabinet is On the lineup; **Off** when none is On and at least one is Off the lineup; **Don't sync** when every cabinet is set to Don't sync. A title no PinPoint machine is matched to has no title lineup setting. _(Named "title intent" until 2026-09-30.)_
 - **Unmatched entry** — a lineup entry no PinPoint machine is matched to.
 - **Section** — one of the four lists that hold everything needing review: **Out of sync**, **In PinPoint, not linked**, **On Pinball Map, not linked**, and **Availability conflict**. Every title, entry, or machine that needs review appears in exactly one section.
 - **In scope** — the page compares machines not marked Removed. A Removed machine appears only where it still affects the lineup (5.2, 5.5).
@@ -44,11 +44,11 @@ Every concept in `pinballmap.md` §1 applies unchanged — match, uncataloged, l
 ## 5. Sections
 
 - **5.1** Sections render in a fixed order — Out of sync, In PinPoint, not linked, On Pinball Map, not linked, Availability conflict — each with its count and a one-line statement of what it holds. A section with no rows is not shown.
-- **5.2** **Out of sync** holds each matched title whose title intent — counting only cabinets not in Availability conflict — is On or Off while Pinball Map disagrees. Each row is tagged with its fix: **To add** (title intent On, not on Pinball Map), **To remove** (title intent Off, on Pinball Map — including a title whose only cabinets are Removed), or **To update** (on Pinball Map with title intent On, Insider Connected target differs, `pinballmap.md` §3.8). Each row offers the one push its tag names.
+- **5.2** **Out of sync** holds each matched title whose title lineup setting — counting only cabinets not in Availability conflict — is On or Off while Pinball Map disagrees. Each row is tagged with its fix: **To add** (title lineup setting On, not on Pinball Map), **To remove** (title lineup setting Off, on Pinball Map — including a title whose only cabinets are Removed), or **To update** (on Pinball Map with title lineup setting On, Insider Connected target differs, `pinballmap.md` §3.8). Each row offers the one push its tag names.
 - **5.3** **In PinPoint, not linked** holds each machine not marked Removed that has no catalog match, is not uncataloged, and is not set to Don't sync. Every row offers the same action: edit the machine, where its title can be matched or the machine marked uncataloged.
-- **5.4** **On Pinball Map, not linked** holds each unmatched entry. Every row offers the same actions: match the entry to a PinPoint machine, create a machine in PinPoint for it, or remove the entry from Pinball Map. Matching a machine to the entry sets it On the lineup (`pinballmap.md` §2.3). Creating a machine opens the New Machine page with the entry's title selected and intent On (`pinballmap.md` §4.11). When PinPoint machines share the entry's title family (`pinballmap.md` §1, Edition near-miss), the row names them as possible matches. Naming them never matches anything (`pinballmap.md` §2.2).
+- **5.4** **On Pinball Map, not linked** holds each unmatched entry. Every row offers the same actions: match the entry to a PinPoint machine, create a machine in PinPoint for it, or remove the entry from Pinball Map. Matching a machine to the entry sets it On the lineup (`pinballmap.md` §2.3). Creating a machine opens the New Machine page with the entry's title selected and its lineup setting On (`pinballmap.md` §4.11). When PinPoint machines share the entry's title family (`pinballmap.md` §1, Edition near-miss), the row names them as possible matches. Naming them never matches anything (`pinballmap.md` §2.2).
 - **5.5** **Availability conflict** holds each machine set On the lineup that is not on the floor, one row per machine. Each row is tagged **Alert** when the machine is Removed or Pending Arrival (`pinballmap.md` §6.2) or **Note** when it is On Loan or Off the Floor (§6.5). Every row offers the same action: edit the machine.
-- **5.6** Each row names the title, the PinPoint cabinets involved with their listing intent and availability, and — when the title is on Pinball Map — the entry's comment count.
+- **5.6** Each row names the title, the PinPoint cabinets involved with their lineup setting and availability, and — when the title is on Pinball Map — the entry's comment count.
 - **5.7** The page itself performs only Pinball Map pushes and matching an entry to a machine; every other change happens on the machine's page. Outbound actions follow the listing control's rules exactly: the same capability and linked-account gates (`pinballmap.md` §8.2), the same confirmations (§4.5, §4.6), and the same no-credential guidance with a link to the location's Pinball Map page (§4.4). Matching follows `pinballmap.md` §2 and §8.1.
 - **5.8** The page offers no action that acts on several rows at once. Every outbound write is one explicit, confirmed action on one entry (`pinballmap.md` §3.3).
 
@@ -56,18 +56,18 @@ Every concept in `pinballmap.md` §1 applies unchanged — match, uncataloged, l
 
 - **6.1** Titles in sync are collapsed to one count, split into on-Pinball-Map and not-on-Pinball-Map, and can be expanded to list them.
 - **6.2** A footer counts what the page does not compare: uncataloged machines, titles set to Don't sync, and Removed machines.
-- **6.3** When no PinPoint cabinet carries an Insider Connected intent for an eligible title, the page compares nothing for that title's Insider Connected setting and states Pinball Map's values in the footer instead (`pinballmap.md` §3.8).
+- **6.3** When no PinPoint cabinet carries an Insider Connected setting for an eligible title, the page compares nothing for that title's Insider Connected value and states Pinball Map's values in the footer instead (`pinballmap.md` §3.8).
 
 ## 7. Vocabulary
 
 - **7.1** `pinballmap.md` §4.8 applies: "listing" never appears; the object is an entry and the set is the lineup.
-- **7.2** Intent is named with the listing control's own words — On the lineup, Off the lineup, Don't sync. Observed presence is named against Pinball Map — on Pinball Map, not on Pinball Map — so the two never read alike.
+- **7.2** The lineup setting is named with the listing control's own words — On the lineup, Off the lineup, Don't sync. Observed presence is named against Pinball Map — on Pinball Map, not on Pinball Map — so the two never read alike.
 - **7.3** The section names and row tags (To add, To remove, To update, Alert, Note) are the canonical names in copy and in discussion.
 
 ## 8. Permissions
 
 - **8.1** Viewing requires signed-in membership (2.2).
-- **8.2** Every action on the page carries the gate of the equivalent action elsewhere — `pinballmap.md` §8 for intent, matching, and pushes, and §3.7 for Confirm lineup. Seeing a row never grants its action.
+- **8.2** Every action on the page carries the gate of the equivalent action elsewhere — `pinballmap.md` §8 for the lineup setting, matching, and pushes, and §3.7 for Confirm lineup. Seeing a row never grants its action.
 
 ---
 
@@ -84,5 +84,6 @@ Changes to this document. Divergence-table rows are working state and are not lo
 
 | Date | Change |
 | :-- | :-- |
+| 2026-09-30 | Renamed listing intent to lineup setting (and Insider Connected intent to Insider Connected setting) throughout, including title intent to title lineup setting; `pinballmap.md` §4.8 bans "intent" in user-facing copy. No behavior change. |
 | 2026-09-28 | §5.4: matching a machine to an entry sets it On the lineup; creating a machine for an entry opens the New Machine page with the entry's title selected and intent On. |
 | 2026-09-27 | Created. The lineup page at `/m/pinball-map` (§2), desktop-only (§2.6), with its header and refresh-failure notice (§3), summary count and nothing-to-review state (§4), four sections — Out of sync, In PinPoint, not linked, On Pinball Map, not linked, Availability conflict (§5) — in-sync and not-compared sections (§6), vocabulary (§7), and permissions (§8). |
