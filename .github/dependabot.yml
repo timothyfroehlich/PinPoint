@@ -5,7 +5,9 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
-    target-branch: "main"
+    # No target-branch. GitHub documents that a target-branch makes Dependabot
+    # skip this entry's labels and commit-message on security-update PRs; while
+    # it was set (to main), #2087 and #2305 arrived without `ownerless`.
     versioning-strategy: increase-if-necessary
     open-pull-requests-limit: 5
     rebase-strategy: "auto"
