@@ -169,7 +169,8 @@ export function AddCommentForm({
               pressed={showFormatting}
               onPressedChange={setShowFormatting}
               disabled={isPending}
-              aria-label="Formatting"
+              // The name starts with the visible text (WCAG 2.5.3).
+              aria-label="Aa formatting"
               className="min-h-11 min-w-11 text-muted-foreground data-[state=on]:text-foreground"
             >
               <span

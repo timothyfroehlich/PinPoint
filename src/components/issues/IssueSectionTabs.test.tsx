@@ -29,6 +29,15 @@ function renderPage(): void {
   );
 }
 
+describe("IssueSectionTabList", () => {
+  it("names the Other issues count as open issues", () => {
+    renderPage();
+    expect(
+      screen.getByRole("tab", { name: "Other issues, 0 open" })
+    ).toBeInTheDocument();
+  });
+});
+
 describe("IssueSections comment links", () => {
   it("a same-page link to a comment switches to Issue and focuses the comment", async () => {
     renderPage();

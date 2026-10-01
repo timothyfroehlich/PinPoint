@@ -198,12 +198,17 @@ export function IssueSectionTabList({
           >
             {section.label}
             {section.id === "other" ? (
-              <span
-                className="rounded-full bg-muted px-1.5 text-xs font-semibold text-muted-foreground"
-                data-testid="other-issues-count"
-              >
-                {otherIssuesCount}
-              </span>
+              <>
+                <span
+                  className="rounded-full bg-muted px-1.5 text-xs font-semibold text-muted-foreground"
+                  data-testid="other-issues-count"
+                  aria-hidden="true"
+                >
+                  {otherIssuesCount}
+                </span>
+                {/* Read as "Other issues, 2 open", not a bare number. */}
+                <span className="sr-only">, {otherIssuesCount} open</span>
+              </>
             ) : null}
           </button>
         );

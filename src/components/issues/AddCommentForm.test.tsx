@@ -79,6 +79,25 @@ describe("AddCommentForm", () => {
     ).toBeInTheDocument();
   });
 
+  it("names the quick composer's formatting toggle by its visible text (WCAG 2.5.3)", () => {
+    render(<AddCommentForm issueId="123" quick />);
+    expect(
+      screen.getByRole("button", { name: "Aa formatting" })
+    ).toBeInTheDocument();
+  });
+
+  it("announces a failed post as an alert", () => {
+    mockUseActionState.mockReturnValue([
+      { ok: false, code: "SERVER", message: "Failed to add comment" },
+      vi.fn(),
+      false,
+    ]);
+    render(<AddCommentForm issueId="123" />);
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Failed to add comment"
+    );
+  });
+
   it("shows loading state when pending (using standard loading prop)", () => {
     mockUseActionState.mockReturnValue([undefined, vi.fn(), true]);
     render(<AddCommentForm issueId="123" />);
