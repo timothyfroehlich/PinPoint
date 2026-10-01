@@ -46,8 +46,8 @@ export function LineupHeader({
   refreshRemaining: number;
   refreshAvailableAt: Date | null;
   /**
-   * Offer Confirm lineup: technician or admin, an operator credential, and a
-   * compared lineup (pinballmap §3.7).
+   * Offer Confirm lineup: technician or admin, their own linked Pinball Map
+   * account, and a compared lineup (pinballmap §3.7).
    */
   canConfirm: boolean;
 }): React.JSX.Element {

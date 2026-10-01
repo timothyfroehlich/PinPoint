@@ -17,6 +17,8 @@ import {
   confirmPinballmapLineupAction,
   type CheckConfirmLineupResult,
 } from "~/app/(app)/m/pinballmap-actions";
+import { toast } from "sonner";
+
 import { RelativeTimeProvider } from "~/components/issues/RelativeTimeProvider";
 import { ConfirmLineupButton } from "./ConfirmLineupButton";
 
@@ -24,7 +26,7 @@ vi.mock("~/app/(app)/m/pinballmap-actions", () => ({
   checkConfirmLineupAction: vi.fn(),
   confirmPinballmapLineupAction: vi.fn(),
 }));
-vi.mock("sonner", () => ({ toast: { success: vi.fn() } }));
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const NOW = new Date().toISOString();
 
@@ -141,6 +143,28 @@ describe("ConfirmLineupButton", () => {
 
     expect(await within(dialog).findByRole("alert")).toHaveTextContent(
       "Pinball Map rejected our operator account."
+    );
+  });
+
+  it("toasts a refused token, since relinking unmounts the dialog", async () => {
+    vi.mocked(checkConfirmLineupAction).mockResolvedValue(checked({}));
+    vi.mocked(confirmPinballmapLineupAction).mockResolvedValue({
+      ok: false,
+      code: "PBM_AUTH_FAILED",
+      message: "Pinball Map authentication failed.",
+    });
+
+    const dialog = await openDialog();
+    const confirm = within(dialog).getByRole("button", {
+      name: "Confirm lineup",
+    });
+    await waitFor(() => expect(confirm).toBeEnabled());
+    await userEvent.click(confirm);
+
+    await waitFor(() =>
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith(
+        "Pinball Map authentication failed."
+      )
     );
   });
 });

@@ -106,6 +106,10 @@ export function ConfirmLineupButton({
       const result = await confirmPinballmapLineupAction(undefined, formData);
       if (!result.ok) {
         setError(result.message);
+        // A refused token marks the link for relinking and revalidates the
+        // page, which then stops offering Confirm and unmounts this dialog.
+        // The toast outlives it, so the reason is not lost.
+        if (result.code === "PBM_AUTH_FAILED") toast.error(result.message);
         return;
       }
       setOpen(false);

@@ -2127,7 +2127,7 @@ export async function confirmPinballmapLineupAction(
           "PBM_REJECTED",
           "Pinball Map couldn't find the tracked location."
         );
-      return pushRejected(authed.userId, linked, written);
+      return await pushRejected(authed.userId, linked, written);
     }
     log.info(
       { userId: authed.userId, locationId, action: "pinballmap.confirmLineup" },
