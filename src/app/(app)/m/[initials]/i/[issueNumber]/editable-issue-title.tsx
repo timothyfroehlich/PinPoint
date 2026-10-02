@@ -51,7 +51,7 @@ interface EditableIssueTitleProps {
    * The header's first row (Issue ID chip and machine link). On mobile the ⋯
    * menu sits at its end so the title gets the full width (spec §4.1, §4.5).
    */
-  eyebrow: React.ReactNode;
+  eyebrow?: React.ReactNode;
   /** Present when the viewer can move the issue to another machine. */
   move?: {
     currentInitials: string;
