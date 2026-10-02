@@ -64,8 +64,8 @@
 
 - **6.1** The Page Preset is Open issues: Open statuses, Machine Presence On the Floor, sorted by Updated, newest first.
 - **6.2** `/issues` and every Issues tab offer four Built-in Views, in order: **Open issues** (the Page Preset); **My issues** (Open statuses assigned to the viewer, every presence except Removed, Updated newest first); **Unassigned** (Open statuses with no assignee, On the Floor, Updated newest first); **Recently fixed** (status Fixed, every presence except Removed, Updated newest first).
-- **6.4** Removed machines' issues appear only when a person sets Machine Presence to include Removed; no Built-in View includes them.
 - **6.3** My issues appears only to signed-in people.
+- **6.4** Removed machines' issues appear only when a person sets Machine Presence to include Removed; no Built-in View includes them.
 
 ---
 
@@ -73,7 +73,8 @@
 
 - **7.1** Canonical parameters are `q`, `status`, `severity`, `priority`, `machine`, `assignee`, `presence`, `created`, `updated`, `frequency`, `owner`, `reporter`, `watching`, `sort`, `dir`, `page`, `pageSize`, and `view`.
 - **7.2** The older parameters `page_size`, a composite `sort` such as `updated_desc`, `include_inactive_machines`, and the separate created and updated date bounds open correctly and are rewritten to the canonical form (list-views §9.4).
-- **7.3** Machine values are machine initials; people are stable IDs plus the `me` and `unassigned` sentinels.
+- **7.3** Machine values are machine initials; people are stable IDs plus the `me` and `unassigned` sentinels; `me` means whoever is viewing.
+- **7.4** A link to Issues for one machine, from a machine page or a Machine View cell, also sets Machine Presence to every presence state, so the machine's issues show whatever its presence.
 
 ---
 
@@ -93,6 +94,7 @@
 | §5.1–§5.3 | Severity and Priority sorts are missing, four column headers send sort values the server ignores, and Assignee sorts by account ID. | PP-jb9v |
 | §5.4 | Export from a Collection or Tag Issues tab ignores the tab's scope. | PP-jb9v |
 | §6 | No Built-in Views. | PP-jb9v |
+| §7.4 | Machine pages and Open Issues cells link to `/issues?machine=` without a presence value, so an off-floor machine's issues are hidden. | PP-jb9v |
 | §7 | Snake_case parameters, composite sort, and unvalidated sort, page size, and ID values. | PP-jb9v |
 
 ---

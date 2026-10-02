@@ -24,7 +24,7 @@
 - **2.2** Summary Widgets appear between the page heading and the host's search and filter toolbar, to everyone who can view the host.
 - **2.3** Wider layouts place a host's Summary Widgets side by side in one row when they fit and stack them full-width when they do not, always expanded, with no collapse control.
 - **2.4** Phones stack a host's Summary Widgets full-width inside one collapsible section. It starts open on screens at least 390px wide and collapsed, as the Summary Row, on narrower ones.
-- **2.5** The Summary Row shows one short figure per widget, as its host's widgets spec defines, and expands the section when selected.
+- **2.5** The Summary Row shows the short figures its host's widgets spec defines, and expands the section when selected.
 - **2.6** The browser remembers each person's expanded or collapsed choice per host. That choice is never URL state and never part of a saved view.
 
 ---
@@ -62,7 +62,7 @@
 
 - **6.1** Selecting a Segment sets the host filter its widgets spec associates with that widget to that Segment's value alone, replacing any other values in that filter. A host's widgets spec may name additional filters a Segment sets.
 - **6.2** Selecting a Segment keeps search and every other filter, and returns the host to page 1.
-- **6.3** A filter set from a Summary Widget appears in the toolbar and active chips like any other filter and is removed the same way.
+- **6.3** A filter set from a Summary Widget shows on its filter control like any other filter and is cleared the same way.
 - **6.4** A Segment with a zero count cannot be selected.
 - **6.5** Segments are keyboard-operable and announce their label and count.
 
@@ -81,5 +81,5 @@
 
 | Date | Change |
 | :-- | :-- |
-| 2026-10-02 | Retired the Filtered population and the All/Filtered choice (§1, §3, §5.1). Widgets stack when a wide layout cannot fit them side by side (§2.3); the phone section starts open at 390px and wider (§2.4); breakdowns run worst first and roll overflow into "N other" (§5.5, §5.6); phone breakdowns sit on the label line (§5.7). |
+| 2026-10-02 | The Summary Row shows the figures its host defines (§2.5); Summary Widget filters show on their filter control (§6.3). Retired the Filtered population and the All/Filtered choice (§1, §3, §5.1). Widgets stack when a wide layout cannot fit them side by side (§2.3); the phone section starts open at 390px and wider (§2.4); breakdowns run worst first and roll overflow into "N other" (§5.5, §5.6); phone breakdowns sit on the label line (§5.7). |
 | 2026-09-26 | Created. Establishes fixed Summary Widgets between a Widget Host's heading and toolbar, a collapsed-by-default Summary Row on phones, per-widget All/Filtered Widget Population as URL state, whole-population server-computed counts, single-count Segments in existing category colors, and Segment selection as a host filter. |

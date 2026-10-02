@@ -50,7 +50,7 @@
 ## 4. URL State and Presets
 
 - **4.1** Canonical Machine View URL state uses `q`, `presence`, `status`, `severity`, `owner`, `sort`, `dir`, `page`, `pageSize`, `columns`, and `view`.
-- **4.2** Multi-values serialize as comma-separated canonical values. Owner filters use stable IDs plus the `unassigned` sentinel. Page sizes are limited to 25, 50, and 100. Severity filters use `cosmetic`, `minor`, `major`, and `unplayable`.
+- **4.2** Multi-values serialize as comma-separated canonical values. Owner filters use stable IDs plus the `me` and `unassigned` sentinels; `me` means whoever is viewing. Page sizes are limited to 25, 50, and 100. Severity filters use `cosmetic`, `minor`, `major`, and `unplayable`.
 - **4.3** _Moved 2026-10-02_ to list-views §9.3.
 - **4.4** _Moved 2026-10-02_ to list-views §4.7 and §4.8.
 - **4.5** _Moved 2026-10-02_ to list-views §9.8.
@@ -70,7 +70,7 @@
 - **5.3** Phones default to a Compact list of one-line rows: a Playability dot, the machine name, its initials badge, and its open-issue count. Other selected fields appear in Table mode.
 - **5.4** Phones offer an optional Table mode with a visible horizontal-overflow cue and pinned Machine identity. Compact/Table mode is stored as a browser preference and is not URL state.
 - **5.5** Sortable headers are keyboard-operable and expose `scope` and `aria-sort`; the table has an accessible name and preserves native table semantics.
-- **5.6** Open Issues values are right-aligned. A nonzero count is colored by the machine's worst open severity and links to `/issues?machine={initials}`; zero remains neutral.
+- **5.6** Open Issues values are right-aligned. A nonzero count is colored by the machine's worst open severity and links to that machine's issues (issues-list §7.4); zero remains neutral.
 - **5.7** Last Serviced displays a compact relative age and links populated values to `/m/{initials}/maintenance`. A machine without qualifying service history displays “Never”.
 - **5.8** Machine View exposes a stable machine-selection callback for a future inspection drawer without implementing drawer state or UI in this delivery.
 
@@ -123,6 +123,8 @@
 | §3.13 | Owner offers Unassigned but not Me. | PP-jb9v |
 | §3.14 | Sorting is only by column header; phones in Compact mode cannot sort. | PP-jb9v |
 | §4.6, §5.6 | Presets show four fields, and Open Issues values are centered. | PP-jb9v |
+| §9.1 | Recently added includes Removed machines. | PP-jb9v |
+| §4.2 | Owner "Me" writes the viewer's account ID into the URL. | PP-jb9v |
 
 ---
 
@@ -130,7 +132,7 @@
 
 | Date | Change |
 | :-- | :-- |
-| 2026-10-02 | Machine View became a List Host on the shared List View (§2.4): moved the generic concepts, URL rules, shared controls, and Saved Views to list-views (§1, §4.3–§4.5, §4.9–§4.11, §5.1, §7.6, §8, §9.4, §9.5); one-line machine identity and rows (§3.2, §5.2, §5.3); dropped Widget Population parameters (§4.1); Recently added leaves out Removed machines (§9.1); Primary Filters, Owner shortcuts, and the sort control (§3.12–§3.14); more default fields (§4.6); right-aligned Open Issues (§5.6). |
+| 2026-10-02 | Machine View became a List Host on the shared List View (§2.4): moved the generic concepts, URL rules, shared controls, and Saved Views to list-views (§1, §4.3–§4.5, §4.9–§4.11, §5.1, §7.6, §8, §9.4, §9.5); one-line machine identity and rows (§3.2, §5.2, §5.3); dropped Widget Population parameters (§4.1); Recently added leaves out Removed machines (§9.1); Primary Filters, Owner shortcuts, and the sort control (§3.12–§3.14); more default fields (§4.6); right-aligned Open Issues that link to the machine's issues in every presence state (§5.6); an Owner `me` sentinel (§4.2). |
 | 2026-09-27 | §7.4: unmatched Pinball Map entries now appear on the Pinball Map lineup page rather than being deferred. |
 | 2026-09-26 | Added the Open Issue Severity filter (§3.11) and Widget Population URL state (§4.1, §4.2, §4.4, §4.9); Saved Views store Widget Populations (§8.2); moved widgets to their own specs (§7.2); deferred Integrations widgets (§7.3). |
 | 2026-09-26 | Added Built-in Views (§9): named, shared configurations per Surface that can be an account's default; anonymous visitors can apply them (§8.1, §8.9, §8.10, §8.13, §4.11). Renamed Default Saved View to Default View (§1, §8.11, §8.12, §8.14). |

@@ -14,11 +14,11 @@
 - **List Host** — a list built on List View. Machine View (machine-views) and Issue View (issues-list) are the List Hosts. A host defines its fields, filters, sorts, row presentation, Page Presets, and Built-in Views.
 - **View Scope** — the authoritative set of records a route may show, supplied by that route. Filtering can narrow a scope but never widen it.
 - **Page Preset** — a route-owned configuration defining a host's default filters, displayed fields, sorting, and page size.
-- **Surface** — a place where a List View appears and where Saved Views belong: Machines, Issues, or one tab of one individual Collection or Tag. Every Collection or Tag tab is its own Surface.
+- **Surface** — a place where a List View appears: Machines, Issues, or one tab of one individual Collection or Tag. Every Collection or Tag tab is its own Surface.
 - **View Configuration** — the displayed fields, search, filters, sorting, and page size a List View shows. Page number is not part of it.
-- **Saved View** — a named, personal View Configuration owned by one account and belonging to one Surface.
+- **Saved View** — a named, personal View Configuration owned by one account and belonging to one List Host. It can be applied on every Surface of that host.
 - **Built-in View** — a named View Configuration PinPoint defines for a Surface, the same for every viewer. One Built-in View on each Surface is its Page Preset.
-- **Default View** — the one Saved View or Built-in View an account marks to open when it visits a Surface without view configuration in the URL.
+- **Default View** — the one Saved View or Built-in View an account marks to open on its host's main page (Machines or Issues) when the URL carries no view configuration.
 - **Applied View** — the Saved View or Built-in View the current View Configuration came from.
 - **Edited** — the state of a List View whose current View Configuration differs from its Applied View.
 - **Primary Filter** — a filter a host shows inline beside search. **Secondary Filter** — a filter a host shows only under More.
@@ -118,23 +118,24 @@
 
 ## 10. Saved Views
 
-- **10.1** Any signed-in account can save the current View Configuration as a named Saved View on the Surface where it is working. Anonymous visitors have no Saved Views but can apply Built-in Views.
+- **10.1** Any signed-in account can save the current View Configuration as a named Saved View from any Surface of a List Host. Anonymous visitors have no Saved Views but can apply Built-in Views.
 - **10.2** A Saved View stores the View Configuration. It never stores a page number or Summary Row open state.
 - **10.3** Saved Views are personal: only the owning account can see, apply, change, or delete them.
 - **10.4** Saved Views sync across every device the owning account uses.
-- **10.5** A Saved View appears only on the Surface where it was created.
+- **10.5** A Saved View appears on every Surface of its List Host: a machine Saved View on Machines and every Collection and Tag Machines tab, an issue Saved View on Issues and every Issues tab.
 - **10.6** Applying a Saved View or Built-in View opens it at page 1.
-- **10.7** A Saved View name is required and must be unique, ignoring case, among the account's Saved Views on that Surface. A colliding name is rejected, never silently overwritten.
+- **10.7** A Saved View name is required and must be unique, ignoring case, among the account's Saved Views for that List Host. A colliding name is rejected, never silently overwritten.
 - **10.8** Manage views lets the account rename or delete its Saved Views and set or clear its Default View.
-- **10.9** An account has at most one Default View per Surface. Defaults on different Surfaces are independent.
-- **10.10** A Surface URL with no view configuration other than page opens the account's Default View if one exists, otherwise the Page Preset. A URL carrying any view configuration opens exactly as written.
+- **10.9** An account has at most one Default View per List Host.
+- **10.10** The Machines or Issues page, opened with no view configuration other than page, shows the account's Default View if one exists, otherwise the Page Preset. A Collection or Tag tab opened that way always shows its Page Preset. A URL carrying any view configuration opens exactly as written.
 - **10.11** When the Default View opens, the address bar shows its canonical URL.
 - **10.12** More views always offers every Built-in View, so an account with a default can still reach the Page Preset.
-- **10.13** Deleting the Default View leaves the Surface without a default; it then opens to the Page Preset.
+- **10.13** Deleting the Default View leaves its host without a default; the main page then opens to the Page Preset.
 - **10.14** A stored field, filter value, or person that no longer exists or is not permitted on the Surface is dropped when the view is applied, exactly as an invalid URL value is (§9.3).
-- **10.15** Deleting a Collection or Tag deletes every Saved View belonging to its Surfaces.
+- **10.15** _Retired 2026-10-02._ Saved Views belong to a List Host, not a Surface, so deleting a Collection or Tag deletes none. Number kept so older citations don't dangle.
 - **10.16** Built-in Views are the same for every viewer and cannot be renamed, changed, or deleted.
 - **10.17** Sharing Saved View records with other accounts is deferred; copied URLs are the sharing mechanism.
+- **10.18** Applying a Saved View on a Collection or Tag tab applies its configuration inside that tab's scope. A filter value outside the scope matches nothing there and never widens it.
 
 ---
 
@@ -164,7 +165,7 @@
 | §3–§8, §12 | Neither list uses the shared layout, List Header, phone sheets, or overflow rules. | PP-jb9v |
 | §5.7 | Issues offers 15, 25, and 50 per page, defaulting to 15. | PP-jb9v |
 | §9.2, §9.4 | Issues uses snake_case parameters and a composite sort value. | PP-jb9v |
-| §10 | Issues has no Saved Views; Machines shows Saved Views in a menu rather than List Header tabs. | PP-jb9v |
+| §10 | Issues has no Saved Views; machine Saved Views and defaults belong to one Surface each and appear in a menu rather than List Header tabs. | PP-jb9v |
 | §11 | Issues restores the last URL from a cookie across sessions; Machines does not restore. | PP-jb9v |
 
 ---
@@ -173,4 +174,4 @@
 
 | Date | Change |
 | :-- | :-- |
-| 2026-10-02 | Created from the approved list-framework design: shared layout, filters, List Header with Saved View tabs, compact and bottom pagers, phone sheets and pinned pager, overflow rules, URL state, Saved Views (moved from machine-views §8), returning to a list, and accessibility. |
+| 2026-10-02 | Created from the approved list-framework design: shared layout, filters, List Header with Saved View tabs, compact and bottom pagers, phone sheets and pinned pager, overflow rules, URL state, Saved Views shared across each host's Surfaces with a Default View on the main page only (moved from machine-views §8), returning to a list, and accessibility. |
