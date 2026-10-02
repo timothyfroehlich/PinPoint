@@ -14,6 +14,7 @@ import {
 } from "~/lib/issues/status";
 import {
   getMachineStatusLabel,
+  MACHINE_STATUS_COLORS,
   SEVERITY_RANK,
   type MachineStatus,
 } from "~/lib/machines/status";
@@ -31,13 +32,6 @@ export interface HeroPeekIssue {
 
 /** Number of open issues surfaced in the hero peek before "View all". */
 const PEEK_LIMIT = 3;
-
-/** Solid dot color per derived machine status (semantic tokens only). */
-const STATUS_DOT: Record<MachineStatus, string> = {
-  operational: "bg-success",
-  needs_service: "bg-warning",
-  unplayable: "bg-destructive",
-};
 
 /**
  * InfoHero — the QR-scanning player's whole answer on the Info tab: machine
@@ -83,7 +77,7 @@ export function InfoHero({
             <span
               className={cn(
                 "size-2.5 shrink-0 rounded-full",
-                STATUS_DOT[machineStatus]
+                MACHINE_STATUS_COLORS[machineStatus].dot
               )}
               aria-hidden="true"
             />
@@ -108,7 +102,10 @@ export function InfoHero({
       <div className="mt-4 border-t border-outline-variant pt-4">
         {openCount === 0 ? (
           <p className="flex items-center gap-2 text-sm text-muted-foreground">
-            <CircleCheck className="size-4 text-success" aria-hidden="true" />
+            <CircleCheck
+              className={cn("size-4", MACHINE_STATUS_COLORS.operational.text)}
+              aria-hidden="true"
+            />
             No open issues — this machine is healthy.
           </p>
         ) : (
