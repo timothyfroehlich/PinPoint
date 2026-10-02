@@ -91,6 +91,21 @@
   --breakpoint-table-modified: 1100px;
 }
 
+/* A page's floating action — the issue page's Comment button — sits
+   --floating-action-gap above the mobile tab bar and is
+   --floating-action-height tall. The app's scroller (<main>) reserves that
+   much more scroll padding while one is on the page, so a focused control
+   never lands under it (WCAG 2.4.11). The one place this geometry lives. */
+:root {
+  --floating-action-gap: 0.75rem;
+  --floating-action-height: 3rem;
+}
+#main-content:has([data-floating-action]) {
+  --floating-action-clearance: calc(
+    var(--floating-action-gap) + var(--floating-action-height)
+  );
+}
+
 @utility glow-primary {
   box-shadow:
     0 0 10px color-mix(in srgb, var(--color-primary) 50%, transparent),
