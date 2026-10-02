@@ -237,13 +237,16 @@ describe("AssigneePicker — Me quick-select", () => {
 });
 
 describe("AssigneePicker — current assignee", () => {
-  function open(assignedToId: string | null): HTMLElement {
+  function open(
+    assignedToId: string | null,
+    onAssign: (userId: string | null) => void = vi.fn()
+  ): HTMLElement {
     render(
       <AssigneePicker
         assignedToId={assignedToId}
         users={mockUsers}
         isPending={false}
-        onAssign={vi.fn()}
+        onAssign={onAssign}
         currentUserId="1"
       />
     );
@@ -277,6 +280,42 @@ describe("AssigneePicker — current assignee", () => {
       .filter((option) => option.querySelector("svg.lucide-check"))
       .map((option) => option.getAttribute("data-testid"));
     expect(checked).toEqual(["assignee-option-2"]);
+  });
+
+  it.each([
+    ["Bob, choosing Bob", "2", "assignee-option-2"],
+    ["no one, choosing Unassigned", null, "assignee-option-unassigned"],
+    ["me, choosing Me", "1", "assignee-option-me"],
+    ["me, choosing my own name", "1", "assignee-option-1"],
+  ] as const)(
+    "closes without saving when the choice is who is already assigned (%s)",
+    (_label, assignedToId, testId) => {
+      const onAssign = vi.fn();
+      open(assignedToId, onAssign);
+
+      fireEvent.click(screen.getByTestId(testId));
+
+      expect(onAssign).not.toHaveBeenCalled();
+      expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    }
+  );
+
+  it("keeps the no-matches message out of the listbox (axe aria-required-children)", () => {
+    const listbox = open(null);
+    fireEvent.change(screen.getByTestId("assignee-search-input"), {
+      target: { value: "zed" },
+    });
+
+    const message = screen
+      .getAllByText("No matches")
+      .filter((element) => element.getAttribute("role") !== "status");
+    expect(message).toHaveLength(1);
+    expect(listbox).not.toHaveTextContent("No matches");
+    for (const child of listbox.querySelectorAll("[cmdk-list-sizer] > *")) {
+      expect(child.getAttribute("role")).toMatch(
+        /^(option|group|presentation)$/
+      );
+    }
   });
 
   it("announces how many people match the filter", () => {

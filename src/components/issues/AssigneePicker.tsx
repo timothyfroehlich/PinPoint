@@ -44,7 +44,8 @@ import { cn } from "~/lib/utils";
  *   where the list's highlight starts, so the highlight never suggests a
  *   different person is assigned
  * - Filtering announces how many people match
- * - `onAssign(userId | null)` fires on selection; `null` means unassigned
+ * - `onAssign(userId | null)` fires on selection; `null` means unassigned.
+ *   Choosing the current assignee only closes the picker
  * - While `isPending` the row shows a spinner and won't open
  * - Viewers without the triage capability get a read-only row instead
  */
@@ -120,9 +121,9 @@ export function AssigneeCommand({
         value={query}
         onValueChange={setQuery}
       />
-      <p role="status" className="sr-only">
+      <div role="status" className="sr-only">
         {resultAnnouncement}
-      </p>
+      </div>
       <CommandList
         aria-label="Assignee options"
         className={cn(touch && "max-h-none min-h-0 flex-1")}
@@ -169,13 +170,9 @@ export function AssigneeCommand({
         </CommandGroup>
         {/* The divider is a border, not a CommandSeparator: a separator
             inside the listbox is not an allowed listbox child. */}
-        <CommandGroup className={cn(currentUser && "border-t border-border")}>
-          {filteredUsers.length === 0 ? (
-            <p className="px-2 py-1.5 text-xs text-muted-foreground">
-              No matches found
-            </p>
-          ) : (
-            filteredUsers.map((user) => (
+        {filteredUsers.length > 0 ? (
+          <CommandGroup className={cn(currentUser && "border-t border-border")}>
+            {filteredUsers.map((user) => (
               <CommandItem
                 key={user.id}
                 value={user.id}
@@ -194,10 +191,23 @@ export function AssigneeCommand({
                 <span className="font-medium leading-none">{user.name}</span>
                 <CurrentMark show={user.id === assignedToId} />
               </CommandItem>
-            ))
-          )}
-        </CommandGroup>
+            ))}
+          </CommandGroup>
+        ) : null}
       </CommandList>
+      {/* Outside the listbox, which may own only options and groups (axe
+          aria-required-children). cmdk's Empty never shows here: "Me" and
+          "Unassigned" always match. */}
+      {filteredUsers.length === 0 ? (
+        <div
+          className={cn(
+            "px-2 py-1.5 text-xs text-muted-foreground",
+            currentUser && "border-t border-border"
+          )}
+        >
+          No matches
+        </div>
+      ) : null}
     </Command>
   );
 }
@@ -242,8 +252,11 @@ export function AssigneePicker({
     setOpen(next);
   };
 
+  // Choosing whoever is already assigned (or Unassigned when no one is)
+  // closes without saving, as the other field pickers do.
   const handleSelect = (userId: string | null): void => {
     setOpen(false);
+    if (userId === assignedToId) return;
     onAssign(userId);
   };
 
