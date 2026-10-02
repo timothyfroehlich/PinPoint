@@ -354,7 +354,6 @@ export async function selectOption(
     "issue-severity-select": (val) => `severity-option-${val}`,
     "issue-priority-select": (val) => `priority-option-${val}`,
     "issue-frequency-select": (val) => `frequency-option-${val}`,
-    "issue-assignee-select": (val) => `assignee-option-${val}`,
     "machine-select": (val) => `machine-option-${val}`,
     "filter-status": (val) => `status-option-${val}`,
     "filter-machine": (val) => `machine-option-${val}`,
@@ -512,7 +511,10 @@ export async function openMoveIssueDialog(page: Page): Promise<void> {
     name: "Move issue to another machine",
   });
   if (hasIssueSectionTabs(page)) {
-    await openDropdownMenu(page.getByRole("button", { name: "Issue actions" }));
+    // By test id, not role: the open menu aria-hides everything outside it,
+    // trigger included, so a role locator stops matching the moment the click
+    // works and openDropdownMenu's aria-expanded check could never pass.
+    await openDropdownMenu(page.getByTestId("issue-actions-menu-trigger"));
     await page
       .getByRole("menuitem", { name: "Move to another machine" })
       .click();

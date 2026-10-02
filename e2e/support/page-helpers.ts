@@ -11,7 +11,11 @@
  */
 
 import type { Page, Locator } from "@playwright/test";
-import { selectOption } from "./actions.js";
+import {
+  hasIssueSectionTabs,
+  selectOption,
+  showIssueSection,
+} from "./actions.js";
 import { HydrationTimeoutError, waitForHydration } from "./fixtures.js";
 
 declare global {
@@ -360,9 +364,6 @@ export async function fillReportForm(
   }
 }
 
-/** The Tailwind `md` breakpoint, which is what decides the layout below. */
-const MD_BREAKPOINT_PX = 768;
-
 // Budgets for the comment Sheet, bounded rather than inheriting the 30s CI
 // `actionTimeout`, so the worst path (click + wait + click + wait) stays inside
 // the 60s CI test timeout. The first click absorbs a trigger still becoming
@@ -399,12 +400,15 @@ const SHEET_OPEN_TIMEOUT = process.env["CI"] ? 10_000 : 3_000;
 export async function openIssueCommentForm(
   page: Page
 ): Promise<{ form: Locator; isSheet: boolean }> {
-  const viewportWidth = page.viewportSize()?.width ?? MD_BREAKPOINT_PX;
-  const isSheet = viewportWidth < MD_BREAKPOINT_PX;
+  const isSheet = hasIssueSectionTabs(page);
 
   if (!isSheet) {
     return { form: page.getByTestId("issue-comment-form"), isSheet: false };
   }
+
+  // The floating Comment button only shows on the Issue tab, the one with
+  // Activity.
+  await showIssueSection(page, "Issue");
 
   const sheetTrigger = page.getByRole("button", {
     name: "Comment",
