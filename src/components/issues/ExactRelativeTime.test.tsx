@@ -4,6 +4,7 @@
  * issue-detail-permissions.test.tsx; this file covers the client side.
  */
 import { fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { ExactRelativeTime } from "./ExactRelativeTime";
 import { RelativeTimeProvider } from "./RelativeTimeProvider";
@@ -52,4 +53,27 @@ describe("ExactRelativeTime", () => {
     fireEvent.click(trigger);
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
+
+  it.each(["{Enter}", " "])(
+    "keeps the exact time showing when a keyboard user presses %s on the focused time",
+    async (key) => {
+      const user = userEvent.setup();
+      const trigger = renderMounted();
+
+      await user.tab();
+      expect(trigger).toHaveFocus();
+      expect(await screen.findByRole("tooltip")).toHaveTextContent(
+        formatDateTime(value)
+      );
+
+      await user.keyboard(key);
+      expect(screen.getByRole("tooltip")).toHaveTextContent(
+        formatDateTime(value)
+      );
+
+      // Escape is how the keyboard dismisses it.
+      await user.keyboard("{Escape}");
+      expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    }
+  );
 });

@@ -40,6 +40,7 @@ interface ExactRelativeTimeProps {
  *   patches a mismatched attribute on hydration. `dateTime` is ISO.
  * - On phones the hit area grows to 44px tall without moving the layout, and
  *   a tap toggles the exact time (a tooltip otherwise opens only on hover).
+ * - Focus shows it, and Enter or Space keeps it showing; Escape hides it.
  */
 export function ExactRelativeTime({
   value,
@@ -51,7 +52,8 @@ export function ExactRelativeTime({
   const descriptionId = useId();
   const [open, setOpen] = useState(false);
   // Radix closes an open tooltip on pointerdown, before the click lands.
-  // Remember whether it was open so a tap on an open tooltip closes it.
+  // Remember whether it was open so a tap on an open tooltip closes it. A
+  // click with no pointerdown before it is a keyboard activation.
   const openAtPointerDownRef = useRef<boolean | null>(null);
 
   const date = typeof value === "string" ? new Date(value) : value;
@@ -72,9 +74,12 @@ export function ExactRelativeTime({
             onClick={(event) => {
               // Keeps Radix's own click handler from closing it again.
               event.preventDefault();
-              const wasOpen = openAtPointerDownRef.current ?? open;
+              const openAtPointerDown = openAtPointerDownRef.current;
               openAtPointerDownRef.current = null;
-              setOpen(!wasOpen);
+              // Enter or Space shows the exact time (focus has usually
+              // opened it already) and never hides it; Escape does that.
+              // A tap or click toggles it.
+              setOpen(openAtPointerDown === null ? true : !openAtPointerDown);
             }}
             className={cn(
               "relative cursor-help rounded-sm bg-transparent p-0 text-left [font:inherit] text-muted-foreground transition-colors duration-150 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
