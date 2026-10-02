@@ -62,6 +62,32 @@ const storedDraftSchema = z.object({
   idempotencyKey: z.string().uuid(),
 });
 
+function sameDoc(a: ProseMirrorDoc | null, b: ProseMirrorDoc | null): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/**
+ * Remove every stored comment draft from this browser — on sign-out, so a
+ * shared device keeps no one's unposted comments.
+ */
+export function clearStoredCommentDrafts(): void {
+  try {
+    const keys: string[] = [];
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const key = window.localStorage.key(i);
+      if (key?.startsWith("comment_draft:")) keys.push(key);
+    }
+    for (const key of keys) window.localStorage.removeItem(key);
+  } catch {
+    // Storage unavailable: nothing was stored.
+  }
+  for (const entry of entries.values()) {
+    if (entry.saveTimer !== null) clearTimeout(entry.saveTimer);
+    entry.saveTimer = null;
+  }
+  entries.clear();
+}
+
 function emptyDraft(): CommentDraft {
   return { doc: null, images: [], idempotencyKey: crypto.randomUUID() };
 }
@@ -258,7 +284,18 @@ export function useCommentDraft(
 
   const setDoc = useCallback(
     (doc: ProseMirrorDoc) =>
-      update(key, composerId, (draft) => ({ ...draft, doc }), "debounced"),
+      update(
+        key,
+        composerId,
+        // A changed comment is a new submission. The key stays the same only
+        // while the text does, so a retry of the same post is deduped but an
+        // edit after a post whose response was lost is not mistaken for it.
+        (draft) =>
+          sameDoc(draft.doc, doc)
+            ? { ...draft, doc }
+            : { ...draft, doc, idempotencyKey: crypto.randomUUID() },
+        "debounced"
+      ),
     [key, composerId]
   );
   const addImage = useCallback(
@@ -266,7 +303,12 @@ export function useCommentDraft(
       update(
         key,
         composerId,
-        (draft) => ({ ...draft, images: [...draft.images, image] }),
+        // Adding a photo changes the submission too.
+        (draft) => ({
+          ...draft,
+          images: [...draft.images, image],
+          idempotencyKey: crypto.randomUUID(),
+        }),
         "now"
       ),
     [key, composerId]

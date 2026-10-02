@@ -71,6 +71,42 @@ describe("comment drafts", () => {
     });
   });
 
+  it("keeps the idempotency key while the comment is unchanged and replaces it when the text or photos change", async () => {
+    const page = await freshPage();
+    const key = page.commentDraftKey("user-1", "issue-1");
+    const { result } = renderHook(() => page.useCommentDraft(key, "sheet"));
+
+    act(() => result.current.setDoc(doc("Flipper sticks")));
+    const first = result.current.snapshot.draft.idempotencyKey;
+    // The same comment again (a retry after a lost response) keeps the key…
+    act(() => result.current.setDoc(doc("Flipper sticks")));
+    expect(result.current.snapshot.draft.idempotencyKey).toBe(first);
+    // …an edited comment is a new submission…
+    act(() => result.current.setDoc(doc("Flipper sticks on multiball")));
+    const edited = result.current.snapshot.draft.idempotencyKey;
+    expect(edited).not.toBe(first);
+    // …and so is one with another photo.
+    act(() => result.current.addImage(photo));
+    expect(result.current.snapshot.draft.idempotencyKey).not.toBe(edited);
+  });
+
+  it("sign-out removes every stored draft from the browser", async () => {
+    const page = await freshPage();
+    const mine = page.commentDraftKey("user-1", "issue-1");
+    const other = page.commentDraftKey("user-1", "issue-2");
+    const { result: a } = renderHook(() => page.useCommentDraft(mine, "s"));
+    const { result: b } = renderHook(() => page.useCommentDraft(other, "s"));
+    act(() => a.current.addImage(photo));
+    act(() => b.current.addImage(photo));
+    localStorage.setItem("unrelated", "keep");
+
+    page.clearStoredCommentDrafts();
+
+    expect(localStorage.getItem(mine)).toBeNull();
+    expect(localStorage.getItem(other)).toBeNull();
+    expect(localStorage.getItem("unrelated")).toBe("keep");
+  });
+
   it("keeps drafts apart per person and per issue", async () => {
     const page = await freshPage();
     const mine = page.commentDraftKey("user-1", "issue-1");

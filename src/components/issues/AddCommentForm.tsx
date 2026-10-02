@@ -85,7 +85,11 @@ export function AddCommentForm({
   useEffect(() => {
     if (seenSnapshotRef.current === snapshot) return;
     seenSnapshotRef.current = snapshot;
-    if (snapshot.origin !== composerId) {
+    // Never replace a document the person is typing in (another tab's save
+    // landing mid-typing); their next keystroke saves their version.
+    const typingHere =
+      formRef.current?.contains(document.activeElement) ?? false;
+    if (snapshot.origin !== composerId && !typingHere) {
       editorRef.current?.setContent(snapshot.draft.doc);
     }
   }, [snapshot, composerId]);
