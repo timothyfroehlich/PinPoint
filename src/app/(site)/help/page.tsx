@@ -7,6 +7,7 @@ import {
   Compass,
   LifeBuoy,
   Lock,
+  MapPin,
   MessageCircleQuestion,
   Plug,
   Shield,
@@ -70,6 +71,13 @@ const referenceCards = [
     href: "/help/notifications",
     icon: Bell,
     description: "How you're notified — in-app, email, and Discord DMs",
+  },
+  {
+    title: "Pinball Map",
+    href: "/help/pinball-map",
+    icon: MapPin,
+    description:
+      "Matching machines, lineup setting, and pushing changes to Pinball Map",
   },
   {
     title: "Discord Integration",

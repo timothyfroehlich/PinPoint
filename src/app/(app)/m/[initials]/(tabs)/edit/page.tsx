@@ -36,13 +36,13 @@ import { MachineDetailsForm } from "./machine-details-form";
 import { DetailsDirtyProvider } from "./details-dirty";
 import { PinballmapDirtyGate } from "./pinballmap-dirty-gate";
 import { MachineOwnerTransfer } from "./machine-owner-transfer";
-import { SectionNavLayout } from "~/components/machines/machine-form/SectionNav";
+import {
+  SectionNavLayout,
+  type SectionNavItem,
+} from "~/components/layout/SectionNav";
 import { SectionAnchor } from "~/components/machines/machine-form/SectionAnchor";
 import { PinnedActionBarSpacer } from "~/components/machines/machine-form/MachineFormActionBar";
-import {
-  MACHINE_FORM_SECTION_IDS,
-  type SectionNavItem,
-} from "~/components/machines/machine-form/sections";
+import { MACHINE_FORM_SECTION_IDS } from "~/components/machines/machine-form/sections";
 import { PBM_ADD_FAILED_PARAM } from "~/lib/pinballmap/create-flow";
 
 /**

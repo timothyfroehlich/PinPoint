@@ -162,7 +162,7 @@ async function resolveCore(
     return {
       ok: false,
       message:
-        "Uncataloged (excluded) machines do not participate in Pinball Map sync and cannot have a sync intent.",
+        "Uncataloged (excluded) machines do not participate in Pinball Map sync and cannot have a lineup setting.",
     };
   }
 
@@ -170,7 +170,7 @@ async function resolveCore(
     return {
       ok: false,
       message:
-        "A machine must be linked to a Pinball Map title to set lineup intent.",
+        "A machine must be linked to a Pinball Map title to set its lineup setting.",
     };
   }
 
@@ -199,7 +199,7 @@ async function resolveCore(
     return {
       ok: false,
       message:
-        "Retargeting a machine to a different title resets intent to 'off'. Setting intent to 'on' requires a separate action.",
+        "Retargeting a machine to a different title resets its lineup setting to 'off'. Setting it to 'on' requires a separate action.",
     };
   }
 

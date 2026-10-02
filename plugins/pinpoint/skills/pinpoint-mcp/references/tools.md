@@ -15,7 +15,7 @@ Every write tool shares these rules:
 - **`severity`**: `cosmetic`, `minor`, `major`, `unplayable`.
 - **`priority`**: `low`, `medium`, `high`.
 - **`frequency`**: `not_specified`, `intermittent`, `frequent`, `constant`.
-- **Pinball Map `intent`**: `on` (PinPoint wants it listed), `off` (wants it not listed), `no_sync` (PinPoint does not manage its listing).
+- **Pinball Map lineup setting (the `intent` parameter)**: `on` (PinPoint wants it listed), `off` (wants it not listed), `no_sync` (PinPoint does not manage its listing).
 
 ## Read tools
 
@@ -63,7 +63,7 @@ Pass exactly one of `query` (a title) or `machineGroupId` (a family id). Procedu
 `machine` (required) plus at least one of the fields below. The fields are saved in this order.
 
 1. **`name`** (1–200 characters). Changes the display name only, never the initials. CHANGE.
-2. **`presenceStatus`**. CHANGE. Does not change Pinball Map intent.
+2. **`presenceStatus`**. CHANGE. Does not change the Pinball Map lineup setting.
 3. **`owner`**: exact full name or UUID. `""` or `null` removes the owner. PERMANENT:
    - Emails, Discord-messages and notifies in-app both the old owner and the new owner.
    - Deletes the old owner's watch on the machine, even if they had set it up themselves. Making them owner again re-adds a watch, but not their old settings.
@@ -73,7 +73,7 @@ Pass exactly one of `query` (a title) or `machineGroupId` (a family id). Procedu
 5. **`insiderConnected`**: `on` or `off`. Records what PinPoint wants; it does not change Pinball Map. Works only when `get_machine` shows `pinballmap.insiderConnected.eligible: true`. It can be switched between `on` and `off` but never cleared. CHANGE.
 6. **`iscoredGameId`**: the iScored game id as text. `""` or `null` clears it. CHANGE. No call to iScored is made.
 
-Trap: presence is saved before intent. Sending `presenceStatus: "removed"` and `intent: "on"` in one call saves the presence and then fails on the intent.
+Trap: presence is saved before the lineup setting. Sending `presenceStatus: "removed"` and `intent: "on"` in one call saves the presence and then fails on the lineup setting.
 
 ### `add_machine`
 
@@ -85,7 +85,7 @@ PERMANENT: the machine cannot be deleted and its initials can never change.
 - `presence` (default `on_the_floor`).
 - `pinballmapMachineId`, or `pinballmapExcluded: true` with `pinballmapExcludedReason`.
 
-There is no intent or iScored parameter; set those afterwards with `update_machine`. Intent starts as `off`.
+There is no `intent` (lineup setting) or iScored parameter; set those afterwards with `update_machine`. The lineup setting starts as `off`.
 
 Trap: `pinballmapExcludedReason` is silently dropped unless `pinballmapExcluded: true` is sent in the same call.
 

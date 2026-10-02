@@ -72,19 +72,24 @@ PinPoint uses a **dark neon aesthetic** -- deep charcoal backgrounds with neon g
 **Purple is not in the palette.** It was removed in favor of teal so the
 primary and secondary read as one green-family pairing rather than two
 competing brands. Do not reintroduce a purple/magenta/fuchsia secondary, or
-raw `purple-*` / `fuchsia-*` / `magenta-*` classes, in new code. The one
-exception is the legacy raw-Tailwind purple used for a handful of entries in
-`STATUS_CONFIG` and `PRIORITY_CONFIG` (both in
-[`src/lib/issues/status.ts`](../../../src/lib/issues/status.ts)) -- those are
-tracked for conversion to semantic tokens and should be migrated
-opportunistically, not extended.
+raw `purple-*` / `fuchsia-*` / `magenta-*` classes, in new code. Pink is
+allowed in one place: the In Progress status family (In Progress, Need Parts,
+Need Help) in `STATUS_CONFIG`. It is a state color, not a brand accent; don't
+use it anywhere else.
+
+**State colors use one hue family per field**, with lightness and saturation
+changing together by level: severity warm (yellow → amber → orange → red),
+New/Confirmed cyan, In Progress pink, Fixed green, priority blue, playability
+green/yellow/red. Unplayable is the same red for severity and playability. A
+chip is the text color with a 15% background and a 45% border. Text clears
+4.5:1 on `bg-card` and on its own tint; bar segments clear 3:1.
 
 **Rules:**
 
 - **All color references in component code must use semantic tokens.** Never write raw Tailwind palette classes (`text-purple-400`, `bg-amber-500/20`, `border-fuchsia-500`) or hardcoded hex (`#d946ef`, `bg-[#abcdef]`) anywhere under `src/app/**`, `src/components/**`, or any `.tsx` / `.ts` file that renders or styles UI. Use `text-primary`, `bg-destructive`, `text-muted-foreground`, `border-success/40`, etc.
 - **`dark:` utility classes are forbidden.** PinPoint is dark-only; `dark:` classes are dead code. Remove them when you touch a file that still contains them.
-- **Design-layer config is the only exception, and the Oxlint config is its registry.** A small number of `src/lib/**` modules may write raw Tailwind palette classes, because in those files the raw palette _is_ the design decision being expressed rather than a shortcut around the token system. The authoritative list is the `excludeFiles` array on the `better-tailwindcss` override in `.oxlintrc.json` — read it there; a copy here would be one more thing to drift. Read it with care: that array mixes two unrelated things. Its `src/**` entries are the design-layer exemptions this rule is about; the test, spec, `e2e/**` and fixture globs alongside them are just files the rule doesn't run on, and are not licence to write raw palette classes anywhere. **Adding a file to that list is a design decision, not a lint fix.** If a component is tripping the rule, the answer is almost always a token, not an exemption. Component code consumes the resulting class strings via the config (`STATUS_CONFIG[status].styles`); never replicate those class strings at call sites.
-- Status colors come from `STATUS_CONFIG` / `SEVERITY_CONFIG` / `PRIORITY_CONFIG` / `FREQUENCY_CONFIG` -- never freestyle status colors in components.
+- **State colors are tokens too — there is no raw-palette exception.** Severity, status, priority, frequency, playability and presence colors are `@theme` tokens in `globals.css` (`--color-severity-*`, `--color-status-*`, `--color-priority-*`, `--color-frequency-*`, `--color-playability-*`, `--color-presence-*`). The base token is the text color; `-bar` is the Summary Widget fill where it differs. A new state value gets a new token, never a raw palette class or an `.oxlintrc.json` exemption.
+- State colors reach components only through their configs: `STATUS_CONFIG` / `SEVERITY_CONFIG` / `PRIORITY_CONFIG` / `FREQUENCY_CONFIG` (`src/lib/issues/status.ts`), `getMachineStatusStyles` / `MACHINE_STATUS_COLORS` (`src/lib/machines/status.ts`), and `getMachinePresenceStyles` / `MACHINE_PRESENCE_WIDGET_COLORS` (`src/lib/machines/presence.ts`). Never freestyle a state color or replicate a config's class string at a call site.
 - Glow effects (`glow-primary`, `glow-secondary`) are for interactive hover states only, never static decoration. Apply `hover:glow-primary` to navigable card surfaces: machine cards (list and dashboard panels), issue cards, and interactive stat cards. Apply `hover:glow-success` to "recently fixed" machine cards where the success color already conveys status semantically. Do not apply any glow to form controls, buttons, modals, destructive actions, nav links, input fields, or dropdown triggers. Glow is permitted **as an interactivity affordance on editable fields** — a text-glow that fades in on hover marks "you can edit this" (`glow-editable-text`, PP-43q3). This is distinct from decorative glow on arbitrary form controls, which remains banned. Editable Machine Settings fields use it via `~/components/machines/settings/affordance`.
 - Frosted glass (bg-card with opacity + `backdrop-blur-sm`) is reserved for navigation chrome.
 - **Never rely on color alone to convey semantics.** Destructive, warning, success, and status cues must ship with an accessible text label — either visible, or via `aria-label` / `sr-only`. Decorative icons that accompany the color cue should be marked `aria-hidden="true"` so screen readers receive the label, not the icon. Under deuteranopia / protanopia (combined ~8% of men), destructive-red and warning-amber collapse to similar mustard shades and are not distinguishable by hue. Concretely: `<Alert variant="destructive">` and `<Alert variant="warning">` include a leading `AlertOctagon` / `AlertTriangle` (or equivalent) as `aria-hidden` decoration plus body text that names the condition; destructive buttons carry a verb label like "Delete" (with any icon `aria-hidden`); status / severity / priority badges expose `.label` alongside their icon.

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { TriangleAlert } from "lucide-react";
 
 import { Forbidden } from "~/components/errors/Forbidden";
+import { HelpLink } from "~/components/help/HelpLink";
 import { RelativeTime } from "~/components/issues/RelativeTime";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
@@ -68,7 +69,18 @@ export default async function PinballMapLineupPage(): Promise<React.JSX.Element>
     getPinballMapLinkStatus(userId),
   ]);
 
-  const header = <PageHeader title="Pinball Map lineup" />;
+  const header = (
+    <PageHeader
+      title="Pinball Map lineup"
+      actions={
+        <HelpLink
+          href="/help/pinball-map"
+          topic="Pinball Map"
+          className="text-sm"
+        />
+      }
+    />
+  );
 
   // Not configured: say so, and render no comparison, Refresh, or retained
   // snapshot as current (§2.4, pinballmap §10.6).

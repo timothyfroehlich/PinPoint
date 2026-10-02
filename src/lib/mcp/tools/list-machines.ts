@@ -230,7 +230,7 @@ export const listMachinesSchema = z.object({
     .enum(PINBALLMAP_FILTERS)
     .optional()
     .describe(
-      "Filter by PinballMap state: 'unlinked' (no catalog match and not excluded), 'linked' (matched to catalog), 'excluded' (marked not on PinballMap), or 'out_of_sync' (linked, and the last-synced lineup disagrees with the lineup intent: 'missing' = intent On but not on the lineup, 'lingering' = intent Off but still on it, or pushAction 'update' = only the Insider Connected setting differs). 'out_of_sync' fails if no lineup has been synced, and never covers unlinked machines — use 'unlinked' for those."
+      "Filter by PinballMap state: 'unlinked' (no catalog match and not excluded), 'linked' (matched to catalog), 'excluded' (marked not on PinballMap), or 'out_of_sync' (linked, and the last-synced lineup disagrees with the lineup setting: 'missing' = setting On but not on the lineup, 'lingering' = setting Off but still on it, or pushAction 'update' = only the Insider Connected setting differs). 'out_of_sync' fails if no lineup has been synced, and never covers unlinked machines — use 'unlinked' for those."
     ),
   limit: z
     .number()

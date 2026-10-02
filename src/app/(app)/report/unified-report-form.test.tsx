@@ -367,4 +367,86 @@ describe("UnifiedReportForm ↔ shared draft store (PP-idrb)", () => {
       );
     });
   });
+
+  describe("stale machineId handling (PP-lql)", () => {
+    it("drops stale machineId from draft, clears machine selection, and disables submit", () => {
+      seedDraft({
+        entry: {
+          machineId: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+          title: "PP-lql stale draft restoration",
+        },
+      });
+      mockUseActionState.mockReturnValue(idleState());
+      render(wrapped());
+
+      // Title should be restored from the draft
+      expect(screen.getByLabelText(/Issue Title/i)).toHaveValue(
+        "PP-lql stale draft restoration"
+      );
+
+      // Hidden machineId input should be present and reset to empty string
+      const machineInput = document.querySelector<HTMLInputElement>(
+        'input[name="machineId"]'
+      );
+      expect(machineInput).not.toBeNull();
+      expect(machineInput?.value).toBe("");
+
+      // Submit button should be disabled because machineId is invalid
+      expect(
+        screen.getByRole("button", { name: "Submit Issue Report" })
+      ).toBeDisabled();
+    });
+  });
+
+  describe("Clear button draft reset", () => {
+    it("clears title, machine, and strips ?machine= from URL on confirmation", async () => {
+      const user = userEvent.setup();
+      window.history.replaceState(
+        null,
+        "",
+        "/report/detailed?machine=11111111-1111-4111-8111-111111111111"
+      );
+
+      seedDraft({
+        entry: {
+          machineId: "11111111-1111-4111-8111-111111111111",
+          title: "Something broke",
+        },
+      });
+
+      mockUseActionState.mockReturnValue(idleState());
+      render(wrapped());
+
+      // Title should be restored from the draft
+      const titleInput = screen.getByLabelText(/Issue Title/i);
+      expect(titleInput).toHaveValue("Something broke");
+
+      // Hidden machineId input should hold the seeded machine
+      const machineInput = document.querySelector<HTMLInputElement>(
+        'input[name="machineId"]'
+      );
+      expect(machineInput).not.toBeNull();
+      expect(machineInput?.value).toBe("11111111-1111-4111-8111-111111111111");
+
+      // Click Clear to open confirmation dialog
+      const clearBtn = screen.getByRole("button", { name: /^Clear$/ });
+      await user.click(clearBtn);
+
+      // Confirm in AlertDialog
+      const confirmBtn = await screen.findByRole("button", {
+        name: "Clear fields",
+      });
+      await user.click(confirmBtn);
+
+      // Title is cleared
+      expect(titleInput).toHaveValue("");
+
+      // Machine is cleared and input remains present
+      expect(machineInput).not.toBeNull();
+      expect(machineInput?.value).toBe("");
+
+      // URL no longer carries ?machine=
+      expect(window.location.search).not.toContain("machine=");
+    });
+  });
 });

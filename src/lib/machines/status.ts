@@ -83,28 +83,41 @@ export function getMachineStatusLabel(status: MachineStatus): string {
 
 /**
  * Get CSS classes for machine status badge
- * Uses Material Design 3 color system from globals.css
  */
 export function getMachineStatusStyles(status: MachineStatus): string {
   const styles: Record<MachineStatus, string> = {
     operational:
-      "bg-success-container text-on-success-container border-success",
+      "bg-playability-operational/15 text-playability-operational border-playability-operational/45",
     needs_service:
-      "bg-warning-container text-on-warning-container border-warning",
-    unplayable: "bg-destructive/10 text-red-400 border-destructive/20",
+      "bg-playability-needs-service/15 text-playability-needs-service border-playability-needs-service/45",
+    unplayable:
+      "bg-playability-unplayable/15 text-playability-unplayable border-playability-unplayable/45",
   };
   return styles[status];
 }
 
 /**
- * Summary Widget colors per playability: `text` for the count, `fill` for the
- * bar segment. Same families as {@link getMachineStatusStyles}.
+ * Playability colors outside the badge: `text` for a count or icon, `fill` for
+ * a Summary Widget bar segment, `dot` for a solid status dot. Same tokens as
+ * {@link getMachineStatusStyles}.
  */
-export const MACHINE_STATUS_WIDGET_COLORS: Record<
+export const MACHINE_STATUS_COLORS: Record<
   MachineStatus,
-  { text: string; fill: string }
+  { text: string; fill: string; dot: string }
 > = {
-  operational: { text: "text-success", fill: "bg-success" },
-  needs_service: { text: "text-warning", fill: "bg-warning" },
-  unplayable: { text: "text-destructive-text", fill: "bg-destructive" },
+  operational: {
+    text: "text-playability-operational",
+    fill: "bg-playability-operational-bar",
+    dot: "bg-playability-operational",
+  },
+  needs_service: {
+    text: "text-playability-needs-service",
+    fill: "bg-playability-needs-service-bar",
+    dot: "bg-playability-needs-service",
+  },
+  unplayable: {
+    text: "text-playability-unplayable",
+    fill: "bg-playability-unplayable-bar",
+    dot: "bg-playability-unplayable",
+  },
 };

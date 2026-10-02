@@ -2,6 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { RelativeTimeProvider } from "~/components/issues/RelativeTimeProvider";
+import { SEVERITY_CONFIG } from "~/lib/issues/status";
 import { getMachineViewPreset } from "~/lib/machines/view/config";
 import type { MachineViewRow } from "~/lib/types";
 import { MachineViewTable } from "./MachineViewTable";
@@ -49,7 +50,7 @@ describe("MachineViewTable", () => {
       name: "View 2 open issues for Attack from Mars",
     });
     expect(issueLink).toHaveAttribute("href", "/issues?machine=AFM");
-    expect(issueLink).toHaveClass("text-amber-500");
+    expect(issueLink).toHaveClass(SEVERITY_CONFIG.major.iconColor);
     expect(
       screen.getByRole("link", {
         name: "View service history for Attack from Mars",

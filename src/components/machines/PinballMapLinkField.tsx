@@ -621,7 +621,7 @@ export function PinballMapLinkField({
             governs the whole group, and a control tucked in beside a label
             reads as subordinate to the thing it decides (Tim, 2026-08-27).
             The segmented control is the same one the Pinball Map block's
-            Intent row uses below — real buttons in a radiogroup, so keyboard
+            Lineup row uses below — real buttons in a radiogroup, so keyboard
             and screen-reader users get both positions (CORE-A11Y-004). */}
         <div className="flex items-center gap-2.5">
           <span

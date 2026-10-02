@@ -517,7 +517,7 @@ describe("the intent toggle", () => {
   it("uses lineup vocabulary in its accessible name (spec 4.8)", () => {
     renderControl({ view: VIEWS.syncOff });
     expect(
-      screen.getByRole("radiogroup", { name: "Pinball Map lineup intent" })
+      screen.getByRole("radiogroup", { name: "Pinball Map lineup setting" })
     ).toBeInTheDocument();
   });
 

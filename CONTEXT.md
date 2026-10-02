@@ -61,6 +61,11 @@ A user-created grouping of machines, owned and managed by a user.
 A third-party service PinPoint connects to for a defined purpose, such as
 Discord notifications or Pinball Map synchronization.
 
+**Lineup setting**:
+PinPoint's choice of whether a machine belongs on the tracked Pinball Map
+location's lineup: On the lineup, Off the lineup, or Don't sync.
+_Avoid_: Intent, listing intent
+
 **iScored game**:
 A game record tracked in the location's iScored gameroom, identified by a numeric game ID.
 _Avoid_: iScored match, title
