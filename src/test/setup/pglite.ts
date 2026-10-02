@@ -92,8 +92,8 @@ type PgliteTx = Parameters<
  * (leaking PGlite into every prod signature) or scatter one `as unknown as` per
  * call site, the whole PGlite↔postgres-js impedance mismatch is confined to this
  * one named, documented test-infra seam — the only unsafe casts live here and
- * nowhere else. Precedent for a confined, commented exception: `use-is-mobile` /
- * `use-table-responsive-columns` (the sanctioned CORE-RESP exceptions).
+ * nowhere else. Precedent for a confined, commented exception: `use-is-mobile`
+ * (the sanctioned CORE-RESP exception).
  */
 export function asDbOrTx(db: PgliteDatabase<typeof schema> | PgliteTx): DbOrTx {
   return db as unknown as DbOrTx;

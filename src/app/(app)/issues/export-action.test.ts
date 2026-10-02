@@ -53,6 +53,12 @@ vi.mock("~/server/db/schema", () => ({
   issues: {},
 }));
 
+// Scoped (Collection/Tag tab) exports are covered against PGlite in
+// src/test/integration/issue-export-scope.test.ts.
+vi.mock("./export-scope", () => ({
+  resolveExportScopeInitials: vi.fn(),
+}));
+
 vi.mock("~/lib/logger", () => ({
   log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));

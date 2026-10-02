@@ -35,6 +35,12 @@ export type IssueListItem = Pick<
   assignedToUser?: Pick<UserProfile, "id" | "name"> | null;
 };
 
+/** One row of an issue list page (issues-list §3), with its comment count. */
+export type IssueListRow = IssueListItem & {
+  /** Comments people wrote; system timeline entries are not counted. */
+  commentCount: number;
+};
+
 // reporterEmail is intentionally excluded: the only query that produces this
 // shape sets `columns: { reporterEmail: false }` to enforce CORE-SEC-007 email
 // privacy at runtime, and no consumer of this type reads it. Omitting it here

@@ -1,73 +1,155 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
-  ArrowUp,
-  ArrowDown,
-  ArrowUpDown,
   AlertCircle,
+  ArrowUpDown,
   Check,
   SlidersHorizontal,
 } from "lucide-react";
+import { toast } from "sonner";
 import { EmptyState } from "~/components/ui/empty-state";
-import { cn } from "~/lib/utils";
-import { formatDateTime } from "~/lib/dates";
-import { RelativeTime } from "~/components/issues/RelativeTime";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { Button } from "~/components/ui/button";
-import { ISSUE_PAGE_SIZES, hasActiveIssueFilters } from "~/lib/issues/filters";
 import {
-  STATUS_CONFIG,
-  SEVERITY_CONFIG,
-  PRIORITY_CONFIG,
-} from "~/lib/issues/status";
-import type { IssueListItem } from "~/lib/types";
-import Link from "next/link";
-import { formatIssueId } from "~/lib/issues/utils";
-import { toast } from "sonner";
+  DEFAULT_ISSUE_SORT,
+  ISSUE_PAGE_SIZES,
+  ISSUE_SORT_OPTIONS,
+  hasActiveIssueFilters,
+  isIssueSort,
+  parseIssueFilters,
+  type IssueSort,
+} from "~/lib/issues/filters";
+import {
+  ISSUE_PRIORITY_VALUES,
+  ISSUE_SEVERITY_VALUES,
+  type IssueListRow,
+} from "~/lib/types";
+import { ALL_ISSUE_STATUSES } from "~/lib/issues/status";
+import type { AccessLevel } from "~/lib/permissions/matrix";
+import { checkPermission } from "~/lib/permissions/helpers";
 import {
   updateIssueStatusAction,
   updateIssueSeverityAction,
   updateIssuePriorityAction,
   assignIssueAction,
 } from "~/app/(app)/issues/actions";
-
-import { useSearchParams } from "next/navigation";
+import type { IssueExportScope } from "~/app/(app)/issues/export-schema";
 import { useSearchFilters } from "~/hooks/use-search-filters";
-import { parseIssueFilters } from "~/lib/issues/filters";
-import { IssueEditableCell } from "~/components/issues/cells/IssueEditableCell";
 import {
-  IssueAssigneeCell,
+  IssueListEntry,
+  type IssueRowField,
   type UserOption,
-} from "~/components/issues/cells/IssueAssigneeCell";
-import {
-  useTableResponsiveColumns,
-  type ColumnConfig,
-} from "~/hooks/use-table-responsive-columns";
+} from "~/components/issues/IssueListEntry";
 import { ExportButton } from "~/components/issues/ExportButton";
 import { PaginationControls } from "~/components/issues/PaginationControls";
 
-export type SortDirection = "asc" | "desc" | null;
+/** Who is looking at the list, for per-row edit permissions (issues-list §3.5). */
+export interface IssueListViewer {
+  userId: string | undefined;
+  accessLevel: AccessLevel;
+}
 
 interface IssueListProps {
-  issues: IssueListItem[];
+  issues: IssueListRow[];
   totalCount: number;
-  sort: string;
+  sort: IssueSort;
   page: number;
   pageSize: number;
   allUsers: UserOption[];
+  viewer: IssueListViewer;
+  /** The Collection or Tag tab this list is on; absent on `/issues`. */
+  exportScope?: IssueExportScope | undefined;
 }
 
-const COLUMN_WIDTH = 150;
-const ISSUE_MIN_WIDTH = 200;
-const ISSUE_BUFFER = 50;
+const FIELD_LABELS: Record<IssueRowField, string> = {
+  status: "Status",
+  severity: "Severity",
+  priority: "Priority",
+  assignee: "Assignee",
+};
+
+/** Sends one row change to the matching server action. */
+async function saveField(
+  issueId: string,
+  field: IssueRowField,
+  value: string | null
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const formData = new FormData();
+  formData.append("issueId", issueId);
+  switch (field) {
+    case "status":
+      formData.append("status", value ?? "");
+      return updateIssueStatusAction(undefined, formData);
+    case "severity":
+      formData.append("severity", value ?? "");
+      return updateIssueSeverityAction(undefined, formData);
+    case "priority":
+      formData.append("priority", value ?? "");
+      return updateIssuePriorityAction(undefined, formData);
+    case "assignee":
+      formData.append("assignedTo", value ?? "");
+      return assignIssueAction(undefined, formData);
+  }
+}
+
+/**
+ * The rows to show after the server re-renders the same list (issues-list
+ * §3.6): the current order, fresh values where the server returned the row,
+ * then any rows that are new to the list.
+ */
+function keepRowsInPlace(
+  current: IssueListRow[],
+  fresh: IssueListRow[]
+): IssueListRow[] {
+  const freshById = new Map(fresh.map((row) => [row.id, row]));
+  const shown = new Set(current.map((row) => row.id));
+  return [
+    ...current.map((row) => freshById.get(row.id) ?? row),
+    ...fresh.filter((row) => !shown.has(row.id)),
+  ];
+}
+
+/** A row with one field changed to the value just saved. */
+function withField(
+  row: IssueListRow,
+  field: IssueRowField,
+  value: string | null,
+  users: UserOption[]
+): IssueListRow {
+  switch (field) {
+    case "status": {
+      const status = ALL_ISSUE_STATUSES.find((s) => s === value);
+      return status === undefined ? row : { ...row, status };
+    }
+    case "severity": {
+      const severity = ISSUE_SEVERITY_VALUES.find((s) => s === value);
+      return severity === undefined ? row : { ...row, severity };
+    }
+    case "priority": {
+      const priority = ISSUE_PRIORITY_VALUES.find((p) => p === value);
+      return priority === undefined ? row : { ...row, priority };
+    }
+    case "assignee": {
+      const user = users.find((u) => u.id === value);
+      return {
+        ...row,
+        assignedTo: user?.id ?? null,
+        assignedToUser: user ? { id: user.id, name: user.name } : null,
+      };
+    }
+  }
+}
 
 export function IssueList({
   issues,
@@ -76,123 +158,86 @@ export function IssueList({
   page,
   pageSize,
   allUsers,
+  viewer,
+  exportScope,
 }: IssueListProps): React.JSX.Element {
   const searchParams = useSearchParams();
   const filters = parseIssueFilters(searchParams);
   const { setSort, setPage, setPageSize } = useSearchFilters(filters);
 
-  const columnConfig = React.useMemo(
-    () =>
-      [
-        { key: "modified", minWidth: COLUMN_WIDTH, priority: 1 },
-        { key: "assignee", minWidth: COLUMN_WIDTH, priority: 2 },
-        { key: "severity", minWidth: COLUMN_WIDTH, priority: 3 },
-        { key: "priority", minWidth: COLUMN_WIDTH, priority: 4 },
-        { key: "status", minWidth: COLUMN_WIDTH, priority: 5 },
-      ] as (ColumnConfig & {
-        key: "modified" | "assignee" | "severity" | "priority" | "status";
-      })[],
-    []
-  );
-
-  // Responsive column visibility
-  const { visibleColumns, containerRef } = useTableResponsiveColumns<
-    "status" | "priority" | "severity" | "assignee" | "modified"
-  >(columnConfig, ISSUE_MIN_WIDTH, ISSUE_BUFFER);
-
-  // For managing multiple concurrent updates if needed, though we'll likely do one at a time per row/cell
-  const [_isPending, startTransition] = React.useTransition();
-  // format: issueId-field
+  const [, startTransition] = React.useTransition();
+  // The one row field being saved, and the one that last failed (issueId-field).
   const [updatingCell, setUpdatingCell] = React.useState<string | null>(null);
-  // Key (issueId-field) of the cell currently displaying an error indicator; null when none.
-  const [errorCellKey, setErrorCellKey] = React.useState<string | null>(null);
+  const [errorCell, setErrorCell] = React.useState<string | null>(null);
 
-  // Stable order tracking: only update display order when sort/page changes
-  const [stableIds, setStableIds] = React.useState<string[]>([]);
-  React.useEffect(() => {
-    setStableIds(issues.map((i) => i.id));
-  }, [issues, sort, page, pageSize, totalCount]);
+  // Stable rows (issues-list §3.6): after a change from a row, the server
+  // re-renders the page with fresh rows, which may reorder the list or drop
+  // the changed row from it. Until the list next reloads — a new URL, meaning
+  // new filters, sort, or page — keep the rows where they were, take fresh
+  // values where the server still returns the row, and keep the locally
+  // updated row where it does not.
+  const listKey = searchParams.toString();
+  const [rows, setRows] = React.useState(issues);
+  const [rowsKey, setRowsKey] = React.useState(listKey);
+  const [rowsSource, setRowsSource] = React.useState(issues);
+  if (rowsKey !== listKey) {
+    setRowsKey(listKey);
+    setRowsSource(issues);
+    setRows(issues);
+  } else if (rowsSource !== issues) {
+    setRowsSource(issues);
+    setRows(keepRowsInPlace(rows, issues));
+  }
 
-  const stableIssues = React.useMemo(() => {
-    const issueMap = new Map(issues.map((i) => [i.id, i]));
-    return stableIds
-      .map((id) => issueMap.get(id))
-      .filter((i): i is IssueListItem => !!i);
-  }, [issues, stableIds]);
-
-  const handleSort = (column: string): void => {
-    // Simple toggle logic
-    // For PinPoint, we mostly use column_asc/column_desc format in the URL
-    // Default for many is desc (e.g. updated_desc)
-
-    const newSort =
-      sort === `${column}_desc`
-        ? `${column}_asc`
-        : sort === `${column}_asc`
-          ? `${column}_desc`
-          : `${column}_desc`;
-
-    setSort(newSort);
+  const handleUpdate = (
+    issueId: string,
+    field: IssueRowField,
+    value: string | null
+  ): void => {
+    const cellKey = `${issueId}-${field}`;
+    setUpdatingCell(cellKey);
+    setErrorCell(null);
+    startTransition(async () => {
+      try {
+        const result = await saveField(issueId, field, value);
+        if (result.ok) {
+          setRows((current) =>
+            current.map((row) =>
+              row.id === issueId ? withField(row, field, value, allUsers) : row
+            )
+          );
+          toast.success(`${FIELD_LABELS[field]} updated`);
+        } else {
+          toast.error(result.message);
+          setErrorCell(cellKey);
+        }
+      } catch {
+        toast.error(`Failed to update ${field}`);
+        setErrorCell(cellKey);
+      } finally {
+        setUpdatingCell(null);
+      }
+    });
   };
 
-  const currentColumn = sort.split("_")[0];
-  const currentDirection = sort.split("_")[1] as SortDirection;
-
-  const renderSortIcon = (column: string): React.JSX.Element => {
-    if (currentColumn !== column) {
-      return (
-        <ArrowUpDown className="ml-2 h-4 w-4 opacity-30 group-hover:opacity-100 transition-opacity duration-150" />
-      );
-    }
-    return currentDirection === "asc" ? (
-      <ArrowUp className="ml-2 h-4 w-4 text-primary" />
-    ) : (
-      <ArrowDown className="ml-2 h-4 w-4 text-primary" />
-    );
+  const fieldState = (
+    issueId: string,
+    cell: string | null
+  ): IssueRowField | null => {
+    if (cell === null || !cell.startsWith(`${issueId}-`)) return null;
+    const field = cell.slice(issueId.length + 1);
+    return field === "status" ||
+      field === "severity" ||
+      field === "priority" ||
+      field === "assignee"
+      ? field
+      : null;
   };
 
-  const getSortAriaSort = (
-    column: string
-  ): "ascending" | "descending" | "none" => {
-    if (currentColumn !== column) return "none";
-    return currentDirection === "asc" ? "ascending" : "descending";
-  };
-
-  const TableHeader = ({
-    label,
-    column,
-    align = "left",
-    className,
-  }: {
-    label: string;
-    column: string;
-    align?: "left" | "right" | "center";
-    className?: string;
-  }): React.JSX.Element => (
-    <th
-      scope="col"
-      aria-sort={getSortAriaSort(column)}
-      className={cn(
-        "px-4 py-3 text-sm font-semibold text-muted-foreground sticky top-0 bg-muted/30 z-10",
-        align === "right" && "text-right",
-        align === "center" && "text-center",
-        className
-      )}
-    >
-      <button
-        type="button"
-        onClick={() => handleSort(column)}
-        className={cn(
-          "group flex w-full items-center cursor-pointer hover:text-foreground transition-colors duration-150",
-          align === "right" && "justify-end",
-          align === "center" && "justify-center"
-        )}
-      >
-        {label}
-        {renderSortIcon(column)}
-      </button>
-    </th>
-  );
+  const sortLabel =
+    ISSUE_SORT_OPTIONS.find((option) => option.value === sort)?.label ??
+    ISSUE_SORT_OPTIONS[0].label;
+  const filtersActive = hasActiveIssueFilters(searchParams);
 
   return (
     <div className="space-y-3">
@@ -201,12 +246,12 @@ export function IssueList({
           <span className="text-sm font-bold tracking-tight text-foreground/90 uppercase">
             Issues Log
           </span>
-          <span className="text-xs font-bold text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+          <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-bold text-muted-foreground">
             {totalCount}
           </span>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-2">
           <PaginationControls
             page={page}
             totalCount={totalCount}
@@ -217,7 +262,42 @@ export function IssueList({
             className="mr-2"
           />
 
-          <ExportButton filters={filters} />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-2 px-2.5 font-medium shadow-sm"
+                aria-label={`Sort: ${sortLabel}`}
+              >
+                <ArrowUpDown className="size-3.5" aria-hidden="true" />
+                {sortLabel}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel className="text-xs text-muted-foreground">
+                Sort
+              </DropdownMenuLabel>
+              <DropdownMenuRadioGroup
+                value={sort}
+                onValueChange={(value) =>
+                  setSort(isIssueSort(value) ? value : DEFAULT_ISSUE_SORT)
+                }
+              >
+                {ISSUE_SORT_OPTIONS.map((option) => (
+                  <DropdownMenuRadioItem
+                    key={option.value}
+                    value={option.value}
+                    className="text-xs"
+                  >
+                    {option.label}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <ExportButton filters={filters} scope={exportScope} />
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -226,71 +306,12 @@ export function IssueList({
                 size="sm"
                 className="h-8 gap-2 px-2.5 font-medium shadow-sm"
               >
-                <SlidersHorizontal className="h-3.5 w-3.5" />
+                <SlidersHorizontal className="size-3.5" aria-hidden="true" />
                 View Options
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                Sort Options
-              </DropdownMenuLabel>
-              <DropdownMenuItem
-                onClick={() => setSort("updated_desc")}
-                className="text-xs"
-              >
-                <span className="flex-1">Modified (Newest)</span>
-                {sort === "updated_desc" && (
-                  <Check className="h-3.5 w-3.5 ml-2" />
-                )}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => setSort("updated_asc")}
-                className="text-xs"
-              >
-                <span className="flex-1">Modified (Oldest)</span>
-                {sort === "updated_asc" && (
-                  <Check className="h-3.5 w-3.5 ml-2" />
-                )}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => setSort("created_desc")}
-                className="text-xs"
-              >
-                <span className="flex-1">Created (Newest)</span>
-                {sort === "created_desc" && (
-                  <Check className="h-3.5 w-3.5 ml-2" />
-                )}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => setSort("created_asc")}
-                className="text-xs"
-              >
-                <span className="flex-1">Created (Oldest)</span>
-                {sort === "created_asc" && (
-                  <Check className="h-3.5 w-3.5 ml-2" />
-                )}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => setSort("assignee_asc")}
-                className="text-xs"
-              >
-                <span className="flex-1">Assignee (A–Z)</span>
-                {sort === "assignee_asc" && (
-                  <Check className="h-3.5 w-3.5 ml-2" />
-                )}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => setSort("assignee_desc")}
-                className="text-xs"
-              >
-                <span className="flex-1">Assignee (Z–A)</span>
-                {sort === "assignee_desc" && (
-                  <Check className="h-3.5 w-3.5 ml-2" />
-                )}
-              </DropdownMenuItem>
-
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuLabel className="text-xs text-muted-foreground">
                 Page Size
               </DropdownMenuLabel>
               {ISSUE_PAGE_SIZES.map((size) => (
@@ -300,7 +321,7 @@ export function IssueList({
                   className="text-xs"
                 >
                   <span className="flex-1">{size} per page</span>
-                  {pageSize === size && <Check className="h-3.5 w-3.5 ml-2" />}
+                  {pageSize === size && <Check className="ml-2 size-3.5" />}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
@@ -308,297 +329,53 @@ export function IssueList({
         </div>
       </div>
 
-      <div
-        ref={containerRef}
-        className="w-full bg-card border rounded-lg overflow-hidden shadow-sm overflow-x-auto"
-      >
-        <div>
-          <table
-            className="w-full text-left border-collapse"
-            aria-label="Issues"
-          >
-            <thead>
-              <tr className="border-b bg-muted/30">
-                <TableHeader
-                  label="Issue"
-                  column="id"
-                  className="w-full min-w-[200px]"
-                />
-                {visibleColumns.status && (
-                  <TableHeader
-                    label="Status"
-                    column="status"
-                    className="min-w-[150px] max-w-[150px]"
-                  />
+      {rows.length > 0 && (
+        <ul
+          aria-label="Issues"
+          className="divide-y divide-border overflow-hidden rounded-lg border bg-card shadow-sm"
+        >
+          {rows.map((issue) => {
+            const ownership = {
+              userId: viewer.userId,
+              reporterId: issue.reportedByUser?.id ?? null,
+            };
+            return (
+              <IssueListEntry
+                key={issue.id}
+                issue={issue}
+                canEditReporting={checkPermission(
+                  "issues.update.reporting",
+                  viewer.accessLevel,
+                  ownership
                 )}
-                {visibleColumns.priority && (
-                  <TableHeader
-                    label="Priority"
-                    column="priority"
-                    className="min-w-[150px] max-w-[150px]"
-                  />
+                canTriage={checkPermission(
+                  "issues.update.triage",
+                  viewer.accessLevel,
+                  ownership
                 )}
-                {visibleColumns.severity && (
-                  <TableHeader
-                    label="Severity"
-                    column="severity"
-                    className="min-w-[150px] max-w-[150px]"
-                  />
-                )}
-                {visibleColumns.assignee && (
-                  <TableHeader
-                    label="Assignee"
-                    column="assignee"
-                    className="min-w-[150px] max-w-[150px]"
-                  />
-                )}
-                {visibleColumns.modified && (
-                  <TableHeader
-                    label="Modified"
-                    column="updated"
-                    align="right"
-                    className="min-w-[150px] max-w-[150px]"
-                  />
-                )}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {stableIssues.map((issue) => {
-                const statusConfig = STATUS_CONFIG[issue.status];
-                const severityConfig = SEVERITY_CONFIG[issue.severity];
-                const priorityConfig = PRIORITY_CONFIG[issue.priority];
+                users={allUsers}
+                onUpdate={(field, value) =>
+                  handleUpdate(issue.id, field, value)
+                }
+                updatingField={fieldState(issue.id, updatingCell)}
+                errorField={fieldState(issue.id, errorCell)}
+              />
+            );
+          })}
+        </ul>
+      )}
 
-                return (
-                  <tr
-                    key={issue.id}
-                    data-testid="issue-row"
-                    data-issue-id={issue.id}
-                    className="hover:bg-muted/50 transition-colors duration-150 group"
-                  >
-                    <td className="px-4 py-4 min-w-[200px] sm:min-w-[300px]">
-                      <div className="flex flex-col gap-0.5">
-                        <div className="flex items-center gap-1.5 text-sm font-bold text-foreground whitespace-nowrap overflow-hidden min-w-0">
-                          <Link
-                            href={`/m/${issue.machineInitials}/i/${issue.issueNumber}`}
-                            data-testid="issue-id"
-                            className="hover:text-primary transition-colors duration-150 shrink-0"
-                          >
-                            {formatIssueId(
-                              issue.machineInitials,
-                              issue.issueNumber
-                            )}
-                          </Link>
-                          <span className="text-muted-foreground font-medium shrink-0">
-                            —
-                          </span>
-                          <span className="text-muted-foreground font-semibold truncate min-w-0">
-                            {issue.machine.name}
-                          </span>
-                        </div>
-                        <Link
-                          href={`/m/${issue.machineInitials}/i/${issue.issueNumber}`}
-                          data-testid="issue-title"
-                          className="text-sm text-muted-foreground line-clamp-1 group-hover:text-foreground transition-colors duration-150"
-                        >
-                          {issue.title}
-                        </Link>
-                      </div>
-                    </td>
-                    {visibleColumns.status && (
-                      <IssueEditableCell
-                        issue={issue}
-                        field="status"
-                        config={statusConfig}
-                        options={Object.entries(STATUS_CONFIG).map(
-                          ([val, cfg]) => ({
-                            value: val,
-                            label: cfg.label,
-                            icon: cfg.icon,
-                            iconColor: cfg.iconColor,
-                          })
-                        )}
-                        onUpdate={(val) => {
-                          const formData = new FormData();
-                          formData.append("issueId", issue.id);
-                          formData.append("status", val);
-                          const cellKey = `${issue.id}-status`;
-                          setUpdatingCell(cellKey);
-                          setErrorCellKey(null);
-                          startTransition(async () => {
-                            try {
-                              const result = await updateIssueStatusAction(
-                                undefined,
-                                formData
-                              );
-                              if (result.ok) {
-                                toast.success("Status updated");
-                              } else {
-                                toast.error(result.message);
-                                setErrorCellKey(cellKey);
-                              }
-                            } catch {
-                              toast.error("Failed to update status");
-                              setErrorCellKey(cellKey);
-                            } finally {
-                              setUpdatingCell(null);
-                            }
-                          });
-                        }}
-                        isUpdating={updatingCell === `${issue.id}-status`}
-                        isError={errorCellKey === `${issue.id}-status`}
-                      />
-                    )}
-                    {visibleColumns.priority && (
-                      <IssueEditableCell
-                        issue={issue}
-                        field="priority"
-                        config={priorityConfig}
-                        options={Object.entries(PRIORITY_CONFIG).map(
-                          ([val, cfg]) => ({
-                            value: val,
-                            label: cfg.label,
-                            icon: cfg.icon,
-                            iconColor: cfg.iconColor,
-                          })
-                        )}
-                        onUpdate={(val) => {
-                          const formData = new FormData();
-                          formData.append("issueId", issue.id);
-                          formData.append("priority", val);
-                          const cellKey = `${issue.id}-priority`;
-                          setUpdatingCell(cellKey);
-                          setErrorCellKey(null);
-                          startTransition(async () => {
-                            try {
-                              const result = await updateIssuePriorityAction(
-                                undefined,
-                                formData
-                              );
-                              if (result.ok) {
-                                toast.success("Priority updated");
-                              } else {
-                                toast.error(result.message);
-                                setErrorCellKey(cellKey);
-                              }
-                            } catch {
-                              toast.error("Failed to update priority");
-                              setErrorCellKey(cellKey);
-                            } finally {
-                              setUpdatingCell(null);
-                            }
-                          });
-                        }}
-                        isUpdating={updatingCell === `${issue.id}-priority`}
-                        isError={errorCellKey === `${issue.id}-priority`}
-                      />
-                    )}
-                    {visibleColumns.severity && (
-                      <IssueEditableCell
-                        issue={issue}
-                        field="severity"
-                        config={severityConfig}
-                        options={Object.entries(SEVERITY_CONFIG).map(
-                          ([val, cfg]) => ({
-                            value: val,
-                            label: cfg.label,
-                            icon: cfg.icon,
-                            iconColor: cfg.iconColor,
-                          })
-                        )}
-                        onUpdate={(val) => {
-                          const formData = new FormData();
-                          formData.append("issueId", issue.id);
-                          formData.append("severity", val);
-                          const cellKey = `${issue.id}-severity`;
-                          setUpdatingCell(cellKey);
-                          setErrorCellKey(null);
-                          startTransition(async () => {
-                            try {
-                              const result = await updateIssueSeverityAction(
-                                undefined,
-                                formData
-                              );
-                              if (result.ok) {
-                                toast.success("Severity updated");
-                              } else {
-                                toast.error(result.message);
-                                setErrorCellKey(cellKey);
-                              }
-                            } catch {
-                              toast.error("Failed to update severity");
-                              setErrorCellKey(cellKey);
-                            } finally {
-                              setUpdatingCell(null);
-                            }
-                          });
-                        }}
-                        isUpdating={updatingCell === `${issue.id}-severity`}
-                        isError={errorCellKey === `${issue.id}-severity`}
-                      />
-                    )}
-                    {visibleColumns.assignee && (
-                      <IssueAssigneeCell
-                        issue={issue}
-                        users={allUsers}
-                        onUpdate={(userId) => {
-                          const formData = new FormData();
-                          formData.append("issueId", issue.id);
-                          formData.append("assignedTo", userId ?? "");
-                          setUpdatingCell(`${issue.id}-assignee`);
-                          startTransition(async () => {
-                            try {
-                              const result = await assignIssueAction(
-                                undefined,
-                                formData
-                              );
-                              if (result.ok) {
-                                toast.success("Assignee updated");
-                              } else {
-                                toast.error(result.message);
-                              }
-                            } catch {
-                              toast.error("Failed to update assignee");
-                            } finally {
-                              setUpdatingCell(null);
-                            }
-                          });
-                        }}
-                        isUpdating={updatingCell === `${issue.id}-assignee`}
-                      />
-                    )}
-                    {visibleColumns.modified && (
-                      <td className="px-4 py-4 text-right min-w-[150px] max-w-[150px]">
-                        <span className="text-xs font-medium text-foreground leading-tight line-clamp-2">
-                          <RelativeTime
-                            value={issue.updatedAt}
-                            fallback={formatDateTime(issue.updatedAt)}
-                          />
-                        </span>
-                      </td>
-                    )}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {issues.length === 0 && (
+      {rows.length === 0 && (
         <EmptyState
           icon={AlertCircle}
-          title={
-            hasActiveIssueFilters(searchParams)
-              ? "No issues found"
-              : "No issues yet"
-          }
+          title={filtersActive ? "No issues found" : "No issues yet"}
           description={
-            hasActiveIssueFilters(searchParams)
+            filtersActive
               ? "Adjust your filters to see more issues."
               : "Issues will appear here once they are reported."
           }
           action={
-            hasActiveIssueFilters(searchParams) ? (
+            filtersActive ? (
               <Button variant="outline" size="sm" asChild>
                 <Link href="/issues">Clear filters</Link>
               </Button>

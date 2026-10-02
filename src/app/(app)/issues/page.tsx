@@ -7,7 +7,8 @@ import { IssueFilters } from "~/components/issues/IssueFilters";
 import { IssueList } from "~/components/issues/IssueList";
 import { IssueSummaryWidgets } from "~/components/issues/IssueSummaryWidgets";
 import { createClient } from "~/lib/supabase/server";
-import { parseIssueFilters } from "~/lib/issues/filters";
+import { DEFAULT_ISSUE_SORT, parseIssueFilters } from "~/lib/issues/filters";
+import { getAccessLevel } from "~/lib/permissions/helpers";
 import { loadIssueListPage } from "~/lib/issues/list-page";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
@@ -115,10 +116,14 @@ export default async function IssuesPage({
         <IssueList
           issues={issuesList}
           totalCount={totalCount}
-          sort={filters.sort ?? "updated_desc"}
+          sort={filters.sort ?? DEFAULT_ISSUE_SORT}
           page={page}
           pageSize={pageSize}
           allUsers={assigneeUsers}
+          viewer={{
+            userId: user?.id,
+            accessLevel: getAccessLevel(currentUserProfile?.role),
+          }}
         />
       </div>
     </PageContainer>

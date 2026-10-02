@@ -15,8 +15,8 @@ const QUERY = "(max-width: 767px)";
  * behavior*: on mobile, tapping a settings row opens a bottom-sheet editor; on
  * desktop, the same row uses inline click-to-edit cells. Those are two
  * different component trees with different event wiring, not two stylings of
- * one tree, so CSS cannot express the difference. Precedent:
- * `use-table-responsive-columns` (PP-rs9), the other documented exception.
+ * one tree, so CSS cannot express the difference. It is the one documented
+ * exception (CORE-RESP-002).
  *
  * SSR-safe: starts `false` (desktop-shaped markup) and updates after mount.
  */

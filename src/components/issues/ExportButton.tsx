@@ -11,17 +11,21 @@ import {
 import { toast } from "sonner";
 import { exportIssuesAction } from "~/app/(app)/issues/export-action";
 import type { IssueFilters } from "~/lib/issues/filters";
+import type { IssueExportScope } from "~/app/(app)/issues/export-schema";
 
 interface ExportButtonProps {
   /** Current filter state — serialized and sent to the server action. */
   filters?: IssueFilters;
   /** Machine initials — for machine-page export (overrides filters). */
   machineInitials?: string;
+  /** The Collection or Tag tab the list belongs to; the server resolves it. */
+  scope?: IssueExportScope | undefined;
 }
 
 export function ExportButton({
   filters,
   machineInitials,
+  scope,
 }: ExportButtonProps): React.JSX.Element {
   const [isExporting, setIsExporting] = React.useState(false);
 
@@ -31,6 +35,7 @@ export function ExportButton({
       const result = await exportIssuesAction({
         ...(filters !== undefined && { filtersJson: JSON.stringify(filters) }),
         ...(machineInitials !== undefined && { machineInitials }),
+        ...(scope !== undefined && { scope }),
       });
 
       if (!result.ok) {

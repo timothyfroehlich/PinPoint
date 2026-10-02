@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatCompactAge,
   formatDayGroup,
+  formatShortAgo,
   formatTimelineBucket,
 } from "./dates";
 
@@ -107,6 +108,23 @@ describe("formatTimelineBucket", () => {
     expect(bucketA.key).toBe(bucketB.key);
     // But each row gets its own date chip.
     expect(bucketA.rowDateLabel).not.toBe(bucketB.rowDateLabel);
+  });
+});
+
+describe("formatShortAgo", () => {
+  const now = new Date("2026-06-09T12:00:00Z");
+
+  it.each([
+    ["2026-06-09T11:59:30Z", "just now"],
+    ["2026-07-01T00:00:00Z", "just now"], // future / clock skew
+    ["2026-06-09T11:48:00Z", "12m ago"],
+    ["2026-06-09T09:00:00Z", "3h ago"],
+    ["2026-06-08T11:00:00Z", "1d ago"],
+    ["2026-06-04T12:00:00Z", "5d ago"],
+    ["2026-01-01T12:00:00Z", "5mo ago"],
+    ["2024-12-09T12:00:00Z", "1y ago"],
+  ])("labels %s as %s", (date, expected) => {
+    expect(formatShortAgo(new Date(date), now)).toBe(expected);
   });
 });
 
