@@ -1,5 +1,5 @@
 import type React from "react";
-import type { LucideIcon } from "lucide-react";
+import { User, type LucideIcon } from "lucide-react";
 import {
   PRIORITY_CONFIG,
   SEVERITY_CONFIG,
@@ -12,10 +12,13 @@ interface IssueSummaryLineProps {
   status: IssueStatus;
   severity: IssueSeverity;
   priority: IssuePriority;
+  /** The assignee's name; null when unassigned. */
+  assigneeName: string | null;
 }
 
 /**
- * The read-only line under the issue title: status, severity, and priority,
+ * The read-only line under the issue title: assignee, status, severity, and
+ * priority,
  * each with its icon (spec issue-detail §4.7). Changing them happens in
  * Details.
  */
@@ -23,6 +26,7 @@ export function IssueSummaryLine({
   status,
   severity,
   priority,
+  assigneeName,
 }: IssueSummaryLineProps): React.JSX.Element {
   const items: {
     key: string;
@@ -32,6 +36,13 @@ export function IssueSummaryLine({
     /** Names the field for screen readers; the icon does that visually. */
     srPrefix?: string;
   }[] = [
+    {
+      key: "assignee",
+      icon: User,
+      color: "text-muted-foreground",
+      text: assigneeName ?? "Unassigned",
+      srPrefix: "Assignee:",
+    },
     {
       key: "status",
       icon: STATUS_CONFIG[status].icon,

@@ -250,22 +250,24 @@ export default async function IssueDetailPage({
         <div className="md:grid md:grid-cols-[minmax(0,1fr)_320px] md:gap-10">
           <div className="min-w-0 space-y-5">
             <header className="space-y-2 md:border-b md:border-outline-variant md:pb-5">
-              <div className="flex flex-wrap items-center gap-2 text-sm">
-                <span className="inline-flex rounded-full border border-outline-variant bg-muted/40 px-2.5 py-0.5 font-mono text-xs font-bold text-muted-foreground">
-                  {formatIssueId(initials, issue.issueNumber)}
-                </span>
-                <Link
-                  href={`/m/${initials}`}
-                  data-testid="machine-link"
-                  className="font-semibold text-primary transition-colors duration-150 hover:text-primary/80"
-                >
-                  {issue.machine.name}
-                </Link>
-              </div>
               <EditableIssueTitle
                 issueId={issue.id}
                 title={issue.title}
                 canEdit={userCanEditTitle}
+                eyebrow={
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <span className="inline-flex rounded-full border border-outline-variant bg-muted/40 px-2.5 py-0.5 font-mono text-xs font-bold text-muted-foreground">
+                      {formatIssueId(initials, issue.issueNumber)}
+                    </span>
+                    <Link
+                      href={`/m/${initials}`}
+                      data-testid="machine-link"
+                      className="font-semibold text-primary transition-colors duration-150 hover:text-primary/80"
+                    >
+                      {issue.machine.name}
+                    </Link>
+                  </div>
+                }
                 {...(userCanReassign
                   ? {
                       move: {
@@ -279,6 +281,7 @@ export default async function IssueDetailPage({
                 status={issue.status}
                 severity={issue.severity}
                 priority={issue.priority}
+                assigneeName={issue.assignedToUser?.name ?? null}
               />
             </header>
 

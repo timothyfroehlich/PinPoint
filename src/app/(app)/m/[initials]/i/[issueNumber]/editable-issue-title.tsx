@@ -47,6 +47,11 @@ interface EditableIssueTitleProps {
   issueId: string;
   title: string;
   canEdit: boolean;
+  /**
+   * The header's first row (Issue ID chip and machine link). On mobile the ⋯
+   * menu sits at its end so the title gets the full width (spec §4.1, §4.5).
+   */
+  eyebrow: React.ReactNode;
   /** Present when the viewer can move the issue to another machine. */
   move?: {
     currentInitials: string;
@@ -81,6 +86,7 @@ export function EditableIssueTitle({
   issueId,
   title,
   canEdit,
+  eyebrow,
   move,
 }: EditableIssueTitleProps): React.JSX.Element {
   const isMobile = useIsMobile();
@@ -236,132 +242,130 @@ export function EditableIssueTitle({
     </h1>
   );
 
-  if (isEditing) {
-    const length = editValue.trim().length;
-    const atLimit = length >= ISSUE_TITLE_MAX;
-    return (
-      <form ref={formRef} action={formAction} className="space-y-1">
-        {/* The page keeps its h1 while the title is being edited. */}
-        <h1 className="sr-only">{title}</h1>
-        <input type="hidden" name="issueId" value={issueId} />
-        <div className="flex items-center gap-2">
-          <Textarea
-            ref={inputRef}
-            name="title"
-            // One logical line that wraps like the heading it replaces, so a
-            // long title stays fully visible while it's edited. Enter saves,
-            // and pasted line breaks become spaces.
-            rows={1}
-            value={editValue}
-            onChange={(e) => {
-              setEditValue(e.target.value.replace(/\r?\n/g, " "));
-              setError(null);
-            }}
-            onKeyDown={handleKeyDown}
-            onBlur={() => {
-              // On mobile, leaving the field never cancels: Save and Cancel
-              // are explicit.
-              if (isMobile) return;
-              // Small delay to allow form submit to fire first
-              window.setTimeout(() => {
-                // Skip cancel if THIS edit session's submission errored —
-                // the user's typed edit would otherwise be silently
-                // discarded when they move focus to read the error toast.
-                // Press Escape to explicitly abandon a failed edit. The
-                // session-counter check ensures a stale error from a
-                // previous session doesn't block a fresh session's cancel.
-                const currentSessionErrored =
-                  erroredSessionRef.current === editSessionRef.current;
-                if (!isPendingRef.current && !currentSessionErrored) {
-                  handleCancel();
-                }
-              }, 200);
-            }}
-            // An older title may already exceed the limit (§4.4): the browser
-            // keeps an over-long value but blocks typing more, so it can only
-            // be edited down.
-            maxLength={ISSUE_TITLE_MAX}
-            enterKeyHint="done"
-            className={cn(
-              "min-h-0 resize-none overflow-hidden px-2 py-0.5",
-              titleTypeClassName
-            )}
-            aria-label="Edit issue title"
-            aria-describedby={cn(
-              error && "issue-title-error",
-              "issue-title-length issue-title-edit-help"
-            )}
-            aria-invalid={error ? true : undefined}
-            // Read-only, not disabled, while saving: a disabled input drops
-            // focus to <body>.
-            readOnly={isPending}
-            aria-busy={isPending || undefined}
-          />
-          {isPending && (
-            <Loader2
-              className="size-5 shrink-0 animate-spin text-muted-foreground motion-reduce:animate-none"
-              aria-hidden="true"
-            />
+  const length = editValue.trim().length;
+  const atLimit = length >= ISSUE_TITLE_MAX;
+  const editor = (
+    <form ref={formRef} action={formAction} className="space-y-1">
+      {/* The page keeps its h1 while the title is being edited. */}
+      <h1 className="sr-only">{title}</h1>
+      <input type="hidden" name="issueId" value={issueId} />
+      <div className="flex items-center gap-2">
+        <Textarea
+          ref={inputRef}
+          name="title"
+          // One logical line that wraps like the heading it replaces, so a
+          // long title stays fully visible while it's edited. Enter saves,
+          // and pasted line breaks become spaces.
+          rows={1}
+          value={editValue}
+          onChange={(e) => {
+            setEditValue(e.target.value.replace(/\r?\n/g, " "));
+            setError(null);
+          }}
+          onKeyDown={handleKeyDown}
+          onBlur={() => {
+            // On mobile, leaving the field never cancels: Save and Cancel
+            // are explicit.
+            if (isMobile) return;
+            // Small delay to allow form submit to fire first
+            window.setTimeout(() => {
+              // Skip cancel if THIS edit session's submission errored —
+              // the user's typed edit would otherwise be silently
+              // discarded when they move focus to read the error toast.
+              // Press Escape to explicitly abandon a failed edit. The
+              // session-counter check ensures a stale error from a
+              // previous session doesn't block a fresh session's cancel.
+              const currentSessionErrored =
+                erroredSessionRef.current === editSessionRef.current;
+              if (!isPendingRef.current && !currentSessionErrored) {
+                handleCancel();
+              }
+            }, 200);
+          }}
+          // An older title may already exceed the limit (§4.4): the browser
+          // keeps an over-long value but blocks typing more, so it can only
+          // be edited down.
+          maxLength={ISSUE_TITLE_MAX}
+          enterKeyHint="done"
+          className={cn(
+            "min-h-0 resize-none overflow-hidden px-2 py-0.5",
+            titleTypeClassName
           )}
+          aria-label="Edit issue title"
+          aria-describedby={cn(
+            error && "issue-title-error",
+            "issue-title-length issue-title-edit-help"
+          )}
+          aria-invalid={error ? true : undefined}
+          // Read-only, not disabled, while saving: a disabled input drops
+          // focus to <body>.
+          readOnly={isPending}
+          aria-busy={isPending || undefined}
+        />
+        {isPending && (
+          <Loader2
+            className="size-5 shrink-0 animate-spin text-muted-foreground motion-reduce:animate-none"
+            aria-hidden="true"
+          />
+        )}
+      </div>
+      {error ? (
+        <p
+          id="issue-title-error"
+          role="alert"
+          className="text-sm text-destructive-text"
+        >
+          {error}
+        </p>
+      ) : null}
+      {/* Reaching the limit is announced; every keystroke is not. */}
+      <span className="sr-only" aria-live="polite">
+        {atLimit ? `${length} of ${ISSUE_TITLE_MAX} characters` : ""}
+      </span>
+      <span id="issue-title-edit-help" className="sr-only">
+        {isMobile
+          ? "Done or Save saves. Cancel discards the edit."
+          : "Enter saves. Escape cancels."}
+      </span>
+      <div className="flex items-start justify-between gap-2">
+        <div
+          id="issue-title-length"
+          className={cn(
+            "text-xs",
+            atLimit ? "text-destructive-text" : "text-muted-foreground"
+          )}
+        >
+          {length}/{ISSUE_TITLE_MAX}
         </div>
-        {error ? (
-          <p
-            id="issue-title-error"
-            role="alert"
-            className="text-sm text-destructive-text"
-          >
-            {error}
-          </p>
-        ) : null}
-        {/* Reaching the limit is announced; every keystroke is not. */}
-        <span className="sr-only" aria-live="polite">
-          {atLimit ? `${length} of ${ISSUE_TITLE_MAX} characters` : ""}
-        </span>
-        <span id="issue-title-edit-help" className="sr-only">
-          {isMobile
-            ? "Done or Save saves. Cancel discards the edit."
-            : "Enter saves. Escape cancels."}
-        </span>
-        <div className="flex items-start justify-between gap-2">
-          <div
-            id="issue-title-length"
-            className={cn(
-              "text-xs",
-              atLimit ? "text-destructive-text" : "text-muted-foreground"
-            )}
-          >
-            {length}/{ISSUE_TITLE_MAX}
+        {isMobile ? (
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              // 44px hit area without a taller button.
+              className="relative after:absolute after:inset-x-0 after:-inset-y-1.5"
+              onClick={handleCancel}
+              aria-disabled={isPending || undefined}
+              data-testid="issue-title-cancel"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="relative after:absolute after:inset-x-0 after:-inset-y-1.5"
+              onClick={handleSave}
+              aria-disabled={isPending || undefined}
+              data-testid="issue-title-save"
+            >
+              Save
+            </Button>
           </div>
-          {isMobile ? (
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                // 44px hit area without a taller button.
-                className="relative after:absolute after:inset-x-0 after:-inset-y-1.5"
-                onClick={handleCancel}
-                aria-disabled={isPending || undefined}
-                data-testid="issue-title-cancel"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                className="relative after:absolute after:inset-x-0 after:-inset-y-1.5"
-                onClick={handleSave}
-                aria-disabled={isPending || undefined}
-                data-testid="issue-title-save"
-              >
-                Save
-              </Button>
-            </div>
-          ) : null}
-        </div>
-      </form>
-    );
-  }
+        ) : null}
+      </div>
+    </form>
+  );
 
   const moveDialog = move ? (
     <ReassignMachineForm
@@ -376,97 +380,116 @@ export function EditableIssueTitle({
     />
   ) : null;
 
-  if (!canEdit && !move) {
-    return <div className="flex items-start gap-1">{heading}</div>;
-  }
+  const hasActions = canEdit || move !== undefined;
 
   return (
-    <div className="flex items-start gap-1">
-      {heading}
-
-      {/* Desktop: Edit title and a labeled Move button (spec §4.3, §4.5). */}
-      <div className="hidden shrink-0 items-center gap-2 md:flex">
-        {canEdit ? (
-          <Button
-            ref={editButtonRef}
-            variant="ghost"
-            size="icon"
-            className="size-9 text-muted-foreground hover:text-foreground"
-            onClick={() => setIsEditing(true)}
-            aria-label="Edit title"
-            data-testid="issue-edit-title"
-          >
-            <Pencil className="size-4" aria-hidden="true" />
-          </Button>
-        ) : null}
-        {move ? (
-          <Button
-            ref={moveButtonRef}
-            type="button"
-            variant="outline"
-            className="h-9 gap-2 px-3"
-            onClick={() => setMoveOpen(true)}
-            aria-label="Move to another machine"
-            data-testid="issue-move-button"
-          >
-            <ArrowLeftRight className="size-4" aria-hidden="true" />
-            Move
-          </Button>
+    <>
+      <div className="flex items-center gap-2">
+        <div className="min-w-0 flex-1">{eyebrow}</div>
+        {hasActions ? (
+          <>
+            {/* Mobile: both actions behind one ⋯ menu. */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  ref={menuTriggerRef}
+                  variant="ghost"
+                  size="icon"
+                  className="-my-2.5 -mr-2 size-11 shrink-0 text-muted-foreground hover:text-foreground md:hidden"
+                  aria-label="Issue actions"
+                  data-testid="issue-actions-menu-trigger"
+                >
+                  <MoreHorizontal className="size-5" aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                onCloseAutoFocus={(event) => {
+                  if (menuChoiceRef.current) {
+                    event.preventDefault();
+                    menuChoiceRef.current = false;
+                    // The menu stays mounted beside the editor, so it hands
+                    // focus to the field itself once it has closed.
+                    inputRef.current?.focus();
+                  }
+                }}
+              >
+                {canEdit ? (
+                  <DropdownMenuItem
+                    className="min-h-11"
+                    onSelect={() => {
+                      menuChoiceRef.current = true;
+                      setIsEditing(true);
+                    }}
+                  >
+                    <Pencil className="size-4" aria-hidden="true" />
+                    Edit title
+                  </DropdownMenuItem>
+                ) : null}
+                {move ? (
+                  <DropdownMenuItem
+                    className="min-h-11"
+                    onSelect={() => {
+                      menuChoiceRef.current = true;
+                      setMoveOpen(true);
+                    }}
+                    data-testid="issue-actions-menu-reassign"
+                  >
+                    <ArrowLeftRight className="size-4" aria-hidden="true" />
+                    Move to another machine
+                  </DropdownMenuItem>
+                ) : null}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
         ) : null}
       </div>
 
-      {/* Mobile: both actions behind one ⋯ menu. */}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            ref={menuTriggerRef}
-            variant="ghost"
-            size="icon"
-            className="-mr-2 size-11 shrink-0 text-muted-foreground hover:text-foreground md:hidden"
-            aria-label="Issue actions"
-            data-testid="issue-actions-menu-trigger"
-          >
-            <MoreHorizontal className="size-5" aria-hidden="true" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align="end"
-          onCloseAutoFocus={(event) => {
-            if (menuChoiceRef.current) {
-              event.preventDefault();
-              menuChoiceRef.current = false;
+      {isEditing ? (
+        editor
+      ) : (
+        <div className="flex items-start gap-1">
+          {heading}
+          {/* Desktop: Edit title and a labeled Move button (spec §4.3, §4.5). */}
+          <div
+            className={
+              hasActions
+                ? "hidden shrink-0 items-center gap-2 md:flex"
+                : "hidden"
             }
-          }}
-        >
-          {canEdit ? (
-            <DropdownMenuItem
-              className="min-h-11"
-              onSelect={() => {
-                menuChoiceRef.current = true;
-                setIsEditing(true);
-              }}
-            >
-              <Pencil className="size-4" aria-hidden="true" />
-              Edit title
-            </DropdownMenuItem>
-          ) : null}
-          {move ? (
-            <DropdownMenuItem
-              className="min-h-11"
-              onSelect={() => {
-                menuChoiceRef.current = true;
-                setMoveOpen(true);
-              }}
-              data-testid="issue-actions-menu-reassign"
-            >
-              <ArrowLeftRight className="size-4" aria-hidden="true" />
-              Move to another machine
-            </DropdownMenuItem>
-          ) : null}
-        </DropdownMenuContent>
-      </DropdownMenu>
+          >
+            {canEdit ? (
+              <Button
+                ref={editButtonRef}
+                variant="ghost"
+                size="icon"
+                className="size-9 text-muted-foreground hover:text-foreground"
+                onClick={() => setIsEditing(true)}
+                aria-label="Edit title"
+                data-testid="issue-edit-title"
+              >
+                <Pencil className="size-4" aria-hidden="true" />
+              </Button>
+            ) : null}
+            {move ? (
+              <Button
+                ref={moveButtonRef}
+                type="button"
+                variant="outline"
+                className="h-9 gap-2 px-3"
+                onClick={() => setMoveOpen(true)}
+                aria-label="Move to another machine"
+                data-testid="issue-move-button"
+              >
+                <ArrowLeftRight className="size-4" aria-hidden="true" />
+                Move
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      )}
 
       {moveDialog}
-    </div>
+    </>
   );
 }
