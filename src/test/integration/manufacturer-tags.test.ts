@@ -147,12 +147,11 @@ describe("manufacturer tags", () => {
         columns: "machine",
       }),
     });
-    expect(ownerFiltered.state.owner).toEqual([]);
-    expect(ownerFiltered.rows.map((row) => row.initials).sort()).toEqual([
-      "EXC",
-      "GON",
-      "LNK",
-    ]);
+    // An owner with no machines in the tag stays selected and matches nothing
+    // there; the tag's scope is never widened (list-views §10.18).
+    expect(ownerFiltered.state.owner).toEqual([outsiderId]);
+    expect(ownerFiltered.rows).toEqual([]);
+    expect(ownerFiltered.scopeCount).toBe(3);
   });
 
   it("shows the current manufacturer across the directory", async () => {
