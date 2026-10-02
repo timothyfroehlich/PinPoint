@@ -12,7 +12,7 @@ When building a new page, pick the closest archetype and follow its pattern.
 
 ### List Page (issues, machines)
 
-`max-w-7xl` -- Filters + card grid `md:grid-cols-2 lg:grid-cols-3`.
+`max-w-7xl`. Top to bottom: title row with page actions → Summary Widgets → search with the Primary Filter dropdowns → one bordered list box (List Header: Saved View tabs, Edited/Save/Discard, sort, compact pager, Export, View options; then the rows) → pager. Below `md`: search gets its own row, the list box runs edge to edge, filters and sort live in one Filters sheet, Saved Views in their own sheet, and a 44px pager is pinned above the tab bar. Rows are one line (machines) or two lines (issues) at every size. Requirements live in `docs/feature-specs/list-views.md`; this entry is the visual summary.
 
 ### Detail Page with Sidebar (machine detail)
 
