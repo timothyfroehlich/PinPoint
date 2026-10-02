@@ -165,7 +165,7 @@
 | §3–§8, §12 | Neither list uses the shared layout, List Header, phone sheets, or overflow rules. | PP-jb9v |
 | §5.7 | Issues offers 15, 25, and 50 per page, defaulting to 15. | PP-jb9v |
 | §9.2, §9.4 | Issues uses snake_case parameters and a composite sort value. | PP-jb9v |
-| §10 | Issues has no Saved Views; machine Saved Views and defaults belong to one Surface each and appear in a menu rather than List Header tabs. | PP-jb9v |
+| §10 | Issues has no Saved Views; machine Saved Views appear in a menu rather than List Header tabs. | PP-jb9v |
 | §11 | Issues restores the last URL from a cookie across sessions; Machines does not restore. | PP-jb9v |
 
 ---

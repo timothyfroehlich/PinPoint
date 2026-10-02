@@ -86,15 +86,17 @@ interface MachineViewSavedViewsMenuProps {
   /** Owner filter values valid in this scope (the loader drops the rest). */
   ownerIds: string[];
   preset: MachineViewPresetId;
-  /** Opens a Built-in or Saved View at page 1 (spec §8.6, §9.5). */
+  /** Opens a Built-in or Saved View at page 1 (list-views §10.6). */
   onApply: (view: MachineViewSelectableView) => void;
-  /** Marks the current configuration as coming from `viewId` (§4.11). */
+  /** Marks the current configuration as coming from `viewId` (§9.6). */
   onViewSaved: (viewId: string) => void;
 }
 
 /**
- * The Saved Views menu (spec §8.7, §8.9, §8.13): a dropdown on desktop and a
- * bottom sheet on phones, with Save changes, Save as new, and Manage views.
+ * The Saved Views menu (list-views §5.3, §10.8, §10.12): a dropdown on
+ * desktop and a bottom sheet on phones, with Save changes, Save as new, and
+ * Manage views. Every machine Surface lists the same Saved Views (§10.5); only
+ * the Machines page offers the Default View (§10.10).
  */
 export function MachineViewSavedViewsMenu({
   layout,
@@ -118,14 +120,14 @@ export function MachineViewSavedViewsMenu({
   );
   const activeSavedView =
     savedViews.views.find((view) => view.id === activeViewId) ?? null;
-  // No `view` reference means the Page Preset's configuration (spec §4.11).
+  // No `view` reference means the Page Preset's configuration (§9.6).
   const activeView =
     activeSavedView ??
     savedViews.builtInViews.find((view) => view.id === activeViewId) ??
     pagePresetView ??
     null;
   // A stored owner that no longer exists in this scope was dropped when the
-  // view was applied (spec §8.15); it does not make the view read as edited.
+  // view was applied (§10.14); it does not make the view read as edited.
   const baseline = activeView
     ? {
         ...activeView.state,
@@ -173,7 +175,7 @@ export function MachineViewSavedViewsMenu({
         active={view.id === activeView?.id}
       >
         <span className="truncate">{view.name}</span>
-        {view.id === savedViews.defaultViewId ? (
+        {savedViews.offersDefault && view.id === savedViews.defaultViewId ? (
           <span className="ml-auto pl-3 text-xs text-muted-foreground">
             Default
           </span>
@@ -182,7 +184,8 @@ export function MachineViewSavedViewsMenu({
     ));
 
   // Save changes applies only to Saved Views; Built-in Views never change
-  // (spec §8.7, §9.4, §9.5).
+  // (§5.3, §10.16). Manage views has nothing to offer off the Machines page
+  // until the account has a Saved View to rename or delete.
   const actions = (
     close: (after: () => void) => void,
     itemClassName: string
@@ -203,12 +206,14 @@ export function MachineViewSavedViewsMenu({
         >
           Save as new…
         </MenuEntry>
-        <MenuEntry
-          className={itemClassName}
-          onSelect={() => close(() => setManageOpen(true))}
-        >
-          Manage views…
-        </MenuEntry>
+        {savedViews.offersDefault || savedViews.views.length > 0 ? (
+          <MenuEntry
+            className={itemClassName}
+            onSelect={() => close(() => setManageOpen(true))}
+          >
+            Manage views…
+          </MenuEntry>
+        ) : null}
       </>
     ) : null;
 
@@ -387,7 +392,7 @@ function MenuEntry({
 
 const DropdownContext = React.createContext(true);
 
-/** Save as new (spec §8.7, §8.8, §8.10). */
+/** Save as new (list-views §5.3, §10.1, §10.7, §10.9). */
 function SaveViewDialog({
   open,
   onOpenChange,
@@ -421,10 +426,9 @@ function SaveViewDialog({
     }
     startTransition(async () => {
       const result = await createSavedMachineViewAction({
-        surface: savedViews.surface,
         name,
         state: toMachineViewSavedState(state),
-        makeDefault,
+        makeDefault: savedViews.offersDefault && makeDefault,
       });
       if (!result.ok) {
         setError(result.message);
@@ -473,16 +477,21 @@ function SaveViewDialog({
               </p>
             ) : null}
           </div>
-          <div className="flex items-center gap-2.5">
-            <Checkbox
-              id="machine-view-save-default"
-              checked={makeDefault}
-              onCheckedChange={(checked) => setMakeDefault(checked === true)}
-            />
-            <Label htmlFor="machine-view-save-default" className="font-normal">
-              Open this view by default
-            </Label>
-          </div>
+          {savedViews.offersDefault ? (
+            <div className="flex items-center gap-2.5">
+              <Checkbox
+                id="machine-view-save-default"
+                checked={makeDefault}
+                onCheckedChange={(checked) => setMakeDefault(checked === true)}
+              />
+              <Label
+                htmlFor="machine-view-save-default"
+                className="font-normal"
+              >
+                Open this view by default
+              </Label>
+            </div>
+          ) : null}
           <DialogFooter>
             <Button
               type="button"
@@ -502,8 +511,9 @@ function SaveViewDialog({
 }
 
 /**
- * Choose the default among Built-in and Saved Views; rename or delete Saved
- * Views (spec §8.9, §8.10, §8.14, §9.4).
+ * Rename or delete Saved Views and, on the Machines page, choose the Default
+ * View among Built-in and Saved Views (list-views §10.8–§10.10, §10.13,
+ * §10.16).
  */
 function ManageViewsDialog({
   open,
@@ -520,25 +530,28 @@ function ManageViewsDialog({
         <DialogHeader>
           <DialogTitle>Manage views</DialogTitle>
           <DialogDescription className="sr-only">
-            Choose the view this page opens with, and rename or delete your
-            saved views.
+            {savedViews.offersDefault
+              ? "Choose the view this page opens with, and rename or delete your saved views."
+              : "Rename or delete your saved views."}
           </DialogDescription>
         </DialogHeader>
-        <ul className="divide-y divide-outline-variant rounded-lg border border-outline-variant">
-          {savedViews.builtInViews.map((view) => (
-            <li key={view.id} className="flex items-center gap-2 p-2 pl-3">
-              <span className="min-w-0 flex-1 truncate text-sm text-foreground">
-                {view.name}
-              </span>
-              <DefaultToggle
-                savedViews={savedViews}
-                viewId={view.id}
-                viewName={view.name}
-                target={{ kind: "builtIn", id: view.id }}
-              />
-            </li>
-          ))}
-        </ul>
+        {savedViews.offersDefault ? (
+          <ul className="divide-y divide-outline-variant rounded-lg border border-outline-variant">
+            {savedViews.builtInViews.map((view) => (
+              <li key={view.id} className="flex items-center gap-2 p-2 pl-3">
+                <span className="min-w-0 flex-1 truncate text-sm text-foreground">
+                  {view.name}
+                </span>
+                <DefaultToggle
+                  savedViews={savedViews}
+                  viewId={view.id}
+                  viewName={view.name}
+                  target={{ kind: "builtIn", id: view.id }}
+                />
+              </li>
+            ))}
+          </ul>
+        ) : null}
         {savedViews.views.length > 0 ? (
           <ul className="divide-y divide-outline-variant rounded-lg border border-outline-variant">
             {savedViews.views.map((view) => (
@@ -587,7 +600,7 @@ function useViewAction(): {
   return { error, setError, isPending, run };
 }
 
-/** Makes a view the Surface's default, or clears it (spec §8.10). */
+/** Makes a view the machine Default View, or clears it (§10.8, §10.9). */
 function DefaultToggle({
   savedViews,
   viewId,
@@ -617,7 +630,6 @@ function DefaultToggle({
         onClick={() =>
           run(() =>
             setMachineViewDefaultAction({
-              surface: savedViews.surface,
               target: isDefault ? null : target,
             })
           )
@@ -689,12 +701,14 @@ function ManageViewRow({
           }}
           className="h-9 min-w-0 flex-1"
         />
-        <DefaultToggle
-          savedViews={savedViews}
-          viewId={view.id}
-          viewName={view.name}
-          target={{ kind: "saved", id: view.id }}
-        />
+        {savedViews.offersDefault ? (
+          <DefaultToggle
+            savedViews={savedViews}
+            viewId={view.id}
+            viewName={view.name}
+            target={{ kind: "saved", id: view.id }}
+          />
+        ) : null}
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button
@@ -712,9 +726,11 @@ function ManageViewRow({
             <AlertDialogHeader>
               <AlertDialogTitle>Delete {view.name}?</AlertDialogTitle>
               <AlertDialogDescription>
-                {isDefault
-                  ? "This is your default view. This page will open to its standard view instead."
-                  : "This view will be removed permanently."}
+                {!isDefault
+                  ? "This view will be removed permanently."
+                  : savedViews.offersDefault
+                    ? "This is your default view. This page will open to its standard view instead."
+                    : "This is your default view. Machines will open to its standard view instead."}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

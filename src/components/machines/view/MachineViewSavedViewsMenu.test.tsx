@@ -10,6 +10,7 @@ import type {
   MachineViewSavedViewSummary,
   MachineViewState,
 } from "~/lib/types";
+import { toMachineViewSavedState } from "~/lib/machines/view/state";
 import { MachineViewSavedViewsMenu } from "./MachineViewSavedViewsMenu";
 
 const actions = vi.hoisted(() => ({
@@ -27,7 +28,6 @@ vi.mock("next/navigation", () => ({
 }));
 
 const presetState = getMachineViewPreset("machines").defaultState;
-const builtInViews = getMachineViewBuiltInViews("machines");
 const brokenView: MachineViewSavedViewSummary = {
   id: "11111111-1111-4111-8111-111111111111",
   name: "Broken machines",
@@ -49,14 +49,19 @@ const brokenView: MachineViewSavedViewSummary = {
 function renderMenu(
   state: MachineViewState,
   activeViewId: string | null,
-  options: { canSave?: boolean; defaultViewId?: string | null } = {}
+  options: {
+    canSave?: boolean;
+    defaultViewId?: string | null;
+    preset?: "machines" | "collection";
+  } = {}
 ): { onApply: ReturnType<typeof vi.fn> } {
   const onApply = vi.fn();
   const canSave = options.canSave ?? true;
+  const preset = options.preset ?? "machines";
   const savedViews: MachineViewSavedViews = {
-    surface: { kind: "machines" },
     canSave,
-    builtInViews,
+    offersDefault: canSave && preset === "machines",
+    builtInViews: getMachineViewBuiltInViews(preset),
     views: canSave ? [brokenView] : [],
     defaultViewId: options.defaultViewId ?? null,
     activeViewId,
@@ -68,7 +73,7 @@ function renderMenu(
       activeViewId={activeViewId}
       state={state}
       ownerIds={[]}
-      preset="machines"
+      preset={preset}
       onApply={onApply}
       onViewSaved={vi.fn()}
     />
@@ -200,8 +205,47 @@ describe("MachineViewSavedViewsMenu", () => {
     );
 
     expect(actions.setMachineViewDefaultAction).toHaveBeenCalledWith({
-      surface: { kind: "machines" },
       target: { kind: "builtIn", id: "service-due" },
+    });
+  });
+
+  it("offers no Default View controls off the Machines page", async () => {
+    const user = userEvent.setup();
+    actions.createSavedMachineViewAction.mockResolvedValue({
+      ok: true,
+      value: { id: "22222222-2222-4222-8222-222222222222" },
+    });
+    const collectionState = getMachineViewPreset("collection").defaultState;
+    renderMenu(collectionState, null, {
+      preset: "collection",
+      defaultViewId: brokenView.id,
+    });
+
+    await user.click(screen.getByRole("button", { name: /^Views:/ }));
+    // The account's Saved View is listed, but not marked as a default here.
+    expect(
+      screen.getByRole("menuitem", { name: "Broken machines" })
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("menuitem", { name: "Manage views…" }));
+    expect(
+      screen.queryByRole("button", { name: /by default$/ })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Delete Broken machines" })
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Done" }));
+
+    await user.click(screen.getByRole("button", { name: /^Views:/ }));
+    await user.click(screen.getByRole("menuitem", { name: "Save as new…" }));
+    expect(
+      screen.queryByLabelText("Open this view by default")
+    ).not.toBeInTheDocument();
+    await user.type(screen.getByRole("textbox", { name: /Name/ }), "Mine");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expect(actions.createSavedMachineViewAction).toHaveBeenCalledWith({
+      name: "Mine",
+      state: toMachineViewSavedState(collectionState),
+      makeDefault: false,
     });
   });
 

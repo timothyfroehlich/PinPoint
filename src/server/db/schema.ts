@@ -34,7 +34,7 @@ import {
 } from "~/lib/opdb/types";
 import { PINTIP_CATEGORIES } from "~/lib/pintips/types";
 import { REPORT_MODE_VALUES } from "~/lib/types/user";
-import type { MachineViewSavedState } from "~/lib/types/machine-view";
+import { LIST_HOSTS } from "~/lib/types/list-view";
 
 /**
  * ⚠️ IMPORTANT: When adding new tables to this schema file,
@@ -1203,34 +1203,30 @@ export const collectionCollaborators = pgTable(
 ).enableRLS();
 
 /**
- * Personal Machine View Saved Views (spec machine-views.md §8, PP-8bh6).
+ * Personal Saved Views (spec list-views.md §10, PP-jb9v.3).
  *
- * A row belongs to one account (`user_id`) and one Surface: Machines, one
- * standard Collection (`collection_id`), or one owner Collection
- * (`owner_collection_user_id`, the machine owner whose Collection it is).
- * Deleting the Collection or either account deletes the row (§8.16). `state`
- * is the Machine View configuration minus the page number (§8.2); it is
- * re-validated through the URL parser whenever it is applied (§8.15).
+ * A row belongs to one account (`user_id`) and one List Host (`host`):
+ * machines or issues. It is offered on every Surface of that host (§10.5),
+ * so deleting a Collection or Tag deletes none (§10.15). `state` is the
+ * host's View Configuration minus the page number (§10.2), stored as the host
+ * wrote it; the host re-validates it whenever it is read (§10.14).
+ *
+ * The SQL table keeps its original Machine View name; renaming it would break
+ * the deployment that still serves while a new one migrates. The three
+ * `legacy*` columns are that deployment's per-Surface ownership. The expand
+ * migration (0098) merged every row onto the Machines Surface and pins them
+ * there; nothing in this runtime reads them, and PP-jb9v.5 drops them.
  */
-export const machineViewSavedViews = pgTable(
+export const savedViews = pgTable(
   "machine_view_saved_views",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     userId: uuid("user_id")
       .notNull()
       .references(() => userProfiles.id, { onDelete: "cascade" }),
-    surface: text("surface", {
-      enum: ["machines", "collection", "owner"],
-    }).notNull(),
-    collectionId: uuid("collection_id").references(() => collections.id, {
-      onDelete: "cascade",
-    }),
-    ownerCollectionUserId: uuid("owner_collection_user_id").references(
-      () => userProfiles.id,
-      { onDelete: "cascade" }
-    ),
+    host: text("host", { enum: LIST_HOSTS }).notNull().default("machines"),
     name: text("name").notNull(),
-    state: jsonb("state").$type<MachineViewSavedState>().notNull(),
+    state: jsonb("state").$type<unknown>().notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -1238,88 +1234,94 @@ export const machineViewSavedViews = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    legacySurface: text("surface", {
+      enum: ["machines", "collection", "owner"],
+    })
+      .notNull()
+      .default("machines"),
+    legacyCollectionId: uuid("collection_id").references(() => collections.id, {
+      onDelete: "cascade",
+    }),
+    legacyOwnerCollectionUserId: uuid("owner_collection_user_id").references(
+      () => userProfiles.id,
+      { onDelete: "cascade" }
+    ),
   },
   (t) => ({
-    surfaceCheck: check(
-      "machine_view_saved_views_surface_check",
-      sql`(${t.surface} = 'machines' AND ${t.collectionId} IS NULL AND ${t.ownerCollectionUserId} IS NULL)
-        OR (${t.surface} = 'collection' AND ${t.collectionId} IS NOT NULL AND ${t.ownerCollectionUserId} IS NULL)
-        OR (${t.surface} = 'owner' AND ${t.collectionId} IS NULL AND ${t.ownerCollectionUserId} IS NOT NULL)`
+    hostCheck: check(
+      "machine_view_saved_views_host_check",
+      sql`${t.host} IN ('machines', 'issues')`
+    ),
+    legacySurfaceCheck: check(
+      "machine_view_saved_views_legacy_surface_check",
+      sql`${t.legacySurface} = 'machines' AND ${t.legacyCollectionId} IS NULL AND ${t.legacyOwnerCollectionUserId} IS NULL`
     ),
     nameNotBlank: check(
       "machine_view_saved_views_name_not_blank",
       sql`length(btrim(${t.name})) > 0`
     ),
-    // §8.8: names are unique per account and Surface, ignoring case.
-    nameUnique: uniqueIndex("uq_machine_view_saved_views_name").on(
+    // §10.7: names are unique per account and List Host, ignoring case.
+    nameUnique: uniqueIndex("uq_machine_view_saved_views_host_name").on(
       t.userId,
-      t.surface,
-      sql`coalesce(${t.collectionId}, ${t.ownerCollectionUserId}, '00000000-0000-0000-0000-000000000000'::uuid)`,
+      t.host,
       sql`lower(${t.name})`
     ),
-    collectionIdx: index("idx_machine_view_saved_views_collection").on(
-      t.collectionId
-    ),
-    ownerCollectionIdx: index(
-      "idx_machine_view_saved_views_owner_collection"
-    ).on(t.ownerCollectionUserId),
   })
 ).enableRLS();
 
 /**
- * An account's default view on one Surface (spec machine-views.md §8.10): one
- * of its Saved Views or a Built-in View id (§9). Deleting the Saved View
- * deletes the row, leaving the Surface without a default (§8.14).
+ * An account's Default View on one List Host (spec list-views.md §10.9): one
+ * of its Saved Views of that host or a Built-in View id. Only the host's main
+ * page opens it (§10.10). Deleting the Saved View deletes the row, leaving the
+ * host without a default (§10.13). Like {@link savedViews}, the SQL name and
+ * the `legacy*` columns predate List Hosts; PP-jb9v.5 drops the columns.
  */
-export const machineViewDefaults = pgTable(
+export const savedViewDefaults = pgTable(
   "machine_view_defaults",
   {
     userId: uuid("user_id")
       .notNull()
       .references(() => userProfiles.id, { onDelete: "cascade" }),
-    surface: text("surface", {
-      enum: ["machines", "collection", "owner"],
-    }).notNull(),
-    collectionId: uuid("collection_id").references(() => collections.id, {
+    host: text("host", { enum: LIST_HOSTS }).notNull().default("machines"),
+    savedViewId: uuid("saved_view_id").references(() => savedViews.id, {
       onDelete: "cascade",
     }),
-    ownerCollectionUserId: uuid("owner_collection_user_id").references(
-      () => userProfiles.id,
-      { onDelete: "cascade" }
-    ),
-    savedViewId: uuid("saved_view_id").references(
-      () => machineViewSavedViews.id,
-      { onDelete: "cascade" }
-    ),
     builtInViewId: text("built_in_view_id"),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    legacySurface: text("surface", {
+      enum: ["machines", "collection", "owner"],
+    })
+      .notNull()
+      .default("machines"),
+    legacyCollectionId: uuid("collection_id").references(() => collections.id, {
+      onDelete: "cascade",
+    }),
+    legacyOwnerCollectionUserId: uuid("owner_collection_user_id").references(
+      () => userProfiles.id,
+      { onDelete: "cascade" }
+    ),
   },
   (t) => ({
-    surfaceCheck: check(
-      "machine_view_defaults_surface_check",
-      sql`(${t.surface} = 'machines' AND ${t.collectionId} IS NULL AND ${t.ownerCollectionUserId} IS NULL)
-        OR (${t.surface} = 'collection' AND ${t.collectionId} IS NOT NULL AND ${t.ownerCollectionUserId} IS NULL)
-        OR (${t.surface} = 'owner' AND ${t.collectionId} IS NULL AND ${t.ownerCollectionUserId} IS NOT NULL)`
+    hostCheck: check(
+      "machine_view_defaults_host_check",
+      sql`${t.host} IN ('machines', 'issues')`
+    ),
+    legacySurfaceCheck: check(
+      "machine_view_defaults_legacy_surface_check",
+      sql`${t.legacySurface} = 'machines' AND ${t.legacyCollectionId} IS NULL AND ${t.legacyOwnerCollectionUserId} IS NULL`
     ),
     targetCheck: check(
       "machine_view_defaults_target_check",
       sql`(${t.savedViewId} IS NULL) <> (${t.builtInViewId} IS NULL)`
     ),
-    oneDefault: uniqueIndex("uq_machine_view_defaults_surface").on(
+    oneDefault: uniqueIndex("uq_machine_view_defaults_host").on(
       t.userId,
-      t.surface,
-      sql`coalesce(${t.collectionId}, ${t.ownerCollectionUserId}, '00000000-0000-0000-0000-000000000000'::uuid)`
+      t.host
     ),
     savedViewIdx: index("idx_machine_view_defaults_saved_view").on(
       t.savedViewId
-    ),
-    collectionIdx: index("idx_machine_view_defaults_collection").on(
-      t.collectionId
-    ),
-    ownerCollectionIdx: index("idx_machine_view_defaults_owner_collection").on(
-      t.ownerCollectionUserId
     ),
   })
 ).enableRLS();
