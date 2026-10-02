@@ -17,7 +17,7 @@
 ## 2. Route & shell
 
 - **2.1** The hub lives at `/m/<initials>/hub`. The initials segment follows the machine page's canonical-casing rule: a lowercase or mixed-case scan redirects to the canonical URL.
-- **2.2** The hub renders inside PinPoint's standard shell — the app header and the mobile bottom tab bar. It does not render the machine page's tab strip (Info · Settings · Service · Timeline · Manage).
+- **2.2** The hub renders inside PinPoint's standard shell — the app header and the mobile bottom tab bar. It does not render the machine page's tab strip (Info · Settings · Service · Apron card · Timeline · Manage).
 - **2.3** The hub is reachable signed out. Signed-out visitors see the shell's normal Sign In / Sign Up controls; nothing on the hub requires an account before the first tap.
 - **2.4** The hub is designed for phones. On a viewport 768px or wider it renders the same single column, centered, at phone width — it never grows a desktop layout.
 
@@ -60,6 +60,7 @@ _None — the current implementation matches this spec._
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-02 | §2.2: the tab strip includes the Apron card tab. |
 | 2026-10-02 | §6.1: Report a problem stays on the `warning` token, described as yellow; the tie to the Major severity color is dropped (Major is orange under the PP-jb9v.1 state palette). |
 | 2026-09-27 | §5.1–§5.3 retired and §5.5–§5.6 added: the hub scrolls, with the action buttons pinned above the tab bar and content fading under them. §3.7: the band leaves the top 60px of the next card visible. §5.4: the band's minimum is 180px. §3.8 added: the PinTips tip card. §1 Thumb zone redefined as the pinned bar. |
 | 2026-09-24 | §3.6–§3.7 added: artwork band at the top of the hub, whole image, sized to the free height with a blurred fill. §3.1: the identity block sits over the band. §5.2: the Open issues card no longer collapses on the smallest phone; the band shrinks instead. §5.4 added: the band's minimum height. |
