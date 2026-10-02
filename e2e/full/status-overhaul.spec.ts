@@ -1,5 +1,6 @@
 import { test, expect } from "../support/fixtures.js";
 import {
+  showIssueSection,
   updateIssueField,
   visibleIssueFieldControl,
   selectMachine,
@@ -47,6 +48,8 @@ test.describe("Status Overhaul E2E", () => {
     // in CI due to cookie propagation timing.
     await expect(page).toHaveURL(/\/m\/TAF\/i\/[0-9]+/, { timeout: 30000 });
 
+    // The field rows live in Details (its own tab on phones).
+    await showIssueSection(page, "Details");
     await expect(visibleIssueFieldControl(page, "status")).toContainText(
       /New/i
     );
@@ -63,19 +66,24 @@ test.describe("Status Overhaul E2E", () => {
     // 3. Update Status
     await updateIssueField(page, "status", "in_progress");
 
-    // 4. Verify status change in badge and timeline
+    // 4. Verify the status row shows the new value
     await expect(visibleIssueFieldControl(page, "status")).toContainText(
       /In Progress/i
     );
-    // 5. Verify actor attribution on the system timeline event
-    const statusEvent = page.getByText(
-      "Status changed from New to In Progress"
-    );
-    await expect(statusEvent).toBeVisible();
 
-    // The system event should show who made the change
-    const systemEventRow = statusEvent.locator("..");
-    await expect(systemEventRow.getByTestId("system-event-actor")).toHaveText(
+    // 5. Activity (on the Issue tab on phones) records the change as one
+    // system line, attributed to the member who made it.
+    await showIssueSection(page, "Issue");
+    const statusEvent = page
+      .getByTestId("issue-timeline")
+      .getByTestId(/^timeline-item-/)
+      .filter({
+        has: page
+          .getByTestId("system-event-text")
+          .filter({ hasText: "changed status New → In Progress" }),
+      });
+    await expect(statusEvent).toBeVisible();
+    await expect(statusEvent.getByTestId("system-event-actor")).toHaveText(
       TEST_USERS.member.name
     );
   });

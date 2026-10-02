@@ -2,7 +2,8 @@
  * E2E Tests for Issue Machine Reassignment (PP-3hb)
  *
  * Verifies the "Move to another machine" action on the issue detail page —
- * the header's Move button from `md` up, the ⋯ "Issue actions" menu below it. NN #11 — every clickable element gets clicked in an E2E test.
+ * the header's Move button from `md` up, the ⋯ "Issue actions" menu below
+ * it. NN #11 — every clickable element gets clicked in an E2E test.
  */
 
 import { test, expect, type Page, type TestInfo } from "../support/fixtures.js";
@@ -154,9 +155,8 @@ test.describe("Issue reassignment", () => {
       ).toHaveCount(0);
 
       if (hasIssueSectionTabs(page)) {
-        await openDropdownMenu(
-          page.getByRole("button", { name: "Issue actions" })
-        );
+        // By test id: the open menu aria-hides its own trigger.
+        await openDropdownMenu(page.getByTestId("issue-actions-menu-trigger"));
         await expect(
           page.getByRole("menuitem", { name: "Edit title" })
         ).toBeVisible();
