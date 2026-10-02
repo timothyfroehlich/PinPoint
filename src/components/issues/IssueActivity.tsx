@@ -50,6 +50,12 @@ function SystemEventRow({
       ? formatTimelineEventAction(entry.eventData)
       : formatTimelineEvent(entry.eventData)
     : null;
+  // A deleted comment keeps its original row, so its own time is when it was
+  // posted; the event happened when the row last changed.
+  const when =
+    entry.eventData?.type === "comment_deleted"
+      ? entry.updatedAt
+      : entry.createdAt;
 
   return (
     <div
@@ -77,8 +83,8 @@ function SystemEventRow({
         <span className="whitespace-nowrap">
           <span aria-hidden="true">· </span>
           <ExactRelativeTime
-            value={entry.createdAt}
-            fallback={formatDateTime(entry.createdAt)}
+            value={when}
+            fallback={formatDateTime(when)}
             className="text-sm"
           />
         </span>

@@ -870,12 +870,14 @@ export async function deleteCommentAction(
       })
       .where(eq(issueImages.commentId, commentId));
 
-    // Convert comment to structured audit trail event
+    // Convert comment to structured audit trail event. Like every other
+    // system event, its author is the person who acted — here, whoever
+    // deleted it — so Activity can name them (spec §7.11).
     await db
       .update(issueComments)
       .set({
         isSystem: true,
-        authorId: null,
+        authorId: user.id,
         content: null,
         eventData: {
           type: "comment_deleted",

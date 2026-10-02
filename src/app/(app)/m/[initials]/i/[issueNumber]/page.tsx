@@ -257,7 +257,7 @@ export default async function IssueDetailPage({
                 <Link
                   href={`/m/${initials}`}
                   data-testid="machine-link"
-                  className="font-semibold text-foreground transition-colors duration-150 hover:text-primary"
+                  className="font-semibold text-primary transition-colors duration-150 hover:text-primary/80"
                 >
                   {issue.machine.name}
                 </Link>

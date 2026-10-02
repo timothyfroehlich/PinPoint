@@ -250,7 +250,8 @@ describe("deleteCommentAction — integration (PP-x4li.1.4)", () => {
 
     expect(row).toBeDefined();
     expect(row.isSystem).toBe(true);
-    expect(row.authorId).toBeNull();
+    // The deleter becomes the event's actor (spec §7.11).
+    expect(row.authorId).toBe(MEMBER_ID);
     expect(row.content).toBeNull();
     expect(row.eventData).toMatchObject({
       type: "comment_deleted",
@@ -277,7 +278,7 @@ describe("deleteCommentAction — integration (PP-x4li.1.4)", () => {
       .where(eq(issueComments.id, commentId));
 
     expect(row.isSystem).toBe(true);
-    expect(row.authorId).toBeNull();
+    expect(row.authorId).toBe(ADMIN_ID);
     expect(row.content).toBeNull();
     expect(row.eventData).toMatchObject({
       type: "comment_deleted",

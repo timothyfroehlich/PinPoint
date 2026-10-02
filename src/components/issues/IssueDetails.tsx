@@ -35,7 +35,7 @@ const cardClassName =
 // row its usual height. The name truncates in an inner span, since a flex
 // container can't ellipsize its own text.
 const linkClassName =
-  "inline-flex min-w-0 max-w-full items-center rounded-sm font-medium text-foreground transition-colors duration-150 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring max-md:-my-2 max-md:min-h-11";
+  "inline-flex min-w-0 max-w-full items-center rounded-sm font-medium text-primary transition-colors duration-150 hover:text-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring max-md:-my-2 max-md:min-h-11";
 
 /**
  * Details (spec issue-detail §9): the field rows, then the context rows. The
