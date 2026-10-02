@@ -19,6 +19,11 @@ interface WatchButtonProps {
  * Watch toggle. The count follows the toggle immediately rather than waiting
  * for the page to revalidate, and the new count is announced politely.
  *
+ * The server's props are the truth. A toggle is an optimistic override tied to
+ * the props it was made against, so it lapses as soon as they change — after
+ * this toggle revalidates, or after a server-side change such as posting a
+ * comment, which makes the author a watcher (spec §8.5).
+ *
  * The button names the action it takes — Watch or Unwatch — and that visible
  * text is its whole accessible name (WCAG 2.5.3), so it carries no
  * `aria-pressed`: a pressed state on a name that changes would read twice.
@@ -31,9 +36,15 @@ export function WatchButton({
   initialIsWatching,
   canWatch,
 }: WatchButtonProps): React.JSX.Element {
-  const [isWatching, setIsWatching] = useState(initialIsWatching);
+  const propsKey = `${String(initialIsWatching)}:${watcherCount}`;
+  const [toggled, setToggled] = useState<{
+    isWatching: boolean;
+    propsKey: string;
+  } | null>(null);
   const [isPending, startTransition] = useTransition();
   const [announcement, setAnnouncement] = useState("");
+  const isWatching =
+    toggled?.propsKey === propsKey ? toggled.isWatching : initialIsWatching;
   const count =
     watcherCount + (isWatching ? 1 : 0) - (initialIsWatching ? 1 : 0);
 
@@ -44,7 +55,7 @@ export function WatchButton({
       const result = await toggleWatcherAction(issueId);
       if (result.ok) {
         const nowWatching = result.value.isWatching;
-        setIsWatching(nowWatching);
+        setToggled({ isWatching: nowWatching, propsKey });
         const nextCount =
           watcherCount + (nowWatching ? 1 : 0) - (initialIsWatching ? 1 : 0);
         setAnnouncement(
