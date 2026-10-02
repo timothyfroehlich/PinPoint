@@ -51,9 +51,14 @@ interface MenuSection {
   options: MenuOption[];
 }
 
-const STATUS_SECTIONS: MenuSection[] = (
-  Object.keys(STATUS_GROUPS) as (keyof typeof STATUS_GROUPS)[]
-).map((group) => ({
+/** The status menu's sections, in workflow order. */
+const STATUS_GROUP_ORDER = [
+  "new",
+  "in_progress",
+  "closed",
+] as const satisfies readonly (keyof typeof STATUS_GROUPS)[];
+
+const STATUS_SECTIONS: MenuSection[] = STATUS_GROUP_ORDER.map((group) => ({
   label: STATUS_GROUP_LABELS[group],
   options: STATUS_GROUPS[group].map((status) => ({
     value: status,
@@ -157,6 +162,20 @@ const PILL_CLASSES =
 const EDITABLE_CLASSES =
   "cursor-pointer transition-colors duration-150 hover:brightness-125 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60";
 
+/*
+ * Phone hit areas (list-views §7.9: every phone control is at least 44px).
+ * A control smaller than 44px keeps its visual size and gets an invisible
+ * `::before` that grows its hit area to 44×44 below `md`. Hit areas sit on
+ * layer 1 of the row's stacking context and every control's visible part on
+ * layer 2, so a hit area only claims taps on space no visible control
+ * occupies: tapping a title, machine link, pill, or avatar always reaches
+ * that control, even where a neighbor's hit area reaches under it.
+ */
+const HIT_AREA_CLASSES =
+  "relative before:absolute before:z-[1] md:before:hidden";
+/** Lifts a control's visible part above neighboring hit areas. */
+const VISIBLE_LAYER = "relative z-[2]";
+
 /** Severity or priority badge; a menu button for people who may change it. */
 function FieldPill({
   name,
@@ -210,10 +229,24 @@ function FieldPill({
         <button
           type="button"
           aria-label={`${name}: ${label}, change`}
-          className={cn(PILL_CLASSES, EDITABLE_CLASSES, styles)}
+          className={cn(
+            "group/pill inline-flex cursor-pointer rounded-full align-middle focus-visible:outline-none disabled:cursor-not-allowed",
+            // 24px pill → 44px tall; its width already exceeds 44px.
+            HIT_AREA_CLASSES,
+            "before:-inset-y-2.5 before:inset-x-0"
+          )}
           data-testid={`issue-${name.toLowerCase()}`}
         >
-          {content}
+          <span
+            className={cn(
+              PILL_CLASSES,
+              VISIBLE_LAYER,
+              "transition-colors duration-150 group-hover/pill:brightness-125 group-focus-visible/pill:ring-2 group-focus-visible/pill:ring-ring group-disabled/pill:opacity-60",
+              styles
+            )}
+          >
+            {content}
+          </span>
         </button>
       }
     />
@@ -238,6 +271,7 @@ function AssigneeAvatar({
       aria-hidden="true"
       className={cn(
         "inline-flex shrink-0 items-center justify-center rounded-full font-bold",
+        VISIBLE_LAYER,
         name === null
           ? "border border-dashed border-muted-foreground/60"
           : "bg-muted text-foreground",
@@ -314,6 +348,7 @@ function AssigneeControl({
           className={cn(
             "inline-flex items-center justify-center rounded-full",
             EDITABLE_CLASSES,
+            HIT_AREA_CLASSES,
             className
           )}
           data-testid="issue-assignee"
@@ -378,7 +413,7 @@ export function IssueListEntry({
     <li
       data-testid="issue-row"
       data-issue-id={issue.id}
-      className="flex items-start gap-2.5 px-4 py-2.5 transition-colors duration-150 hover:bg-muted/40"
+      className="isolate flex items-start gap-2.5 px-4 py-2.5 transition-colors duration-150 hover:bg-muted/40"
     >
       {errorField !== null && (
         <span role="alert" className="sr-only">
@@ -399,7 +434,10 @@ export function IssueListEntry({
               aria-label={`Status: ${status.label}, change`}
               className={cn(
                 "-ml-1 flex size-7 shrink-0 items-center justify-center rounded-md hover:bg-muted",
-                EDITABLE_CLASSES
+                EDITABLE_CLASSES,
+                // 28px → 44px, into the row padding and the column gap only.
+                HIT_AREA_CLASSES,
+                "before:-inset-2"
               )}
               data-testid="issue-status"
             >
@@ -417,7 +455,10 @@ export function IssueListEntry({
         <div className="leading-snug">
           <Link
             href={issueHref}
-            className="mr-1.5 align-middle text-[15px] font-semibold text-foreground break-words transition-colors duration-150 hover:text-primary"
+            className={cn(
+              "mr-1.5 align-middle text-[15px] font-semibold text-foreground break-words transition-colors duration-150 hover:text-primary",
+              VISIBLE_LAYER
+            )}
             data-testid="issue-title"
           >
             {issue.title}
@@ -461,7 +502,10 @@ export function IssueListEntry({
             <span aria-hidden="true">·</span>
             <Link
               href={`/m/${issue.machineInitials}`}
-              className="min-w-0 truncate underline decoration-primary/30 underline-offset-2 transition-colors duration-150 hover:text-foreground"
+              className={cn(
+                "min-w-0 truncate underline decoration-primary/30 underline-offset-2 transition-colors duration-150 hover:text-foreground",
+                VISIBLE_LAYER
+              )}
             >
               {issue.machine.name}
             </Link>
@@ -476,7 +520,7 @@ export function IssueListEntry({
               <span className="hidden md:inline">updated </span>
               <RelativeTime
                 value={issue.updatedAt}
-                format="short"
+                format="compact"
                 fallback={formatDate(issue.updatedAt)}
               />
             </span>
@@ -489,7 +533,7 @@ export function IssueListEntry({
             isUpdating={updatingField === "assignee"}
             onChange={onAssigneeChange}
             avatarClassName="size-5 text-[9px]"
-            className="-my-1.5 -mr-1.5 size-8 shrink-0 items-center justify-center md:hidden"
+            className="-my-1.5 -mr-1.5 size-8 shrink-0 items-center justify-center before:-inset-1.5 md:hidden"
           />
         </div>
       </div>

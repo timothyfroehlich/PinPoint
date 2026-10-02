@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   formatCompactAge,
+  formatCompactAgeAgo,
   formatDayGroup,
-  formatShortAgo,
   formatTimelineBucket,
 } from "./dates";
 
@@ -111,23 +111,6 @@ describe("formatTimelineBucket", () => {
   });
 });
 
-describe("formatShortAgo", () => {
-  const now = new Date("2026-06-09T12:00:00Z");
-
-  it.each([
-    ["2026-06-09T11:59:30Z", "just now"],
-    ["2026-07-01T00:00:00Z", "just now"], // future / clock skew
-    ["2026-06-09T11:48:00Z", "12m ago"],
-    ["2026-06-09T09:00:00Z", "3h ago"],
-    ["2026-06-08T11:00:00Z", "1d ago"],
-    ["2026-06-04T12:00:00Z", "5d ago"],
-    ["2026-01-01T12:00:00Z", "5mo ago"],
-    ["2024-12-09T12:00:00Z", "1y ago"],
-  ])("labels %s as %s", (date, expected) => {
-    expect(formatShortAgo(new Date(date), now)).toBe(expected);
-  });
-});
-
 describe("formatCompactAge", () => {
   const now = new Date("2026-06-09T12:00:00Z");
 
@@ -155,5 +138,20 @@ describe("formatCompactAge", () => {
     expect(formatCompactAge(new Date("2024-12-09T12:00:00Z"), now)).toBe(
       "1y 6mo"
     );
+  });
+});
+
+describe("formatCompactAgeAgo", () => {
+  const now = new Date("2026-09-21T12:00:00.000Z");
+
+  it("formats compact service ages", () => {
+    expect(formatCompactAgeAgo("2026-09-19T12:00:00.000Z", now)).toBe("2d ago");
+    expect(formatCompactAgeAgo("2026-08-19T12:00:00.000Z", now)).toBe(
+      "1mo 2d ago"
+    );
+    expect(formatCompactAgeAgo("2024-08-19T12:00:00.000Z", now)).toBe(
+      "2y 1mo ago"
+    );
+    expect(formatCompactAgeAgo(now, now)).toBe("today");
   });
 });

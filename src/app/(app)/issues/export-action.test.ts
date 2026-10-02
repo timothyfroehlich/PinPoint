@@ -55,8 +55,10 @@ vi.mock("~/server/db/schema", () => ({
 
 // Scoped (Collection/Tag tab) exports are covered against PGlite in
 // src/test/integration/issue-export-scope.test.ts.
+const mockResolveExportScopeInitials = vi.fn();
 vi.mock("./export-scope", () => ({
-  resolveExportScopeInitials: vi.fn(),
+  resolveExportScopeInitials: (...args: unknown[]) =>
+    mockResolveExportScopeInitials(...args),
 }));
 
 vi.mock("~/lib/logger", () => ({
@@ -334,6 +336,22 @@ describe("exportIssuesAction", () => {
       if (!result.ok) {
         expect(result.code).toBe("SERVER");
       }
+    });
+
+    it("returns SERVER error when a scope loader throws", async () => {
+      mockResolveExportScopeInitials.mockRejectedValue(
+        new Error("Connection timeout")
+      );
+
+      const result = await exportIssuesAction({
+        scope: { kind: "tag", type: "location", slug: "back-room" },
+      });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("SERVER");
+      }
+      expect(mockFindManyIssues).not.toHaveBeenCalled();
     });
   });
 });

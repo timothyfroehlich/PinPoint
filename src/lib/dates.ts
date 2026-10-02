@@ -112,32 +112,16 @@ export function formatCompactAge(
 }
 
 /**
- * Short relative label for dense list rows: "just now", "12m ago", "3h ago",
- * "5d ago", "4mo ago", "2y ago". One unit only, so it fits beside other
- * metadata on a phone row.
- *
- * `now` is injectable for testing; client components pass the shared ticker
- * value so SSR and hydration agree (see `RelativeTime`).
+ * {@link formatCompactAge} with an "ago" suffix, for the age fields of list
+ * rows on both List Hosts (machine-views §5.7, issues-list §3.3): "today",
+ * "5d ago", "2mo 5d ago", "1y 3mo ago".
  */
-export function formatShortAgo(
+export function formatCompactAgeAgo(
   date: Date | string | number,
   now: Date | number = new Date()
 ): string {
-  const start = toDate(date);
-  const end = toDate(now);
-  const minutes = Math.floor((end.getTime() - start.getTime()) / 60_000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const {
-    years = 0,
-    months = 0,
-    days = 0,
-  } = intervalToDuration({ start, end });
-  if (years > 0) return `${years}y ago`;
-  if (months > 0) return `${months}mo ago`;
-  return `${Math.max(days, 1)}d ago`;
+  const age = formatCompactAge(date, now);
+  return age === "today" ? age : `${age} ago`;
 }
 
 /**

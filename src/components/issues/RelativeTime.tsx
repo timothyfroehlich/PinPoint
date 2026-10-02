@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { formatRelative, formatShortAgo } from "~/lib/dates";
+import { formatCompactAgeAgo, formatRelative } from "~/lib/dates";
 import { useRelativeNow } from "./RelativeTimeProvider";
 
 interface RelativeTimeProps {
@@ -31,10 +31,11 @@ interface RelativeTimeProps {
    */
   fallback?: string;
   /**
-   * `long` (default) reads "about 3 hours ago"; `short` reads "3h ago" for
-   * dense list rows (`formatShortAgo`).
+   * `long` (default) reads "about 3 hours ago"; `compact` reads "5d ago" or
+   * "today", the list-row age wording both List Hosts share
+   * (`formatCompactAgeAgo`).
    */
-  format?: "long" | "short";
+  format?: "long" | "compact";
 }
 
 export function RelativeTime({
@@ -61,7 +62,9 @@ export function RelativeTime({
   let label: string;
   try {
     label =
-      format === "short" ? formatShortAgo(date, now) : formatRelative(date);
+      format === "compact"
+        ? formatCompactAgeAgo(date, now)
+        : formatRelative(date);
   } catch (err) {
     // formatDistanceToNow can throw RangeError on edge inputs; stay on fallback.
     console.warn("[RelativeTime] formatRelative threw", err);
