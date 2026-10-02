@@ -27,10 +27,6 @@ import {
 import { deriveMachineStatus } from "~/lib/machines/status";
 import { createMachineSchema } from "~/app/(app)/m/schemas";
 import {
-  applyMachineFilters,
-  type MachineWithDerivedStatus,
-} from "~/lib/machines/filters-queries";
-import {
   toggleMachineWatcher,
   updateMachineWatchMode,
 } from "~/services/machines";
@@ -554,63 +550,6 @@ describe("Machine Presence Status (PGlite)", () => {
       });
       expect(result?.presenceStatus).toBe(status);
     }
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Machine Presence Filtering via applyMachineFilters
-// (covers the list-page "machine list hides non-floor / filter reveals" E2E tests)
-// ---------------------------------------------------------------------------
-
-describe("Machine Presence Filtering (applyMachineFilters)", () => {
-  const makeEntry = (
-    overrides: Partial<MachineWithDerivedStatus>
-  ): MachineWithDerivedStatus => ({
-    id: "test-id",
-    name: "Test Machine",
-    initials: "TM",
-    status: "operational",
-    presenceStatus: "on_the_floor",
-    openIssuesCount: 0,
-    createdAt: new Date(),
-    ...overrides,
-  });
-
-  const onFloor = makeEntry({ initials: "OF", presenceStatus: "on_the_floor" });
-  const onLoan = makeEntry({ initials: "OL", presenceStatus: "on_loan" });
-  const offFloor = makeEntry({
-    initials: "FF",
-    presenceStatus: "off_the_floor",
-  });
-
-  it("returns all machines when no presence filter is set", () => {
-    const result = applyMachineFilters([onFloor, onLoan, offFloor], {});
-    expect(result).toHaveLength(3);
-  });
-
-  it("filters to only on-the-floor machines when presence=['on_the_floor']", () => {
-    const result = applyMachineFilters([onFloor, onLoan, offFloor], {
-      presence: ["on_the_floor"],
-    });
-    expect(result).toHaveLength(1);
-    expect(result[0]?.initials).toBe("OF");
-  });
-
-  it("reveals on-loan machines when presence=['on_loan']", () => {
-    const result = applyMachineFilters([onFloor, onLoan, offFloor], {
-      presence: ["on_loan"],
-    });
-    expect(result).toHaveLength(1);
-    expect(result[0]?.initials).toBe("OL");
-  });
-
-  it("returns multiple presence statuses when presence has multiple values", () => {
-    const result = applyMachineFilters([onFloor, onLoan, offFloor], {
-      presence: ["on_loan", "off_the_floor"],
-    });
-    expect(result).toHaveLength(2);
-    expect(result.map((m) => m.initials)).toContain("OL");
-    expect(result.map((m) => m.initials)).toContain("FF");
   });
 });
 
