@@ -16,12 +16,16 @@ import { useActiveIssueSection } from "~/components/issues/IssueSectionTabs";
 
 interface FloatingCommentButtonProps {
   issueId: string;
+  /** The signed-in viewer, whose comment draft the sheet restores. */
+  userId: string;
 }
 
 /**
  * Mobile-only floating Comment button (spec issue-detail §8.3). Sits above the
  * bottom tab bar on the Issue tab only — the tab that shows Activity — and
  * opens the comment composer in a sheet, which closes once the comment posts.
+ * Dismissing the sheet keeps what was typed: the composer's draft is restored
+ * the next time it opens (and survives a reload).
  *
  * - Renders inside `IssueSections`, which says which tab is showing
  * - Hidden from `md:` up, where the comment box sits inline in Activity
@@ -33,6 +37,7 @@ interface FloatingCommentButtonProps {
  */
 export function FloatingCommentButton({
   issueId,
+  userId,
 }: FloatingCommentButtonProps): React.JSX.Element | null {
   const [open, setOpen] = useState(false);
   const section = useActiveIssueSection();
@@ -95,6 +100,7 @@ export function FloatingCommentButton({
           <div className="px-4">
             <AddCommentForm
               issueId={issueId}
+              userId={userId}
               quick
               onSubmitSuccess={handlePosted}
             />

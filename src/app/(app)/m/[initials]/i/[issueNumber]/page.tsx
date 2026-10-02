@@ -324,9 +324,9 @@ export default async function IssueDetailPage({
             </IssueSectionPanel>
           </div>
         </div>
-        {accessLevel !== "unauthenticated" && (
-          <FloatingCommentButton issueId={issue.id} />
-        )}
+        {accessLevel !== "unauthenticated" && user ? (
+          <FloatingCommentButton issueId={issue.id} userId={user.id} />
+        ) : null}
       </IssueSections>
     </PageContainer>
   );

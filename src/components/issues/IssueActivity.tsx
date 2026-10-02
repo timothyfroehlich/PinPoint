@@ -240,7 +240,7 @@ export function IssueActivity({
         }
       />
 
-      {currentUserRole === "unauthenticated" ? (
+      {currentUserRole === "unauthenticated" || currentUserId === null ? (
         <div
           className="rounded-lg border border-dashed border-outline-variant px-4 py-1 text-sm md:py-3"
           data-testid="login-to-comment"
@@ -260,7 +260,11 @@ export function IssueActivity({
           <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Add a comment
           </h3>
-          <AddCommentForm issueId={issue.id} refocusOnSuccess />
+          <AddCommentForm
+            issueId={issue.id}
+            userId={currentUserId}
+            refocusOnSuccess
+          />
         </div>
       )}
     </section>

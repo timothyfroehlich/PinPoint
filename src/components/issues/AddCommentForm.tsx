@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "~/components/ui/button";
 import { Toggle } from "~/components/ui/toggle";
@@ -12,15 +12,20 @@ import {
 import { ImageUploadButton } from "~/components/images/ImageUploadButton";
 import { ImageGallery } from "~/components/images/ImageGallery";
 import { BLOB_CONFIG } from "~/lib/blob/config";
-import { type ImageMetadata } from "~/types/images";
 import {
   RichTextEditor,
   type RichTextEditorHandle,
 } from "~/components/editor/RichTextEditorDynamic";
-import { type ProseMirrorDoc } from "~/lib/tiptap/types";
+import {
+  commentDraftKey,
+  useCommentDraft,
+  type CommentDraftSnapshot,
+} from "~/components/issues/comment-draft";
 
 interface AddCommentFormProps {
   issueId: string;
+  /** The signed-in author; drafts are kept per person and per issue. */
+  userId: string;
   /** Called once per posted comment, with the new comment's id. */
   onSubmitSuccess?: (commentId: string) => void;
   /**
@@ -39,8 +44,14 @@ interface AddCommentFormProps {
   refocusOnSuccess?: boolean;
 }
 
+/**
+ * The comment composer. What the author types and the photos they upload are
+ * kept as a draft (`comment-draft.ts`) until the comment posts, so closing the
+ * mobile sheet or reloading the page loses nothing.
+ */
 export function AddCommentForm({
   issueId,
+  userId,
   onSubmitSuccess,
   quick = false,
   refocusOnSuccess = false,
@@ -52,15 +63,32 @@ export function AddCommentForm({
     AddCommentResult | undefined,
     FormData
   >(addCommentAction, undefined);
-  const [uploadedImages, setUploadedImages] = useState<ImageMetadata[]>([]);
-  const [comment, setComment] = useState<ProseMirrorDoc | null>(null);
-  // Stable across retries so a 504-then-retry of the same comment is deduped
-  // server-side (PP-e5th). `form.reset()` does not touch React state, so the
-  // key is regenerated explicitly on success — a failed submit keeps it, so the
-  // retry is recognised as the same submission.
-  const [idempotencyKey, setIdempotencyKey] = useState(() =>
-    crypto.randomUUID()
-  );
+  const composerId = useId();
+  const {
+    snapshot,
+    setDoc,
+    addImage,
+    clear: clearDraft,
+  } = useCommentDraft(commentDraftKey(userId, issueId), composerId);
+  // The idempotency key lives in the draft: stable across retries (and
+  // reloads) so a 504-then-retry of the same comment is deduped server-side
+  // (PP-e5th), and replaced only when a post succeeds.
+  const {
+    doc: comment,
+    images: uploadedImages,
+    idempotencyKey,
+  } = snapshot.draft;
+
+  // Mirror changes another composer made to the shared draft (the hidden
+  // inline box while the mobile sheet is in use, or another browser tab).
+  const seenSnapshotRef = useRef<CommentDraftSnapshot>(snapshot);
+  useEffect(() => {
+    if (seenSnapshotRef.current === snapshot) return;
+    seenSnapshotRef.current = snapshot;
+    if (snapshot.origin !== composerId) {
+      editorRef.current?.setContent(snapshot.draft.doc);
+    }
+  }, [snapshot, composerId]);
 
   // The result this form has already acted on. The effect below also re-runs
   // when `onSubmitSuccess` or `quick` change identity, and must not toast,
@@ -72,21 +100,16 @@ export function AddCommentForm({
       handledStateRef.current = state;
       toast.success("Comment added");
       formRef.current?.reset();
-      setUploadedImages([]);
-      setComment(null);
+      // Empties the draft and mints a fresh key — the next comment is a new
+      // logical submission.
+      clearDraft();
       editorRef.current?.clear();
       if (quick) setShowFormatting(false);
-      // Fresh key — the next comment is a new logical submission.
-      setIdempotencyKey(crypto.randomUUID());
       if (refocusOnSuccess) editorRef.current?.focus();
       // Container handles focus / sheet-close / next-action.
       onSubmitSuccess?.(state.value.commentId);
     }
-  }, [state, onSubmitSuccess, quick, refocusOnSuccess]);
-
-  const handleUploadComplete = (imageData: ImageMetadata): void => {
-    setUploadedImages((prev) => [...prev, imageData]);
-  };
+  }, [state, onSubmitSuccess, quick, refocusOnSuccess, clearDraft]);
 
   // Cmd/Ctrl+Enter posts — expected by anyone who has used a chat composer.
   const handleKeyDown = (event: React.KeyboardEvent<HTMLFormElement>): void => {
@@ -125,7 +148,7 @@ export function AddCommentForm({
       <RichTextEditor
         ref={editorRef}
         content={comment}
-        onChange={setComment}
+        onChange={setDoc}
         mentionsEnabled={true}
         placeholder="Leave a comment..."
         ariaLabel="Comment"
@@ -160,7 +183,7 @@ export function AddCommentForm({
             issueId={issueId}
             currentCount={uploadedImages.length}
             maxCount={BLOB_CONFIG.LIMITS.COMMENT_MAX}
-            onUploadComplete={handleUploadComplete}
+            onUploadComplete={addImage}
             disabled={isPending}
             buttonClassName="max-md:min-h-11"
             successMessage="Photo uploaded"
@@ -199,7 +222,7 @@ export function AddCommentForm({
                 issueId={issueId}
                 currentCount={uploadedImages.length}
                 maxCount={BLOB_CONFIG.LIMITS.COMMENT_MAX}
-                onUploadComplete={handleUploadComplete}
+                onUploadComplete={addImage}
                 disabled={isPending}
                 buttonClassName="max-md:min-h-11"
                 successMessage="Photo uploaded"

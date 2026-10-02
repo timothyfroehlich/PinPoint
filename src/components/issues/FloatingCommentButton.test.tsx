@@ -7,13 +7,23 @@ import {
 } from "~/components/issues/IssueSectionTabs";
 
 // Stub AddCommentForm to avoid jsdom + ProseMirror fragility. Surface
-// `issueId` and `quick` so a dropped prop fails the open test.
+// `issueId`, `userId` (whose draft it restores), and `quick` so a dropped prop
+// fails the open test.
 vi.mock("~/components/issues/AddCommentForm", () => ({
   AddCommentForm: vi.fn(
-    ({ issueId, quick }: { issueId: string; quick?: boolean }) => (
+    ({
+      issueId,
+      userId,
+      quick,
+    }: {
+      issueId: string;
+      userId: string;
+      quick?: boolean;
+    }) => (
       <div
         data-testid="mock-add-comment-form"
         data-issue-id={issueId}
+        data-user-id={userId}
         data-quick={String(quick)}
       />
     )
@@ -24,7 +34,7 @@ function renderOnIssuePage(): void {
   render(
     <IssueSections>
       <IssueSectionTabList otherIssuesCount={0} />
-      <FloatingCommentButton issueId="test-issue-123" />
+      <FloatingCommentButton issueId="test-issue-123" userId="user-1" />
     </IssueSections>
   );
 }
@@ -62,6 +72,7 @@ describe("FloatingCommentButton (spec issue-detail §8.3)", () => {
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
     const form = screen.getByTestId("mock-add-comment-form");
     expect(form.getAttribute("data-issue-id")).toBe("test-issue-123");
+    expect(form.getAttribute("data-user-id")).toBe("user-1");
     expect(form.getAttribute("data-quick")).toBe("true");
   });
 });

@@ -28,6 +28,11 @@ import { RICH_TEXT_CLASSES } from "~/components/editor/rich-text-classes";
 export interface RichTextEditorHandle {
   clear: () => void;
   focus: () => void;
+  /**
+   * Replace the document without firing `onChange` — for mirroring a change
+   * made elsewhere (another composer sharing the same draft).
+   */
+  setContent: (doc: ProseMirrorDoc | null) => void;
 }
 
 export interface RichTextEditorProps {
@@ -206,6 +211,10 @@ export const RichTextEditor = forwardRef<
       },
       focus: () => {
         editor?.commands.focus();
+      },
+      setContent: (doc) => {
+        if (doc) editor?.commands.setContent(doc, { emitUpdate: false });
+        else editor?.commands.clearContent(false);
       },
     }),
     [editor]
