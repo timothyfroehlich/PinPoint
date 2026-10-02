@@ -41,6 +41,8 @@ E2E earns its slot when the test is genuinely class F. Most other classes have a
 
 Before writing a new test, check the canonical location for that bug class. Most new tests should _extend an existing file_, not create a new one — the audit found agents creating duplicate coverage because they couldn't see what already existed.
 
+For the inverse, feature-first view — "which layers already cover feature X?" — see the [test coverage map](../../../docs/testing/coverage-map.md), which maps the user-facing surfaces against the four layers with representative files.
+
 | Testing…                                                  | Look first at…                                                                                                                                                                                                                                                                                                                                                             |
 | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Permission enforcement (role-gated UI / actions)          | [issue-detail-permissions.test.ts](../../../src/test/integration/issue-detail-permissions.test.ts), [issue-detail-permissions.test.tsx](../../../src/test/unit/components/issues/issue-detail-permissions.test.tsx)                                                                                                                                                        |
@@ -136,3 +138,4 @@ The house pattern instead forwards the `db` singleton to worker-scoped PGlite, s
 - AGENTS.md §5 "Which tests to run" — the decision tree and the commands.
 - [NON_NEGOTIABLES.md](../../../docs/NON_NEGOTIABLES.md#testing) — the `CORE-TEST-*` rules themselves.
 - [e2e-audit-2026-05.md](../../../docs/testing/e2e-audit-2026-05.md) — per-spec verdicts and the bug-class framework's history.
+- [coverage-map.md](../../../docs/testing/coverage-map.md) — feature-surface → test-layer map (where is feature X tested?).
