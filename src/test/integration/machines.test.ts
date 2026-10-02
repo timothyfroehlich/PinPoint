@@ -475,8 +475,10 @@ describe("Machine CRUD Operations (PGlite)", () => {
 //   - "issue is visible in issues list while machine is on the floor" (class-I — covered by issue-filtering.test.ts)
 //   - "edit modal shows presence dropdown and updates status" (class-B action, class-H UI)
 //   - "detail page shows presence badge and inactive banner" (class-D rendering)
-//   - "machine list hides non-floor machines by default" (class-I filter)
-//   - "presence filter reveals non-floor machines" (class-I filter)
+//   - "machine list hides non-floor machines by default" (class-I — covered by
+//     src/lib/machines/view/state.test.ts: Machines preset defaults presence to on_the_floor)
+//   - "presence filter reveals non-floor machines" (class-I — covered by
+//     src/lib/machines/view/model.test.ts: applyMachineViewState presence filtering)
 //   - "issues list excludes issues from inactive machines" (class-I — covered by issue-filtering.test.ts)
 //
 // Note: Issue-list exclusion logic is already covered in
