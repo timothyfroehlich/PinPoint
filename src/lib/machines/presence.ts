@@ -35,21 +35,23 @@ export function getMachinePresenceLabel(status: MachinePresenceStatus): string {
 }
 
 /**
- * CSS classes for presence badge.
- * Uses neutral/muted palette to differentiate from health status colors.
+ * CSS classes for presence badge. State-color tokens (globals.css, design
+ * bible §1); On the Floor shares the Operational green.
  */
 export function getMachinePresenceStyles(
   status: MachinePresenceStatus
 ): string {
   const styles: Record<MachinePresenceStatus, string> = {
     on_the_floor:
-      "bg-success-container text-on-success-container border-success",
+      "bg-presence-on-the-floor/15 text-presence-on-the-floor border-presence-on-the-floor/45",
     off_the_floor:
-      "bg-surface-container-highest text-muted-foreground border-outline-variant",
-    on_loan: "bg-tertiary-container text-on-tertiary-container border-tertiary",
+      "bg-presence-off-the-floor/15 text-presence-off-the-floor border-presence-off-the-floor/45",
+    on_loan:
+      "bg-presence-on-loan/15 text-presence-on-loan border-presence-on-loan/45",
     pending_arrival:
-      "bg-secondary-container text-on-secondary-container border-secondary",
-    removed: "bg-surface-container text-muted-foreground border-outline",
+      "bg-presence-pending-arrival/15 text-presence-pending-arrival border-presence-pending-arrival/45",
+    removed:
+      "bg-presence-removed/15 text-presence-removed border-presence-removed/45",
   };
 
   return styles[status];
@@ -61,16 +63,24 @@ export function isOnTheFloor(status: MachinePresenceStatus): boolean {
 
 /**
  * Summary Widget colors per presence: `text` for the count, `fill` for the bar
- * segment. Mirrors {@link getMachinePresenceStyles}: On the Floor is success,
- * Pending Arrival secondary, and the away states stay neutral.
+ * segment. Same tokens as {@link getMachinePresenceStyles}.
  */
 export const MACHINE_PRESENCE_WIDGET_COLORS: Record<
   MachinePresenceStatus,
   { text: string; fill: string }
 > = {
-  on_the_floor: { text: "text-success", fill: "bg-success" },
-  off_the_floor: { text: "text-muted-foreground", fill: "bg-muted-foreground" },
-  on_loan: { text: "text-foreground", fill: "bg-outline-variant" },
-  pending_arrival: { text: "text-secondary", fill: "bg-secondary" },
-  removed: { text: "text-muted-foreground", fill: "bg-outline" },
+  on_the_floor: {
+    text: "text-presence-on-the-floor",
+    fill: "bg-presence-on-the-floor-bar",
+  },
+  off_the_floor: {
+    text: "text-presence-off-the-floor",
+    fill: "bg-presence-off-the-floor",
+  },
+  on_loan: { text: "text-presence-on-loan", fill: "bg-presence-on-loan-bar" },
+  pending_arrival: {
+    text: "text-presence-pending-arrival",
+    fill: "bg-presence-pending-arrival",
+  },
+  removed: { text: "text-presence-removed", fill: "bg-presence-removed-bar" },
 };

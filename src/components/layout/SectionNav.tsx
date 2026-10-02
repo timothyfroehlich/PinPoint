@@ -10,7 +10,14 @@ import {
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { cn } from "~/lib/utils";
-import type { SectionNavItem } from "./sections";
+
+export interface SectionNavItem {
+  /** Fragment id of the section's anchor. */
+  id: string;
+  label: string;
+  /** 2 indents the entry under the one before it. Default 1. */
+  depth?: 1 | 2;
+}
 
 /**
  * How far down the scroll container the reading line sits. A section is "in
@@ -153,6 +160,7 @@ export function SectionNavLayout({
               aria-current={current ? "location" : undefined}
               className={cn(
                 "border-l-2 px-3 py-1.5 text-sm transition-colors",
+                section.depth === 2 && "pl-6",
                 current
                   ? "border-primary font-semibold text-foreground"
                   : "border-outline-variant text-muted-foreground hover:text-foreground"
@@ -195,7 +203,10 @@ export function SectionNavLayout({
                 <a
                   href={`#${section.id}`}
                   aria-current={section.id === active ? "location" : undefined}
-                  className={cn(section.id === active && "font-semibold")}
+                  className={cn(
+                    section.depth === 2 && "pl-5",
+                    section.id === active && "font-semibold"
+                  )}
                 >
                   {section.label}
                 </a>

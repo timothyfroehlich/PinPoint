@@ -11,6 +11,7 @@ import { formatDate } from "~/lib/dates";
 import { SEVERITY_CONFIG } from "~/lib/issues/status";
 import {
   getMachineStatusLabel,
+  MACHINE_STATUS_COLORS,
   type MachineStatus,
 } from "~/lib/machines/status";
 import { MACHINE_VIEW_FIELDS } from "~/lib/machines/view/config";
@@ -20,13 +21,10 @@ import { cn } from "~/lib/utils";
 
 export type MachineSelectionHandler = (machineId: string) => void;
 
-const STATUS_INDICATORS: Record<
-  MachineStatus,
-  { icon: LucideIcon; color: string }
-> = {
-  operational: { icon: CircleCheck, color: "text-success" },
-  needs_service: { icon: Wrench, color: "text-warning" },
-  unplayable: { icon: TriangleAlert, color: "text-destructive-text" },
+const STATUS_ICONS: Record<MachineStatus, LucideIcon> = {
+  operational: CircleCheck,
+  needs_service: Wrench,
+  unplayable: TriangleAlert,
 };
 
 interface MachineIdentityProps {
@@ -79,11 +77,13 @@ function RelativeAge({ value }: { value: string }): React.JSX.Element {
 }
 
 function Playability({ status }: { status: MachineStatus }): React.JSX.Element {
-  const indicator = STATUS_INDICATORS[status];
-  const Icon = indicator.icon;
+  const Icon = STATUS_ICONS[status];
   return (
     <span className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground">
-      <Icon aria-hidden="true" className={cn("size-4", indicator.color)} />
+      <Icon
+        aria-hidden="true"
+        className={cn("size-4", MACHINE_STATUS_COLORS[status].text)}
+      />
       {getMachineStatusLabel(status)}
     </span>
   );

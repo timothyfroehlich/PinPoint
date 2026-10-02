@@ -15,8 +15,9 @@
 - **Owner Collection** — the Machine Group of every machine one person owns. Membership follows machine ownership; nobody curates it and it cannot be edited or shared.
 - **Editor** — a signed-in account the owner has granted edit access to one Collection. Editor access belongs to the account, never to a link.
 - **View Link** — a Collection's secret, revocable URL that grants read-only access to anyone holding it, signed in or not.
-- **Tag** — a public Machine Group whose name describes something about its machines. Every tag belongs to exactly one tag type.
-- **Tag Type** — the kind of attribute a tag describes and the rule that decides its membership. Manufacturer is the first tag type.
+- **Tag** — a public Machine Group whose name describes something about its machines. A tag belongs to at most one tag type. Every automatic tag belongs to one.
+- **Tag Type** — the kind of attribute a tag describes and the rule that decides its membership. A tag type is either automatic (PinPoint derives membership from machine data) or hand-applied (people apply its tags to machines). Manufacturer is the first automatic tag type.
+- **Exclusive Tag Type** — a tag type whose tags a machine can hold at most one of at a time. Every automatic tag type is exclusive.
 - **Current Manufacturer** — the one manufacturer PinPoint attributes to a machine, derived from stored metadata (§8.1). A machine without one belongs to no manufacturer tag.
 
 ---
@@ -78,12 +79,12 @@
 ## 7. Tags
 
 - **7.1** Tags are public: anyone, including anonymous visitors, can open a tag's page.
-- **7.2** A tag's page is a Machine Group page (§4) whose machines are exactly the tag's members under its tag type's rule, in every presence state by default.
-- **7.3** A public tag browse lists every tag with at least one machine, grouped by tag type, and links to each tag's page.
+- **7.2** A tag's page is a Machine Group page (§4) whose machines are exactly the tag's members, in every presence state by default. An automatic tag's members follow its tag type's rule; a hand-applied tag's members are the machines it was applied to (11.4).
+- **7.3** A public tag browse lists every tag, grouped by tag type, and links to each tag's page. Hand-applied tags with no tag type form their own group. Automatic tags exist only while at least one machine belongs to them (§8, §9). A hand-applied tag is listed even when it has no machines.
 - **7.4** A machine's page links to each tag the machine belongs to.
 - **7.5** A tag's page and address stay the same while its membership changes.
 - **7.6** Tag membership is computed from data PinPoint already stores. Showing a tag, a tag page, or the tag browse never calls an external service.
-- **7.7** Each tag type has a public page listing its tags. A tag's page identifies it as a tag and links to its tag type's page, and the tag browse links each tag type's section to that page.
+- **7.7** Each tag type has a public page listing its tags. A tag's page identifies it as a tag and links to its tag type's page when it has one. The tag browse links each tag type's section to that page.
 - **7.8** A tag type whose membership PinPoint derives from machine data, rather than people assigning it, is marked automatic on its page and in the tag browse.
 
 ---
@@ -112,21 +113,44 @@
 
 ## 10. Deferred Work
 
-- **10.1** Tags people create and apply by hand, and who may curate them, are deferred.
-- **10.2** Hand-applied tag types whose tags are mutually exclusive on one machine are deferred.
+- **10.1** _Retired 2026-10-02._ Hand-applied tags are now §11. Number kept so older citations don't dangle.
+- **10.2** _Retired 2026-10-02._ Exclusive hand-applied tag types are now §11.5–11.7. Number kept so older citations don't dangle.
 - **10.3** Collection descriptions are deferred.
 - **10.4** Saving a Collection reached through a View Link to My Collections is deferred.
 - **10.5** A public directory of Collections is deferred.
 - **10.6** Adding a machine to a Collection from the machine's own page is deferred.
 - **10.7** Writing notes from a Machine Group's Timeline is deferred.
+- **10.8** Merging one hand-applied tag into another is deferred.
+
+---
+
+## 11. Hand-Applied Tags
+
+- **11.1** A technician or admin can create a hand-applied tag type, giving it a name and choosing whether it is exclusive.
+- **11.2** A tag type name is at most 20 characters and unique across all tag types, automatic ones included. Names that differ only in capitalization or extra whitespace count as the same name.
+- **11.3** A technician or admin can create a hand-applied tag, either in a hand-applied tag type or with no tag type. A tag name is at most 20 characters. It is unique within its tag type, or among tags with no tag type, under the same rule as 11.2. Nobody can add a tag to an automatic tag type.
+- **11.4** A technician or admin can apply any hand-applied tag to any machine and remove it. A machine's owner can apply and remove hand-applied tags on the machines they own. No one else can. Applying or removing a tag never changes the machine itself.
+- **11.5** In an exclusive tag type, applying a tag to a machine that already holds another tag of that type replaces the old tag.
+- **11.6** A machine can hold any number of tags from a tag type that is not exclusive, and any number of tags that have no tag type.
+- **11.7** A technician or admin can change whether a hand-applied tag type is exclusive. A tag type can be made exclusive only while no machine holds more than one of its tags. Making it non-exclusive is always allowed.
+- **11.8** A technician or admin can rename a hand-applied tag type or tag. Links to its page keep working after a rename.
+- **11.9** A technician or admin can delete a hand-applied tag or tag type. Deleting a tag removes it from every machine. Deleting a tag type deletes its tags. Deletion asks for confirmation and cannot be undone. The machines are otherwise unaffected.
+- **11.10** A machine's page lets anyone who can tag that machine (11.4) apply and remove its hand-applied tags. They choose from every hand-applied tag, including tags with no machines.
+- **11.11** A hand-applied tag's page lets technicians and admins add machines to the tag and remove machines from it, several at a time. Owners tag their machines from the machine's page (11.10).
+- **11.12** The tag browse lets technicians and admins create tag types and tags. A hand-applied tag type's page lets them create tags in that type.
+- **11.13** A hand-applied tag with no machines is listed after every tag in its group that has machines, wherever its group's tags are listed. Its page stays open to everyone and shows that it has no machines.
+- **11.14** The tag browse and a machine's page list hand-applied tag types after the automatic ones, ordered by name, followed by tags with no tag type. Tags within each group are ordered by name, subject to 11.13.
+- **11.15** A technician or admin can create a tag from a machine's page while tagging that machine. The tag has no tag type unless they choose one, and it is applied to that machine.
+- **11.16** A technician or admin can move a hand-applied tag into a hand-applied tag type, from one tag type to another, or out of its tag type. A move is blocked if the tag's name is already taken where it is going, or if it would leave a machine holding two tags of an exclusive tag type.
 
 ---
 
 ## Known divergences (code vs spec)
 
-| Requirement | Divergence                         | Resolution |
-| :---------- | :--------------------------------- | :--------- |
-| 6.2         | Owner Collections require sign-in. | PP-wqit.9  |
+| Requirement | Divergence | Resolution |
+| :-- | :-- | :-- |
+| 6.2 | Owner Collections require sign-in. | PP-wqit.9 |
+| 7.2, 7.3, 7.7, §11 | Hand-applied tags and tag types do not exist; every tag is automatic. | PP-wqit.3, PP-wqit.4 |
 
 ---
 
@@ -134,6 +158,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-02 | Added hand-applied tags, with or without a hand-applied tag type, curated by technicians and admins and applied by machine owners to their own machines. Tag types can be exclusive. Names are capped at 20 characters. The tag browse lists hand-applied tags with no machines. Retired deferred items 10.1–10.2 and deferred tag merging. |
 | 2026-09-26 | Uncataloged machines join Type, Display, and Player Count tags through hand-entered values. |
 | 2026-09-25 | Added Type, Display, and Player Count tag types from OPDB data; dropped deferred era tags. |
 | 2026-09-25 | Added tag type pages and automatic tag type marking. |

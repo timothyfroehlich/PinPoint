@@ -53,7 +53,7 @@ Single-select user pickers all follow the **Picker Pattern** (Popover + cmdk Com
 | File                                       | What It Teaches                                                             |
 | :----------------------------------------- | :-------------------------------------------------------------------------- |
 | `src/app/globals.css`                      | Material Design 3 color system, Tailwind v4 @theme block, custom properties |
-| `src/lib/issues/status.ts` (STATUS_CONFIG) | Canonical color assignments per status (Tailwind class names)               |
+| `src/lib/issues/status.ts` (STATUS_CONFIG) | Maps each status value to its state-color token classes (`globals.css`)     |
 
 ### Layout
 

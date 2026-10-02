@@ -39,12 +39,70 @@
      on the machine Manage tab (PP-o355.19). */
   --color-destructive-text: #ef4444; /* red-500 — 5.09:1 on --color-background */
 
-  /* Status Specific */
-  --color-status-new: #4ade80;
-  --color-status-in-progress: #0ea5e9; /* sky-500 — non-palette, aligned with STATUS_CONFIG.in_progress border/bg family */
-  --color-status-unplayable: var(
-    --color-destructive
-  ); /* aliased to keep the three destructive-ish reds in sync */
+  /* State colors — "Families · blue priority" (PP-jb9v.1, design bible §1).
+     One hue family per field; the level changes lightness and saturation
+     together. The base token is the TEXT color (chips use it at /15 for the
+     background and /45 for the border); `-bar` is the Summary Widget segment
+     fill where it differs from the text color. Text clears 4.5:1 on --color-card
+     and on its own /15 tint; bars clear 3:1 on --color-card. Values are the
+     Tailwind v4 stops named in each comment. src/lib/issues/status.ts,
+     src/lib/machines/status.ts and src/lib/machines/presence.ts map values to
+     these tokens; components read those configs, never the tokens directly. */
+  --color-severity-cosmetic: #fff085; /* yellow-200 */
+  --color-severity-cosmetic-bar: #fef9c2; /* yellow-100 */
+  --color-severity-minor: #ffd230; /* amber-300 */
+  --color-severity-minor-bar: #ffb900; /* amber-400 */
+  --color-severity-major: #ffb86a; /* orange-300 */
+  --color-severity-major-bar: #ff6900; /* orange-500 */
+  --color-severity-unplayable: #ff6467; /* red-400 */
+  --color-severity-unplayable-bar: #e7000b; /* red-600 */
+
+  --color-status-new: #cefafe; /* cyan-100 */
+  --color-status-new-bar: #a2f4fd; /* cyan-200 */
+  --color-status-confirmed: #00d3f2; /* cyan-400 */
+  --color-status-confirmed-bar: #0092b8; /* cyan-600 */
+  --color-status-in-progress: #fccee8; /* pink-200 (text and bar) */
+  --color-status-need-parts: #fda5d5; /* pink-300 */
+  --color-status-need-parts-bar: #fb64b6; /* pink-400 */
+  --color-status-need-help: #fb64b6; /* pink-400 */
+  --color-status-need-help-bar: #e60076; /* pink-600 */
+  --color-status-wait-owner: #cad5e2; /* slate-300 (text and bar) */
+  --color-status-fixed: #05df72; /* green-400 (text and bar) */
+  --color-status-wont-fix: #9f9fa9; /* zinc-400 (text and bar) */
+  --color-status-wai: #d4d4d8; /* zinc-300 (text and bar) */
+  --color-status-no-repro: #90a1b9; /* slate-400 (text and bar) */
+  --color-status-duplicate: #a1a1a1; /* neutral-400 (text and bar) */
+
+  --color-priority-low: #90a1b9; /* slate-400 */
+  --color-priority-low-bar: #62748e; /* slate-500 */
+  --color-priority-medium: #bedbff; /* blue-200 */
+  --color-priority-medium-bar: #8ec5ff; /* blue-300 */
+  --color-priority-high: #51a2ff; /* blue-400 */
+  --color-priority-high-bar: #2b7fff; /* blue-500 */
+
+  /* Frequency has no Summary Widget, so no bar tokens. */
+  --color-frequency-not-specified: #9f9fa9; /* zinc-400 */
+  --color-frequency-intermittent: #90a1b9; /* slate-400 */
+  --color-frequency-frequent: #cad5e2; /* slate-300 */
+  --color-frequency-constant: #f1f5f9; /* slate-100 */
+
+  --color-playability-operational: #05df72; /* green-400 */
+  --color-playability-operational-bar: #00a63e; /* green-600 */
+  --color-playability-needs-service: #ffdf20; /* yellow-300 */
+  --color-playability-needs-service-bar: #fdc700; /* yellow-400 */
+  /* Unplayable is one red for severity and playability — aliased so they can't drift. */
+  --color-playability-unplayable: var(--color-severity-unplayable);
+  --color-playability-unplayable-bar: var(--color-severity-unplayable-bar);
+
+  /* On the Floor matches Operational — aliased so they can't drift. */
+  --color-presence-on-the-floor: var(--color-playability-operational);
+  --color-presence-on-the-floor-bar: var(--color-playability-operational-bar);
+  --color-presence-off-the-floor: #d4d4d8; /* zinc-300 (text and bar) */
+  --color-presence-on-loan: #90a1b9; /* slate-400 */
+  --color-presence-on-loan-bar: #62748e; /* slate-500 */
+  --color-presence-pending-arrival: #46ecd5; /* teal-300 (text and bar) */
+  --color-presence-removed: #9f9fa9; /* zinc-400 */
+  --color-presence-removed-bar: #71717b; /* zinc-500 */
 
   /* Semantic Status Colors */
   --color-success: #22c55e;
@@ -251,7 +309,7 @@
     @apply text-xl font-semibold tracking-tight;
   }
   p {
-    @apply leading-7 not-first:mt-4;
+    @apply not-first:mt-4;
   }
   a {
     @apply transition-colors duration-150;

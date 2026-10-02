@@ -13,9 +13,3 @@ export const MACHINE_FORM_SECTION_IDS = {
   integrations: "section-nav-integrations",
   dangerZone: "section-nav-danger-zone",
 } as const;
-
-export interface SectionNavItem {
-  /** Fragment id of the section's anchor. */
-  id: string;
-  label: string;
-}

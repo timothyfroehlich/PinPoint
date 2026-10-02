@@ -491,8 +491,6 @@
     {
       "files": ["**/*.ts", "**/*.tsx"],
       "excludeFiles": [
-        "src/lib/issues/status.ts",
-        "src/lib/machines/status.ts",
         "**/*.test.ts",
         "**/*.test.tsx",
         "**/*.spec.ts",
