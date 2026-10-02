@@ -14,6 +14,7 @@ import {
   getMachineViewBuiltInViews,
   MACHINE_VIEW_PAGE_PRESET_VIEW_ID,
 } from "./config";
+import { getExistingMachineViewOwners } from "./owners";
 import {
   hasMachineViewConfiguration,
   normalizeMachineViewSavedState,
@@ -38,17 +39,31 @@ export function machineViewDefaultBuiltInIds(): string[] {
 
 /**
  * The account's machine Saved Views, ordered by name, each configuration
- * re-validated as it is read (list-views §10.14).
+ * re-validated as it is read (list-views §10.14). An owner is dropped only
+ * when that person no longer exists, never because a Surface's scope has
+ * none of their machines (§10.18), so the configuration the menu compares
+ * against is the one the loader applies on every Surface.
  */
 export async function listSavedMachineViews(
   tx: DbTransaction,
   userId: string
 ): Promise<MachineViewSavedViewSummary[]> {
   const rows = await listSavedViews(tx, userId, "machines");
-  return rows.map(({ id, name, state }) => ({
+  const views = rows.map(({ id, name, state }) => ({
     id,
     name,
     state: normalizeMachineViewSavedState(state),
+  }));
+  const existingOwners = await getExistingMachineViewOwners(
+    tx,
+    views.flatMap((view) => view.state.owner)
+  );
+  return views.map((view) => ({
+    ...view,
+    state: {
+      ...view.state,
+      owner: view.state.owner.filter((id) => existingOwners.has(id)),
+    },
   }));
 }
 

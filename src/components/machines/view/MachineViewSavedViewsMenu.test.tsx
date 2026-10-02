@@ -53,6 +53,7 @@ function renderMenu(
     canSave?: boolean;
     defaultViewId?: string | null;
     preset?: "machines" | "collection";
+    views?: MachineViewSavedViewSummary[];
   } = {}
 ): { onApply: ReturnType<typeof vi.fn> } {
   const onApply = vi.fn();
@@ -62,7 +63,7 @@ function renderMenu(
     canSave,
     offersDefault: canSave && preset === "machines",
     builtInViews: getMachineViewBuiltInViews(preset),
-    views: canSave ? [brokenView] : [],
+    views: canSave ? (options.views ?? [brokenView]) : [],
     defaultViewId: options.defaultViewId ?? null,
     activeViewId,
   };
@@ -72,7 +73,6 @@ function renderMenu(
       savedViews={savedViews}
       activeViewId={activeViewId}
       state={state}
-      ownerIds={[]}
       preset={preset}
       onApply={onApply}
       onViewSaved={vi.fn()}
@@ -120,6 +120,48 @@ describe("MachineViewSavedViewsMenu", () => {
     );
     expect(
       screen.getByRole("menuitem", { name: "Save changes" })
+    ).toBeInTheDocument();
+  });
+
+  it("keeps an owner with nothing on this Surface in the baseline and in Save changes (list-views §10.18)", async () => {
+    const user = userEvent.setup();
+    actions.updateSavedMachineViewAction.mockResolvedValue({
+      ok: true,
+      value: { id: brokenView.id },
+    });
+    // The loader keeps Dana selected on a tab with none of her machines.
+    const danasView = {
+      ...brokenView,
+      state: { ...brokenView.state, owner: ["dana-id"] },
+    };
+    renderMenu({ ...danasView.state, q: "stern", page: 1 }, danasView.id, {
+      preset: "collection",
+      views: [danasView],
+    });
+
+    await user.click(
+      screen.getByRole("button", { name: "Views: Broken machines, edited" })
+    );
+    await user.click(screen.getByRole("menuitem", { name: "Save changes" }));
+
+    expect(actions.updateSavedMachineViewAction).toHaveBeenCalledWith({
+      id: danasView.id,
+      state: { ...danasView.state, q: "stern" },
+    });
+  });
+
+  it("reads as edited once an owner with nothing on this Surface is cleared", () => {
+    const danasView = {
+      ...brokenView,
+      state: { ...brokenView.state, owner: ["dana-id"] },
+    };
+    renderMenu({ ...danasView.state, owner: [], page: 1 }, danasView.id, {
+      preset: "collection",
+      views: [danasView],
+    });
+
+    expect(
+      screen.getByRole("button", { name: "Views: Broken machines, edited" })
     ).toBeInTheDocument();
   });
 

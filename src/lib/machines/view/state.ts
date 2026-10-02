@@ -289,8 +289,9 @@ function storedParamValue(value: unknown): string | null {
  * Validates a configuration to store or one read back from storage exactly as
  * URL parameters are validated (list-views §9.3, §10.14): values that no
  * longer exist are dropped, keys the parser does not know are ignored, and a
- * missing key takes the preset's default. Fields or owners a particular
- * Surface does not permit are dropped again when the view is applied there.
+ * missing key takes the preset's default. Owners are checked against the
+ * people who exist on read and again when the view is applied; fields a
+ * particular Surface does not permit are dropped when it is applied there.
  */
 export function normalizeMachineViewSavedState(
   stored: unknown

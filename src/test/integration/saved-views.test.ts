@@ -1,8 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { asDbOrTx, getTestDb, setupTestDb } from "~/test/setup/pglite";
-import { createTestUser } from "~/test/helpers/factories";
-import { savedViews, userProfiles } from "~/server/db/schema";
+import { createTestMachine, createTestUser } from "~/test/helpers/factories";
+import {
+  collectionMachines,
+  collections,
+  machines,
+  savedViews,
+  userProfiles,
+} from "~/server/db/schema";
 import type { ListHost, MachineViewSavedState } from "~/lib/types";
 import { isPgErrorCode } from "~/lib/db/postgres-errors";
 import { getViewer } from "~/lib/collections/viewer";
@@ -22,8 +28,15 @@ const {
   setDefaultView,
   updateSavedViewState,
 } = await import("~/lib/list-view/saved-views");
-const { loadMachineViewSavedViews } =
+const { listSavedMachineViews, loadMachineViewSavedViews } =
   await import("~/lib/machines/view/saved-views");
+const { loadMachineViewFromDatabase } =
+  await import("~/lib/machines/view/queries");
+const {
+  normalizeMachineViewSavedState,
+  savedMachineViewSearchParams,
+  toMachineViewSavedState,
+} = await import("~/lib/machines/view/state");
 
 const state: MachineViewSavedState = {
   q: "",
@@ -367,6 +380,103 @@ describe("machine Saved Views on each Surface (list-views §10.5, §10.10)", () 
         },
       }),
     ]);
+  });
+
+  it("drops a stored owner only once that person no longer exists (§10.14)", async () => {
+    const db = await getTestDb();
+    const ownerId = randomUUID();
+    await db
+      .insert(userProfiles)
+      .values(createTestUser({ id: ownerId, firstName: "Dana" }));
+    await createSavedView(asDbOrTx(db), {
+      userId,
+      host: "machines",
+      name: "Dana's",
+      state: { ...state, owner: [ownerId, randomUUID(), "unassigned"] },
+      makeDefault: false,
+    });
+
+    const [view] = await listSavedMachineViews(asDbOrTx(db), userId);
+    expect(view?.state.owner).toEqual([ownerId, "unassigned"]);
+  });
+
+  it("keeps an out-of-scope owner through apply and Save changes on a Collection tab (§10.18)", async () => {
+    const db = await getTestDb();
+    const danaId = randomUUID();
+    const collectionId = randomUUID();
+    const insideId = randomUUID();
+    await db
+      .insert(userProfiles)
+      .values(createTestUser({ id: danaId, firstName: "Dana" }));
+    await db.insert(machines).values([
+      createTestMachine({
+        id: insideId,
+        initials: "INS",
+        name: "Inside",
+        ownerId: userId,
+      }),
+      createTestMachine({ initials: "DAN", name: "Dana's", ownerId: danaId }),
+    ]);
+    await db
+      .insert(collections)
+      .values({ id: collectionId, name: "Mine", ownerId: userId });
+    await db
+      .insert(collectionMachines)
+      .values({ collectionId, machineId: insideId, addedBy: userId });
+    const stored: MachineViewSavedState = {
+      ...state,
+      presence: "all",
+      status: [],
+      severity: [],
+      owner: [danaId],
+    };
+    const created = await createSavedView(asDbOrTx(db), {
+      userId,
+      host: "machines",
+      name: "Dana's machines",
+      state: stored,
+      makeDefault: false,
+    });
+    if (!created.ok) throw new Error(created.message);
+    const id = created.value.id;
+
+    // Apply the view on the Collection tab: Dana owns nothing here, so the
+    // filter stays set and the tab shows no machines.
+    const { savedViews: offered } = await loadMachineViewSavedViews(
+      "collection",
+      new URLSearchParams({ view: id })
+    );
+    const offeredView = offered.views.find((view) => view.id === id);
+    if (!offeredView) throw new Error("Saved View not offered");
+    const applied = await loadMachineViewFromDatabase(asDbOrTx(db), {
+      scope: { kind: "collection", collectionId },
+      preset: "collection",
+      searchParams: savedMachineViewSearchParams(
+        offeredView.state,
+        "collection",
+        id
+      ),
+    });
+    expect(applied.state.owner).toEqual([danaId]);
+    expect(applied.rows).toEqual([]);
+    expect(applied.ownerOptions).toContainEqual({
+      id: danaId,
+      name: "Dana User",
+    });
+
+    // Save changes writes back the applied configuration, as the Saved
+    // Views menu and its server action do.
+    const saved = await updateSavedViewState(asDbOrTx(db), {
+      userId,
+      host: "machines",
+      id,
+      state: normalizeMachineViewSavedState(
+        toMachineViewSavedState({ ...applied.state, q: "inside" })
+      ),
+    });
+    expect(saved).toMatchObject({ ok: true });
+    const [reread] = await listSavedMachineViews(asDbOrTx(db), userId);
+    expect(reread?.state).toMatchObject({ owner: [danaId], q: "inside" });
   });
 
   it("offers an anonymous visitor Built-in Views only", async () => {

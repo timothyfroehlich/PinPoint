@@ -180,7 +180,6 @@ export function MachineView({
                   savedViews={savedViews}
                   activeViewId={activeViewId}
                   state={state}
-                  ownerIds={result.ownerOptions.map((owner) => owner.id)}
                   preset={preset}
                   onApply={applyView}
                   onViewSaved={(viewId) => navigate(state, viewId)}

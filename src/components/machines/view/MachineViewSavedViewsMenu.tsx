@@ -83,8 +83,6 @@ interface MachineViewSavedViewsMenuProps {
    */
   activeViewId: string | null;
   state: MachineViewState;
-  /** Owner filter values valid in this scope (the loader drops the rest). */
-  ownerIds: string[];
   preset: MachineViewPresetId;
   /** Opens a Built-in or Saved View at page 1 (list-views §10.6). */
   onApply: (view: MachineViewSelectableView) => void;
@@ -103,7 +101,6 @@ export function MachineViewSavedViewsMenu({
   savedViews,
   activeViewId,
   state,
-  ownerIds,
   preset,
   onApply,
   onViewSaved,
@@ -126,13 +123,11 @@ export function MachineViewSavedViewsMenu({
     savedViews.builtInViews.find((view) => view.id === activeViewId) ??
     pagePresetView ??
     null;
-  // A stored owner that no longer exists in this scope was dropped when the
-  // view was applied (§10.14); it does not make the view read as edited.
+  // Stored values that no longer exist were dropped when the views were read
+  // (§10.14). An owner with nothing on this Surface is still a value, so it
+  // stays in the baseline and in what Save changes writes back (§10.18).
   const baseline = activeView
-    ? {
-        ...activeView.state,
-        owner: activeView.state.owner.filter((id) => ownerIds.includes(id)),
-      }
+    ? activeView.state
     : toMachineViewSavedState(getMachineViewPreset(preset).defaultState);
   const edited = !machineViewSavedStatesEqual(
     toMachineViewSavedState(state),
