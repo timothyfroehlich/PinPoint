@@ -340,5 +340,47 @@ describe("EditableIssueTitle", () => {
         ).toHaveFocus();
       });
     });
+
+    it("ignores Cancel and Save while a save is in flight", async () => {
+      const user = userEvent.setup();
+      let settle: (value: {
+        ok: true;
+        value: { issueId: string };
+      }) => void = () => undefined;
+      updateIssueTitleSpy.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            settle = resolve;
+          })
+      );
+      render(
+        <EditableIssueTitle issueId="issue-1" title="Original Title" canEdit />
+      );
+      const input = await openFromMenu(user);
+      await user.type(input, " edited");
+      await user.click(screen.getByRole("button", { name: "Save" }));
+      await waitFor(() => {
+        expect(screen.getByLabelText("Edit issue title")).toHaveAttribute(
+          "aria-busy",
+          "true"
+        );
+      });
+
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      // Still editing, with the typed value, and saved only once.
+      expect(screen.getByLabelText("Edit issue title")).toHaveValue(
+        "Original Title edited"
+      );
+      expect(updateIssueTitleSpy).toHaveBeenCalledTimes(1);
+
+      settle({ ok: true, value: { issueId: "issue-1" } });
+      await waitFor(() => {
+        expect(
+          screen.queryByLabelText("Edit issue title")
+        ).not.toBeInTheDocument();
+      });
+    });
   });
 });

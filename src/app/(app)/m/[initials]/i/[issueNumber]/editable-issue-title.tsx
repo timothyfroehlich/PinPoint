@@ -194,7 +194,10 @@ export function EditableIssueTitle({
     }
   }, [state]);
 
+  // Neither Cancel nor Save acts while a save is in flight: the buttons are
+  // only aria-disabled (to keep focus), so their clicks still arrive.
   const handleCancel = (): void => {
+    if (isPendingRef.current) return;
     setEditValue(title);
     closeEditor();
   };
