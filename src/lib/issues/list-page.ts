@@ -10,7 +10,6 @@ import {
 import { db } from "~/server/db";
 import { issues, machines } from "~/server/db/schema";
 import { getUnifiedUsers } from "~/lib/users/queries";
-import { ISSUE_LIST_COLUMNS } from "~/lib/issues/queries";
 import {
   buildOrderBy,
   buildWhereConditions,
@@ -41,6 +40,25 @@ export interface IssueListPageData {
   pageSize: number;
   summary: IssueListSummary;
 }
+
+/**
+ * Issue columns a list row loads. `reporterEmail` is deliberately absent:
+ * reporter emails never leave admin views (CORE-SEC-007).
+ */
+const ISSUE_LIST_COLUMNS = {
+  id: true,
+  issueNumber: true,
+  title: true,
+  status: true,
+  severity: true,
+  priority: true,
+  frequency: true,
+  createdAt: true,
+  updatedAt: true,
+  machineInitials: true,
+  reporterName: true,
+  assignedTo: true,
+} as const;
 
 const OPEN_STATUS_SET: ReadonlySet<string> = new Set(OPEN_STATUSES);
 
