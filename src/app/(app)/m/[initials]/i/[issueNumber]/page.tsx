@@ -281,7 +281,7 @@ export default async function IssueDetailPage({
                 status={issue.status}
                 severity={issue.severity}
                 priority={issue.priority}
-                assigneeName={issue.assignedToUser?.name ?? null}
+                assignee={issue.assignedToUser ?? null}
               />
             </header>
 

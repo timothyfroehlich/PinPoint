@@ -8,6 +8,7 @@ import { UpdateIssueFrequencyForm } from "~/app/(app)/m/[initials]/i/[issueNumbe
 import { ContextRow } from "~/components/issues/fields/IssueFieldRow";
 import { ExactRelativeTime } from "~/components/issues/ExactRelativeTime";
 import { WatchButton } from "~/components/issues/WatchButton";
+import { PersonHoverCard } from "~/components/people/PersonHoverCard";
 import { formatDateTime } from "~/lib/dates";
 import { getMachineOwnerName } from "~/lib/issues/owner";
 import { resolveIssueReporter } from "~/lib/issues/utils";
@@ -121,7 +122,13 @@ export function IssueDetails({
           )}
         </ContextRow>
         <ContextRow label="Reported" testId="details-reported">
-          <span className="font-medium text-foreground">{reporter.name}</span>
+          {/* Only a real userProfiles.id links; an invited or former reporter
+              degrades to plain text. */}
+          <PersonHoverCard
+            userId={issue.reportedByUser?.id ?? null}
+            displayName={reporter.name}
+            className="font-medium text-foreground"
+          />
           <ExactRelativeTime
             value={issue.createdAt.toISOString()}
             fallback={formatDateTime(issue.createdAt)}

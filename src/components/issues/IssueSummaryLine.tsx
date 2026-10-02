@@ -5,6 +5,7 @@ import {
   SEVERITY_CONFIG,
   STATUS_CONFIG,
 } from "~/lib/issues/status";
+import { PersonHoverCard } from "~/components/people/PersonHoverCard";
 import type { IssuePriority, IssueSeverity, IssueStatus } from "~/lib/types";
 import { cn } from "~/lib/utils";
 
@@ -12,27 +13,27 @@ interface IssueSummaryLineProps {
   status: IssueStatus;
   severity: IssueSeverity;
   priority: IssuePriority;
-  /** The assignee's name; null when unassigned. */
-  assigneeName: string | null;
+  /** Null when unassigned. */
+  assignee: { id: string; name: string } | null;
 }
 
 /**
  * The read-only line under the issue title: assignee, status, severity, and
- * priority,
- * each with its icon (spec issue-detail §4.7). Changing them happens in
- * Details.
+ * priority, each with its icon (spec issue-detail §4.7). Changing them happens
+ * in Details. The assignee's name links to their profile with a hover card,
+ * like every person's name on the page.
  */
 export function IssueSummaryLine({
   status,
   severity,
   priority,
-  assigneeName,
+  assignee,
 }: IssueSummaryLineProps): React.JSX.Element {
   const items: {
     key: string;
     icon: LucideIcon;
     color: string;
-    text: string;
+    text: React.ReactNode;
     /** Names the field for screen readers; the icon does that visually. */
     srPrefix?: string;
   }[] = [
@@ -40,7 +41,15 @@ export function IssueSummaryLine({
       key: "assignee",
       icon: User,
       color: "text-muted-foreground",
-      text: assigneeName ?? "Unassigned",
+      text: assignee ? (
+        <PersonHoverCard
+          userId={assignee.id}
+          displayName={assignee.name}
+          className="text-foreground"
+        />
+      ) : (
+        "Unassigned"
+      ),
       srPrefix: "Assignee:",
     },
     {

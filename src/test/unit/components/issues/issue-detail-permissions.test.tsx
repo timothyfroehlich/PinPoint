@@ -7,6 +7,7 @@ import type { IssueWithAllRelations } from "~/lib/types";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 import { IssueActivity } from "~/components/issues/IssueActivity";
 import { IssueDetails } from "~/components/issues/IssueDetails";
+import { IssueSummaryLine } from "~/components/issues/IssueSummaryLine";
 import { deleteCommentAction } from "~/app/(app)/issues/actions";
 import { TooltipProvider } from "~/components/ui/tooltip";
 
@@ -202,8 +203,66 @@ describe("Issue detail Details (spec §3, §9)", () => {
       })
     ).toHaveAttribute("href", "/issues?owner=owner-1");
     expect(
-      within(screen.getByTestId("details-reported")).getByText("Reporter One")
-    ).toBeInTheDocument();
+      within(screen.getByTestId("details-reported")).getByRole("link", {
+        name: "Reporter One",
+      })
+    ).toHaveAttribute("href", "/u/reporter-1");
+  });
+
+  it("shows an invited reporter's name in Reported as plain text", () => {
+    renderWithProviders(
+      <IssueDetails
+        issue={createIssue({
+          reportedByUser: null,
+          invitedReporter: { id: "invited-1", name: "Invited Reporter" },
+        })}
+        allUsers={allUsers}
+        currentUserId={null}
+        accessLevel="unauthenticated"
+        ownershipContext={{}}
+      />
+    );
+
+    const reported = screen.getByTestId("details-reported");
+    expect(within(reported).getByText("Invited Reporter")).toBeInTheDocument();
+    expect(within(reported).queryByRole("link")).not.toBeInTheDocument();
+  });
+});
+
+describe("Issue detail summary line (spec §4.7)", () => {
+  it("links the assignee's name to their profile after a screen-reader prefix", () => {
+    render(
+      <IssueSummaryLine
+        status="new"
+        severity="minor"
+        priority="medium"
+        assignee={{ id: "assignee-1", name: "Assignee One" }}
+      />
+    );
+
+    expect(screen.getByRole("link", { name: "Assignee One" })).toHaveAttribute(
+      "href",
+      "/u/assignee-1"
+    );
+    expect(screen.getByTestId("issue-summary-line")).toHaveTextContent(
+      /^Assignee: Assignee One/
+    );
+  });
+
+  it("states Unassigned as plain text", () => {
+    render(
+      <IssueSummaryLine
+        status="new"
+        severity="minor"
+        priority="medium"
+        assignee={null}
+      />
+    );
+
+    expect(screen.getByTestId("issue-summary-line")).toHaveTextContent(
+      /^Assignee: Unassigned/
+    );
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });
 });
 
