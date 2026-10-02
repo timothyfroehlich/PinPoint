@@ -77,4 +77,38 @@ test.describe("FloatingCommentButton — mobile signed-in", () => {
       form.getByRole("button", { name: "Add Comment" })
     ).toBeVisible();
   });
+
+  // The unit tests cover the draft store against jsdom storage with the
+  // editor mocked; this is the one place the real TipTap editor restores a
+  // draft from the browser's localStorage after a full reload. Nothing is
+  // posted, so the seeded issue is untouched.
+  test("a comment draft survives closing the sheet and reloading the page", async ({
+    page,
+  }, testInfo) => {
+    await loginAs(page, testInfo);
+    await page.goto(ISSUE_URL);
+    const draft = `Draft ${testInfo.project.name} ${Date.now().toString()}`;
+
+    const { form } = await openIssueCommentForm(page);
+    const editor = form.getByRole("textbox", { name: "Comment" });
+    await expect(editor).toBeFocused();
+    await page.keyboard.type(draft);
+    await expect(editor).toContainText(draft);
+
+    // Dismiss the sheet; reopening it in the same page view restores the draft.
+    await form.getByRole("button", { name: "Close" }).click();
+    await expect(form).toBeHidden();
+    const reopened = await openIssueCommentForm(page);
+    await expect(
+      reopened.form.getByRole("textbox", { name: "Comment" })
+    ).toContainText(draft);
+    await reopened.form.getByRole("button", { name: "Close" }).click();
+
+    // A reload restores it too.
+    await page.reload();
+    const afterReload = await openIssueCommentForm(page);
+    await expect(
+      afterReload.form.getByRole("textbox", { name: "Comment" })
+    ).toContainText(draft);
+  });
 });
