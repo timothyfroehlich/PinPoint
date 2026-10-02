@@ -80,7 +80,7 @@
 
 ## 8. Returning to the List
 
-- **8.1** The Issues tab in the app navigation follows list-views §11: it reopens the last Issue View configuration used in the current browser session, and a new session opens the Default View.
+- **8.1** The Issues tab in the app navigation follows list-views §11: it reopens the last Issue View configuration used in the current browser session, and a new session opens the list as list-views §10.10 describes.
 
 ---
 

@@ -142,7 +142,7 @@
 ## 11. Returning to a List
 
 - **11.1** Within one browser tab session, returning to a List Host through the app navigation reopens the last View Configuration and page used there.
-- **11.2** A new browser session opens the Default View (§10.10).
+- **11.2** A new browser session opens the list as §10.10 describes.
 
 ---
 
