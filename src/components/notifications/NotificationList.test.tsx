@@ -132,24 +132,7 @@ describe("NotificationList", () => {
     });
   });
 
-  it("should call markAsReadAction when notification is clicked", async () => {
-    const user = userEvent.setup();
-    render(<NotificationList notifications={mockNotifications} />);
-
-    // Open dropdown
-    const trigger = screen.getByRole("button", { name: /notifications/i });
-    await user.click(trigger);
-
-    // Click the notification link
-    const notificationLink = await screen.findByText("Assigned to MM-1");
-    await user.click(notificationLink);
-
-    await waitFor(() => {
-      expect(markAsReadAction).toHaveBeenCalledWith("1");
-    });
-  });
-
-  it("should close dropdown when notification is clicked", async () => {
+  it("marks notification as read and closes dropdown when notification is clicked", async () => {
     const user = userEvent.setup();
     render(<NotificationList notifications={mockNotifications} />);
 
@@ -164,8 +147,9 @@ describe("NotificationList", () => {
     const notificationLink = screen.getByText("Assigned to MM-1");
     await user.click(notificationLink);
 
-    // Verify it closes (content should disappear)
+    // Verify markAsReadAction was called and dropdown closed
     await waitFor(() => {
+      expect(markAsReadAction).toHaveBeenCalledWith("1");
       expect(screen.queryByText("Assigned to MM-1")).not.toBeInTheDocument();
     });
   });
