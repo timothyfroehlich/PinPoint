@@ -132,6 +132,32 @@ describe("CreateMachineForm — iScored picker integration", () => {
     expect(fd?.get("initials")).toBe("MM");
     expect(fd?.get("iscoredGameId")).toBe("104656");
   });
+
+  it("resets name and initials inputs on successful submission", async () => {
+    const user = userEvent.setup();
+    render(<CreateMachineForm allUsers={[]} canSelectOwner={false} />);
+
+    const nameInput = screen.getByLabelText(/Machine Name/);
+    const initialsInput = screen.getByLabelText(/Initials/);
+
+    await user.type(nameInput, "Medieval Madness");
+    await user.type(initialsInput, "MM");
+
+    expect(nameInput).toHaveValue("Medieval Madness");
+    expect(initialsInput).toHaveValue("MM");
+
+    await user.click(screen.getByRole("button", { name: /Create Machine/i }));
+
+    await waitFor(() => {
+      expect(createMachineAction).toHaveBeenCalled();
+    });
+
+    // After success, the form's useEffect calls resetForm() which clears inputs
+    await waitFor(() => {
+      expect(nameInput).toHaveValue("");
+      expect(initialsInput).toHaveValue("");
+    });
+  });
 });
 
 describe("CreateMachineForm — opened from a lineup entry (pinballmap 4.11)", () => {
