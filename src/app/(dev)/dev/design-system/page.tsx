@@ -261,17 +261,17 @@ function ColorPaletteSection(): React.JSX.Element {
           <ColorSwatch
             name="Status: New"
             cssVar="--color-status-new"
-            hex="#4ade80"
+            hex="#cefafe"
           />
           <ColorSwatch
             name="Status: In Progress"
             cssVar="--color-status-in-progress"
-            hex="#d946ef"
+            hex="#fccee8"
           />
           <ColorSwatch
-            name="Status: Unplayable"
-            cssVar="--color-status-unplayable"
-            hex="#ef4444"
+            name="Playability: Unplayable"
+            cssVar="--color-playability-unplayable"
+            hex="#ff6467"
           />
         </div>
       </div>

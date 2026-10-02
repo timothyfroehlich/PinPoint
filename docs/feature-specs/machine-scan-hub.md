@@ -50,7 +50,7 @@
 
 ## 6. Color
 
-- **6.1** Post a score uses the primary token. Report a problem uses the existing `warning` token (amber) with dark text — the color family the Major severity label already uses. No new token is introduced.
+- **6.1** Post a score uses the primary token. Report a problem uses the existing `warning` token (yellow) with dark text. No new token is introduced.
 
 ## Known divergences
 
@@ -60,6 +60,7 @@ _None — the current implementation matches this spec._
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-02 | §6.1: Report a problem stays on the `warning` token, described as yellow; the tie to the Major severity color is dropped (Major is orange under the PP-jb9v.1 state palette). |
 | 2026-09-27 | §5.1–§5.3 retired and §5.5–§5.6 added: the hub scrolls, with the action buttons pinned above the tab bar and content fading under them. §3.7: the band leaves the top 60px of the next card visible. §5.4: the band's minimum is 180px. §3.8 added: the PinTips tip card. §1 Thumb zone redefined as the pinned bar. |
 | 2026-09-24 | §3.6–§3.7 added: artwork band at the top of the hub, whole image, sized to the free height with a blurred fill. §3.1: the identity block sits over the band. §5.2: the Open issues card no longer collapses on the smallest phone; the band shrinks instead. §5.4 added: the band's minimum height. |
 | 2026-09-22 | §3.2: the unlinked state shows the sentence only, to everyone — the hub never renders the Manage link (resolves the conflict with §3.5). Unlinked-state mockup added. |

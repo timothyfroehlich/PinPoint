@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import {
   deriveMachineStatus,
   getMachineStatusLabel,
-  getMachineStatusStyles,
 } from "~/lib/machines/status";
 import type { IssueForStatus } from "~/lib/machines/status";
 
@@ -63,23 +62,5 @@ describe("getMachineStatusLabel", () => {
     expect(getMachineStatusLabel("operational")).toBe("Operational");
     expect(getMachineStatusLabel("needs_service")).toBe("Needs Service");
     expect(getMachineStatusLabel("unplayable")).toBe("Unplayable");
-  });
-});
-
-describe("getMachineStatusStyles", () => {
-  it("returns the correct styles for each status", () => {
-    const operationalStyles = getMachineStatusStyles("operational");
-    expect(operationalStyles).toContain("bg-success-container");
-    expect(operationalStyles).toContain("text-on-success-container");
-
-    const needsServiceStyles = getMachineStatusStyles("needs_service");
-    expect(needsServiceStyles).toContain("bg-warning-container");
-    expect(needsServiceStyles).toContain("text-on-warning-container");
-
-    const unplayableStyles = getMachineStatusStyles("unplayable");
-    expect(unplayableStyles).toContain("bg-destructive/10");
-    // text-red-400 (not text-destructive #dc2626) to clear WCAG AA on the
-    // composited bg-destructive/10 surface — see PP-fn28.
-    expect(unplayableStyles).toContain("text-red-400");
   });
 });

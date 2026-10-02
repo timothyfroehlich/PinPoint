@@ -14,7 +14,7 @@ import {
 } from "~/lib/machines/presence";
 import {
   getMachineStatusLabel,
-  MACHINE_STATUS_WIDGET_COLORS,
+  MACHINE_STATUS_COLORS,
   type MachineStatus,
 } from "~/lib/machines/status";
 import type { MachineViewState, MachineViewSummary } from "~/lib/types";
@@ -67,8 +67,8 @@ export function MachineSummaryWidgets({
       value,
       label: getMachineStatusLabel(value),
       count: playability.byStatus[value],
-      textClassName: MACHINE_STATUS_WIDGET_COLORS[value].text,
-      fillClassName: MACHINE_STATUS_WIDGET_COLORS[value].fill,
+      textClassName: MACHINE_STATUS_COLORS[value].text,
+      fillClassName: MACHINE_STATUS_COLORS[value].fill,
     }));
   const presenceText = plural(presence.total, "machine", "machines");
   const playabilityText = `of ${playability.onTheFloor} playable`;
@@ -109,7 +109,7 @@ export function MachineSummaryWidgets({
         headline={{
           figure: playable,
           text: playabilityText,
-          accentClassName: MACHINE_STATUS_WIDGET_COLORS.operational.text,
+          accentClassName: MACHINE_STATUS_COLORS.operational.text,
         }}
         segments={playabilitySegments}
         selectedValue={
