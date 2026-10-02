@@ -58,7 +58,7 @@ export function MachineTimelineComposer({
   );
 
   const hasBody = docHasText(doc);
-  const isDirty = hasBody || tag !== "note" || fullMode;
+  const isDirty = hasBody;
   const canPost = hasBody && !pending;
 
   const handlePost = (): void => {

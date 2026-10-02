@@ -158,4 +158,26 @@ describe("MachineTimelineComposer", () => {
       screen.queryByRole("option", { name: /^event$/i })
     ).not.toBeInTheDocument();
   });
+
+  it("does not intercept navigation when composer has no body text even if formatting or tag is changed", async () => {
+    const user = userEvent.setup();
+    render(
+      <div>
+        <MachineTimelineComposer machineId="m1" onPosted={vi.fn()} />
+        <a href="/other">Other Page</a>
+      </div>
+    );
+
+    // Toggle formatting
+    await user.click(screen.getByRole("button", { name: /show formatting/i }));
+    // Change tag
+    await user.click(screen.getByRole("combobox", { name: /tag/i }));
+    await user.click(screen.getByRole("option", { name: /maintenance/i }));
+
+    // Click link — should NOT trigger unsaved changes guard because body is empty
+    await user.click(screen.getByRole("link", { name: /other page/i }));
+    expect(
+      screen.queryByText(/discard unsaved changes\?/i)
+    ).not.toBeInTheDocument();
+  });
 });

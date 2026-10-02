@@ -90,6 +90,7 @@ export function useUnsavedChangesGuard({
   const [isOpen, setIsOpen] = useState(false);
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const lastInterceptedLink = useRef<HTMLAnchorElement | null>(null);
+  const navigationConfirmed = useRef(false);
 
   // 1. Guard page unload (refresh, tab close, off-site link)
   useEffect(() => {
@@ -153,6 +154,22 @@ export function useUnsavedChangesGuard({
       // CRITICAL (PP-kny4): Do NOT call event.stopPropagation().
       // Allowing propagation lets React synthetic event handlers run (e.g. closing
       // drawers, dropdowns, or popovers) while preventDefault cancels Next.js Link routing.
+
+      // If the intercepted link is inside a Radix menu, dismissing the menu via Escape
+      // ensures it does not linger behind or after the discard confirmation dialog (PP-kny4).
+      const menu = anchor.closest<HTMLElement>(
+        '[role="menu"], [data-radix-menu-content]'
+      );
+      if (menu) {
+        document.dispatchEvent(
+          new KeyboardEvent("keydown", {
+            key: "Escape",
+            bubbles: true,
+            cancelable: true,
+          })
+        );
+      }
+
       lastInterceptedLink.current = anchor;
       setPendingHref(
         `${destination.pathname}${destination.search}${destination.hash}`
@@ -172,6 +189,7 @@ export function useUnsavedChangesGuard({
   }, []);
 
   const confirmDiscard = useCallback((): void => {
+    navigationConfirmed.current = true;
     const href = pendingHref;
     setIsOpen(false);
     setPendingHref(null);
@@ -182,6 +200,7 @@ export function useUnsavedChangesGuard({
   }, [pendingHref, onDiscard, router]);
 
   const openConfirm = useCallback((targetHref?: string | null): void => {
+    lastInterceptedLink.current = null;
     setPendingHref(targetHref ?? null);
     setIsOpen(true);
   }, []);
@@ -214,7 +233,13 @@ export function useUnsavedChangesGuard({
     >
       <AlertDialogContent
         onCloseAutoFocus={(event) => {
+          if (navigationConfirmed.current) {
+            navigationConfirmed.current = false;
+            lastInterceptedLink.current = null;
+            return;
+          }
           const link = lastInterceptedLink.current;
+          lastInterceptedLink.current = null;
           if (link && document.contains(link)) {
             event.preventDefault();
             link.focus();

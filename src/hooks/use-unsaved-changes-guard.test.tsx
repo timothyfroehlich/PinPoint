@@ -6,6 +6,12 @@ import {
   useUnsavedChangesGuard,
   UnsavedChangesGuard,
 } from "./use-unsaved-changes-guard";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "~/components/ui/dropdown-menu";
 
 const pushMock = vi.fn();
 vi.mock("next/navigation", () => ({
@@ -292,6 +298,51 @@ describe("useUnsavedChangesGuard", () => {
       // No navigation when pendingHref was null
       expect(pushMock).not.toHaveBeenCalled();
     });
+
+    it("clears lastInterceptedLink so manual openConfirm does not refocus previous link, and skips refocus on confirmed discard", async () => {
+      const user = userEvent.setup();
+      render(
+        <div>
+          <a href="/target-tab">Tab Link</a>
+          <TestComponent isDirty={true} />
+        </div>
+      );
+
+      const tabLink = screen.getByRole("link", { name: "Tab Link" });
+      const cancelBtn = screen.getByRole("button", { name: "Cancel Button" });
+
+      // 1. Intercept link click
+      await user.click(tabLink);
+      expect(screen.getByText("Discard unsaved changes?")).toBeInTheDocument();
+
+      // 2. Choose "Stay on page"
+      await user.click(screen.getByRole("button", { name: "Stay on page" }));
+      expect(
+        screen.queryByText("Discard unsaved changes?")
+      ).not.toBeInTheDocument();
+      expect(document.activeElement).toBe(tabLink);
+
+      // 3. Now trigger openConfirm(null) via Cancel button
+      await user.click(cancelBtn);
+      expect(screen.getByText("Discard unsaved changes?")).toBeInTheDocument();
+
+      // 4. Cancel dialog closes — focus must NOT jump to the old tab link
+      await user.click(screen.getByRole("button", { name: "Stay on page" }));
+      expect(
+        screen.queryByText("Discard unsaved changes?")
+      ).not.toBeInTheDocument();
+      expect(document.activeElement).not.toBe(tabLink);
+
+      // 5. Intercept link click again, then confirm discard
+      await user.click(tabLink);
+      const tabLinkFocusSpy = vi.spyOn(tabLink, "focus");
+      await user.click(
+        screen.getByRole("button", { name: "Discard and leave" })
+      );
+      expect(pushMock).toHaveBeenCalledWith("/target-tab");
+      // Focus must NOT be forced on the leaving page's link
+      expect(tabLinkFocusSpy).not.toHaveBeenCalled();
+    });
   });
 
   describe("UnsavedChangesGuard declarative component", () => {
@@ -322,6 +373,56 @@ describe("useUnsavedChangesGuard", () => {
       await user.click(screen.getByRole("button", { name: "Edit Form" }));
       await user.click(screen.getByRole("link", { name: "Leave" }));
       expect(screen.getByText("Discard unsaved changes?")).toBeInTheDocument();
+    });
+  });
+
+  describe("Radix DropdownMenu integration", () => {
+    function DropdownMenuForm({
+      isDirty,
+    }: {
+      isDirty: boolean;
+    }): React.JSX.Element {
+      return (
+        <div>
+          <UnsavedChangesGuard isDirty={isDirty} />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button type="button">Open Menu</button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem asChild>
+                <a href="/target">Menu Link</a>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      );
+    }
+
+    it("dismisses open Radix dropdown menu when an item link is intercepted, and remains closed after cancel", async () => {
+      const user = userEvent.setup();
+      render(<DropdownMenuForm isDirty={true} />);
+
+      await user.click(screen.getByRole("button", { name: "Open Menu" }));
+      expect(
+        screen.getByRole("menuitem", { name: "Menu Link" })
+      ).toBeInTheDocument();
+
+      await user.click(screen.getByRole("menuitem", { name: "Menu Link" }));
+
+      // Discard dialog should open
+      expect(screen.getByText("Discard unsaved changes?")).toBeInTheDocument();
+
+      // Choose "Stay on page"
+      await user.click(screen.getByRole("button", { name: "Stay on page" }));
+      expect(
+        screen.queryByText("Discard unsaved changes?")
+      ).not.toBeInTheDocument();
+
+      // Menu should NOT remain open
+      expect(
+        screen.queryByRole("menuitem", { name: "Menu Link" })
+      ).not.toBeInTheDocument();
     });
   });
 });
