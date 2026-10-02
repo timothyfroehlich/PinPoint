@@ -12,7 +12,7 @@
 
 - **Summary Widget** — a fixed summary of one aspect of a Widget Population: a headline, one segmented bar, and a breakdown of its Segments.
 - **Widget Host** — a searchable, filterable, paginated list whose view state lives in the URL, such as Machine View or the Issues list. The host's widgets spec names the widgets it shows, their URL parameters, and the filters their Segments set.
-- **Widget Population** — the records one Summary Widget summarizes. All is the host's complete authoritative scope; Filtered is every record matching the host's current search and filters across all pages.
+- **Widget Population** — the records one Summary Widget summarizes: the host's complete authoritative scope, whatever search and filters are set. The Filtered population was retired 2026-10-02.
 - **Segment** — one category in a widget's bar and breakdown, with one count.
 - **Summary Row** — the single collapsed line that stands in for a host's Summary Widgets on phones.
 
@@ -22,8 +22,8 @@
 
 - **2.1** Each host's widgets spec defines which Summary Widgets appear and in what order. A person cannot add, remove, hide, or reorder them.
 - **2.2** Summary Widgets appear between the page heading and the host's search and filter toolbar, to everyone who can view the host.
-- **2.3** Wider layouts place a host's Summary Widgets side by side in one row, always expanded, with no collapse control.
-- **2.4** Phones stack a host's Summary Widgets full-width inside one collapsible section that starts collapsed as the Summary Row.
+- **2.3** Wider layouts place a host's Summary Widgets side by side in one row when they fit and stack them full-width when they do not, always expanded, with no collapse control.
+- **2.4** Phones stack a host's Summary Widgets full-width inside one collapsible section. It starts open on screens at least 390px wide and collapsed, as the Summary Row, on narrower ones.
 - **2.5** The Summary Row shows one short figure per widget, as its host's widgets spec defines, and expands the section when selected.
 - **2.6** The browser remembers each person's expanded or collapsed choice per host. That choice is never URL state and never part of a saved view.
 
@@ -31,10 +31,8 @@
 
 ## 3. Widget Population
 
-- **3.1** Each Summary Widget offers an All/Filtered choice of Widget Population. Each widget defaults to All independently of the others.
-- **3.2** Widget Population is URL state. A widget set to Filtered carries a host-named parameter with the value `filtered`; All is the default and is omitted.
-- **3.3** Changing a Widget Population keeps the host's current page.
-- **3.4** A host with saved views stores each widget's Widget Population as part of the saved view.
+- **3.1** Every Summary Widget summarizes its host's whole scope; search and filters never change its counts. There is no All/Filtered choice.
+- **3.2–3.4** _Retired 2026-10-02_ with the Filtered population: Widget Population is no longer URL state or part of a saved view. Numbers kept so older citations don't dangle.
 
 ---
 
@@ -50,11 +48,13 @@
 
 ## 5. Presentation
 
-- **5.1** A Summary Widget shows a group label with its All/Filtered choice, a headline, one continuous segmented bar, and a breakdown listing every Segment's count and label.
+- **5.1** A Summary Widget shows a group label, a headline, one continuous segmented bar, and a breakdown listing every Segment's count and label.
 - **5.2** A Segment shows exactly one count. Widgets carry no secondary counts or subtitles.
 - **5.3** Bar Segments are sized by their counts and colored with the colors PinPoint already uses for that category's badges.
 - **5.4** Every count appears as text, so color is never the only signal.
-- **5.5** A Segment with a zero count still appears in the breakdown with its zero.
+- **5.5** A Segment with a zero count still appears in the breakdown with its zero, unless it is rolled into "other" (§5.6).
+- **5.6** The breakdown lists Segments in the order the host's widgets spec defines, worst first. When the line cannot fit every Segment, it shows whole count-and-label pairs from the start while they fit and rolls the rest into one "N other" entry; the bar still shows every Segment.
+- **5.7** On phones the breakdown sits on the widget's label line, with nothing beneath the bar and no color swatches.
 
 ---
 
@@ -70,7 +70,10 @@
 
 ## Known divergences (code vs spec)
 
-_None — the current implementation matches this spec._
+| Requirement | Divergence | Resolution |
+| :-- | :-- | :-- |
+| §3.1 | Every widget offers an All/Filtered choice stored in the URL and in Saved Views. | PP-jb9v |
+| §2.3, §2.4, §5.5–§5.7 | Widgets never stack on wide layouts, phones always start collapsed, and breakdowns wrap in a fixed order below the bar. | PP-jb9v |
 
 ---
 
@@ -78,4 +81,5 @@ _None — the current implementation matches this spec._
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-02 | Retired the Filtered population and the All/Filtered choice (§1, §3, §5.1). Widgets stack when a wide layout cannot fit them side by side (§2.3); the phone section starts open at 390px and wider (§2.4); breakdowns run worst first and roll overflow into "N other" (§5.5, §5.6); phone breakdowns sit on the label line (§5.7). |
 | 2026-09-26 | Created. Establishes fixed Summary Widgets between a Widget Host's heading and toolbar, a collapsed-by-default Summary Row on phones, per-widget All/Filtered Widget Population as URL state, whole-population server-computed counts, single-count Segments in existing category colors, and Segment selection as a host filter. |
