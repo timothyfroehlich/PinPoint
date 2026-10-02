@@ -189,9 +189,9 @@ export function AddCommentForm({
             successMessage="Photo uploaded"
           />
           {state && !state.ok && (
-            <p role="alert" className="text-sm text-destructive-text">
+            <div role="alert" className="text-sm text-destructive-text">
               {state.message}
-            </p>
+            </div>
           )}
           {/* Sticky so Post stays in view above the keyboard while the
               sheet's content scrolls. */}
@@ -232,9 +232,9 @@ export function AddCommentForm({
             {submitButton}
           </div>
           {state && !state.ok && (
-            <p role="alert" className="text-sm text-destructive-text">
+            <div role="alert" className="text-sm text-destructive-text">
               {state.message}
-            </p>
+            </div>
           )}
         </>
       )}

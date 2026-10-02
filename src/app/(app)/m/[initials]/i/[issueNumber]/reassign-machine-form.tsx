@@ -115,7 +115,7 @@ export function ReassignMachineForm({
         />
 
         {state && !state.ok && (
-          <p className="text-sm text-destructive-text">{state.message}</p>
+          <div className="text-sm text-destructive-text">{state.message}</div>
         )}
 
         <AlertDialogFooter>

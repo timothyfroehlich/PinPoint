@@ -146,9 +146,9 @@ export function ImageUploadButton({
       />
 
       {isAtLimit && (
-        <p className="text-xs text-muted-foreground">
+        <div className="text-xs text-muted-foreground">
           Maximum number of images reached.
-        </p>
+        </div>
       )}
     </div>
   );

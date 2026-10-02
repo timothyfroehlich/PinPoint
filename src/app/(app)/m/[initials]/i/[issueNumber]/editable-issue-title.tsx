@@ -303,13 +303,13 @@ export function EditableIssueTitle({
         )}
       </div>
       {error ? (
-        <p
+        <div
           id="issue-title-error"
           role="alert"
           className="text-sm text-destructive-text"
         >
           {error}
-        </p>
+        </div>
       ) : null}
       {/* Reaching the limit is announced; every keystroke is not. */}
       <span className="sr-only" aria-live="polite">

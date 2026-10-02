@@ -104,9 +104,9 @@ export function ActivityFeed({
           </button>
         ) : null}
       </div>
-      <p role="status" className="sr-only">
+      <div role="status" className="sr-only">
         {announcement}
-      </p>
+      </div>
 
       {visible.length > 0 ? (
         <ol className="flex flex-col gap-3">

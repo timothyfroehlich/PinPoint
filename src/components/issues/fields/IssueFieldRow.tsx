@@ -292,13 +292,13 @@ export function FieldRowWithFeedback({
     <div>
       {children}
       {error ? (
-        <p role="alert" className="px-3 pb-2 text-sm text-destructive-text">
+        <div role="alert" className="px-3 pb-2 text-sm text-destructive-text">
           {error}
-        </p>
+        </div>
       ) : null}
-      <p role="status" className="sr-only">
+      <div role="status" className="sr-only">
         {announcement}
-      </p>
+      </div>
     </div>
   );
 }
