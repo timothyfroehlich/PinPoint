@@ -1,4 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { getTestDb, setupTestDb } from "~/test/setup/pglite";
+import { userProfiles } from "~/server/db/schema";
+import { createTestUser } from "~/test/helpers/factories";
 
 vi.mock("~/lib/discord/config", () => ({
   getDiscordConfig: vi.fn(),
@@ -9,17 +12,17 @@ vi.mock("~/lib/discord/client", () => ({
 vi.mock("~/lib/supabase/server", () => ({
   createClient: vi.fn(),
 }));
-vi.mock("~/server/db", () => ({
-  db: { query: { userProfiles: { findFirst: vi.fn() } } },
-}));
+vi.mock("~/server/db", async () => {
+  const { getTestDb } = await import("~/test/setup/pglite");
+  return {
+    db: await getTestDb(),
+  };
+});
 
 import { testDiscordDmAction } from "./test-discord-dm-action";
 import { getDiscordConfig } from "~/lib/discord/config";
 import { sendDm } from "~/lib/discord/client";
 import { createClient } from "~/lib/supabase/server";
-import { db } from "~/server/db";
-
-const findFirst = db.query.userProfiles.findFirst as ReturnType<typeof vi.fn>;
 
 function mockUser(id: string | null): void {
   vi.mocked(createClient).mockResolvedValue({
@@ -32,12 +35,13 @@ function mockUser(id: string | null): void {
   } as unknown as Awaited<ReturnType<typeof createClient>>);
 }
 
-beforeEach(() => {
-  vi.clearAllMocks();
-  findFirst.mockReset();
-});
-
 describe("testDiscordDmAction", () => {
+  setupTestDb();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("returns reason='not_authenticated' when no user", async () => {
     mockUser(null);
     expect(await testDiscordDmAction()).toEqual({
@@ -48,8 +52,13 @@ describe("testDiscordDmAction", () => {
   });
 
   it("returns reason='not_linked' when the user has no discord_user_id", async () => {
-    mockUser("u1");
-    findFirst.mockResolvedValue({ id: "u1", discordUserId: null });
+    const db = await getTestDb();
+    const userId = crypto.randomUUID();
+    await db
+      .insert(userProfiles)
+      .values(createTestUser({ id: userId, discordUserId: null }));
+
+    mockUser(userId);
     expect(await testDiscordDmAction()).toEqual({
       ok: false,
       reason: "not_linked",
@@ -58,8 +67,13 @@ describe("testDiscordDmAction", () => {
   });
 
   it("returns reason='not_configured' when integration is disabled", async () => {
-    mockUser("u1");
-    findFirst.mockResolvedValue({ id: "u1", discordUserId: "d1" });
+    const db = await getTestDb();
+    const userId = crypto.randomUUID();
+    await db
+      .insert(userProfiles)
+      .values(createTestUser({ id: userId, discordUserId: "d1" }));
+
+    mockUser(userId);
     vi.mocked(getDiscordConfig).mockResolvedValue(null);
     expect(await testDiscordDmAction()).toEqual({
       ok: false,
@@ -68,8 +82,13 @@ describe("testDiscordDmAction", () => {
   });
 
   it("returns ok=true on successful DM", async () => {
-    mockUser("u1");
-    findFirst.mockResolvedValue({ id: "u1", discordUserId: "d1" });
+    const db = await getTestDb();
+    const userId = crypto.randomUUID();
+    await db
+      .insert(userProfiles)
+      .values(createTestUser({ id: userId, discordUserId: "d1" }));
+
+    mockUser(userId);
     vi.mocked(getDiscordConfig).mockResolvedValue({
       botToken: "t",
       guildId: "g",
@@ -88,8 +107,13 @@ describe("testDiscordDmAction", () => {
   });
 
   it("propagates blocked from sendDm", async () => {
-    mockUser("u1");
-    findFirst.mockResolvedValue({ id: "u1", discordUserId: "d1" });
+    const db = await getTestDb();
+    const userId = crypto.randomUUID();
+    await db
+      .insert(userProfiles)
+      .values(createTestUser({ id: userId, discordUserId: "d1" }));
+
+    mockUser(userId);
     vi.mocked(getDiscordConfig).mockResolvedValue({
       botToken: "t",
       guildId: "g",
@@ -109,8 +133,13 @@ describe("testDiscordDmAction", () => {
   });
 
   it("propagates no_shared_server and includes inviteUrl from sendDm", async () => {
-    mockUser("u1");
-    findFirst.mockResolvedValue({ id: "u1", discordUserId: "d1" });
+    const db = await getTestDb();
+    const userId = crypto.randomUUID();
+    await db
+      .insert(userProfiles)
+      .values(createTestUser({ id: userId, discordUserId: "d1" }));
+
+    mockUser(userId);
     vi.mocked(getDiscordConfig).mockResolvedValue({
       botToken: "t",
       guildId: "g",
@@ -133,8 +162,13 @@ describe("testDiscordDmAction", () => {
   it.each([["rate_limited"], ["transient"]] as const)(
     "propagates %s from sendDm",
     async (reason) => {
-      mockUser("u1");
-      findFirst.mockResolvedValue({ id: "u1", discordUserId: "d1" });
+      const db = await getTestDb();
+      const userId = crypto.randomUUID();
+      await db
+        .insert(userProfiles)
+        .values(createTestUser({ id: userId, discordUserId: "d1" }));
+
+      mockUser(userId);
       vi.mocked(getDiscordConfig).mockResolvedValue({
         botToken: "t",
         guildId: "g",
