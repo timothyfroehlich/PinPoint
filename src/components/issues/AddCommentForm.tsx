@@ -1,8 +1,16 @@
 "use client";
 
 import type React from "react";
-import { useActionState, useEffect, useId, useRef, useState } from "react";
+import {
+  useActionState,
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
+import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 import { Button } from "~/components/ui/button";
 import { Toggle } from "~/components/ui/toggle";
 import {
@@ -82,17 +90,30 @@ export function AddCommentForm({
   // Mirror changes another composer made to the shared draft (the hidden
   // inline box while the mobile sheet is in use, or another browser tab).
   const seenSnapshotRef = useRef<CommentDraftSnapshot>(snapshot);
+  // The last document typed in this composer.
+  const localDocRef = useRef<ProseMirrorDoc | null>(null);
+  const handleDocChange = useCallback(
+    (doc: ProseMirrorDoc) => {
+      localDocRef.current = doc;
+      setDoc(doc);
+    },
+    [setDoc]
+  );
   useEffect(() => {
     if (seenSnapshotRef.current === snapshot) return;
     seenSnapshotRef.current = snapshot;
+    if (snapshot.origin === composerId) return;
     // Never replace a document the person is typing in (another tab's save
-    // landing mid-typing); their next keystroke saves their version.
+    // landing mid-typing): their version wins, so what they see is what
+    // posts.
     const typingHere =
       formRef.current?.contains(document.activeElement) ?? false;
-    if (snapshot.origin !== composerId && !typingHere) {
-      editorRef.current?.setContent(snapshot.draft.doc);
+    if (typingHere && localDocRef.current !== null) {
+      setDoc(localDocRef.current);
+      return;
     }
-  }, [snapshot, composerId]);
+    editorRef.current?.setContent(snapshot.draft.doc);
+  }, [snapshot, composerId, setDoc]);
 
   // The result this form has already acted on. The effect below also re-runs
   // when `onSubmitSuccess` or `quick` change identity, and must not toast,
@@ -106,6 +127,7 @@ export function AddCommentForm({
       formRef.current?.reset();
       // Empties the draft and mints a fresh key — the next comment is a new
       // logical submission.
+      localDocRef.current = null;
       clearDraft();
       editorRef.current?.clear();
       if (quick) setShowFormatting(false);
@@ -152,7 +174,7 @@ export function AddCommentForm({
       <RichTextEditor
         ref={editorRef}
         content={comment}
-        onChange={setDoc}
+        onChange={handleDocChange}
         mentionsEnabled={true}
         placeholder="Leave a comment..."
         ariaLabel="Comment"
