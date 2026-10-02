@@ -73,13 +73,15 @@ export const fieldDrawerContentClassName =
  * screen without scrolling: a one-line header, small group labels, and the
  * options as a two-column grid of 44px tiles (spec issue-detail §13.2).
  *
- * One radio group per field (APG radio group): Status's Open / In Progress /
- * Closed runs are labeled groups inside it. Only the checked option is in the
- * Tab order; the arrow keys move through every option, across groups, and
- * check the one they land on. Space, Enter, or a tap applies the checked
- * option — the sheet closes and the field saves — so arrowing through never
- * saves a value on the way. Choosing the current value closes the sheet
- * without saving. Opening the sheet focuses the current value.
+ * One listbox per field (APG listbox, single select): Status's Open / In
+ * Progress / Closed runs are labeled groups inside it. Choosing saves at once,
+ * so selection does not follow focus — the APG pattern for a listbox whose
+ * selection has side effects. Only the focused option is in the Tab order;
+ * the arrow keys, Home, and End move focus through every option, across
+ * groups, without changing anything. Space, Enter, or a tap chooses the
+ * focused option: the sheet closes and the field saves. Choosing the current
+ * value closes the sheet without saving. Opening the sheet focuses the current
+ * value.
  */
 export function MetadataDrawer<T extends string>({
   title,
@@ -90,8 +92,8 @@ export function MetadataDrawer<T extends string>({
   disabled = false,
 }: MetadataDrawerProps<T>): React.JSX.Element {
   const [open, setOpen] = React.useState(false);
-  // The option the arrow keys have checked; applied on Space, Enter, or tap.
-  const [checked, setChecked] = React.useState<T>(currentValue);
+  // The option keyboard focus is on; Space, Enter, or a tap chooses it.
+  const [active, setActive] = React.useState<T>(currentValue);
   const optionRefs = React.useRef(new Map<T, HTMLButtonElement>());
   const idPrefix = React.useId();
 
@@ -102,18 +104,23 @@ export function MetadataDrawer<T extends string>({
   };
 
   const onKeyDown = (event: React.KeyboardEvent, value: T): void => {
-    const step =
-      event.key === "ArrowDown" || event.key === "ArrowRight"
-        ? 1
-        : event.key === "ArrowUp" || event.key === "ArrowLeft"
-          ? -1
-          : 0;
-    if (step === 0) return;
-    event.preventDefault();
     const index = options.findIndex((option) => option.value === value);
-    const next = options[(index + step + options.length) % options.length];
+    let nextIndex: number;
+    if (event.key === "ArrowDown" || event.key === "ArrowRight") {
+      nextIndex = (index + 1) % options.length;
+    } else if (event.key === "ArrowUp" || event.key === "ArrowLeft") {
+      nextIndex = (index - 1 + options.length) % options.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = options.length - 1;
+    } else {
+      return;
+    }
+    event.preventDefault();
+    const next = options[nextIndex];
     if (!next) return;
-    setChecked(next.value);
+    setActive(next.value);
     optionRefs.current.get(next.value)?.focus();
   };
 
@@ -123,7 +130,7 @@ export function MetadataDrawer<T extends string>({
       onOpenChange={(next) => {
         if (next && disabled) return;
         // Every open starts from the saved value.
-        if (next) setChecked(currentValue);
+        if (next) setActive(currentValue);
         setOpen(next);
       }}
     >
@@ -145,7 +152,7 @@ export function MetadataDrawer<T extends string>({
           description={`Choose a new ${title.toLowerCase()} value.`}
         />
         <div
-          role="radiogroup"
+          role="listbox"
           aria-label={title}
           className="space-y-2.5 overflow-y-auto px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
         >
@@ -155,7 +162,7 @@ export function MetadataDrawer<T extends string>({
               <div className="grid grid-cols-2 gap-1.5">
                 {items.map((option) => {
                   const Icon = option.icon;
-                  const isChecked = option.value === checked;
+                  const isCurrent = option.value === currentValue;
                   return (
                     <button
                       key={option.value}
@@ -167,15 +174,15 @@ export function MetadataDrawer<T extends string>({
                         }
                       }}
                       type="button"
-                      role="radio"
-                      aria-checked={isChecked}
-                      // Roving tabindex: only the checked option is a Tab stop.
-                      tabIndex={isChecked ? 0 : -1}
+                      role="option"
+                      aria-selected={isCurrent}
+                      // Roving tabindex: only the focused option is a Tab stop.
+                      tabIndex={option.value === active ? 0 : -1}
                       data-testid={option.testId}
                       className={cn(
                         "flex min-h-11 min-w-0 items-center gap-1.5 rounded-lg border px-2.5 py-1 text-left text-sm font-medium leading-tight transition-colors duration-150",
                         "hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                        isChecked
+                        isCurrent
                           ? "border-primary bg-primary/10 text-foreground"
                           : "border-outline-variant bg-background text-foreground"
                       )}

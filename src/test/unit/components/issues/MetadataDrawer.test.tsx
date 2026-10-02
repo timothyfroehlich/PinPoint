@@ -54,21 +54,19 @@ function renderDrawer(
 }
 
 describe("MetadataDrawer", () => {
-  it("is one radio group with labeled runs, checks the current value, and focuses it on open", async () => {
+  it("is one listbox with labeled groups, selects the current value, and focuses it on open", async () => {
     renderDrawer(vi.fn());
 
     fireEvent.click(screen.getByRole("button", { name: "Open status" }));
 
-    expect(screen.getAllByRole("radiogroup")).toHaveLength(1);
-    expect(
-      screen.getByRole("radiogroup", { name: "Status" })
-    ).toBeInTheDocument();
+    expect(screen.getAllByRole("listbox")).toHaveLength(1);
+    expect(screen.getByRole("listbox", { name: "Status" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Open" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Closed" })).toBeInTheDocument();
-    const current = screen.getByRole("radio", { name: "Confirmed" });
-    expect(current).toHaveAttribute("aria-checked", "true");
-    expect(screen.getByRole("radio", { name: "Fixed" })).toHaveAttribute(
-      "aria-checked",
+    const current = screen.getByRole("option", { name: "Confirmed" });
+    expect(current).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("option", { name: "Fixed" })).toHaveAttribute(
+      "aria-selected",
       "false"
     );
     await waitFor(() => {
@@ -76,34 +74,38 @@ describe("MetadataDrawer", () => {
     });
   });
 
-  it("keeps only the checked option in the Tab order; arrows move and check across groups without saving", async () => {
+  it("keeps only the focused option in the Tab order; arrows, Home, and End move focus across groups without selecting or saving", async () => {
     const onSelect = vi.fn<(value: Value) => void>();
     const user = userEvent.setup();
     renderDrawer(onSelect);
 
     await user.click(screen.getByRole("button", { name: "Open status" }));
-    const confirmed = screen.getByRole("radio", { name: "Confirmed" });
+    const confirmed = screen.getByRole("option", { name: "Confirmed" });
     await waitFor(() => {
       expect(confirmed).toHaveFocus();
     });
-    expect(screen.getAllByRole("radio").map((radio) => radio.tabIndex)).toEqual(
-      [-1, 0, -1]
-    );
+    expect(
+      screen.getAllByRole("option").map((option) => option.tabIndex)
+    ).toEqual([-1, 0, -1]);
 
     // Down crosses from Open into Closed, and wraps back to the first.
     await user.keyboard("{ArrowDown}");
-    const fixed = screen.getByRole("radio", { name: "Fixed" });
+    const fixed = screen.getByRole("option", { name: "Fixed" });
     expect(fixed).toHaveFocus();
-    expect(fixed).toHaveAttribute("aria-checked", "true");
     expect(fixed.tabIndex).toBe(0);
-    expect(confirmed).toHaveAttribute("aria-checked", "false");
+    // Focus moved; the saved value did not.
+    expect(fixed).toHaveAttribute("aria-selected", "false");
+    expect(confirmed).toHaveAttribute("aria-selected", "true");
     await user.keyboard("{ArrowDown}");
-    expect(screen.getByRole("radio", { name: "New" })).toHaveFocus();
-    await user.keyboard("{ArrowUp}");
+    expect(screen.getByRole("option", { name: "New" })).toHaveFocus();
+    await user.keyboard("{End}");
     expect(fixed).toHaveFocus();
+    await user.keyboard("{Home}");
+    expect(screen.getByRole("option", { name: "New" })).toHaveFocus();
+    await user.keyboard("{End}");
     expect(onSelect).not.toHaveBeenCalled();
 
-    // Space applies the checked option.
+    // Space chooses the focused option.
     await user.keyboard(" ");
     expect(onSelect).toHaveBeenCalledExactlyOnceWith("fixed");
   });
@@ -113,11 +115,11 @@ describe("MetadataDrawer", () => {
     renderDrawer(onSelect);
 
     fireEvent.click(screen.getByRole("button", { name: "Open status" }));
-    fireEvent.click(screen.getByRole("radio", { name: "Confirmed" }));
+    fireEvent.click(screen.getByRole("option", { name: "Confirmed" }));
 
     expect(onSelect).not.toHaveBeenCalled();
     await waitFor(() => {
-      expect(screen.queryByRole("radiogroup")).not.toBeInTheDocument();
+      expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
     });
   });
 
@@ -126,7 +128,7 @@ describe("MetadataDrawer", () => {
     renderDrawer(onSelect);
 
     fireEvent.click(screen.getByRole("button", { name: "Open status" }));
-    fireEvent.click(screen.getByRole("radio", { name: "Fixed" }));
+    fireEvent.click(screen.getByRole("option", { name: "Fixed" }));
 
     expect(onSelect).toHaveBeenCalledWith("fixed");
   });
@@ -136,6 +138,6 @@ describe("MetadataDrawer", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Open status" }));
 
-    expect(screen.queryByRole("radiogroup")).not.toBeInTheDocument();
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
   });
 });
