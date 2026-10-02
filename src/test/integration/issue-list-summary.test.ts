@@ -1,7 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import { setupTestDb, getTestDb } from "~/test/setup/pglite";
-import { createTestIssue, createTestMachine } from "~/test/helpers/factories";
-import { issues, machines } from "~/server/db/schema";
+import {
+  createTestIssue,
+  createTestMachine,
+  createTestUser,
+} from "~/test/helpers/factories";
+import {
+  invitedUsers,
+  issues,
+  machines,
+  userProfiles,
+} from "~/server/db/schema";
 import { loadIssueListPage } from "~/lib/issues/list-page";
 
 vi.mock("~/server/db", async () => {
@@ -104,5 +113,63 @@ describe("issue list Summary Widget counts", () => {
     expect(summary.severity.open).toBe(2);
     expect(summary.severity.machinesWithOpenIssues).toBe(2);
     expect(summary.severity.bySeverity.unplayable).toBe(2);
+  });
+});
+
+/**
+ * CORE-SEC-007: the list loader runs on public pages, so no email reaches the
+ * page — not the guest reporter email on the issue row, not a reporter or
+ * assignee account's email through a joined relation, and not a user's email
+ * through the filter and assignee user lists.
+ */
+describe("issue list loader email privacy (CORE-SEC-007)", () => {
+  setupTestDb();
+
+  it("returns no reporter, assignee, or user email anywhere in the page data", async () => {
+    const db = await getTestDb();
+    const member = createTestUser({ email: "member-reporter@example.com" });
+    const assignee = createTestUser({ email: "assignee@example.com" });
+    await db.insert(userProfiles).values([member, assignee]);
+    const [invited] = await db
+      .insert(invitedUsers)
+      .values({
+        firstName: "Invited",
+        lastName: "Reporter",
+        email: "invited-reporter@example.com",
+      })
+      .returning();
+    if (!invited) throw new Error("Invited user insert returned no row");
+    await db
+      .insert(machines)
+      .values(createTestMachine({ initials: "AA", ownerId: member.id }));
+    await db.insert(issues).values([
+      createTestIssue("AA", {
+        issueNumber: 1,
+        reportedBy: member.id,
+        assignedTo: assignee.id,
+      }),
+      createTestIssue("AA", {
+        issueNumber: 2,
+        invitedReportedBy: invited.id,
+      }),
+      createTestIssue("AA", {
+        issueNumber: 3,
+        reporterName: "Named Guest",
+        reporterEmail: "named-guest@example.com",
+      }),
+      createTestIssue("AA", {
+        issueNumber: 4,
+        reporterEmail: "email-only-guest@example.com",
+      }),
+    ]);
+
+    const page = await loadIssueListPage({ status: [] }, { isAdmin: false });
+
+    // Every seeded issue and user loaded, so the absence below is meaningful.
+    expect(page.issuesList).toHaveLength(4);
+    expect(page.filterUsers.map((user) => user.id)).toEqual(
+      expect.arrayContaining([member.id, assignee.id, invited.id])
+    );
+    expect(JSON.stringify(page)).not.toMatch(/@example\.com/);
   });
 });
