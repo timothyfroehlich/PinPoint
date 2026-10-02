@@ -4,8 +4,8 @@ import type React from "react";
 import {
   useState,
   useActionState,
-  useCallback,
   useEffect,
+  useMemo,
   useRef,
   startTransition,
 } from "react";
@@ -17,21 +17,12 @@ import {
   type FieldOption,
 } from "~/components/issues/fields/IssueFieldRow";
 import type { Result } from "~/lib/result";
+import {
+  withTransportFailure,
+  type TransportFailure,
+} from "./transport-failure";
 
 type FieldActionResult = Result<{ issueId: string }, string>;
-
-/** A save whose request never completed (offline, dropped connection). */
-export interface TransportFailure {
-  ok: false;
-  code: "TRANSPORT";
-  message: string;
-}
-
-export const TRANSPORT_FAILURE: TransportFailure = {
-  ok: false,
-  code: "TRANSPORT",
-  message: "Not saved. Check your connection and try again.",
-};
 
 interface IssueFieldRowFormProps<
   T extends string,
@@ -76,22 +67,7 @@ export function IssueFieldRowForm<
   testId,
 }: IssueFieldRowFormProps<T, R>): React.JSX.Element {
   const [selected, setSelected] = useState<T>(value);
-  const saveAction = useCallback(
-    async (
-      _previous: R | TransportFailure | undefined,
-      formData: FormData
-    ): Promise<R | TransportFailure> => {
-      try {
-        // The field actions don't read their previous state.
-        return await action(undefined, formData);
-      } catch {
-        // A fresh object, so a second failure in a row still re-runs the
-        // result effect.
-        return { ...TRANSPORT_FAILURE };
-      }
-    },
-    [action]
-  );
+  const saveAction = useMemo(() => withTransportFailure(action), [action]);
   const [state, formAction, isPending] = useActionState<
     R | TransportFailure | undefined,
     FormData

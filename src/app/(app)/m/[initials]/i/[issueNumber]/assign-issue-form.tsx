@@ -27,24 +27,11 @@ import {
 } from "~/lib/permissions/helpers";
 import { type AccessLevel } from "~/lib/permissions/matrix";
 import {
-  TRANSPORT_FAILURE,
+  withTransportFailure,
   type TransportFailure,
-} from "./issue-field-row-form";
+} from "./transport-failure";
 
-/**
- * A request that throws (the connection dropped) is a failed save, not an
- * exception for the route's error boundary.
- */
-async function assignOrFail(
-  _previous: AssignIssueResult | TransportFailure | undefined,
-  formData: FormData
-): Promise<AssignIssueResult | TransportFailure> {
-  try {
-    return await assignIssueAction(undefined, formData);
-  } catch {
-    return { ...TRANSPORT_FAILURE };
-  }
-}
+const assignOrFail = withTransportFailure(assignIssueAction);
 
 interface AssignIssueFormProps {
   issueId: string;

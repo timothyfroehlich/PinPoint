@@ -27,21 +27,11 @@ import { cn } from "~/lib/utils";
 import { ISSUE_TITLE_MAX, ISSUE_TITLE_MAX_MESSAGE } from "~/lib/issues/title";
 import { ReassignMachineForm } from "./reassign-machine-form";
 import {
-  TRANSPORT_FAILURE,
+  withTransportFailure,
   type TransportFailure,
-} from "./issue-field-row-form";
+} from "./transport-failure";
 
-/** A save whose request throws shows as a failed save, not an error page. */
-async function updateTitleOrFail(
-  _previous: UpdateIssueTitleResult | TransportFailure | undefined,
-  formData: FormData
-): Promise<UpdateIssueTitleResult | TransportFailure> {
-  try {
-    return await updateIssueTitleAction(undefined, formData);
-  } catch {
-    return { ...TRANSPORT_FAILURE };
-  }
-}
+const updateTitleOrFail = withTransportFailure(updateIssueTitleAction);
 
 interface EditableIssueTitleProps {
   issueId: string;

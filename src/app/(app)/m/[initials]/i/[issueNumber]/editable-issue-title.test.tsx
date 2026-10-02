@@ -10,7 +10,14 @@ vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-const updateIssueTitleSpy = vi.spyOn(actions, "updateIssueTitleAction");
+// Mocked at the module boundary: the component wraps the action once, at
+// module load, so a spy installed after import would never be called.
+vi.mock("~/app/(app)/issues/actions", async (importOriginal) => ({
+  ...(await importOriginal<typeof actions>()),
+  updateIssueTitleAction: vi.fn(),
+}));
+
+const updateIssueTitleSpy = vi.mocked(actions.updateIssueTitleAction);
 
 // The component schedules an onBlur cancel via window.setTimeout(_, 200).
 // We can't use vi.useFakeTimers globally because RTL's `waitFor` polls via
