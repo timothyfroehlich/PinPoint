@@ -33,10 +33,8 @@ interface Props {
  *   mode, so flipping back is lossless.
  * - **Tier 3 (issue):** out of scope here — photos / structured fields live
  *   on issues.
- *
- * `Cmd`/`Ctrl`+`Enter` submits. `beforeunload` guards tab-close / reload
- * while dirty (in-app Link clicks are not covered — Next App Router has no
- * route-change hook).
+ * `Cmd`/`Ctrl`+`Enter` submits. `UnsavedChangesGuard` guards page exits
+ * (tab-close, reload, and in-app link navigation) while dirty.
  */
 export function MachineTimelineComposer({
   machineId,
@@ -92,6 +90,7 @@ export function MachineTimelineComposer({
   // Cmd/Ctrl+Enter to submit — expected by anyone who has used a chat or
   // code-review composer.
   const handleKeyDown = (e: React.KeyboardEvent): void => {
+    if (e.target instanceof Node && !e.currentTarget.contains(e.target)) return;
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
       e.preventDefault();
       handlePost();
@@ -99,58 +98,60 @@ export function MachineTimelineComposer({
   };
 
   return (
-    // eslint-disable-next-line jsx-a11y/no-static-element-interactions -- keyboard shortcut on composer wrapper div, PP-u4cp
-    <div
-      className="@container rounded-md border bg-card p-3"
-      onKeyDown={handleKeyDown}
-    >
+    <>
       <UnsavedChangesGuard isDirty={isDirty} />
-      <RichTextEditor
-        content={doc}
-        onChange={setDoc}
-        placeholder="Add a quick note… (⌘/Ctrl + Enter to post)"
-        showToolbar={fullMode}
-        compact={!fullMode}
-        // eslint-disable-next-line jsx-a11y/no-autofocus -- deliberate focus-on-open in sheet, PP-u4cp
-        autoFocus={autoFocus}
-      />
-      <div className="mt-3 flex items-center gap-2">
-        <Toggle
-          size="sm"
-          pressed={fullMode}
-          onPressedChange={setFullMode}
-          disabled={pending}
-          aria-label={fullMode ? "Hide formatting" : "Show formatting"}
-          title={fullMode ? "Hide formatting" : "Show formatting"}
-          className="gap-1.5 text-muted-foreground data-[state=on]:text-foreground"
-        >
-          <span className="text-base font-semibold leading-none tracking-tight">
-            Aa
-          </span>
-          {/* Bare "Aa" in a narrow composer (iOS-style); the word appears
+      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- keyboard shortcut on composer wrapper div, PP-u4cp */}
+      <div
+        className="@container rounded-md border bg-card p-3"
+        onKeyDown={handleKeyDown}
+      >
+        <RichTextEditor
+          content={doc}
+          onChange={setDoc}
+          placeholder="Add a quick note… (⌘/Ctrl + Enter to post)"
+          showToolbar={fullMode}
+          compact={!fullMode}
+          // eslint-disable-next-line jsx-a11y/no-autofocus -- deliberate focus-on-open in sheet, PP-u4cp
+          autoFocus={autoFocus}
+        />
+        <div className="mt-3 flex items-center gap-2">
+          <Toggle
+            size="sm"
+            pressed={fullMode}
+            onPressedChange={setFullMode}
+            disabled={pending}
+            aria-label={fullMode ? "Hide formatting" : "Show formatting"}
+            title={fullMode ? "Hide formatting" : "Show formatting"}
+            className="gap-1.5 text-muted-foreground data-[state=on]:text-foreground"
+          >
+            <span className="text-base font-semibold leading-none tracking-tight">
+              Aa
+            </span>
+            {/* Bare "Aa" in a narrow composer (iOS-style); the word appears
               once the composer card is wide enough (e.g. the centered desktop
               sheet) so it reads more explicitly. Container query, not viewport
               — the label tracks the composer's own width (CORE-RESP-003). */}
-          <span className="hidden text-xs font-medium @lg:inline">
-            Formatting
-          </span>
-        </Toggle>
-        <div className="ml-auto flex items-center gap-2">
-          <TagSelect value={tag} onChange={setTag} disabled={pending} />
-          {onCancel ? (
-            <Button variant="ghost" onClick={onCancel} disabled={pending}>
-              Cancel
+            <span className="hidden text-xs font-medium @lg:inline">
+              Formatting
+            </span>
+          </Toggle>
+          <div className="ml-auto flex items-center gap-2">
+            <TagSelect value={tag} onChange={setTag} disabled={pending} />
+            {onCancel ? (
+              <Button variant="ghost" onClick={onCancel} disabled={pending}>
+                Cancel
+              </Button>
+            ) : null}
+            <Button disabled={!canPost} onClick={handlePost}>
+              {pending ? "Posting…" : "Post"}
             </Button>
-          ) : null}
-          <Button disabled={!canPost} onClick={handlePost}>
-            {pending ? "Posting…" : "Post"}
-          </Button>
+          </div>
         </div>
+        {error ? (
+          <p className="mt-2 text-sm text-destructive-text">{error}</p>
+        ) : null}
       </div>
-      {error ? (
-        <p className="mt-2 text-sm text-destructive-text">{error}</p>
-      ) : null}
-    </div>
+    </>
   );
 }
 
