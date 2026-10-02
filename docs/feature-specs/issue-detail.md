@@ -110,6 +110,7 @@
 - **8.4** A signed-out visitor sees no comment box and no Comment button; a prompt to log in to comment takes the comment box's place at the end of Activity.
 - **8.5** Posting a comment makes its author a watcher.
 - **8.6** A retried submission of the same comment never posts it twice.
+- **8.7** A signed-in person's unposted comment for an issue — its text and photos — is kept until it posts: closing the composer, switching tabs, or reloading the page restores it. Posting clears it.
 
 ---
 
@@ -195,6 +196,7 @@ None.
 | §5.4 | The report's photos include every photo on the issue, so a comment's photos also appear in the initial report. | PP-buwx |
 | §6.1, §6.4 | The callout sits directly under the header, before the metadata grid and the initial report, and its title includes the machine's name. | PP-t4h1 |
 | §7.1 | The Activity heading is hidden when the content column is narrower than 448px (every phone). | PP-t4h1 |
+| §8.7 | Closing the comment composer or reloading the page discards the draft and its uploaded photos. | PP-t4h1 |
 | §7.3 | No Comments only toggle. | PP-t4h1 |
 | §7.5 | A system event takes two lines: actor and time, then a sentence ("Priority changed from Medium to High"). | PP-t4h1 |
 | §7.7 | When the content column is 576px or wider (desktop), entries show avatars joined by a vertical line, and the comment box shows the viewer's avatar. | PP-t4h1 |
@@ -221,6 +223,7 @@ Changes to this document. Divergence-table rows are working state and are not lo
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-02 | §8.7 keeps an unposted comment draft, with its photos, until it posts. |
 | 2026-10-02 | §1 Summary line and §4.7 add the assignee to the summary line, which may wrap to a second line; §4.1 and §4.5 move the mobile ⋯ menu to the end of the header's first row; §7.3 hides Comments only while Activity is empty. |
 | 2026-10-01 | Design-review decisions: §4.4 gives mobile Save and Cancel buttons and keeps the edit open when the field loses focus; §5.1 and §7.4 make the exact time available on tap; §8.3 shows the Comment button on the Issue tab only; §11.1 shows the Other issues count as a badge; §13.2 adds relative times and exempts links inside a line of text. |
 | 2026-10-01 | §1 Header, §3.7, §4.3, and §4.5: on mobile, Edit title and Move share a ⋯ menu beside the title; desktop keeps the always-visible Edit title button and a labeled Move button. |
