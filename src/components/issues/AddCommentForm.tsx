@@ -31,12 +31,19 @@ interface AddCommentFormProps {
    * the on-screen keyboard.
    */
   quick?: boolean;
+  /**
+   * Put focus back in the editor after a post. The submit button is disabled
+   * while posting, so without this an inline form drops focus to <body>.
+   * Containers that move focus themselves (the mobile sheet) leave it off.
+   */
+  refocusOnSuccess?: boolean;
 }
 
 export function AddCommentForm({
   issueId,
   onSubmitSuccess,
   quick = false,
+  refocusOnSuccess = false,
 }: AddCommentFormProps): React.JSX.Element {
   const [showFormatting, setShowFormatting] = useState(!quick);
   const formRef = useRef<HTMLFormElement>(null);
@@ -71,10 +78,11 @@ export function AddCommentForm({
       if (quick) setShowFormatting(false);
       // Fresh key — the next comment is a new logical submission.
       setIdempotencyKey(crypto.randomUUID());
+      if (refocusOnSuccess) editorRef.current?.focus();
       // Container handles focus / sheet-close / next-action.
       onSubmitSuccess?.(state.value.commentId);
     }
-  }, [state, onSubmitSuccess, quick]);
+  }, [state, onSubmitSuccess, quick, refocusOnSuccess]);
 
   const handleUploadComplete = (imageData: ImageMetadata): void => {
     setUploadedImages((prev) => [...prev, imageData]);
