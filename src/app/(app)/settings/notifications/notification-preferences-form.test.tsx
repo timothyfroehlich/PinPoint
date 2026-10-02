@@ -157,6 +157,31 @@ describe("NotificationPreferencesForm", () => {
     );
   });
 
+  it("hides email toggles and shows notice when isInternalAccount is true", () => {
+    const { container } = render(
+      <NotificationPreferencesForm
+        preferences={defaultPreferences}
+        isInternalAccount={true}
+      />
+    );
+
+    expect(
+      screen.getByText(
+        "Email notifications are not available for username accounts."
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("Email Notifications")
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText("In-App Notifications")).toBeInTheDocument();
+
+    // Verify per-row hideEmail columns are omitted from matrix rows
+    expect(container.querySelectorAll('button[id^="email"]').length).toBe(0);
+    expect(
+      container.querySelectorAll('button[id^="inAppNotify"]').length
+    ).toBeGreaterThan(0);
+  });
+
   describe("dirty state & guards (PP-bhd7.1)", () => {
     it("arms beforeunload guard when any switch differs from saved value, and disarms when reverted", async () => {
       const user = userEvent.setup();

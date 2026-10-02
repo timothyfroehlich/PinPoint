@@ -1,7 +1,9 @@
 /**
  * E2E Tests: Navigation Component
  *
- * Tests navigation bar behavior for authenticated and unauthenticated states.
+ * Tests navigation bar behavior for authenticated users.
+ * Unauthenticated nav tested in landing-page.spec.ts.
+ * Bottom Tab Bar tested in BottomTabBar.test.tsx (RTL unit).
  */
 
 import { test, expect } from "../support/fixtures.js";
@@ -13,27 +15,6 @@ import {
 import { TEST_USERS } from "../support/constants.js";
 
 test.describe("Navigation", () => {
-  test("unauthenticated navigation - show Sign In and Sign Up buttons", async ({
-    page,
-  }) => {
-    // Navigate to home page (landing page for unauthenticated users)
-    await page.goto("/");
-
-    // Verify landing page welcome heading is visible
-    await expect(
-      page.getByRole("heading", { name: /Welcome to PinPoint/i })
-    ).toBeVisible();
-
-    // AppHeader is unified — same testids on all viewports
-    await expect(page.getByTestId("nav-signin")).toBeVisible();
-    await expect(page.getByTestId("nav-signup")).toBeVisible();
-
-    // Verify Report Issue CTA is available on landing page
-    await expect(page.getByTestId("cta-report-issue")).toBeVisible();
-
-    await assertNoA11yViolations(page);
-  });
-
   test("authenticated navigation - show user menu", async ({
     page,
   }, testInfo) => {
