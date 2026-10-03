@@ -750,7 +750,7 @@ async function seedUsersAndData() {
           {
             author: userIds.admin,
             isSystem: true,
-            eventData: { type: "assigned", assigneeName: "Member User" },
+            eventData: { type: "assigned", assigneeId: userIds.member },
             daysAgo: 1.5,
           },
           {
@@ -789,7 +789,7 @@ async function seedUsersAndData() {
           {
             author: userIds.admin,
             isSystem: true,
-            eventData: { type: "assigned", assigneeName: "Admin User" },
+            eventData: { type: "assigned", assigneeId: userIds.admin },
             daysAgo: 3.5,
           },
           {

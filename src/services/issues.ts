@@ -12,7 +12,6 @@ import {
   issueWatchers,
   machines,
   issueComments,
-  userProfiles,
   issueImages,
   pinballmapComments,
 } from "~/server/db/schema";
@@ -376,15 +375,11 @@ export async function createIssue({
 
     // 3. Assignment Logic (if applicable)
     if (assignedTo) {
-      // Create timeline event
-      const assignee = await tx.query.userProfiles.findFirst({
-        where: eq(userProfiles.id, assignedTo),
-        columns: { name: true },
-      });
-      const assigneeName = assignee?.name ?? "Unknown User";
+      // Create timeline event. It stores the assignee's id; Activity resolves
+      // the current name when it renders (PP-0fg0.1).
       await createTimelineEvent(
         issue.id,
-        { type: "assigned", assigneeName },
+        { type: "assigned", assigneeId: assignedTo },
         tx,
         reportedBy ?? null
       );
@@ -1079,16 +1074,6 @@ export async function assignIssue({
       };
     }
 
-    // Get new assignee name if assigning to someone
-    let assigneeName = "Unassigned";
-    if (assignedTo) {
-      const assignee = await tx.query.userProfiles.findFirst({
-        where: eq(userProfiles.id, assignedTo),
-        columns: { name: true },
-      });
-      assigneeName = assignee?.name ?? "Unknown User";
-    }
-
     // Update assignment
     await tx
       .update(issues)
@@ -1106,9 +1091,10 @@ export async function assignIssue({
         .onConflictDoNothing();
     }
 
-    // Create timeline event
+    // Create timeline event. It stores the assignee's id; Activity resolves
+    // the current name when it renders (PP-0fg0.1).
     const event: TimelineEventData = assignedTo
-      ? { type: "assigned", assigneeName }
+      ? { type: "assigned", assigneeId: assignedTo }
       : { type: "unassigned" };
     const assignmentEventId = await createTimelineEvent(
       issueId,
@@ -1140,7 +1126,7 @@ export async function assignIssue({
     }
 
     log.info(
-      { issueId, assignedTo, assigneeName, action: "assignIssue" },
+      { issueId, assignedTo, action: "assignIssue" },
       "Issue assignment updated"
     );
 

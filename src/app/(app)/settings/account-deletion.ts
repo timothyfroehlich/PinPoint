@@ -1,4 +1,4 @@
-import { and, count, eq, inArray, ne } from "drizzle-orm";
+import { and, count, eq, inArray, ne, or, sql } from "drizzle-orm";
 import { db as globalDb, type Db } from "~/server/db";
 import {
   issueComments,
@@ -102,6 +102,30 @@ export async function anonymizeUserReferences(
       .update(issueComments)
       .set({ authorId: null, updatedAt: new Date() })
       .where(eq(issueComments.authorId, userId));
+
+    // Activity's assignment events name the assignee by id (PP-0fg0.1). Null
+    // the id, so the event shows the deleted-account placeholder even where a
+    // profile row outlives the account. Also clear a legacy name snapshot
+    // equal to this person's name: an event migration 0100 could not tie to
+    // one account (a shared name, or one written while it deployed). With a
+    // shared name that clears the namesake's event too, erring toward privacy.
+    const assignedEvent = sql`${issueComments.eventData}->>'type' = 'assigned'`;
+    const assigneeId = sql`${issueComments.eventData}->>'assigneeId'`;
+    await tx
+      .update(issueComments)
+      .set({ eventData: { type: "assigned", assigneeId: null } })
+      .where(
+        and(
+          assignedEvent,
+          or(
+            sql`${assigneeId} = ${userId}`,
+            and(
+              sql`${assigneeId} IS NULL`,
+              sql`${issueComments.eventData}->>'assigneeName' = ${profile.name}`
+            )
+          )
+        )
+      );
 
     await tx
       .update(issueImages)

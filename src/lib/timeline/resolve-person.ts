@@ -25,6 +25,12 @@ export interface PersonResolverInput {
   invitedName: string | null;
 }
 
+/**
+ * Display name for a person whose account was deleted. Single source of truth
+ * for every renderer that resolves a person reference.
+ */
+export const FORMER_USER_NAME = "Former user";
+
 export interface ResolvedPerson {
   displayName: string;
   isInvited: boolean;
@@ -69,5 +75,5 @@ export function resolvePerson(input: PersonResolverInput): ResolvedPerson {
   // Neither id present: the referenced real user was deleted and the FK was
   // nulled. The historical fact (a person acted here) survives; the identity
   // resolves to a privacy-safe placeholder.
-  return { displayName: "Former user", isInvited: false };
+  return { displayName: FORMER_USER_NAME, isInvited: false };
 }

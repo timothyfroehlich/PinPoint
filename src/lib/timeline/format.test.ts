@@ -2,22 +2,25 @@ import { describe, it, expect } from "vitest";
 import {
   formatTimelineEvent,
   formatTimelineEventAction,
-  type TimelineEventData,
+  type ResolvedTimelineEvent,
 } from "~/lib/timeline/types";
 
 describe("formatTimelineEvent", () => {
   it("formats assigned event", () => {
-    const event: TimelineEventData = { type: "assigned", assigneeName: "Tim" };
+    const event: ResolvedTimelineEvent = {
+      type: "assigned",
+      assigneeDisplayName: "Tim",
+    };
     expect(formatTimelineEvent(event)).toBe("Assigned to Tim");
   });
 
   it("formats unassigned event", () => {
-    const event: TimelineEventData = { type: "unassigned" };
+    const event: ResolvedTimelineEvent = { type: "unassigned" };
     expect(formatTimelineEvent(event)).toBe("Unassigned");
   });
 
   it("formats status_changed event", () => {
-    const event: TimelineEventData = {
+    const event: ResolvedTimelineEvent = {
       type: "status_changed",
       from: "new",
       to: "in_progress",
@@ -28,7 +31,7 @@ describe("formatTimelineEvent", () => {
   });
 
   it("formats severity_changed event", () => {
-    const event: TimelineEventData = {
+    const event: ResolvedTimelineEvent = {
       type: "severity_changed",
       from: "minor",
       to: "unplayable",
@@ -39,7 +42,7 @@ describe("formatTimelineEvent", () => {
   });
 
   it("formats priority_changed event", () => {
-    const event: TimelineEventData = {
+    const event: ResolvedTimelineEvent = {
       type: "priority_changed",
       from: "low",
       to: "high",
@@ -50,7 +53,7 @@ describe("formatTimelineEvent", () => {
   });
 
   it("formats frequency_changed event", () => {
-    const event: TimelineEventData = {
+    const event: ResolvedTimelineEvent = {
       type: "frequency_changed",
       from: "intermittent",
       to: "constant",
@@ -61,7 +64,7 @@ describe("formatTimelineEvent", () => {
   });
 
   it("formats comment_deleted by author", () => {
-    const event: TimelineEventData = {
+    const event: ResolvedTimelineEvent = {
       type: "comment_deleted",
       deletedBy: "author",
     };
@@ -69,7 +72,7 @@ describe("formatTimelineEvent", () => {
   });
 
   it("formats comment_deleted by admin", () => {
-    const event: TimelineEventData = {
+    const event: ResolvedTimelineEvent = {
       type: "comment_deleted",
       deletedBy: "admin",
     };
@@ -77,7 +80,7 @@ describe("formatTimelineEvent", () => {
   });
 
   it("formats title_changed event", () => {
-    const event: TimelineEventData = {
+    const event: ResolvedTimelineEvent = {
       type: "title_changed",
       from: "Old Title",
       to: "New Title",
@@ -88,7 +91,7 @@ describe("formatTimelineEvent", () => {
   });
 
   it("formats machine_reassigned event", () => {
-    const event: TimelineEventData = {
+    const event: ResolvedTimelineEvent = {
       type: "machine_reassigned",
       fromInitials: "MM",
       fromIssueNumber: 7,
@@ -103,7 +106,7 @@ describe("formatTimelineEvent", () => {
   });
 
   it("handles unknown status enum values gracefully", () => {
-    const event: TimelineEventData = {
+    const event: ResolvedTimelineEvent = {
       type: "status_changed",
       from: "unknown_val",
       to: "new",
@@ -115,8 +118,8 @@ describe("formatTimelineEvent", () => {
 });
 
 describe("formatTimelineEventAction (follows the actor's name)", () => {
-  it.each<[TimelineEventData, string]>([
-    [{ type: "assigned", assigneeName: "Tim" }, "assigned Tim"],
+  it.each<[ResolvedTimelineEvent, string]>([
+    [{ type: "assigned", assigneeDisplayName: "Tim" }, "assigned Tim"],
     [{ type: "unassigned" }, "unassigned the issue"],
     [
       { type: "status_changed", from: "new", to: "in_progress" },

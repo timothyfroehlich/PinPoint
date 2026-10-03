@@ -12,13 +12,26 @@ import {
   FREQUENCY_CONFIG,
 } from "~/lib/issues/status";
 import { formatIssueId } from "~/lib/issues/utils";
+import { FORMER_USER_NAME } from "~/lib/timeline/resolve-person";
 
 /**
  * Structured timeline event payload.
  * Discriminated union on `type` — stored as jsonb in the `event_data` column.
  */
 export type TimelineEventData =
-  | { type: "assigned"; assigneeName: string }
+  | {
+      type: "assigned";
+      /**
+       * The assignee's account (PP-0fg0.1). Null once that account is
+       * deleted, and on a legacy event whose name matched no single account.
+       */
+      assigneeId: string | null;
+      /**
+       * Legacy name snapshot, left only on events migration 0100 could not
+       * match to an account. New events never write it.
+       */
+      assigneeName?: string;
+    }
   | { type: "unassigned" }
   | { type: "status_changed"; from: string; to: string }
   | { type: "severity_changed"; from: string; to: string }
@@ -37,13 +50,41 @@ export type TimelineEventData =
     };
 
 /**
+ * A stored event with its person references resolved to display names: what
+ * the formatters render. Only an assignment refers to a person.
+ */
+export type ResolvedTimelineEvent =
+  | Exclude<TimelineEventData, { type: "assigned" }>
+  | { type: "assigned"; assigneeDisplayName: string };
+
+/**
+ * Resolve an event's person references against current account names (id →
+ * name). An assignee shows their current name; failing that, the event's
+ * legacy name snapshot; failing that, the deleted-account placeholder.
+ */
+export function resolveTimelineEvent(
+  event: TimelineEventData,
+  accountNames: ReadonlyMap<string, string>
+): ResolvedTimelineEvent {
+  if (event.type !== "assigned") return event;
+  const currentName =
+    typeof event.assigneeId === "string"
+      ? accountNames.get(event.assigneeId)
+      : undefined;
+  return {
+    type: "assigned",
+    assigneeDisplayName: currentName ?? event.assigneeName ?? FORMER_USER_NAME,
+  };
+}
+
+/**
  * Convert a structured timeline event to a human-readable string.
  * Used by the timeline UI to display system events.
  */
-export function formatTimelineEvent(event: TimelineEventData): string {
+export function formatTimelineEvent(event: ResolvedTimelineEvent): string {
   switch (event.type) {
     case "assigned":
-      return `Assigned to ${event.assigneeName}`;
+      return `Assigned to ${event.assigneeDisplayName}`;
     case "unassigned":
       return "Unassigned";
     case "status_changed":
@@ -72,10 +113,12 @@ export function formatTimelineEvent(event: TimelineEventData): string {
  * ("changed priority Medium → High"), for the issue page's Activity (spec
  * issue-detail §7.5). Without an actor, use `formatTimelineEvent`.
  */
-export function formatTimelineEventAction(event: TimelineEventData): string {
+export function formatTimelineEventAction(
+  event: ResolvedTimelineEvent
+): string {
   switch (event.type) {
     case "assigned":
-      return `assigned ${event.assigneeName}`;
+      return `assigned ${event.assigneeDisplayName}`;
     case "unassigned":
       return "unassigned the issue";
     case "status_changed":
