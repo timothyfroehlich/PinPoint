@@ -1,8 +1,11 @@
 import { subDays, subMonths } from "date-fns";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   formatCompactAge,
+  formatDate,
+  formatDateTime,
+  formatRelative,
   formatDayGroup,
   formatTimelineBucket,
 } from "./dates";
@@ -29,22 +32,10 @@ describe("formatDayGroup", () => {
   });
 
   it("returns the absolute medium date for timestamps a week or older", () => {
-    const label = formatDayGroup(subDays(new Date(), 14));
-    expect(label).not.toBe("Today");
-    expect(label).not.toBe("Yesterday");
-    // Two-week-back dates fall outside the 2..6 weekday window, so the
-    // label must NOT be a weekday name.
-    const weekdays = [
-      "Sunday",
-      "Monday",
-      "Tuesday",
-      "Wednesday",
-      "Thursday",
-      "Friday",
-      "Saturday",
-    ];
-    expect(weekdays).not.toContain(label);
-    expect(label.length).toBeGreaterThan(0);
+    const date = subDays(new Date(), 14);
+    expect(formatDayGroup(date)).toBe(
+      new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(date)
+    );
   });
 });
 
@@ -136,6 +127,55 @@ describe("formatCompactAge", () => {
   it("drops days once the age reaches a year", () => {
     expect(formatCompactAge(new Date("2024-12-09T12:00:00Z"), now)).toBe(
       "1y 6mo"
+    );
+  });
+});
+
+// Preserve normalization/options contracts in the formatter's canonical file.
+// Intl is the external boundary; expected outputs do not call PinPoint helpers.
+const FIXED_NOW = new Date("2026-04-18T12:00:00.000Z");
+const FIXED_DATE = new Date("2026-01-15T08:30:00.000Z");
+const INPUTS = [
+  ["Date", FIXED_DATE],
+  ["ISO string", "2026-01-15T08:30:00.000Z"],
+  ["numeric timestamp", FIXED_DATE.getTime()],
+] as const;
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+describe("date formatter input and presentation contracts", () => {
+  it.each(INPUTS)(
+    "formats %s as medium date and medium date with short time",
+    (_label, input) => {
+      expect(formatDate(input)).toBe(
+        new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(
+          FIXED_DATE
+        )
+      );
+      expect(formatDateTime(input)).toBe(
+        new Intl.DateTimeFormat(undefined, {
+          dateStyle: "medium",
+          timeStyle: "short",
+        }).format(FIXED_DATE)
+      );
+    }
+  );
+
+  it.each([
+    ["Date", new Date("2026-04-18T11:00:00.000Z")],
+    ["ISO string", "2026-04-18T11:00:00.000Z"],
+    ["numeric timestamp", FIXED_NOW.getTime() - 60 * 60 * 1000],
+  ] as const)("formats a past %s with the relative suffix", (_label, input) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(FIXED_NOW);
+    expect(formatRelative(input)).toBe("about 1 hour ago");
+  });
+
+  it.each([null, undefined])("rejects nullish runtime input %s", (input) => {
+    expect(() => Reflect.apply(formatDateTime, undefined, [input])).toThrow(
+      new TypeError("Expected date to be a Date, string, or number")
     );
   });
 });
