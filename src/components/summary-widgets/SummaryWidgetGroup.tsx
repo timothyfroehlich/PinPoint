@@ -76,8 +76,10 @@ export function SummaryWidgetGroup({
   // null until the person chooses: CSS then decides (CONTENT_VISIBILITY).
   const [choice, setChoice] = React.useState<boolean | null>(null);
   // Whether the CSS default currently shows the section; only drives
-  // aria-expanded, which CSS cannot set (CORE-RESP-002 boundary).
-  const [defaultOpen, setDefaultOpen] = React.useState(false);
+  // aria-expanded, which CSS cannot set (CORE-RESP-002 boundary). null until
+  // measured: the server cannot know the screen width, so its HTML leaves
+  // aria-expanded out rather than state something CSS may contradict.
+  const [defaultOpen, setDefaultOpen] = React.useState<boolean | null>(null);
 
   React.useLayoutEffect(() => {
     setChoice(readChoice(storageKey));
@@ -99,8 +101,12 @@ export function SummaryWidgetGroup({
   const expanded = choice ?? defaultOpen;
 
   function toggle(): void {
-    setChoice(!expanded);
-    writeChoice(storageKey, !expanded);
+    const content = contentRef.current;
+    const shown =
+      expanded ??
+      (content !== null && getComputedStyle(content).display !== "none");
+    setChoice(!shown);
+    writeChoice(storageKey, !shown);
   }
 
   const visibility = choice === null ? "default" : choice ? "open" : "closed";
@@ -112,7 +118,7 @@ export function SummaryWidgetGroup({
     >
       <button
         type="button"
-        aria-expanded={expanded}
+        aria-expanded={expanded ?? undefined}
         aria-controls={contentId}
         onClick={toggle}
         className="flex min-h-11 w-full items-center gap-2 py-2 text-left text-sm text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none md:hidden"

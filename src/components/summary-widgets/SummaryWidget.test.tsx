@@ -1,5 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SummaryWidget, type SummaryWidgetSegment } from "./SummaryWidget";
 
@@ -29,19 +30,39 @@ const segments: SummaryWidgetSegment<Value>[] = [
   },
 ];
 
-function renderWidget(): { onSegmentSelect: ReturnType<typeof vi.fn> } {
-  const onSegmentSelect = vi.fn();
-  render(
+function widget({
+  widgetSegments = segments,
+  selectedValue = null,
+  onSegmentSelect = vi.fn(),
+}: {
+  widgetSegments?: SummaryWidgetSegment<Value>[];
+  selectedValue?: Value | null;
+  onSegmentSelect?: (value: Value) => void;
+} = {}): React.JSX.Element {
+  return (
     <SummaryWidget
       id="test-widget"
       label="Status"
       headline={{ figure: 4, text: "up", accentClassName: "text-success" }}
-      segments={segments}
-      selectedValue={null}
+      segments={widgetSegments}
+      selectedValue={selectedValue}
       onSegmentSelect={onSegmentSelect}
     />
   );
+}
+
+function renderWidget(options: Parameters<typeof widget>[0] = {}): {
+  onSegmentSelect: ReturnType<typeof vi.fn>;
+} {
+  const onSegmentSelect = vi.fn();
+  render(widget({ ...options, onSegmentSelect }));
   return { onSegmentSelect };
+}
+
+function withCounts(
+  counts: [number, number, number]
+): SummaryWidgetSegment<Value>[] {
+  return segments.map((segment, i) => ({ ...segment, count: counts[i] ?? 0 }));
 }
 
 /**
@@ -112,5 +133,55 @@ describe("SummaryWidget", () => {
     expect(
       screen.queryByRole("list", { name: "Other Status" })
     ).not.toBeInTheDocument();
+  });
+
+  it("names the rolled-up Segment that is the active filter on N other", () => {
+    stubBreakdownWidths();
+    renderWidget({ selectedValue: "up" });
+    const region = screen.getByRole("region", { name: "Status" });
+
+    expect(
+      within(region).getByRole("button", { name: "6 other, Up selected" })
+    ).toBeEnabled();
+  });
+
+  it("keeps N other unselectable when every rolled-up Segment is zero", async () => {
+    stubBreakdownWidths();
+    const user = userEvent.setup();
+    renderWidget({ widgetSegments: withCounts([4, 0, 0]) });
+    const other = screen.getByRole("button", { name: "0 other" });
+
+    expect(other).toBeDisabled();
+    await user.click(other);
+    expect(
+      screen.queryByRole("list", { name: "Other Status" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("server-renders whole pairs only, wrapping the ones that do not fit out of view until measured", () => {
+    const container = document.createElement("div");
+    container.innerHTML = renderToString(widget());
+    const pairs = within(container).getAllByRole("button");
+
+    // No measurement yet: every pair, no "N other".
+    expect(pairs.map((button) => button.getAttribute("aria-label"))).toEqual([
+      "0 Down",
+      "2 Worn",
+      "4 Up",
+    ]);
+    // A one-entry-high wrapping line hides an overflowing pair whole rather
+    // than clipping it mid-pair. jsdom has no layout, so the classes are
+    // the observable contract here.
+    const line = pairs[0]?.parentElement;
+    expect(line).toHaveClass("flex-wrap", "max-h-8", "overflow-hidden");
+  });
+
+  it("stops wrapping once measured, so a shown entry is never hidden whole", () => {
+    stubBreakdownWidths();
+    renderWidget();
+    const line = screen.getByRole("button", { name: "0 Down" }).parentElement;
+
+    expect(line).not.toHaveClass("flex-wrap");
+    expect(line).toHaveClass("overflow-x-clip");
   });
 });

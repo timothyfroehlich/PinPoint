@@ -197,21 +197,25 @@ function SummaryWidgetBreakdown<T extends string>({
     return () => observer.disconnect();
   }, [entriesKey]);
 
-  // Before the first measurement every pair renders; the line clips them.
-  const shownCount =
-    measurements?.segmentWidths.length === segments.length
-      ? fitBreakdown(measurements)
-      : segments.length;
+  const measured = measurements?.segmentWidths.length === segments.length;
+  // Until measured (the server render included), every pair renders.
+  const shownCount = measured ? fitBreakdown(measurements) : segments.length;
   const shown = segments.slice(0, shownCount);
   const rolledUp = segments.slice(shownCount);
   const rolledUpCount = rolledUp.reduce((sum, s) => sum + s.count, 0);
-  const rolledUpSelected = rolledUp.some((s) => s.value === selectedValue);
+  const rolledUpSelected = rolledUp.find((s) => s.value === selectedValue);
+  // Like a zero Segment (§6.4), "N other" holding only zeros cannot open.
+  const otherDisabled = rolledUpCount === 0;
 
   return (
     <div
       ref={lineRef}
       className={cn(
-        "relative flex min-w-0 items-center overflow-x-clip",
+        "relative flex min-w-0 items-center",
+        // Unmeasured, pairs that do not fit wrap onto a second row the
+        // one-entry-high line hides, so no pair ever shows cut in half.
+        // Measured, every entry shown fits; clip only sub-pixel overflow.
+        measured ? "overflow-x-clip" : "max-h-8 flex-wrap overflow-hidden",
         LINE_GAP_CLASS,
         className
       )}
@@ -225,11 +229,18 @@ function SummaryWidgetBreakdown<T extends string>({
         />
       ))}
       {rolledUp.length > 0 ? (
-        <Popover open={otherOpen} onOpenChange={setOtherOpen}>
+        <Popover open={otherOpen && !otherDisabled} onOpenChange={setOtherOpen}>
           <PopoverTrigger asChild>
             <button
               type="button"
-              aria-label={`${rolledUpCount} other`}
+              disabled={otherDisabled}
+              // The border alone cannot tell assistive technology which
+              // rolled-up Segment is the active filter.
+              aria-label={
+                rolledUpSelected
+                  ? `${rolledUpCount} other, ${rolledUpSelected.label} selected`
+                  : `${rolledUpCount} other`
+              }
               className={cn(
                 ENTRY_CLASS,
                 SEGMENT_BUTTON_CLASS,
