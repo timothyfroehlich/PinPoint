@@ -7,6 +7,7 @@ import {
   collectionCollaborators,
   userProfiles,
 } from "~/server/db/schema";
+import { machineNotRemoved } from "~/lib/machines/queries";
 
 export interface CollectionListItem {
   id: string;
@@ -47,9 +48,8 @@ export async function getMyCollections(
 }
 
 /**
- * Count the machines owned by `ownerId` — the size of that user's owner-type
- * collection (/c/owner/[ownerId]). A dedicated count rather than
- * `getOwnerCollection`, which eagerly loads every machine and its open issues.
+ * Count the machines owned by `ownerId`, leaving out Removed ones (PP-s363).
+ * A dedicated count rather than `getOwnerCollection`, which eagerly loads every machine and its open issues.
  */
 export async function getOwnedMachineCount(
   tx: DbTransaction = db,
@@ -58,7 +58,7 @@ export async function getOwnedMachineCount(
   const [row] = await tx
     .select({ value: count() })
     .from(machines)
-    .where(eq(machines.ownerId, ownerId));
+    .where(and(eq(machines.ownerId, ownerId), machineNotRemoved()));
   return Number(row?.value ?? 0);
 }
 
