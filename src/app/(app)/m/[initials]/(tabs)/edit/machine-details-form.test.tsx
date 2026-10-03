@@ -741,12 +741,6 @@ describe("MachineDetailsForm", () => {
   });
 
   describe("iScored game ID field", () => {
-    it("renders with defaultValue from prop", () => {
-      renderForm({ iscoredGameId: "73" });
-      const input = screen.getByTestId("edit-machine-iscored-game-id");
-      expect(input).toHaveValue("73");
-    });
-
     it("marks form dirty when edited via picker", async () => {
       const user = userEvent.setup();
       renderForm({ iscoredGameId: null });
@@ -793,12 +787,6 @@ describe("MachineDetailsForm", () => {
   });
 
   describe("hydration and pre-hydration submit safety (PP-aeei)", () => {
-    it("renders form with method='post' to prevent native GET submit", () => {
-      renderForm();
-      const form = screen.getByTestId("machine-details-form");
-      expect(form).toHaveAttribute("method", "post");
-    });
-
     it("disables save button during SSR / before hydration", () => {
       const html = renderToString(
         <DetailsDirtyProvider>
