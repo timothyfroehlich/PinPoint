@@ -31,7 +31,7 @@ export interface CleanupResult {
  * - `issue_images.full_image_url` (issue image originals)
  * - `issue_images.cropped_image_url` (issue image crops)
  */
-export async function getReferencedBlobUrls(): Promise<Set<string>> {
+async function getReferencedBlobUrls(): Promise<Set<string>> {
   const urls = new Set<string>();
 
   // Avatar URLs from user profiles

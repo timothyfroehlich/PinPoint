@@ -26,81 +26,56 @@
  * that lives entirely in SQL.
  */
 
-import { describe, it, expect, beforeEach, afterAll } from "vitest";
-import postgres from "postgres";
-import { drizzle } from "drizzle-orm/postgres-js";
-import { eq, sql } from "drizzle-orm";
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  beforeEach,
+  afterAll,
+  vi,
+} from "vitest";
+import { eq } from "drizzle-orm";
 import { pinballmapState } from "~/server/db/schema";
+import { syncLocationSnapshot } from "~/lib/pinballmap/state";
+import type { LocationSnapshot } from "~/lib/pinballmap/types";
 
-const databaseUrl =
-  process.env.POSTGRES_URL_NON_POOLING ?? process.env.POSTGRES_URL;
+const { client, db } = await vi.hoisted(async () => {
+  const databaseUrl =
+    process.env.POSTGRES_URL_NON_POOLING ?? process.env.POSTGRES_URL;
+  if (!databaseUrl)
+    throw new Error("Missing POSTGRES_URL for the PinballMap throttle test.");
+  const { default: postgres } = await import("postgres");
+  const { drizzle } = await import("drizzle-orm/postgres-js");
+  const schema = await import("~/server/db/schema");
+  // Supavisor's transaction pooler does not support prepared statements.
+  const client = postgres(databaseUrl, { prepare: false });
+  return { client, db: drizzle(client, { schema }) };
+});
+vi.mock("server-only", () => ({}));
+vi.mock("~/server/db", () => ({ db }));
+vi.mock("~/lib/pinballmap/client", () => ({
+  getPinballMapClient: () =>
+    Promise.resolve({ fetchLocation: () => Promise.resolve(snapshot) }),
+}));
 
-if (!databaseUrl) {
-  throw new Error("Missing POSTGRES_URL for the PinballMap throttle test.");
-}
-
-// `prepare: false` for the same reason as the sibling credential test: the
-// fallback is the Supavisor transaction pooler on `:6543`, which has no
-// prepared statements (AGENTS.md §7, PP-d8l8).
-const client = postgres(databaseUrl, { prepare: false });
-const db = drizzle(client, { schema: { pinballmapState } });
+const snapshot: LocationSnapshot = {
+  locationId: 26454,
+  name: "Local throttle fixture",
+  dateLastUpdated: null,
+  lastUpdatedByUsername: null,
+  machineCount: 0,
+  lmxes: [],
+  fetchedAtIso: "2026-09-12T12:00:00.000Z",
+  raw: {},
+};
+let originalState: typeof pinballmapState.$inferSelect | undefined;
+let originalStateRead = false;
 
 const SINGLETON_ID = "singleton";
 const LOCATION_ID = 26454;
 const BURST = 3;
 const REFILL_MS = 3 * 60 * 1000;
-
-/**
- * The production statement, reproduced. Importing `syncLocationSnapshot` would
- * drag in `server-only` plus a PinballMap fetch; the SQL is what is under test,
- * so keep this identical to `stampSyncAttempt` in `src/lib/pinballmap/state.ts`.
- */
-const ELAPSED_PERIODS = sql`greatest(0, floor(extract(epoch from (now() - ${pinballmapState.refreshTokensAt})) * 1000 / ${REFILL_MS}))`;
-const AVAILABLE_TOKENS = sql`least(${BURST}, ${pinballmapState.refreshTokens} + ${ELAPSED_PERIODS})`;
-
-async function claim(attemptAt: Date): Promise<boolean> {
-  const claimed = await db
-    .insert(pinballmapState)
-    .values({
-      id: SINGLETON_ID,
-      locationId: LOCATION_ID,
-      lastSyncAttemptAt: attemptAt,
-      updatedAt: attemptAt,
-      refreshTokens: BURST - 1,
-      refreshTokensAt: attemptAt,
-    })
-    .onConflictDoUpdate({
-      target: pinballmapState.id,
-      set: {
-        lastSyncAttemptAt: attemptAt,
-        updatedAt: attemptAt,
-        refreshTokens: sql`${AVAILABLE_TOKENS} - 1`,
-        refreshTokensAt: sql`CASE
-          WHEN ${AVAILABLE_TOKENS} >= ${BURST} THEN now()
-          ELSE ${pinballmapState.refreshTokensAt} + (interval '1 millisecond' * ${REFILL_MS} * ${ELAPSED_PERIODS})
-        END`,
-      },
-      setWhere: sql`${AVAILABLE_TOKENS} >= 1`,
-    })
-    .returning({ id: pinballmapState.id });
-  return claimed.length > 0;
-}
-
-/** The cron path: stamps the attempt, spends no token. */
-async function stampUnguarded(attemptAt: Date): Promise<void> {
-  await db
-    .insert(pinballmapState)
-    .values({
-      id: SINGLETON_ID,
-      locationId: LOCATION_ID,
-      lastSyncAttemptAt: attemptAt,
-      updatedAt: attemptAt,
-    })
-    .onConflictDoUpdate({
-      target: pinballmapState.id,
-      set: { lastSyncAttemptAt: attemptAt, updatedAt: attemptAt },
-    });
-}
 
 async function setBucket(tokens: number, tokensAt: Date): Promise<void> {
   await db
@@ -110,10 +85,20 @@ async function setBucket(tokens: number, tokensAt: Date): Promise<void> {
       locationId: LOCATION_ID,
       refreshTokens: tokens,
       refreshTokensAt: tokensAt,
+      configurationGeneration: 0,
+      mutationLeaseId: null,
+      mutationLeaseExpiresAt: null,
     })
     .onConflictDoUpdate({
       target: pinballmapState.id,
-      set: { refreshTokens: tokens, refreshTokensAt: tokensAt },
+      set: {
+        locationId: LOCATION_ID,
+        configurationGeneration: 0,
+        mutationLeaseId: null,
+        mutationLeaseExpiresAt: null,
+        refreshTokens: tokens,
+        refreshTokensAt: tokensAt,
+      },
     });
 }
 
@@ -132,23 +117,47 @@ async function readBucket(): Promise<{ tokens: number; tokensAt: Date }> {
 describe("manual-refresh token bucket (real postgres.js driver)", () => {
   // The singleton is shared state seeded by supabase/seed-pinballmap-state.ts,
   // so each case sets the columns it depends on rather than deleting the row —
-  // dropping it would strip `snapshot_json` from every other suite and from the
-  // dev database this same stack serves.
+  // the production sync changes health and snapshot fields too, so afterAll
+  // restores the full original singleton before releasing the connection.
+  beforeAll(async () => {
+    originalState = await db.query.pinballmapState.findFirst({
+      where: eq(pinballmapState.id, SINGLETON_ID),
+    });
+    originalStateRead = true;
+  });
+
   beforeEach(async () => {
     await setBucket(BURST, new Date());
   });
 
   afterAll(async () => {
-    await client.end();
+    try {
+      if (originalState) {
+        await db
+          .insert(pinballmapState)
+          .values(originalState)
+          .onConflictDoUpdate({
+            target: pinballmapState.id,
+            set: originalState,
+          });
+      } else if (originalStateRead) {
+        await db
+          .delete(pinballmapState)
+          .where(eq(pinballmapState.id, SINGLETON_ID));
+      }
+    } finally {
+      await client.end();
+    }
   });
 
   it("executes the claim instead of failing to bind", async () => {
     // The PP-hbi0 regression, kept as a case because the shape of the statement
     // changed rather than the risk disappearing. Before the original fix this
     // REJECTED with a TypeError from Buffer.byteLength rather than returning
-    // either verdict. `.resolves` is the assertion; the boolean is other cases'
-    // business.
-    await expect(claim(new Date())).resolves.toBeTypeOf("boolean");
+    // a successful sync. The production owner and real driver both run here.
+    await expect(
+      syncLocationSnapshot({ trigger: "manual" })
+    ).resolves.toMatchObject({ ok: true });
   });
 
   it("allows the full burst back-to-back, then refuses", async () => {
@@ -156,17 +165,25 @@ describe("manual-refresh token bucket (real postgres.js driver)", () => {
     // machines in a row is the ordinary thing to do, and the old guard refused
     // the second one (spec 3.2).
     for (let i = 0; i < BURST; i++) {
-      await expect(claim(new Date())).resolves.toBe(true);
+      await expect(
+        syncLocationSnapshot({ trigger: "manual" })
+      ).resolves.toMatchObject({ ok: true });
     }
-    await expect(claim(new Date())).resolves.toBe(false);
+    await expect(
+      syncLocationSnapshot({ trigger: "manual" })
+    ).resolves.toMatchObject({ ok: false, reason: "throttled" });
   });
 
   it("grants exactly one token per refill period", async () => {
     // Empty, one period ago: one token back, not two and not the whole burst.
     await setBucket(0, new Date(Date.now() - REFILL_MS - 1000));
 
-    await expect(claim(new Date())).resolves.toBe(true);
-    await expect(claim(new Date())).resolves.toBe(false);
+    await expect(
+      syncLocationSnapshot({ trigger: "manual" })
+    ).resolves.toMatchObject({ ok: true });
+    await expect(
+      syncLocationSnapshot({ trigger: "manual" })
+    ).resolves.toMatchObject({ ok: false, reason: "throttled" });
   });
 
   it("never refills past the burst ceiling, however long it has been idle", async () => {
@@ -175,9 +192,13 @@ describe("manual-refresh token bucket (real postgres.js driver)", () => {
     await setBucket(0, new Date(Date.now() - 24 * 60 * 60 * 1000 - 1000));
 
     for (let i = 0; i < BURST; i++) {
-      await expect(claim(new Date())).resolves.toBe(true);
+      await expect(
+        syncLocationSnapshot({ trigger: "manual" })
+      ).resolves.toMatchObject({ ok: true });
     }
-    await expect(claim(new Date())).resolves.toBe(false);
+    await expect(
+      syncLocationSnapshot({ trigger: "manual" })
+    ).resolves.toMatchObject({ ok: false, reason: "throttled" });
   });
 
   it("keeps partial progress toward the next token", async () => {
@@ -187,7 +208,9 @@ describe("manual-refresh token bucket (real postgres.js driver)", () => {
     const twoAndAHalf = new Date(Date.now() - 2.5 * REFILL_MS);
     await setBucket(0, twoAndAHalf);
 
-    await expect(claim(new Date())).resolves.toBe(true);
+    await expect(
+      syncLocationSnapshot({ trigger: "manual" })
+    ).resolves.toMatchObject({ ok: true });
 
     const { tokensAt } = await readBucket();
     // Advanced by exactly two periods — the half-period is still banked.
@@ -201,7 +224,9 @@ describe("manual-refresh token bucket (real postgres.js driver)", () => {
     // The hourly refresh is separately sanctioned. Charging it to the human
     // allowance would let the cron lock people out of their own button.
     await setBucket(BURST, new Date());
-    await stampUnguarded(new Date());
+    await expect(
+      syncLocationSnapshot({ trigger: "cron" })
+    ).resolves.toMatchObject({ ok: true });
 
     expect((await readBucket()).tokens).toBe(BURST);
   });
