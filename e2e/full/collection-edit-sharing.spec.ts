@@ -33,12 +33,12 @@ test.describe("Collection edit sharing (PP-wqit.7)", () => {
     const collectionUrl = page.url();
 
     await page.getByTestId("collection-machines-multiselect").click();
-    await page.getByPlaceholder("Search machines…").fill("Slick Chick");
-    await page.getByRole("option", { name: /Slick Chick/ }).click();
+    await page.getByPlaceholder("Search machines…").fill("Attack from Mars");
+    await page.getByRole("option", { name: /Attack from Mars/ }).click();
     await page.keyboard.press("Escape");
     await page.getByTestId("collection-add-machines").click();
     await expect(
-      page.getByRole("link", { name: "Slick Chick", exact: true })
+      page.getByRole("link", { name: "Attack from Mars", exact: true })
     ).toBeVisible();
 
     // --- Owner grants Technician User editor access -----------------------
