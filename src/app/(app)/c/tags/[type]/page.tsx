@@ -53,7 +53,7 @@ export default async function TagTypePage({
             tags={tags.map((tag) => ({
               href: tagHref(tag.type, tag.slug),
               name: tag.name,
-              machineCount: tag.machines.length,
+              machineCount: tag.machineCount,
             }))}
           />
         )}
