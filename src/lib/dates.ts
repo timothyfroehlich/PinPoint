@@ -78,14 +78,23 @@ export function formatRelative(date: Date | string | number): string {
 }
 
 /**
- * Compact elapsed-age label for dense tables: "5d", "2mo 5d", "1y 3mo".
+ * Compact elapsed-age label for dense tables: "12m", "3h", "5d", "2mo 5d",
+ * "1y 3mo".
  *
  * Calendar-accurate (via date-fns `intervalToDuration`), not 30-day months.
  * Granularity steps down as the age grows so the label stays ~5 chars:
- *   - < 1 day            → "today"
+ *   - < 1 minute         → "now"
+ *   - < 1 hour           → "Nm"
+ *   - < 1 day            → "Nh"
  *   - < 1 month          → "Nd"
  *   - < 1 year           → "Xmo Yd"
  *   - >= 1 year          → "Xy Zmo"
+ *
+ * `date` must be an instant (a timestamp). Every caller passes one — issue
+ * `updatedAt`/`createdAt` and timeline-event `createdAt`, all `timestamptz`.
+ * A date-only value ("2026-10-02") parses as UTC midnight, so it would read
+ * as a misleading number of hours; give such a value its own day-precision
+ * label rather than passing it here.
  *
  * `now` is injectable for testing; callers in client components should pass
  * the shared ticker value so SSR and hydration agree (see {@link CompactAge}).
@@ -96,11 +105,13 @@ export function formatCompactAge(
 ): string {
   const start = toDate(date);
   const end = toDate(now);
-  if (start.getTime() > end.getTime()) return "today"; // future/clock skew
+  if (start.getTime() > end.getTime()) return "now"; // future/clock skew
   const {
     years = 0,
     months = 0,
     days = 0,
+    hours = 0,
+    minutes = 0,
   } = intervalToDuration({
     start,
     end,
@@ -108,20 +119,22 @@ export function formatCompactAge(
   if (years > 0) return months > 0 ? `${years}y ${months}mo` : `${years}y`;
   if (months > 0) return days > 0 ? `${months}mo ${days}d` : `${months}mo`;
   if (days > 0) return `${days}d`;
-  return "today";
+  if (hours > 0) return `${hours}h`;
+  if (minutes > 0) return `${minutes}m`;
+  return "now";
 }
 
 /**
  * {@link formatCompactAge} with an "ago" suffix, for the age fields of list
- * rows on both List Hosts (machine-views §5.7, issues-list §3.3): "today",
- * "5d ago", "2mo 5d ago", "1y 3mo ago".
+ * rows on both List Hosts (machine-views §5.7, issues-list §3.3): "just now",
+ * "12m ago", "3h ago", "5d ago", "2mo 5d ago", "1y 3mo ago".
  */
 export function formatCompactAgeAgo(
   date: Date | string | number,
   now: Date | number = new Date()
 ): string {
   const age = formatCompactAge(date, now);
-  return age === "today" ? age : `${age} ago`;
+  return age === "now" ? "just now" : `${age} ago`;
 }
 
 /**

@@ -176,6 +176,31 @@ const HIT_AREA_CLASSES =
 /** Lifts a control's visible part above neighboring hit areas. */
 const VISIBLE_LAYER = "relative z-[2]";
 
+/**
+ * One "·"-separated part of an issue row's line 2 after the first. The
+ * separator fills the parent's 12px column gap (`gap-x-3`) to the part's left,
+ * so a part that wraps to the start of a line takes its separator out of view.
+ */
+function LinePart({
+  className,
+  children,
+}: {
+  className?: string;
+  children: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <span className={cn("relative", className)}>
+      <span
+        aria-hidden="true"
+        className="absolute top-0 right-full w-3 text-center text-muted-foreground"
+      >
+        ·
+      </span>
+      {children}
+    </span>
+  );
+}
+
 /** Severity or priority badge; a menu button for people who may change it. */
 function FieldPill({
   name,
@@ -489,41 +514,42 @@ export function IssueListEntry({
           </span>
         </div>
 
-        {/* One line at every width: the machine name gives way first, then
-            the status name; the ID and age always show. */}
-        <div className="flex min-w-0 items-center gap-2">
-          <p className="flex min-w-0 flex-1 items-baseline gap-1.5 text-[13px] whitespace-nowrap text-muted-foreground">
+        {/* Line 2 never truncates (issues-list §3.3): when it does not fit,
+            it wraps between its parts, so every part shows in full. Each
+            separator sits in the column gap before its part; a part that
+            starts a wrapped line pushes its separator past the left edge,
+            where `overflow-x-clip` hides it. Only the machine name, the one
+            part that can outgrow a phone line by itself, may break inside. */}
+        <div className="flex min-w-0 items-start gap-2">
+          <p className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-0.5 overflow-x-clip text-[13px] text-muted-foreground">
             <span
-              className="shrink-0 font-mono text-foreground/85"
+              className="whitespace-nowrap font-mono text-foreground/85"
               data-testid="issue-id"
             >
               {formatIssueId(issue.machineInitials, issue.issueNumber)}
             </span>
-            <span aria-hidden="true">·</span>
-            <Link
-              href={`/m/${issue.machineInitials}`}
-              className={cn(
-                "min-w-0 truncate underline decoration-primary/30 underline-offset-2 transition-colors duration-150 hover:text-foreground",
-                VISIBLE_LAYER
-              )}
-            >
-              {issue.machine.name}
-            </Link>
-            <span aria-hidden="true">·</span>
-            <span
-              className={cn("min-w-0 shrink-[0.2] truncate", status.iconColor)}
-            >
+            <LinePart className="min-w-0 break-words">
+              <Link
+                href={`/m/${issue.machineInitials}`}
+                className={cn(
+                  "underline decoration-primary/30 underline-offset-2 transition-colors duration-150 hover:text-foreground",
+                  VISIBLE_LAYER
+                )}
+              >
+                {issue.machine.name}
+              </Link>
+            </LinePart>
+            <LinePart className={cn("whitespace-nowrap", status.iconColor)}>
               {status.label}
-            </span>
-            <span aria-hidden="true">·</span>
-            <span className="shrink-0">
+            </LinePart>
+            <LinePart className="whitespace-nowrap">
               <span className="hidden md:inline">updated </span>
               <RelativeTime
                 value={issue.updatedAt}
                 format="compact"
                 fallback={formatDate(issue.updatedAt)}
               />
-            </span>
+            </LinePart>
           </p>
           <AssigneeControl
             name={assigneeName}
