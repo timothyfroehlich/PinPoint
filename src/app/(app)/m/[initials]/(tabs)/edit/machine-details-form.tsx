@@ -8,19 +8,9 @@ import {
   useRef,
   useState,
 } from "react";
-import { useRouter } from "next/navigation";
 import { useHydrated } from "~/hooks/use-hydrated";
+import { useUnsavedChangesGuard } from "~/hooks/use-unsaved-changes-guard";
 import { useDetailsDirty } from "./details-dirty";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "~/components/ui/alert-dialog";
 import { Button } from "~/components/ui/button";
 import {
   updateMachineAction,
@@ -118,13 +108,6 @@ export function MachineDetailsForm({
   const [resultDismissed, setResultDismissed] = useState(false);
   const shownState = resultDismissed ? undefined : state;
 
-  const router = useRouter();
-  // Non-null exactly while the discard dialog is open: either a navigation
-  // the user started (so "Discard changes" can finish the trip), or Cancel,
-  // which discards after the same confirmation (machine-editing 4.1).
-  const [pendingDiscard, setPendingDiscard] = useState<
-    { kind: "navigate"; href: string } | { kind: "cancel" } | null
-  >(null);
   // The RichTextEditor is uncontrolled after mount (content is an initial
   // prop), so its doc is mirrored here to serialize into the hidden field.
   const [descriptionDoc, setDescriptionDoc] = useState<ProseMirrorDoc | null>(
@@ -167,103 +150,6 @@ export function MachineDetailsForm({
     }
   }, [state, setIsDirty]);
 
-  /**
-   * Unsaved-changes guard, part 1 of 2: exits that unload the document —
-   * reload, tab close, and off-site links.
-   *
-   * Armed only while dirty. A permanently-registered handler slows every
-   * navigation and is treated as abuse by some browsers, so the subscription
-   * itself is the signal. The prompt's wording belongs to the browser — custom
-   * strings have been ignored for a decade, so `preventDefault()` is the whole
-   * API (no legacy `returnValue`).
-   */
-  useEffect(() => {
-    if (!isDirty) return;
-    const handleBeforeUnload = (event: BeforeUnloadEvent): void => {
-      event.preventDefault();
-    };
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-    };
-  }, [isDirty]);
-
-  /**
-   * Unsaved-changes guard, part 2 of 2: in-app navigation.
-   *
-   * The Edit MODAL this page replaced funnelled every dismiss vector through one
-   * controlled `onOpenChange` and confirmed there. The conversion dropped it,
-   * reasoning that a page has no dismiss vector — true, but a page has
-   * navigation vectors, and `MachineTabStrip` renders Info/Settings/Service/
-   * Timeline links directly above this form (via `RouteTabStrip`, which emits
-   * real `next/link` anchors). App Router navigations never unload the document,
-   * so `beforeunload` cannot see them: one click discarded a paragraph of
-   * Description with no prompt (PP-o355.19 review).
-   *
-   * App Router exposes no navigation-guard API, so the click is the only seam.
-   * Capture phase, to run before Next's own handler; on `document` rather than
-   * the form because the links live OUTSIDE this component's subtree. It
-   * unregisters the moment the form is clean, so it has no reach beyond the
-   * window where there is something to lose.
-   *
-   * Threading a guard through React context into `RouteTabStrip` would be
-   * tidier in the abstract, but that component is shared by every machine page;
-   * this keeps a one-page concern on the one page.
-   *
-   * KNOWN GAP — the browser Back button within the app. It fires `popstate`,
-   * which is not cancellable; guarding it means pushing a sentinel history entry
-   * and re-pushing on every pop, which breaks Back for as long as the form is
-   * dirty. A user who cannot leave is a worse bug than the one that fixes, so
-   * same-app Back still discards silently. (`beforeunload` does cover Back when
-   * it leaves the origin.) Don't "fix" this speculatively.
-   */
-  useEffect(() => {
-    if (!isDirty) return;
-    const handleClick = (event: MouseEvent): void => {
-      // A modified or non-primary click opens a new tab or window, so THIS
-      // document — and the edits in it — survives. Let it through.
-      if (
-        event.defaultPrevented ||
-        event.button !== 0 ||
-        event.metaKey ||
-        event.ctrlKey ||
-        event.shiftKey ||
-        event.altKey
-      ) {
-        return;
-      }
-      const target = event.target;
-      if (!(target instanceof Element)) return;
-      const anchor = target.closest("a[href]");
-      if (!(anchor instanceof HTMLAnchorElement)) return;
-      // Opens elsewhere, or downloads without navigating.
-      if (anchor.target !== "" && anchor.target !== "_self") return;
-      if (anchor.hasAttribute("download")) return;
-
-      const destination = new URL(anchor.href, window.location.href);
-      // Off-site: the document unloads, so `beforeunload` already covers it.
-      if (destination.origin !== window.location.origin) return;
-      // Same page (including a bare fragment): discards nothing.
-      if (
-        destination.pathname === window.location.pathname &&
-        destination.search === window.location.search
-      ) {
-        return;
-      }
-
-      event.preventDefault();
-      event.stopPropagation();
-      setPendingDiscard({
-        kind: "navigate",
-        href: `${destination.pathname}${destination.search}${destination.hash}`,
-      });
-    };
-    document.addEventListener("click", handleClick, true);
-    return () => {
-      document.removeEventListener("click", handleClick, true);
-    };
-  }, [isDirty]);
-
   // Snapshot the live form DOM and dispatch straight to the action.
   //
   // This form deliberately does NOT carry `action={formAction}` (PP-1ajq).
@@ -304,10 +190,6 @@ export function MachineDetailsForm({
     submitSeqRef.current += 1;
   };
 
-  const keepEditing = (): void => {
-    setPendingDiscard(null);
-  };
-
   const discardEdits = (): void => {
     setDescriptionDoc(description);
     setOwnerRequirementsDoc(ownerRequirements);
@@ -323,23 +205,25 @@ export function MachineDetailsForm({
     setResultDismissed(true);
   };
 
-  const confirmDiscard = (): void => {
-    const pending = pendingDiscard;
-    setPendingDiscard(null);
-    if (pending?.kind === "navigate") {
-      // Clear dirtiness FIRST so both listeners unsubscribe before the
-      // navigation starts — otherwise the guard is still armed on the way out.
-      setIsDirty(false);
-      router.push(pending.href);
-      return;
-    }
-    discardEdits();
-  };
+  const { dialog: unsavedChangesDialog, openConfirm } = useUnsavedChangesGuard({
+    isDirty,
+    description: (href) => (
+      <>
+        You&apos;ve made changes to {name} that haven&apos;t been saved.
+        {href
+          ? " Leaving now will discard them."
+          : " Discarding reverts every field to its saved value."}
+      </>
+    ),
+    discardLabel: "Discard changes",
+    stayLabel: "Keep editing",
+    onDiscard: discardEdits,
+  });
 
   // Cancel discards after confirming (machine-editing 4.1). With nothing
   // unsaved it is disabled — there is nothing to discard (Tim, PP-wqit.14.2).
   const handleCancel = (): void => {
-    setPendingDiscard({ kind: "cancel" });
+    openConfirm(null);
   };
 
   return (
@@ -478,34 +362,7 @@ export function MachineDetailsForm({
         </MachineFormActionBar>
       </form>
 
-      {/* Copy carried over verbatim from the Edit modal this page replaced, so
-          the choice reads identically to anyone who used the old dialog. */}
-      <AlertDialog
-        open={pendingDiscard !== null}
-        onOpenChange={(open) => {
-          if (!open) keepEditing();
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
-            <AlertDialogDescription>
-              You&apos;ve made changes to {name} that haven&apos;t been saved.
-              {pendingDiscard?.kind === "navigate"
-                ? " Leaving now will discard them."
-                : " Discarding reverts every field to its saved value."}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={keepEditing}>
-              Keep editing
-            </AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={confirmDiscard}>
-              Discard changes
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {unsavedChangesDialog}
     </>
   );
 }

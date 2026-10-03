@@ -22,7 +22,7 @@ pnpm = "aqua:pnpm/pnpm"
 [tools]
 node = "24.20.0"
 python = "3.14.7"
-ruff = "0.16.7"
+ruff = "0.16.8"
 zizmor = "1.30.1"
 # Supabase CLI executable only — the approved local-stack / migration-tooling
 # version, sourced here for Mac, Bazzite, CI, and preview
@@ -31,7 +31,7 @@ zizmor = "1.30.1"
 # and production migration ownership are all deliberately out of mise's scope.
 # Bump under the weekly Supabase cooldown + Bazzite rootless-podman/SELinux
 # compatibility check (see pinpoint-chores; PP-9mg0).
-supabase = "2.117.0"
+supabase = "2.118.0"
 
 [settings]
 idiomatic_version_file_enable_tools = ["pnpm"]
