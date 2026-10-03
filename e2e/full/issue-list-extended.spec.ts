@@ -101,51 +101,59 @@ test.describe("Issue List Features - Extended", () => {
 
   test("a Severity Segment filters the list to its issues", async ({
     page,
-  }, testInfo) => {
-    test.skip(
-      testInfo.project.name.includes("Mobile"),
-      "Phones collapse the widgets; the Machines phone test covers that layout"
-    );
+  }) => {
     await page.goto("/issues");
+    // Below 390px the stacked widgets start collapsed (widgets §2.4), so the
+    // Mobile Safari project (375px) opens the section first.
+    if ((page.viewportSize()?.width ?? 0) < 390) {
+      const summary = page.getByRole("button", { name: /^Summary: / });
+      // aria-expanded is set only once hydrated, so the click is not lost.
+      await expect(summary).toHaveAttribute("aria-expanded", "false");
+      await summary.click();
+    }
     const severity = page.getByRole("region", { name: "Severity" });
     await expect(severity).toBeVisible();
 
-    const levels = [
-      { label: "Cosmetic", value: "cosmetic" },
-      { label: "Minor", value: "minor" },
-      { label: "Major", value: "major" },
-      { label: "Unplayable", value: "unplayable" },
-    ];
-    let chosen: { label: string; value: string } | null = null;
-    for (const level of levels) {
-      const button = severity.getByRole("button", {
-        name: new RegExp(`^\\d+ ${level.label}$`),
-      });
-      if (await button.isEnabled()) {
-        chosen = level;
-        await button.click();
-        break;
-      }
-    }
-    if (chosen === null) throw new Error("No selectable Severity Segment");
+    // Zero-count Segments are left out of the breakdown (widgets §5.5) and
+    // pairs that do not fit roll into "N other" from the end (§5.6), so the
+    // first pair on the line is a selectable Segment.
+    const levelPattern = "(Unplayable|Major|Minor|Cosmetic)";
+    const first = severity
+      .getByRole("button", { name: new RegExp(`^\\d+ ${levelPattern}$`) })
+      .first();
+    await expect(first).toBeVisible();
+    const label = ((await first.getAttribute("aria-label")) ?? "").replace(
+      /^\d+ /,
+      ""
+    );
+    const segment = severity.getByRole("button", {
+      name: new RegExp(`^\\d+ ${label}$`),
+    });
+    await segment.click();
 
     await expect(page).toHaveURL(
-      new RegExp(`[?&]severity=${chosen.value}(?:&|$)`)
+      new RegExp(`[?&]severity=${label.toLowerCase()}(?:&|$)`)
     );
-    const selected = severity.getByRole("button", {
-      name: new RegExp(`^\\d+ ${chosen.label}$`),
-    });
-    await expect(selected).toHaveAttribute("aria-pressed", "true");
-    // All counts issues on On the Floor machines, the list's default view
-    // (issue-widgets §2.2), so the Segment count equals the filtered total.
-    // Both come from the same render, so other workers' issues can't race it.
-    const count = Number.parseInt(
-      (await selected.getAttribute("aria-label")) ?? "",
-      10
-    );
-    await expect(
-      page.getByText(new RegExp(`^Showing \\d+ of ${count} issues$`))
-    ).toBeVisible();
+    await expect(segment).toHaveAttribute("aria-pressed", "true");
+    // The widgets count open issues on On the Floor machines (issue-widgets
+    // §2.2, §4.2), the list's default view, so the selected Segment's count
+    // equals the filtered total. Poll both together, so a render that lands
+    // between the reads (another worker's new issue) cannot split them.
+    await expect
+      .poll(
+        async () => {
+          const count = Number.parseInt(
+            (await segment.getAttribute("aria-label")) ?? "",
+            10
+          );
+          const showing = await page
+            .getByText(/^Showing \d+ of \d+ issues$/)
+            .textContent();
+          return showing?.endsWith(` of ${count} issues`) ?? false;
+        },
+        { message: "the selected Segment's count equals the filtered total" }
+      )
+      .toBe(true);
   });
 
   test("should persist filters when navigating to issue detail and back", async ({

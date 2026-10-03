@@ -53,7 +53,7 @@
 
 | Requirement | Divergence | Resolution |
 | :-- | :-- | :-- |
-| §2.3, §2.4, §3.2, §4.2, §5.2 | Widget Population parameters, a three-figure Summary Row, and Segments in mildest-first order. | PP-jb9v |
+| §2.1 | A Collection or Tag Issues tab whose group has no machines, or whose stale `?machine=` filter selects none of its machines, shows only a message and no Summary Widgets. | PP-jb9v |
 
 ---
 

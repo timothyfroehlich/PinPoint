@@ -137,15 +137,27 @@ describe("Invited Users Integration", () => {
       })
       .returning();
 
-    // Create machines: User3 has 2, User1 has 1, invited has 1
-    await db
-      .insert(machines)
-      .values([
-        createTestMachine({ initials: "M01", ownerId: activeUser3Id }),
-        createTestMachine({ initials: "M02", ownerId: activeUser3Id }),
-        createTestMachine({ initials: "M03", ownerId: activeUser1Id }),
-        createTestMachine({ initials: "M04", invitedOwnerId: invitedUser.id }),
-      ]);
+    // Create machines: User3 has 2, User1 has 1, invited has 1. Removed
+    // machines are archived and never count (PP-s363): Alpha's three would
+    // otherwise sort them first, and the invited user's would make 2.
+    await db.insert(machines).values([
+      createTestMachine({ initials: "M01", ownerId: activeUser3Id }),
+      createTestMachine({ initials: "M02", ownerId: activeUser3Id }),
+      createTestMachine({ initials: "M03", ownerId: activeUser1Id }),
+      createTestMachine({ initials: "M04", invitedOwnerId: invitedUser.id }),
+      ...["R01", "R02", "R03"].map((initials) =>
+        createTestMachine({
+          initials,
+          ownerId: activeUser2Id,
+          presenceStatus: "removed",
+        })
+      ),
+      createTestMachine({
+        initials: "R04",
+        invitedOwnerId: invitedUser.id,
+        presenceStatus: "removed",
+      }),
+    ]);
 
     const unifiedUsers = await getUnifiedUsers();
 

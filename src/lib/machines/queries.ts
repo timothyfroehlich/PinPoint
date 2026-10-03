@@ -1,7 +1,16 @@
 import { db } from "~/server/db";
 import { machines, userProfiles, invitedUsers } from "~/server/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, ne, type SQL } from "drizzle-orm";
 import type { MachineOwner } from "~/lib/types";
+
+/**
+ * Removed is PinPoint's archived presence state (PP-s363). A Removed machine
+ * drops out of every surface that lists, counts, picks, or searches machines
+ * unless the person opts in; its own page and history stay reachable.
+ */
+export function machineNotRemoved(): SQL {
+  return ne(machines.presenceStatus, "removed");
+}
 
 export async function getMachineOwner(
   machineId: string

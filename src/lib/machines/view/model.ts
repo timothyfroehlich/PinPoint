@@ -1,14 +1,12 @@
 import type {
   IssueSeverity,
+  MachinePresenceWidgetStatus,
   MachineViewHealth,
   MachineViewRow,
   MachineViewState,
   MachineViewSummary,
 } from "~/lib/types";
-import {
-  MACHINE_PRESENCE_RANK,
-  type MachinePresenceStatus,
-} from "~/lib/machines/presence";
+import { MACHINE_PRESENCE_RANK } from "~/lib/machines/presence";
 import {
   MACHINE_STATUS_RANK,
   SEVERITY_RANK,
@@ -219,16 +217,12 @@ function matchesMachineViewFilters(
   return true;
 }
 
-/**
- * Filters, sorts, and paginates. `filteredRows` is every row matching the
- * current search and filters across all pages — the Filtered Widget Population.
- */
+/** Filters, sorts, and paginates. */
 export function applyMachineViewState(
   rows: MachineViewCandidate[],
   state: MachineViewState
 ): {
   rows: MachineViewCandidate[];
-  filteredRows: MachineViewCandidate[];
   totalCount: number;
   page: number;
 } {
@@ -245,24 +239,28 @@ export function applyMachineViewState(
 
   return {
     rows: sorted.slice(offset, offset + state.pageSize),
-    filteredRows,
     totalCount: sorted.length,
     page,
   };
 }
 
+/** Removed machines are not counted (machine-widgets §3.1, §3.2). */
 function summarizePresence(
   rows: MachineViewCandidate[]
 ): MachineViewSummary["presence"] {
-  const byPresence: Record<MachinePresenceStatus, number> = {
+  const byPresence: Record<MachinePresenceWidgetStatus, number> = {
     on_the_floor: 0,
     off_the_floor: 0,
     on_loan: 0,
     pending_arrival: 0,
-    removed: 0,
   };
-  for (const row of rows) byPresence[row.presence] += 1;
-  return { total: rows.length, byPresence };
+  let total = 0;
+  for (const row of rows) {
+    if (row.presence === "removed") continue;
+    byPresence[row.presence] += 1;
+    total += 1;
+  }
+  return { total, byPresence };
 }
 
 function summarizePlayability(
@@ -283,21 +281,15 @@ function summarizePlayability(
 }
 
 /**
- * Summary Widget counts (machine-widgets §3–§4). `allRows` is the route's
- * whole scope and `filteredRows` every row matching the current search and
- * filters; each widget counts the population its state parameter selects.
- * Rows must carry health enrichment.
+ * Summary Widget counts (machine-widgets §3–§4) over `scopeRows`, the route's
+ * whole scope: search and filters never change them (widgets §3.1). Rows must
+ * carry health enrichment.
  */
 export function summarizeMachineView(
-  allRows: MachineViewCandidate[],
-  filteredRows: MachineViewCandidate[],
-  state: Pick<MachineViewState, "presenceWidget" | "playabilityWidget">
+  scopeRows: MachineViewCandidate[]
 ): MachineViewSummary {
-  const population = (
-    choice: MachineViewState["presenceWidget"]
-  ): MachineViewCandidate[] => (choice === "filtered" ? filteredRows : allRows);
   return {
-    presence: summarizePresence(population(state.presenceWidget)),
-    playability: summarizePlayability(population(state.playabilityWidget)),
+    presence: summarizePresence(scopeRows),
+    playability: summarizePlayability(scopeRows),
   };
 }
