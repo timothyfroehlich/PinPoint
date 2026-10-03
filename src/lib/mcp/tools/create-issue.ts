@@ -3,6 +3,7 @@ import "server-only";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { after } from "next/server";
 import { z } from "zod";
+import { ISSUE_TITLE_MAX } from "~/lib/issues/title";
 
 import { dispatchNotification } from "~/lib/notifications";
 import { checkPermission } from "~/lib/permissions/helpers";
@@ -36,8 +37,10 @@ const createIssueSchema = z.object({
     .string()
     .trim()
     .min(1, "Title is required")
-    .max(200)
-    .describe("Short summary of the problem."),
+    .max(ISSUE_TITLE_MAX)
+    .describe(
+      `Short summary of the problem, at most ${ISSUE_TITLE_MAX} characters.`
+    ),
   description: z
     .string()
     .trim()

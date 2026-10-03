@@ -28,6 +28,11 @@ import { RICH_TEXT_CLASSES } from "~/components/editor/rich-text-classes";
 export interface RichTextEditorHandle {
   clear: () => void;
   focus: () => void;
+  /**
+   * Replace the document without firing `onChange` — for mirroring a change
+   * made elsewhere (another composer sharing the same draft).
+   */
+  setContent: (doc: ProseMirrorDoc | null) => void;
 }
 
 export interface RichTextEditorProps {
@@ -201,12 +206,19 @@ export const RichTextEditor = forwardRef<
         class: cn(
           RICH_TEXT_CLASSES,
           "focus:outline-none px-3 py-2",
+          // 16px on phones: iOS Safari zooms the page into any field smaller
+          // than that when it takes focus.
+          "max-md:text-base",
           // One line in compact mode, ~3 lines otherwise. Mutually exclusive
           // so the arbitrary-value min-heights never both apply (which made
           // the winner depend on stylesheet order). Compact is "jot" mode, so
           // it also drops the tall paragraph margins.
           compact ? "min-h-[40px] [&_p]:!my-1" : "min-h-[100px]"
         ),
+        // aria-label is prohibited on a role-less div (axe
+        // aria-prohibited-attr); the editable surface is a multi-line textbox.
+        role: "textbox",
+        "aria-multiline": "true",
         "aria-label": ariaLabel ?? placeholder,
       },
     },
@@ -223,6 +235,10 @@ export const RichTextEditor = forwardRef<
       },
       focus: () => {
         editor?.commands.focus();
+      },
+      setContent: (doc) => {
+        if (doc) editor?.commands.setContent(doc, { emitUpdate: false });
+        else editor?.commands.clearContent(false);
       },
     }),
     [editor]

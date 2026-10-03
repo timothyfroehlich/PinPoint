@@ -19,11 +19,13 @@ Use `<EmptyState>` whenever a list, collection, or section has zero items to dis
 | `description` | Optional body text. Explain what would populate this section.        |
 | `action`      | Optional CTA — typically a `<Button>` or `<Link>` styled as such.    |
 | `variant`     | `"card"` (default, wraps in `<Card>`) or `"bare"` (plain container). |
+| `size`        | `"default"` or `"compact"`: a small icon, no circle, tight padding.  |
 
 **When to use each variant:**
 
 - `variant="card"` — the empty state IS the content of the section. Dashboard widgets, standalone "no results" pages.
 - `variant="bare"` — the empty state is rendered inside a list that's already wrapped in a `Card` or container. No double-border effect.
+- `size="compact"` — an empty section that sits among other content (an activity feed, a sidebar list), where a 96px icon circle would outweigh the page around it. The issue detail page's Activity and Other issues use it.
 
 **Rules:**
 
@@ -88,16 +90,17 @@ A rate-limit budget is bookkeeping, not information. A control that spends from 
 
 When something happens in response to user action, where should they see feedback?
 
-| What happened                                     | Where to show feedback                                                                              |
-| :------------------------------------------------ | :-------------------------------------------------------------------------------------------------- |
-| Form submit success → redirect                    | Server Action does the write, then `redirect(...)`; if needed, show success on the destination page |
-| Form submit success → stay on page (settings)     | Return success state from the Server Action; `<SaveCancelButtons>` green flash (3s "Saved!")        |
-| Form submit error                                 | `<Alert variant="destructive">` at top + inline field messages                                      |
-| Field validation error (Zod)                      | Inline `<p className="text-sm text-destructive-text">` under the field                              |
-| Inline list edit (status change, priority change) | `toast` for both success and error                                                                  |
-| optimistic action (toggle, bookmark)              | Immediate UI update; `toast.error()` on failure                                                     |
-| Long-running background work (uploads)            | Toast with progress indicator                                                                       |
-| Short in-place work (counter increment)           | Immediate UI update, no notification                                                                |
+| What happened                                            | Where to show feedback                                                                                                                                                                                     |
+| :------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Form submit success → redirect                           | Server Action does the write, then `redirect(...)`; if needed, show success on the destination page                                                                                                        |
+| Form submit success → stay on page (settings)            | Return success state from the Server Action; `<SaveCancelButtons>` green flash (3s "Saved!")                                                                                                               |
+| Form submit error                                        | `<Alert variant="destructive">` at top + inline field messages                                                                                                                                             |
+| Field validation error (Zod)                             | Inline `<p className="text-sm text-destructive-text">` under the field                                                                                                                                     |
+| Inline list edit (status change, priority change)        | `toast` for both success and error                                                                                                                                                                         |
+| Field row whose new value shows in place (issue Details) | No success toast — the row, and any summary that repeats it, already show the change; a `role="status"` line announces it. On failure: roll back, inline `role="alert"` under the row, and `toast.error()` |
+| optimistic action (toggle, bookmark)                     | Immediate UI update; `toast.error()` on failure                                                                                                                                                            |
+| Long-running background work (uploads)                   | Toast with progress indicator                                                                                                                                                                              |
+| Short in-place work (counter increment)                  | Immediate UI update, no notification                                                                                                                                                                       |
 
 **Why server-side redirect instead of `toast.success() + router.push()`?** The redirect is part of the action's own result, so the confirmation and the navigation cannot disagree. `toast.success()` + `router.push()` is two independent client steps: the toast can fire while the push fails, leaving the user told the thing succeeded on a page that never moved — the false confirmation CORE-ARCH-012 forbids. Redirecting also unmounts the form as part of the transition, sidestepping React 19's post-action form reset entirely (see `pinpoint-ui` → **Server Action Forms** for the Radix Select carve-out and the CREATE-form reset rules). If a success toast is genuinely needed on the destination page, persist a one-time success state (e.g., via a search param or short-lived cookie read in the destination route) and render it there.
 

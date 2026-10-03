@@ -39,11 +39,12 @@ test.describe("Issue detail smoke — unauthenticated render", () => {
 
     await assertNoA11yViolations(page);
 
-    // The StickyCommentComposer is gated server-side: unauthenticated visitors
-    // must not see the "Add a comment" trigger. (Consolidated from
-    // issue-detail-sticky-composer.spec.ts mobile signed-out test.)
+    // The floating "Comment" button is gated server-side: unauthenticated
+    // visitors must not get it. Activity offers a log-in prompt instead.
+    // (Consolidated from the mobile composer spec's signed-out test.)
     await expect(
-      page.getByRole("button", { name: "Add a comment" })
+      page.getByRole("button", { name: "Comment", exact: true })
     ).not.toBeAttached();
+    await expect(page.getByTestId("login-to-comment")).toBeVisible();
   });
 });
