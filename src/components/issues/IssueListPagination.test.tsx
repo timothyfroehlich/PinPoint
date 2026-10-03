@@ -17,7 +17,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { IssueList } from "./IssueList";
-import type { IssueListItem } from "~/lib/types";
+import type { IssueListRow } from "~/lib/types";
 
 // ---------------------------------------------------------------------------
 // Mock next/navigation — IssueList uses useSearchParams (directly) and
@@ -78,27 +78,9 @@ vi.mock("~/lib/cookies/client", () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Mock useTableResponsiveColumns to return all columns visible.
-// The hook uses ResizeObserver which is unavailable in jsdom. For these tests
-// we only care about the pagination bar, not the column layout.
+// Minimal IssueListRow fixture factory
 // ---------------------------------------------------------------------------
-vi.mock("~/hooks/use-table-responsive-columns", () => ({
-  useTableResponsiveColumns: () => ({
-    visibleColumns: {
-      status: true,
-      priority: true,
-      severity: true,
-      assignee: true,
-      modified: true,
-    },
-    containerRef: { current: null },
-  }),
-}));
-
-// ---------------------------------------------------------------------------
-// Minimal IssueListItem fixture factory
-// ---------------------------------------------------------------------------
-function makeIssue(n: number): IssueListItem {
+function makeIssue(n: number): IssueListRow {
   return {
     id: `issue-${n}`,
     issueNumber: n,
@@ -112,16 +94,21 @@ function makeIssue(n: number): IssueListItem {
     machineInitials: "AFM",
     reporterName: null,
     assignedTo: null,
-    machine: { id: "machine-1", name: "Attack from Mars" },
+    machine: { id: "machine-1", name: "Attack from Mars", ownerId: null },
     reportedByUser: null,
     invitedReporter: null,
     assignedToUser: null,
+    commentCount: 0,
   };
 }
 
-const DEFAULT_PROPS = {
+const DEFAULT_PROPS: Pick<
+  React.ComponentProps<typeof IssueList>,
+  "sort" | "allUsers" | "viewer"
+> = {
   sort: "updated_desc",
   allUsers: [],
+  viewer: { userId: undefined, accessLevel: "unauthenticated" },
 };
 
 describe("IssueList pagination buttons (audit row 7, class-H)", () => {

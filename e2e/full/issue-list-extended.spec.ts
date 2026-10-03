@@ -1,4 +1,4 @@
-import { test, expect } from "../support/fixtures.js";
+import { test, expect, type Locator } from "../support/fixtures.js";
 import { cleanupTestEntities } from "../support/cleanup.js";
 import {
   TEST_USERS,
@@ -29,11 +29,9 @@ test.describe("Issue List Features - Extended", () => {
     }
   });
 
-  test("should inline-edit issues", async ({ page }, testInfo) => {
-    // Inline-edit columns (priority, assignee) are hidden on mobile viewports
-    // via responsive column visibility (useTableResponsiveColumns)
-    const isMobile = testInfo.project.name.includes("Mobile");
-    test.skip(isMobile, "Inline-edit columns hidden on mobile viewports");
+  test("should inline-edit issues", async ({ page }) => {
+    // Priority and assignee are menus on every row at every width: a pill on
+    // line 1 and an avatar beside line 2 (phones) or in the right column.
 
     // Create a unique test issue to avoid parallel worker conflicts
     const issueTitle = getTestIssueTitle("Inline Edit Test");
@@ -54,21 +52,21 @@ test.describe("Issue List Features - Extended", () => {
       .toBe(issueTitle);
     await expect(page.getByText("Showing 1 of 1 issues")).toBeVisible();
 
-    const row = page.getByRole("row", { name: issueTitle });
+    const issueRow = (): Locator =>
+      page
+        .getByRole("list", { name: "Issues" })
+        .getByRole("listitem")
+        .filter({ has: page.getByRole("link", { name: issueTitle }) });
+    const row = issueRow();
     await expect(row).toBeVisible();
 
     // 1. Test Priority Inline Edit (Low -> High)
-    const priorityTrigger = row
-      .getByRole("button")
-      .filter({ hasText: /Low|Medium|High/ })
-      .first();
-    await expect(priorityTrigger).toBeVisible();
-    await priorityTrigger.click();
-    await page.getByRole("menuitem", { name: "High" }).click();
+    await row.getByRole("button", { name: "Priority: Low, change" }).click();
+    await page.getByRole("menuitemradio", { name: "High" }).click();
 
     // Verify optimistic update
     await expect(
-      row.getByRole("button").filter({ hasText: "High" })
+      row.getByRole("button", { name: "Priority: High, change" })
     ).toBeVisible();
 
     // Verify persistence after reload
@@ -79,25 +77,25 @@ test.describe("Issue List Features - Extended", () => {
       .poll(() => new URL(page.url()).searchParams.get("q"), { timeout: 15000 })
       .toBe(issueTitle);
 
-    const rowAfterReload = page.getByRole("row", { name: issueTitle });
+    const rowAfterReload = issueRow();
     await expect(
-      rowAfterReload.getByRole("button").filter({ hasText: "High" })
+      rowAfterReload.getByRole("button", { name: "Priority: High, change" })
     ).toBeVisible();
 
     // 2. Test Assignee Inline Edit (Unassigned -> Admin)
-    const assigneeCell = rowAfterReload
-      .getByRole("button")
-      .filter({ hasText: /Unassigned/i });
-    await expect(assigneeCell).toBeVisible();
-    await assigneeCell.click();
-    await page.getByRole("menuitem", { name: TEST_USERS.admin.name }).click();
+    await rowAfterReload
+      .getByRole("button", { name: "Unassigned, change assignee" })
+      .click();
+    await page
+      .getByRole("menuitemradio", { name: TEST_USERS.admin.name })
+      .click();
 
     // Verify assignee update
     await expect(page.getByText("Assignee updated")).toBeVisible();
     await expect(
-      rowAfterReload
-        .getByRole("button")
-        .filter({ hasText: TEST_USERS.admin.name })
+      rowAfterReload.getByRole("button", {
+        name: `Assigned to ${TEST_USERS.admin.name}, change assignee`,
+      })
     ).toBeVisible();
   });
 

@@ -1,45 +1,23 @@
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
-import { Button } from "./button";
-
-// Mock Loader2 to avoid issues with icon rendering in tests if necessary,
-// though lucide-react usually behaves well.
-// But checking for the SVG content is easier if we know what it renders.
+import { Button } from "~/components/ui/button";
 
 describe("Button", () => {
-  it("renders children correctly", () => {
-    render(<Button>Click me</Button>);
-    expect(
-      screen.getByRole("button", { name: /click me/i })
-    ).toBeInTheDocument();
-  });
+  it("preserves children and disables loading buttons even with disabled=false", () => {
+    const { rerender } = render(<Button>Click me</Button>);
+    expect(screen.getByRole("button", { name: "Click me" })).toBeEnabled();
 
-  it("applies loading state correctly", () => {
-    render(<Button loading>Click me</Button>);
+    rerender(<Button loading>Click me</Button>);
+    expect(screen.getByRole("button", { name: "Click me" })).toBeDisabled();
 
-    const button = screen.getByRole("button");
-    expect(button).toBeDisabled();
-    // Check for spinner. lucide icons usually render an svg with specific class
-    expect(button.querySelector(".animate-spin")).toBeInTheDocument();
-    expect(button).toHaveTextContent("Click me");
-  });
-
-  it("handles explicit disabled prop with loading", () => {
-    render(
+    rerender(
       <Button loading disabled={false}>
         Click me
       </Button>
     );
-    expect(screen.getByRole("button")).toBeDisabled();
-  });
-
-  it("does not pollute DOM with loading prop", () => {
-    render(
-      <Button loading data-testid="btn">
-        Click me
-      </Button>
-    );
-    const button = screen.getByTestId("btn");
+    const button = screen.getByRole("button", { name: "Click me" });
+    expect(button).toBeDisabled();
+    expect(button.querySelector(".animate-spin")).toBeInTheDocument();
     expect(button).not.toHaveAttribute("loading");
   });
 

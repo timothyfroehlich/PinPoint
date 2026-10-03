@@ -19,11 +19,8 @@ const UPSERT_CHUNK = 1_000;
  * refresh leaves the previous data in place, and an entry OPDB later drops
  * keeps its last known values rather than silently losing its tags.
  */
-export async function refreshOpdbRecords(
-  tx: DbTransaction,
-  fetchExport: () => Promise<OpdbMachine[]> = fetchOpdbExport
-): Promise<number> {
-  const machines = await fetchExport();
+export async function refreshOpdbRecords(tx: DbTransaction): Promise<number> {
+  const machines = await fetchOpdbExport();
   const refreshedAt = new Date();
   // One transaction across the chunks, so a failure partway leaves every row
   // at its previous values rather than a mix of old and new.

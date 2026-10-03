@@ -25,7 +25,7 @@ import {
   issueComments,
 } from "~/server/db/schema";
 import { OPEN_STATUSES } from "~/lib/issues/status";
-import type { IssueFilters } from "./filters";
+import type { IssueFilters, IssueSort } from "./filters";
 
 /**
  * Builds an array of Drizzle SQL conditions from filters
@@ -302,29 +302,71 @@ export function buildWhereConditions(
   return conditions;
 }
 
+/** Severity rank, least to most severe (issues-list §5.1: rank, not alphabet). */
+const SEVERITY_RANK = sql<number>`case ${issues.severity}
+  when 'cosmetic' then 1 when 'minor' then 2 when 'major' then 3
+  when 'unplayable' then 4 end`;
+
+/** Priority rank, least to most urgent. */
+const PRIORITY_RANK = sql<number>`case ${issues.priority}
+  when 'low' then 1 when 'medium' then 2 when 'high' then 3 end`;
+
 /**
- * Builds Drizzle SortOrder from sort string
- * This should ONLY be called on the server.
+ * The assignee's display name; null when unassigned. The relational query
+ * builder qualifies every column in an ORDER BY with the root table's alias,
+ * so the subquery names its own alias in plain SQL.
  */
-export function buildOrderBy(sort: string | undefined): SQL[] {
+const ASSIGNEE_NAME = sql<string | null>`(select "assignee"."name"
+  from "user_profiles" "assignee"
+  where "assignee"."id" = ${issues.assignedTo})`;
+
+/** Issue ID order: machine initials, then number (issues-list §5.3). */
+const ISSUE_ID_ORDER: SQL[] = [
+  asc(issues.machineInitials),
+  asc(issues.issueNumber),
+];
+
+/**
+ * Builds the ORDER BY for an issue sort (issues-list §5.1–§5.3). Every sort
+ * ends in issue ID order, so ties, and therefore pages, are deterministic.
+ * Assignee sorts by display name with unassigned last in both directions,
+ * then by Updated, newest first. An absent sort is the default, Updated
+ * newest first. This should ONLY be called on the server.
+ */
+export function buildOrderBy(sort: IssueSort | undefined): SQL[] {
   switch (sort) {
     case "created_asc":
-      return [asc(issues.createdAt)];
+      return [asc(issues.createdAt), ...ISSUE_ID_ORDER];
     case "created_desc":
-      return [desc(issues.createdAt)];
+      return [desc(issues.createdAt), ...ISSUE_ID_ORDER];
     case "updated_asc":
-      return [asc(issues.updatedAt)];
-    case "updated_desc":
-      return [desc(issues.updatedAt)];
+      return [asc(issues.updatedAt), ...ISSUE_ID_ORDER];
     case "issue_asc":
-      return [asc(issues.machineInitials), asc(issues.issueNumber)];
+      return ISSUE_ID_ORDER;
     case "issue_desc":
       return [desc(issues.machineInitials), desc(issues.issueNumber)];
+    case "severity_asc":
+      return [asc(SEVERITY_RANK), ...ISSUE_ID_ORDER];
+    case "severity_desc":
+      return [desc(SEVERITY_RANK), ...ISSUE_ID_ORDER];
+    case "priority_asc":
+      return [asc(PRIORITY_RANK), ...ISSUE_ID_ORDER];
+    case "priority_desc":
+      return [desc(PRIORITY_RANK), ...ISSUE_ID_ORDER];
     case "assignee_asc":
-      return [asc(issues.assignedTo), desc(issues.updatedAt)];
+      return [
+        sql`${ASSIGNEE_NAME} asc nulls last`,
+        desc(issues.updatedAt),
+        ...ISSUE_ID_ORDER,
+      ];
     case "assignee_desc":
-      return [desc(issues.assignedTo), desc(issues.updatedAt)];
-    default:
-      return [desc(issues.updatedAt)];
+      return [
+        sql`${ASSIGNEE_NAME} desc nulls last`,
+        desc(issues.updatedAt),
+        ...ISSUE_ID_ORDER,
+      ];
+    case "updated_desc":
+    case undefined:
+      return [desc(issues.updatedAt), ...ISSUE_ID_ORDER];
   }
 }
