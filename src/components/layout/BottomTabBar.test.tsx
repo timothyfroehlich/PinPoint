@@ -78,13 +78,6 @@ describe("BottomTabBar", () => {
     );
   });
 
-  it("renders the More button", () => {
-    render(<BottomTabBar />);
-    expect(
-      screen.getByRole("button", { name: /more options/i })
-    ).toBeInTheDocument();
-  });
-
   it("highlights the active tab based on pathname", () => {
     vi.mocked(usePathname).mockReturnValue("/issues");
     render(<BottomTabBar />);

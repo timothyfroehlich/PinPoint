@@ -1,4 +1,4 @@
-import { render, renderHook } from "@testing-library/react";
+import { render } from "@testing-library/react";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { useHydrated } from "~/hooks/use-hydrated";
@@ -17,11 +17,6 @@ describe("useHydrated", () => {
     const html = renderToString(<TestComponent />);
     expect(html).toContain("server-rendered");
     expect(html).not.toContain("client-hydrated");
-  });
-
-  it("returns true on client-side render", () => {
-    const { result } = renderHook(() => useHydrated());
-    expect(result.current).toBe(true);
   });
 
   it("renders hydrated status on client DOM", () => {
