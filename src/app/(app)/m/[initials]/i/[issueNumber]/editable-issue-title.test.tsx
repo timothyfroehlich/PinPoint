@@ -6,6 +6,10 @@ import { mockMobileViewport } from "~/test/helpers/viewport";
 import { EditableIssueTitle } from "./editable-issue-title";
 import * as actions from "~/app/(app)/issues/actions";
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
 vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
@@ -310,6 +314,27 @@ describe("EditableIssueTitle", () => {
       expect(
         screen.getByRole("button", { name: "Issue actions" })
       ).toHaveFocus();
+    });
+
+    it("asks before leaving the page with an unsaved edit", async () => {
+      const user = userEvent.setup();
+      render(
+        <EditableIssueTitle
+          issueId="issue-1"
+          title="Original Title"
+          canEdit
+          eyebrow={<a href="/m/AFM">Attack from Mars</a>}
+        />
+      );
+      const input = await openFromMenu(user);
+      await user.type(input, " edited");
+      await user.click(screen.getByRole("link", { name: "Attack from Mars" }));
+
+      expect(
+        await screen.findByRole("alertdialog", {
+          name: "Discard unsaved changes?",
+        })
+      ).toBeInTheDocument();
     });
 
     it("Save submits the edited title", async () => {

@@ -168,6 +168,12 @@ Native reset clears the form's DOM state; explicit `setState` clears React's vie
 
 Applies to deferred-save forms that buffer edits in client state until an explicit Save.
 
+**Draft or guard — pick one per surface:**
+
+- **A composer for something new** (a comment, a timeline note, a report) keeps a **draft** in `localStorage` and gets **no guard**: leaving loses nothing, so a "changes will be lost" dialog would be false. Comment drafts (`~/components/issues/comment-draft.ts`) are the reference: keyed per person and per target, cleared after a successful post and on sign-out, synced across tabs.
+- **An edit of something already saved**, held until Save (a comment edit, an issue title on mobile, the machine and settings forms), gets the **guard** and no draft.
+- An inline field that already cancels when it loses focus (the desktop issue title) needs neither: leaving the field discards the edit by design.
+
 Use the shared guard from `~/hooks/use-unsaved-changes-guard`:
 
 ```tsx

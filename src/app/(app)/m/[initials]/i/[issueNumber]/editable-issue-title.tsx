@@ -8,6 +8,7 @@ import {
   useLayoutEffect,
   useActionState,
 } from "react";
+import { flushSync } from "react-dom";
 import { ArrowLeftRight, Loader2, MoreHorizontal, Pencil } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import {
@@ -23,6 +24,7 @@ import {
   type UpdateIssueTitleResult,
 } from "~/app/(app)/issues/actions";
 import { useIsMobile } from "~/hooks/use-is-mobile";
+import { UnsavedChangesGuard } from "~/hooks/use-unsaved-changes-guard";
 import { cn } from "~/lib/utils";
 import { ISSUE_TITLE_MAX, ISSUE_TITLE_MAX_MESSAGE } from "~/lib/issues/title";
 import { ReassignMachineForm } from "./reassign-machine-form";
@@ -235,6 +237,11 @@ export function EditableIssueTitle({
     </h1>
   );
 
+  // On mobile, where Save and Cancel are explicit, leaving the page with an
+  // unsaved title edit asks first (pinpoint-ui "Unsaved changes navigation
+  // guard"). On desktop, leaving the field already cancels the edit.
+  const isDirty = isMobile && isEditing && editValue.trim() !== title;
+
   const length = editValue.trim().length;
   const atLimit = length >= ISSUE_TITLE_MAX;
   const editor = (
@@ -377,12 +384,15 @@ export function EditableIssueTitle({
 
   return (
     <>
+      <UnsavedChangesGuard isDirty={isDirty} />
       <div className="flex items-center gap-2">
         <div className="min-w-0 flex-1">{eyebrow}</div>
         {hasActions ? (
           <>
-            {/* Mobile: both actions behind one ⋯ menu. */}
-            <DropdownMenu>
+            {/* Mobile: both actions behind one ⋯ menu. Non-modal, so it
+                doesn't pull focus back into itself when Edit title moves
+                focus to the field. */}
+            <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
                 <Button
                   ref={menuTriggerRef}
@@ -412,7 +422,11 @@ export function EditableIssueTitle({
                     className="min-h-11"
                     onSelect={() => {
                       menuChoiceRef.current = true;
-                      setIsEditing(true);
+                      // iOS opens the keyboard only for focus given during
+                      // the tap itself, so render the field and focus it
+                      // now rather than after the menu closes.
+                      flushSync(() => setIsEditing(true));
+                      inputRef.current?.focus();
                     }}
                   >
                     <Pencil className="size-4" aria-hidden="true" />

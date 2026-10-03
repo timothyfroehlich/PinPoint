@@ -29,6 +29,8 @@ import {
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { type ProseMirrorDoc } from "~/lib/tiptap/types";
+import { holdKeyboardForUpcomingField } from "~/lib/ios-keyboard";
+import { UnsavedChangesGuard } from "~/hooks/use-unsaved-changes-guard";
 import { cn } from "~/lib/utils";
 import { ACTIVITY_HEADING_ID } from "~/components/issues/activity-ids";
 
@@ -160,8 +162,15 @@ function CommentEditForm({
     }
   }, [state, onDone]);
 
+  // Leaving the page with an unsaved edit asks first (pinpoint-ui
+  // "Unsaved changes navigation guard"); the edit is not kept as a draft.
+  const isDirty =
+    state?.ok !== true &&
+    JSON.stringify(content) !== JSON.stringify(initialContent);
+
   return (
     <form action={formAction} className="space-y-4">
+      <UnsavedChangesGuard isDirty={isDirty} />
       <input type="hidden" name="commentId" value={commentId} />
       <RichTextEditor
         content={content}
@@ -293,8 +302,7 @@ export function CommentShell({
   const articleRef = React.useRef<HTMLElement>(null);
   const triggerRef = React.useRef<HTMLButtonElement>(null);
   // A menu choice moves focus itself (into the editor or the dialog), so the
-  // menu must not pull it back to the ⋯ button as it closes. The editor opens
-  // only once the menu has let go of focus, so its autofocus sticks.
+  // menu must not pull it back to the ⋯ button as it closes.
   const menuChoiceRef = React.useRef<"edit" | "delete" | null>(null);
   // Set when the editor closes while focus is in it (or already lost).
   const restoreFocusRef = React.useRef(false);
@@ -331,7 +339,9 @@ export function CommentShell({
         </div>
 
         {canEdit || canDelete ? (
-          <DropdownMenu>
+          // Non-modal, so it doesn't pull focus back into itself when Edit
+          // moves focus toward the editor.
+          <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <Button
                 ref={triggerRef}
@@ -352,7 +362,6 @@ export function CommentShell({
                 if (!choice) return;
                 event.preventDefault();
                 menuChoiceRef.current = null;
-                if (choice === "edit") setIsEditing(true);
               }}
             >
               {canEdit ? (
@@ -360,6 +369,13 @@ export function CommentShell({
                   className="max-md:min-h-11"
                   onSelect={() => {
                     menuChoiceRef.current = "edit";
+                    // The editor loads after the tap, too late for iOS to
+                    // raise the keyboard for it; hold the keyboard up until
+                    // the editor's autofocus takes over.
+                    if (articleRef.current) {
+                      holdKeyboardForUpcomingField(articleRef.current);
+                    }
+                    setIsEditing(true);
                   }}
                 >
                   <Pencil className="mr-2 size-4" aria-hidden="true" />

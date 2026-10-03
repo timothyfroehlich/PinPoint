@@ -33,15 +33,38 @@ vi.mock("~/app/(app)/issues/watcher-actions", () => ({
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-// The real editor is a lazy TipTap bundle; a textarea stands in for it.
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
+// The real editor is a lazy TipTap bundle; a textarea stands in for it,
+// reporting what is typed as a one-paragraph document.
 vi.mock("~/components/editor/RichTextEditorDynamic", () => ({
   RichTextEditor: ({
     ariaLabel,
     autoFocus,
+    onChange,
   }: {
     ariaLabel?: string;
     autoFocus?: boolean;
-  }) => <textarea aria-label={ariaLabel} autoFocus={autoFocus} />,
+    onChange?: (doc: ProseMirrorDoc) => void;
+  }) => (
+    <textarea
+      aria-label={ariaLabel}
+      autoFocus={autoFocus}
+      onChange={(event) =>
+        onChange?.({
+          type: "doc",
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: event.target.value }],
+            },
+          ],
+        })
+      }
+    />
+  ),
 }));
 
 vi.mock("~/components/issues/AddCommentForm", () => ({
@@ -485,6 +508,34 @@ describe("Issue detail Activity (spec §7–§8)", () => {
       await waitFor(() => {
         expect(trigger).toHaveFocus();
       });
+    });
+
+    it("asks before leaving the page with an unsaved edit", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <>
+          <IssueActivity
+            issue={createIssue(withComments(comment))}
+            currentUserId="member-1"
+            currentUserRole="member"
+          />
+          <a href="/issues">All issues</a>
+        </>
+      );
+
+      await user.click(screen.getByRole("button", { name: "Comment actions" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Edit" }));
+      await user.type(
+        screen.getByRole("textbox", { name: "Edit comment" }),
+        "Also the right flipper"
+      );
+      await user.click(screen.getByRole("link", { name: "All issues" }));
+
+      expect(
+        await screen.findByRole("alertdialog", {
+          name: "Discard unsaved changes?",
+        })
+      ).toBeInTheDocument();
     });
 
     it("canceling a delete returns focus to the actions button", async () => {
