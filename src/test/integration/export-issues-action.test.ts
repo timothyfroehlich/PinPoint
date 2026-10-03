@@ -324,19 +324,18 @@ describe("exportIssuesAction — PGlite integration (CORE-TEST-004)", () => {
       expect(result.value.csv).not.toContain("Early issue on AFM");
     });
 
-    it("falls back to default open filters when filtersJson has invalid enum", async () => {
+    it("returns VALIDATION rather than exporting everything when filters fail the schema", async () => {
       await mockAuth(USER_ID);
 
       const result = await exportIssuesAction({
         filtersJson: JSON.stringify({ status: ["invalid-status"] }),
       });
 
-      expect(result.ok).toBe(true);
-      if (!result.ok) return;
-
-      // Both open issues match because invalid filter was dropped safely
-      expect(result.value.csv).toContain("Early issue on AFM");
-      expect(result.value.csv).toContain("Later issue on AFM");
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("VALIDATION");
+        expect(result.message).toBe("Invalid filter data.");
+      }
     });
   });
 });

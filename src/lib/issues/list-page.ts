@@ -5,6 +5,7 @@ import {
   eq,
   exists,
   inArray,
+  sql,
   type SQL,
 } from "drizzle-orm";
 import { db } from "~/server/db";
@@ -17,7 +18,7 @@ import {
 import type { IssueFilters } from "~/lib/issues/filters";
 import { OPEN_STATUSES } from "~/lib/issues/status";
 import type {
-  IssueListItem,
+  IssueListRow,
   IssueListSummary,
   IssueWidgetCounts,
   UnifiedUser,
@@ -32,7 +33,7 @@ export type IssueFilterUser = Pick<
 export type IssueAssigneeUser = Pick<UnifiedUser, "id" | "name">;
 
 export interface IssueListPageData {
-  issuesList: IssueListItem[];
+  issuesList: IssueListRow[];
   totalCount: number;
   filterUsers: IssueFilterUser[];
   assigneeUsers: IssueAssigneeUser[];
@@ -199,12 +200,25 @@ export async function loadIssueListPage(
         where: and(...where),
         orderBy,
         with: {
-          machine: { columns: { id: true, name: true } },
+          machine: { columns: { id: true, name: true, ownerId: true } },
           reportedByUser: { columns: { id: true, name: true } },
           invitedReporter: { columns: { id: true, name: true } },
           assignedToUser: { columns: { id: true, name: true } },
         },
         columns: ISSUE_LIST_COLUMNS,
+        // Comments people wrote (issues-list §3.4); system rows are timeline
+        // events. The relational builder qualifies every column inside
+        // `extras` with the root table's alias, so the subquery names its
+        // own alias in plain SQL rather than through the schema objects.
+        extras: (table) => ({
+          commentCount: sql<number>`(
+            select count(*)::int from "issue_comments" "comment"
+            where "comment"."issue_id" = ${table.id}
+              and not "comment"."is_system"
+          )`
+            .mapWith(Number)
+            .as("comment_count"),
+        }),
         limit: pageSize,
         offset: (page - 1) * pageSize,
       }),
