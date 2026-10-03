@@ -248,6 +248,7 @@ function publicRow(candidate: MachineViewCandidate): MachineViewRow {
     manufacturer: candidate.manufacturer,
     year: candidate.year,
     ownerName: candidate.ownerName,
+    hasOwner: candidate.hasOwner,
     presence: candidate.presence,
     createdAt: candidate.createdAt,
   };
@@ -307,6 +308,7 @@ export async function loadMachineViewFromDatabase(
       year: machine.year,
       ownerId: machine.ownerId,
       ownerName: machine.ownerName,
+      hasOwner: machine.ownerId !== null,
       presence: machine.presence,
       createdAt: machine.createdAt.toISOString(),
       canonicalModelName: machine.canonicalModelName,

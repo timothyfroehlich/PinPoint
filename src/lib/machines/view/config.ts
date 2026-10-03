@@ -103,9 +103,6 @@ const DEFAULT_COLUMNS: MachineViewFieldId[] = [
   "openIssues",
   "lastServiced",
   "lastActivity",
-  "owner",
-  "manufacturer",
-  "year",
 ];
 
 export interface MachineViewPreset {

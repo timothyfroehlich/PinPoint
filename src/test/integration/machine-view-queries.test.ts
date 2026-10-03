@@ -184,6 +184,41 @@ describe("machine view database pipeline", () => {
     expect(all.rows.every((row) => !Object.hasOwn(row, "ownerId"))).toBe(true);
   });
 
+  it("sends the identity line's manufacturer, year, and owner name whatever fields are displayed (§3.2, §3.3)", async () => {
+    const db = await getTestDb();
+    await db.insert(machines).values(
+      createTestMachine({
+        initials: "DDD",
+        name: "Delta",
+        ownerId: null,
+        year: null,
+      })
+    );
+
+    const result = await loadMachineViewFromDatabase(asDbOrTx(db), {
+      scope: { kind: "all" },
+      preset: "machines",
+      searchParams: new URLSearchParams({
+        presence: "all",
+        columns: "machine",
+      }),
+    });
+
+    const byInitials = new Map(result.rows.map((row) => [row.initials, row]));
+    expect(byInitials.get("AAA")).toMatchObject({
+      ownerName: "Owner One",
+      hasOwner: true,
+    });
+    expect(byInitials.get("DDD")).toMatchObject({
+      manufacturer: "Unknown",
+      year: null,
+      ownerName: "Unassigned",
+      hasOwner: false,
+    });
+    // Names only; an owner's email never reaches the client (CORE-SEC-007).
+    expect(JSON.stringify(result.rows)).not.toContain("@");
+  });
+
   it("sends health on every row for the phone Compact row, whatever fields are displayed (§5.3)", async () => {
     const db = await getTestDb();
     await db

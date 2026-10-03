@@ -29,19 +29,26 @@ const STATUS_ICONS: Record<MachineStatus, LucideIcon> = {
 
 interface MachineIdentityProps {
   row: MachineViewRow;
+  /**
+   * The table shows a second line of manufacturer, year, and owner; the phone
+   * Compact row keeps identity to one line (machine-views §3.2, §5.3).
+   */
+  variant: "table" | "compact";
   onMachineSelect?: MachineSelectionHandler | undefined;
 }
 
 /**
- * Machine identity on one line (machine-views §3.2): the title link, which
- * truncates (its full title stays in the link text and tooltip), then the
- * initials badge, which never shrinks.
+ * Machine identity (machine-views §3.2): the title link, which truncates (its
+ * full title stays in the link text and tooltip), then the initials badge,
+ * which never shrinks. In the table a muted second line names the
+ * manufacturer, year, and owner, and also truncates rather than wrapping.
  */
 export function MachineIdentity({
   row,
+  variant,
   onMachineSelect,
 }: MachineIdentityProps): React.JSX.Element {
-  return (
+  const nameLine = (
     <div className="flex min-w-0 items-center gap-2">
       <Link
         href={`/m/${row.initials}`}
@@ -64,6 +71,23 @@ export function MachineIdentity({
       >
         {row.initials}
       </Badge>
+    </div>
+  );
+  if (variant === "compact") return nameLine;
+
+  const year = row.year === null ? "Unknown" : String(row.year);
+  return (
+    <div className="min-w-0">
+      {nameLine}
+      <div
+        title={`${row.manufacturer} · ${year} · ${row.ownerName}`}
+        className="mt-0.5 truncate text-xs text-muted-foreground"
+      >
+        {row.manufacturer} · {year} ·{" "}
+        <span className={row.hasOwner ? "text-foreground" : undefined}>
+          {row.ownerName}
+        </span>
+      </div>
     </div>
   );
 }

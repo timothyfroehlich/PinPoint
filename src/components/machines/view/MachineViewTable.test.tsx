@@ -15,6 +15,7 @@ function machine(overrides: Partial<MachineViewRow> = {}): MachineViewRow {
     manufacturer: "Bally",
     year: 1995,
     ownerName: "Alex",
+    hasOwner: true,
     presence: "on_the_floor",
     createdAt: "2026-01-01T00:00:00.000Z",
     health: {
@@ -30,12 +31,16 @@ function machine(overrides: Partial<MachineViewRow> = {}): MachineViewRow {
 }
 
 describe("MachineViewTable", () => {
-  it("shows identity on one line and Owner, Manufacturer, and Year as their own fields", () => {
+  it("shows identity on two lines and Owner, Manufacturer, and Year as fields of their own", () => {
+    const defaults = getMachineViewPreset("machines").defaultState;
     render(
       <RelativeTimeProvider>
         <MachineViewTable
           rows={[machine()]}
-          state={getMachineViewPreset("machines").defaultState}
+          state={{
+            ...defaults,
+            columns: [...defaults.columns, "owner", "manufacturer", "year"],
+          }}
           mobileMode="compact"
           onSort={vi.fn()}
         />
@@ -48,7 +53,11 @@ describe("MachineViewTable", () => {
     });
     expect(titleLink).toHaveAttribute("href", "/m/AFM");
     expect(titleLink).toHaveAttribute("title", "Attack from Mars");
-    expect(identity).toHaveTextContent(/^Attack from MarsAFM$/);
+    expect(within(identity).getByText("AFM")).toBeInTheDocument();
+    const details = within(identity).getByTitle("Bally · 1995 · Alex");
+    expect(details).toHaveTextContent(/^Bally · 1995 · Alex$/);
+    expect(details).toHaveClass("truncate", "text-muted-foreground");
+    expect(within(details).getByText("Alex")).toHaveClass("text-foreground");
 
     const cells = screen.getAllByRole("cell");
     const headers = screen
@@ -65,6 +74,31 @@ describe("MachineViewTable", () => {
         name: "View service history for Attack from Mars",
       })
     ).toHaveAttribute("href", "/m/AFM/maintenance");
+  });
+
+  it("names missing identity details Unknown and Unassigned, keeping Unassigned muted", () => {
+    render(
+      <MachineViewTable
+        rows={[
+          machine({
+            manufacturer: "Unknown",
+            year: null,
+            ownerName: "Unassigned",
+            hasOwner: false,
+          }),
+        ]}
+        state={getMachineViewPreset("machines").defaultState}
+        mobileMode="compact"
+        onSort={vi.fn()}
+      />
+    );
+
+    const details = within(screen.getByRole("rowheader")).getByTitle(
+      "Unknown · Unknown · Unassigned"
+    );
+    expect(within(details).getByText("Unassigned")).not.toHaveClass(
+      "text-foreground"
+    );
   });
 
   it("right-aligns a severity-colored issue count linking to the machine's issues in every presence state", () => {

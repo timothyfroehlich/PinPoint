@@ -29,6 +29,7 @@ function candidate(
     year: 1990,
     ownerId: null,
     ownerName: "Unassigned",
+    hasOwner: false,
     presence,
     createdAt: new Date(Date.UTC(2026, 0, index + 1)).toISOString(),
     canonicalModelName: `Machine ${index}`,

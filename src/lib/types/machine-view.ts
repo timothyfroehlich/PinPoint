@@ -65,7 +65,10 @@ export interface MachineViewRow {
   title: string;
   manufacturer: string;
   year: number | null;
+  /** The owner's display name, or "Unassigned"; never an email (CORE-SEC-007). */
   ownerName: string;
+  /** False when the machine has no owner and `ownerName` is "Unassigned". */
+  hasOwner: boolean;
   presence: MachinePresenceStatus;
   createdAt: string;
   health?: MachineViewHealth;

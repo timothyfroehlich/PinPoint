@@ -32,7 +32,11 @@ export function MachineViewCompactList({
             <PlayabilityDot status={row.health.playability} />
           ) : null}
           <div className="min-w-0 flex-1">
-            <MachineIdentity row={row} onMachineSelect={onMachineSelect} />
+            <MachineIdentity
+              row={row}
+              variant="compact"
+              onMachineSelect={onMachineSelect}
+            />
           </div>
           <div className="shrink-0">
             <OpenIssueCount row={row} variant="compact" />

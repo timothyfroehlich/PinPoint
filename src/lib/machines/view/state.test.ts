@@ -19,7 +19,7 @@ describe("machine view URL state", () => {
       dir: "asc",
       page: 1,
       pageSize: 25,
-      // Both Page Presets display nine fields by default (§4.6).
+      // Both Page Presets display six fields by default (§4.6).
       columns: [
         "machine",
         "playability",
@@ -27,9 +27,6 @@ describe("machine view URL state", () => {
         "openIssues",
         "lastServiced",
         "lastActivity",
-        "owner",
-        "manufacturer",
-        "year",
       ],
       severity: [],
       presenceWidget: "all",

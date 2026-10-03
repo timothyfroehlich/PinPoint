@@ -126,10 +126,11 @@ export function MachineViewTable({
                     cells scrolled beneath it never show through. */}
                 <th
                   scope="row"
-                  className="sticky left-0 z-10 h-11 w-full max-w-0 min-w-52 border-r border-outline-variant bg-card py-1 pr-3 pl-4 text-left font-normal group-hover:bg-linear-to-r group-hover:from-muted/50 group-hover:to-muted/50"
+                  className="sticky left-0 z-10 h-14 w-full max-w-0 min-w-52 border-r border-outline-variant bg-card py-1 pr-3 pl-4 text-left font-normal group-hover:bg-linear-to-r group-hover:from-muted/50 group-hover:to-muted/50"
                 >
                   <MachineIdentity
                     row={row}
+                    variant="table"
                     onMachineSelect={onMachineSelect}
                   />
                 </th>
@@ -139,7 +140,7 @@ export function MachineViewTable({
                     <td
                       key={field}
                       className={cn(
-                        "h-11 w-px whitespace-nowrap px-3 py-1 last:pr-4",
+                        "h-14 w-px whitespace-nowrap px-3 py-1 last:pr-4",
                         renderer.align === "right" && "text-right",
                         renderer.tableClassName
                       )}
