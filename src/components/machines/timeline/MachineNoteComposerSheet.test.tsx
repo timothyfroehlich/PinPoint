@@ -4,6 +4,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import { MachineNoteComposerSheet } from "./MachineNoteComposerSheet";
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
 const addMachineCommentAction = vi.fn(() =>
   Promise.resolve({ success: true as const })
 );

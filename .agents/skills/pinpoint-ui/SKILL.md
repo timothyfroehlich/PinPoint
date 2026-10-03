@@ -164,6 +164,37 @@ Native reset clears the form's DOM state; explicit `setState` clears React's vie
 
 **E2E coverage**: every CREATE form needs at least one assertion that, after a successful submit, every field reads back empty/placeholder. For forms that navigate away, submit → wait for redirect → navigate back → assert empty. See `e2e/full/form-resets.spec.ts`.
 
+### Unsaved changes navigation guard (PP-kny4)
+
+Applies to deferred-save forms that buffer edits in client state until an explicit Save.
+
+Use the shared guard from `~/hooks/use-unsaved-changes-guard`:
+
+```tsx
+import { UnsavedChangesGuard } from "~/hooks/use-unsaved-changes-guard";
+
+export function MyForm() {
+  const [isDirty, setIsDirty] = useState(false);
+
+  return (
+    <form>
+      <UnsavedChangesGuard isDirty={isDirty} />
+      {/* ... fields ... */}
+    </form>
+  );
+}
+```
+
+Or call `useUnsavedChangesGuard({ isDirty, onDiscard, description, ... })` when you need programmatic dialog control (e.g. triggering the same prompt from an in-form Cancel button via `openConfirm(null)`), custom dialog copy, or cleanup before navigation.
+
+**Key rules for navigation guards:**
+
+1. **Never call `event.stopPropagation()` in click guards.** The guard uses a capturing listener on `document` to call `event.preventDefault()` (which halts Next.js `<Link>` routing), but MUST allow the click event to propagate to React's root. Calling `stopPropagation()` prevents React synthetic event handlers from firing, breaking drawer dismissals (e.g. mobile `BottomTabBar` "More" drawer), Radix dropdown closures, and active popovers.
+2. **Focus restoration on stay**: When the user cancels ("Stay on page"), the dialog's `onCloseAutoFocus` restores keyboard focus to the clicked link.
+3. **App Router boundary contracts**:
+   - `popstate` (browser Back): in-app Back cannot be blocked synchronously without sentinel history traps that break browser navigation. Forms with auto-save semantics can pass `onPopState: flushUnsaved` for fire-and-forget saving on Back; discard-only forms accept silent discard.
+   - `router.push`: programmatic navigation does not emit DOM click events. Callers performing programmatic navigation must inspect their own dirty state first.
+
 ## Server & Data Conventions
 
 ### Server Actions

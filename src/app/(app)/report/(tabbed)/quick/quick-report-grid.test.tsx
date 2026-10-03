@@ -8,6 +8,9 @@ import { QuickReportGrid } from "./quick-report-grid";
 
 const submitRow = vi.fn();
 const submitAll = vi.fn();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
 vi.mock("./actions", () => ({
   submitQuickIssueRowAction: (...a: unknown[]) => submitRow(...a),
   submitQuickIssuesAction: (...a: unknown[]) => submitAll(...a),
