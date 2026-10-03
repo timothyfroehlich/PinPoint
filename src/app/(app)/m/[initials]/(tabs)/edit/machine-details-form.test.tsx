@@ -741,6 +741,12 @@ describe("MachineDetailsForm", () => {
   });
 
   describe("iScored game ID field", () => {
+    it("renders with defaultValue from prop", () => {
+      renderForm({ iscoredGameId: "73" });
+      const input = screen.getByTestId("edit-machine-iscored-game-id");
+      expect(input).toHaveValue("73");
+    });
+
     it("marks form dirty when edited via picker", async () => {
       const user = userEvent.setup();
       renderForm({ iscoredGameId: null });
