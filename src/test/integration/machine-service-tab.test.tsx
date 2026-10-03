@@ -37,7 +37,7 @@ interface RecentActivityProps {
   machineId: string;
   machineInitials: string;
   machineName: string;
-  canCompose: boolean;
+  composerUserId: string | null;
 }
 const mockRecentActivity = vi.fn<
   (p: RecentActivityProps) => React.ReactElement
@@ -76,21 +76,6 @@ const mockOpsBox = vi.fn<(p: OpsBoxProps) => React.ReactElement>(() => (
 ));
 vi.mock("~/app/(app)/m/[initials]/machine-ops-box", () => ({
   MachineOpsBox: (p: OpsBoxProps) => mockOpsBox(p),
-}));
-
-// The apron card panel is an async server component over a client leaf that
-// loads next/font (only available inside a Next build). Stub it to capture
-// the permission props the page computes (apron-cards spec §3.6 edit, §9.3
-// member+ export); the panel hides itself when both are false.
-interface ApronPanelProps {
-  canEdit: boolean;
-  canExport: boolean;
-}
-const mockApronPanel = vi.fn<(p: ApronPanelProps) => React.ReactElement>(() => (
-  <div data-testid="apron-card-entry" />
-));
-vi.mock("~/app/(app)/m/[initials]/apron/ApronCardPanel", () => ({
-  ApronCardPanel: (p: ApronPanelProps) => mockApronPanel(p),
 }));
 
 const NO_PARAMS = Promise.resolve<Record<string, string | undefined>>({});
@@ -136,8 +121,8 @@ describe("Machine Service (maintenance) tab", () => {
     const props = mockRecentActivity.mock.calls[0][0];
     expect(props.machineId).toBe(machine.id);
     expect(props.machineInitials).toBe("GZ");
-    // members may post notes
-    expect(props.canCompose).toBe(true);
+    // members may post notes, as themselves
+    expect(props.composerUserId).toBe(memberId);
   });
 
   it("denies the compose gate to anonymous viewers", async () => {
@@ -150,7 +135,7 @@ describe("Machine Service (maintenance) tab", () => {
       })
     );
 
-    expect(mockRecentActivity.mock.calls[0][0].canCompose).toBe(false);
+    expect(mockRecentActivity.mock.calls[0][0].composerUserId).toBeNull();
   });
 
   it("shows only open issues by default", async () => {
@@ -256,39 +241,5 @@ describe("Machine Service (maintenance) tab", () => {
     const props = mockOpsBox.mock.calls[0][0];
     expect(props.canViewOwnerRequirements).toBe(true);
     expect(props.canEditGeneral).toBe(true);
-  });
-
-  // Apron card entry (PP-esta): replaces the old QR card in the rail.
-  it("gives anonymous viewers neither apron card edit nor export", async () => {
-    mockGetUser.mockResolvedValue({ data: { user: null } });
-    render(
-      await MachineMaintenanceTab({
-        params: Promise.resolve({ initials: "GZ" }),
-        searchParams: NO_PARAMS,
-      })
-    );
-    const props = mockApronPanel.mock.calls[0][0];
-    expect(props.canEdit).toBe(false);
-    expect(props.canExport).toBe(false);
-  });
-
-  it("lets a non-owner member export the apron card but not edit it", async () => {
-    const memberId = randomUUID();
-    const db = await getTestDb();
-    await db
-      .insert(userProfiles)
-      .values(createTestUser({ id: memberId, role: "member" }));
-    mockGetUser.mockResolvedValue({ data: { user: { id: memberId } } });
-
-    render(
-      await MachineMaintenanceTab({
-        params: Promise.resolve({ initials: "GZ" }),
-        searchParams: NO_PARAMS,
-      })
-    );
-
-    const props = mockApronPanel.mock.calls[0][0];
-    expect(props.canEdit).toBe(false);
-    expect(props.canExport).toBe(true);
   });
 });

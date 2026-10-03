@@ -3,9 +3,10 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import { eq } from "drizzle-orm";
+import { z } from "zod";
 
 import { db } from "~/server/db";
-import { machines, userProfiles } from "~/server/db/schema";
+import { machineApronCards, machines, userProfiles } from "~/server/db/schema";
 import { createClient } from "~/lib/supabase/server";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { apronCardContent } from "~/lib/machines/apron-card";
@@ -20,15 +21,20 @@ import { ApronCardPrintSheet } from "./ApronCardPrintSheet";
 export const metadata: Metadata = { title: "Apron card · PinPoint" };
 
 /**
- * Browser print of a saved apron card at its exact physical size (spec
- * §9.2), on ordinary paper with crop marks to cut along. Members only (§9.3); always renders the saved state, never a draft.
+ * Browser print of one saved apron card (`?card=<id>`) at its exact physical
+ * size (spec §9.2), on ordinary paper with crop marks to cut along. Members
+ * only (§9.3); always renders the saved state, never a draft (§9.1).
  */
 export default async function ApronCardPrintPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ initials: string }>;
+  searchParams: Promise<{ card?: string | string[] }>;
 }): Promise<React.JSX.Element> {
   const { initials } = await params;
+  const cardId = z.uuid().safeParse((await searchParams).card);
+  if (!cardId.success) notFound();
   const supabase = await createClient();
   const {
     data: { user },
@@ -45,11 +51,8 @@ export default async function ApronCardPrintPage({
       with: {
         owner: { columns: { name: true } },
         invitedOwner: { columns: { name: true } },
-        // The machine's first saved card (spec apron-cards §3.8), oldest
-        // first. Selecting among several cards is not built yet.
         apronCards: {
-          orderBy: (cards, { asc }) => [asc(cards.createdAt), asc(cards.id)],
-          limit: 1,
+          where: eq(machineApronCards.id, cardId.data),
         },
         pinballmapTitle: {
           columns: {

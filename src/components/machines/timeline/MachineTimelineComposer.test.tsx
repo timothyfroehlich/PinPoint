@@ -1,12 +1,12 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+import {
+  clearStoredCommentDrafts,
+  machineNoteDraftKey,
+} from "~/components/issues/comment-draft";
 import { MachineTimelineComposer } from "./MachineTimelineComposer";
-
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn() }),
-}));
 
 const addMachineCommentAction = vi.fn(() =>
   Promise.resolve({ success: true as const })
@@ -50,8 +50,18 @@ vi.mock("~/components/editor/RichTextEditor", () => ({
 }));
 
 describe("MachineTimelineComposer", () => {
+  afterEach(() => {
+    clearStoredCommentDrafts();
+  });
+
   it("defaults the tag to Note — the author is never forced to classify", () => {
-    render(<MachineTimelineComposer machineId="m1" onPosted={vi.fn()} />);
+    render(
+      <MachineTimelineComposer
+        machineId="m1"
+        userId="user-1"
+        onPosted={vi.fn()}
+      />
+    );
     // The tag picker trigger shows the "Note" pill, not the "Add tag"
     // placeholder, because the default tag is `note`.
     const tagTrigger = screen.getByRole("combobox", { name: /tag/i });
@@ -59,28 +69,29 @@ describe("MachineTimelineComposer", () => {
     expect(tagTrigger).not.toHaveTextContent(/add tag/i);
   });
 
-  it("renders the Post button and no Cancel by default", () => {
-    render(<MachineTimelineComposer machineId="m1" onPosted={vi.fn()} />);
+  it("renders the Post button and no Cancel", () => {
+    render(
+      <MachineTimelineComposer
+        machineId="m1"
+        userId="user-1"
+        onPosted={vi.fn()}
+      />
+    );
     expect(screen.getByRole("button", { name: /post/i })).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /cancel/i })
     ).not.toBeInTheDocument();
   });
 
-  it("shows a Cancel button when onCancel is provided (sheet entry point)", () => {
+  it("disables Post until there is body text (tag alone is not enough)", async () => {
+    const user = userEvent.setup();
     render(
       <MachineTimelineComposer
         machineId="m1"
+        userId="user-1"
         onPosted={vi.fn()}
-        onCancel={vi.fn()}
       />
     );
-    expect(screen.getByRole("button", { name: /cancel/i })).toBeInTheDocument();
-  });
-
-  it("disables Post until there is body text (tag alone is not enough)", async () => {
-    const user = userEvent.setup();
-    render(<MachineTimelineComposer machineId="m1" onPosted={vi.fn()} />);
     // Default tag is set but body is empty → Post disabled.
     expect(screen.getByRole("button", { name: /post/i })).toBeDisabled();
     await user.click(screen.getByRole("button", { name: /sim-type/i }));
@@ -91,7 +102,13 @@ describe("MachineTimelineComposer", () => {
     const onPosted = vi.fn();
     const user = userEvent.setup();
     addMachineCommentAction.mockClear();
-    render(<MachineTimelineComposer machineId="m1" onPosted={onPosted} />);
+    render(
+      <MachineTimelineComposer
+        machineId="m1"
+        userId="user-1"
+        onPosted={onPosted}
+      />
+    );
     await user.click(screen.getByRole("button", { name: /sim-type/i }));
     await user.click(screen.getByRole("button", { name: /post/i }));
     expect(addMachineCommentAction).toHaveBeenCalledWith(
@@ -102,7 +119,13 @@ describe("MachineTimelineComposer", () => {
   it("submits on Cmd/Ctrl+Enter when body text exists", async () => {
     const user = userEvent.setup();
     addMachineCommentAction.mockClear();
-    render(<MachineTimelineComposer machineId="m1" onPosted={vi.fn()} />);
+    render(
+      <MachineTimelineComposer
+        machineId="m1"
+        userId="user-1"
+        onPosted={vi.fn()}
+      />
+    );
     await user.click(screen.getByRole("button", { name: /sim-type/i }));
     await user.keyboard("{Meta>}{Enter}{/Meta}");
     expect(addMachineCommentAction).toHaveBeenCalledTimes(1);
@@ -111,14 +134,26 @@ describe("MachineTimelineComposer", () => {
   it("does NOT submit on Cmd+Enter while the body is empty", async () => {
     const user = userEvent.setup();
     addMachineCommentAction.mockClear();
-    render(<MachineTimelineComposer machineId="m1" onPosted={vi.fn()} />);
+    render(
+      <MachineTimelineComposer
+        machineId="m1"
+        userId="user-1"
+        onPosted={vi.fn()}
+      />
+    );
     await user.keyboard("{Meta>}{Enter}{/Meta}");
     expect(addMachineCommentAction).not.toHaveBeenCalled();
   });
 
   it("reveals the formatting toolbar when the Aa toggle is pressed", async () => {
     const user = userEvent.setup();
-    render(<MachineTimelineComposer machineId="m1" onPosted={vi.fn()} />);
+    render(
+      <MachineTimelineComposer
+        machineId="m1"
+        userId="user-1"
+        onPosted={vi.fn()}
+      />
+    );
     // Quick-note default: toolbar hidden.
     expect(screen.getByTestId("toolbar-state")).toHaveTextContent(
       "toolbar-off"
@@ -135,7 +170,13 @@ describe("MachineTimelineComposer", () => {
 
   it("offers only non-reserved tags in the selector", async () => {
     const user = userEvent.setup();
-    render(<MachineTimelineComposer machineId="m1" onPosted={vi.fn()} />);
+    render(
+      <MachineTimelineComposer
+        machineId="m1"
+        userId="user-1"
+        onPosted={vi.fn()}
+      />
+    );
     await user.click(screen.getByRole("combobox", { name: /tag/i }));
     // Spot-check three user tags from different families; reserved tags
     // (lifecycle/issue) and the retired `event` tag must not appear.
@@ -159,52 +200,143 @@ describe("MachineTimelineComposer", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("does not intercept navigation when composer has no body text even if formatting or tag is changed", async () => {
+  it("keeps the unposted note and its tag when the composer closes and reopens", async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(
+      <MachineTimelineComposer
+        machineId="m1"
+        userId="user-1"
+        onPosted={vi.fn()}
+      />
+    );
+    await user.click(screen.getByRole("button", { name: /sim-type/i }));
+    await user.click(screen.getByRole("combobox", { name: /tag/i }));
+    await user.click(screen.getByRole("option", { name: /maintenance/i }));
+    unmount();
+
+    addMachineCommentAction.mockClear();
+    render(
+      <MachineTimelineComposer
+        machineId="m1"
+        userId="user-1"
+        onPosted={vi.fn()}
+      />
+    );
+    expect(screen.getByRole("combobox", { name: /tag/i })).toHaveTextContent(
+      /maintenance/i
+    );
+    await user.click(screen.getByRole("button", { name: /post/i }));
+    expect(addMachineCommentAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tag: "maintenance",
+        contentJson: expect.stringContaining('"hi"'),
+      })
+    );
+  });
+
+  it("falls back to the Note tag when a restored draft carries a reserved tag", async () => {
+    localStorage.setItem(
+      machineNoteDraftKey("user-1", "m1"),
+      JSON.stringify({
+        version: 1,
+        savedAt: Date.now(),
+        doc: {
+          type: "doc",
+          content: [
+            { type: "paragraph", content: [{ type: "text", text: "hi" }] },
+          ],
+        },
+        images: [],
+        tag: "issue",
+        idempotencyKey: crypto.randomUUID(),
+      })
+    );
+    const user = userEvent.setup();
+    addMachineCommentAction.mockClear();
+    render(
+      <MachineTimelineComposer
+        machineId="m1"
+        userId="user-1"
+        onPosted={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: /post/i }));
+
+    expect(addMachineCommentAction).toHaveBeenCalledWith(
+      expect.objectContaining({ tag: "note" })
+    );
+  });
+
+  it("keeps a separate draft per machine", async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(
+      <MachineTimelineComposer
+        machineId="m1"
+        userId="user-1"
+        onPosted={vi.fn()}
+      />
+    );
+    await user.click(screen.getByRole("button", { name: /sim-type/i }));
+    unmount();
+
+    render(
+      <MachineTimelineComposer
+        machineId="m2"
+        userId="user-1"
+        onPosted={vi.fn()}
+      />
+    );
+    expect(screen.getByRole("button", { name: /post/i })).toBeDisabled();
+  });
+
+  it("empties the draft once the note posts", async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(
+      <MachineTimelineComposer
+        machineId="m1"
+        userId="user-1"
+        onPosted={vi.fn()}
+      />
+    );
+    await user.click(screen.getByRole("button", { name: /sim-type/i }));
+    await user.click(screen.getByRole("button", { name: /post/i }));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /post/i })).toBeDisabled();
+    });
+    unmount();
+
+    render(
+      <MachineTimelineComposer
+        machineId="m1"
+        userId="user-1"
+        onPosted={vi.fn()}
+      />
+    );
+    expect(screen.getByRole("button", { name: /post/i })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: /tag/i })).toHaveTextContent(
+      /note/i
+    );
+  });
+
+  it("lets the person leave the page without asking — the note is kept as a draft", async () => {
     const user = userEvent.setup();
     render(
       <div>
-        <MachineTimelineComposer machineId="m1" onPosted={vi.fn()} />
+        <MachineTimelineComposer
+          machineId="m1"
+          userId="user-1"
+          onPosted={vi.fn()}
+        />
         <a href="/other">Other Page</a>
       </div>
     );
+    await user.click(screen.getByRole("button", { name: /sim-type/i }));
 
-    // Toggle formatting
-    await user.click(screen.getByRole("button", { name: /show formatting/i }));
-    // Change tag
-    await user.click(screen.getByRole("combobox", { name: /tag/i }));
-    await user.click(screen.getByRole("option", { name: /maintenance/i }));
-
-    // Click link — should NOT trigger unsaved changes guard because body is empty
     await user.click(screen.getByRole("link", { name: /other page/i }));
+
     expect(
       screen.queryByText(/discard unsaved changes\?/i)
     ).not.toBeInTheDocument();
-  });
-
-  it("does not submit the note when Cmd/Ctrl+Enter is pressed while the discard dialog is open", async () => {
-    const user = userEvent.setup();
-    render(
-      <div>
-        <MachineTimelineComposer machineId="m1" onPosted={vi.fn()} />
-        <a href="/other">Other Page</a>
-      </div>
-    );
-
-    // Type a note
-    await user.click(screen.getByRole("button", { name: /sim-type/i }));
-
-    // Click link to trigger discard dialog
-    await user.click(screen.getByRole("link", { name: /other page/i }));
-    expect(screen.getByText("Discard unsaved changes?")).toBeInTheDocument();
-
-    // Press Cmd+Enter while focus is inside the dialog
-    const dialog = screen.getByRole("alertdialog");
-    dialog.focus();
-    await user.keyboard("{Meta>}{Enter}{/Meta}");
-
-    // Should NOT have posted
-    expect(addMachineCommentAction).not.toHaveBeenCalled();
-    // Dialog should still be open
-    expect(screen.getByText("Discard unsaved changes?")).toBeInTheDocument();
   });
 });

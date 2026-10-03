@@ -93,10 +93,12 @@ export default async function MachineTimelinePage({
     accessLevel = getAccessLevel(profile?.role ?? null);
   }
 
-  const canCompose = checkPermission(
-    "machines.timeline.comment.add",
-    accessLevel
-  );
+  // Who may post timeline notes; their unposted note is kept as a draft.
+  const composerUserId =
+    currentUserId !== null &&
+    checkPermission("machines.timeline.comment.add", accessLevel)
+      ? currentUserId
+      : null;
   // Converting an imported Pinball Map comment files an issue in the
   // converter's name, so it needs a signed-in reporter (pinballmap spec 7.5).
   const canConvertPinballMapComment =
@@ -164,7 +166,7 @@ export default async function MachineTimelinePage({
         machineId={machineId}
         machineName={machineName}
         currentTags={effectiveTags}
-        canCompose={canCompose}
+        composerUserId={composerUserId}
       />
       {rows.length === 0 ? (
         <p className="py-10 text-center text-sm text-muted-foreground">

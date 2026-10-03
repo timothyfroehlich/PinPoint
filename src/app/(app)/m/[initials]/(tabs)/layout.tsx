@@ -7,6 +7,7 @@ import { userProfiles } from "~/server/db/schema";
 import {
   getAccessLevel,
   canAccessMachineManage,
+  checkPermission,
   type OwnershipContext,
 } from "~/lib/permissions/index";
 import { PageContainer } from "~/components/layout/PageContainer";
@@ -75,6 +76,10 @@ export default async function MachineDetailLayout({
           initials={machine.initials}
           maintenance={maintenance}
           canManage={canManage}
+          canSeeApronCards={checkPermission(
+            "machines.apron.export",
+            accessLevel
+          )}
         />
         <div className="pt-2">{children}</div>
       </div>
