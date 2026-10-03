@@ -9,7 +9,7 @@ import { machines } from "~/server/db/schema";
 import { createClient } from "~/lib/supabase/server";
 import { checkPermission } from "~/lib/permissions/helpers";
 import { getUserAccessLevel } from "~/lib/permissions/access";
-import { createIssue } from "~/services/issues";
+import { createIssue, MachineRemovedError } from "~/services/issues";
 import { dispatchNotification } from "~/lib/notifications";
 import { reportError } from "~/lib/observability/report-error";
 import { log } from "~/lib/logger";
@@ -90,6 +90,9 @@ async function createOne(
       machineInitials: machine.initials,
     };
   } catch (error) {
+    if (error instanceof MachineRemovedError) {
+      return { index, ok: false, error: error.message };
+    }
     reportError(error, { action: "submitQuickIssueRow", index });
     log.error(
       { index, err: error instanceof Error ? error.message : error },
