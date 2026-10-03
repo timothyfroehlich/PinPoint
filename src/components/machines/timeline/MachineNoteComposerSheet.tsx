@@ -18,6 +18,8 @@ import {
 interface Props {
   machineId: string;
   machineName: string;
+  /** The signed-in author; their unposted note is kept as a draft. */
+  userId: string;
 }
 
 /**
@@ -29,12 +31,14 @@ interface Props {
  * same bottom sheet is centered to a comfortable max-width rather than running
  * full-bleed.
  *
- * The composer's server action revalidates the machine routes, so the timeline
+ * Closing the sheet keeps the unposted note as a draft; reopening it restores
+ * the text and tag. The composer's server action revalidates the machine routes, so the timeline
  * and the overview "Recent activity" section refresh once the sheet closes.
  */
 export function MachineNoteComposerSheet({
   machineId,
   machineName,
+  userId,
 }: Props): React.ReactElement {
   const [open, setOpen] = useState(false);
 
@@ -61,6 +65,7 @@ export function MachineNoteComposerSheet({
         <div className="px-4 pb-6">
           <MachineTimelineComposer
             machineId={machineId}
+            userId={userId}
             // eslint-disable-next-line jsx-a11y/no-autofocus -- deliberate focus-on-open in bottom sheet, PP-u4cp
             autoFocus
             onCancel={() => {

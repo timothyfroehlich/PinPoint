@@ -1,19 +1,30 @@
 "use client";
 
 import type React from "react";
-import { useState, useTransition } from "react";
+import { useId, useRef, useState, useTransition } from "react";
 
-import { UnsavedChangesGuard } from "~/hooks/use-unsaved-changes-guard";
 import { addMachineCommentAction } from "~/app/(app)/m/[initials]/(tabs)/timeline/actions";
-import { RichTextEditor } from "~/components/editor/RichTextEditor";
+import {
+  RichTextEditor,
+  type RichTextEditorHandle,
+} from "~/components/editor/RichTextEditor";
+import {
+  machineNoteDraftKey,
+  useCommentDraft,
+  useDraftEditorSync,
+} from "~/components/issues/comment-draft";
 import { TagSelect } from "~/components/machines/timeline/TagSelect";
 import { Button } from "~/components/ui/button";
 import { Toggle } from "~/components/ui/toggle";
-import { type TimelineTag } from "~/lib/timeline/machine-tags";
+import { tagSchema, type TimelineTag } from "~/lib/timeline/machine-tags";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
+
+const EMPTY_DOC: ProseMirrorDoc = { type: "doc", content: [] };
 
 interface Props {
   machineId: string;
+  /** The signed-in author; drafts are kept per person and per machine. */
+  userId: string;
   onPosted: () => void;
   /** Optional Cancel affordance (shown when composing inside a sheet). */
   onCancel?: (() => void) | undefined;
@@ -33,30 +44,43 @@ interface Props {
  *   mode, so flipping back is lossless.
  * - **Tier 3 (issue):** out of scope here — photos / structured fields live
  *   on issues.
- * `Cmd`/`Ctrl`+`Enter` submits. `UnsavedChangesGuard` guards page exits
- * (tab-close, reload, and in-app link navigation) while dirty.
+ * `Cmd`/`Ctrl`+`Enter` submits. The text and tag are kept as a draft
+ * (`comment-draft.ts`) until the note posts, so closing the sheet or reloading
+ * the page loses nothing.
  */
 export function MachineTimelineComposer({
   machineId,
+  userId,
   onPosted,
   onCancel,
   autoFocus = false,
 }: Props): React.ReactElement {
-  const [tag, setTag] = useState<TimelineTag>("note");
-  const [doc, setDoc] = useState<ProseMirrorDoc>({ type: "doc", content: [] });
   const [fullMode, setFullMode] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  // Stable across retries: a 504-then-retry of the SAME post reuses this key so
-  // the server dedups it (PP-e5th). Regenerated only after a successful post so
-  // the next genuine note gets a distinct key. A failed post keeps the key, so
-  // the user's retry is recognised as the same submission.
-  const [idempotencyKey, setIdempotencyKey] = useState(() =>
-    crypto.randomUUID()
+  const containerRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<RichTextEditorHandle>(null);
+  const composerId = useId();
+  const draft = useCommentDraft(
+    machineNoteDraftKey(userId, machineId),
+    composerId
   );
+  const { onDocChange, clear } = useDraftEditorSync({
+    draft,
+    composerId,
+    editorRef,
+    containerRef,
+  });
+  // The idempotency key lives in the draft: stable across retries (and
+  // reloads) so a 504-then-retry of the same note is deduped server-side
+  // (PP-e5th), and replaced only when a post succeeds or the note changes.
+  const { idempotencyKey } = draft.snapshot.draft;
+  const doc = draft.snapshot.draft.doc ?? EMPTY_DOC;
+  // Notes default to `note`; a stored tag that is no longer valid falls back.
+  const storedTag = tagSchema.safeParse(draft.snapshot.draft.tag);
+  const tag: TimelineTag = storedTag.success ? storedTag.data : "note";
 
   const hasBody = docHasText(doc);
-  const isDirty = hasBody;
   const canPost = hasBody && !pending;
 
   const handlePost = (): void => {
@@ -72,11 +96,8 @@ export function MachineTimelineComposer({
           idempotencyKey,
         });
         if (result.success) {
-          setDoc({ type: "doc", content: [] });
-          setTag("note");
+          clear();
           setFullMode(false);
-          // Fresh key — the next note is a new logical submission.
-          setIdempotencyKey(crypto.randomUUID());
           onPosted();
         } else {
           setError(result.error);
@@ -98,60 +119,59 @@ export function MachineTimelineComposer({
   };
 
   return (
-    <>
-      <UnsavedChangesGuard isDirty={isDirty} />
-      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- keyboard shortcut on composer wrapper div, PP-u4cp */}
-      <div
-        className="@container rounded-md border bg-card p-3"
-        onKeyDown={handleKeyDown}
-      >
-        <RichTextEditor
-          content={doc}
-          onChange={setDoc}
-          placeholder="Add a quick note… (⌘/Ctrl + Enter to post)"
-          showToolbar={fullMode}
-          compact={!fullMode}
-          // eslint-disable-next-line jsx-a11y/no-autofocus -- deliberate focus-on-open in sheet, PP-u4cp
-          autoFocus={autoFocus}
-        />
-        <div className="mt-3 flex items-center gap-2">
-          <Toggle
-            size="sm"
-            pressed={fullMode}
-            onPressedChange={setFullMode}
-            disabled={pending}
-            aria-label={fullMode ? "Hide formatting" : "Show formatting"}
-            title={fullMode ? "Hide formatting" : "Show formatting"}
-            className="gap-1.5 text-muted-foreground data-[state=on]:text-foreground"
-          >
-            <span className="text-base font-semibold leading-none tracking-tight">
-              Aa
-            </span>
-            {/* Bare "Aa" in a narrow composer (iOS-style); the word appears
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions -- keyboard shortcut on composer wrapper div, PP-u4cp
+    <div
+      ref={containerRef}
+      className="@container rounded-md border bg-card p-3"
+      onKeyDown={handleKeyDown}
+    >
+      <RichTextEditor
+        ref={editorRef}
+        content={doc}
+        onChange={onDocChange}
+        placeholder="Add a quick note… (⌘/Ctrl + Enter to post)"
+        showToolbar={fullMode}
+        compact={!fullMode}
+        // eslint-disable-next-line jsx-a11y/no-autofocus -- deliberate focus-on-open in sheet, PP-u4cp
+        autoFocus={autoFocus}
+      />
+      <div className="mt-3 flex items-center gap-2">
+        <Toggle
+          size="sm"
+          pressed={fullMode}
+          onPressedChange={setFullMode}
+          disabled={pending}
+          aria-label={fullMode ? "Hide formatting" : "Show formatting"}
+          title={fullMode ? "Hide formatting" : "Show formatting"}
+          className="gap-1.5 text-muted-foreground data-[state=on]:text-foreground"
+        >
+          <span className="text-base font-semibold leading-none tracking-tight">
+            Aa
+          </span>
+          {/* Bare "Aa" in a narrow composer (iOS-style); the word appears
               once the composer card is wide enough (e.g. the centered desktop
               sheet) so it reads more explicitly. Container query, not viewport
               — the label tracks the composer's own width (CORE-RESP-003). */}
-            <span className="hidden text-xs font-medium @lg:inline">
-              Formatting
-            </span>
-          </Toggle>
-          <div className="ml-auto flex items-center gap-2">
-            <TagSelect value={tag} onChange={setTag} disabled={pending} />
-            {onCancel ? (
-              <Button variant="ghost" onClick={onCancel} disabled={pending}>
-                Cancel
-              </Button>
-            ) : null}
-            <Button disabled={!canPost} onClick={handlePost}>
-              {pending ? "Posting…" : "Post"}
+          <span className="hidden text-xs font-medium @lg:inline">
+            Formatting
+          </span>
+        </Toggle>
+        <div className="ml-auto flex items-center gap-2">
+          <TagSelect value={tag} onChange={draft.setTag} disabled={pending} />
+          {onCancel ? (
+            <Button variant="ghost" onClick={onCancel} disabled={pending}>
+              Cancel
             </Button>
-          </div>
+          ) : null}
+          <Button disabled={!canPost} onClick={handlePost}>
+            {pending ? "Posting…" : "Post"}
+          </Button>
         </div>
-        {error ? (
-          <p className="mt-2 text-sm text-destructive-text">{error}</p>
-        ) : null}
       </div>
-    </>
+      {error ? (
+        <p className="mt-2 text-sm text-destructive-text">{error}</p>
+      ) : null}
+    </div>
   );
 }
 

@@ -1,16 +1,8 @@
 "use client";
 
 import type React from "react";
-import {
-  useActionState,
-  useCallback,
-  useEffect,
-  useId,
-  useRef,
-  useState,
-} from "react";
+import { useActionState, useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
-import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 import { Button } from "~/components/ui/button";
 import { Toggle } from "~/components/ui/toggle";
 import {
@@ -27,7 +19,7 @@ import {
 import {
   commentDraftKey,
   useCommentDraft,
-  type CommentDraftSnapshot,
+  useDraftEditorSync,
 } from "~/components/issues/comment-draft";
 
 interface AddCommentFormProps {
@@ -72,12 +64,8 @@ export function AddCommentForm({
     FormData
   >(addCommentAction, undefined);
   const composerId = useId();
-  const {
-    snapshot,
-    setDoc,
-    addImage,
-    clear: clearDraft,
-  } = useCommentDraft(commentDraftKey(userId, issueId), composerId);
+  const draft = useCommentDraft(commentDraftKey(userId, issueId), composerId);
+  const { snapshot, addImage } = draft;
   // The idempotency key lives in the draft: stable across retries (and
   // reloads) so a 504-then-retry of the same comment is deduped server-side
   // (PP-e5th), and replaced only when a post succeeds.
@@ -89,31 +77,12 @@ export function AddCommentForm({
 
   // Mirror changes another composer made to the shared draft (the hidden
   // inline box while the mobile sheet is in use, or another browser tab).
-  const seenSnapshotRef = useRef<CommentDraftSnapshot>(snapshot);
-  // The last document typed in this composer.
-  const localDocRef = useRef<ProseMirrorDoc | null>(null);
-  const handleDocChange = useCallback(
-    (doc: ProseMirrorDoc) => {
-      localDocRef.current = doc;
-      setDoc(doc);
-    },
-    [setDoc]
-  );
-  useEffect(() => {
-    if (seenSnapshotRef.current === snapshot) return;
-    seenSnapshotRef.current = snapshot;
-    if (snapshot.origin === composerId) return;
-    // Never replace a document the person is typing in (another tab's save
-    // landing mid-typing): their version wins, so what they see is what
-    // posts.
-    const typingHere =
-      formRef.current?.contains(document.activeElement) ?? false;
-    if (typingHere && localDocRef.current !== null) {
-      setDoc(localDocRef.current);
-      return;
-    }
-    editorRef.current?.setContent(snapshot.draft.doc);
-  }, [snapshot, composerId, setDoc]);
+  const { onDocChange, clear: clearComposer } = useDraftEditorSync({
+    draft,
+    composerId,
+    editorRef,
+    containerRef: formRef,
+  });
 
   // The result this form has already acted on. The effect below also re-runs
   // when `onSubmitSuccess` or `quick` change identity, and must not toast,
@@ -125,17 +94,13 @@ export function AddCommentForm({
       handledStateRef.current = state;
       toast.success("Comment added");
       formRef.current?.reset();
-      // Empties the draft and mints a fresh key — the next comment is a new
-      // logical submission.
-      localDocRef.current = null;
-      clearDraft();
-      editorRef.current?.clear();
+      clearComposer();
       if (quick) setShowFormatting(false);
       if (refocusOnSuccess) editorRef.current?.focus();
       // Container handles focus / sheet-close / next-action.
       onSubmitSuccess?.(state.value.commentId);
     }
-  }, [state, onSubmitSuccess, quick, refocusOnSuccess, clearDraft]);
+  }, [state, onSubmitSuccess, quick, refocusOnSuccess, clearComposer]);
 
   // Cmd/Ctrl+Enter posts — expected by anyone who has used a chat composer.
   const handleKeyDown = (event: React.KeyboardEvent<HTMLFormElement>): void => {
@@ -174,7 +139,7 @@ export function AddCommentForm({
       <RichTextEditor
         ref={editorRef}
         content={comment}
-        onChange={handleDocChange}
+        onChange={onDocChange}
         mentionsEnabled={true}
         placeholder="Leave a comment..."
         ariaLabel="Comment"

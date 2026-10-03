@@ -1,12 +1,9 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { clearStoredCommentDrafts } from "~/components/issues/comment-draft";
 import { MachineNoteComposerSheet } from "./MachineNoteComposerSheet";
-
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn() }),
-}));
 
 const addMachineCommentAction = vi.fn(() =>
   Promise.resolve({ success: true as const })
@@ -38,8 +35,18 @@ vi.mock("~/components/editor/RichTextEditor", () => ({
 }));
 
 describe("MachineNoteComposerSheet", () => {
+  afterEach(() => {
+    clearStoredCommentDrafts();
+  });
+
   it("renders the New Note trigger, sheet closed initially", () => {
-    render(<MachineNoteComposerSheet machineId="m1" machineName="AFM" />);
+    render(
+      <MachineNoteComposerSheet
+        machineId="m1"
+        machineName="AFM"
+        userId="user-1"
+      />
+    );
     expect(
       screen.getByRole("button", { name: /new note/i })
     ).toBeInTheDocument();
@@ -51,7 +58,13 @@ describe("MachineNoteComposerSheet", () => {
 
   it("opens the composer in the sheet when the trigger is clicked", async () => {
     const user = userEvent.setup();
-    render(<MachineNoteComposerSheet machineId="m1" machineName="AFM" />);
+    render(
+      <MachineNoteComposerSheet
+        machineId="m1"
+        machineName="AFM"
+        userId="user-1"
+      />
+    );
     await user.click(screen.getByRole("button", { name: /new note/i }));
     expect(
       await screen.findByRole("button", { name: /^post$/i })
@@ -62,7 +75,13 @@ describe("MachineNoteComposerSheet", () => {
 
   it("closes the sheet when Cancel is clicked", async () => {
     const user = userEvent.setup();
-    render(<MachineNoteComposerSheet machineId="m1" machineName="AFM" />);
+    render(
+      <MachineNoteComposerSheet
+        machineId="m1"
+        machineName="AFM"
+        userId="user-1"
+      />
+    );
     await user.click(screen.getByRole("button", { name: /new note/i }));
     await screen.findByRole("button", { name: /^post$/i });
 
@@ -78,7 +97,13 @@ describe("MachineNoteComposerSheet", () => {
   it("closes the sheet after a successful post", async () => {
     const user = userEvent.setup();
     addMachineCommentAction.mockClear();
-    render(<MachineNoteComposerSheet machineId="m1" machineName="AFM" />);
+    render(
+      <MachineNoteComposerSheet
+        machineId="m1"
+        machineName="AFM"
+        userId="user-1"
+      />
+    );
     await user.click(screen.getByRole("button", { name: /new note/i }));
     await screen.findByRole("button", { name: /^post$/i });
 
@@ -93,5 +118,30 @@ describe("MachineNoteComposerSheet", () => {
         screen.queryByRole("button", { name: /^post$/i })
       ).not.toBeInTheDocument();
     });
+  });
+
+  it("restores the unposted note when the sheet reopens", async () => {
+    const user = userEvent.setup();
+    render(
+      <MachineNoteComposerSheet
+        machineId="m1"
+        machineName="AFM"
+        userId="user-1"
+      />
+    );
+    await user.click(screen.getByRole("button", { name: /new note/i }));
+    await user.click(await screen.findByRole("button", { name: /sim-type/i }));
+    await user.keyboard("{Escape}");
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("button", { name: /^post$/i })
+      ).not.toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: /new note/i }));
+
+    expect(
+      await screen.findByRole("button", { name: /^post$/i })
+    ).toBeEnabled();
   });
 });
