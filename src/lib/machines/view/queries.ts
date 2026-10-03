@@ -342,7 +342,7 @@ export async function loadMachineViewFromDatabase(
     rows: applied.rows.map((row) => publicRow(row, dependencyPlan.health)),
     scopeCount: baseRows.length,
     totalCount: applied.totalCount,
-    summary: summarizeMachineView(candidates, applied.filteredRows, state),
+    summary: summarizeMachineView(candidates),
     state,
     ownerOptions: [...ownerOptionsById]
       .map(([id, name]) => ({ id, name }))

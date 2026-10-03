@@ -62,79 +62,106 @@ test.describe("Machines Public Access", () => {
   }, testInfo) => {
     test.skip(
       testInfo.project.name.includes("Mobile"),
-      "Phones collapse the widgets; the phone test below covers that layout"
+      "Phones show the compact list, not the table this test counts; the Issues Severity test covers Segment selection on phones"
     );
     await page.goto("/m?presence=all");
     const playability = page.getByRole("region", { name: "Playability" });
     await expect(playability).toBeVisible();
 
-    const segments = [
-      { label: "Operational", value: "operational" },
-      { label: "Needs Service", value: "needs_service" },
-      { label: "Unplayable", value: "unplayable" },
-    ];
-    let chosen: { label: string; value: string; count: number } | null = null;
-    for (const segment of segments) {
-      const button = playability.getByRole("button", {
-        name: new RegExp(`^\\d+ ${segment.label}$`),
-      });
-      if (await button.isEnabled()) {
-        const name = (await button.getAttribute("aria-label")) ?? "";
-        chosen = { ...segment, count: Number.parseInt(name, 10) };
-        await button.click();
-        break;
-      }
-    }
-    if (chosen === null) throw new Error("No selectable Playability Segment");
-
-    await expect(page).toHaveURL(
-      new RegExp(`[?&]status=${chosen.value}(?:&|$)`)
+    // Zero-count Segments are left out of the breakdown (widgets §5.5) and
+    // pairs that do not fit roll into "N other" from the end (§5.6), so the
+    // first pair on the line is a selectable Segment.
+    const first = playability
+      .getByRole("button", {
+        name: /^\d+ (Unplayable|Needs Service|Operational)$/,
+      })
+      .first();
+    await expect(first).toBeVisible();
+    const label = ((await first.getAttribute("aria-label")) ?? "").replace(
+      /^\d+ /,
+      ""
     );
+    const segment = playability.getByRole("button", {
+      name: new RegExp(`^\\d+ ${label}$`),
+    });
+    await segment.click();
+
+    const value = label.toLowerCase().replace(" ", "_");
+    await expect(page).toHaveURL(new RegExp(`[?&]status=${value}(?:&|$)`));
     // On the Floor is the /m default, so the canonical URL drops `presence`
     // once the Segment replaces the starting `presence=all`.
     expect(new URL(page.url()).searchParams.has("presence")).toBe(false);
     await expect(
-      page.getByRole("button", { name: `Remove ${chosen.label} filter` })
+      page.getByRole("button", { name: `Remove ${label} filter` })
     ).toBeVisible();
+    await expect(segment).toHaveAttribute("aria-pressed", "true");
     // Widget counts use the same derivation as the rows (widgets §4.3). The
     // seed has far fewer machines than one 25-row page, so every match shows.
-    await expect(
-      page
-        .getByRole("table")
-        .getByRole("row")
-        .filter({ has: page.getByRole("cell") })
-    ).toHaveCount(chosen.count);
+    // Poll the count and the rows together after the filter applies: a count
+    // read before the click goes stale when another worker adds a machine.
+    const rows = page
+      .getByRole("table")
+      .getByRole("row")
+      .filter({ has: page.getByRole("cell") });
+    await expect
+      .poll(
+        async () => {
+          const count = Number.parseInt(
+            (await segment.getAttribute("aria-label")) ?? "",
+            10
+          );
+          return (await rows.count()) === count;
+        },
+        { message: "the selected Segment's count equals the row count" }
+      )
+      .toBe(true);
   });
 
-  test.describe("on a phone", () => {
-    test.use({ viewport: { width: 390, height: 844 } });
+  test.describe("on a phone narrower than 390px", () => {
+    test.use({ viewport: { width: 375, height: 812 } });
 
-    test("the Summary Row expands and the choice survives a reload", async ({
+    test("the Summary Row starts collapsed and an expanded choice survives a reload", async ({
       page,
     }) => {
       await page.goto("/m");
       const summaryRow = page.getByRole("button", {
-        name: /\d+ machines? · \d+ of \d+ playable$/,
+        name: /^Summary: \d+ of \d+ playable$/,
       });
+      const presence = page.getByRole("region", { name: "Presence" });
       await expect(summaryRow).toHaveAttribute("aria-expanded", "false");
-      await expect(
-        page.getByRole("region", { name: "Presence" })
-      ).not.toBeVisible();
+      await expect(presence).not.toBeVisible();
 
       await summaryRow.click();
-      const expanded = page.getByRole("button", { name: "Summary" });
-      await expect(expanded).toHaveAttribute("aria-expanded", "true");
-      await expect(
-        page.getByRole("region", { name: "Presence" })
-      ).toBeVisible();
+      await expect(summaryRow).toHaveAttribute("aria-expanded", "true");
+      await expect(presence).toBeVisible();
 
       await page.reload();
-      await expect(
-        page.getByRole("button", { name: "Summary" })
-      ).toHaveAttribute("aria-expanded", "true");
-      await expect(
-        page.getByRole("region", { name: "Presence" })
-      ).toBeVisible();
+      await expect(summaryRow).toHaveAttribute("aria-expanded", "true");
+      await expect(presence).toBeVisible();
+    });
+  });
+
+  test.describe("on a phone at least 390px wide", () => {
+    test.use({ viewport: { width: 390, height: 844 } });
+
+    test("the Summary Row starts open and a collapsed choice survives a reload", async ({
+      page,
+    }) => {
+      await page.goto("/m");
+      const summaryRow = page.getByRole("button", {
+        name: /^Summary: \d+ of \d+ playable$/,
+      });
+      const presence = page.getByRole("region", { name: "Presence" });
+      await expect(summaryRow).toHaveAttribute("aria-expanded", "true");
+      await expect(presence).toBeVisible();
+
+      await summaryRow.click();
+      await expect(summaryRow).toHaveAttribute("aria-expanded", "false");
+      await expect(presence).not.toBeVisible();
+
+      await page.reload();
+      await expect(summaryRow).toHaveAttribute("aria-expanded", "false");
+      await expect(presence).not.toBeVisible();
     });
   });
 });

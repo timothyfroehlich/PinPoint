@@ -1,15 +1,11 @@
 import type { IssuePriority, IssueSeverity, IssueStatus } from "./database";
 
 /**
- * Which records a Summary Widget summarizes (widgets spec §1, §3): the host's
- * whole scope, or every record matching its current search and filters.
+ * Counts for the issue-list Summary Widgets (issue-widgets §2–§5). Every widget
+ * summarizes the same population: every issue, open or closed, on the host's
+ * On the Floor machines (§2.2).
  */
-export const WIDGET_POPULATIONS = ["all", "filtered"] as const;
-
-export type WidgetPopulation = (typeof WIDGET_POPULATIONS)[number];
-
-/** Counts for one issue Summary Widget population (issue-widgets §3–§5). */
-export interface IssueWidgetCounts {
+export interface IssueListSummary {
   /** Every issue in the population, open or closed. */
   total: number;
   /** Open issues in the population. */
@@ -22,11 +18,4 @@ export interface IssueWidgetCounts {
   bySeverity: Record<IssueSeverity, number>;
   /** Open issues of each priority. */
   byPriority: Record<IssuePriority, number>;
-}
-
-/** Counts for the issue-list Summary Widgets, each in its own population. */
-export interface IssueListSummary {
-  status: IssueWidgetCounts;
-  severity: IssueWidgetCounts;
-  priority: IssueWidgetCounts;
 }

@@ -232,70 +232,22 @@ describe("summarizeMachineView", () => {
     }),
   ];
 
-  it("counts the Filtered population across every page, not the current page", () => {
-    const many = Array.from({ length: 30 }, (_, index) =>
-      candidate({
-        id: `m-${index}`,
-        initials: `M${index}`,
-        health: health({ cosmetic: 1 }),
-      })
-    );
-    const state = {
-      ...getMachineViewPreset("collection").defaultState,
-      presenceWidget: "filtered" as const,
-    };
-    const applied = applyMachineViewState(many, state);
-
-    const summary = summarizeMachineView(many, applied.filteredRows, state);
-
-    expect(applied.rows).toHaveLength(25);
-    expect(summary.presence.total).toBe(30);
-  });
-
-  it("divides the All population by presence and open issue severity", () => {
-    const summary = summarizeMachineView(
-      rows,
-      [],
-      getMachineViewPreset("collection").defaultState
-    );
-
-    expect(summary.presence).toEqual({
-      total: 5,
+  it("divides presence without counting Removed machines (machine-widgets §3.1, §3.2)", () => {
+    expect(summarizeMachineView(rows).presence).toEqual({
+      total: 4,
       byPresence: {
         on_the_floor: 3,
         off_the_floor: 1,
         on_loan: 0,
         pending_arrival: 0,
-        removed: 1,
       },
     });
   });
 
-  it("counts playability over On the Floor machines only", () => {
-    const summary = summarizeMachineView(
-      rows,
-      rows,
-      getMachineViewPreset("collection").defaultState
-    );
-
-    expect(summary.playability).toEqual({
+  it("counts playability over On the Floor machines only (machine-widgets §4.2)", () => {
+    expect(summarizeMachineView(rows).playability).toEqual({
       onTheFloor: 3,
       byStatus: { operational: 1, needs_service: 1, unplayable: 1 },
     });
-  });
-
-  it("counts each widget over its own All or Filtered population", () => {
-    const state = {
-      ...getMachineViewPreset("collection").defaultState,
-      severity: ["unplayable" as const],
-      playabilityWidget: "filtered" as const,
-    };
-    const { filteredRows } = applyMachineViewState(rows, state);
-
-    const summary = summarizeMachineView(rows, filteredRows, state);
-
-    expect(summary.presence.total).toBe(5);
-    expect(filteredRows.map((row) => row.id)).toEqual(["b", "d"]);
-    expect(summary.playability.onTheFloor).toBe(1);
   });
 });
