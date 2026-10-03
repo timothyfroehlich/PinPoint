@@ -157,20 +157,6 @@ export function QuickReportGrid(): React.JSX.Element {
       ?.focus();
   }, [focusPending, entries]);
 
-  // Warn before leaving with unsubmitted work. (The draft also persists to
-  // localStorage now, so this is belt-and-suspenders against an accidental
-  // back/close.)
-  const hasUnsaved = entries.some(entryHasContent);
-  React.useEffect(() => {
-    if (!hasUnsaved) return;
-    const handler = (e: BeforeUnloadEvent): void => {
-      e.preventDefault();
-      e.returnValue = "";
-    };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [hasUnsaved]);
-
   async function submitOne(entry: SharedEntry): Promise<void> {
     const key = entry.idempotencyKey;
     setUiFor(key, { submitting: true, error: null });
