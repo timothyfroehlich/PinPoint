@@ -9,21 +9,35 @@ import {
 import {
   getMachinePresenceLabel,
   MACHINE_PRESENCE_WIDGET_COLORS,
-  type MachinePresenceStatus,
-  VALID_MACHINE_PRESENCE_STATUSES,
 } from "~/lib/machines/presence";
 import {
   getMachineStatusLabel,
   MACHINE_STATUS_COLORS,
   type MachineStatus,
 } from "~/lib/machines/status";
-import type { MachineViewState, MachineViewSummary } from "~/lib/types";
+import type {
+  MachinePresenceWidgetStatus,
+  MachineViewState,
+  MachineViewSummary,
+} from "~/lib/types";
+import { cn } from "~/lib/utils";
 
 const STORAGE_KEY = "pinpoint:summary-widgets:machines";
-const PLAYABILITY_VALUES: MachineStatus[] = [
-  "operational",
-  "needs_service",
+
+/**
+ * Segment order: Presence leads with On the Floor and leaves out Removed
+ * (machine-widgets §3.2); Playability runs worst first (§4.2).
+ */
+const PRESENCE_SEGMENTS: readonly MachinePresenceWidgetStatus[] = [
+  "on_the_floor",
+  "off_the_floor",
+  "on_loan",
+  "pending_arrival",
+];
+const PLAYABILITY_SEGMENTS: readonly MachineStatus[] = [
   "unplayable",
+  "needs_service",
+  "operational",
 ];
 
 interface MachineSummaryWidgetsProps {
@@ -43,7 +57,8 @@ function soleValue<T>(values: "all" | T[]): T | null {
 
 /**
  * The Presence and Playability widgets on Machine View (machine-widgets
- * spec). Segment selection sets Machine View filters.
+ * spec), always counting the route's whole scope. Segment selection sets
+ * Machine View filters, keeping search and the other filters (widgets §6.2).
  */
 export function MachineSummaryWidgets({
   summary,
@@ -54,8 +69,8 @@ export function MachineSummaryWidgets({
   const playable =
     playability.byStatus.operational + playability.byStatus.needs_service;
 
-  const presenceSegments: SummaryWidgetSegment<MachinePresenceStatus>[] =
-    VALID_MACHINE_PRESENCE_STATUSES.map((value) => ({
+  const presenceSegments: SummaryWidgetSegment<MachinePresenceWidgetStatus>[] =
+    PRESENCE_SEGMENTS.map((value) => ({
       value,
       label: getMachinePresenceLabel(value),
       count: presence.byPresence[value],
@@ -63,35 +78,39 @@ export function MachineSummaryWidgets({
       fillClassName: MACHINE_PRESENCE_WIDGET_COLORS[value].fill,
     }));
   const playabilitySegments: SummaryWidgetSegment<MachineStatus>[] =
-    PLAYABILITY_VALUES.map((value) => ({
+    PLAYABILITY_SEGMENTS.map((value) => ({
       value,
       label: getMachineStatusLabel(value),
       count: playability.byStatus[value],
       textClassName: MACHINE_STATUS_COLORS[value].text,
       fillClassName: MACHINE_STATUS_COLORS[value].fill,
     }));
-  const presenceText = plural(presence.total, "machine", "machines");
   const playabilityText = `of ${playability.onTheFloor} playable`;
-  const summaryRow = [
-    `${presence.total} ${presenceText}`,
-    `${playable} ${playabilityText}`,
-  ].join(" · ");
+  const playableAccent = MACHINE_STATUS_COLORS.operational.text;
 
-  const selectedStatus = soleValue(state.status);
+  // The Playability headline (machine-widgets §2.4).
+  const summaryRow = (
+    <>
+      <span className={cn("font-semibold tabular-nums", playableAccent)}>
+        {playable}
+      </span>{" "}
+      {playabilityText}
+    </>
+  );
 
   return (
-    <SummaryWidgetGroup storageKey={STORAGE_KEY} summaryRow={summaryRow}>
+    <SummaryWidgetGroup
+      storageKey={STORAGE_KEY}
+      summaryRow={summaryRow}
+      widgetCount={2}
+    >
       <SummaryWidget
         id="machine-widget-presence"
         label="Presence"
-        population={state.presenceWidget}
-        onPopulationChange={(presenceWidget) =>
-          onStateChange({ ...state, presenceWidget })
-        }
         headline={{
-          figure: presence.total,
-          text: presenceText,
-          accentClassName: "text-primary",
+          figure: presence.byPresence.on_the_floor,
+          text: `on the floor of ${presence.total} ${plural(presence.total, "machine", "machines")}`,
+          accentClassName: MACHINE_PRESENCE_WIDGET_COLORS.on_the_floor.text,
         }}
         segments={presenceSegments}
         selectedValue={soleValue(state.presence)}
@@ -102,18 +121,16 @@ export function MachineSummaryWidgets({
       <SummaryWidget
         id="machine-widget-playability"
         label="Playability"
-        population={state.playabilityWidget}
-        onPopulationChange={(playabilityWidget) =>
-          onStateChange({ ...state, playabilityWidget })
-        }
         headline={{
           figure: playable,
           text: playabilityText,
-          accentClassName: MACHINE_STATUS_COLORS.operational.text,
+          accentClassName: playableAccent,
         }}
         segments={playabilitySegments}
         selectedValue={
-          soleValue(state.presence) === "on_the_floor" ? selectedStatus : null
+          soleValue(state.presence) === "on_the_floor"
+            ? soleValue(state.status)
+            : null
         }
         onSegmentSelect={(value) =>
           onStateChange({

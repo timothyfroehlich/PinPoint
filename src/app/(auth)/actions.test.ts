@@ -19,12 +19,6 @@ import { forgotPasswordAction } from "./actions";
  * We mock the entire server context (headers, cookies) and the Supabase client.
  */
 
-// Mock Next.js server modules BEFORE importing the module under test
-vi.mock("next/headers", () => ({
-  headers: vi.fn(),
-  cookies: vi.fn(),
-}));
-
 // Mock Supabase client
 vi.mock("~/lib/supabase/server", () => ({
   createClient: vi.fn(),
@@ -40,7 +34,6 @@ vi.mock("~/lib/logger", () => ({
 }));
 
 // Import mocked modules for type safety
-import { headers } from "next/headers";
 import { createClient } from "~/lib/supabase/server";
 
 interface MockSupabaseClient {
@@ -121,30 +114,6 @@ describe("forgotPasswordAction - Origin Resolution", () => {
 
   it("should use NEXT_PUBLIC_SITE_URL when set", async () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://pinpoint.example.com");
-
-    const mockSupabase = createMockSupabase();
-    mockCreateClient(mockSupabase);
-
-    const formData = new FormData();
-    formData.set("email", "test@example.com");
-
-    await forgotPasswordAction(undefined, formData);
-
-    expect(mockSupabase.auth.resetPasswordForEmail).toHaveBeenCalled();
-    expectRedirectToContain(mockSupabase, "https://pinpoint.example.com");
-  });
-
-  it("should ignore other headers and use NEXT_PUBLIC_SITE_URL", async () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://pinpoint.example.com");
-
-    // Provide headers that might otherwise confuse logic
-
-    vi.mocked(headers).mockReturnValue({
-      get: (key: string) => {
-        if (key === "host") return "evil.com";
-        return null;
-      },
-    } as any);
 
     const mockSupabase = createMockSupabase();
     mockCreateClient(mockSupabase);

@@ -92,7 +92,6 @@
 | §2.3 | The page title is "All Issues". | PP-jb9v |
 | §4.2, §4.7 | Machine presence has no filter control; a hidden parameter includes other presence states. | PP-jb9v |
 | §6 | No Built-in Views. | PP-jb9v |
-| §7.4 | Machine pages and Open Issues cells link to `/issues?machine=` without a presence value, so an off-floor machine's issues are hidden. | PP-jb9v |
 | §7 | Snake_case parameters, composite sort, and unvalidated page size and ID values. | PP-jb9v |
 
 ---

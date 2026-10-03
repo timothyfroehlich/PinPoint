@@ -63,10 +63,11 @@ export function isOnTheFloor(status: MachinePresenceStatus): boolean {
 
 /**
  * Summary Widget colors per presence: `text` for the count, `fill` for the bar
- * segment. Same tokens as {@link getMachinePresenceStyles}.
+ * segment. Same tokens as {@link getMachinePresenceStyles}. The Presence
+ * Widget does not count Removed machines (machine-widgets §3.2).
  */
 export const MACHINE_PRESENCE_WIDGET_COLORS: Record<
-  MachinePresenceStatus,
+  Exclude<MachinePresenceStatus, "removed">,
   { text: string; fill: string }
 > = {
   on_the_floor: {
@@ -82,5 +83,4 @@ export const MACHINE_PRESENCE_WIDGET_COLORS: Record<
     text: "text-presence-pending-arrival",
     fill: "bg-presence-pending-arrival",
   },
-  removed: { text: "text-presence-removed", fill: "bg-presence-removed-bar" },
 };

@@ -35,12 +35,13 @@ export async function MachineRecentActivity({
   machineId,
   machineInitials,
   machineName,
-  canCompose,
+  composerUserId,
 }: {
   machineId: string;
   machineInitials: string;
   machineName: string;
-  canCompose: boolean;
+  /** The signed-in person, when they may post notes; `null` hides New Note. */
+  composerUserId: string | null;
 }): Promise<React.JSX.Element> {
   const rows = await getMachineTimeline(db, {
     machineId,
@@ -75,10 +76,11 @@ export async function MachineRecentActivity({
               New Issue
             </Link>
           </Button>
-          {canCompose ? (
+          {composerUserId !== null ? (
             <MachineNoteComposerSheet
               machineId={machineId}
               machineName={machineName}
+              userId={composerUserId}
             />
           ) : null}
         </div>

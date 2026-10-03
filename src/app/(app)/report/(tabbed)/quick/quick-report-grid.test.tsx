@@ -239,36 +239,17 @@ describe("QuickReportGrid", () => {
     );
   });
 
-  it("guards against navigating away only while a row has unsaved content", async () => {
-    submitRow.mockResolvedValue({
-      index: 0,
-      ok: true,
-      issueNumber: 42,
-      machineInitials: "GP",
-    });
+  it("lets the person leave without asking — unsubmitted rows are kept as a draft", async () => {
     const addSpy = vi.spyOn(window, "addEventListener");
-    const removeSpy = vi.spyOn(window, "removeEventListener");
     renderGrid();
-    const row = screen.getByTestId("quick-row");
-    // A pristine blank grid arms no guard.
+    await userEvent.type(
+      within(screen.getByTestId("quick-row")).getByLabelText(/problem/i),
+      "Spinner rejecting"
+    );
+
     expect(addSpy).not.toHaveBeenCalledWith(
       "beforeunload",
       expect.any(Function)
-    );
-    // Typing content arms the beforeunload guard.
-    await userEvent.type(
-      within(row).getByLabelText(/problem/i),
-      "Spinner rejecting"
-    );
-    expect(addSpy).toHaveBeenCalledWith("beforeunload", expect.any(Function));
-    // Submitting saves the work and leaves an empty trailing row — guard clears.
-    await userEvent.click(within(row).getByRole("button", { name: /submit/i }));
-    await screen.findByRole("link", { name: "GP-42" });
-    await waitFor(() =>
-      expect(removeSpy).toHaveBeenCalledWith(
-        "beforeunload",
-        expect.any(Function)
-      )
     );
   });
 

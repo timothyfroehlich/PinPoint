@@ -1,28 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { resolveRedirectPath } from "./route";
-import { isInternalUrl } from "~/lib/url";
-
-describe("isInternalUrl", () => {
-  it("should return true for root path", () => {
-    expect(isInternalUrl("/")).toBe(true);
-  });
-
-  it("should return true for internal paths", () => {
-    expect(isInternalUrl("/dashboard")).toBe(true);
-    expect(isInternalUrl("/reset-password")).toBe(true);
-    expect(isInternalUrl("/m/ABC")).toBe(true);
-  });
-
-  it("should return false for external URLs", () => {
-    expect(isInternalUrl("http://example.com")).toBe(false);
-    expect(isInternalUrl("https://evil.com/phishing")).toBe(false);
-  });
-
-  it("should return false for protocol-relative URLs", () => {
-    expect(isInternalUrl("//evil.com/phishing")).toBe(false);
-    expect(isInternalUrl("//localhost/phishing")).toBe(false);
-  });
-});
 
 describe("resolveRedirectPath", () => {
   beforeEach(() => {

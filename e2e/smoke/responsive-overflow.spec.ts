@@ -67,6 +67,7 @@ const authenticatedRoutes = [
   `/m/${seededMachines.medievalMadness.initials}`,
   `/m/${seededMachines.medievalMadness.initials}/settings`,
   `/m/${ownedMachineInitials}/edit`,
+  `/m/${ownedMachineInitials}/apron`,
   `/m/${machineInitials}/i/${issueNum}`,
   "/settings",
 ];
@@ -106,6 +107,7 @@ test.describe("Responsive: no horizontal overflow", () => {
         "info",
         "settings",
         "maintenance",
+        "apron",
         "timeline",
         "edit",
       ]) {

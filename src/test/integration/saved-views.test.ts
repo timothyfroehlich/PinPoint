@@ -48,8 +48,6 @@ const state: MachineViewSavedState = {
   dir: "asc",
   pageSize: 25,
   columns: ["machine", "playability"],
-  presenceWidget: "all",
-  playabilityWidget: "filtered",
 };
 
 const builtInViewIds = ["on-the-floor", "needs-attention"];
@@ -363,6 +361,9 @@ describe("machine Saved Views on each Surface (list-views §10.5, §10.10)", () 
         status: ["unplayable", "retired_status"],
         columns: ["machine", "retiredField", "owner"],
         issuesWidget: "filtered",
+        // Retired with the All/Filtered choice (machine-widgets §2.2).
+        presenceWidget: "filtered",
+        playabilityWidget: "filtered",
       },
     });
 

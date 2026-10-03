@@ -560,9 +560,15 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
       if (!result.ok) {
         expect(result.code).toBe("UNAUTHORIZED");
       }
+
+      const db = await getTestDb();
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.initials, uniqueInitials),
+      });
+      expect(machineAfter).toBeUndefined();
     });
 
-    it("should reject creation for guest users", async () => {
+    it("should reject creation for guest users and not write to DB", async () => {
       const { createClient } = await import("~/lib/supabase/server");
       const { createMachineAction } = await import("~/app/(app)/m/actions");
 
@@ -588,6 +594,42 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
       if (!result.ok) {
         expect(result.code).toBe("UNAUTHORIZED");
       }
+
+      const db = await getTestDb();
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.initials, uniqueInitials),
+      });
+      expect(machineAfter).toBeUndefined();
+    });
+
+    it("should reject creation for unauthenticated caller and not write to DB", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { createMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
+        },
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
+
+      machineCounter += 1;
+      const uniqueInitials = `UA${String(machineCounter).padStart(2, "0")}`;
+      const formData = new FormData();
+      formData.append("name", "Medieval Madness");
+      formData.append("initials", uniqueInitials);
+
+      const result = await createMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("UNAUTHORIZED");
+      }
+
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.initials, uniqueInitials),
+      });
+      expect(machineAfter).toBeUndefined();
     });
 
     it("should allow technician to create a machine", async () => {
@@ -950,6 +992,98 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
       if (!result.ok) {
         expect(result.code).toBe("NOT_FOUND");
       }
+    });
+
+    it("should require authentication (unauthenticated caller) and not write to DB", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const ownerUser = await createUser("member");
+      const machine = await createMachine(ownerUser.id);
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
+        },
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
+
+      const formData = new FormData();
+      formData.append("id", machine.id);
+      formData.append("name", "Unauthenticated Update");
+
+      const result = await updateMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("UNAUTHORIZED");
+      }
+
+      // Read-only invariant: machine must be unchanged
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(machineAfter?.name).toBe(machine.name);
+    });
+
+    it("should validate input (invalid UUID)", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineAction } = await import("~/app/(app)/m/actions");
+
+      const adminUser = await createUser("admin");
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
+        },
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
+
+      const formData = new FormData();
+      formData.append("id", "not-a-uuid");
+      formData.append("name", "Updated Name");
+
+      const result = await updateMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("VALIDATION");
+      }
+    });
+
+    it("should validate presenceStatus input and not modify machine", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const adminUser = await createUser("admin");
+      const machine = await createMachine(adminUser.id);
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
+        },
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
+
+      const formData = new FormData();
+      formData.append("id", machine.id);
+      formData.append("name", "Updated Name");
+      formData.append("presenceStatus", "invalid_presence");
+
+      const result = await updateMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("VALIDATION");
+      }
+
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(machineAfter?.presenceStatus).toBe(machine.presenceStatus);
+      expect(machineAfter?.name).toBe(machine.name);
     });
 
     it("should update machine presence status", async () => {
@@ -1688,6 +1822,80 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
       expect(machineAfter?.description).toBeNull();
     });
 
+    it("unauthenticated caller edits description → UNAUTHORIZED, field unchanged in DB", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineDescription } =
+        await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const ownerUser = await createUser("member");
+      const machine = await createMachine(ownerUser.id);
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
+        },
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
+
+      const result = await updateMachineDescription(machine.id, validDoc);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("UNAUTHORIZED");
+      }
+
+      // Read-only invariant: description must NOT have changed
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(machineAfter?.description).toBeNull();
+    });
+
+    it("machine not found for description → NOT_FOUND", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineDescription } =
+        await import("~/app/(app)/m/actions");
+
+      const adminUser = await createUser("admin");
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
+        },
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
+
+      const missingId = randomUUID();
+      const result = await updateMachineDescription(missingId, validDoc);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("NOT_FOUND");
+      }
+    });
+
+    it("invalid machineId (not a UUID) for description → VALIDATION", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineDescription } =
+        await import("~/app/(app)/m/actions");
+
+      const adminUser = await createUser("admin");
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
+        },
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
+
+      const result = await updateMachineDescription("not-a-uuid", validDoc);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("VALIDATION");
+      }
+    });
+
     it("member-owner edits description → ok, description persisted in DB", async () => {
       const { createClient } = await import("~/lib/supabase/server");
       const { updateMachineDescription } =
@@ -1825,6 +2033,35 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
           getUser: vi
             .fn()
             .mockResolvedValue({ data: { user: { id: nonOwnerMember.id } } }),
+        },
+      } as unknown as Awaited<ReturnType<typeof createClient>>);
+
+      const result = await updateMachineOwnerRequirements(machine.id, validDoc);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("UNAUTHORIZED");
+      }
+
+      // Read-only invariant: ownerRequirements must NOT have changed
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(machineAfter?.ownerRequirements).toBeNull();
+    });
+
+    it("unauthenticated caller → ownerRequirements UNAUTHORIZED, ownerRequirements unchanged", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineOwnerRequirements } =
+        await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const ownerUser = await createUser("member");
+      const machine = await createMachine(ownerUser.id);
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
         },
       } as unknown as Awaited<ReturnType<typeof createClient>>);
 

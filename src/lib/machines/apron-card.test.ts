@@ -5,7 +5,6 @@ import {
   type ApronMachineSource,
   apronCardPixelSize,
   apronCreditRows,
-  cardParagraphs,
   fitTitleSize,
   groupedEdition,
   shrinkUntilFits,
@@ -13,6 +12,7 @@ import {
 import { NO_CREDITS } from "~/lib/opdb/credits";
 import { qrSvgPath } from "~/lib/machines/apron-qr";
 import { plainTextToDoc } from "~/lib/tiptap/types";
+import { plainCardText } from "~/lib/machines/apron-card-text";
 
 describe("groupedEdition", () => {
   it("maps edition suffixes only within Pinball Map groups", () => {
@@ -89,8 +89,8 @@ describe("apronCardContent", () => {
   it("uses the main description while retaining disabled tip text", () => {
     expect(apronCardContent(machine, card, credits, false)).toMatchObject({
       edition: "Premium Edition",
-      description: "Main description",
-      tip: "Aim for the scoop",
+      description: plainCardText("Main description"),
+      tip: plainCardText("Aim for the scoop"),
       tipEnabled: false,
     });
   });
@@ -109,7 +109,7 @@ describe("apronCardContent", () => {
         credits,
         false
       ).description
-    ).toBe("Custom description");
+    ).toEqual(plainCardText("Custom description"));
   });
 
   it("prints the registered owner's name", () => {
@@ -283,10 +283,6 @@ describe("fitTitleSize", () => {
 });
 
 describe("card helpers", () => {
-  it("splits card text into trimmed paragraphs", () => {
-    expect(cardParagraphs("One.\n\n  Two.  \n")).toEqual(["One.", "Two."]);
-  });
-
   it("gives each size its physical dimensions at 96px per inch", () => {
     const wpc = apronCardPixelSize("wpc");
     expect(wpc.width).toBeCloseTo(576, 6);

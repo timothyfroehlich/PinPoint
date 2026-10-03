@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { asDbOrTx, getTestDb, setupTestDb } from "~/test/setup/pglite";
 import {
@@ -178,14 +179,48 @@ describe("machine view database pipeline", () => {
     expect(all.rows.map((row) => row.initials)).toEqual(["AAA", "BBB", "CCC"]);
     expect(collection.rows.map((row) => row.initials)).toEqual(["AAA", "CCC"]);
     expect(owner.rows.map((row) => row.initials)).toEqual(["AAA", "BBB"]);
-    expect(all.rows.every((row) => row.health === undefined)).toBe(true);
     expect(all.rows.every((row) => row.lastServicedAt === undefined)).toBe(
       true
     );
     expect(all.rows.every((row) => !Object.hasOwn(row, "ownerId"))).toBe(true);
   });
 
-  it("counts Summary Widget health without sending health on rows that do not need it", async () => {
+  it("sends the identity line's manufacturer, year, and owner name whatever fields are displayed (§3.2, §3.3)", async () => {
+    const db = await getTestDb();
+    await db.insert(machines).values(
+      createTestMachine({
+        initials: "DDD",
+        name: "Delta",
+        ownerId: null,
+        year: null,
+      })
+    );
+
+    const result = await loadMachineViewFromDatabase(asDbOrTx(db), {
+      scope: { kind: "all" },
+      preset: "machines",
+      searchParams: new URLSearchParams({
+        presence: "all",
+        columns: "machine",
+      }),
+    });
+
+    const byInitials = new Map(result.rows.map((row) => [row.initials, row]));
+    expect(byInitials.get("AAA")).toMatchObject({
+      ownerName: "Owner One",
+      hasOwner: true,
+    });
+    expect(byInitials.get("DDD")).toMatchObject({
+      manufacturer: "Unknown",
+      year: null,
+      ownerName: "Unassigned",
+      hasOwner: false,
+    });
+    // Names only; an owner's email never reaches the client (CORE-SEC-007).
+    expect(JSON.stringify(result.rows)).not.toContain("@");
+  });
+
+  it("sends health on every row for the phone Compact row, whatever fields are displayed (§5.3)", async () => {
     const db = await getTestDb();
     await db
       .insert(issues)
@@ -204,7 +239,74 @@ describe("machine view database pipeline", () => {
     });
 
     expect(result.summary.playability.byStatus.unplayable).toBe(1);
-    expect(result.rows.every((row) => row.health === undefined)).toBe(true);
+    expect(
+      result.rows.map((row) => [
+        row.initials,
+        row.health?.playability,
+        row.health?.openIssues,
+        row.health?.worstSeverity,
+      ])
+    ).toEqual([
+      ["AAA", "unplayable", 1, "unplayable"],
+      ["BBB", "operational", 0, null],
+      ["CCC", "operational", 1, "minor"],
+    ]);
+  });
+
+  it("counts Summary Widgets over the whole scope, whatever the filters, without Removed machines", async () => {
+    const db = await getTestDb();
+    await db
+      .update(machines)
+      .set({ presenceStatus: "removed" })
+      .where(eq(machines.id, gammaId));
+    await db
+      .update(machines)
+      .set({ presenceStatus: "on_loan" })
+      .where(eq(machines.id, betaId));
+    await db
+      .insert(issues)
+      .values([
+        createTestIssue("AAA", { issueNumber: 1, severity: "unplayable" }),
+      ]);
+    // Search and filters that match nothing never change the counts
+    // (widgets §3.1).
+    const searchParams = new URLSearchParams({
+      q: "no such machine",
+      presence: "off_the_floor",
+      status: "operational",
+    });
+
+    const tx = asDbOrTx(db);
+    const all = await loadMachineViewFromDatabase(tx, {
+      scope: { kind: "all" },
+      preset: "machines",
+      searchParams,
+    });
+    const collection = await loadMachineViewFromDatabase(tx, {
+      scope: { kind: "collection", collectionId },
+      preset: "collection",
+      searchParams,
+    });
+
+    expect(all.totalCount).toBe(0);
+    // Gamma is Removed: not counted, not in the headline total.
+    expect(all.summary.presence).toEqual({
+      total: 2,
+      byPresence: {
+        on_the_floor: 1,
+        off_the_floor: 0,
+        on_loan: 1,
+        pending_arrival: 0,
+      },
+    });
+    expect(all.summary.playability).toEqual({
+      onTheFloor: 1,
+      byStatus: { operational: 0, needs_service: 0, unplayable: 1 },
+    });
+    // The Collection tab holds Alpha and Gamma: only its own scope counts.
+    expect(collection.summary.presence.total).toBe(1);
+    expect(collection.summary.presence.byPresence.on_the_floor).toBe(1);
+    expect(collection.summary.playability.onTheFloor).toBe(1);
   });
 
   it("keeps an owner with no machines in the scope, matching nothing (list-views §10.18)", async () => {

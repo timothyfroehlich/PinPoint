@@ -1,7 +1,7 @@
 "use client";
 
-import type React from "react";
-import { useSearchParams } from "next/navigation";
+import * as React from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   SummaryWidget,
   SummaryWidgetGroup,
@@ -9,22 +9,43 @@ import {
 } from "~/components/summary-widgets";
 import { useSearchFilters } from "~/hooks/use-search-filters";
 import { parseIssueFilters } from "~/lib/issues/filters";
+import { cn } from "~/lib/utils";
 import {
-  OPEN_STATUSES,
   PRIORITY_CONFIG,
   SEVERITY_CONFIG,
   STATUS_CONFIG,
   type IssueStatus,
 } from "~/lib/issues/status";
-import {
-  ISSUE_PRIORITY_VALUES,
-  ISSUE_SEVERITY_VALUES,
-  type IssueListSummary,
-  type IssuePriority,
-  type IssueSeverity,
+import type {
+  IssueListSummary,
+  IssuePriority,
+  IssueSeverity,
 } from "~/lib/types";
 
 const STORAGE_KEY = "pinpoint:summary-widgets:issues";
+
+/** Segment order, worst first (issue-widgets §3.2, §4.2, §5.2). */
+const STATUS_SEGMENTS: readonly IssueStatus[] = [
+  "need_help",
+  "need_parts",
+  "wait_owner",
+  "new",
+  "confirmed",
+  "in_progress",
+];
+const SEVERITY_SEGMENTS: readonly IssueSeverity[] = [
+  "unplayable",
+  "major",
+  "minor",
+  "cosmetic",
+];
+const PRIORITY_SEGMENTS: readonly IssuePriority[] = ["high", "medium", "low"];
+
+/**
+ * The retired Widget Population parameters (issue-widgets §2.3). They are
+ * ignored, and dropped from the address bar when a URL still carries them.
+ */
+const RETIRED_PARAMS = ["status_widget", "severity_widget", "priority_widget"];
 
 interface IssueSummaryWidgetsProps {
   summary: IssueListSummary;
@@ -45,59 +66,85 @@ function machinesText(count: number): string {
 
 /**
  * The Status, Severity, and Priority widgets on issue lists (issue-widgets
- * spec). Reads the list's filters from the URL, as IssueList does, so a group
- * Issues tab's forced machine scope never leaks into the URL.
+ * spec). Every widget counts the host's whole scope (§2.2), whatever the
+ * list's filters. Reads the list's filters from the URL, as IssueList does,
+ * so a group Issues tab's forced machine scope never leaks into the URL.
  */
 export function IssueSummaryWidgets({
   summary,
 }: IssueSummaryWidgetsProps): React.JSX.Element {
+  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const filters = parseIssueFilters(searchParams);
   const { pushFilters } = useSearchFilters(filters);
-  const { status, severity, priority } = summary;
 
-  const statusSegments: SummaryWidgetSegment<IssueStatus>[] = OPEN_STATUSES.map(
-    (value) => ({
+  React.useEffect(() => {
+    if (!RETIRED_PARAMS.some((param) => searchParams.has(param))) return;
+    const canonical = new URLSearchParams(searchParams.toString());
+    for (const param of RETIRED_PARAMS) canonical.delete(param);
+    const query = canonical.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, {
+      scroll: false,
+    });
+  }, [pathname, router, searchParams]);
+
+  const statusSegments: SummaryWidgetSegment<IssueStatus>[] =
+    STATUS_SEGMENTS.map((value) => ({
       value,
       label: STATUS_CONFIG[value].label,
-      count: status.byStatus[value],
+      count: summary.byStatus[value],
       textClassName: STATUS_CONFIG[value].iconColor,
       fillClassName: STATUS_CONFIG[value].barColor,
-    })
-  );
+    }));
   const severitySegments: SummaryWidgetSegment<IssueSeverity>[] =
-    ISSUE_SEVERITY_VALUES.map((value) => ({
+    SEVERITY_SEGMENTS.map((value) => ({
       value,
       label: SEVERITY_CONFIG[value].label,
-      count: severity.bySeverity[value],
+      count: summary.bySeverity[value],
       textClassName: SEVERITY_CONFIG[value].iconColor,
       fillClassName: SEVERITY_CONFIG[value].barColor,
     }));
   const prioritySegments: SummaryWidgetSegment<IssuePriority>[] =
-    ISSUE_PRIORITY_VALUES.map((value) => ({
+    PRIORITY_SEGMENTS.map((value) => ({
       value,
       label: PRIORITY_CONFIG[value].label,
-      count: priority.byPriority[value],
+      count: summary.byPriority[value],
       textClassName: PRIORITY_CONFIG[value].iconColor,
       fillClassName: PRIORITY_CONFIG[value].barColor,
     }));
 
-  const summaryRow = [
-    `${status.open} open`,
-    `${severity.bySeverity.unplayable} unplayable`,
-    `${priority.byPriority.high} high priority`,
-  ].join(" · ");
+  // The open-issue total and the Unplayable open-issue count (§2.4).
+  const summaryRow = (
+    <>
+      <span className="font-semibold text-foreground tabular-nums">
+        {summary.open}
+      </span>{" "}
+      open ·{" "}
+      <span
+        className={cn(
+          "font-semibold tabular-nums",
+          SEVERITY_CONFIG.unplayable.iconColor
+        )}
+      >
+        {summary.bySeverity.unplayable}
+      </span>{" "}
+      unplayable
+    </>
+  );
 
   return (
-    <SummaryWidgetGroup storageKey={STORAGE_KEY} summaryRow={summaryRow}>
+    <SummaryWidgetGroup
+      storageKey={STORAGE_KEY}
+      summaryRow={summaryRow}
+      widgetCount={3}
+    >
       <SummaryWidget
         id="issue-widget-status"
         label="Status"
-        population={filters.statusWidget ?? "all"}
-        onPopulationChange={(statusWidget) => pushFilters({ statusWidget })}
         headline={{
-          figure: status.open,
-          text: `open of ${status.total} ${plural(status.total, "issue", "issues")}`,
+          figure: summary.open,
+          text: `open of ${summary.total} ${plural(summary.total, "issue", "issues")}`,
           accentClassName: STATUS_CONFIG.new.iconColor,
         }}
         segments={statusSegments}
@@ -107,11 +154,9 @@ export function IssueSummaryWidgets({
       <SummaryWidget
         id="issue-widget-severity"
         label="Severity"
-        population={filters.severityWidget ?? "all"}
-        onPopulationChange={(severityWidget) => pushFilters({ severityWidget })}
         headline={{
-          figure: severity.open,
-          text: machinesText(severity.machinesWithOpenIssues),
+          figure: summary.open,
+          text: machinesText(summary.machinesWithOpenIssues),
           accentClassName: "text-warning",
         }}
         segments={severitySegments}
@@ -121,11 +166,9 @@ export function IssueSummaryWidgets({
       <SummaryWidget
         id="issue-widget-priority"
         label="Priority"
-        population={filters.priorityWidget ?? "all"}
-        onPopulationChange={(priorityWidget) => pushFilters({ priorityWidget })}
         headline={{
-          figure: priority.open,
-          text: machinesText(priority.machinesWithOpenIssues),
+          figure: summary.open,
+          text: machinesText(summary.machinesWithOpenIssues),
           accentClassName: PRIORITY_CONFIG.high.iconColor,
         }}
         segments={prioritySegments}

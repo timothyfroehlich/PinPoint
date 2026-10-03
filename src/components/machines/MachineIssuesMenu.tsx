@@ -14,6 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
+import { machineIssuesHref } from "~/lib/issues/links";
 import { cn } from "~/lib/utils";
 import { exportIssuesAction } from "~/app/(app)/issues/export-action";
 
@@ -90,7 +91,7 @@ export function MachineIssuesMenu({
         />
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link href={`/issues?machine=${machineInitials}`}>
+          <Link href={machineIssuesHref(machineInitials)}>
             <ListFilter className="size-4" aria-hidden="true" />
             View all in Issues list
           </Link>
