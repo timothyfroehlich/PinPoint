@@ -10,7 +10,7 @@ vi.mock("react", async (importOriginal) => {
   const actual = await importOriginal<typeof React>();
   return {
     ...actual,
-    useActionState: (...args: any[]) => mockUseActionState(...args),
+    useActionState: (...args: unknown[]) => mockUseActionState(...args),
   };
 });
 

@@ -31,7 +31,6 @@ import {
 import { PinballmapAbandonedEntries } from "~/components/machines/PinballmapAbandonedEntries";
 import { getUnifiedUsers } from "~/lib/users/queries";
 import { getMachineForLayout } from "~/app/(app)/m/[initials]/_data";
-import { ApronCardPanel } from "~/app/(app)/m/[initials]/apron/ApronCardPanel";
 import { MachineDetailsForm } from "./machine-details-form";
 import { DetailsDirtyProvider } from "./details-dirty";
 import { PinballmapDirtyGate } from "./pinballmap-dirty-gate";
@@ -330,8 +329,6 @@ export default async function MachineEditPage({
     );
 
   // The section list beside the form (machine-editing 5.1), in page order.
-  // Data-driven: the Apron card section joins between Integrations and Danger
-  // zone in PP-wqit.14.3.
   const sections: SectionNavItem[] = [
     { id: MACHINE_FORM_SECTION_IDS.details, label: "Details" },
     ...(canSetIntent
@@ -367,12 +364,6 @@ export default async function MachineEditPage({
             ) : null}
             {pinballmapBlock}
           </section>
-          <ApronCardPanel
-            machine={machine}
-            variant="row"
-            canEdit={canEdit}
-            canExport={checkPermission("machines.apron.export", accessLevel)}
-          />
         </div>
       </DetailsDirtyProvider>
     );
@@ -417,16 +408,6 @@ export default async function MachineEditPage({
               pinballmap={pinballmapBlock}
             />
           </section>
-
-          {/* Apron card — still edited in its own dialog, the same one the
-              Service tab opens (apron-cards spec §3.1), until PP-wqit.14.3
-              brings it into the form. */}
-          <ApronCardPanel
-            machine={machine}
-            variant="row"
-            canEdit={canEdit}
-            canExport={checkPermission("machines.apron.export", accessLevel)}
-          />
 
           {/* Danger zone — applies immediately, so it waits while the form has
               unsaved changes (4.2). Machine deletion joins this section in

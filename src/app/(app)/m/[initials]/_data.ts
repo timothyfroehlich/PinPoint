@@ -1,7 +1,8 @@
 import { cache } from "react";
 import { eq, notInArray, sql } from "drizzle-orm";
 import { db } from "~/server/db";
-import { machines, issues } from "~/server/db/schema";
+import { machineApronCards, machines, issues } from "~/server/db/schema";
+import type { SavedApronCard } from "~/lib/machines/apron-card";
 import { CLOSED_STATUSES } from "~/lib/issues/status";
 import { getCurrentManufacturer } from "~/lib/machines/manufacturer";
 import {
@@ -59,12 +60,6 @@ export const getMachineForLayout = cache(async (initials: string) => {
         },
         watchers: {
           columns: { userId: true, watchMode: true },
-        },
-        // The machine's first saved card (spec apron-cards §3.8), oldest
-        // first. Selecting among several cards is not built yet.
-        apronCards: {
-          orderBy: (cards, { asc }) => [asc(cards.createdAt), asc(cards.id)],
-          limit: 1,
         },
         // Joined rather than looked up afterwards. A second PK query would be
         // sequential — it needs the machine row to know the id — so every one
@@ -242,6 +237,31 @@ export function getMachineCredits(machine: {
   }
   const opdbId = machine.pinballmapTitle?.opdbId ?? null;
   return opdbId === null ? Promise.resolve(NO_CREDITS) : getOpdbCredits(opdbId);
+}
+
+/**
+ * A machine's saved apron cards in the order they were created (spec
+ * apron-cards §1), for the Apron card tab. Only that tab and its save action
+ * read them, so they stay out of `getMachineForLayout`.
+ */
+export async function getMachineApronCards(
+  machineId: string
+): Promise<SavedApronCard[]> {
+  return db.query.machineApronCards.findMany({
+    where: eq(machineApronCards.machineId, machineId),
+    columns: {
+      id: true,
+      name: true,
+      size: true,
+      useCustomDescription: true,
+      description: true,
+      tip: true,
+      tipEnabled: true,
+      designEnabled: true,
+      artEnabled: true,
+    },
+    orderBy: (cards, { asc }) => [asc(cards.createdAt), asc(cards.id)],
+  });
 }
 
 export type MachineForLayout = NonNullable<

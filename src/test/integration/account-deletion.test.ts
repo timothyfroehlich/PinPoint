@@ -336,8 +336,9 @@ describe("Account Deletion Reassign Picker — guest filter (PP-hci / PP-aby)", 
 // machine unassigned).  The unit layer cannot make that assertion — it only
 // verified that the mock transaction callback was invoked.
 //
-// External-boundary checks (signOut/deleteUser call order) remain in the
-// unit file where they belong.
+// External-boundary checks (signOut/deleteUser call order and admin signOut
+// failure tolerance) are verified directly in this integration block alongside
+// real DB anonymization.
 // ---------------------------------------------------------------------------
 
 describe("deleteAccountAction — DB integration (PGlite)", () => {
@@ -445,5 +446,162 @@ describe("deleteAccountAction — DB integration (PGlite)", () => {
     if (!result.ok) {
       expect(result.code).toBe("SOLE_ADMIN");
     }
+
+    // Row survives and is not anonymized; auth mocks not called
+    const profile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, userId),
+    });
+    expect(profile).toBeDefined();
+    expect(profile?.email).toBe("sole@example.com");
+    expect(profile?.name).not.toBe("Former Member");
+    expect(mockDeleteUser).not.toHaveBeenCalled();
+    expect(mockAdminSignOut).not.toHaveBeenCalled();
+  });
+
+  it("returns UNAUTHORIZED when not logged in", async () => {
+    const { deleteAccountAction } =
+      await import("~/app/(app)/settings/actions");
+    const db = await getTestDb();
+    mockGetUser.mockResolvedValue({ data: { user: null } });
+
+    const userId = randomUUID();
+    await db.insert(userProfiles).values(
+      createTestUser({
+        id: userId,
+        email: "unauthed@example.com",
+        firstName: "Unauthed",
+        lastName: "User",
+      })
+    );
+
+    const fd = new FormData();
+    fd.set("confirmation", "DELETE");
+    const result = await deleteAccountAction(undefined, fd);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("UNAUTHORIZED");
+    }
+
+    // Row survives and is not anonymized; auth mocks not called
+    const profile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, userId),
+    });
+    expect(profile).toBeDefined();
+    expect(profile?.email).toBe("unauthed@example.com");
+    expect(mockDeleteUser).not.toHaveBeenCalled();
+    expect(mockAdminSignOut).not.toHaveBeenCalled();
+  });
+
+  it("returns VALIDATION when confirmation is wrong", async () => {
+    const { deleteAccountAction } =
+      await import("~/app/(app)/settings/actions");
+    const db = await getTestDb();
+    const userId = randomUUID();
+    mockGetUser.mockResolvedValue({ data: { user: { id: userId } } });
+
+    await db.insert(userProfiles).values(
+      createTestUser({
+        id: userId,
+        email: "wrong-confirm@example.com",
+        firstName: "Wrong",
+        lastName: "Confirm",
+      })
+    );
+
+    const fd = new FormData();
+    fd.set("confirmation", "WRONG");
+    const result = await deleteAccountAction(undefined, fd);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("VALIDATION");
+    }
+
+    // Row survives and is not anonymized; auth mocks not called
+    const profile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, userId),
+    });
+    expect(profile).toBeDefined();
+    expect(profile?.email).toBe("wrong-confirm@example.com");
+    expect(mockDeleteUser).not.toHaveBeenCalled();
+    expect(mockAdminSignOut).not.toHaveBeenCalled();
+  });
+
+  it("still redirects when auth deletion fails (best-effort)", async () => {
+    const { deleteAccountAction } =
+      await import("~/app/(app)/settings/actions");
+    const { redirect } = await import("next/navigation");
+    const db = await getTestDb();
+    const userId = randomUUID();
+
+    mockGetUser.mockResolvedValue({ data: { user: { id: userId } } });
+    await db.insert(userProfiles).values(
+      createTestUser({
+        id: userId,
+        email: "deleter-err@example.com",
+        role: "member",
+      })
+    );
+    mockDeleteUser.mockResolvedValue({
+      error: { message: "Auth service error" },
+    });
+
+    const fd = new FormData();
+    fd.set("confirmation", "DELETE");
+
+    await expect(deleteAccountAction(undefined, fd)).rejects.toThrow(
+      "NEXT_REDIRECT"
+    );
+    expect(mockSignOut).toHaveBeenCalled();
+    expect(redirect).toHaveBeenCalledWith("/");
+  });
+
+  it("reports admin signOut errors but still proceeds with deletion", async () => {
+    const { deleteAccountAction } =
+      await import("~/app/(app)/settings/actions");
+    const { redirect } = await import("next/navigation");
+    const { reportError } = await import("~/lib/observability/report-error");
+    const db = await getTestDb();
+    const userId = randomUUID();
+
+    mockGetUser.mockResolvedValue({ data: { user: { id: userId } } });
+    await db.insert(userProfiles).values(
+      createTestUser({
+        id: userId,
+        email: "deleter-signout-err@example.com",
+        role: "member",
+      })
+    );
+
+    const signOutErr = { message: "supabase signOut failed" };
+    mockAdminSignOut.mockResolvedValue({ error: signOutErr });
+
+    const fd = new FormData();
+    fd.set("confirmation", "DELETE");
+
+    await expect(deleteAccountAction(undefined, fd)).rejects.toThrow(
+      "NEXT_REDIRECT"
+    );
+
+    expect(reportError).toHaveBeenCalledWith(
+      signOutErr,
+      expect.objectContaining({
+        action: "deleteAccountAuthSignOut",
+        bestEffort: true,
+        userId,
+      })
+    );
+    expect(mockAdminSignOut).toHaveBeenCalledWith(userId, "global");
+    expect(mockDeleteUser).toHaveBeenCalledWith(userId);
+
+    // SECURITY INVARIANT: admin signOut must revoke all sessions BEFORE the
+    // auth row is deleted.
+    const signOutOrder = mockAdminSignOut.mock.invocationCallOrder[0];
+    const deleteOrder = mockDeleteUser.mock.invocationCallOrder[0];
+    expect(signOutOrder).toBeDefined();
+    expect(deleteOrder).toBeDefined();
+    expect(signOutOrder).toBeLessThan(deleteOrder);
+    expect(redirect).toHaveBeenCalledWith("/");
   });
 });

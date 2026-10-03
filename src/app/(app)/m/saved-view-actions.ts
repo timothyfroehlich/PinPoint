@@ -20,7 +20,6 @@ import { normalizeMachineViewSavedState } from "~/lib/machines/view/state";
 import {
   ISSUE_SEVERITY_VALUES,
   MACHINE_VIEW_FIELD_IDS,
-  WIDGET_POPULATIONS,
   type SavedViewError,
 } from "~/lib/types";
 import { db } from "~/server/db";
@@ -51,8 +50,6 @@ const savedStateSchema = z.object({
   dir: z.enum(["asc", "desc"]),
   pageSize: z.union([z.literal(25), z.literal(50), z.literal(100)]),
   columns: z.array(z.enum(MACHINE_VIEW_FIELD_IDS)),
-  presenceWidget: z.enum(WIDGET_POPULATIONS),
-  playabilityWidget: z.enum(WIDGET_POPULATIONS),
 });
 
 /**
