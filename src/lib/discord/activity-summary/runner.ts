@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, lt, or } from "drizzle-orm";
 
 import type { DiscordChannelStatus } from "~/lib/discord/channel-check";
 import {
@@ -8,7 +8,7 @@ import {
   postChannelMessage,
   type DiscordSendResult,
 } from "~/lib/discord/client";
-import { getDiscordBotToken } from "~/lib/discord/config";
+import { getDiscordConfig } from "~/lib/discord/config";
 import { DISCORD_MAX_MESSAGE_LENGTH } from "~/lib/discord/messages";
 import { loadLineupData } from "~/lib/pinballmap/lineup-data";
 import { requireSiteUrl } from "~/lib/url";
@@ -170,7 +170,7 @@ type FailedStatus = Extract<
 >;
 
 /** A failed post's channel status (region alerts §3.3). */
-function failureStatus(sent: Exclude<DiscordSendResult, { ok: true }>): {
+export function failureStatus(sent: Exclude<DiscordSendResult, { ok: true }>): {
   status: FailedStatus;
   statusDetail: string;
 } {
@@ -199,8 +199,6 @@ async function recordStatus(
     status: DiscordChannelStatus;
     statusDetail: string | null;
     lastPostAt?: Date;
-    periodEnd?: Date;
-    reviewKeys?: string[] | null;
   }
 ): Promise<void> {
   await db
@@ -209,10 +207,6 @@ async function recordStatus(
       summaryStatus: fields.status,
       summaryStatusDetail: fields.statusDetail,
       ...(fields.lastPostAt ? { summaryLastPostAt: fields.lastPostAt } : {}),
-      ...(fields.periodEnd ? { summaryPeriodEnd: fields.periodEnd } : {}),
-      ...(fields.reviewKeys
-        ? { summaryPinballMapReviewKeys: fields.reviewKeys }
-        : {}),
     })
     .where(
       and(
@@ -221,6 +215,17 @@ async function recordStatus(
       )
     );
 }
+
+/**
+ * The bot token when Discord is configured — a bot token AND a server ID on
+ * file (§2.4, discord.md §2.2) — or null when an admin has turned Discord off.
+ */
+async function configuredBotToken(): Promise<string | null> {
+  const config = await getDiscordConfig();
+  return config?.botToken ?? null;
+}
+
+const DISCORD_NOT_CONFIGURED = "Discord bot token or server ID not configured";
 
 // ─── Scheduled ────────────────────────────────────────────────────────
 
@@ -286,11 +291,11 @@ export async function runScheduledActivitySummary(
 
   // A missing token is reported without spending the period, so a run in the
   // same hour after the token is fixed still posts.
-  const botToken = await getDiscordBotToken();
+  const botToken = await configuredBotToken();
   if (!botToken) {
     await recordStatus(config.channelId, {
       status: "needs_discord",
-      statusDetail: "Discord bot token not configured",
+      statusDetail: DISCORD_NOT_CONFIGURED,
     });
     return { outcome: "skipped", reason: "needs_discord" };
   }
@@ -377,9 +382,9 @@ export async function sendActivitySummaryNow(
   const config = await readSummaryConfig();
   if (config === null) return { ok: false, reason: "no_channel" };
 
-  const botToken = await getDiscordBotToken();
+  const botToken = await configuredBotToken();
   if (!botToken) {
-    const statusDetail = "Discord bot token not configured";
+    const statusDetail = DISCORD_NOT_CONFIGURED;
     await recordStatus(config.channelId, {
       status: "needs_discord",
       statusDetail,
@@ -401,9 +406,29 @@ export async function sendActivitySummaryNow(
       status: "posting",
       statusDetail: null,
       lastPostAt: new Date(),
-      periodEnd: now,
-      reviewKeys: built.pinballMapReviewKeys,
     });
+    // End the current period here (§3.10) — but only move the stored end
+    // forward: a scheduled run that claimed a later post time while this send
+    // was in flight keeps its claim, so a duplicate delivery of that hour
+    // still finds it taken (§3.5).
+    await db
+      .update(discordIntegrationConfig)
+      .set({
+        summaryPeriodEnd: now,
+        ...(built.pinballMapReviewKeys !== null
+          ? { summaryPinballMapReviewKeys: built.pinballMapReviewKeys }
+          : {}),
+      })
+      .where(
+        and(
+          eq(discordIntegrationConfig.id, "singleton"),
+          eq(discordIntegrationConfig.summaryChannelId, config.channelId),
+          or(
+            isNull(discordIntegrationConfig.summaryPeriodEnd),
+            lt(discordIntegrationConfig.summaryPeriodEnd, now)
+          )
+        )
+      );
     return { ok: true, messages: built.messages.length };
   }
 

@@ -1,8 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getUserAccessLevel } from "~/lib/permissions/access";
-import { checkPermission } from "~/lib/permissions/helpers";
 import {
   checkTrackedLocation,
   clearTrackedLocation,
@@ -12,8 +10,8 @@ import {
 } from "~/lib/pinballmap/state";
 import { reconcileAfterSync } from "~/lib/pinballmap/sync";
 import { reportError } from "~/lib/observability/report-error";
-import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
+import { authorizeIntegrationsAdmin } from "../authorize";
 import { pinballmapState } from "~/server/db/schema";
 import { log } from "~/lib/logger";
 import { getDiscordBotToken } from "~/lib/discord/config";
@@ -47,22 +45,6 @@ import type {
 } from "./types";
 
 const INTEGRATIONS_PATH = "/admin/integrations";
-
-type IntegrationsAuthorization = { ok: true; userId: string } | { ok: false };
-
-async function authorizeIntegrationsAdmin(): Promise<IntegrationsAuthorization> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false };
-
-  const accessLevel = await getUserAccessLevel(user.id);
-  if (!checkPermission("admin.integrations.manage", accessLevel)) {
-    return { ok: false };
-  }
-  return { ok: true, userId: user.id };
-}
 
 async function readAllowance(): Promise<PinballMapAllowanceView> {
   const observedAt = new Date();

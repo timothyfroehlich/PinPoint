@@ -27,6 +27,8 @@ vi.mock("~/lib/logger", () => ({
 
 vi.mock("~/lib/discord/config", () => ({
   getDiscordBotToken: () => Promise.resolve("bot-token"),
+  getDiscordConfig: () =>
+    Promise.resolve({ botToken: "bot-token", guildId: "guild" }),
 }));
 
 const posts = vi.hoisted(() => [] as string[]);

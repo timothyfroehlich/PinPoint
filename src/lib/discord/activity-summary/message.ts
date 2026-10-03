@@ -356,10 +356,15 @@ function overflowLine(
   siteUrl: string
 ): string {
   const machines = new Set(omitted.flatMap((item) => item.machineIds)).size;
+  // An omitted Pinball Map section or member list names no machine; say so
+  // rather than letting it disappear behind a machine count.
+  const otherSections = omitted.some((item) => item.machineIds.length === 0);
   const lead =
-    machines > 0
-      ? `… and ${plural(machines, "more machine", "more machines")}.`
-      : "… and more.";
+    machines === 0
+      ? "… and more."
+      : otherSections
+        ? `… and ${plural(machines, "more machine", "more machines")}, and more.`
+        : `… and ${plural(machines, "more machine", "more machines")}.`;
   return `${lead} [Open PinPoint](<${siteUrl}>)`;
 }
 

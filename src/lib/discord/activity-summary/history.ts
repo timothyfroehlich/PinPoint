@@ -21,7 +21,11 @@ import {
 } from "~/lib/machines/presence";
 import { personLabel, resolvePerson } from "~/lib/timeline/resolve-person";
 import type { TimelineEventData } from "~/lib/timeline/types";
-import type { IssueSeverity, IssueStatus } from "~/lib/types";
+import {
+  ISSUE_SEVERITY_VALUES,
+  type IssueSeverity,
+  type IssueStatus,
+} from "~/lib/types";
 import { db } from "~/server/db";
 import {
   invitedUsers,
@@ -80,14 +84,8 @@ function isIssueStatus(value: string): value is IssueStatus {
   return (ALL_ISSUE_STATUSES as readonly string[]).includes(value);
 }
 
-const ISSUE_SEVERITIES: readonly IssueSeverity[] = [
-  "cosmetic",
-  "minor",
-  "major",
-  "unplayable",
-];
 function isIssueSeverity(value: string): value is IssueSeverity {
-  return (ISSUE_SEVERITIES as readonly string[]).includes(value);
+  return (ISSUE_SEVERITY_VALUES as readonly string[]).includes(value);
 }
 
 function isPresence(value: string): value is MachinePresenceStatus {

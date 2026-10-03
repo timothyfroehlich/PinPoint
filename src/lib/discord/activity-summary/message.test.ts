@@ -429,6 +429,23 @@ describe("activity summary length (§7)", () => {
       `… and ${String(60 - shown.length)} more machines. [Open PinPoint](<${SITE}>)`
     );
   });
+
+  it("says other sections were left out too when the Pinball Map section does not fit (§7.5)", () => {
+    const messages = formatSummaryMessages({
+      model: buildSummaryModel(
+        manyMachines(60),
+        DEFAULT_ACTIVITY_SUMMARY_EVENTS
+      ),
+      period: DAY,
+      siteUrl: SITE,
+      pinballMapSection: "### 📍 Pinball Map\nNothing to review.",
+    });
+    expect(messages).toHaveLength(2);
+    expect(messages.join("\n")).not.toContain("📍 Pinball Map");
+    expect(messages[1]?.split("\n").at(-1)).toMatch(
+      /^… and \d+ more machines, and more\. \[Open PinPoint\]/
+    );
+  });
 });
 
 describe("planSummaryMessages (§3.6, §3.9, §5.11)", () => {

@@ -43,6 +43,10 @@ vi.mock("~/lib/permissions/access", () => ({
 }));
 vi.mock("~/lib/discord/config", () => ({
   getDiscordBotToken: getDiscordBotTokenMock,
+  getDiscordConfig: async () => {
+    const botToken: unknown = await getDiscordBotTokenMock();
+    return typeof botToken === "string" ? { botToken, guildId: "guild" } : null;
+  },
 }));
 vi.mock("~/lib/discord/client", () => ({
   DISCORD_MESSAGE_FLAGS: { SUPPRESS_EMBEDS: 1 << 2 },
@@ -300,6 +304,20 @@ describe("Activity summary settings actions", () => {
 
       expect(result).toMatchObject({ ok: false, reason: "cant_post" });
       expect((await readRow())?.summaryStatus).toBe("cant_post");
+    });
+
+    it("moves the saved channel to Needs Discord when Discord rejects the token", async () => {
+      await saveActivitySummaryConfigAction(VALID_INPUT);
+      postChannelMessageMock.mockResolvedValue({
+        ok: false,
+        reason: "blocked",
+        invalidToken: true,
+      });
+
+      const result = await sendActivitySummaryTestAction(CHANNEL_ID);
+
+      expect(result).toMatchObject({ ok: false, reason: "needs_discord" });
+      expect((await readRow())?.summaryStatus).toBe("needs_discord");
     });
   });
 

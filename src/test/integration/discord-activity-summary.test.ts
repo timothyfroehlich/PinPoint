@@ -60,6 +60,7 @@ vi.mock("~/lib/logger", () => ({
 
 const discord = vi.hoisted(() => ({
   hasToken: true,
+  hasServerId: true,
   result: { ok: true } as DiscordSendResult,
   posts: [] as { channelId: string; content: string; flags?: number }[],
 }));
@@ -67,6 +68,13 @@ const discord = vi.hoisted(() => ({
 vi.mock("~/lib/discord/config", () => ({
   getDiscordBotToken: () =>
     Promise.resolve(discord.hasToken ? "bot-token" : null),
+  // Configured only with a token AND a server ID (discord.md §2.2).
+  getDiscordConfig: () =>
+    Promise.resolve(
+      discord.hasToken && discord.hasServerId
+        ? { botToken: "bot-token", guildId: "guild" }
+        : null
+    ),
 }));
 
 vi.mock("~/lib/discord/client", () => ({
@@ -544,6 +552,7 @@ describe("activity summary runner (PGlite)", () => {
 
   beforeEach(() => {
     discord.hasToken = true;
+    discord.hasServerId = true;
     discord.result = { ok: true };
     discord.posts = [];
   });
@@ -653,6 +662,45 @@ describe("activity summary runner (PGlite)", () => {
     expect((await runScheduledActivitySummary({ now: SIX_PM })).outcome).toBe(
       "posted"
     );
+  });
+
+  it("posts nothing once Discord is turned off by clearing the server ID (§2.4)", async () => {
+    await seedConfig();
+    await seedIssue(THREE_PM);
+    discord.hasServerId = false;
+
+    expect(await runScheduledActivitySummary({ now: SIX_PM })).toEqual({
+      outcome: "skipped",
+      reason: "needs_discord",
+    });
+    expect(await sendActivitySummaryNow({ now: SIX_PM })).toEqual(
+      expect.objectContaining({ ok: false, reason: "needs_discord" })
+    );
+    expect(discord.posts).toHaveLength(0);
+    expect((await storedConfig()).summaryPeriodEnd).toBeNull();
+  });
+
+  it("Send summary now never moves the period end back past a claimed post time (§3.5, §3.10)", async () => {
+    await seedConfig();
+    await seedIssue(THREE_PM);
+
+    // The 6 PM run claims and posts while a Send summary now that started
+    // just before 6 PM is still in flight.
+    expect((await runScheduledActivitySummary({ now: SIX_PM })).outcome).toBe(
+      "posted"
+    );
+    const justBefore = new Date(SIX_PM_INSTANT.getTime() - 2000);
+    expect((await sendActivitySummaryNow({ now: justBefore })).ok).toBe(true);
+
+    expect((await storedConfig()).summaryPeriodEnd?.toISOString()).toBe(
+      SIX_PM_INSTANT.toISOString()
+    );
+    // A duplicate delivery of the 6 PM run still finds the period claimed.
+    expect(await runScheduledActivitySummary({ now: SIX_PM })).toEqual({
+      outcome: "skipped",
+      reason: "already_sent",
+    });
+    expect(discord.posts).toHaveLength(2);
   });
 
   it("posts nothing while Disabled or without a channel (§2.4)", async () => {

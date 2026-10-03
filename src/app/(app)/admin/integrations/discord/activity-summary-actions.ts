@@ -14,13 +14,14 @@ import {
 import { getDiscordBotToken } from "~/lib/discord/config";
 import { sanitizeDiscordText } from "~/lib/discord/messages";
 import { ACTIVITY_SUMMARY_EVENT_KEYS } from "~/lib/discord/activity-summary/events";
-import { sendActivitySummaryNow } from "~/lib/discord/activity-summary/runner";
+import {
+  failureStatus,
+  sendActivitySummaryNow,
+} from "~/lib/discord/activity-summary/runner";
 import { log } from "~/lib/logger";
 import { reportError } from "~/lib/observability/report-error";
-import { getUserAccessLevel } from "~/lib/permissions/access";
-import { checkPermission } from "~/lib/permissions/helpers";
-import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
+import { authorizeIntegrationsAdmin } from "../authorize";
 import { discordIntegrationConfig } from "~/server/db/schema";
 import {
   saveActivitySummaryConfigSchema,
@@ -28,23 +29,6 @@ import {
 } from "./schema";
 
 const INTEGRATIONS_PATH = "/admin/integrations";
-
-type IntegrationsAuthorization = { ok: true; userId: string } | { ok: false };
-
-/** The manage-integrations gate (discord-activity-summary §8.1). */
-async function authorizeIntegrationsAdmin(): Promise<IntegrationsAuthorization> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false };
-
-  const accessLevel = await getUserAccessLevel(user.id);
-  if (!checkPermission("admin.integrations.manage", accessLevel)) {
-    return { ok: false };
-  }
-  return { ok: true, userId: user.id };
-}
 
 /**
  * The bot token for a channel check or test post. A Vault read failure is
@@ -287,11 +271,9 @@ export async function sendActivitySummaryTestAction(
         : { ok: true };
     }
 
-    const status = sent.reason === "blocked" ? "cant_post" : "couldnt_check";
-    const statusDetail =
-      sent.reason === "blocked"
-        ? "Channel unreachable or bot missing permissions"
-        : "Discord was unreachable";
+    // The same mapping a real post uses, so a rejected token reads Needs
+    // Discord here too (region alerts §3.3).
+    const { status, statusDetail } = failureStatus(sent);
     await recordStatus(status, statusDetail);
     return { ok: false, reason: status, message: statusDetail };
   } catch (error) {
