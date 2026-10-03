@@ -179,14 +179,48 @@ describe("machine view database pipeline", () => {
     expect(all.rows.map((row) => row.initials)).toEqual(["AAA", "BBB", "CCC"]);
     expect(collection.rows.map((row) => row.initials)).toEqual(["AAA", "CCC"]);
     expect(owner.rows.map((row) => row.initials)).toEqual(["AAA", "BBB"]);
-    expect(all.rows.every((row) => row.health === undefined)).toBe(true);
     expect(all.rows.every((row) => row.lastServicedAt === undefined)).toBe(
       true
     );
     expect(all.rows.every((row) => !Object.hasOwn(row, "ownerId"))).toBe(true);
   });
 
-  it("counts Summary Widget health without sending health on rows that do not need it", async () => {
+  it("sends the identity line's manufacturer, year, and owner name whatever fields are displayed (§3.2, §3.3)", async () => {
+    const db = await getTestDb();
+    await db.insert(machines).values(
+      createTestMachine({
+        initials: "DDD",
+        name: "Delta",
+        ownerId: null,
+        year: null,
+      })
+    );
+
+    const result = await loadMachineViewFromDatabase(asDbOrTx(db), {
+      scope: { kind: "all" },
+      preset: "machines",
+      searchParams: new URLSearchParams({
+        presence: "all",
+        columns: "machine",
+      }),
+    });
+
+    const byInitials = new Map(result.rows.map((row) => [row.initials, row]));
+    expect(byInitials.get("AAA")).toMatchObject({
+      ownerName: "Owner One",
+      hasOwner: true,
+    });
+    expect(byInitials.get("DDD")).toMatchObject({
+      manufacturer: "Unknown",
+      year: null,
+      ownerName: "Unassigned",
+      hasOwner: false,
+    });
+    // Names only; an owner's email never reaches the client (CORE-SEC-007).
+    expect(JSON.stringify(result.rows)).not.toContain("@");
+  });
+
+  it("sends health on every row for the phone Compact row, whatever fields are displayed (§5.3)", async () => {
     const db = await getTestDb();
     await db
       .insert(issues)
@@ -205,7 +239,18 @@ describe("machine view database pipeline", () => {
     });
 
     expect(result.summary.playability.byStatus.unplayable).toBe(1);
-    expect(result.rows.every((row) => row.health === undefined)).toBe(true);
+    expect(
+      result.rows.map((row) => [
+        row.initials,
+        row.health?.playability,
+        row.health?.openIssues,
+        row.health?.worstSeverity,
+      ])
+    ).toEqual([
+      ["AAA", "unplayable", 1, "unplayable"],
+      ["BBB", "operational", 0, null],
+      ["CCC", "operational", 1, "minor"],
+    ]);
   });
 
   it("counts Summary Widgets over the whole scope, whatever the filters, without Removed machines", async () => {

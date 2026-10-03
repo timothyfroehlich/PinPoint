@@ -49,6 +49,7 @@ function result(overrides: Partial<MachineViewResult> = {}): MachineViewResult {
         manufacturer: "Bally",
         year: 1995,
         ownerName: "Alex",
+        hasOwner: true,
         presence: "on_the_floor",
         createdAt: "2026-01-01T00:00:00.000Z",
         health: {
