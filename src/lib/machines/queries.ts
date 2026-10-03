@@ -1,6 +1,11 @@
 import { db, type DbTransaction } from "~/server/db";
-import { machines, userProfiles, invitedUsers } from "~/server/db/schema";
-import { and, asc, eq, inArray, ne, or, type SQL } from "drizzle-orm";
+import {
+  invitedUsers,
+  issues,
+  machines,
+  userProfiles,
+} from "~/server/db/schema";
+import { and, asc, eq, exists, inArray, ne, or, type SQL } from "drizzle-orm";
 import type { MachineOwner } from "~/lib/types";
 
 /**
@@ -10,6 +15,18 @@ import type { MachineOwner } from "~/lib/types";
  */
 export function machineNotRemoved(): SQL {
   return ne(machines.presenceStatus, "removed");
+}
+
+/** An issue-row condition: the issue's machine is not Removed. */
+export function issueMachineNotRemoved(): SQL {
+  return exists(
+    db
+      .select({ one: machines.id })
+      .from(machines)
+      .where(
+        and(eq(machines.initials, issues.machineInitials), machineNotRemoved())
+      )
+  );
 }
 
 export interface MachineChoice {
