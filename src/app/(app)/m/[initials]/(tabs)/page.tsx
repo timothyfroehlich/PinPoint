@@ -86,10 +86,11 @@ export default async function MachineInfoTab({
     machineOwnerId: machine.ownerId ?? undefined,
   };
 
-  const canCompose = checkPermission(
-    "machines.timeline.comment.add",
-    accessLevel
-  );
+  // Who may post timeline notes; their unposted note is kept as a draft.
+  const composerUserId =
+    user && checkPermission("machines.timeline.comment.add", accessLevel)
+      ? user.id
+      : null;
 
   const machineStatus = deriveMachineStatus(openIssues);
 
@@ -297,7 +298,7 @@ export default async function MachineInfoTab({
         machineId={machine.id}
         machineInitials={machine.initials}
         machineName={machine.name}
-        canCompose={canCompose}
+        composerUserId={composerUserId}
       />
     </div>
   );

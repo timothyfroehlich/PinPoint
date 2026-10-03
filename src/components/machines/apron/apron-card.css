@@ -232,15 +232,39 @@
   text-wrap: pretty;
 }
 
-.apron-card__text p {
+.apron-card__text :is(p, ul, ol, li) {
   margin: 0;
   /* The app's global paragraph rhythm must not leak onto the card. */
   font-size: inherit;
   line-height: inherit;
 }
 
-.apron-card__text p + p {
+.apron-card__text :is(p, ul, ol) + :is(p, ul, ol) {
   margin-top: 5px;
+}
+
+.apron-card__text :is(ul, ol) {
+  padding-left: 1.25em;
+}
+
+.apron-card__text ul {
+  list-style: disc;
+}
+
+.apron-card__text ol {
+  list-style: decimal;
+}
+
+.apron-card__text li + li {
+  margin-top: 2px;
+}
+
+.apron-card__text strong {
+  font-weight: 700;
+}
+
+.apron-card__text em {
+  font-style: italic;
 }
 
 .apron-card__label {

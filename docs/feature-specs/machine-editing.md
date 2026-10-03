@@ -53,9 +53,7 @@
 
 ## Known divergences
 
-| Requirement | Divergence | Resolution |
-| :-- | :-- | :-- |
-| §2.3, §3.7 | The Manage tab still shows the apron card panel, with its edit dialog and Export. | PP-o23o |
+_None — the current implementation matches this spec._
 
 ---
 

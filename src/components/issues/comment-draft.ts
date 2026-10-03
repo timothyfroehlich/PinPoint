@@ -1,9 +1,16 @@
 "use client";
 
-import { useCallback, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useSyncExternalStore,
+  type RefObject,
+} from "react";
 import { z } from "zod";
 import { BLOB_CONFIG } from "~/lib/blob/config";
 import { isValidImageMetadata } from "~/lib/blob/validation";
+import type { RichTextEditorHandle } from "~/components/editor/RichTextEditor";
 import {
   docToPlainText,
   proseMirrorDocValueSchema,
@@ -16,7 +23,8 @@ import type { ImageMetadata } from "~/types/images";
  * into an issue's comment composer, kept per signed-in person and per issue so
  * closing the mobile sheet, switching section tabs, or reloading the page
  * never loses them. The desktop inline box and the mobile sheet read and write
- * the same draft.
+ * the same draft. A machine timeline note keeps its draft here too, with the
+ * tag it was given (`machineNoteDraftKey`).
  *
  * - One in-memory store per draft key, shared by every composer on the page
  *   (`useSyncExternalStore`), so two mounted composers never disagree.
@@ -31,6 +39,8 @@ import type { ImageMetadata } from "~/types/images";
 export interface CommentDraft {
   doc: ProseMirrorDoc | null;
   images: ImageMetadata[];
+  /** A machine timeline note's tag; `null` for an issue comment. */
+  tag: string | null;
   idempotencyKey: string;
 }
 
@@ -54,11 +64,18 @@ export function commentDraftKey(userId: string, issueId: string): string {
   return `comment_draft:${userId}:${issueId}`;
 }
 
+/** The draft of a note on a machine's timeline. */
+export function machineNoteDraftKey(userId: string, machineId: string): string {
+  return `comment_draft:${userId}:machine:${machineId}`;
+}
+
 const storedDraftSchema = z.object({
   version: z.literal(DRAFT_VERSION),
   savedAt: z.number(),
   doc: proseMirrorDocValueSchema.nullable(),
   images: z.array(z.unknown()),
+  // Absent from drafts saved before machine notes kept drafts.
+  tag: z.string().nullable().default(null),
   idempotencyKey: z.string().uuid(),
 });
 
@@ -67,8 +84,8 @@ function sameDoc(a: ProseMirrorDoc | null, b: ProseMirrorDoc | null): boolean {
 }
 
 /**
- * Remove every stored comment draft from this browser — on sign-out, so a
- * shared device keeps no one's unposted comments.
+ * Remove every stored comment and note draft from this browser — on sign-out,
+ * so a shared device keeps no one's unposted comments.
  */
 export function clearStoredCommentDrafts(): void {
   try {
@@ -89,7 +106,12 @@ export function clearStoredCommentDrafts(): void {
 }
 
 function emptyDraft(): CommentDraft {
-  return { doc: null, images: [], idempotencyKey: crypto.randomUUID() };
+  return {
+    doc: null,
+    images: [],
+    tag: null,
+    idempotencyKey: crypto.randomUUID(),
+  };
 }
 
 /** Whether a draft holds anything worth keeping. */
@@ -120,6 +142,7 @@ export function parseCommentDraft(
     images: parsed.data.images
       .filter(isValidImageMetadata)
       .slice(0, BLOB_CONFIG.LIMITS.COMMENT_MAX),
+    tag: parsed.data.tag,
     idempotencyKey: parsed.data.idempotencyKey,
   };
   return draftHasContent(draft) ? draft : null;
@@ -245,7 +268,7 @@ function installPageListeners(): void {
 }
 
 const SERVER_SNAPSHOT: CommentDraftSnapshot = {
-  draft: { doc: null, images: [], idempotencyKey: "" },
+  draft: { doc: null, images: [], tag: null, idempotencyKey: "" },
   origin: null,
 };
 
@@ -253,6 +276,7 @@ export interface CommentDraftControls {
   snapshot: CommentDraftSnapshot;
   setDoc: (doc: ProseMirrorDoc) => void;
   addImage: (image: ImageMetadata) => void;
+  setTag: (tag: string) => void;
   /** Empty the draft (after a post) and mint the next idempotency key. */
   clear: () => void;
 }
@@ -313,10 +337,85 @@ export function useCommentDraft(
       ),
     [key, composerId]
   );
+  const setTag = useCallback(
+    (tag: string) =>
+      update(
+        key,
+        composerId,
+        // Re-tagging a note changes the submission too.
+        (draft) =>
+          draft.tag === tag
+            ? draft
+            : { ...draft, tag, idempotencyKey: crypto.randomUUID() },
+        "now"
+      ),
+    [key, composerId]
+  );
   const clear = useCallback(
     () => update(key, composerId, () => emptyDraft(), "now"),
     [key, composerId]
   );
 
-  return { snapshot, setDoc, addImage, clear };
+  return { snapshot, setDoc, addImage, setTag, clear };
+}
+
+export interface DraftEditorSync {
+  /** The editor's `onChange`. */
+  onDocChange: (doc: ProseMirrorDoc) => void;
+  /** Empty the draft and the editor, after a post. */
+  clear: () => void;
+}
+
+/**
+ * Keep a composer's editor in step with its draft. Changes another composer
+ * made to the same draft (the hidden inline box while the mobile sheet is in
+ * use, or another browser tab) are copied into this editor — unless the
+ * person is typing in `containerRef`, in which case their version wins and is
+ * saved back, so what they see is what posts.
+ */
+export function useDraftEditorSync({
+  draft,
+  composerId,
+  editorRef,
+  containerRef,
+}: {
+  draft: CommentDraftControls;
+  composerId: string;
+  editorRef: RefObject<RichTextEditorHandle | null>;
+  containerRef: RefObject<HTMLElement | null>;
+}): DraftEditorSync {
+  const { snapshot, setDoc, clear: clearDraft } = draft;
+  const seenSnapshotRef = useRef<CommentDraftSnapshot>(snapshot);
+  // The last document typed in this composer.
+  const localDocRef = useRef<ProseMirrorDoc | null>(null);
+
+  const onDocChange = useCallback(
+    (doc: ProseMirrorDoc) => {
+      localDocRef.current = doc;
+      setDoc(doc);
+    },
+    [setDoc]
+  );
+
+  useEffect(() => {
+    if (seenSnapshotRef.current === snapshot) return;
+    seenSnapshotRef.current = snapshot;
+    if (snapshot.origin === composerId) return;
+    const typingHere =
+      containerRef.current?.contains(document.activeElement) ?? false;
+    if (typingHere && localDocRef.current !== null) {
+      setDoc(localDocRef.current);
+      return;
+    }
+    editorRef.current?.setContent(snapshot.draft.doc);
+  }, [snapshot, composerId, setDoc, editorRef, containerRef]);
+
+  const clear = useCallback(() => {
+    localDocRef.current = null;
+    // Mints a fresh idempotency key — the next post is a new submission.
+    clearDraft();
+    editorRef.current?.clear();
+  }, [clearDraft, editorRef]);
+
+  return { onDocChange, clear };
 }
