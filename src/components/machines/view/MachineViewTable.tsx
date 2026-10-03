@@ -26,14 +26,12 @@ interface MachineViewTableProps {
 function SortHeader({
   field,
   state,
-  sticky = false,
   align = "left",
   onSort,
 }: {
   field: MachineViewFieldId;
   state: MachineViewState;
-  sticky?: boolean;
-  align?: "left" | "center" | "right";
+  align?: "left" | "right";
   onSort: (field: MachineViewFieldId) => void;
 }): React.JSX.Element {
   const active = state.sort === field;
@@ -42,6 +40,7 @@ function SortHeader({
     : state.dir === "asc"
       ? ArrowUp
       : ArrowDown;
+  const isMachine = field === "machine";
   return (
     <th
       scope="col"
@@ -49,10 +48,13 @@ function SortHeader({
         active ? (state.dir === "asc" ? "ascending" : "descending") : "none"
       }
       className={cn(
-        "sticky top-0 z-20 whitespace-nowrap border-b border-outline-variant bg-muted/30 px-4 py-3 text-left text-sm font-semibold text-muted-foreground",
-        align === "center" && "text-center",
+        "sticky top-0 z-20 h-10 whitespace-nowrap border-b border-outline-variant bg-card px-3 text-left text-sm font-semibold text-muted-foreground",
         align === "right" && "text-right",
-        sticky && "left-0 z-30 min-w-72 border-r border-outline-variant"
+        // The Machine column takes the remaining width and stays pinned while
+        // the narrow columns scroll (machine-views §5.2).
+        isMachine
+          ? "left-0 z-30 w-full max-w-0 min-w-52 border-r border-outline-variant pl-4"
+          : "w-px last:pr-4"
       )}
     >
       <button
@@ -60,14 +62,13 @@ function SortHeader({
         onClick={() => onSort(field)}
         className={cn(
           "group inline-flex items-center rounded-sm hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-          align === "center" && "justify-center",
           align === "right" && "justify-end"
         )}
       >
         {MACHINE_VIEW_FIELDS[field].label}
         <Icon
           className={cn(
-            "ml-2 size-4",
+            "ml-1.5 size-3.5",
             active ? "text-primary" : "opacity-30 group-hover:opacity-100"
           )}
         />
@@ -99,18 +100,13 @@ export function MachineViewTable({
         aria-label="Machine table"
         className="max-h-[65vh] overflow-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       >
-        <table className="w-full min-w-max border-collapse text-left text-sm">
+        <table className="w-full border-collapse text-left text-sm">
           <caption className="sr-only">
             Machines with selected status and activity fields
           </caption>
           <thead>
             <tr>
-              <SortHeader
-                field="machine"
-                state={state}
-                sticky
-                onSort={onSort}
-              />
+              <SortHeader field="machine" state={state} onSort={onSort} />
               {fields.map((field) => (
                 <SortHeader
                   key={field}
@@ -127,7 +123,7 @@ export function MachineViewTable({
               <tr key={row.id} className="group hover:bg-muted/50">
                 <th
                   scope="row"
-                  className="sticky left-0 z-10 min-w-72 border-r border-outline-variant bg-card px-4 py-4 text-left group-hover:bg-muted/50"
+                  className="sticky left-0 z-10 h-11 w-full max-w-0 min-w-52 border-r border-outline-variant bg-card py-1 pr-3 pl-4 text-left font-normal group-hover:bg-muted/50"
                 >
                   <MachineIdentity
                     row={row}
@@ -140,8 +136,7 @@ export function MachineViewTable({
                     <td
                       key={field}
                       className={cn(
-                        "whitespace-nowrap px-4 py-4",
-                        renderer.align === "center" && "text-center",
+                        "h-11 w-px whitespace-nowrap px-3 py-1 last:pr-4",
                         renderer.align === "right" && "text-right",
                         renderer.tableClassName
                       )}

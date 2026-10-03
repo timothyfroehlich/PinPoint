@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { getMachineViewPreset } from "./config";
 import {
   nextMachineViewSort,
   normalizeMachineViewSavedState,
@@ -18,7 +19,16 @@ describe("machine view URL state", () => {
       dir: "asc",
       page: 1,
       pageSize: 25,
-      columns: ["machine", "playability", "openIssues", "lastServiced"],
+      // Both Page Presets display seven fields by default (§4.6).
+      columns: [
+        "machine",
+        "playability",
+        "openIssues",
+        "lastServiced",
+        "owner",
+        "manufacturer",
+        "year",
+      ],
       severity: [],
       presenceWidget: "all",
       playabilityWidget: "all",
@@ -28,6 +38,9 @@ describe("machine view URL state", () => {
   it("uses the Collection preset defaults independently", () => {
     const state = parseMachineViewState(new URLSearchParams(), "collection");
     expect(state.presence).toBe("all");
+    expect(state.columns).toEqual(
+      parseMachineViewState(new URLSearchParams(), "machines").columns
+    );
     expect({ sort: state.sort, dir: state.dir }).toEqual({
       sort: "playability",
       dir: "desc",
@@ -84,12 +97,9 @@ describe("machine view URL state", () => {
     expect(state.dir).toBe("asc");
     expect(state.page).toBe(1);
     expect(state.pageSize).toBe(25);
-    expect(state.columns).toEqual([
-      "machine",
-      "playability",
-      "openIssues",
-      "lastServiced",
-    ]);
+    expect(state.columns).toEqual(
+      getMachineViewPreset("machines").defaultState.columns
+    );
     expect(
       parseMachineViewState(
         new URLSearchParams({ page: "2broken" }),

@@ -6,6 +6,7 @@ import type {
   MachineViewState,
 } from "~/lib/types";
 import { MACHINE_VIEW_FIELD_IDS } from "~/lib/types";
+import { VALID_MACHINE_PRESENCE_STATUSES } from "~/lib/machines/presence";
 
 export type MachineViewDependency = "health" | "service" | "activity";
 
@@ -88,11 +89,15 @@ export const MACHINE_VIEW_FIELDS: Record<
   },
 };
 
+/** Both Page Presets' displayed fields (machine-views §4.6). */
 const DEFAULT_COLUMNS: MachineViewFieldId[] = [
   "machine",
   "playability",
   "openIssues",
   "lastServiced",
+  "owner",
+  "manufacturer",
+  "year",
 ];
 
 export interface MachineViewPreset {
@@ -192,7 +197,10 @@ export const MACHINE_VIEW_BUILT_IN_VIEWS: Record<
       columns: [...DEFAULT_COLUMNS, "presence"],
     }),
     builtIn("machines", "recently-added", "Recently added", {
-      presence: "all",
+      // Every presence state except Removed (machine-views §9.1).
+      presence: VALID_MACHINE_PRESENCE_STATUSES.filter(
+        (presence) => presence !== "removed"
+      ),
       sort: "dateAdded",
       dir: "desc",
       columns: [...DEFAULT_COLUMNS, "presence", "dateAdded"],

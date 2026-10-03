@@ -94,7 +94,6 @@
 | §5.1–§5.3 | Severity and Priority sorts are missing, four column headers send sort values the server ignores, and Assignee sorts by account ID. | PP-jb9v |
 | §5.4 | Export from a Collection or Tag Issues tab ignores the tab's scope. | PP-jb9v |
 | §6 | No Built-in Views. | PP-jb9v |
-| §7.4 | Machine pages and Open Issues cells link to `/issues?machine=` without a presence value, so an off-floor machine's issues are hidden. | PP-jb9v |
 | §7 | Snake_case parameters, composite sort, and unvalidated sort, page size, and ID values. | PP-jb9v |
 
 ---

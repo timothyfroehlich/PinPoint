@@ -119,11 +119,8 @@
 | Requirement | Divergence | Resolution |
 | :-- | :-- | :-- |
 | §2.4 | Machine View has its own toolbar, chips, and Saved Views menu rather than the shared List View. | PP-jb9v |
-| §3.2, §5.2, §5.3 | Machine identity is two lines, and the phone Compact list reflows every selected field. | PP-jb9v |
 | §3.13 | Owner offers Unassigned but not Me. | PP-jb9v |
 | §3.14 | Sorting is only by column header; phones in Compact mode cannot sort. | PP-jb9v |
-| §4.6, §5.6 | Presets show four fields, and Open Issues values are centered. | PP-jb9v |
-| §9.1 | Recently added includes Removed machines. | PP-jb9v |
 | §4.2 | Owner "Me" writes the viewer's account ID into the URL. | PP-jb9v |
 
 ---
