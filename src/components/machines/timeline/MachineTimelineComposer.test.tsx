@@ -2,7 +2,10 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { clearStoredCommentDrafts } from "~/components/issues/comment-draft";
+import {
+  clearStoredCommentDrafts,
+  machineNoteDraftKey,
+} from "~/components/issues/comment-draft";
 import { MachineTimelineComposer } from "./MachineTimelineComposer";
 
 const addMachineCommentAction = vi.fn(() =>
@@ -228,6 +231,40 @@ describe("MachineTimelineComposer", () => {
         tag: "maintenance",
         contentJson: expect.stringContaining('"hi"'),
       })
+    );
+  });
+
+  it("falls back to the Note tag when a restored draft carries a reserved tag", async () => {
+    localStorage.setItem(
+      machineNoteDraftKey("user-1", "m1"),
+      JSON.stringify({
+        version: 1,
+        savedAt: Date.now(),
+        doc: {
+          type: "doc",
+          content: [
+            { type: "paragraph", content: [{ type: "text", text: "hi" }] },
+          ],
+        },
+        images: [],
+        tag: "issue",
+        idempotencyKey: crypto.randomUUID(),
+      })
+    );
+    const user = userEvent.setup();
+    addMachineCommentAction.mockClear();
+    render(
+      <MachineTimelineComposer
+        machineId="m1"
+        userId="user-1"
+        onPosted={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: /post/i }));
+
+    expect(addMachineCommentAction).toHaveBeenCalledWith(
+      expect.objectContaining({ tag: "note" })
     );
   });
 

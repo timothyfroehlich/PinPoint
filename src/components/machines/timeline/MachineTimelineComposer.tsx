@@ -16,7 +16,7 @@ import {
 import { TagSelect } from "~/components/machines/timeline/TagSelect";
 import { Button } from "~/components/ui/button";
 import { Toggle } from "~/components/ui/toggle";
-import { tagSchema, type TimelineTag } from "~/lib/timeline/machine-tags";
+import { userTagSchema, type TimelineTag } from "~/lib/timeline/machine-tags";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 
 const EMPTY_DOC: ProseMirrorDoc = { type: "doc", content: [] };
@@ -73,8 +73,8 @@ export function MachineTimelineComposer({
   // (PP-e5th), and replaced only when a post succeeds or the note changes.
   const { idempotencyKey } = draft.snapshot.draft;
   const doc = draft.snapshot.draft.doc ?? EMPTY_DOC;
-  // Notes default to `note`; a stored tag that is no longer valid falls back.
-  const storedTag = tagSchema.safeParse(draft.snapshot.draft.tag);
+  // Notes default to `note`; a stored tag a person may not apply falls back.
+  const storedTag = userTagSchema.safeParse(draft.snapshot.draft.tag);
   const tag: TimelineTag = storedTag.success ? storedTag.data : "note";
 
   const hasBody = docHasText(doc);
