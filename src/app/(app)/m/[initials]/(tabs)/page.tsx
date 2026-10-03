@@ -37,7 +37,6 @@ import { TopScoresCard } from "~/components/machines/TopScoresCard";
 import { InfoHero } from "./info-hero";
 import { InfoRail } from "./info-rail";
 import { getTagsForMachine } from "~/lib/tags/tags";
-import { tagHref } from "~/lib/tags/types";
 
 /**
  * Machine Info Tab (default route for /m/[initials]/) — the QR-scanning
@@ -233,10 +232,7 @@ export default async function MachineInfoTab({
       addedAt={machine.createdAt}
       modelName={modelName}
       manufacturer={machine.currentManufacturer}
-      tags={tags.map((tag) => ({
-        name: tag.name,
-        href: tagHref(tag.type, tag.slug),
-      }))}
+      tags={tags.map((tag) => ({ name: tag.name, href: tag.href }))}
       year={machine.year}
       credits={credits}
       topScoresSlot={

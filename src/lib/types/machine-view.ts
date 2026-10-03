@@ -26,7 +26,9 @@ export type MachineViewScope =
   | { kind: "all" }
   | { kind: "collection"; collectionId: string }
   | { kind: "owner"; ownerId: string }
-  | { kind: "tag"; tagType: TagTypeId; slug: string };
+  | { kind: "tag"; tagType: TagTypeId; slug: string }
+  /** A hand-applied tag, by id (spec collections-and-tags §11). */
+  | { kind: "handTag"; tagId: string };
 
 export type MachineViewSortDirection = "asc" | "desc";
 export type MachineViewPageSize = 25 | 50 | 100;

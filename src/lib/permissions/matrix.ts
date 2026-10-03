@@ -754,6 +754,38 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
       },
     ],
   },
+  {
+    id: "tags",
+    label: "Tags",
+    permissions: [
+      {
+        id: "tags.manage",
+        label: "Manage tags",
+        description:
+          "Create, rename, and delete hand-applied tag types and tags, and add machines to a tag or remove them from its page. Anyone can view tags; automatic tags follow machine data and nobody edits them.",
+        access: {
+          unauthenticated: false,
+          guest: false,
+          member: false,
+          technician: true,
+          admin: true,
+        },
+      },
+      {
+        id: "tags.apply",
+        label: "Tag machines",
+        description:
+          "Apply hand-applied tags to a machine and remove them (members on machines they own; technicians and admins on any machine).",
+        access: {
+          unauthenticated: false,
+          guest: false,
+          member: "owner",
+          technician: true,
+          admin: true,
+        },
+      },
+    ],
+  },
 ];
 
 /**

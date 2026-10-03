@@ -93,7 +93,11 @@ describe("manufacturer tags", () => {
 
   it("lists every tag with its machines in any presence state", async () => {
     const db = await getTestDb();
-    const tags = (await listTags(asDbOrTx(db))).manufacturer;
+    const group = (await listTags(asDbOrTx(db))).find(
+      (candidate) =>
+        candidate.kind === "automatic" && candidate.type.id === "manufacturer"
+    );
+    const tags = group?.tags ?? [];
     expect(
       tags.map((tag) => ({
         slug: tag.slug,

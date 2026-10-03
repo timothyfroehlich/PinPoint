@@ -7,6 +7,7 @@ import {
   collectionMachines,
   issues,
   machines,
+  machineTags,
   timelineEvents,
 } from "~/server/db/schema";
 import { CLOSED_STATUSES } from "~/lib/issues/status";
@@ -73,6 +74,13 @@ async function machineIdsForScope(
   if (scope.kind === "tag") {
     const tag = await getTag(tx, scope.tagType, scope.slug);
     return tag?.machines.map((machine) => machine.id) ?? [];
+  }
+  if (scope.kind === "handTag") {
+    const rows = await tx
+      .select({ machineId: machineTags.machineId })
+      .from(machineTags)
+      .where(eq(machineTags.tagId, scope.tagId));
+    return rows.map((row) => row.machineId);
   }
   if (scope.kind !== "collection") return null;
   const rows = await tx
@@ -365,6 +373,8 @@ function scopeId(scope: MachineViewScope): string {
       return scope.ownerId;
     case "tag":
       return `${scope.tagType}/${scope.slug}`;
+    case "handTag":
+      return scope.tagId;
   }
 }
 
@@ -387,6 +397,8 @@ function scopeFromId(
         ? { kind: "tag", tagType, slug: id.slice(split + 1) }
         : { kind: "tag", tagType: "manufacturer", slug: "" };
     }
+    case "handTag":
+      return { kind: "handTag", tagId: id };
   }
 }
 
