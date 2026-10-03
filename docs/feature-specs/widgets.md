@@ -70,10 +70,7 @@
 
 ## Known divergences (code vs spec)
 
-| Requirement | Divergence | Resolution |
-| :-- | :-- | :-- |
-| §3.1 | Every widget offers an All/Filtered choice stored in the URL and in Saved Views. | PP-jb9v |
-| §2.3, §2.4, §5.5–§5.7 | Widgets never stack on wide layouts, phones always start collapsed, and breakdowns wrap in a fixed order below the bar. | PP-jb9v |
+_None — the current implementation matches this spec._
 
 ---
 

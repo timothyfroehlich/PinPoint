@@ -102,7 +102,6 @@
   --color-presence-on-loan-bar: #62748e; /* slate-500 */
   --color-presence-pending-arrival: #46ecd5; /* teal-300 (text and bar) */
   --color-presence-removed: #9f9fa9; /* zinc-400 */
-  --color-presence-removed-bar: #71717b; /* zinc-500 */
 
   /* Semantic Status Colors */
   --color-success: #22c55e;

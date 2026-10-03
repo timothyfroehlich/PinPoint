@@ -49,9 +49,7 @@
 
 ## Known divergences (code vs spec)
 
-| Requirement | Divergence | Resolution |
-| :-- | :-- | :-- |
-| §2.2, §2.4, §3.1, §3.2, §4.2 | Widget Population parameters exist; the Summary Row shows two figures, Presence counts Removed machines, and Segments run in the old order. | PP-jb9v |
+_None — the current implementation matches this spec._
 
 ---
 

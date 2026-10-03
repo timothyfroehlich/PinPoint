@@ -16,13 +16,7 @@ import {
 } from "~/lib/issues/filters-queries";
 import type { IssueFilters } from "~/lib/issues/filters";
 import { OPEN_STATUSES } from "~/lib/issues/status";
-import type {
-  IssueListItem,
-  IssueListSummary,
-  IssueWidgetCounts,
-  UnifiedUser,
-  WidgetPopulation,
-} from "~/lib/types";
+import type { IssueListItem, IssueListSummary, UnifiedUser } from "~/lib/types";
 
 /** Minimal user shapes sent to the client filter/assignee controls (CORE-SEC-006). */
 export type IssueFilterUser = Pick<
@@ -63,10 +57,31 @@ const ISSUE_LIST_COLUMNS = {
 const OPEN_STATUS_SET: ReadonlySet<string> = new Set(OPEN_STATUSES);
 
 /**
- * Counts one Summary Widget population (issue-widgets §3–§5) in two grouped
- * queries, so no issue rows leave the database (widgets §4.2).
+ * Summary Widget counts for an issue list (issue-widgets §2–§5): every issue,
+ * open or closed, on the host's On the Floor machines (§2.2), whatever search
+ * and filters the list carries (widgets §3.1). On a group Issues tab those are
+ * the group's On the Floor machines. Two grouped queries, so no issue rows
+ * leave the database (widgets §4.2).
  */
-async function countIssuePopulation(where: SQL[]): Promise<IssueWidgetCounts> {
+async function loadIssueListSummary(
+  scopeMachineInitials: string[] | undefined
+): Promise<IssueListSummary> {
+  const where: SQL[] = [
+    exists(
+      db
+        .select()
+        .from(machines)
+        .where(
+          and(
+            eq(machines.initials, issues.machineInitials),
+            eq(machines.presenceStatus, "on_the_floor")
+          )
+        )
+    ),
+  ];
+  if (scopeMachineInitials !== undefined) {
+    where.push(inArray(issues.machineInitials, scopeMachineInitials));
+  }
   const [groups, machineRows] = await Promise.all([
     db
       .select({
@@ -84,7 +99,7 @@ async function countIssuePopulation(where: SQL[]): Promise<IssueWidgetCounts> {
       .where(and(...where, inArray(issues.status, [...OPEN_STATUSES]))),
   ]);
 
-  const counts: IssueWidgetCounts = {
+  const counts: IssueListSummary = {
     total: 0,
     open: 0,
     machinesWithOpenIssues: machineRows[0]?.value ?? 0,
@@ -113,57 +128,6 @@ async function countIssuePopulation(where: SQL[]): Promise<IssueWidgetCounts> {
     counts.byPriority[group.priority] += group.value;
   }
   return counts;
-}
-
-/**
- * Summary Widget counts for an issue list. All is every issue, open or
- * closed, on the host's On the Floor machines (issue-widgets §2.2), matching
- * the list's default view; Filtered is every issue matching the list's
- * filters across all pages. Only populations a widget uses load.
- */
-async function loadIssueListSummary(
-  filters: IssueFilters,
-  filteredWhere: SQL[],
-  scopeMachineInitials: string[] | undefined
-): Promise<IssueListSummary> {
-  const populations: Record<keyof IssueListSummary, WidgetPopulation> = {
-    status: filters.statusWidget ?? "all",
-    severity: filters.severityWidget ?? "all",
-    priority: filters.priorityWidget ?? "all",
-  };
-  const used = new Set(Object.values(populations));
-  const allWhere: SQL[] = [
-    exists(
-      db
-        .select()
-        .from(machines)
-        .where(
-          and(
-            eq(machines.initials, issues.machineInitials),
-            eq(machines.presenceStatus, "on_the_floor")
-          )
-        )
-    ),
-  ];
-  if (scopeMachineInitials !== undefined) {
-    allWhere.push(inArray(issues.machineInitials, scopeMachineInitials));
-  }
-  const [all, filtered] = await Promise.all([
-    used.has("all") ? countIssuePopulation(allWhere) : undefined,
-    used.has("filtered") ? countIssuePopulation(filteredWhere) : undefined,
-  ]);
-  const pick = (population: WidgetPopulation): IssueWidgetCounts => {
-    const counts = population === "all" ? all : filtered;
-    if (counts === undefined) {
-      throw new Error(`Issue widget population ${population} was not loaded`);
-    }
-    return counts;
-  };
-  return {
-    status: pick(populations.status),
-    severity: pick(populations.severity),
-    priority: pick(populations.priority),
-  };
 }
 
 /**
@@ -212,7 +176,7 @@ export async function loadIssueListPage(
         .select({ value: count() })
         .from(issues)
         .where(and(...where)),
-      loadIssueListSummary(filters, where, options.scopeMachineInitials),
+      loadIssueListSummary(options.scopeMachineInitials),
     ]);
 
   const filterUsers: IssueFilterUser[] = allUsers.map((u) => ({

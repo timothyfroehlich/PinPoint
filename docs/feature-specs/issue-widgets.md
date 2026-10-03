@@ -51,9 +51,7 @@
 
 ## Known divergences (code vs spec)
 
-| Requirement | Divergence | Resolution |
-| :-- | :-- | :-- |
-| §2.3, §2.4, §3.2, §4.2, §5.2 | Widget Population parameters, a three-figure Summary Row, and Segments in mildest-first order. | PP-jb9v |
+_None — the current implementation matches this spec._
 
 ---
 
