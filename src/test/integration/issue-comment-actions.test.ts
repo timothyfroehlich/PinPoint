@@ -604,6 +604,36 @@ describe("addCommentAction — integration (PP-x4li.1.4)", () => {
       .where(eq(issueComments.issueId, issueId));
     expect(rows).toHaveLength(0);
   });
+
+  it("returns SERVER error and does not mutate database when addIssueComment fails", async () => {
+    await mockAuth(MEMBER_ID);
+    const issuesService = await import("~/services/issues");
+    const spy = vi
+      .spyOn(issuesService, "addIssueComment")
+      .mockRejectedValueOnce(new Error("Database connection failure"));
+
+    const { addCommentAction } = await import("~/app/(app)/issues/actions");
+
+    const formData = new FormData();
+    formData.append("issueId", issueId);
+    formData.append("comment", JSON.stringify(validCommentDoc));
+
+    const result = await addCommentAction(undefined, formData);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("SERVER");
+    }
+
+    const db = await getTestDb();
+    const rows = await db
+      .select()
+      .from(issueComments)
+      .where(eq(issueComments.issueId, issueId));
+    expect(rows).toHaveLength(0);
+
+    spy.mockRestore();
+  });
 });
 
 // ---------------------------------------------------------------------------

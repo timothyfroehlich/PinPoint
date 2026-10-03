@@ -21,8 +21,8 @@
 ### 2.1 Redundant Layers & Mock Retirements (CORE-TEST-004)
 
 1. **Mocked DB Unit Tests -> PGlite Integration (CORE-TEST-004)**:
-   - `src/app/(app)/settings/reporting/actions.test.ts` (4 tests): Uses chained mocks (`mockUpdate`, `mockSet`, `mockWhere`, `mockReturning`) on `~/server/db` to test `updateDefaultReportModeAction`. Upgraded to worker-scoped PGlite integration test `src/test/integration/default-report-mode-action.test.ts` (`setupTestDb()` / `getTestDb()`), asserting real `userProfiles` row persistence and layout cache revalidation. Retired unit file deleted.
-   - `src/app/(app)/issues/export-action.test.ts` (16 tests): Uses canned `mockFindManyIssues`, `mockFindFirstProfile`, and mock `drizzle-orm` operators (`eq`, `and`) to test `exportIssuesAction`. Upgraded to worker-scoped PGlite integration test `src/test/integration/export-issues-action.test.ts` (`setupTestDb()` / `getTestDb()`), inserting real `issues`, `machines`, and `userProfiles`, asserting real query execution, relations, CSV serialization, filename formatting, and auth checks. Retired unit file deleted.
+   - `src/app/(app)/settings/reporting/actions.test.ts` (4 tests): Uses chained mocks (`mockUpdate`, `mockSet`, `mockWhere`, `mockReturning`) on `~/server/db` to test `updateDefaultReportModeAction`. Upgraded to worker-scoped PGlite integration test `src/test/integration/settings/default-report-mode-action.test.ts` (`setupTestDb()` / `getTestDb()`), asserting real `userProfiles` row persistence and layout cache revalidation. Retired unit file deleted.
+   - `src/app/(app)/issues/export-action.test.ts` (16 tests): Uses canned `mockFindManyIssues`, `mockFindFirstProfile`, and mock `drizzle-orm` operators (`eq`, `and`) to test `exportIssuesAction`. Upgraded to worker-scoped PGlite integration test `src/test/integration/issue-export-scope.test.ts` (`setupTestDb()` / `getTestDb()`), inserting real `issues`, `machines`, and `userProfiles`, asserting real query execution, relations, CSV serialization, filename formatting, and auth checks. Retired unit file deleted.
 
 ### 2.2 Consolidations into Canonical Keepers
 

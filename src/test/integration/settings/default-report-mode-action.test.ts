@@ -63,7 +63,7 @@ describe("updateDefaultReportModeAction — PGlite integration (CORE-TEST-004)",
         id: MEMBER_ID,
         role: "member",
         email: "member-report-mode@test.com",
-        mobileReportMode: "quick",
+        mobileReportMode: "detailed",
         desktopReportMode: "quick",
       }),
       createTestUser({
@@ -116,7 +116,7 @@ describe("updateDefaultReportModeAction — PGlite integration (CORE-TEST-004)",
       .from(userProfiles)
       .where(eq(userProfiles.id, MEMBER_ID));
 
-    expect(profile.mobileReportMode).toBe("quick");
+    expect(profile.mobileReportMode).toBe("detailed");
     expect(profile.desktopReportMode).toBe("quick");
   });
 
@@ -140,7 +140,7 @@ describe("updateDefaultReportModeAction — PGlite integration (CORE-TEST-004)",
     expect(profile.desktopReportMode).toBe("quick");
   });
 
-  it("requires a signed-in account", async () => {
+  it("requires a signed-in account and leaves database untouched", async () => {
     await mockAuth(null);
 
     const result = await updateDefaultReportModeAction(
@@ -149,5 +149,14 @@ describe("updateDefaultReportModeAction — PGlite integration (CORE-TEST-004)",
     );
 
     expect(result).toMatchObject({ ok: false, code: "UNAUTHORIZED" });
+
+    const db = await getTestDb();
+    const [profile] = await db
+      .select()
+      .from(userProfiles)
+      .where(eq(userProfiles.id, MEMBER_ID));
+
+    expect(profile.mobileReportMode).toBe("detailed");
+    expect(profile.desktopReportMode).toBe("quick");
   });
 });
