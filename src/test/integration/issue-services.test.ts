@@ -887,6 +887,45 @@ describe("Issue Service Functions (Integration)", () => {
       );
     });
 
+    it("names a mentioned person by their current name in the description (PP-0fg0.2)", async () => {
+      const db = await getTestDb();
+      const description: ProseMirrorDoc = {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              { type: "text", text: "Ask " },
+              // The label as it was when the description was written.
+              {
+                type: "mention",
+                attrs: { id: testUser2.id, label: "Old Name" },
+              },
+            ],
+          },
+        ],
+      };
+      await db
+        .update(issues)
+        .set({ description })
+        .where(eq(issues.id, testIssue.id));
+
+      await assignIssue({
+        issueId: testIssue.id,
+        assignedTo: testUser2.id,
+        actorId: testUser.id,
+      });
+
+      expect(vi.mocked(planNotification)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "issue_assigned",
+          issueDescription: "Ask @New Assignee",
+        }),
+        expect.anything(),
+        expect.anything()
+      );
+    });
+
     it("uses a new persisted event ID when an assignee returns", async () => {
       const db = await getTestDb();
       await assignIssue({
@@ -1065,6 +1104,42 @@ describe("Issue Service Functions (Integration)", () => {
             issueTitle: testIssue.title,
             machineName: testMachine.name,
             commentContent: "My comment",
+          }),
+        ]),
+        expect.anything(),
+        expect.anything()
+      );
+    });
+
+    it("names a mentioned person by their current name in the comment body (PP-0fg0.2)", async () => {
+      // A draft can carry a label that went stale before it was posted.
+      const content: ProseMirrorDoc = {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              { type: "text", text: "Thanks " },
+              {
+                type: "mention",
+                attrs: { id: testUser.id, label: "Old Name" },
+              },
+            ],
+          },
+        ],
+      };
+
+      await addIssueComment({
+        issueId: testIssue.id,
+        content,
+        userId: testUser.id,
+      });
+
+      expect(vi.mocked(planNotifications)).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            type: "new_comment",
+            commentContent: "Thanks @Test User",
           }),
         ]),
         expect.anything(),

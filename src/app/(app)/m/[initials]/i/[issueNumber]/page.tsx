@@ -24,6 +24,7 @@ import { CLOSED_STATUSES } from "~/lib/issues/status";
 import { formatIssueId } from "~/lib/issues/utils";
 import type { IssueWithAllRelations } from "~/lib/types";
 import { EditableIssueTitle } from "./editable-issue-title";
+import { getIssueForDetail } from "./_data";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { OwnerRequirementsCallout } from "~/components/machines/OwnerRequirementsCallout";
 import {
@@ -81,78 +82,8 @@ export default async function IssueDetailPage({
 
   const [issue, currentUserProfile, otherIssues, otherIssuesCount] =
     await Promise.all([
-      // Query issue with all relations
-      db.query.issues.findFirst({
-        where: and(
-          eq(issues.machineInitials, initials),
-          eq(issues.issueNumber, issueNum)
-        ),
-        columns: { reporterEmail: false },
-        with: {
-          machine: {
-            columns: {
-              id: true,
-              name: true,
-              initials: true,
-              ownerRequirements: true,
-            },
-            with: {
-              owner: {
-                columns: {
-                  id: true,
-                  name: true,
-                },
-              },
-              invitedOwner: {
-                columns: {
-                  id: true,
-                  name: true,
-                },
-              },
-            },
-          },
-          reportedByUser: {
-            columns: {
-              id: true,
-              name: true,
-            },
-          },
-          assignedToUser: {
-            columns: {
-              id: true,
-              name: true,
-            },
-          },
-          invitedReporter: {
-            columns: {
-              id: true,
-              name: true,
-            },
-          },
-          comments: {
-            orderBy: (comments, { asc: orderAsc }) => [
-              orderAsc(comments.createdAt),
-            ],
-            with: {
-              author: {
-                columns: {
-                  id: true,
-                  name: true,
-                },
-              },
-              images: {
-                where: (images, { isNull }) => isNull(images.deletedAt),
-              },
-            },
-          },
-          images: {
-            where: (images, { isNull }) => isNull(images.deletedAt),
-          },
-          watchers: {
-            columns: { userId: true },
-          },
-        },
-      }),
+      // Query issue with all relations; mentions carry current names
+      getIssueForDetail(initials, issueNum),
       // Fetch current user's profile for permission-aware rendering and to
       // gate the (potentially expensive + privacy-sensitive) assignee roster
       // fetch below.

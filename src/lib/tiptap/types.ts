@@ -140,6 +140,51 @@ export function extractMentions(
 }
 
 /**
+ * Replace each mention's stored `label` with the name `names` holds for its
+ * `id`. A mention whose id is not in `names` keeps its stored label.
+ *
+ * Mention nodes persist the person's name as it was when the mention was
+ * written; the server loads current names (`loadMentionNames`) and applies
+ * them here so every renderer and the editor read the current one. Pure: the
+ * input doc is not mutated.
+ */
+export function applyMentionNames(
+  doc: ProseMirrorDoc,
+  names: ReadonlyMap<string, string>
+): ProseMirrorDoc;
+export function applyMentionNames(
+  doc: ProseMirrorDoc | null,
+  names: ReadonlyMap<string, string>
+): ProseMirrorDoc | null;
+export function applyMentionNames(
+  doc: ProseMirrorDoc | null | undefined,
+  names: ReadonlyMap<string, string>
+): ProseMirrorDoc | null | undefined;
+export function applyMentionNames(
+  doc: ProseMirrorDoc | null | undefined,
+  names: ReadonlyMap<string, string>
+): ProseMirrorDoc | null | undefined {
+  if (!isProseMirrorDoc(doc) || names.size === 0) return doc;
+
+  function relabel(nodes: ProseMirrorNode[]): ProseMirrorNode[] {
+    return nodes.map((node) => {
+      const id = node.attrs?.["id"];
+      if (node.type === "mention" && typeof id === "string") {
+        const name = names.get(id);
+        return name === undefined
+          ? node
+          : { ...node, attrs: { ...node.attrs, label: name } };
+      }
+      return Array.isArray(node.content)
+        ? { ...node, content: relabel(node.content) }
+        : node;
+    });
+  }
+
+  return { ...doc, content: relabel(doc.content) };
+}
+
+/**
  * Extract plain text from a ProseMirror document (for search, truncation, etc.).
  * Robustly handles legacy plain text strings.
  */
