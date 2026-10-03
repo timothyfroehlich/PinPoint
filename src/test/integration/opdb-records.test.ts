@@ -1,7 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { asDbOrTx, getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { opdbMachines } from "~/server/db/schema";
 import type { OpdbMachine } from "~/lib/opdb/types";
+
+vi.mock("~/lib/opdb/export", () => ({
+  fetchOpdbExport: vi.fn(),
+}));
+
+import { fetchOpdbExport } from "~/lib/opdb/export";
 
 const { getOpdbRecords, refreshOpdbRecords } =
   await import("~/lib/opdb/records");
@@ -28,14 +34,18 @@ const funhouse: OpdbMachine = {
 describe("OPDB records", () => {
   setupTestDb();
 
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("stores the export and updates rows on the next refresh", async () => {
     const tx = asDbOrTx(await getTestDb());
-    expect(
-      await refreshOpdbRecords(tx, () => Promise.resolve([godzilla, funhouse]))
-    ).toBe(2);
-    await refreshOpdbRecords(tx, () =>
-      Promise.resolve([{ ...funhouse, playerCount: 2 }])
-    );
+    vi.mocked(fetchOpdbExport).mockResolvedValue([godzilla, funhouse]);
+    expect(await refreshOpdbRecords(tx)).toBe(2);
+    vi.mocked(fetchOpdbExport).mockResolvedValue([
+      { ...funhouse, playerCount: 2 },
+    ]);
+    await refreshOpdbRecords(tx);
 
     const rows = await tx.select().from(opdbMachines);
     expect(rows).toHaveLength(2);
@@ -47,16 +57,17 @@ describe("OPDB records", () => {
 
   it("keeps the stored copy when the download fails", async () => {
     const tx = asDbOrTx(await getTestDb());
-    await refreshOpdbRecords(tx, () => Promise.resolve([funhouse]));
-    await expect(
-      refreshOpdbRecords(tx, () => Promise.reject(new Error("CDN down")))
-    ).rejects.toThrow("CDN down");
+    vi.mocked(fetchOpdbExport).mockResolvedValue([funhouse]);
+    await refreshOpdbRecords(tx);
+    vi.mocked(fetchOpdbExport).mockRejectedValue(new Error("CDN down"));
+    await expect(refreshOpdbRecords(tx)).rejects.toThrow("CDN down");
     expect(await tx.select().from(opdbMachines)).toHaveLength(1);
   });
 
   it("resolves exact IDs and falls back from an alias to its machine", async () => {
     const tx = asDbOrTx(await getTestDb());
-    await refreshOpdbRecords(tx, () => Promise.resolve([godzilla, funhouse]));
+    vi.mocked(fetchOpdbExport).mockResolvedValue([godzilla, funhouse]);
+    await refreshOpdbRecords(tx);
 
     const records = await getOpdbRecords(tx, [
       "G5Dz7-Mq139",

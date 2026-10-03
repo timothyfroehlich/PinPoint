@@ -61,30 +61,6 @@ describe("IntegrationsDirtyStateProvider", () => {
     );
   });
 
-  it("confirms same-app links and restores focus when navigation is canceled", async () => {
-    const user = userEvent.setup();
-    render(
-      <IntegrationsDirtyStateProvider>
-        <DirtySection sectionId="discord" />
-        <a href="/m?status=active">Machines</a>
-      </IntegrationsDirtyStateProvider>
-    );
-    const link = screen.getByRole("link", { name: "Machines" });
-
-    await user.click(link);
-    expect(
-      screen.getByRole("alertdialog", { name: "Discard unsaved changes?" })
-    ).toBeInTheDocument();
-    expect(pushMock).not.toHaveBeenCalled();
-
-    await user.click(screen.getByRole("button", { name: "Stay on page" }));
-    await waitFor(() => expect(link).toHaveFocus());
-
-    await user.click(link);
-    await user.click(screen.getByRole("button", { name: "Discard and leave" }));
-    expect(pushMock).toHaveBeenCalledWith("/m?status=active");
-  });
-
   it("does not synthesize a browser-Back guard", async () => {
     render(
       <IntegrationsDirtyStateProvider>

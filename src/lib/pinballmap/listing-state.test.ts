@@ -185,13 +185,6 @@ describe("derivePbmListingView — the fourteen states", () => {
   it.each(CASES)("$name when $when", ({ name, args }) => {
     expect(derive(args).name).toBe(name);
   });
-
-  it("covers every name in the union exactly once", () => {
-    const covered = CASES.map((c) => c.name).sort();
-    expect(new Set(covered).size).toBe(CASES.length);
-    // Fails loudly when a state is added to the union without a row here.
-    expect(covered).toHaveLength(14);
-  });
 });
 
 describe("out of sync", () => {

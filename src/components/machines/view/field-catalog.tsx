@@ -15,7 +15,7 @@ import {
   type MachineStatus,
 } from "~/lib/machines/status";
 import { MACHINE_VIEW_FIELDS } from "~/lib/machines/view/config";
-import { formatCompactAgeAgo } from "~/lib/machines/view/model";
+import { formatCompactAgeAgo } from "~/lib/dates";
 import type { MachineViewFieldId, MachineViewRow } from "~/lib/types";
 import { cn } from "~/lib/utils";
 

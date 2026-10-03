@@ -54,7 +54,7 @@ export interface PbmLinkSelection {
  * CHECK allows one "no value"). A name is never split on punctuation (machine
  * editing spec 3.5) — "Lawlor, Pat" stays one name.
  */
-export function normalizeCreditNames(
+function normalizeCreditNames(
   names: readonly string[] | undefined
 ): string[] | null {
   if (names === undefined) return null;

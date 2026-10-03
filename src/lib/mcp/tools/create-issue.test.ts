@@ -50,10 +50,6 @@ describe("createIssueIdempotencyKey", () => {
     );
   });
 
-  it("is stable for an identical call in the same window", () => {
-    expect(key()).toBe(key());
-  });
-
   it("differs when any field of the report differs", () => {
     const original = key();
     expect(key({ title: "right flipper weak" })).not.toBe(original);

@@ -22,10 +22,8 @@ export default async function TagIssuesPage({
     <MachineGroupIssuesTab
       machines={tag.machines}
       searchParams={await searchParams}
-      viewer={{
-        userId: viewer.userId,
-        isAdmin: viewer.role === "admin", // permissions-audit-allow: SQL visibility flag, mirrors /issues page
-      }}
+      viewer={viewer}
+      exportScope={{ kind: "tag", type, slug }}
     />
   );
 }

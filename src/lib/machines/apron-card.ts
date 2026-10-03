@@ -1,4 +1,8 @@
-import { docToPlainText, type ProseMirrorDoc } from "~/lib/tiptap/types";
+import type { ProseMirrorDoc } from "~/lib/tiptap/types";
+import {
+  cardTextBlocks,
+  type CardTextBlock,
+} from "~/lib/machines/apron-card-text";
 import {
   getCurrentManufacturer,
   type MachineManufacturerSource,
@@ -32,8 +36,9 @@ export interface ApronCardContent {
   manufacturer: string | null;
   year: number | null;
   ownerName: string | null;
-  description: string;
-  tip: string;
+  /** The printable card text (spec §3.7). */
+  description: CardTextBlock[];
+  tip: CardTextBlock[];
   tipEnabled: boolean;
   credits: MachineCredits;
   designEnabled: boolean;
@@ -66,6 +71,13 @@ export interface ApronCardSettings {
   artEnabled: boolean;
 }
 
+/** A machine's saved card as the Apron card tab reads it (spec §11). */
+export interface SavedApronCard extends ApronCardSettings {
+  id: string;
+  name: string;
+  size: ApronCardSize;
+}
+
 /** Only grouped Pinball Map families supply edition metadata. */
 export function groupedEdition(
   title: Pick<
@@ -90,12 +102,17 @@ export function groupedEdition(
   return /\bedition$/i.test(mapped) ? mapped : `${mapped} Edition`;
 }
 
-export function apronCardContent(
+/** Identity lines and credits — everything on a card but its settings. */
+export type ApronCardIdentity = Omit<
+  ApronCardContent,
+  "description" | "tip" | "tipEnabled" | "designEnabled" | "artEnabled"
+>;
+
+export function apronCardIdentity(
   machine: ApronMachineSource,
-  card: ApronCardSettings | null,
   credits: MachineCredits,
   hasPinTips: boolean
-): ApronCardContent {
+): ApronCardIdentity {
   return {
     name: machine.name,
     edition: groupedEdition(machine.pinballmapTitle),
@@ -108,16 +125,44 @@ export function apronCardContent(
     // the "(invited)" status marker the in-app owner block shows is an
     // internal-workflow detail, not something the physical card carries.
     ownerName: machine.owner?.name ?? machine.invitedOwner?.name ?? null,
-    description: docToPlainText(
-      card?.useCustomDescription ? card.description : machine.description
-    ),
-    tip: docToPlainText(card?.tip),
-    tipEnabled: card?.tipEnabled ?? false,
     credits,
-    designEnabled: card?.designEnabled ?? true,
-    artEnabled: card?.artEnabled ?? true,
     hasPinTips,
   };
+}
+
+/**
+ * What a card prints for its settings (spec §2.2, §3.7): the card description
+ * when chosen, else the machine's main description. One function for the
+ * Apron card tab's preview and for print and export, so they never disagree.
+ */
+export function cardFaceContent(
+  identity: ApronCardIdentity,
+  mainDescription: ProseMirrorDoc | null,
+  card: ApronCardSettings | null
+): ApronCardContent {
+  return {
+    ...identity,
+    description: cardTextBlocks(
+      card?.useCustomDescription ? card.description : mainDescription
+    ),
+    tip: cardTextBlocks(card?.tip),
+    tipEnabled: card?.tipEnabled ?? false,
+    designEnabled: card?.designEnabled ?? true,
+    artEnabled: card?.artEnabled ?? true,
+  };
+}
+
+export function apronCardContent(
+  machine: ApronMachineSource,
+  card: ApronCardSettings | null,
+  credits: MachineCredits,
+  hasPinTips: boolean
+): ApronCardContent {
+  return cardFaceContent(
+    apronCardIdentity(machine, credits, hasPinTips),
+    machine.description,
+    card
+  );
 }
 
 /** Names a credit row shows before collapsing the rest into a count (10.3). */
@@ -322,13 +367,6 @@ export function shrinkUntilFits({
   return size;
 }
 
-/** Splits card text into paragraphs on blank or single line breaks. */
-export function cardParagraphs(text: string): string[] {
-  return text
-    .split(/\n+/)
-    .map((p) => p.trim())
-    .filter(Boolean);
-}
 /** A size's physical dimensions in CSS px (96 per inch). */
 export function apronCardPixelSize(size: ApronCardSize): {
   width: number;

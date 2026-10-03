@@ -2,7 +2,11 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import { useCallback, useRef, useEffect } from "react";
-import { ISSUE_WIDGET_PARAMS, type IssueFilters } from "~/lib/issues/filters";
+import {
+  ISSUE_WIDGET_PARAMS,
+  type IssueFilters,
+  type IssueSort,
+} from "~/lib/issues/filters";
 import { storeLastIssuesPath } from "~/lib/cookies/client";
 
 interface UseSearchFiltersOptions {
@@ -14,7 +18,7 @@ interface UseSearchFiltersReturn {
     updates: Partial<IssueFilters>,
     options?: UseSearchFiltersOptions
   ) => void;
-  setSort: (sort: string) => void;
+  setSort: (sort: IssueSort) => void;
   setPage: (page: number) => void;
   setPageSize: (pageSize: number) => void;
 }
@@ -128,7 +132,7 @@ export function useSearchFilters(
    * Updates sort column and resets to page 1
    */
   const setSort = useCallback(
-    (newSort: string): void => {
+    (newSort: IssueSort): void => {
       pushFilters({ sort: newSort, page: 1 });
     },
     [pushFilters]
