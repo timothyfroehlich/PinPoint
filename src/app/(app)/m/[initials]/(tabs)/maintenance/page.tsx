@@ -14,7 +14,6 @@ import {
 import { deriveMachineStatus } from "~/lib/machines/status";
 import { MachineIssuesCard } from "~/app/(app)/m/[initials]/machine-issues-card";
 import { MachineOpsBox } from "~/app/(app)/m/[initials]/machine-ops-box";
-import { ApronCardPanel } from "~/app/(app)/m/[initials]/apron/ApronCardPanel";
 import {
   getMachineForLayout,
   getMachineAllIssues,
@@ -78,7 +77,6 @@ export default async function MachineMaintenanceTab({
     "machines.view.ownerRequirements",
     accessLevel
   );
-  const canExportApron = checkPermission("machines.apron.export", accessLevel);
 
   const currentUserWatch = user
     ? machine.watchers.find((w) => w.userId === user.id)
@@ -102,12 +100,12 @@ export default async function MachineMaintenanceTab({
 
   // Two independent columns (design §4 / service-desktop mockup `.col`s): the
   // main column flows Open Issues → Activity; the 320px right rail stacks the
-  // Machine box → Apron card. Each column sizes to its own content, so a short Open
+  // Machine box. Each column sizes to its own content, so a short Open
   // Issues card no longer stretches to the tall Machine box — the previous 2×2
   // grid placed all four cards on shared rows, coupling their heights and
   // leaving dead space below the shorter card. On mobile the two columns
   // collapse into one flex stack in DOM reading order: Open Issues → Activity →
-  // Machine box → Apron card.
+  // Machine box. Apron cards have their own tab (apron-cards spec §3.1).
   return (
     <div className="flex flex-col gap-6 md:grid md:grid-cols-[minmax(0,1fr)_320px] md:items-start md:gap-6">
       <div className="flex flex-col gap-6 md:col-start-1">
@@ -139,12 +137,6 @@ export default async function MachineMaintenanceTab({
           ownerRequirements={machine.ownerRequirements}
           canViewOwnerRequirements={canViewOwnerRequirements}
           canEditGeneral={canEditGeneral}
-        />
-        <ApronCardPanel
-          machine={machine}
-          variant="rail"
-          canEdit={canEditGeneral}
-          canExport={canExportApron}
         />
       </div>
     </div>

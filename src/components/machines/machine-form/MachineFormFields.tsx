@@ -65,8 +65,8 @@ export interface MachineFormFieldsProps {
 /**
  * The machine form's fields, in the one order both pages share
  * (machine-editing 2.1, 2.5): machine name and availability; Model Details;
- * Description; Owner's Requirements; Integrations. The Apron card section
- * joins after Integrations in PP-wqit.14.3.
+ * Description; Owner's Requirements; Integrations. Apron cards have their own
+ * tab (apron-cards 3.1).
  *
  * Fields only — each page owns its `<form>`, its submission, and its actions,
  * because creating and editing save differently (4.1–4.3). What a page puts in

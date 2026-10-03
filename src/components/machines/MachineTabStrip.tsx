@@ -13,12 +13,15 @@ interface MachineTabStripProps {
   };
   /** Viewer may open Manage to edit the machine or read Pinball Map status. */
   canManage: boolean;
+  /** Viewer is a member who can see and export apron cards (apron-cards 3.8). */
+  canSeeApronCards: boolean;
 }
 
 export function MachineTabStrip({
   initials,
   maintenance,
   canManage,
+  canSeeApronCards,
 }: MachineTabStripProps): React.JSX.Element {
   return (
     <RouteTabStrip
@@ -36,6 +39,9 @@ export function MachineTabStrip({
           label: "Service",
           badge: { count: maintenance.openCount, status: maintenance.status },
         },
+        // Members only (apron-cards 3.8). Placed beside Service by design,
+        // so for guests the tabs after it shift left by one.
+        ...(canSeeApronCards ? [{ slug: "apron", label: "Apron card" }] : []),
         { slug: "timeline", label: "Timeline" },
         // URL slug stays `edit`; the visible label is "Manage". The tab holds
         // the machine's RECORD — name, model, availability, PBM listing,
