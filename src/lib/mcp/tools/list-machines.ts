@@ -16,11 +16,8 @@ import {
 import { z } from "zod";
 
 import { checkPermission } from "~/lib/permissions/helpers";
-import {
-  VALID_MACHINE_PRESENCE_STATUSES,
-  type MachinePresenceStatus,
-} from "~/lib/machines/presence";
 import type { PbmListingView } from "~/lib/pinballmap/listing-state";
+import { machineNotRemoved } from "~/lib/machines/queries";
 import { db } from "~/server/db";
 import { machines, pinballmapCatalog } from "~/server/db/schema";
 
@@ -34,7 +31,9 @@ import {
   getOpenIssueCounts,
   getOwnerNamesByMachine,
   McpToolError,
+  presenceFilterSchema,
   READ_ONLY_TOOL_ANNOTATIONS,
+  resolvePresence,
   runTool,
   type ToolOutcome,
 } from "./shared";
@@ -180,37 +179,6 @@ async function loadOutOfSync(): Promise<OutOfSyncLineup> {
   return { source, views };
 }
 
-/**
- * `presence` takes a SET, not a single value (PP-u4ab.13).
- *
- * A single value cannot express the question the fleet linking pass (PP-h059)
- * actually runs on: "unlinked AND still plausibly in the collection". Without
- * it, `pinballmap: "unlinked"` also returns the cabinets that are `removed` or
- * `pending_arrival` — rows nobody will ever link, which therefore sit in every
- * page of that filter forever and hold `total` above zero permanently. The
- * model was left to notice and skip them by hand on each page.
- *
- * The single-value form is kept, not deprecated: it is what every existing
- * caller sends, and `presence: "off_the_floor"` stays the natural way to ask a
- * one-state question.
- *
- * `.min(1)` on the array is deliberate. An empty set would type-check, produce
- * `inArray(col, [])` — a predicate matching nothing — and hand back
- * `total: 0` for the whole collection, which reads as an authoritative "there
- * are none" rather than as the malformed filter it is (CORE-ARCH-012). Zod
- * rejects it instead.
- */
-const presenceFilterSchema = z.union([
-  z.enum(VALID_MACHINE_PRESENCE_STATUSES),
-  z.array(z.enum(VALID_MACHINE_PRESENCE_STATUSES)).min(1),
-]);
-
-type PresenceFilter = z.infer<typeof presenceFilterSchema>;
-
-function resolvePresence(filter: PresenceFilter): MachinePresenceStatus[] {
-  return Array.isArray(filter) ? filter : [filter];
-}
-
 /** Exported for the schema-level tests; the tool registers this same object. */
 export const listMachinesSchema = z.object({
   search: z
@@ -224,7 +192,7 @@ export const listMachinesSchema = z.object({
   presence: presenceFilterSchema
     .optional()
     .describe(
-      "Which availability statuses to include: a single status or an array of statuses (on_the_floor, off_the_floor, on_loan, pending_arrival, removed)."
+      "Which availability statuses to include: a single status or an array of statuses (on_the_floor, off_the_floor, on_loan, pending_arrival, removed). Omitted, every status except removed is returned (except under pinballmap 'out_of_sync', which covers every status); name 'removed' to include Removed machines."
     ),
   pinballmap: z
     .enum(PINBALLMAP_FILTERS)
@@ -267,6 +235,11 @@ export async function runListMachines(
     conditions.push(
       inArray(machines.presenceStatus, resolvePresence(args.presence))
     );
+  } else if (args.pinballmap !== "out_of_sync") {
+    // Removed is the archived state: left out unless the caller names it in
+    // `presence` (PP-s363). `out_of_sync` keeps them, because a Removed machine
+    // still on the Pinball Map lineup is exactly what that filter reports.
+    conditions.push(machineNotRemoved());
   }
   if (args.search) {
     const like = `%${args.search}%`;
@@ -373,7 +346,7 @@ export function registerListMachines(server: McpServer): void {
     {
       title: "List machines",
       description:
-        "List machines with initials, name, availability (presence), owner name, and open-issue count. Supports search by name/initials, presence filtering, and PinballMap filtering ('unlinked' | 'linked' | 'excluded' | 'out_of_sync'). Under 'out_of_sync' each machine carries lineup.state and lineup.pushAction, and the result carries lineupSnapshot (when the lineup was last synced). Returns paginated results with total count and hasMore.",
+        "List machines with initials, name, availability (presence), owner name, and open-issue count. Supports search by name/initials, presence filtering (Removed machines are left out unless presence names 'removed'), and PinballMap filtering ('unlinked' | 'linked' | 'excluded' | 'out_of_sync'). Under 'out_of_sync' each machine carries lineup.state and lineup.pushAction, and the result carries lineupSnapshot (when the lineup was last synced). Returns paginated results with total count and hasMore.",
       inputSchema: listMachinesSchema,
       annotations: READ_ONLY_TOOL_ANNOTATIONS,
     },
