@@ -160,7 +160,7 @@ describe("useUnsavedChangesGuard", () => {
 
       render(
         <div>
-          <a href="/destination">Target Link</a>
+          <a href="/m?status=active">Target Link</a>
           <TestComponent isDirty={true} onDiscard={onDiscard} />
         </div>
       );
@@ -174,7 +174,7 @@ describe("useUnsavedChangesGuard", () => {
       await user.click(discardBtn);
 
       expect(onDiscard).toHaveBeenCalledTimes(1);
-      expect(pushMock).toHaveBeenCalledWith("/destination");
+      expect(pushMock).toHaveBeenCalledWith("/m?status=active");
     });
 
     it("cancels discard and stays on page when user clicks Stay", async () => {
