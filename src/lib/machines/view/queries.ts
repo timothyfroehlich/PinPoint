@@ -240,10 +240,7 @@ export function getLatestMachineActivityDates(
   return latestTimelineDates(tx, machineIds, false);
 }
 
-function publicRow(
-  candidate: MachineViewCandidate,
-  includeHealth: boolean
-): MachineViewRow {
+function publicRow(candidate: MachineViewCandidate): MachineViewRow {
   const row: MachineViewRow = {
     id: candidate.id,
     initials: candidate.initials,
@@ -254,7 +251,9 @@ function publicRow(
     presence: candidate.presence,
     createdAt: candidate.createdAt,
   };
-  if (includeHealth && candidate.health !== undefined) {
+  // Every row carries health: the phone Compact row always shows Playability
+  // and the open-issue count, whatever fields are selected (§5.3).
+  if (candidate.health !== undefined) {
     row.health = candidate.health;
   }
   if (candidate.lastServicedAt !== undefined) {
@@ -286,9 +285,10 @@ export async function loadMachineViewFromDatabase(
   const dependencyPlan = planMachineViewDependencies(validatedState);
   const machineIds = baseRows.map((row) => row.id);
   const machineInitials = baseRows.map((row) => row.initials);
-  // Summary Widgets always need health across the whole scope
-  // (machine-widgets §2.3), so it loads regardless of the row plan; rows only
-  // carry it to the browser when a field, sort, or filter needs it.
+  // Health loads for the whole scope on every request: the Summary Widgets
+  // count it across the scope (machine-widgets §2.3) and every row carries it
+  // to the browser (machine-views §5.3). Service and activity dates load only
+  // when a displayed field or the sort needs them.
   const [health, serviceDates, activityDates] = await Promise.all([
     getMachineViewHealth(tx, machineInitials),
     dependencyPlan.service
@@ -339,7 +339,7 @@ export async function loadMachineViewFromDatabase(
   const state = { ...validatedState, page: applied.page };
 
   return {
-    rows: applied.rows.map((row) => publicRow(row, dependencyPlan.health)),
+    rows: applied.rows.map(publicRow),
     scopeCount: baseRows.length,
     totalCount: applied.totalCount,
     summary: summarizeMachineView(candidates, applied.filteredRows, state),

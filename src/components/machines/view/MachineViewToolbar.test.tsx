@@ -141,7 +141,16 @@ describe("MachineViewToolbar", () => {
     );
     expect(onStateChange).toHaveBeenCalledWith({
       ...state,
-      columns: ["machine", "playability", "openIssues"],
+      columns: [
+        "machine",
+        "playability",
+        "presence",
+        "openIssues",
+        "lastActivity",
+        "owner",
+        "manufacturer",
+        "year",
+      ],
       page: 3,
     });
 
@@ -179,17 +188,22 @@ describe("MachineViewToolbar", () => {
     renderToolbar(state);
 
     await user.click(screen.getByTestId("machine-view-mobile-options-trigger"));
-    expect(screen.getByText("3 selected")).toBeInTheDocument();
+    expect(screen.getByText("8 selected")).toBeInTheDocument();
     await user.click(screen.getByText("Fields"));
-    await user.click(screen.getByRole("checkbox", { name: "Last Activity" }));
+    await user.click(screen.getByRole("checkbox", { name: "Date Added" }));
     expect(onStateChange).toHaveBeenCalledWith({
       ...state,
       columns: [
         "machine",
         "playability",
+        "presence",
         "openIssues",
         "lastServiced",
         "lastActivity",
+        "owner",
+        "manufacturer",
+        "year",
+        "dateAdded",
       ],
       page: 3,
     });

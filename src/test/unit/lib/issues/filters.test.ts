@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { parseIssueFilters, hasActiveIssueFilters } from "~/lib/issues/filters";
+import { machineIssuesHref } from "~/lib/issues/links";
 
 describe("parseIssueFilters", () => {
   it("parses search query", () => {
@@ -141,5 +142,17 @@ describe("hasActiveIssueFilters", () => {
   it("returns false when no params are present", () => {
     const params = new URLSearchParams("");
     expect(hasActiveIssueFilters(params)).toBe(false);
+  });
+});
+
+describe("machineIssuesHref", () => {
+  it("opens one machine's issues in every presence state (issues-list §7.4)", () => {
+    const href = machineIssuesHref("AFM");
+    const url = new URL(href, "https://pinpoint.test");
+
+    expect(url.pathname).toBe("/issues");
+    const filters = parseIssueFilters(url.searchParams);
+    expect(filters.machine).toEqual(["AFM"]);
+    expect(filters.includeInactiveMachines).toBe(true);
   });
 });
