@@ -1,6 +1,7 @@
-import { asc, eq, or, sql } from "drizzle-orm";
+import { and, asc, eq, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { CLOSED_STATUSES } from "~/lib/issues/status";
+import { machineNotRemoved } from "~/lib/machines/queries";
 import type { QuickSearchResults } from "~/lib/quick-search/types";
 import { db } from "~/server/db";
 import { issues, machines, pinballmapCatalog } from "~/server/db/schema";
@@ -91,12 +92,16 @@ export async function searchQuickNavigation(
         eq(machines.pinballmapMachineId, pinballmapCatalog.pinballmapMachineId)
       )
       .where(
-        or(
-          sql`${machines.initials} ilike ${contains}`,
-          sql`${machines.name} ilike ${contains}`,
-          sql`${modelIdentity} ilike ${contains}`,
-          sql`${modelManufacturer} ilike ${contains}`,
-          sql`${modelYear} ilike ${contains}`
+        and(
+          // Removed machines and their issues are left out (spec 3.4).
+          machineNotRemoved(),
+          or(
+            sql`${machines.initials} ilike ${contains}`,
+            sql`${machines.name} ilike ${contains}`,
+            sql`${modelIdentity} ilike ${contains}`,
+            sql`${modelManufacturer} ilike ${contains}`,
+            sql`${modelYear} ilike ${contains}`
+          )
         )
       )
       .orderBy(machineRank, asc(machines.name))
@@ -113,11 +118,14 @@ export async function searchQuickNavigation(
       .from(issues)
       .innerJoin(machines, eq(issues.machineInitials, machines.initials))
       .where(
-        or(
-          sql`${issueIdentifier} ilike ${contains}`,
-          sql`${issues.title} ilike ${contains}`,
-          sql`${issues.machineInitials} ilike ${contains}`,
-          sql`${machines.name} ilike ${contains}`
+        and(
+          machineNotRemoved(),
+          or(
+            sql`${issueIdentifier} ilike ${contains}`,
+            sql`${issues.title} ilike ${contains}`,
+            sql`${issues.machineInitials} ilike ${contains}`,
+            sql`${machines.name} ilike ${contains}`
+          )
         )
       )
       .orderBy(issueRank, closedRank, asc(issues.title))
