@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   formatCompactAge,
+  formatCompactAgeAgo,
   formatDayGroup,
   formatTimelineBucket,
 } from "./dates";
@@ -113,13 +114,19 @@ describe("formatTimelineBucket", () => {
 describe("formatCompactAge", () => {
   const now = new Date("2026-06-09T12:00:00Z");
 
-  it("returns 'today' for same-day and future timestamps", () => {
-    expect(formatCompactAge(new Date("2026-06-09T01:00:00Z"), now)).toBe(
-      "today"
-    );
-    expect(formatCompactAge(new Date("2026-07-01T00:00:00Z"), now)).toBe(
-      "today"
-    );
+  it("returns 'now' under a minute and for future timestamps", () => {
+    expect(formatCompactAge(new Date("2026-06-09T11:59:30Z"), now)).toBe("now");
+    expect(formatCompactAge(new Date("2026-07-01T00:00:00Z"), now)).toBe("now");
+  });
+
+  it("returns minutes under an hour and hours under a day", () => {
+    expect(formatCompactAge(new Date("2026-06-09T11:48:00Z"), now)).toBe("12m");
+    expect(formatCompactAge(new Date("2026-06-09T09:00:00Z"), now)).toBe("3h");
+    expect(formatCompactAge(new Date("2026-06-08T12:01:00Z"), now)).toBe("23h");
+  });
+
+  it("switches to days at exactly one day", () => {
+    expect(formatCompactAge(new Date("2026-06-08T12:00:00Z"), now)).toBe("1d");
   });
 
   it("returns days only when under a month old", () => {
@@ -137,5 +144,24 @@ describe("formatCompactAge", () => {
     expect(formatCompactAge(new Date("2024-12-09T12:00:00Z"), now)).toBe(
       "1y 6mo"
     );
+  });
+});
+
+describe("formatCompactAgeAgo", () => {
+  const now = new Date("2026-09-21T12:00:00.000Z");
+
+  it("formats compact service ages", () => {
+    expect(formatCompactAgeAgo("2026-09-19T12:00:00.000Z", now)).toBe("2d ago");
+    expect(formatCompactAgeAgo("2026-08-19T12:00:00.000Z", now)).toBe(
+      "1mo 2d ago"
+    );
+    expect(formatCompactAgeAgo("2024-08-19T12:00:00.000Z", now)).toBe(
+      "2y 1mo ago"
+    );
+    expect(formatCompactAgeAgo("2026-09-21T11:48:00.000Z", now)).toBe(
+      "12m ago"
+    );
+    expect(formatCompactAgeAgo("2026-09-21T09:00:00.000Z", now)).toBe("3h ago");
+    expect(formatCompactAgeAgo(now, now)).toBe("just now");
   });
 });

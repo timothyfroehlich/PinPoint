@@ -30,7 +30,7 @@ For **disabled controls** that need a "why disabled" explanation, the tooltip-on
 
 ### Data tables (CORE-A11Y-003)
 
-`src/components/issues/IssueList.tsx` is the reference implementation for a sortable table — `<th scope="col">`, `aria-sort` tracking the live sort state, an accessible name on the table, and a real `<button>` in the header cell. Copy its semantics into every new sortable table rather than re-deriving them.
+`src/components/machines/view/MachineViewTable.tsx` is the reference implementation for a sortable table — `<th scope="col">`, `aria-sort` tracking the live sort state, an accessible name on the table, and a real `<button>` in the header cell. Copy its semantics into every new sortable table rather than re-deriving them.
 
 ### ARIA labels on icon-only triggers
 

@@ -23,10 +23,8 @@ export default async function CollectionIssuesPage({
     <MachineGroupIssuesTab
       machines={data.collection.machines}
       searchParams={await searchParams}
-      viewer={{
-        userId: viewer.userId,
-        isAdmin: viewer.role === "admin", // permissions-audit-allow: SQL visibility flag, mirrors /issues page
-      }}
+      viewer={viewer}
+      exportScope={{ kind: "collection", handle: id }}
     />
   );
 }
