@@ -1,5 +1,33 @@
 {/* This file is auto-updated by the weekly changelog workflow. Newest entries at top. */}
 
+## September 28, 2026
+
+### New Features
+
+- **Link Your Own Pinball Map Account** — Settings now lets you sign in to Pinball Map once and link that account to PinPoint. Anything you push to Pinball Map from here then goes up as you, not as the collective. Unlinking removes PinPoint's copy of the sign-in, and deleting your account removes it too
+- **Pinball Map Lineup Page** — A new page lists every place PinPoint and Pinball Map disagree about what's on the floor: machines to add, remove, or update, Pinball Map entries not yet matched to a machine here, and availability conflicts — each with the one action that fixes it. A **Confirm lineup** button tells Pinball Map our lineup is current, so the "last updated" date on our listing stays fresh. Reach it from the Pinball Map button on the machine list or the admin menu
+- **Playing Tips on Machine Pages** — A machine's Info tab and its QR scan page now show a playing tip from PinTips, with a shuffle button for another one and a link to all of that game's tips. Apron cards for games with tips get a "Get playing tips" QR code
+- **Summary Widgets on Lists** — The machine list and the issue list now open with counts across the top — presence and how many machines are playable, and issues by status, severity, and priority. The numbers cover every match across all pages, not just the page you're on, and tapping a segment filters the list to it. On a phone they fold into one summary line you can expand. (The old Open Issues widget on the machine list is gone: it counted issues but filtered machines, so the numbers never lined up)
+- **Saved Views** — Set up the machine list the way you like it — filters, sorting, columns, page size — then save it under a name. Pick one as your default and the bare page opens that way every time. Saved views work on the machine directory, collections, and owner pages, and you can rename or delete them from the same menu
+- **Type, Display and Player Count Tags** — Every cataloged machine now carries tags for what it is (Electromechanical, Solid State, Pure Mechanical), what kind of display it has (Reels, Lights, Alphanumeric, CGA, DMD, LCD), and how many can play. Tap one to see every machine that shares it, alongside the manufacturer tags
+- **Design and Art Credits** — A machine's Info tab now lists who designed the game and who did the art, and those credits can be printed on its apron card
+- **Details for Machines Not in the Catalog** — A hand-entered machine can now record its type, display, player count, designers, and artists, so it gets the same tags and the same apron-card credits as a cataloged one
+- **One Machine Form** — Adding a machine and managing one now use the same form, with named sections, a section list on desktop, a "Jump to" menu on phones, and a pinned Save bar. New Machine can set up Pinball Map while you create it: the lineup setting, Insider Connected, and adding the game to Pinball Map once it's created
+- **Insider Connected: On, Off, or Don't Sync** — The Insider Connected control on the Manage tab is now a three-way toggle. Don't sync leaves the setting alone and stops PinPoint from flagging it as out of step with Pinball Map
+- **Pinball Map Help Page** — A full walkthrough of the Pinball Map integration at Help › Pinball Map, with screenshots: linking your account, who can do what, refresh limits, matching a machine, the Manage tab controls, removals, imported comments, and troubleshooting. Help links now sit next to the controls they explain
+- **Paging at the Bottom of the Machine List** — The page arrows and View Options now repeat below the list, so you don't have to scroll back to the top to go to the next page. On phones they float just above the tab bar while you scroll
+- **Clearer Status Colors** — Severity, status, priority, frequency, and machine playability each now use one color family of their own — severity runs yellow through red, priority is blue, In Progress is pink — so a glance tells you which kind of label you're looking at
+
+### Bug Fixes
+
+- A form submitted the instant a page finished loading could silently do nothing and dump what you typed into the address bar. Submit buttons now wait until the page is ready, and nothing leaks into the URL
+- An apron card for a machine owned by an invited member printed a blank owner line; it now prints their name
+- A member who owns a machine could not open the iScored game picker on it — the picker ignored machine ownership when checking permission
+- Notification settings now warn you before you leave with unsaved changes, and your toggles no longer snap back after saving
+- A machine title with hyphens or an ellipsis — "Lights...Camera...Action!", "Harley-Davidson" — now wraps at those breaks on an apron card instead of running past the panel
+
+---
+
 ## September 21, 2026
 
 ### New Features
