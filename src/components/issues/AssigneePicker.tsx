@@ -115,8 +115,6 @@ export function AssigneeCommand({
       <CommandInput
         placeholder="Search users..."
         aria-label="Filter users"
-        // 16px on phones so iOS doesn't zoom the page on focus.
-        className={cn(touch && "text-base")}
         data-testid="assignee-search-input"
         value={query}
         onValueChange={setQuery}

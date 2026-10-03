@@ -185,6 +185,9 @@ export const RichTextEditor = forwardRef<
         class: cn(
           RICH_TEXT_CLASSES,
           "focus:outline-none px-3 py-2",
+          // 16px on phones: iOS Safari zooms the page into any field smaller
+          // than that when it takes focus.
+          "max-md:text-base",
           // One line in compact mode, ~3 lines otherwise. Mutually exclusive
           // so the arbitrary-value min-heights never both apply (which made
           // the winner depend on stylesheet order). Compact is "jot" mode, so
