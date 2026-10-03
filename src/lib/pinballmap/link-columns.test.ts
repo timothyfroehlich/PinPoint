@@ -70,7 +70,15 @@ beforeEach(() => {
   } as unknown as Awaited<ReturnType<typeof getPinballMapState>>);
 });
 
+const LINK_REQUIRED = "Choose a model, or set Source to Manual Entry.";
+
 describe("resolvePbmLinkColumnsForCreate", () => {
+  it("rejects a selection that is neither linked nor excluded", async () => {
+    const result = await resolvePbmLinkColumnsForCreate({});
+
+    expect(result).toEqual({ ok: false, message: LINK_REQUIRED });
+  });
+
   it("never puts a new machine on the lineup", async () => {
     const result = await resolvePbmLinkColumnsForCreate({
       pinballmapMachineId: 6221,
@@ -84,6 +92,18 @@ describe("resolvePbmLinkColumnsForCreate", () => {
 });
 
 describe("resolvePbmLinkColumnsForUpdate", () => {
+  it("rejects clearing the link to neither linked nor excluded", async () => {
+    // The old "cleared entirely" outcome no longer exists: a linked machine
+    // leaves its title only by re-matching or by being marked not on Pinball
+    // Map (both covered below).
+    const result = await resolvePbmLinkColumnsForUpdate(
+      {},
+      { pinballmapMachineId: 6221, pinballmapIntent: "on" }
+    );
+
+    expect(result).toEqual({ ok: false, message: LINK_REQUIRED });
+  });
+
   it("carries intent forward when the title is unchanged", async () => {
     const result = await resolvePbmLinkColumnsForUpdate(
       { pinballmapMachineId: 6221 },
@@ -122,18 +142,6 @@ describe("resolvePbmLinkColumnsForUpdate", () => {
     expect(result.columns.pinballmapIntent).toBe("no_sync");
   });
 
-  it("keeps Don't sync even when the link is cleared entirely", async () => {
-    const result = await resolvePbmLinkColumnsForUpdate(
-      {},
-      { pinballmapMachineId: 6221, pinballmapIntent: "no_sync" }
-    );
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.columns.pinballmapMachineId).toBeNull();
-    expect(result.columns.pinballmapIntent).toBe("no_sync");
-  });
-
   it("leaves an Off machine Off on an unchanged title", async () => {
     const result = await resolvePbmLinkColumnsForUpdate(
       { pinballmapMachineId: 6221 },
@@ -167,22 +175,6 @@ describe("resolvePbmLinkColumnsForUpdate", () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.abandoned).toEqual({
-      lmxId: 4471,
-      pinballmapMachineId: 6221,
-      locationId: 26454,
-    });
-  });
-
-  it("records an abandonment when an intent-On machine's link is cleared entirely (PP-l81u)", async () => {
-    const result = await resolvePbmLinkColumnsForUpdate(
-      {},
-      { pinballmapMachineId: 6221, pinballmapIntent: "on" }
-    );
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.columns.pinballmapMachineId).toBeNull();
     expect(result.abandoned).toEqual({
       lmxId: 4471,
       pinballmapMachineId: 6221,
@@ -303,17 +295,6 @@ describe("hand-entered model identity", () => {
     // The catalog wins outright — its own metadata, not a merge of the two.
     expect(result.columns.manufacturer).toBe("Stern");
     expect(result.columns.year).toBe(2021);
-  });
-
-  it("drops them for a machine that is neither linked nor excluded", async () => {
-    const result = await resolvePbmLinkColumnsForUpdate(
-      { modelName: "Bordertown" },
-      stored
-    );
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.columns.modelName).toBeNull();
   });
 });
 

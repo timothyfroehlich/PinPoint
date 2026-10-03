@@ -1396,7 +1396,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       const initials = nextInitials();
 
       const outcome = await runAddMachine(
-        { name: "Medieval Madness", initials },
+        { name: "Medieval Madness", initials, pinballmapExcluded: true },
         ctx("admin", admin)
       );
       const result = outcome.result as { initials: string; name: string };
@@ -1413,7 +1413,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       const member = await makeUser("member");
       await expect(
         runAddMachine(
-          { name: "Nope", initials: nextInitials() },
+          { name: "Nope", initials: nextInitials(), pinballmapExcluded: true },
           ctx("member", member)
         )
       ).rejects.toMatchObject({ reason: "denied" });
@@ -1424,10 +1424,33 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       const machine = await seedMachine();
       await expect(
         runAddMachine(
-          { name: "Dup", initials: machine.initials },
+          {
+            name: "Dup",
+            initials: machine.initials,
+            pinballmapExcluded: true,
+          },
           ctx("admin", admin)
         )
       ).rejects.toMatchObject({ reason: "invalid" });
+    });
+
+    it("rejects a machine that is neither linked nor marked not on Pinball Map", async () => {
+      const admin = await makeUser("admin");
+      const initials = nextInitials();
+
+      await expect(
+        runAddMachine({ name: "Unpicked", initials }, ctx("admin", admin))
+      ).rejects.toMatchObject({
+        reason: "invalid",
+        message:
+          "Pass pinballmapMachineId (find it with search_pinballmap_catalog), or pinballmapExcluded: true for a machine Pinball Map does not list.",
+      });
+      const db = await getTestDb();
+      expect(
+        await db.query.machines.findFirst({
+          where: eq(machines.initials, initials),
+        })
+      ).toBeUndefined();
     });
   });
 
