@@ -128,9 +128,10 @@ describe("Built-in Views", () => {
       "off_the_floor",
       "on_the_floor",
     ]);
-    expect(view?.state.columns).toEqual(
-      expect.arrayContaining(["presence", "dateAdded"])
-    );
+    expect(view?.state.columns).toEqual([
+      ...getMachineViewPreset("machines").defaultState.columns,
+      "dateAdded",
+    ]);
   });
 
   it("use only states the URL parser round-trips unchanged", () => {

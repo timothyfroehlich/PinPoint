@@ -27,8 +27,10 @@ const savedView: MachineViewSavedViewSummary = {
     columns: [
       "machine",
       "playability",
+      "presence",
       "openIssues",
       "lastServiced",
+      "lastActivity",
       "owner",
       "manufacturer",
       "year",

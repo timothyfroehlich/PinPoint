@@ -99,8 +99,10 @@ export const MACHINE_VIEW_FIELDS: Record<
 const DEFAULT_COLUMNS: MachineViewFieldId[] = [
   "machine",
   "playability",
+  "presence",
   "openIssues",
   "lastServiced",
+  "lastActivity",
   "owner",
   "manufacturer",
   "year",
@@ -200,7 +202,6 @@ export const MACHINE_VIEW_BUILT_IN_VIEWS: Record<
     }),
     builtIn("machines", "all-machines", "All machines", {
       presence: "all",
-      columns: [...DEFAULT_COLUMNS, "presence"],
     }),
     builtIn("machines", "recently-added", "Recently added", {
       // Every presence state except Removed (machine-views §9.1).
@@ -209,7 +210,7 @@ export const MACHINE_VIEW_BUILT_IN_VIEWS: Record<
       ),
       sort: "dateAdded",
       dir: "desc",
-      columns: [...DEFAULT_COLUMNS, "presence", "dateAdded"],
+      columns: [...DEFAULT_COLUMNS, "dateAdded"],
     }),
   ],
   collection: [
