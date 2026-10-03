@@ -68,9 +68,6 @@ export function MachineNoteComposerSheet({
             userId={userId}
             // eslint-disable-next-line jsx-a11y/no-autofocus -- deliberate focus-on-open in bottom sheet, PP-u4cp
             autoFocus
-            onCancel={() => {
-              setOpen(false);
-            }}
             onPosted={() => {
               setOpen(false);
             }}

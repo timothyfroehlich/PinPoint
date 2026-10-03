@@ -69,11 +69,13 @@ describe("MachineNoteComposerSheet", () => {
     expect(
       await screen.findByRole("button", { name: /^post$/i })
     ).toBeInTheDocument();
-    // Cancel affordance is present (composer received onCancel).
-    expect(screen.getByRole("button", { name: /cancel/i })).toBeInTheDocument();
+    // No Cancel: the sheet's own close keeps the note as a draft.
+    expect(
+      screen.queryByRole("button", { name: /cancel/i })
+    ).not.toBeInTheDocument();
   });
 
-  it("closes the sheet when Cancel is clicked", async () => {
+  it("closes the sheet from its close button", async () => {
     const user = userEvent.setup();
     render(
       <MachineNoteComposerSheet
@@ -85,7 +87,7 @@ describe("MachineNoteComposerSheet", () => {
     await user.click(screen.getByRole("button", { name: /new note/i }));
     await screen.findByRole("button", { name: /^post$/i });
 
-    await user.click(screen.getByRole("button", { name: /cancel/i }));
+    await user.click(screen.getByRole("button", { name: /close/i }));
 
     await waitFor(() => {
       expect(

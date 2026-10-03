@@ -66,7 +66,7 @@ describe("MachineTimelineComposer", () => {
     expect(tagTrigger).not.toHaveTextContent(/add tag/i);
   });
 
-  it("renders the Post button and no Cancel by default", () => {
+  it("renders the Post button and no Cancel", () => {
     render(
       <MachineTimelineComposer
         machineId="m1"
@@ -78,18 +78,6 @@ describe("MachineTimelineComposer", () => {
     expect(
       screen.queryByRole("button", { name: /cancel/i })
     ).not.toBeInTheDocument();
-  });
-
-  it("shows a Cancel button when onCancel is provided (sheet entry point)", () => {
-    render(
-      <MachineTimelineComposer
-        machineId="m1"
-        userId="user-1"
-        onPosted={vi.fn()}
-        onCancel={vi.fn()}
-      />
-    );
-    expect(screen.getByRole("button", { name: /cancel/i })).toBeInTheDocument();
   });
 
   it("disables Post until there is body text (tag alone is not enough)", async () => {

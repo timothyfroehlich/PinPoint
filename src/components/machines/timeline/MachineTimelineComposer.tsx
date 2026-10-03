@@ -26,8 +26,6 @@ interface Props {
   /** The signed-in author; drafts are kept per person and per machine. */
   userId: string;
   onPosted: () => void;
-  /** Optional Cancel affordance (shown when composing inside a sheet). */
-  onCancel?: (() => void) | undefined;
   /** Autofocus the editor on mount (sheet entry point). */
   autoFocus?: boolean | undefined;
 }
@@ -52,7 +50,6 @@ export function MachineTimelineComposer({
   machineId,
   userId,
   onPosted,
-  onCancel,
   autoFocus = false,
 }: Props): React.ReactElement {
   const [fullMode, setFullMode] = useState(false);
@@ -158,11 +155,6 @@ export function MachineTimelineComposer({
         </Toggle>
         <div className="ml-auto flex items-center gap-2">
           <TagSelect value={tag} onChange={draft.setTag} disabled={pending} />
-          {onCancel ? (
-            <Button variant="ghost" onClick={onCancel} disabled={pending}>
-              Cancel
-            </Button>
-          ) : null}
           <Button disabled={!canPost} onClick={handlePost}>
             {pending ? "Posting…" : "Post"}
           </Button>
