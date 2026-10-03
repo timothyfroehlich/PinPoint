@@ -1,4 +1,5 @@
 import type { ApronCardContent } from "~/lib/machines/apron-card";
+import { plainCardText } from "~/lib/machines/apron-card-text";
 import type { MachineCredits } from "~/lib/opdb/credits";
 
 /**
@@ -58,8 +59,8 @@ const LONG_OWNER = "Maximiliana Featherstonehaugh-Worthington";
 const NO_CREDITS: MachineCredits = { design: [], art: [] };
 
 const noText = {
-  description: "",
-  tip: "",
+  description: [],
+  tip: [],
   tipEnabled: false,
 } satisfies Pick<ApronCardContent, "description" | "tip" | "tipEnabled">;
 
@@ -316,8 +317,10 @@ const FIXTURE_SOURCES: readonly FixtureSource[] = [
       manufacturer: "Williams",
       year: 1988,
       ownerName: "Jordan Lee",
-      description: "",
-      tip: "Flippers were rebuilt this season; report any weak flips.",
+      description: [],
+      tip: plainCardText(
+        "Flippers were rebuilt this season; report any weak flips."
+      ),
       tipEnabled: true,
     },
     credits: { design: ["Mark Ritchie"], art: ["Python Anghelo"] },
@@ -333,8 +336,10 @@ const FIXTURE_SOURCES: readonly FixtureSource[] = [
       manufacturer: "Williams",
       year: 1988,
       ownerName: "Jordan Lee",
-      description: "",
-      tip: "Flippers were rebuilt this season; report any weak flips.",
+      description: [],
+      tip: plainCardText(
+        "Flippers were rebuilt this season; report any weak flips."
+      ),
       tipEnabled: true,
     },
     credits: { design: ["Mark Ritchie"], art: ["Python Anghelo"] },
@@ -368,6 +373,8 @@ export function withFilledText(
   if (!fixture.textFill) return fixture.content;
   return {
     ...fixture.content,
-    [fixture.textFill.field]: takeWords(fixture.textFill.words, count),
+    [fixture.textFill.field]: plainCardText(
+      takeWords(fixture.textFill.words, count)
+    ),
   };
 }

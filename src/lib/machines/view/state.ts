@@ -7,7 +7,6 @@ import {
   type MachineViewSavedState,
   type MachineViewSortDirection,
   type MachineViewState,
-  type WidgetPopulation,
 } from "~/lib/types";
 import {
   VALID_MACHINE_PRESENCE_STATUSES,
@@ -55,16 +54,6 @@ function parseCanonicalList<T extends string>(
     allowedSet.has(item)
   );
 }
-
-function widgetPopulation(value: string | null): WidgetPopulation {
-  return value === "filtered" ? "filtered" : "all";
-}
-
-/** Widget Population URL parameters (machine-widgets §2.2); `all` is omitted. */
-const WIDGET_POPULATION_PARAMS = [
-  "presenceWidget",
-  "playabilityWidget",
-] as const satisfies readonly (keyof MachineViewState)[];
 
 function positiveInteger(value: string | null, fallback: number): number {
   if (!value || !/^[1-9]\d*$/.test(value)) return fallback;
@@ -156,8 +145,6 @@ export function parseMachineViewState(
     page: positiveInteger(searchParams.get("page"), defaults.page),
     pageSize,
     columns,
-    presenceWidget: widgetPopulation(searchParams.get("presenceWidget")),
-    playabilityWidget: widgetPopulation(searchParams.get("playabilityWidget")),
   };
 }
 
@@ -198,9 +185,6 @@ export function serializeMachineViewState(
   if (!arraysEqual(state.columns, defaults.columns)) {
     params.set("columns", state.columns.join(","));
   }
-  for (const param of WIDGET_POPULATION_PARAMS) {
-    if (state[param] === "filtered") params.set(param, "filtered");
-  }
   if (view) params.set("view", view);
 
   return params;
@@ -216,7 +200,6 @@ const MACHINE_VIEW_CONFIGURATION_PARAMS = [
   "dir",
   "pageSize",
   "columns",
-  ...WIDGET_POPULATION_PARAMS,
   "view",
 ] as const;
 
@@ -263,7 +246,6 @@ const SAVED_STATE_KEYS = [
   "dir",
   "pageSize",
   "columns",
-  ...WIDGET_POPULATION_PARAMS,
 ] as const satisfies readonly (keyof MachineViewSavedState)[];
 
 /**
@@ -289,7 +271,10 @@ function storedParamValue(value: unknown): string | null {
  * Validates a configuration to store or one read back from storage exactly as
  * URL parameters are validated (list-views §9.3, §10.14): values that no
  * longer exist are dropped, keys the parser does not know are ignored, and a
- * missing key takes the preset's default. Owners are checked against the
+ * missing key takes the preset's default. Ignored keys include the retired
+ * Widget Population keys older views still carry (machine-widgets §2.2); the
+ * normalized result never holds them, so saving a view never writes them
+ * back. Owners are checked against the
  * people who exist on read and again when the view is applied; fields a
  * particular Surface does not permit are dropped when it is applied there.
  */

@@ -691,11 +691,14 @@ export async function deletePinballMapComments(conditionIds: number[]) {
   if (error) throw error;
 }
 
-/** Store a saved Stern apron card on a machine, as the editor would (PP-esta). */
+/**
+ * Store a saved Stern apron card named "Card 1" on a machine, as the Apron
+ * card tab would (PP-esta, PP-o23o). Returns the card's id.
+ */
 export async function seedSavedApronCard(
   machineId: string,
   card: { description: string; tip?: string }
-): Promise<void> {
+): Promise<string> {
   // One paragraph per line, as the editor stores card text.
   const doc = (text: string) => ({
     type: "doc",
@@ -707,20 +710,25 @@ export async function seedSavedApronCard(
         content: [{ type: "text", text: line }],
       })),
   });
-  const { error } = await supabaseAdmin.from("machine_apron_cards").upsert(
-    {
-      machine_id: machineId,
-      name: "Card 1",
-      size: "stern",
-      use_custom_description: true,
-      description: doc(card.description),
-      tip: card.tip === undefined ? null : doc(card.tip),
-      tip_enabled: card.tip !== undefined,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "machine_id,name" }
-  );
+  const { data, error } = await supabaseAdmin
+    .from("machine_apron_cards")
+    .upsert(
+      {
+        machine_id: machineId,
+        name: "Card 1",
+        size: "stern",
+        use_custom_description: true,
+        description: doc(card.description),
+        tip: card.tip === undefined ? null : doc(card.tip),
+        tip_enabled: card.tip !== undefined,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "machine_id,name" }
+    )
+    .select("id")
+    .single();
   if (error) throw error;
+  return data.id;
 }
 
 /**

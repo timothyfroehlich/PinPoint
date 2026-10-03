@@ -59,6 +59,11 @@ export interface RichTextEditorProps {
   showToolbar?: boolean | undefined;
   /** Focus the editor on mount (e.g. when opened inside a sheet). */
   autoFocus?: boolean | undefined;
+  /**
+   * `card`: bold, italic, and lists only — the formatting a printed apron
+   * card carries (apron-cards 3.7). Defaults to `full`.
+   */
+  formats?: "full" | "card" | undefined;
 }
 
 export const RichTextEditor = forwardRef<
@@ -77,23 +82,39 @@ export const RichTextEditor = forwardRef<
     ariaLabel,
     showToolbar = true,
     autoFocus = false,
+    formats = "full",
   }: RichTextEditorProps,
   ref
 ) {
   const extensions = useMemo(() => {
-    const list: AnyExtension[] = [
-      StarterKit.configure({
-        heading: { levels: [2, 3] },
-        link: false, // Disabled here — configured explicitly below with custom options
-      }),
-      Link.configure({
-        openOnClick: false,
-        autolink: true,
-      }),
-      Placeholder.configure({
-        placeholder,
-      }),
-    ];
+    const list: AnyExtension[] =
+      formats === "card"
+        ? [
+            StarterKit.configure({
+              heading: false,
+              blockquote: false,
+              code: false,
+              codeBlock: false,
+              horizontalRule: false,
+              strike: false,
+              underline: false,
+              link: false,
+            }),
+            Placeholder.configure({ placeholder }),
+          ]
+        : [
+            StarterKit.configure({
+              heading: { levels: [2, 3] },
+              link: false, // Disabled here — configured explicitly below with custom options
+            }),
+            Link.configure({
+              openOnClick: false,
+              autolink: true,
+            }),
+            Placeholder.configure({
+              placeholder,
+            }),
+          ];
 
     if (mentionsEnabled) {
       list.push(
@@ -166,7 +187,7 @@ export const RichTextEditor = forwardRef<
     }
 
     return list;
-  }, [mentionsEnabled, placeholder]);
+  }, [mentionsEnabled, placeholder, formats]);
 
   const editor = useEditor({
     extensions,
@@ -240,7 +261,11 @@ export const RichTextEditor = forwardRef<
       )}
     >
       {showToolbar ? (
-        <EditorToolbar editor={editor} mentionsEnabled={mentionsEnabled} />
+        <EditorToolbar
+          editor={editor}
+          mentionsEnabled={mentionsEnabled}
+          formats={formats}
+        />
       ) : null}
       <EditorContent editor={editor} />
     </div>

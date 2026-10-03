@@ -16,8 +16,8 @@ const content: ApronCardContent = {
   manufacturer: "Stern",
   year: 2021,
   ownerName: "Tim",
-  description: "",
-  tip: "",
+  description: [],
+  tip: [],
   tipEnabled: false,
   credits: { design: [], art: [] },
   designEnabled: false,
@@ -55,5 +55,41 @@ describe("ApronCardFace action rows", () => {
       />
     );
     expect(screen.queryByText("Get playing tips")).not.toBeInTheDocument();
+  });
+});
+
+describe("ApronCardFace card text", () => {
+  it("prints bold, italic, and lists (spec 3.7)", () => {
+    render(
+      <ApronCardFace
+        content={{
+          ...content,
+          description: [
+            {
+              kind: "paragraph",
+              runs: [{ text: "Hit the " }, { text: "ramps", bold: true }],
+            },
+            {
+              kind: "list",
+              ordered: true,
+              items: [
+                [{ text: "Lock", italic: true }],
+                [{ text: "Multiball" }],
+              ],
+            },
+          ],
+        }}
+        size="stern"
+        scanUrl="https://example.test/m/GDZ/hub?source=apron"
+      />
+    );
+    expect(screen.getByText("ramps").tagName).toBe("STRONG");
+    expect(screen.getByText("Lock").tagName).toBe("EM");
+    const items = screen.getAllByRole("listitem");
+    expect(items.map((item) => item.textContent)).toEqual([
+      "Lock",
+      "Multiball",
+    ]);
+    expect(items[0]?.parentElement?.tagName).toBe("OL");
   });
 });

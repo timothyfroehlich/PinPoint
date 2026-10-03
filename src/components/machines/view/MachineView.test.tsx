@@ -16,13 +16,14 @@ window.matchMedia = vi.fn().mockImplementation(() => ({
   dispatchEvent: vi.fn(),
 }));
 
-const navigation = vi.hoisted(() => ({
-  replace: vi.fn(),
-  searchParams: new URLSearchParams(),
-}));
+const navigation = vi.hoisted(() => {
+  const replace = vi.fn();
+  // One router object, as Next.js returns, so effects keyed on it settle.
+  return { replace, router: { replace }, searchParams: new URLSearchParams() };
+});
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ replace: navigation.replace }),
+  useRouter: () => navigation.router,
   usePathname: () => "/m",
   useSearchParams: () => navigation.searchParams,
 }));
@@ -70,7 +71,6 @@ function result(overrides: Partial<MachineViewResult> = {}): MachineViewResult {
           off_the_floor: 0,
           on_loan: 0,
           pending_arrival: 1,
-          removed: 0,
         },
       },
       playability: {
@@ -244,7 +244,7 @@ describe("MachineView", () => {
     expect(scrollIntoView).toHaveBeenCalledWith({ block: "start" });
   });
 
-  it("sets filters from widget Segments and keeps the page for populations", async () => {
+  it("drops a retired population parameter and sets filters from widget Segments", async () => {
     const user = userEvent.setup();
     const state = {
       ...getMachineViewPreset("collection").defaultState,
@@ -252,30 +252,65 @@ describe("MachineView", () => {
       presence: "all" as const,
       page: 3,
     };
+    // A URL from before the All/Filtered choice was retired
+    // (machine-widgets §2.2): the parameter is ignored and rewritten away.
     navigation.searchParams = new URLSearchParams({
       q: "mars",
       presence: "all",
       page: "3",
+      playabilityWidget: "filtered",
     });
     render(<MachineView result={result({ state })} preset="collection" />);
+    expect(navigation.replace).toHaveBeenLastCalledWith(
+      "/m?q=mars&presence=all&page=3",
+      {
+        scroll: false,
+      }
+    );
     const playability = screen.getByRole("region", { name: "Playability" });
 
-    await user.click(
-      within(playability).getByRole("button", { name: "Filtered" })
-    );
-    expect(navigation.replace).toHaveBeenLastCalledWith(
-      "/m?q=mars&presence=all&page=3&playabilityWidget=filtered",
-      { scroll: false }
-    );
-
+    // A Playability Segment also sets Presence to On the Floor (§4.3), keeps
+    // search, and returns to page 1 (widgets §6.2).
     await user.click(
       within(playability).getByRole("button", { name: "1 Needs Service" })
     );
     expect(navigation.replace).toHaveBeenLastCalledWith(
       // On the Floor is the Collections Page Preset, so it leaves the URL.
-      "/m?q=mars&status=needs_service&playabilityWidget=filtered",
+      "/m?q=mars&status=needs_service",
       { scroll: false }
     );
+  });
+
+  it("lists Segments in spec order and shows the Playability headline as the Summary Row", () => {
+    render(<MachineView result={result()} preset="machines" />);
+    const names = (widget: string): (string | null)[] =>
+      within(screen.getByRole("region", { name: widget }))
+        .getAllByRole("button")
+        .map((button) => button.getAttribute("aria-label"));
+
+    // Presence leads with On the Floor and has no Removed Segment (§3.2);
+    // Playability runs worst first (§4.2). Zero Segments are left out (widgets §5.5).
+    expect(names("Presence")).toEqual(["2 On the Floor", "1 Pending Arrival"]);
+    expect(names("Playability")).toEqual(["1 Needs Service", "1 Operational"]);
+    expect(
+      screen.getByRole("button", { name: "Summary: 2 of 2 playable" })
+    ).toHaveAttribute("aria-controls");
+  });
+
+  it("collapses and hides headlines unless both widgets fit side by side (widgets §2.3, §5.1)", () => {
+    render(<MachineView result={result()} preset="machines" />);
+    const presence = screen.getByRole("region", { name: "Presence" });
+    const playability = screen.getByRole("region", { name: "Playability" });
+
+    expect(
+      screen.getByRole("button", { name: "Summary: 2 of 2 playable" })
+    ).toHaveClass("md:@min-[40rem]:hidden");
+    for (const headline of [
+      within(presence).getByText(/^on the floor of/),
+      within(playability).getByText("of 2 playable"),
+    ]) {
+      expect(headline).toHaveClass("hidden", "md:@min-[40rem]:block");
+    }
   });
 
   it("restores and updates the phone display preference", async () => {
