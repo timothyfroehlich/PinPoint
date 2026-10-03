@@ -66,7 +66,6 @@ function makeMachine(
     owner: null,
     invitedOwner: null,
     watchers: [],
-    apronCards: [],
     modelName: null,
     modelTitle: null,
     pinballmapTitle: null,

@@ -98,7 +98,6 @@
 | Requirement | Current implementation gap |
 | :-- | :-- |
 | §4.2 | Automatic apron-size fill from a Pinball Map match is intentionally deferred. Editors choose Stern/SPIKE or WPC manually for now; unmatched machines still have no default. |
-| §1 Saved card, §3.1–3.5, §3.8, §4.1–4.3, §6.4, §9.1, §9.4, §9.5, §10.5, §11 | Cards are stored in `machine_apron_cards`, but the app reads and writes only a machine's first saved card, edited in a dialog opened from the Service and Manage tabs. There is no Apron card tab, card switcher, add/rename/delete/copy, rich-text card text, or export-time overflow override yet. |
 
 ## Changelog
 
