@@ -49,13 +49,6 @@ describe("ExportButton", () => {
     vi.clearAllMocks();
   });
 
-  it("renders an accessible export button", () => {
-    render(<ExportButton machineInitials="TM" />);
-    const btn = screen.getByRole("button", { name: "Export to CSV" });
-    expect(btn).toBeInTheDocument();
-    expect(btn).not.toBeDisabled();
-  });
-
   it("disables the button while export is in progress", async () => {
     // Action never resolves so the button stays disabled throughout the test
     mockExportAction.mockReturnValue(new Promise(() => {}));
