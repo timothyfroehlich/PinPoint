@@ -205,7 +205,6 @@ export function MachineView({
             {mobileMode === "compact" ? (
               <MachineViewCompactList
                 rows={result.rows}
-                columns={state.columns}
                 onMachineSelect={onMachineSelect}
               />
             ) : null}
