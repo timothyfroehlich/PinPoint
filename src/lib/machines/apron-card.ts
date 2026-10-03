@@ -102,12 +102,17 @@ export function groupedEdition(
   return /\bedition$/i.test(mapped) ? mapped : `${mapped} Edition`;
 }
 
-export function apronCardContent(
+/** Identity lines and credits — everything on a card but its settings. */
+export type ApronCardIdentity = Omit<
+  ApronCardContent,
+  "description" | "tip" | "tipEnabled" | "designEnabled" | "artEnabled"
+>;
+
+export function apronCardIdentity(
   machine: ApronMachineSource,
-  card: ApronCardSettings | null,
   credits: MachineCredits,
   hasPinTips: boolean
-): ApronCardContent {
+): ApronCardIdentity {
   return {
     name: machine.name,
     edition: groupedEdition(machine.pinballmapTitle),
@@ -120,16 +125,44 @@ export function apronCardContent(
     // the "(invited)" status marker the in-app owner block shows is an
     // internal-workflow detail, not something the physical card carries.
     ownerName: machine.owner?.name ?? machine.invitedOwner?.name ?? null,
+    credits,
+    hasPinTips,
+  };
+}
+
+/**
+ * What a card prints for its settings (spec §2.2, §3.7): the card description
+ * when chosen, else the machine's main description. One function for the
+ * Apron card tab's preview and for print and export, so they never disagree.
+ */
+export function cardFaceContent(
+  identity: ApronCardIdentity,
+  mainDescription: ProseMirrorDoc | null,
+  card: ApronCardSettings | null
+): ApronCardContent {
+  return {
+    ...identity,
     description: cardTextBlocks(
-      card?.useCustomDescription ? card.description : machine.description
+      card?.useCustomDescription ? card.description : mainDescription
     ),
     tip: cardTextBlocks(card?.tip),
     tipEnabled: card?.tipEnabled ?? false,
-    credits,
     designEnabled: card?.designEnabled ?? true,
     artEnabled: card?.artEnabled ?? true,
-    hasPinTips,
   };
+}
+
+export function apronCardContent(
+  machine: ApronMachineSource,
+  card: ApronCardSettings | null,
+  credits: MachineCredits,
+  hasPinTips: boolean
+): ApronCardContent {
+  return cardFaceContent(
+    apronCardIdentity(machine, credits, hasPinTips),
+    machine.description,
+    card
+  );
 }
 
 /** Names a credit row shows before collapsing the rest into a count (10.3). */

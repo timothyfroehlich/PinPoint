@@ -8,7 +8,7 @@ import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
-import { apronCardContent } from "~/lib/machines/apron-card";
+import { apronCardIdentity } from "~/lib/machines/apron-card";
 import { buildMachineHubUrl } from "~/lib/machines/hub-url";
 import { resolveRequestUrl } from "~/lib/url";
 import {
@@ -58,22 +58,12 @@ export default async function MachineApronCardPage({
     getMachineCredits(machine),
     getMachinePinTips(machine.pinballmapTitle?.opdbId ?? null),
   ]);
-  const { name, edition, manufacturer, year, ownerName, hasPinTips } =
-    apronCardContent(machine, null, credits, pinTips !== null);
 
   return (
     <ApronCardTab
       machineId={machine.id}
       machineInitials={machine.initials}
-      identity={{
-        name,
-        edition,
-        manufacturer,
-        year,
-        ownerName,
-        credits,
-        hasPinTips,
-      }}
+      identity={apronCardIdentity(machine, credits, pinTips !== null)}
       mainDescription={machine.description}
       savedCards={savedCards}
       scanUrl={buildMachineHubUrl(

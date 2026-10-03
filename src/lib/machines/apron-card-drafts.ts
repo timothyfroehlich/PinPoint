@@ -1,9 +1,5 @@
-import {
-  type ApronCardContent,
-  type ApronCardSize,
-  type SavedApronCard,
-} from "~/lib/machines/apron-card";
-import { cardTextBlocks, cardTextDoc } from "~/lib/machines/apron-card-text";
+import type { ApronCardSize, SavedApronCard } from "~/lib/machines/apron-card";
+import { cardTextDoc } from "~/lib/machines/apron-card-text";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 
 /**
@@ -23,12 +19,6 @@ export interface ApronCardDraft {
   designEnabled: boolean;
   artEnabled: boolean;
 }
-
-/** Identity lines and credits the tab never changes (spec §2.1, §10). */
-export type ApronCardIdentity = Omit<
-  ApronCardContent,
-  "description" | "tip" | "tipEnabled" | "designEnabled" | "artEnabled"
->;
 
 export function draftFromSaved(card: SavedApronCard): ApronCardDraft {
   return { ...card, key: card.id };
@@ -88,30 +78,4 @@ export function draftsDirty(
     const card = saved[i];
     return card === undefined || !sameCard(draft, card);
   });
-}
-
-/** The card face's content for a card's current settings (spec §2.2, §3.4). */
-export function draftContent(
-  identity: ApronCardIdentity,
-  mainDescription: ProseMirrorDoc | null,
-  card: Pick<
-    ApronCardDraft,
-    | "useCustomDescription"
-    | "description"
-    | "tip"
-    | "tipEnabled"
-    | "designEnabled"
-    | "artEnabled"
-  >
-): ApronCardContent {
-  return {
-    ...identity,
-    description: cardTextBlocks(
-      card.useCustomDescription ? card.description : mainDescription
-    ),
-    tip: cardTextBlocks(card.tip),
-    tipEnabled: card.tipEnabled,
-    designEnabled: card.designEnabled,
-    artEnabled: card.artEnabled,
-  };
 }

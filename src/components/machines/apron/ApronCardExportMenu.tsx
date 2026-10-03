@@ -84,7 +84,10 @@ export function ApronCardExportMenu({
 
   const chosen = cards.find((card) => card.id === chosenId) ?? cards[0] ?? null;
   const chosenOverflows = chosen ? overflowing[chosen.id] === true : false;
-  const blocked = chosen === null || (chosenOverflows && !override);
+  // Until its hidden face has been measured, a card is not known to fit.
+  const measured = chosen ? chosen.id in overflowing : false;
+  const blocked =
+    chosen === null || !measured || (chosenOverflows && !override);
   const filename = chosen
     ? `${machineInitials}-${fileSlug(chosen.name)}-apron-card`
     : "";
@@ -97,6 +100,7 @@ export function ApronCardExportMenu({
           : (cards[0]?.id ?? null)
       );
       setOverride(false);
+      setOverflowing({});
     }
     setOpen(next);
   };

@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useId, useState, useTransition } from "react";
+import { useId, useMemo, useState, useTransition } from "react";
 import { AlertTriangle, MoreHorizontal, Plus } from "lucide-react";
 import { toast } from "sonner";
 
@@ -37,17 +37,17 @@ import { useUnsavedChangesGuard } from "~/hooks/use-unsaved-changes-guard";
 import {
   APRON_CARD_SIZES,
   apronCardPixelSize,
+  cardFaceContent,
+  type ApronCardIdentity,
   type ApronCardSize,
   type SavedApronCard,
 } from "~/lib/machines/apron-card";
 import {
   blankDraft,
-  draftContent,
   draftFromSaved,
   draftsDirty,
   nextCardName,
   type ApronCardDraft,
-  type ApronCardIdentity,
 } from "~/lib/machines/apron-card-drafts";
 import { docIsEmpty, type ProseMirrorDoc } from "~/lib/tiptap/types";
 import { formatCreditNames } from "~/lib/opdb/credits";
@@ -110,6 +110,9 @@ export function ApronCardTab({
   const [overflowing, setOverflowing] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  // Held apart from the selection, which moves to a neighbour as soon as the
+  // card is deleted, while the dialog is still closing.
+  const [deleteName, setDeleteName] = useState("");
   const [isSaving, startSaving] = useTransition();
 
   const dirty = deletedIds.length > 0 || draftsDirty(drafts, saved);
@@ -214,12 +217,16 @@ export function ApronCardTab({
     });
   };
 
-  const exportable: ExportableApronCard[] = saved.map((card) => ({
-    id: card.id,
-    name: card.name,
-    size: card.size,
-    content: draftContent(identity, mainDescription, card),
-  }));
+  const exportable = useMemo<ExportableApronCard[]>(
+    () =>
+      saved.map((card) => ({
+        id: card.id,
+        name: card.name,
+        size: card.size,
+        content: cardFaceContent(identity, mainDescription, card),
+      })),
+    [saved, identity, mainDescription]
+  );
   const exportMenu = (className?: string): React.JSX.Element => (
     <ApronCardExportMenu
       machineInitials={machineInitials}
@@ -232,7 +239,7 @@ export function ApronCardTab({
 
   if (drafts.length === 0) {
     return (
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4" inert={isSaving}>
         <section
           aria-label="Apron card"
           className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-outline-variant px-4 py-10 text-center"
@@ -264,7 +271,7 @@ export function ApronCardTab({
   const size: ApronCardSize = selected?.size ?? "stern";
   const previewWidth = apronCardPixelSize(size).width + 40;
   const content = selected
-    ? draftContent(identity, mainDescription, selected)
+    ? cardFaceContent(identity, mainDescription, selected)
     : null;
   const otherCards = drafts.filter((card) => card.key !== selected?.key);
   // The preview column is the card's printed width plus the frame's padding.
@@ -319,7 +326,9 @@ export function ApronCardTab({
   );
 
   return (
-    <div className="flex flex-col gap-4">
+    // Inert while saving: a successful save replaces every card with the
+    // stored copy, so an edit made mid-save would be lost.
+    <div className="flex flex-col gap-4" inert={isSaving}>
       <div className="flex items-center gap-2">
         <Select
           value={selectedKey ?? ""}
@@ -388,6 +397,7 @@ export function ApronCardTab({
                 <DropdownMenuItem
                   variant="destructive"
                   onSelect={() => {
+                    setDeleteName(selected?.name ?? "");
                     setDeleteOpen(true);
                   }}
                 >
@@ -558,7 +568,7 @@ export function ApronCardTab({
               <DeleteCardDialog
                 open={deleteOpen}
                 onOpenChange={setDeleteOpen}
-                name={selected.name}
+                name={deleteName}
                 onDelete={deleteSelected}
               />
             </>
