@@ -69,7 +69,7 @@ function makeIssue(overrides: Partial<IssueListRow> = {}): IssueListRow {
     machineInitials: "AFM",
     reporterName: null,
     assignedTo: null,
-    machine: { id: "machine-1", name: "Attack from Mars" },
+    machine: { id: "machine-1", name: "Attack from Mars", ownerId: null },
     reportedByUser: { id: REPORTER_ID, name: "Rhea Porter" },
     invitedReporter: null,
     assignedToUser: null,

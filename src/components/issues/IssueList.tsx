@@ -338,6 +338,7 @@ export function IssueList({
             const ownership = {
               userId: viewer.userId,
               reporterId: issue.reportedByUser?.id ?? null,
+              machineOwnerId: issue.machine.ownerId,
             };
             return (
               <IssueListEntry

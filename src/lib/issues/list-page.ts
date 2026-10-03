@@ -200,7 +200,7 @@ export async function loadIssueListPage(
         where: and(...where),
         orderBy,
         with: {
-          machine: { columns: { id: true, name: true } },
+          machine: { columns: { id: true, name: true, ownerId: true } },
           reportedByUser: { columns: { id: true, name: true } },
           invitedReporter: { columns: { id: true, name: true } },
           assignedToUser: { columns: { id: true, name: true } },

@@ -94,9 +94,11 @@ export async function exportIssuesAction(input: {
       return err("VALIDATION", "Invalid filter data.");
     }
     const filterValidation = exportFiltersSchema.safeParse(parsed);
-    if (filterValidation.success) {
-      filters = filterValidation.data;
+    // An unreadable filter must not widen the export to every issue.
+    if (!filterValidation.success) {
+      return err("VALIDATION", "Invalid filter data.");
     }
+    filters = filterValidation.data;
   }
 
   try {

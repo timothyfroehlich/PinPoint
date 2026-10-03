@@ -31,8 +31,8 @@ interface RelativeTimeProps {
    */
   fallback?: string;
   /**
-   * `long` (default) reads "about 3 hours ago"; `compact` reads "5d ago" or
-   * "today", the list-row age wording both List Hosts share
+   * `long` (default) reads "about 3 hours ago"; `compact` reads "just now", "12m ago",
+   * "3h ago", or "5d ago", the list-row age wording both List Hosts share
    * (`formatCompactAgeAgo`).
    */
   format?: "long" | "compact";

@@ -36,7 +36,9 @@ export type IssueListItem = Pick<
 };
 
 /** One row of an issue list page (issues-list §3), with its comment count. */
-export type IssueListRow = IssueListItem & {
+export type IssueListRow = Omit<IssueListItem, "machine"> & {
+  /** The owner id lets a row mirror the server's ownership checks (§3.5). */
+  machine: Pick<Machine, "id" | "name" | "ownerId">;
   /** Comments people wrote; system timeline entries are not counted. */
   commentCount: number;
 };

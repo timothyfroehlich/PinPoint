@@ -97,7 +97,7 @@ export function formatRelative(date: Date | string | number): string {
  * label rather than passing it here.
  *
  * `now` is injectable for testing; callers in client components should pass
- * the shared ticker value so SSR and hydration agree (see {@link CompactAge}).
+ * the shared ticker value so SSR and hydration agree (see `RelativeTime` with `format="compact"`).
  */
 export function formatCompactAge(
   date: Date | string | number,

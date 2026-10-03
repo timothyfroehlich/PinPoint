@@ -142,6 +142,18 @@ describe("exportIssuesAction", () => {
         expect(result.code).toBe("VALIDATION");
       }
     });
+
+    it("returns VALIDATION rather than exporting everything when filters fail the schema", async () => {
+      const result = await exportIssuesAction({
+        filtersJson: JSON.stringify({ status: "open" }),
+      });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("VALIDATION");
+      }
+      expect(mockFindManyIssues).not.toHaveBeenCalled();
+    });
   });
 
   // ---------------------------------------------------------------------------
@@ -283,21 +295,6 @@ describe("exportIssuesAction", () => {
       expect((passedFilters.createdFrom as Date).toISOString()).toBe(
         createdFrom.toISOString()
       );
-    });
-
-    it("uses empty filters when filtersJson contains an invalid enum value", async () => {
-      // z.array(z.enum(...)) rejects the whole input on an invalid value,
-      // so safeParse fails and the action falls back to empty filters rather
-      // than crashing — the export proceeds with no filter constraints.
-      const filters = { status: ["invalid-status"], q: "search term" };
-
-      await exportIssuesAction({ filtersJson: JSON.stringify(filters) });
-
-      expect(mockBuildWhereConditions).toHaveBeenCalledOnce();
-      const [passedFilters] = mockBuildWhereConditions.mock.calls[0];
-      // Both fields dropped because the whole parse fails on invalid enum
-      expect(passedFilters.status).toBeUndefined();
-      expect(passedFilters.q).toBeUndefined();
     });
 
     it("injects currentUserId from the authenticated user", async () => {
