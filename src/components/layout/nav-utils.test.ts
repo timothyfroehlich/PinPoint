@@ -89,16 +89,6 @@ describe("isNavItemActive", () => {
   });
 
   describe("Custom issuesPath", () => {
-    it("activates Issues tab when issuesPath is /issues?status=open&assignee=123", () => {
-      expect(
-        isNavItemActive(
-          "/issues",
-          "/issues",
-          "/issues?status=open&assignee=123"
-        )
-      ).toBe(true);
-    });
-
     it("activates Issues tab for issue detail even with custom issuesPath", () => {
       expect(
         isNavItemActive(

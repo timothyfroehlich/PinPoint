@@ -129,7 +129,7 @@ describe("IscoredGamePicker component", () => {
 
   it("floats suggested match to top with badge without forcibly preselecting", async () => {
     const user = userEvent.setup();
-    render(<IscoredGamePicker machineName="Medieval Madness" />);
+    render(<IscoredGamePicker machineName="Demolition Man" />);
 
     await waitFor(() => {
       expect(getIscoredGamesAction).toHaveBeenCalled();
@@ -145,9 +145,10 @@ describe("IscoredGamePicker component", () => {
     const badge = await screen.findByTestId("iscored-suggested-badge");
     expect(badge).toHaveTextContent("Suggested match");
 
-    // The option for Medieval Madness has the badge
-    const mmOption = screen.getByTestId("iscored-game-option-77956");
-    expect(mmOption).toContainElement(badge);
+    // The suggestion starts below another result in the fetched list.
+    const suggestedOption = screen.getByTestId("iscored-game-option-104656");
+    expect(suggestedOption).toContainElement(badge);
+    expect(screen.getAllByRole("option")[0]).toBe(suggestedOption);
   });
 
   it("allows selecting a game and marks dirty", async () => {

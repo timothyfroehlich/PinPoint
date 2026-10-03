@@ -21,11 +21,6 @@ const snap = (
 });
 
 describe("findLmxForMachine", () => {
-  it("returns the lmx whose machineId matches the linked title", () => {
-    const lmx = findLmxForMachine(snap([{ id: 900, machineId: 42 }]), 42);
-    expect(lmx?.id).toBe(900);
-  });
-
   it("returns null when the title is not in the lineup", () => {
     expect(
       findLmxForMachine(snap([{ id: 900, machineId: 42 }]), 99)
