@@ -1,7 +1,6 @@
 import type { IssueSeverity } from "./database";
 import type { MachinePresenceStatus } from "~/lib/machines/presence";
 import type { MachineStatus } from "~/lib/machines/status";
-import type { WidgetPopulation } from "./summary-widget";
 import type { TagTypeId } from "~/lib/tags/types";
 
 export const MACHINE_VIEW_FIELD_IDS = [
@@ -42,8 +41,6 @@ export interface MachineViewState {
   page: number;
   pageSize: MachineViewPageSize;
   columns: MachineViewFieldId[];
-  presenceWidget: WidgetPopulation;
-  playabilityWidget: WidgetPopulation;
 }
 
 export interface MachineViewOwnerOption {
@@ -73,14 +70,21 @@ export interface MachineViewRow {
   lastActivityAt?: string | null;
 }
 
+/** The presence states the Presence Widget counts: every one but Removed. */
+export type MachinePresenceWidgetStatus = Exclude<
+  MachinePresenceStatus,
+  "removed"
+>;
+
 /**
- * Summary Widget counts (machine-widgets §3–§5). Each widget's counts cover
- * the Widget Population its state parameter selects, across every page.
+ * Summary Widget counts (machine-widgets §3–§4), always over the route's
+ * whole scope and every page (widgets §3.1, §4.1).
  */
 export interface MachineViewSummary {
   presence: {
+    /** Machines in the scope other than Removed ones (§3.1). */
     total: number;
-    byPresence: Record<MachinePresenceStatus, number>;
+    byPresence: Record<MachinePresenceWidgetStatus, number>;
   };
   playability: {
     onTheFloor: number;

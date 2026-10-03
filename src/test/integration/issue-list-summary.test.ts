@@ -19,9 +19,9 @@ vi.mock("~/server/db", async () => {
 });
 
 /**
- * Issue-list Summary Widget counts (issue-widgets §2–§5): All counts every
- * issue on the host's On the Floor machines; Filtered follows the list's
- * filters across all pages.
+ * Issue-list Summary Widget counts (issue-widgets §2–§5): every issue, open or
+ * closed, on the host's On the Floor machines (§2.2), whatever search and
+ * filters the list carries (widgets §3.1).
  */
 describe("issue list Summary Widget counts", () => {
   setupTestDb();
@@ -35,6 +35,11 @@ describe("issue list Summary Widget counts", () => {
         initials: "CC",
         name: "Charlie",
         presenceStatus: "off_the_floor",
+      }),
+      createTestMachine({
+        initials: "DD",
+        name: "Delta",
+        presenceStatus: "removed",
       }),
     ]);
     await db.insert(issues).values([
@@ -62,57 +67,69 @@ describe("issue list Summary Widget counts", () => {
         severity: "unplayable",
         priority: "high",
       }),
+      createTestIssue("DD", {
+        issueNumber: 1,
+        status: "need_help",
+        severity: "unplayable",
+        priority: "high",
+      }),
     ]);
   }
 
-  it("counts All as every issue on On the Floor machines, open or closed", async () => {
+  it("counts open and closed issues on On the Floor machines, ignoring the list's search and filters", async () => {
     await seed();
-    const { summary } = await loadIssueListPage(
-      { severity: ["major"] },
+    const { summary, totalCount } = await loadIssueListPage(
+      {
+        q: "nothing matches this",
+        severity: ["major"],
+        includeInactiveMachines: true,
+      },
       { isAdmin: false }
     );
 
-    // All ignores the list's filters but skips CC, which is off the floor.
-    expect(summary.status.total).toBe(3);
-    expect(summary.status.open).toBe(2);
-    expect(summary.status.byStatus).toMatchObject({
-      new: 1,
-      in_progress: 1,
-      fixed: 1,
-    });
-    expect(summary.severity.machinesWithOpenIssues).toBe(2);
-    expect(summary.severity.bySeverity).toEqual({
-      cosmetic: 0,
-      minor: 0,
-      major: 1,
-      unplayable: 1,
-    });
-    expect(summary.priority.byPriority).toEqual({
-      low: 0,
-      medium: 1,
-      high: 1,
+    // The list itself matches nothing; the widgets still count the scope,
+    // skipping CC (off the floor) and DD (removed).
+    expect(totalCount).toBe(0);
+    expect(summary).toEqual({
+      total: 3,
+      open: 2,
+      machinesWithOpenIssues: 2,
+      byStatus: {
+        new: 1,
+        confirmed: 0,
+        in_progress: 1,
+        need_parts: 0,
+        need_help: 0,
+        wait_owner: 0,
+        fixed: 1,
+        wont_fix: 0,
+        wai: 0,
+        no_repro: 0,
+        duplicate: 0,
+      },
+      bySeverity: { cosmetic: 0, minor: 0, major: 1, unplayable: 1 },
+      byPriority: { low: 0, medium: 1, high: 1 },
     });
   });
 
-  it("counts Filtered with the list's filters and All within a group's scope", async () => {
+  it("counts only a group Issues tab's On the Floor machines", async () => {
     await seed();
     const { summary } = await loadIssueListPage(
-      {
-        machine: ["AA", "CC"],
-        severity: ["unplayable"],
-        includeInactiveMachines: true,
-        severityWidget: "filtered",
-      },
-      { isAdmin: false, scopeMachineInitials: ["AA", "CC"] }
+      { machine: ["BB"], includeInactiveMachines: true },
+      { isAdmin: false, scopeMachineInitials: ["AA", "CC", "DD"] }
     );
 
-    // Status stays All: the group's On the Floor machine AA only.
-    expect(summary.status.total).toBe(2);
-    expect(summary.status.open).toBe(1);
-    // Severity is Filtered: open unplayable issues on AA and CC.
-    expect(summary.severity.open).toBe(2);
-    expect(summary.severity.machinesWithOpenIssues).toBe(2);
-    expect(summary.severity.bySeverity.unplayable).toBe(2);
+    // The group holds AA, CC, and DD; only AA is on the floor. The tab's
+    // machine filter (BB) never narrows or widens the widgets.
+    expect(summary.total).toBe(2);
+    expect(summary.open).toBe(1);
+    expect(summary.machinesWithOpenIssues).toBe(1);
+    expect(summary.bySeverity).toEqual({
+      cosmetic: 0,
+      minor: 0,
+      major: 0,
+      unplayable: 1,
+    });
   });
 });
 

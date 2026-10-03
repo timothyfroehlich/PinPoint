@@ -42,6 +42,7 @@ export {
   type MachineViewFieldId,
   type MachineViewHealth,
   type MachineViewOwnerOption,
+  type MachinePresenceWidgetStatus,
   type MachineViewPageSize,
   type MachineViewPresetId,
   type MachineViewResult,
@@ -63,9 +64,4 @@ export {
   type StoredSavedView,
 } from "./list-view";
 
-export {
-  WIDGET_POPULATIONS,
-  type IssueListSummary,
-  type IssueWidgetCounts,
-  type WidgetPopulation,
-} from "./summary-widget";
+export { type IssueListSummary } from "./summary-widget";
