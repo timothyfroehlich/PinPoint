@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { AddCommentForm } from "./AddCommentForm";
 import { commentDraftKey } from "./comment-draft";
@@ -14,6 +14,35 @@ vi.mock("sonner", () => ({
 
 vi.mock("~/app/(app)/issues/actions", () => ({
   addCommentAction: vi.fn(),
+}));
+
+vi.mock("~/components/images/ImageUploadButton", () => ({
+  ImageUploadButton: ({
+    onUploadComplete,
+  }: {
+    onUploadComplete?: (imageData: unknown) => void;
+  }) => (
+    <button
+      type="button"
+      data-testid="mock-upload-image"
+      onClick={() =>
+        onUploadComplete?.({
+          blobUrl:
+            "https://abc123.public.blob.vercel-storage.com/uploads/test.jpg",
+          blobPathname: "uploads/test.jpg",
+          originalFilename: "test.jpg",
+          fileSizeBytes: 1234,
+          mimeType: "image/jpeg",
+        })
+      }
+    >
+      Upload Photo
+    </button>
+  ),
+}));
+
+vi.mock("~/components/images/ImageGallery", () => ({
+  ImageGallery: () => <div data-testid="image-gallery" />,
 }));
 
 // Mock the dynamic RichTextEditor so tests don't require a DOM/TipTap runtime
@@ -225,7 +254,7 @@ describe("AddCommentForm", () => {
     expect(JSON.parse(field("imagesMetadata") ?? "")).toEqual([photo]);
     expect(field("idempotencyKey")).toBe(key);
     // The photo shows in the composer, as it did before the sheet closed.
-    expect(screen.getByText("Photos (1/4)")).toBeInTheDocument();
+    expect(screen.getByTestId("image-gallery")).toBeInTheDocument();
   });
 
   it("clears the saved draft once the comment posts", async () => {
@@ -260,5 +289,46 @@ describe("AddCommentForm", () => {
       document.querySelector<HTMLInputElement>('input[name="idempotencyKey"]')
         ?.value
     ).not.toBe("5b0f7a52-6c1e-4d0e-9c1b-2f8f6c3d4e5a");
+  });
+
+  it("resets uploaded images and hidden imagesMetadata input after a successful submit", async () => {
+    mockUseActionState.mockReturnValue([undefined, vi.fn(), false]);
+    const { rerender } = render(
+      <AddCommentForm issueId="123" userId="user-1" />
+    );
+
+    const hiddenImages = document.querySelector<HTMLInputElement>(
+      'input[name="imagesMetadata"]'
+    );
+    expect(hiddenImages).not.toBeNull();
+    expect(hiddenImages?.value).toBe("[]");
+    expect(screen.queryByTestId("image-gallery")).not.toBeInTheDocument();
+
+    // Simulate uploading an image via ImageUploadButton
+    fireEvent.click(screen.getByTestId("mock-upload-image"));
+
+    // The hidden input should now serialize the uploaded image metadata
+    const parsedImages = JSON.parse(hiddenImages?.value ?? "[]");
+    expect(parsedImages).toHaveLength(1);
+    expect(parsedImages[0]).toMatchObject({
+      blobUrl: "https://abc123.public.blob.vercel-storage.com/uploads/test.jpg",
+      originalFilename: "test.jpg",
+    });
+    expect(screen.getByTestId("image-gallery")).toBeInTheDocument();
+
+    // Simulate successful form action completion (triggers post-submit useEffect)
+    mockUseActionState.mockReturnValue([{ ok: true }, vi.fn(), false]);
+    rerender(<AddCommentForm issueId="123" userId="user-1" />);
+
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith("Comment added");
+    });
+
+    // setUploadedImages([]) in useEffect resets imagesMetadata input back to "[]"
+    // and removes the ImageGallery
+    await waitFor(() => {
+      expect(hiddenImages?.value).toBe("[]");
+      expect(screen.queryByTestId("image-gallery")).not.toBeInTheDocument();
+    });
   });
 });

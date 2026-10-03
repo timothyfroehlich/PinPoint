@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { MachineView } from "~/components/machines/view";
 import { loadMachineView } from "~/lib/machines/view/queries";
 import { toMachineViewSearchParams } from "~/lib/machines/view/state";
+import { loadMachineViewSavedViews } from "~/lib/machines/view/saved-views";
 import { getTagForLayout } from "~/app/(app)/c/tags/[type]/[slug]/_data";
 
 interface PageProps {
@@ -21,10 +22,16 @@ export default async function TagOverviewPage({
   const tag = await getTagForLayout(type, slug);
   if (!tag) notFound();
 
-  const result = await loadMachineView({
-    scope: { kind: "tag", tagType: tag.type, slug: tag.slug },
-    preset: "collection",
-    searchParams: toMachineViewSearchParams(rawSearchParams),
-  });
-  return <MachineView result={result} preset="collection" />;
+  const viewSearchParams = toMachineViewSearchParams(rawSearchParams);
+  const [{ savedViews }, result] = await Promise.all([
+    loadMachineViewSavedViews("collection", viewSearchParams),
+    loadMachineView({
+      scope: { kind: "tag", tagType: tag.type, slug: tag.slug },
+      preset: "collection",
+      searchParams: viewSearchParams,
+    }),
+  ]);
+  return (
+    <MachineView result={result} preset="collection" savedViews={savedViews} />
+  );
 }

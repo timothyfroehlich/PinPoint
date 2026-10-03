@@ -28,14 +28,14 @@
 
 ## 3. Authoring card content
 
-- **3.1** Saved cards and their settings (apron size, credit display settings, card description, tip) are edited in the Apron card section of the machine form, on the machine's Manage tab and on the New Machine page (machine-editing §3.7). There is no separate card editor.
-- **3.2** The Apron card section offers an explicit choice for the card text: the machine's main description (edited in the same form's Description field), or a card description just for the card. Switching back to the main description discards nothing — the card description is kept, only unused.
+- **3.1** Saved cards and their settings (apron size, credit display settings, card description, tip) are edited on the machine's Apron card tab, which has its own Save. There is no other card editor, and the New Machine page has none: cards are added once the machine exists.
+- **3.2** The Apron card tab offers an explicit choice for the card text: the machine's main description (edited on the Manage tab; the card uses its saved value), or a card description just for the card. Switching back to the main description discards nothing — the card description is kept, only unused.
 - **3.3** Tip has an enabled/disabled toggle, independent of its saved text. When disabled, the card shows a single Description block and no Tip heading, regardless of saved tip content.
-- **3.4** Preview shows the card face rendered from the form's current values, including unsaved ones. Description and tip share one flowing region on the card rather than two independently sized boxes: growing one narrows the room available to the other in the preview, matching what the printed card will do.
-- **3.5** Description and tip are checked as one combined region, not measured line by line: PinPoint knows only whether the combined content still fits the card, not how many lines over it runs. While it does not fit, the Apron card section shows one card-level notice rather than a per-field message, and exporting it requires the override in §9.5. The form can still be saved.
+- **3.4** Preview shows the card face rendered from the tab's current values, including unsaved ones. Description and tip share one flowing region on the card rather than two independently sized boxes: growing one narrows the room available to the other in the preview, matching what the printed card will do.
+- **3.5** Description and tip are checked as one combined region, not measured line by line: PinPoint knows only whether the combined content still fits the card, not how many lines over it runs. While it does not fit, the Apron card tab shows one card-level notice rather than a per-field message, and exporting it requires the override in §9.5. The card can still be saved.
 - **3.6** Changing apron size, card description, tip, or a credit display setting requires the machine-management capability: machine owner, technician, or administrator.
 - **3.7** The card description and tip offer bold, italic, bulleted lists, and numbered lists, and the card prints that formatting. When the card uses the machine's main description, it prints bold, italic, and lists, and prints headings and links as plain text.
-- **3.8** The Service tab shows a thumbnail of the machine's first saved card with Preview and Export, and links to the Manage tab's Apron card section for editing.
+- **3.8** Every signed-in member sees the Apron card tab. A member without the machine-management capability sees each saved card's Preview and Export and no editing controls.
 
 ## 4. Apron size
 
@@ -90,7 +90,7 @@
 - **11.3** A person can add a saved card; it starts blank apart from the apron size PinPoint fills (§4.2).
 - **11.4** While editing a saved card, a person can copy the card description and tip from another of the same machine's saved cards.
 - **11.5** A person can rename or delete any saved card, including a machine's only one.
-- **11.6** The Apron card section shows one saved card at a time, with a control to switch between them. Switching keeps unsaved edits to every card; saving the form saves all of them.
+- **11.6** The Apron card tab shows one saved card at a time, with a control to switch between them. Switching keeps unsaved edits to every card; saving the tab saves all of them.
 - **11.7** Adding, renaming, or deleting a saved card requires the machine-management capability (§3.6).
 
 ## Known divergences
@@ -98,12 +98,13 @@
 | Requirement | Current implementation gap |
 | :-- | :-- |
 | §4.2 | Automatic apron-size fill from a Pinball Map match is intentionally deferred. Editors choose Stern/SPIKE or WPC manually for now; unmatched machines still have no default. |
-| §1 Saved card, §3.1, §3.5, §3.8, §4.1–4.3, §6.4, §9.1, §9.4, §9.5, §10.5, §11 | A machine still stores one card as columns on the machine; multiple saved cards and the export-time overflow override are not built yet. |
+| §1 Saved card, §3.1–3.5, §3.8, §4.1–4.3, §6.4, §9.1, §9.4, §9.5, §10.5, §11 | Cards are stored in `machine_apron_cards`, but the app reads and writes only a machine's first saved card, edited in a dialog opened from the Service and Manage tabs. There is no Apron card tab, card switcher, add/rename/delete/copy, rich-text card text, or export-time overflow override yet. |
 
 ## Changelog
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-02 | Card editing moves from the machine form to its own Apron card tab with its own Save; the New Machine page has no card; the Service tab thumbnail is replaced by the tab (§3.1–3.5, §3.8, §11.6). |
 | 2026-09-28 | Multiple saved cards per machine, each with a required size; an overflowing card saves and exports only with an explicit override (§1, §3.1, §3.5, §3.8, §4.1–4.3, §6.4, §9.1, §9.4, §9.5, §10.5, §11). |
 | 2026-09-28 | §5.2–§5.3: the card names playing tips as a third QR destination. §5.4 added: the playing tips row appears only for a machine with tips. |
 | 2026-09-27 | Card settings are edited in the machine form's Apron card section on the Manage tab and New Machine page, with no separate editor; Preview renders unsaved values; card description and tip become rich text that prints bold, italic, and lists; the Service tab keeps a thumbnail with Preview and Export (§1, §3.1–3.8). Credits for an uncataloged machine come from its hand-entered designers and artists (§1, §10.1, §10.3, §10.4). |

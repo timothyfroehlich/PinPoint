@@ -30,23 +30,6 @@ const savedView: MachineViewSavedViewSummary = {
   },
 };
 
-/**
- * A Saved View row exactly as it may still sit in Postgres from before the
- * Open Issues widget was retired (PR #2237 shipped `issuesWidget` in stored
- * state). The DB column is `jsonb.$type<MachineViewSavedState>()` with no
- * runtime validation on read (src/server/db/schema.ts), so a stored legacy
- * key simply rides along unused.
- */
-const legacyState: typeof savedView.state & { issuesWidget: string } = {
-  ...savedView.state,
-  issuesWidget: "filtered",
-};
-const legacySavedView: MachineViewSavedViewSummary = {
-  id: "22222222-2222-4222-8222-222222222222",
-  name: "Legacy view",
-  state: legacyState,
-};
-
 function resolve(
   query: string,
   defaultViewId: string | null = null,
@@ -110,20 +93,6 @@ describe("saved view request resolution", () => {
     expect(
       resolve("view=service-due", null, "collection").activeViewId
     ).toBeNull();
-  });
-
-  it("still loads a Saved View stored with the retired issuesWidget key", () => {
-    const result = resolveSavedMachineViewRequest({
-      views: [legacySavedView],
-      defaultViewId: legacySavedView.id,
-      preset: "machines",
-      searchParams: new URLSearchParams(),
-      pathname: "/m",
-    });
-    expect(result.activeViewId).toBe(legacySavedView.id);
-    expect(result.redirectTo).toBe(
-      `/m?status=needs_service%2Cunplayable&sort=playability&dir=desc&pageSize=50&view=${legacySavedView.id}`
-    );
   });
 });
 

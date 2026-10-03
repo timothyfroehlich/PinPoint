@@ -26,6 +26,7 @@ The `e2e/.auth/` directory is gitignored and auto-created by the `auth-setup` Pl
 - **`loginAs(page, testInfo, options?)`**: Performs fresh login. Use for mid-test role switches or auth flow tests.
 - **`logout(page)`**: Logs out via UI.
 - **`selectOption(page, triggerId, value)`**: Robustly selects from shadcn/ui Select.
+- **`assertNoA11yViolations(page, options?)`**: Runs an axe-core scan of the page's current state; fails only on `serious`/`critical` impacts. Full behavior, the always-disabled rules, and when to call it are in pinpoint-e2e `SKILL.md` § "Accessibility Checks (axe-core)".
 
 ## `e2e/support/page-helpers.ts`
 

@@ -42,11 +42,10 @@ read `filter-conventions.md`.
 
 Single-select user pickers all follow the **Picker Pattern** (Popover + cmdk Command) — see `pinpoint-design-bible` §12 for the canonical pattern + rules. Don't reimplement; copy from one of these.
 
-| File                                         | What It Teaches                                                                                     |
-| :------------------------------------------- | :-------------------------------------------------------------------------------------------------- |
-| `src/components/issues/AssigneePicker.tsx`   | Picker pattern, "Unassigned" sentinel, "Me" quick-select, callback-driven assignment via `onAssign` |
-| `src/components/machines/OwnerSelect.tsx`    | Picker pattern, hide-guests toggle, invite-on-the-fly via `<InviteUserDialog>`                      |
-| `src/components/machines/MachineFilters.tsx` | Inline filter bar (not a picker — filter composition + sort dropdown for the list page)             |
+| File                                       | What It Teaches                                                                                     |
+| :----------------------------------------- | :-------------------------------------------------------------------------------------------------- |
+| `src/components/issues/AssigneePicker.tsx` | Picker pattern, "Unassigned" sentinel, "Me" quick-select, callback-driven assignment via `onAssign` |
+| `src/components/machines/OwnerSelect.tsx`  | Picker pattern, hide-guests toggle, invite-on-the-fly via `<InviteUserDialog>`                      |
 
 ### Styling & Tokens
 
@@ -73,5 +72,5 @@ Every authenticated page should compose `<MainLayout>` → `<PageContainer>` →
 ## Label Standards
 
 - Status group labels: import `STATUS_GROUP_LABELS` from `src/lib/issues/status.ts`. Never hardcode the strings at a call site.
-- Quick-select labels for "current user" filters are **"Me"** (assignee — `src/components/issues/AssigneePicker.tsx`) and **"My machines"**. Reuse those exact strings rather than inventing "Mine" / "My games". **"My machines" filters _issues_ by the machines the current user owns**, so it lives on the issues side (`IssueFilters.tsx`), **not** in `MachineFilters.tsx` — a plausible-looking wrong turn. For the wiring (the `ownedMachineInitials` prop, and the dead `getMachineQuickSelectOrdering` path, PP-nri8) see `filter-conventions.md` § Quick-selects.
+- Quick-select labels for "current user" filters are **"Me"** (assignee — `src/components/issues/AssigneePicker.tsx`) and **"My machines"**. Reuse those exact strings rather than inventing "Mine" / "My games". **"My machines" filters _issues_ by the machines the current user owns**, so it lives on the issues side (`IssueFilters.tsx`), **not** in the machine list toolbar (`MachineViewToolbar.tsx`) — a plausible-looking wrong turn. For the wiring (the `ownedMachineInitials` prop) see `filter-conventions.md` § Quick-selects.
 - Status `wait_owner`: render `STATUS_CONFIG.wait_owner.label`, never the raw enum value. Mockups occasionally spell it "Wait Owner" — **the config wins over the mockup**, and this has been decided; don't relitigate it from a design file.

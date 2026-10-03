@@ -15,8 +15,11 @@
 
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render } from "@testing-library/react";
 import { randomUUID } from "node:crypto";
-import { authUsers } from "~/server/db/schema";
+import { authUsers, userProfiles } from "~/server/db/schema";
+import { usernameToInternalEmail } from "~/lib/auth/internal-accounts";
+import { createTestUser } from "~/test/helpers/factories";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 
 // ── Mocks (must be declared before dynamic imports) ────────────────────────
@@ -62,21 +65,25 @@ vi.mock("~/server/db", async () => {
 vi.mock("~/lib/discord/config", () => ({
   isDiscordIntegrationConfigured: vi.fn().mockResolvedValue(false),
 }));
-vi.mock("~/lib/auth/internal-accounts", () => ({
-  isInternalAccount: vi.fn().mockReturnValue(false),
-}));
 vi.mock(
   "~/app/(app)/settings/connected-accounts/connected-accounts-section",
   () => ({
     ConnectedAccountsSection: () => null,
   })
 );
+const mockNotificationPreferencesForm = vi.fn();
 vi.mock(
   "~/app/(app)/settings/notifications/notification-preferences-form",
   () => ({
-    NotificationPreferencesForm: () => null,
+    NotificationPreferencesForm: (props: unknown) => {
+      mockNotificationPreferencesForm(props);
+      return null;
+    },
   })
 );
+vi.mock("~/app/(app)/settings/reporting/default-report-mode-form", () => ({
+  DefaultReportModeForm: () => null,
+}));
 vi.mock("~/app/(app)/settings/change-password-section", () => ({
   ChangePasswordSection: () => null,
 }));
@@ -152,5 +159,59 @@ describe("SettingsPage — authenticated user with missing profile (PP-etip)", (
     expect(mockRedirect.mock.calls[0][0]).toMatch(/login|signin/i);
     expect(mockNotFound).not.toHaveBeenCalled();
     expect(mockReportError).not.toHaveBeenCalled();
+  });
+
+  describe("notification preferences wiring", () => {
+    it("passes isInternalAccount={true} to NotificationPreferencesForm for username accounts", async () => {
+      const userId = randomUUID();
+      const internalEmail = usernameToInternalEmail(`testuser-${userId}`);
+
+      const db = await getTestDb();
+      await db.insert(authUsers).values({ id: userId, email: internalEmail });
+      await db.insert(userProfiles).values(
+        createTestUser({
+          id: userId,
+          email: internalEmail,
+        })
+      );
+
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: userId, email: internalEmail } },
+      });
+
+      render(await SettingsPage());
+
+      expect(mockNotificationPreferencesForm).toHaveBeenCalledWith(
+        expect.objectContaining({
+          isInternalAccount: true,
+        })
+      );
+    });
+
+    it("passes isInternalAccount={false} to NotificationPreferencesForm for standard accounts", async () => {
+      const userId = randomUUID();
+      const standardEmail = `user-${userId}@example.com`;
+
+      const db = await getTestDb();
+      await db.insert(authUsers).values({ id: userId, email: standardEmail });
+      await db.insert(userProfiles).values(
+        createTestUser({
+          id: userId,
+          email: standardEmail,
+        })
+      );
+
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: userId, email: standardEmail } },
+      });
+
+      render(await SettingsPage());
+
+      expect(mockNotificationPreferencesForm).toHaveBeenCalledWith(
+        expect.objectContaining({
+          isInternalAccount: false,
+        })
+      );
+    });
   });
 });

@@ -5,10 +5,10 @@ import { getTestEmail } from "../support/test-isolation.js";
 
 /**
  * The one journey only a browser covers: a Default View is applied by a
- * server redirect when the Surface opens without view configuration
- * (machine-views.md §8.11–§8.13). Persistence and URL resolution are covered
- * in src/test/integration/machine-view-saved-views.test.ts and
- * src/lib/machines/view/saved-views.test.ts. A fresh account keeps each
+ * server redirect when the Machines page opens without view configuration
+ * (list-views.md §10.10–§10.12). Persistence, which Surfaces open the default,
+ * and URL resolution are covered in src/test/integration/saved-views.test.ts
+ * and src/lib/machines/view/saved-views.test.ts. A fresh account keeps each
  * browser project's default from colliding with another's.
  */
 test.describe("Machine View saved views", () => {
@@ -45,13 +45,13 @@ test.describe("Machine View saved views", () => {
     await expect(page).toHaveURL(/[?&]view=[0-9a-f-]{36}/);
     await expect(trigger).toHaveAccessibleName("Views: Unplayable only");
 
-    // A bare URL opens the default at its canonical URL (§8.11, §8.12).
+    // A bare URL opens the default at its canonical URL (§10.10, §10.11).
     await page.goto("/m");
     await expect(page).toHaveURL(/status=unplayable/);
     await expect(page).toHaveURL(/[?&]view=[0-9a-f-]{36}/);
     await expect(trigger).toHaveAccessibleName("Views: Unplayable only");
 
-    // Built-in Views stay reachable despite the default (§8.13).
+    // Built-in Views stay reachable despite the default (§10.12).
     await trigger.click();
     await page.getByText("On the floor", { exact: true }).click();
     await expect(page).toHaveURL(/[?&]view=on-the-floor$/);
