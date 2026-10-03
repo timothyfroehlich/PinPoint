@@ -24,6 +24,7 @@
 
 - **3.1** The Discord section implements the credential-entry card defined by the Discord spec (`docs/feature-specs/discord.md` §2–§3): fields, validation, and connection status. It has no enable toggle — the required configuration's presence and validation determine its state.
 - **3.2** The section links to the Discord help page. Discord login is a separate system from these notifications (`discord.md`) and is not configured here.
+- **3.3** The Discord section also hosts the activity summary settings (`docs/feature-specs/discord-activity-summary.md`).
 
 ## 4. The Pinball Map section
 
@@ -63,6 +64,7 @@ Changes to this document. Divergence-table rows are working state and are not lo
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-03 | §3.3 names the activity summary settings the Discord section hosts (`discord-activity-summary.md`). |
 | 2026-09-30 | §4.1 names the sync-report channel the Pinball Map section hosts (`pinballmap-sync-report.md`). |
 | 2026-08-27 | Slimmed to a page-level spec. The Pinball Map section's detailed behavior — the sync-health readout and Sync now (§4), the configuration-presence state model (§5), and the location-change rules (§6) — moved to `pinballmap.md` §10; §5 and §6 are kept as retired-number tombstones so older citations still resolve, and §7 Permissions is unchanged. The page spec now states only the page structure (§2), the sections and where each one's behavior lives (§3–§4), and the shared admin capability (§7). No integration behavior changed — this is a relocation; the section description also names the region-alert channel it hosts, matching the region-alerts spec (PP-o355.51.8). |
 | 2026-08-23 | Replaced the distinct Pinball Map enable flag with configuration presence: a stored location means configured and clearing it means Not configured. Defined reversible dormant-state retention, shared throttling for location validation, and validate-then-commit behavior for initial configuration, resumption, and location replacement. Clarified that this state governs location tracking, not the separately configured region-alert feature. Updated the Discord section to follow its approved credential-entry spec. |
