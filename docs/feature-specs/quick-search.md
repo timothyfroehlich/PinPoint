@@ -28,7 +28,7 @@
 - **3.1** Machine results match machine name, initials, and model identity.
 - **3.2** Issue results match formatted issue identifier, issue title, machine name, and machine initials.
 - **3.3** Quick search does not match issue descriptions, comments, reporter identity, assignee identity, or email addresses.
-- **3.4** Search includes every machine and issue the current viewer has permission to view.
+- **3.4** Search includes every machine and issue the current viewer has permission to view, except Removed machines and the issues on them.
 - **3.5** Search includes both open and closed issues.
 
 ## 4. Results and ranking
@@ -72,11 +72,14 @@
 
 ## Known divergences
 
-_None — the current implementation matches this spec._
+| Requirement | Divergence | Resolution |
+| :-- | :-- | :-- |
+| 3.4 | Search includes Removed machines and their issues. | PP-s363 |
 
 ## Changelog
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-03 | Search leaves out Removed machines and their issues (3.4). |
 | 2026-09-22 | Clarified inline desktop search, focus behavior, failure state, and the mobile dialog focus boundary. |
 | 2026-09-20 | Created the quick-search requirements for machines and issues. |
