@@ -283,18 +283,9 @@ describe("MachineView", () => {
         .map((button) => button.getAttribute("aria-label"));
 
     // Presence leads with On the Floor and has no Removed Segment (§3.2);
-    // Playability runs worst first (§4.2).
-    expect(names("Presence")).toEqual([
-      "2 On the Floor",
-      "0 Off the Floor",
-      "0 On Loan",
-      "1 Pending Arrival",
-    ]);
-    expect(names("Playability")).toEqual([
-      "0 Unplayable",
-      "1 Needs Service",
-      "1 Operational",
-    ]);
+    // Playability runs worst first (§4.2). Zero Segments are left out (widgets §5.5).
+    expect(names("Presence")).toEqual(["2 On the Floor", "1 Pending Arrival"]);
+    expect(names("Playability")).toEqual(["1 Needs Service", "1 Operational"]);
     expect(
       screen.getByRole("button", { name: "Summary: 2 of 2 playable" })
     ).toHaveAttribute("aria-controls");

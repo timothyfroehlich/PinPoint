@@ -94,7 +94,7 @@ describe("SummaryWidget", () => {
     expect(onSegmentSelect).toHaveBeenCalledWith("up");
   });
 
-  it("lists every Segment in the host's order, keeping a zero one unselectable", () => {
+  it("lists nonzero Segments in the host's order and leaves zero ones out", () => {
     renderWidget();
     const region = screen.getByRole("region", { name: "Status" });
 
@@ -102,19 +102,23 @@ describe("SummaryWidget", () => {
       within(region)
         .getAllByRole("button")
         .map((button) => button.getAttribute("aria-label"))
-    ).toEqual(["0 Down", "2 Worn", "4 Up"]);
-    expect(screen.getByRole("button", { name: "0 Down" })).toBeDisabled();
+    ).toEqual(["2 Worn", "4 Up"]);
+    expect(
+      screen.queryByRole("button", { name: "0 Down" })
+    ).not.toBeInTheDocument();
   });
 
   it("rolls Segments that do not fit into N other, which still offers each one", async () => {
     stubBreakdownWidths();
     const user = userEvent.setup();
-    const { onSegmentSelect } = renderWidget();
+    const { onSegmentSelect } = renderWidget({
+      widgetSegments: withCounts([1, 2, 4]),
+    });
     const region = screen.getByRole("region", { name: "Status" });
 
-    // "0 Down" fits beside "6 other"; Worn and Up roll up.
+    // "1 Down" fits beside "6 other"; Worn and Up roll up.
     expect(
-      within(region).getByRole("button", { name: "0 Down" })
+      within(region).getByRole("button", { name: "1 Down" })
     ).toBeInTheDocument();
     expect(
       within(region).queryByRole("button", { name: "4 Up" })
@@ -137,7 +141,10 @@ describe("SummaryWidget", () => {
 
   it("names the rolled-up Segment that is the active filter on N other", () => {
     stubBreakdownWidths();
-    renderWidget({ selectedValue: "up" });
+    renderWidget({
+      widgetSegments: withCounts([1, 2, 4]),
+      selectedValue: "up",
+    });
     const region = screen.getByRole("region", { name: "Status" });
 
     expect(
@@ -145,17 +152,18 @@ describe("SummaryWidget", () => {
     ).toBeEnabled();
   });
 
-  it("keeps N other unselectable when every rolled-up Segment is zero", async () => {
+  it("leaves zero-count Segments out of N other", async () => {
     stubBreakdownWidths();
     const user = userEvent.setup();
-    renderWidget({ widgetSegments: withCounts([4, 0, 0]) });
-    const other = screen.getByRole("button", { name: "0 other" });
+    renderWidget({ widgetSegments: withCounts([1, 0, 4]) });
 
-    expect(other).toBeDisabled();
-    await user.click(other);
+    await user.click(screen.getByRole("button", { name: "4 other" }));
+    const others = screen.getByRole("list", { name: "Other Status" });
     expect(
-      screen.queryByRole("list", { name: "Other Status" })
-    ).not.toBeInTheDocument();
+      within(others)
+        .getAllByRole("button")
+        .map((button) => button.getAttribute("aria-label"))
+    ).toEqual(["4 Up"]);
   });
 
   it("server-renders whole pairs only, wrapping the ones that do not fit out of view until measured", () => {
@@ -165,7 +173,6 @@ describe("SummaryWidget", () => {
 
     // No measurement yet: every pair, no "N other".
     expect(pairs.map((button) => button.getAttribute("aria-label"))).toEqual([
-      "0 Down",
       "2 Worn",
       "4 Up",
     ]);
@@ -179,7 +186,7 @@ describe("SummaryWidget", () => {
   it("stops wrapping once measured, so a shown entry is never hidden whole", () => {
     stubBreakdownWidths();
     renderWidget();
-    const line = screen.getByRole("button", { name: "0 Down" }).parentElement;
+    const line = screen.getByRole("button", { name: "2 Worn" }).parentElement;
 
     expect(line).not.toHaveClass("flex-wrap");
     expect(line).toHaveClass("overflow-x-clip");

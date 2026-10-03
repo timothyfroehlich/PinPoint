@@ -61,7 +61,6 @@ describe("IssueSummaryWidgets", () => {
       "1 Need Parts",
       "1 Pending Owner",
       "2 New",
-      "0 Confirmed",
       "1 In Progress",
     ]);
     expect(segmentNames("Severity")).toEqual([

@@ -52,7 +52,7 @@
 - **5.2** A Segment shows exactly one count. Widgets carry no secondary counts or subtitles.
 - **5.3** Bar Segments are sized by their counts and colored with the colors PinPoint already uses for that category's badges.
 - **5.4** Every count appears as text, so color is never the only signal.
-- **5.5** A Segment with a zero count still appears in the breakdown with its zero, unless it is rolled into "other" (§5.6).
+- **5.5** The breakdown lists only Segments with a nonzero count; a Segment with a zero count is left out of the breakdown and of "N other".
 - **5.6** The breakdown lists Segments in the order the host's widgets spec defines, worst first. When the line cannot fit every Segment, it shows whole count-and-label pairs from the start while they fit and rolls the rest into one "N other" entry; the bar still shows every Segment.
 - **5.7** On phones the breakdown sits on the widget's label line, with nothing beneath the bar and no color swatches.
 
@@ -80,5 +80,6 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-03 | Zero-count Segments are left out of the breakdown and of "N other" (§5.5). |
 | 2026-10-02 | The Summary Row shows the figures its host defines (§2.5); Summary Widget filters show on their filter control (§6.3). Retired the Filtered population and the All/Filtered choice (§1, §3, §5.1). Widgets stack when a wide layout cannot fit them side by side (§2.3); the phone section starts open at 390px and wider (§2.4); breakdowns run worst first and roll overflow into "N other" (§5.5, §5.6); phone breakdowns sit on the label line (§5.7). |
 | 2026-09-26 | Created. Establishes fixed Summary Widgets between a Widget Host's heading and toolbar, a collapsed-by-default Summary Row on phones, per-widget All/Filtered Widget Population as URL state, whole-population server-computed counts, single-count Segments in existing category colors, and Segment selection as a host filter. |

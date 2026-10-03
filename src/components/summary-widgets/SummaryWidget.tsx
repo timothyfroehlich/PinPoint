@@ -94,8 +94,6 @@ function SegmentButton<T extends string>({
   return (
     <button
       type="button"
-      // A zero Segment is listed but cannot be selected (widgets §5.5, §6.4).
-      disabled={segment.count === 0}
       aria-pressed={selected}
       aria-label={`${segment.count} ${segment.label}`}
       onClick={() => onSelect(segment.value)}
@@ -204,8 +202,6 @@ function SummaryWidgetBreakdown<T extends string>({
   const rolledUp = segments.slice(shownCount);
   const rolledUpCount = rolledUp.reduce((sum, s) => sum + s.count, 0);
   const rolledUpSelected = rolledUp.find((s) => s.value === selectedValue);
-  // Like a zero Segment (§6.4), "N other" holding only zeros cannot open.
-  const otherDisabled = rolledUpCount === 0;
 
   return (
     <div
@@ -229,11 +225,10 @@ function SummaryWidgetBreakdown<T extends string>({
         />
       ))}
       {rolledUp.length > 0 ? (
-        <Popover open={otherOpen && !otherDisabled} onOpenChange={setOtherOpen}>
+        <Popover open={otherOpen} onOpenChange={setOtherOpen}>
           <PopoverTrigger asChild>
             <button
               type="button"
-              disabled={otherDisabled}
               // The border alone cannot tell assistive technology which
               // rolled-up Segment is the active filter.
               aria-label={
@@ -311,7 +306,9 @@ export function SummaryWidget<T extends string>({
   onSegmentSelect,
 }: SummaryWidgetProps<T>): React.JSX.Element {
   const labelId = `${id}-label`;
-  const barSegments = segments.filter((segment) => segment.count > 0);
+  // Zero-count Segments take no bar width and are left out of the breakdown
+  // and "N other" (widgets §5.5), so they can never be selected (§6.4).
+  const nonzeroSegments = segments.filter((segment) => segment.count > 0);
 
   return (
     <section
@@ -341,10 +338,10 @@ export function SummaryWidget<T extends string>({
         aria-hidden="true"
         className={cn(
           "order-4 flex h-1.5 basis-full gap-0.5 overflow-hidden rounded-full md:order-3",
-          barSegments.length === 0 && "bg-muted"
+          nonzeroSegments.length === 0 && "bg-muted"
         )}
       >
-        {barSegments.map((segment) => (
+        {nonzeroSegments.map((segment) => (
           <div
             key={segment.value}
             className={cn("h-full min-w-1 basis-0", segment.fillClassName)}
@@ -354,7 +351,7 @@ export function SummaryWidget<T extends string>({
       </div>
       <SummaryWidgetBreakdown
         label={label}
-        segments={segments}
+        segments={nonzeroSegments}
         selectedValue={selectedValue}
         onSegmentSelect={onSegmentSelect}
         className="order-2 flex-1 basis-0 md:order-4 md:basis-full"
