@@ -17,14 +17,12 @@
  */
 
 import { test, expect } from "../support/fixtures.js";
-import { ensureLoggedIn, logout, loginAs } from "../support/actions.js";
-import { seededMachines, TEST_USERS } from "../support/constants.js";
+import { STORAGE_STATE } from "../support/auth-state.js";
+import { seededMachines } from "../support/constants.js";
 import { clearMachineField } from "../support/supabase-admin.js";
 
 test.describe("Machine Details - Extended", () => {
-  test.beforeEach(async ({ page }, testInfo) => {
-    await ensureLoggedIn(page, testInfo);
-  });
+  test.use({ storageState: STORAGE_STATE.admin });
 
   // The ownerRequirements test writes to Medieval Madness. Always clear it so
   // subsequent runs don't see stale data.
@@ -37,19 +35,12 @@ test.describe("Machine Details - Extended", () => {
 
   test("should display owner requirements callout on issue page", async ({
     page,
-  }, testInfo) => {
-    // First, let's login as admin and set owner requirements on a machine
-    await logout(page, testInfo);
-    await loginAs(page, testInfo, {
-      email: TEST_USERS.admin.email,
-      password: TEST_USERS.admin.password,
-    });
+  }) => {
+    const maintenancePath = `/m/${seededMachines.medievalMadness.initials}/maintenance`;
 
     // Navigate to the admin-owned machine's Service tab — Owner's Requirements
     // relocated off the Info tab into the Service-tab Machine box (PP-5sgt.3).
-    await page.goto(
-      `/m/${seededMachines.medievalMadness.initials}/maintenance`
-    );
+    await page.goto(maintenancePath);
 
     // Click the Edit pencil to enter edit mode. RichTextDisplay can render
     // links (mentions/urls) and nesting <a> inside <button> is invalid HTML,
@@ -63,8 +54,18 @@ test.describe("Machine Details - Extended", () => {
       .locator(".ProseMirror");
     await textarea.fill("Please handle with care - vintage machine");
 
-    // Save
-    await page.getByTestId("machine-owner-requirements-save").click();
+    // The display updates optimistically. Wait for the save to finish before
+    // reloading, or the navigation can abort the Server Action in Firefox.
+    const [saveResponse] = await Promise.all([
+      page.waitForResponse(
+        (response) =>
+          new URL(response.url()).pathname === maintenancePath &&
+          response.request().method() === "POST"
+      ),
+      page.getByTestId("machine-owner-requirements-save").click(),
+    ]);
+    expect(saveResponse.ok()).toBe(true);
+    await saveResponse.finished();
 
     // Verify it saved
     await expect(
@@ -74,13 +75,22 @@ test.describe("Machine Details - Extended", () => {
     // Now navigate to an issue for this machine to check the callout. The
     // issues list lives on the Service tab and renders cards flat (no
     // expando wrapper to expand).
-    await page.goto(
-      `/m/${seededMachines.medievalMadness.initials}/maintenance`
-    );
+    await page.goto(maintenancePath);
 
-    // Click the first issue card
-    const firstIssueCard = page.getByTestId("issue-card").first();
-    await firstIssueCard.click();
+    // Verify the saved value survived the server round-trip, then follow the
+    // issue link and wait for arrival before asserting the callout.
+    await expect(
+      page.getByTestId("machine-owner-requirements-display")
+    ).toContainText("Please handle with care - vintage machine");
+    const firstIssueLink = page
+      .getByRole("region", { name: /^Open Issues/ })
+      .getByRole("link")
+      .first();
+    const issuePath = await firstIssueLink.getAttribute("href");
+    if (!issuePath)
+      throw new Error("The issue link is missing its destination");
+    await firstIssueLink.click();
+    await expect(page).toHaveURL(issuePath);
 
     // The Owner's requirements callout sits on the Issue tab, the one every
     // arrival opens on.
@@ -89,12 +99,5 @@ test.describe("Machine Details - Extended", () => {
     await expect(callout).toContainText(
       "Please handle with care - vintage machine"
     );
-
-    // Restore member login
-    await logout(page, testInfo);
-    await loginAs(page, testInfo, {
-      email: TEST_USERS.member.email,
-      password: TEST_USERS.member.password,
-    });
   });
 });

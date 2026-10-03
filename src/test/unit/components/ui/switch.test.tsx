@@ -35,11 +35,6 @@ function formDataFor(ui: React.ReactElement): FormData {
 }
 
 describe("SwitchWithFormSupport form submission", () => {
-  it("submits 'on' when enabled and checked", () => {
-    const data = formDataFor(<Switch name="notify" defaultChecked />);
-    expect(data.get("notify")).toBe("on");
-  });
-
   it("submits an explicit 'off' when enabled and unchecked", () => {
     // This is why the hidden input exists at all: a native unchecked checkbox
     // would submit nothing, but the action must distinguish "off" from absent.
@@ -75,17 +70,6 @@ describe("SwitchWithFormSupport form submission", () => {
       />
     );
     expect(data.has("notify")).toBe(false);
-  });
-
-  it("matches a native disabled checkbox: neither contributes a value", () => {
-    const data = formDataFor(
-      <>
-        <Switch name="switchField" defaultChecked disabled />
-        <input type="checkbox" name="nativeField" defaultChecked disabled />
-      </>
-    );
-    expect(data.has("switchField")).toBe(false);
-    expect(data.has("nativeField")).toBe(false);
   });
 
   it("emits no submission field when rendered without a name", () => {

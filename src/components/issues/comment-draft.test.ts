@@ -67,6 +67,7 @@ describe("comment drafts", () => {
     expect(restored.current.snapshot.draft).toEqual({
       doc: doc("Flipper sticks"),
       images: [photo],
+      tag: null,
       idempotencyKey: savedKey,
     });
   });
@@ -179,6 +180,7 @@ describe("comment drafts", () => {
     expect(result.current.snapshot.draft).toEqual({
       doc: null,
       images: [],
+      tag: null,
       idempotencyKey: expect.not.stringMatching(postedKey),
     });
     // The cleared draft stays cleared: no pending save resurrects it.
@@ -211,6 +213,45 @@ describe("comment drafts", () => {
     );
     act(() => reopened.result.current.clear());
     expect(reopened.result.current.snapshot.draft.doc).toBeNull();
+  });
+
+  it("keeps a machine note's tag with its text, and a new tag is a new submission", async () => {
+    const page = await freshPage();
+    const key = page.machineNoteDraftKey("user-1", "machine-1");
+    const { result } = renderHook(() => page.useCommentDraft(key, "sheet"));
+
+    act(() => result.current.setDoc(doc("Rebuilt flippers")));
+    const typedKey = result.current.snapshot.draft.idempotencyKey;
+    act(() => result.current.setTag("maintenance"));
+    expect(result.current.snapshot.draft.idempotencyKey).not.toBe(typedKey);
+    const taggedKey = result.current.snapshot.draft.idempotencyKey;
+    act(() => result.current.setTag("maintenance"));
+    expect(result.current.snapshot.draft.idempotencyKey).toBe(taggedKey);
+
+    const reloaded = await freshPage();
+    const { result: restored } = renderHook(() =>
+      reloaded.useCommentDraft(key, "sheet")
+    );
+    expect(restored.current.snapshot.draft).toEqual(
+      expect.objectContaining({
+        doc: doc("Rebuilt flippers"),
+        tag: "maintenance",
+        idempotencyKey: taggedKey,
+      })
+    );
+  });
+
+  it("clears machine note drafts on sign-out", async () => {
+    const page = await freshPage();
+    const key = page.machineNoteDraftKey("user-1", "machine-1");
+    const { result } = renderHook(() => page.useCommentDraft(key, "sheet"));
+    act(() => result.current.setDoc(doc("Rebuilt flippers")));
+    act(() => vi.advanceTimersByTime(page.COMMENT_DRAFT_SAVE_DELAY_MS));
+    expect(localStorage.getItem(key)).not.toBeNull();
+
+    page.clearStoredCommentDrafts();
+
+    expect(localStorage.getItem(key)).toBeNull();
   });
 
   describe("parseCommentDraft", () => {
@@ -256,6 +297,11 @@ describe("comment drafts", () => {
         })
       );
       expect(draft?.images).toEqual([photo, photo, photo, photo]);
+    });
+
+    it("restores a draft saved before drafts carried a tag", async () => {
+      const { parseCommentDraft } = await freshPage();
+      expect(parseCommentDraft(stored({}))?.tag).toBeNull();
     });
   });
 });

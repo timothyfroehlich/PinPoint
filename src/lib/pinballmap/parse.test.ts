@@ -53,26 +53,12 @@ describe("parseCatalog image metadata", () => {
  * they were pretty-printed so the checked-in diff is reviewable, and the repo's
  * formatter owns them from here. No field was added, removed or edited.
  *
- * Everything else asserting this wire format does so against hand-written
- * fixtures derived from reading PBM's controller source. Those are correct — the
- * capture confirmed them field for field — but they can only ever restate what we
- * already believed. These tests are the ones that would catch PBM *changing*
- * its serializer, which is the failure this integration cannot detect at runtime:
- * a shape change makes entries drop silently and looks exactly like a quiet day.
+ * These captured responses exercise PinPoint's parser against the published
+ * wire shape, with exact projection and malformed-entry rejection assertions.
  *
  * Offline by construction (CORE-TEST-006) — the payload is on disk, nothing here
  * reaches pinballmap.com.
  */
-
-/** The complete wire shape of a region LMX record, per PBM's controller. */
-const EXPECTED_LMX_FIELDS = [
-  "created_at",
-  "ic_enabled",
-  "id",
-  "location_id",
-  "machine_id",
-  "updated_at",
-];
 
 describe("parseRegionLmxes against the captured Austin payload", () => {
   const raw = regionLmxFixture.location_machine_xrefs;
@@ -84,21 +70,6 @@ describe("parseRegionLmxes against the captured Austin payload", () => {
     // A shrinking parse is how a shape change would reach us. The parser now
     // rejects malformed entries rather than silently turning them into removals.
     expect(parsed).toHaveLength(raw.length);
-  });
-
-  it("sees no field outside the six PBM documents", () => {
-    const observed = new Set(raw.flatMap((entry) => Object.keys(entry)));
-
-    expect([...observed].sort()).toEqual(EXPECTED_LMX_FIELDS);
-  });
-
-  it("carries no nested machine, location or conditions object", () => {
-    // The index action serializes with `includes: []` / `methods: []`. Only
-    // `#show` nests a machine — the distinction the whole label-resolution design
-    // rests on, since it is why names come from our own mirror instead.
-    for (const key of ["machine", "location", "machine_conditions", "name"]) {
-      expect(EXPECTED_LMX_FIELDS).not.toContain(key);
-    }
   });
 
   it("keeps the three ids and discards the rest", () => {

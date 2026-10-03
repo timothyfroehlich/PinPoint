@@ -4,7 +4,7 @@ import { asc, eq } from "drizzle-orm";
 import type { DbTransaction } from "~/server/db";
 import { pinTips } from "~/server/db/schema";
 import { fetchPinTipsExport } from "./export";
-import type { PinTip, PinTipForCard } from "./types";
+import type { PinTipForCard } from "./types";
 
 /** 5 bound params per row keeps a 1,000-row chunk far under Postgres' 65,535. */
 const INSERT_CHUNK = 1_000;
@@ -19,11 +19,8 @@ const INSERT_CHUNK = 1_000;
  * either the old one or exactly the new export, which is how a tip removed
  * from PinTips disappears here too (spec 2.3).
  */
-export async function refreshPinTips(
-  tx: DbTransaction,
-  fetchExport: () => Promise<PinTip[]> = fetchPinTipsExport
-): Promise<number> {
-  const tips = await fetchExport();
+export async function refreshPinTips(tx: DbTransaction): Promise<number> {
+  const tips = await fetchPinTipsExport();
   const refreshedAt = new Date();
   await tx.transaction(async (write) => {
     await write.delete(pinTips);

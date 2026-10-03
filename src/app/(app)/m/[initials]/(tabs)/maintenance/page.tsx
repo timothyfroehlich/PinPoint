@@ -55,10 +55,11 @@ export default async function MachineMaintenanceTab({
 
   const accessLevel = getAccessLevel(currentUserProfile?.role);
   const canWatch = checkPermission("machines.watch", accessLevel);
-  const canCompose = checkPermission(
-    "machines.timeline.comment.add",
-    accessLevel
-  );
+  // Who may post timeline notes; their unposted note is kept as a draft.
+  const composerUserId =
+    user && checkPermission("machines.timeline.comment.add", accessLevel)
+      ? user.id
+      : null;
 
   const { machine } = await getMachineForLayout(initials);
   if (!machine) {
@@ -126,7 +127,7 @@ export default async function MachineMaintenanceTab({
           machineId={machine.id}
           machineInitials={machine.initials}
           machineName={machine.name}
-          canCompose={canCompose}
+          composerUserId={composerUserId}
         />
       </div>
       <div className="flex flex-col gap-6 md:col-start-2">
