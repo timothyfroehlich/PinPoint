@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { formatRelative } from "~/lib/dates";
+import { formatCompactAgeAgo, formatRelative } from "~/lib/dates";
 import { useRelativeNow } from "./RelativeTimeProvider";
 
 interface RelativeTimeProps {
@@ -23,19 +23,26 @@ interface RelativeTimeProps {
    * down as a prop — the string is then built once, in one zone, and cannot
    * diverge.
    *
-   * `NotificationList` and `IssueList` also pass `formatDateTime(...)`, but
-   * both are `"use client"` and call it inline, so the value is computed twice
+   * `NotificationList` and `IssueListEntry` also pass inline-formatted dates,
+   * but both are `"use client"`, so the value is computed twice
    * in two possibly-different zones. That is tolerable *here* only because a
    * fallback is text that the ticker replaces on mount; the same inline call
    * feeding an `aria-label` or any other attribute is a real bug, because
    * React does not patch mismatched attributes (see `ExactRelativeTime`).
    */
   fallback?: string;
+  /**
+   * `long` (default) reads "about 3 hours ago"; `compact` reads "just now", "12m ago",
+   * "3h ago", or "5d ago", the list-row age wording both List Hosts share
+   * (`formatCompactAgeAgo`).
+   */
+  format?: "long" | "compact";
 }
 
 export function RelativeTime({
   value,
   fallback,
+  format = "long",
 }: RelativeTimeProps): React.JSX.Element {
   // `null` during SSR and before the provider's first tick — render fallback.
   // After mount the shared ticker emits a number every 60s, causing a re-render.
@@ -55,7 +62,10 @@ export function RelativeTime({
 
   let label: string;
   try {
-    label = formatRelative(date);
+    label =
+      format === "compact"
+        ? formatCompactAgeAgo(date, now)
+        : formatRelative(date);
   } catch (err) {
     // formatDistanceToNow can throw RangeError on edge inputs; stay on fallback.
     console.warn("[RelativeTime] formatRelative threw", err);
