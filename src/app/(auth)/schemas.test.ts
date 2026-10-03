@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   loginSchema,
+  signupSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
 } from "./schemas";
@@ -155,5 +156,219 @@ describe("resetPasswordSchema", () => {
       confirmPassword: "Pāsswörd123!",
     });
     expect(result.success).toBe(true);
+  });
+});
+
+describe("signupSchema", () => {
+  it("should validate correct name, email, password, and terms", () => {
+    const result = signupSchema.safeParse({
+      firstName: "John",
+      lastName: "Doe",
+      email: "john@example.com",
+      password: "SecurePass123",
+      confirmPassword: "SecurePass123",
+      termsAccepted: true,
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.firstName).toBe("John");
+      expect(result.data.lastName).toBe("Doe");
+      expect(result.data.email).toBe("john@example.com");
+      expect(result.data.password).toBe("SecurePass123");
+      expect(result.data.termsAccepted).toBe(true);
+    }
+  });
+
+  it("should trim whitespace from names", () => {
+    const result = signupSchema.safeParse({
+      firstName: "  John  ",
+      lastName: "  Doe  ",
+      email: "john@example.com",
+      password: "SecurePass123",
+      confirmPassword: "SecurePass123",
+      termsAccepted: true,
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.firstName).toBe("John");
+      expect(result.data.lastName).toBe("Doe");
+    }
+  });
+
+  it("should reject empty names", () => {
+    const result = signupSchema.safeParse({
+      firstName: "",
+      lastName: "",
+      email: "john@example.com",
+      password: "SecurePass123",
+      confirmPassword: "SecurePass123",
+      termsAccepted: true,
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0]?.message).toContain(
+        "First name is required"
+      );
+    }
+  });
+
+  it("should reject names longer than 50 characters", () => {
+    const result = signupSchema.safeParse({
+      firstName: "a".repeat(51),
+      lastName: "Doe",
+      email: "john@example.com",
+      password: "SecurePass123",
+      confirmPassword: "SecurePass123",
+      termsAccepted: true,
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0]?.message).toContain("less than 50");
+    }
+  });
+
+  it("should reject invalid email format", () => {
+    const result = signupSchema.safeParse({
+      firstName: "John",
+      lastName: "Doe",
+      email: "invalid-email",
+      password: "SecurePass123",
+      confirmPassword: "SecurePass123",
+      termsAccepted: true,
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0]?.message).toContain("valid email");
+    }
+  });
+
+  it("should reject password shorter than 8 characters", () => {
+    const result = signupSchema.safeParse({
+      firstName: "John",
+      lastName: "Doe",
+      email: "john@example.com",
+      password: "short",
+      confirmPassword: "short",
+      termsAccepted: true,
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0]?.message).toContain("at least 8");
+    }
+  });
+
+  it("should reject password longer than 128 characters", () => {
+    const result = signupSchema.safeParse({
+      firstName: "John",
+      lastName: "Doe",
+      email: "john@example.com",
+      password: "a".repeat(129),
+      confirmPassword: "a".repeat(129),
+      termsAccepted: true,
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0]?.message).toContain("less than 128");
+    }
+  });
+
+  it("should accept password exactly 8 characters", () => {
+    const result = signupSchema.safeParse({
+      firstName: "John",
+      lastName: "Doe",
+      email: "john@example.com",
+      password: "12345678",
+      confirmPassword: "12345678",
+      termsAccepted: true,
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("should accept password exactly 128 characters", () => {
+    const result = signupSchema.safeParse({
+      firstName: "John",
+      lastName: "Doe",
+      email: "john@example.com",
+      password: "a".repeat(128),
+      confirmPassword: "a".repeat(128),
+      termsAccepted: true,
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("should reject mismatched passwords", () => {
+    const result = signupSchema.safeParse({
+      firstName: "John",
+      lastName: "Doe",
+      email: "john@example.com",
+      password: "SecurePass123",
+      confirmPassword: "DifferentPass456",
+      termsAccepted: true,
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0]?.message).toContain(
+        "Passwords do not match"
+      );
+      expect(result.error.issues[0]?.path).toContain("confirmPassword");
+    }
+  });
+
+  it("should reject confirmPassword exceeding 128 characters", () => {
+    const result = signupSchema.safeParse({
+      firstName: "John",
+      lastName: "Doe",
+      email: "john@example.com",
+      password: "SecurePass123",
+      confirmPassword: "a".repeat(129),
+      termsAccepted: true,
+    });
+
+    expect(result.success).toBe(false);
+    const confirmPasswordError = result.error?.issues.find(
+      (i) => i.path.includes("confirmPassword") && i.code === "too_big"
+    );
+    expect(confirmPasswordError).toBeDefined();
+  });
+
+  it("should reject when terms are not accepted", () => {
+    const result = signupSchema.safeParse({
+      firstName: "John",
+      lastName: "Doe",
+      email: "john@example.com",
+      password: "SecurePass123",
+      confirmPassword: "SecurePass123",
+      termsAccepted: false,
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const termsError = result.error.issues.find((i) =>
+        i.path.includes("termsAccepted")
+      );
+      expect(termsError?.message).toContain("Terms of Service");
+    }
+  });
+
+  it("should reject when terms field is missing", () => {
+    const result = signupSchema.safeParse({
+      firstName: "John",
+      lastName: "Doe",
+      email: "john@example.com",
+      password: "SecurePass123",
+      confirmPassword: "SecurePass123",
+    });
+
+    expect(result.success).toBe(false);
   });
 });
