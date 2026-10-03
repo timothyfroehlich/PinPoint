@@ -7,13 +7,16 @@ import { Lightbulb, Trophy, Wrench } from "lucide-react";
 import {
   APRON_CARD_LAYOUTS,
   apronCreditRows,
-  cardParagraphs,
   fitTitleSize,
   shrinkUntilFits,
   titleWords,
   type ApronCardContent,
   type ApronCardSize,
 } from "~/lib/machines/apron-card";
+import type {
+  CardTextBlock,
+  CardTextRun,
+} from "~/lib/machines/apron-card-text";
 import { qrSvgPath } from "~/lib/machines/apron-qr";
 import { cn } from "~/lib/utils";
 import { barlow, barlowCondensed } from "./fonts";
@@ -57,8 +60,8 @@ export function ApronCardFace({
     onReadyRef.current = onReady;
   });
 
-  const description = cardParagraphs(content.description);
-  const tip = content.tipEnabled ? cardParagraphs(content.tip) : [];
+  const description = content.description;
+  const tip = content.tipEnabled ? content.tip : [];
   const showTip = content.tipEnabled;
   const qrPx = showTip ? layout.qrWithTipPx : layout.qrPx;
   const creditRows = apronCreditRows(content);
@@ -265,9 +268,7 @@ export function ApronCardFace({
                   <div className="apron-card__display apron-card__label">
                     Description
                   </div>
-                  {description.map((p, i) => (
-                    <p key={i}>{p}</p>
-                  ))}
+                  <CardText blocks={description} />
                 </div>
               ) : null}
               {tip.length > 0 ? (
@@ -275,21 +276,58 @@ export function ApronCardFace({
                   <div className="apron-card__display apron-card__label">
                     Tip
                   </div>
-                  {tip.map((p, i) => (
-                    <p key={i}>{p}</p>
-                  ))}
+                  <CardText blocks={tip} />
                 </div>
               ) : null}
             </>
           ) : (
             <div>
-              {description.map((p, i) => (
-                <p key={i}>{p}</p>
-              ))}
+              <CardText blocks={description} />
             </div>
           )}
         </div>
       </div>
     </div>
+  );
+}
+
+function Runs({ runs }: { runs: CardTextRun[] }): React.JSX.Element {
+  return (
+    <>
+      {runs.map((run, i) => {
+        if (run.text === "\n") return <br key={i} />;
+        let node: React.ReactNode = run.text;
+        if (run.italic) node = <em>{node}</em>;
+        if (run.bold) node = <strong>{node}</strong>;
+        return <Fragment key={i}>{node}</Fragment>;
+      })}
+    </>
+  );
+}
+
+/** Card text with its bold, italic, and lists (spec §3.7). */
+function CardText({ blocks }: { blocks: CardTextBlock[] }): React.JSX.Element {
+  return (
+    <>
+      {blocks.map((block, i) => {
+        if (block.kind === "paragraph") {
+          return (
+            <p key={i}>
+              <Runs runs={block.runs} />
+            </p>
+          );
+        }
+        const items = block.items.map((runs, j) => (
+          <li key={j}>
+            <Runs runs={runs} />
+          </li>
+        ));
+        return block.ordered ? (
+          <ol key={i}>{items}</ol>
+        ) : (
+          <ul key={i}>{items}</ul>
+        );
+      })}
+    </>
   );
 }

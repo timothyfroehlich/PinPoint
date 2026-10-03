@@ -19,12 +19,16 @@ import { Separator } from "~/components/ui/separator";
 interface EditorToolbarProps {
   editor: Editor | null;
   mentionsEnabled?: boolean;
+  /** `card` offers bold, italic, and lists only (no headings or links). */
+  formats?: "full" | "card";
 }
 
 export function EditorToolbar({
   editor,
   mentionsEnabled,
+  formats = "full",
 }: EditorToolbarProps): React.JSX.Element | null {
+  const full = formats === "full";
   if (!editor) {
     return null;
   }
@@ -75,28 +79,32 @@ export function EditorToolbar({
 
       <Separator orientation="vertical" className="mx-1 h-6" />
 
-      <Toggle
-        size="sm"
-        pressed={editor.isActive("heading", { level: 2 })}
-        onPressedChange={() =>
-          editor.chain().focus().toggleHeading({ level: 2 }).run()
-        }
-        aria-label="Toggle heading 2"
-      >
-        <Heading2 className="h-4 w-4" />
-      </Toggle>
-      <Toggle
-        size="sm"
-        pressed={editor.isActive("heading", { level: 3 })}
-        onPressedChange={() =>
-          editor.chain().focus().toggleHeading({ level: 3 }).run()
-        }
-        aria-label="Toggle heading 3"
-      >
-        <Heading3 className="h-4 w-4" />
-      </Toggle>
+      {full ? (
+        <>
+          <Toggle
+            size="sm"
+            pressed={editor.isActive("heading", { level: 2 })}
+            onPressedChange={() =>
+              editor.chain().focus().toggleHeading({ level: 2 }).run()
+            }
+            aria-label="Toggle heading 2"
+          >
+            <Heading2 className="h-4 w-4" />
+          </Toggle>
+          <Toggle
+            size="sm"
+            pressed={editor.isActive("heading", { level: 3 })}
+            onPressedChange={() =>
+              editor.chain().focus().toggleHeading({ level: 3 }).run()
+            }
+            aria-label="Toggle heading 3"
+          >
+            <Heading3 className="h-4 w-4" />
+          </Toggle>
 
-      <Separator orientation="vertical" className="mx-1 h-6" />
+          <Separator orientation="vertical" className="mx-1 h-6" />
+        </>
+      ) : null}
 
       <Toggle
         size="sm"
@@ -115,16 +123,20 @@ export function EditorToolbar({
         <ListOrdered className="h-4 w-4" />
       </Toggle>
 
-      <Separator orientation="vertical" className="mx-1 h-6" />
+      {full ? (
+        <>
+          <Separator orientation="vertical" className="mx-1 h-6" />
 
-      <Toggle
-        size="sm"
-        pressed={editor.isActive("link")}
-        onPressedChange={setLink}
-        aria-label="Insert link"
-      >
-        <Link className="h-4 w-4" />
-      </Toggle>
+          <Toggle
+            size="sm"
+            pressed={editor.isActive("link")}
+            onPressedChange={setLink}
+            aria-label="Insert link"
+          >
+            <Link className="h-4 w-4" />
+          </Toggle>
+        </>
+      ) : null}
 
       {mentionsEnabled && (
         <Toggle
