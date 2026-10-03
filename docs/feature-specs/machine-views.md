@@ -118,7 +118,6 @@
 
 | Requirement | Divergence | Resolution |
 | :-- | :-- | :-- |
-| §9.2 | Collections' Page Preset is All machines, which shows every presence state without the Presence field. | PP-s363 |
 | §2.4 | Machine View has its own toolbar, chips, and Saved Views menu rather than the shared List View. | PP-jb9v |
 | §3.2, §5.2, §5.3 | Machine identity is two lines, and the phone Compact list reflows every selected field. | PP-jb9v |
 | §3.13 | Owner offers Unassigned but not Me. | PP-jb9v |

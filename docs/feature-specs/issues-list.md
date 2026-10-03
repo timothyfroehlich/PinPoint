@@ -88,7 +88,6 @@
 
 | Requirement | Divergence | Resolution |
 | :-- | :-- | :-- |
-| 4.5 | Machine and My machines include Removed machines. | PP-s363 |
 | §2.3 | The page title is "All Issues". | PP-jb9v |
 | §4.2, §4.7 | Machine presence has no filter control; a hidden parameter includes other presence states. | PP-jb9v |
 | §6 | No Built-in Views. | PP-jb9v |

@@ -153,7 +153,6 @@
 | :-- | :-- | :-- |
 | 6.2 | Owner Collections require sign-in. | PP-wqit.9 |
 | 7.2, 7.3, 7.7, §11 | Hand-applied tags and tag types do not exist; every tag is automatic. | PP-wqit.3, PP-wqit.4 |
-| 2.7, 4.2, 5.2, 7.9 | The add-machine choice, header counts, Collection counts, and tag counts include Removed machines. | PP-s363 |
 
 ---
 

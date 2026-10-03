@@ -152,7 +152,6 @@
 
 | Requirement | Code today | Resolution |
 | :-- | :-- | :-- |
-| §10.1–§10.2 | Every reporting mode offers Removed machines and accepts reports on them. | PP-s363 |
 | §2.3, §3.5–§3.11, §4.1, §4.3–§4.4, §5–§6 | Quick report templates, progressive problem selection, template values and confirmation, and deflection guidance do not exist. | `PP-ek0e.3` |
 | §9.1, §9.6 | Detailed report still shows five recent issues on desktop and lets its panel collapse; Quick report shows three and is always visible. | `PP-ek0e` follow-up decision; preserve Detailed behavior in `PP-ek0e.2` |
 

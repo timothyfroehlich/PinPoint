@@ -72,9 +72,7 @@
 
 ## Known divergences
 
-| Requirement | Divergence | Resolution |
-| :-- | :-- | :-- |
-| 3.4 | Search includes Removed machines and their issues. | PP-s363 |
+_None — the current implementation matches this spec._
 
 ## Changelog
 
