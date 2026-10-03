@@ -1,15 +1,20 @@
 import type React from "react";
-import { parseIssueFilters } from "~/lib/issues/filters";
+import { DEFAULT_ISSUE_SORT, parseIssueFilters } from "~/lib/issues/filters";
 import { loadIssueListPage } from "~/lib/issues/list-page";
 import { IssueFilters } from "~/components/issues/IssueFilters";
 import { IssueList } from "~/components/issues/IssueList";
 import { IssueSummaryWidgets } from "~/components/issues/IssueSummaryWidgets";
 import type { CollectionMachine } from "~/lib/collections/owner";
+import type { Viewer } from "~/lib/collections/viewer";
+import { getAccessLevel } from "~/lib/permissions/helpers";
+import type { IssueExportScope } from "~/app/(app)/issues/export-schema";
 
 interface MachineGroupIssuesTabProps {
   machines: CollectionMachine[];
   searchParams: Record<string, string | string[] | undefined>;
-  viewer: { userId: string | undefined; isAdmin: boolean };
+  viewer: Viewer;
+  /** Names this tab's Surface so Export can resolve its scope on the server. */
+  exportScope: IssueExportScope;
 }
 
 /**
@@ -20,6 +25,7 @@ export async function MachineGroupIssuesTab({
   machines,
   searchParams: rawParams,
   viewer,
+  exportScope,
 }: MachineGroupIssuesTabProps): Promise<React.JSX.Element> {
   const urlParams = new URLSearchParams();
   Object.entries(rawParams).forEach(([key, value]) => {
@@ -69,7 +75,7 @@ export async function MachineGroupIssuesTab({
     pageSize,
     summary,
   } = await loadIssueListPage(filters, {
-    isAdmin: viewer.isAdmin,
+    isAdmin: viewer.role === "admin", // permissions-audit-allow: SQL visibility flag, mirrors /issues page
     scopeMachineInitials: groupInitials,
   });
 
@@ -91,10 +97,15 @@ export async function MachineGroupIssuesTab({
       <IssueList
         issues={issuesList}
         totalCount={totalCount}
-        sort={filters.sort ?? "updated_desc"}
+        sort={filters.sort ?? DEFAULT_ISSUE_SORT}
         page={page}
         pageSize={pageSize}
         allUsers={assigneeUsers}
+        viewer={{
+          userId: viewer.userId,
+          accessLevel: getAccessLevel(viewer.role),
+        }}
+        exportScope={exportScope}
       />
     </div>
   );

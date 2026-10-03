@@ -40,7 +40,7 @@ export function OwnerBadge({
         data-testid="owner-badge"
       >
         <Crown className="size-3 shrink-0" aria-hidden="true" />
-        Game Owner
+        Owner
       </span>
     );
   }
@@ -55,11 +55,8 @@ export function OwnerBadge({
       )}
       data-testid="owner-badge"
     >
-      <Crown className="size-3" />
-      {/* sm-structural-allow: text abbreviation show/hide at viewport width, not layout structure */}
-      <span className="hidden sm:inline">Game Owner</span>
-      {/* sm-structural-allow: text abbreviation show/hide at viewport width, not layout structure */}
-      <span className="sm:hidden">Owner</span>
+      <Crown className="size-3" aria-hidden="true" />
+      Owner
     </Badge>
   );
 }

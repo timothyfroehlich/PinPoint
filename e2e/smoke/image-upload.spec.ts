@@ -78,16 +78,17 @@ test.describe("Image Upload Reporting", () => {
     // 6. Verify Redirection to Issue Detail
     await expect(page).toHaveURL(/\/i\/\d+/);
 
-    // 7. Verify image appears inline in the timeline, not in a separate images panel
+    // 7. Verify the image appears inline in the initial report, not in a
+    // separate images panel
     await expect(page.getByText("Images (1)")).toHaveCount(0);
-    await expect(page.getByTestId("issue-timeline")).toBeVisible();
-
-    // The image itself appears in the initial report card inside the timeline
-    const image = page.getByRole("img", { name: "test-image.png" }).first();
+    const image = page
+      .getByRole("region", { name: "Initial report" })
+      .getByRole("img", { name: "test-image.png" })
+      .first();
     await expect(image).toBeVisible();
 
     // Wait for hydration before clicking — the helper completes navigation on
-    // domcontentloaded, but the timeline image's click handler is bound by
+    // domcontentloaded, but the report image's click handler is bound by
     // React during hydration. On Mobile Chrome the click could fire before
     // hydration and silently no-op, leaving the lightbox unopened.
     await page

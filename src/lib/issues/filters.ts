@@ -10,6 +10,32 @@ import { ALL_ISSUE_STATUSES } from "~/lib/issues/status";
 export const ISSUE_PAGE_SIZES = [15, 25, 50] as const;
 export type IssuePageSize = (typeof ISSUE_PAGE_SIZES)[number];
 
+/**
+ * Every issue sort (issues-list §5.1), each field in both directions, as the
+ * composite `field_dir` value the URL carries today. Severity and Priority
+ * "highest" mean the most severe / most urgent first.
+ */
+export const ISSUE_SORT_OPTIONS = [
+  { value: "updated_desc", label: "Updated, newest" },
+  { value: "updated_asc", label: "Updated, oldest" },
+  { value: "created_desc", label: "Created, newest" },
+  { value: "created_asc", label: "Created, oldest" },
+  { value: "issue_asc", label: "Issue ID, A–Z" },
+  { value: "issue_desc", label: "Issue ID, Z–A" },
+  { value: "severity_desc", label: "Severity, highest" },
+  { value: "severity_asc", label: "Severity, lowest" },
+  { value: "priority_desc", label: "Priority, highest" },
+  { value: "priority_asc", label: "Priority, lowest" },
+  { value: "assignee_asc", label: "Assignee, A–Z" },
+  { value: "assignee_desc", label: "Assignee, Z–A" },
+] as const;
+export type IssueSort = (typeof ISSUE_SORT_OPTIONS)[number]["value"];
+export const DEFAULT_ISSUE_SORT: IssueSort = "updated_desc";
+
+export function isIssueSort(value: string): value is IssueSort {
+  return ISSUE_SORT_OPTIONS.some((option) => option.value === value);
+}
+
 export interface IssueFilters {
   q?: string | undefined;
   status?: IssueStatus[] | undefined;
@@ -26,7 +52,7 @@ export interface IssueFilters {
   createdTo?: Date | undefined;
   updatedFrom?: Date | undefined;
   updatedTo?: Date | undefined;
-  sort?: string | undefined;
+  sort?: IssueSort | undefined;
   page?: number | undefined;
   pageSize?: number | undefined;
   currentUserId?: string | undefined; // Server-side only, for watching filter
@@ -89,7 +115,10 @@ export function parseIssueFilters(params: URLSearchParams): IssueFilters {
   const frequency = parseCommaList(params.get("frequency"), VALID_FREQUENCIES);
   if (frequency) filters.frequency = frequency;
 
-  filters.sort = params.get("sort") ?? "updated_desc";
+  // Unknown sort values (stale links, old column-header values) fall back to
+  // the default rather than reaching the query unvalidated.
+  const sort = params.get("sort");
+  filters.sort = sort !== null && isIssueSort(sort) ? sort : DEFAULT_ISSUE_SORT;
   const p = parseInt(params.get("page") ?? "1", 10);
   filters.page = !isNaN(p) && p > 0 ? p : 1;
   const ps = parseInt(params.get("page_size") ?? "15", 10);

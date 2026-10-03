@@ -1,23 +1,37 @@
 "use client";
 
 import type React from "react";
-import { useActionState, startTransition } from "react";
+import {
+  useActionState,
+  useEffect,
+  useRef,
+  useState,
+  startTransition,
+} from "react";
+import { toast } from "sonner";
 import {
   assignIssueAction,
   type AssignIssueResult,
 } from "~/app/(app)/issues/actions";
-import { AssigneePicker } from "~/components/issues/AssigneePicker";
 import {
-  getPermissionDeniedReason,
-  getPermissionState,
+  AssigneeInitial,
+  AssigneePicker,
+} from "~/components/issues/AssigneePicker";
+import {
+  FieldRowStatic,
+  FieldRowWithFeedback,
+} from "~/components/issues/fields/IssueFieldRow";
+import {
+  checkPermission,
   type OwnershipContext,
 } from "~/lib/permissions/helpers";
 import { type AccessLevel } from "~/lib/permissions/matrix";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "~/components/ui/tooltip";
+  withTransportFailure,
+  type TransportFailure,
+} from "./transport-failure";
+
+const assignOrFail = withTransportFailure(assignIssueAction);
 
 interface AssignIssueFormProps {
   issueId: string;
@@ -28,6 +42,11 @@ interface AssignIssueFormProps {
   ownershipContext: OwnershipContext;
 }
 
+/**
+ * The Assignee row in the issue's Details (spec issue-detail §9.4). A failed
+ * save shows as a toast and inline under the row; a successful one is
+ * announced to screen readers.
+ */
 export function AssignIssueForm({
   issueId,
   assignedToId,
@@ -37,70 +56,72 @@ export function AssignIssueForm({
   ownershipContext,
 }: AssignIssueFormProps): React.JSX.Element {
   const [state, formAction, isPending] = useActionState<
-    AssignIssueResult | undefined,
+    AssignIssueResult | TransportFailure | undefined,
     FormData
-  >(assignIssueAction, undefined);
-  const permissionState = getPermissionState(
+  >(assignOrFail, undefined);
+  const [announcement, setAnnouncement] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  // Who the in-flight save assigns, as the announcement words it.
+  const savingNameRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!state) return;
+    if (state.ok) {
+      if (savingNameRef.current) {
+        setAnnouncement(`Assignee changed to ${savingNameRef.current}`);
+      }
+    } else {
+      setError(state.message);
+      toast.error(state.message);
+    }
+    savingNameRef.current = null;
+  }, [state]);
+
+  const canAssign = checkPermission(
     "issues.update.triage",
     accessLevel,
     ownershipContext
   );
-  const deniedReason = permissionState.allowed
-    ? null
-    : getPermissionDeniedReason(
-        "issues.update.triage",
-        accessLevel,
-        ownershipContext
-      );
-  const assignedUserName =
-    users.find((user) => user.id === assignedToId)?.name ?? "Unassigned";
 
-  if (
-    !permissionState.allowed &&
-    permissionState.reason === "unauthenticated"
-  ) {
+  if (!canAssign) {
+    const assignedName =
+      users.find((user) => user.id === assignedToId)?.name ?? null;
     return (
-      <div
-        className="rounded-md border border-input bg-muted/40 px-3 py-2 text-sm text-muted-foreground"
-        data-testid="assignee-readonly"
-      >
-        {assignedUserName}
-      </div>
+      <FieldRowStatic
+        label="Assignee"
+        value={{
+          label: assignedName ?? "Unassigned",
+          muted: assignedName === null,
+          leading: <AssigneeInitial name={assignedName} />,
+        }}
+        testId="assignee-readonly"
+      />
     );
   }
 
-  const picker = (
-    <AssigneePicker
-      assignedToId={assignedToId}
-      users={users}
-      currentUserId={currentUserId}
-      isPending={isPending}
-      disabled={!permissionState.allowed}
-      disabledReason={deniedReason}
-      onAssign={(userId) => {
-        const formData = new FormData();
-        formData.append("issueId", issueId);
-        formData.append("assignedTo", userId ?? "");
-        startTransition(() => {
-          formAction(formData);
-        });
-      }}
-    />
-  );
-
   return (
-    <div>
-      {permissionState.allowed ? (
-        picker
-      ) : (
-        <Tooltip>
-          <TooltipTrigger asChild>{picker}</TooltipTrigger>
-          <TooltipContent>{deniedReason}</TooltipContent>
-        </Tooltip>
-      )}
-      {state && !state.ok && (
-        <p className="text-sm text-destructive-text">{state.message}</p>
-      )}
-    </div>
+    <FieldRowWithFeedback announcement={announcement} error={error}>
+      <AssigneePicker
+        assignedToId={assignedToId}
+        users={users}
+        currentUserId={currentUserId}
+        isPending={isPending}
+        onAssign={(userId) => {
+          if (isPending) return;
+          setError(null);
+          setAnnouncement("");
+          savingNameRef.current =
+            userId === null
+              ? "Unassigned"
+              : (users.find((user) => user.id === userId)?.name ?? null);
+          const formData = new FormData();
+          formData.append("issueId", issueId);
+          formData.append("assignedTo", userId ?? "");
+          startTransition(() => {
+            formAction(formData);
+          });
+        }}
+      />
+    </FieldRowWithFeedback>
   );
 }

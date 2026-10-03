@@ -6,6 +6,7 @@
  */
 
 import { z } from "zod";
+import { ISSUE_TITLE_MAX, ISSUE_TITLE_MAX_MESSAGE } from "~/lib/issues/title";
 import { ISSUE_FREQUENCY_VALUES } from "~/lib/types";
 import { ISSUE_STATUS_VALUES } from "~/lib/issues/status";
 
@@ -145,7 +146,7 @@ export const updateIssueTitleSchema = z.object({
     .string()
     .trim()
     .min(1, "Title cannot be empty")
-    .max(100, "Title must be 100 characters or less"),
+    .max(ISSUE_TITLE_MAX, ISSUE_TITLE_MAX_MESSAGE),
 });
 
 /**

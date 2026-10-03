@@ -9,6 +9,7 @@ import { test, expect, type Page } from "../support/fixtures.js";
 import {
   assertNoHorizontalOverflow,
   assertNoA11yViolations,
+  showIssueSection,
 } from "../support/actions.js";
 import { cleanupTestEntities, extractIdFromUrl } from "../support/cleanup.js";
 import { seededMachines } from "../support/constants.js";
@@ -222,27 +223,35 @@ test.describe("Issues System", () => {
       ).toBeVisible();
 
       await expect(page.getByTestId("issue-timeline")).toBeVisible();
-      // Authenticated mobile uses StickyCommentComposer (sticky bar with
-      // "Add a comment" button); desktop shows the inline composer at the end
-      // of the timeline. Either is the canonical comment composer for its
-      // viewport — assert on whichever applies.
+      await expect(
+        page.getByRole("heading", { level: 2, name: "Activity" })
+      ).toBeVisible();
+      // Authenticated mobile composes through the floating "Comment" button;
+      // desktop shows the inline composer at the end of Activity. Either is
+      // the canonical comment composer for its viewport.
+      const floatingComment = page.getByRole("button", {
+        name: "Comment",
+        exact: true,
+      });
       if (isMobile) {
-        await expect(
-          page.getByRole("button", { name: "Add a comment" })
-        ).toBeVisible();
+        await expect(floatingComment).toBeVisible();
       } else {
         await expect(page.getByTestId("issue-comment-form")).toBeVisible();
+        await expect(floatingComment).toBeHidden();
       }
-      await expect(page.getByRole("heading", { name: "Activity" })).toHaveCount(
-        isMobile ? 0 : 1
-      );
 
-      // New unified design: metadata grid visible everywhere; Back to Issues
-      // link is mobile-only (desktop relies on AppHeader nav).
-      await expect(page.getByTestId("issue-metadata-grid")).toBeVisible();
+      // Details: mobile hides it behind the Details tab; desktop shows it in
+      // the right column alongside the Issue content.
+      const fieldRows = page.getByTestId("issue-field-rows");
+      if (isMobile) {
+        await expect(fieldRows).toBeHidden();
+        await showIssueSection(page, "Details");
+      }
+      await expect(fieldRows).toBeVisible();
       await expect(
-        page.getByRole("link", { name: /Back to Issues/i })
-      ).toHaveCount(isMobile ? 1 : 0);
+        page.getByRole("button", { name: /^Status: / })
+      ).toBeVisible();
+      await expect(page.getByTestId("issue-context-rows")).toBeVisible();
 
       // Verify no horizontal overflow on issue detail page
       await assertNoHorizontalOverflow(page);
@@ -287,11 +296,11 @@ test.describe("Issues System", () => {
         })
       ).toBeVisible();
 
+      // The Assignee row lives in Details (its own tab on mobile).
+      await showIssueSection(page, "Details");
+
       // Find the assignee picker - initially shows "Unassigned"
-      const assigneePicker = page
-        .getByTestId("assignee-picker-trigger")
-        .filter({ visible: true })
-        .first();
+      const assigneePicker = page.getByTestId("assignee-picker-trigger");
       await expect(assigneePicker).toBeVisible();
       await expect(assigneePicker).toContainText("Unassigned");
 
@@ -311,15 +320,20 @@ test.describe("Issues System", () => {
 
       // Reload page to verify persistence
       await page.reload();
+      await showIssueSection(page, "Details");
+      await expect(page.getByTestId("assignee-picker-trigger")).toContainText(
+        "Member User"
+      );
+
+      // Verify the assignment event appears in Activity (on the Issue tab on
+      // mobile).
+      await showIssueSection(page, "Issue");
       await expect(
         page
-          .getByTestId("assignee-picker-trigger")
-          .filter({ visible: true })
-          .first()
-      ).toContainText("Member User");
-
-      // Verify assignment timeline event appears
-      await expect(page.getByText("Assigned to Member User")).toBeVisible();
+          .getByTestId("issue-timeline")
+          .getByTestId("system-event-text")
+          .filter({ hasText: "assigned Member User" })
+      ).toBeVisible();
     });
   });
 });

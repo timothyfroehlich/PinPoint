@@ -48,6 +48,8 @@ interface IssueCardProps {
    * Status + Severity (design §4, PP-dnk8). Strip layout only.
    */
   capNarrowBadges?: boolean;
+  /** The title's heading level: h3 when the list sits under its own h2. */
+  titleAs?: "h2" | "h3";
   dataTestId?: string;
 }
 
@@ -60,6 +62,7 @@ export function IssueCard({
   showReporter = false,
   showMachineName = true,
   capNarrowBadges = false,
+  titleAs = "h2",
   dataTestId,
 }: IssueCardProps): React.JSX.Element {
   const isClosed = (CLOSED_STATUSES as readonly string[]).includes(
@@ -91,6 +94,7 @@ export function IssueCard({
           <div className="flex flex-col @lg/card-header:flex-row @lg/card-header:items-center justify-between gap-4 w-full">
             <div className="flex-1 min-w-0">
               <CardTitle
+                as={titleAs}
                 className={cn(
                   "text-foreground mb-1 truncate",
                   variant === "compact" ? "text-sm" : "text-base"

@@ -12,6 +12,7 @@ import { uploadIssueImage } from "~/server/actions/images";
 import { toast } from "sonner";
 import { type ImageMetadata } from "~/types/images";
 import { getUploadErrorMessage } from "~/components/images/upload-error-message";
+import { cn } from "~/lib/utils";
 
 interface ImageUploadButtonProps {
   issueId: string; // 'new' or UUID
@@ -19,6 +20,10 @@ interface ImageUploadButtonProps {
   disabled?: boolean;
   currentCount: number;
   maxCount: number;
+  /** Extra classes for the Upload Photo and Take Photo buttons. */
+  buttonClassName?: string;
+  /** The success toast; callers word it for their surface. */
+  successMessage?: string;
 }
 
 export function ImageUploadButton({
@@ -27,6 +32,8 @@ export function ImageUploadButton({
   disabled,
   currentCount,
   maxCount,
+  buttonClassName,
+  successMessage = "Image uploaded successfully",
 }: ImageUploadButtonProps): React.JSX.Element {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -57,7 +64,7 @@ export function ImageUploadButton({
       const result = await uploadIssueImage(formData);
 
       if (result.ok) {
-        toast.success("Image uploaded successfully");
+        toast.success(successMessage);
         onUploadComplete?.(result.value);
       } else {
         toast.error(`Upload failed: ${result.message}`);
@@ -91,7 +98,7 @@ export function ImageUploadButton({
         <Button
           type="button"
           variant="outline"
-          className="flex-1 gap-2"
+          className={cn("flex-1 gap-2", buttonClassName)}
           disabled={(disabled ?? false) || isUploading || isAtLimit}
           onClick={() => fileInputRef.current?.click()}
         >
@@ -107,7 +114,7 @@ export function ImageUploadButton({
         <Button
           type="button"
           variant="outline"
-          className="flex-1 gap-2 md:hidden"
+          className={cn("flex-1 gap-2 md:hidden", buttonClassName)}
           disabled={(disabled ?? false) || isUploading || isAtLimit}
           onClick={() => {
             if (fileInputRef.current) {
@@ -139,9 +146,9 @@ export function ImageUploadButton({
       />
 
       {isAtLimit && (
-        <p className="text-xs text-muted-foreground">
+        <div className="text-xs text-muted-foreground">
           Maximum number of images reached.
-        </p>
+        </div>
       )}
     </div>
   );

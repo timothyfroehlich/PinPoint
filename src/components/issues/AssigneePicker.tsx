@@ -1,45 +1,53 @@
 "use client";
 
 import React from "react";
-import { cn } from "~/lib/utils";
-import { Loader2, User } from "lucide-react";
+import { Check, User } from "lucide-react";
+import { FieldRowButton } from "~/components/issues/fields/IssueFieldRow";
+import {
+  FieldDrawerHeader,
+  fieldDrawerContentClassName,
+} from "~/components/issues/fields/MetadataDrawer";
 import {
   Command,
   CommandGroup,
   CommandInput,
   CommandItem,
   CommandList,
-  CommandSeparator,
 } from "~/components/ui/command";
+import { Drawer, DrawerContent, DrawerTrigger } from "~/components/ui/drawer";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "~/components/ui/popover";
+import { useIsMobile } from "~/hooks/use-is-mobile";
+import { cn } from "~/lib/utils";
 
 /**
- * AssigneePicker — Dropdown for assigning a user to an issue.
+ * AssigneePicker — the Details card's Assignee row and its picker (spec
+ * issue-detail §9.4).
  *
  * ## Pattern
- * Popover + Command (cmdk) with manual search filtering. We use `Command` +
- * `CommandInput` + `CommandList` + `CommandItem` for full cmdk keyboard navigation.
- * `shouldFilter={false}` lets us filter manually so "Me" and "Unassigned" stay
- * visible regardless of query. Radix Popover handles click-outside and focus management.
+ * A Command (cmdk) list with manual search filtering: `shouldFilter={false}`
+ * keeps "Me" and "Unassigned" visible regardless of the query. On desktop the
+ * list sits in a Popover anchored to the row; on phones it sits in a bottom
+ * sheet with the same chrome as the other field pickers, search box on top
+ * and 44px rows. Two component trees, so this branches on `useIsMobile` (a
+ * CORE-RESP-002 sanctioned exception).
  *
  * ## Composition
- * - Trigger button shows the selected user's avatar initial + name, or "Unassigned"
- * - CommandInput provides the search field; items are filtered manually so that
- *   "Me" and "Unassigned" are always visible regardless of query
- * - Alphabetical user list also includes the current user (under their real name),
- *   so searching by name finds them even though they already appear as "Me"
- * - `onAssign(userId | null)` fires on selection; `null` means unassigned
- *
- * ## Key Abstractions
- * - `assignedToId: string | null` — `null` represents the unassigned state
- * - `currentUserId` — when provided, shows "Me" as a quick-select above
- *   "Unassigned"; that user still also appears in the alphabetical list
- * - `isPending` shows a spinner overlay during optimistic update transitions
- * - `disabled` / `disabledReason` support permission-gated assignment
+ * - Trigger row shows the selected user's initial + name, or "Unassigned"
+ * - Alphabetical user list also includes the current user (under their real
+ *   name), so searching by name finds them even though they already appear
+ *   as "Me"
+ * - The current assignee's row (or Unassigned) carries a check mark and is
+ *   where the list's highlight starts, so the highlight never suggests a
+ *   different person is assigned
+ * - Filtering announces how many people match
+ * - `onAssign(userId | null)` fires on selection; `null` means unassigned.
+ *   Choosing the current assignee only closes the picker
+ * - While `isPending` the row shows a spinner and won't open
+ * - Viewers without the triage capability get a read-only row instead
  */
 
 interface PickerUser {
@@ -52,9 +60,165 @@ interface AssigneePickerProps {
   users: PickerUser[];
   isPending: boolean;
   onAssign: (userId: string | null) => void;
-  disabled?: boolean;
-  disabledReason?: string | null;
   currentUserId?: string | null;
+}
+
+interface AssigneeCommandProps {
+  assignedToId: string | null;
+  users: PickerUser[];
+  currentUser: PickerUser | null;
+  onSelect: (userId: string | null) => void;
+  /** Phone rows are 44px tall (spec §13.2). */
+  touch?: boolean;
+}
+
+/** The searchable assignee list; the Popover or the Drawer wraps it. */
+export function AssigneeCommand({
+  assignedToId,
+  users,
+  currentUser,
+  onSelect,
+  touch = false,
+}: AssigneeCommandProps): React.JSX.Element {
+  const [query, setQuery] = React.useState("");
+
+  const filteredUsers = React.useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) {
+      return users;
+    }
+    return users.filter((user) => user.name.toLowerCase().includes(normalized));
+  }, [query, users]);
+
+  const itemClassName = cn(touch && "min-h-11");
+  // The highlight starts on whoever is assigned now.
+  const defaultValue =
+    assignedToId === null
+      ? "unassigned"
+      : assignedToId === currentUser?.id
+        ? `me-${currentUser.id}`
+        : assignedToId;
+  const trimmedQuery = query.trim();
+  const resultAnnouncement = trimmedQuery
+    ? filteredUsers.length === 0
+      ? "No matches"
+      : `${filteredUsers.length} ${filteredUsers.length === 1 ? "match" : "matches"}`
+    : "";
+
+  return (
+    <Command
+      shouldFilter={false}
+      defaultValue={defaultValue}
+      // In the sheet the search stays put while the list scrolls.
+      className={cn(touch && "min-h-0 flex-1 bg-transparent")}
+    >
+      <CommandInput
+        placeholder="Search users..."
+        aria-label="Filter users"
+        data-testid="assignee-search-input"
+        value={query}
+        onValueChange={setQuery}
+      />
+      <div role="status" className="sr-only">
+        {resultAnnouncement}
+      </div>
+      <CommandList
+        aria-label="Assignee options"
+        className={cn(touch && "max-h-none min-h-0 flex-1")}
+      >
+        {/* Quick-selects: "Me" (if the current user is assignable) and
+            "Unassigned". */}
+        <CommandGroup>
+          {currentUser ? (
+            <CommandItem
+              value={`me-${currentUser.id}`}
+              onSelect={() => onSelect(currentUser.id)}
+              className={itemClassName}
+              data-testid="assignee-option-me"
+              data-assigned={assignedToId === currentUser.id}
+              aria-current={
+                assignedToId === currentUser.id ? "true" : undefined
+              }
+            >
+              <User
+                className="size-6 shrink-0 p-0.5 text-primary"
+                aria-hidden="true"
+              />
+              <span className="font-medium text-primary">Me</span>
+              <CurrentMark show={assignedToId === currentUser.id} />
+            </CommandItem>
+          ) : null}
+          <CommandItem
+            value="unassigned"
+            onSelect={() => onSelect(null)}
+            className={itemClassName}
+            data-testid="assignee-option-unassigned"
+            data-assigned={assignedToId === null}
+            aria-current={assignedToId === null ? "true" : undefined}
+          >
+            <span
+              className="flex size-6 items-center justify-center rounded-full bg-muted text-xs text-muted-foreground"
+              aria-hidden="true"
+            >
+              ?
+            </span>
+            <span className="font-medium">Unassigned</span>
+            <CurrentMark show={assignedToId === null} />
+          </CommandItem>
+        </CommandGroup>
+        {/* The divider is a border, not a CommandSeparator: a separator
+            inside the listbox is not an allowed listbox child. */}
+        {filteredUsers.length > 0 ? (
+          <CommandGroup className={cn(currentUser && "border-t border-border")}>
+            {filteredUsers.map((user) => (
+              <CommandItem
+                key={user.id}
+                value={user.id}
+                onSelect={() => onSelect(user.id)}
+                className={itemClassName}
+                data-testid={`assignee-option-${user.id}`}
+                data-assigned={user.id === assignedToId}
+                aria-current={user.id === assignedToId ? "true" : undefined}
+              >
+                <span
+                  className="flex size-6 items-center justify-center rounded-full bg-muted text-xs text-muted-foreground"
+                  aria-hidden="true"
+                >
+                  {user.name.slice(0, 1).toUpperCase()}
+                </span>
+                <span className="font-medium leading-none">{user.name}</span>
+                <CurrentMark show={user.id === assignedToId} />
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        ) : null}
+      </CommandList>
+      {/* Outside the listbox, which may own only options and groups (axe
+          aria-required-children). cmdk's Empty never shows here: "Me" and
+          "Unassigned" always match. */}
+      {filteredUsers.length === 0 ? (
+        <div
+          className={cn(
+            "px-2 py-1.5 text-xs text-muted-foreground",
+            currentUser && "border-t border-border"
+          )}
+        >
+          No matches
+        </div>
+      ) : null}
+    </Command>
+  );
+}
+
+/** The check that marks the current assignee's row. */
+function CurrentMark({ show }: { show: boolean }): React.JSX.Element | null {
+  if (!show) return null;
+  return (
+    <Check
+      className="ml-auto size-4 shrink-0 text-primary"
+      aria-hidden="true"
+    />
+  );
 }
 
 export function AssigneePicker({
@@ -62,19 +226,10 @@ export function AssigneePicker({
   users,
   isPending,
   onAssign,
-  disabled = false,
-  disabledReason = null,
   currentUserId = null,
 }: AssigneePickerProps): React.JSX.Element {
+  const isMobile = useIsMobile();
   const [open, setOpen] = React.useState(false);
-  const [query, setQuery] = React.useState("");
-
-  // Reset search when popover closes
-  React.useEffect(() => {
-    if (!open) {
-      setQuery("");
-    }
-  }, [open]);
 
   const selectedUser = React.useMemo(
     () => users.find((user) => user.id === assignedToId) ?? null,
@@ -90,163 +245,102 @@ export function AssigneePicker({
     [currentUserId, users]
   );
 
-  // Alphabetical list includes the current user under their real name (in
-  // addition to the "Me" quick-select) so searching by name still finds them.
-  const filteredUsers = React.useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    if (!normalized) {
-      return users;
-    }
-    return users.filter((user) => user.name.toLowerCase().includes(normalized));
-  }, [query, users]);
-
-  const handleSelect = (userId: string | null): void => {
-    onAssign(userId);
-    setOpen(false);
+  const handleOpenChange = (next: boolean): void => {
+    if (next && isPending) return;
+    setOpen(next);
   };
 
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          className={cn(
-            "flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 text-left text-sm text-foreground transition",
-            "hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          )}
-          aria-haspopup="listbox"
-          aria-expanded={open}
-          disabled={isPending || disabled}
-          title={disabledReason ?? undefined}
-          data-testid="assignee-picker-trigger"
+  // Choosing whoever is already assigned (or Unassigned when no one is)
+  // closes without saving, as the other field pickers do.
+  const handleSelect = (userId: string | null): void => {
+    setOpen(false);
+    if (userId === assignedToId) return;
+    onAssign(userId);
+  };
+
+  const trigger = (
+    <FieldRowButton
+      label="Assignee"
+      value={{
+        label: selectedUser ? selectedUser.name : "Unassigned",
+        muted: selectedUser === null,
+        leading: <AssigneeInitial name={selectedUser?.name ?? null} />,
+      }}
+      isPending={isPending}
+      aria-haspopup="dialog"
+      aria-expanded={open}
+      data-testid="assignee-picker-trigger"
+    />
+  );
+
+  // The list mounts with the popup, so its search resets on every open.
+  const list = (
+    <AssigneeCommand
+      assignedToId={assignedToId}
+      users={users}
+      currentUser={currentUser}
+      onSelect={handleSelect}
+      touch={isMobile}
+    />
+  );
+
+  if (isMobile) {
+    return (
+      <Drawer open={open} onOpenChange={handleOpenChange}>
+        <DrawerTrigger asChild>{trigger}</DrawerTrigger>
+        <DrawerContent
+          className={fieldDrawerContentClassName}
+          data-testid="assignee-drawer"
+          onOpenAutoFocus={(event) => {
+            // Start in the search box, as the desktop popover does.
+            const search =
+              event.currentTarget instanceof HTMLElement
+                ? event.currentTarget.querySelector("input")
+                : null;
+            if (search) {
+              event.preventDefault();
+              search.focus();
+            }
+          }}
         >
-          <div className="flex items-center gap-2">
-            {isPending ? (
-              <>
-                <Loader2 className="size-6 animate-spin motion-reduce:animate-none p-1 text-muted-foreground" />
-                <span className="font-medium text-muted-foreground">
-                  Updating...
-                </span>
-              </>
-            ) : (
-              <>
-                <div className="size-6 rounded-full bg-muted flex items-center justify-center text-xs text-muted-foreground">
-                  {selectedUser
-                    ? selectedUser.name.slice(0, 1).toUpperCase()
-                    : "?"}
-                </div>
-                <span className="font-medium">
-                  {selectedUser ? selectedUser.name : "Unassigned"}
-                </span>
-              </>
-            )}
-          </div>
-          {isPending ? (
-            <Loader2
-              className="size-4 animate-spin motion-reduce:animate-none opacity-50"
-              aria-hidden="true"
-              data-testid="assignee-picker-loader"
-            />
-          ) : (
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 15 15"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              className="size-4 opacity-50"
-              aria-hidden="true"
-            >
-              <path
-                d="M4.93179 5.43179C4.75605 5.60753 4.75605 5.89245 4.93179 6.06819C5.10753 6.24392 5.39245 6.24392 5.56819 6.06819L7.49999 4.13638L9.43179 6.06819C9.60753 6.24392 9.89245 6.24392 10.0682 6.06819C10.2439 5.89245 10.2439 5.60753 10.0682 5.43179L7.81819 3.18179C7.73379 3.0974 7.61933 3.04999 7.49999 3.04999C7.38064 3.04999 7.26618 3.0974 7.18179 3.18179L4.93179 5.43179ZM10.0682 9.56819C10.2439 9.39245 10.2439 9.10753 10.0682 8.93179C9.89245 8.75606 9.60753 8.75606 9.43179 8.93179L7.49999 10.8636L5.56819 8.93179C5.39245 8.75606 5.10753 8.75606 4.93179 8.93179C4.75605 9.10753 4.75605 9.39245 4.93179 9.56819L7.18179 11.8182C7.26618 11.9026 7.38064 11.95 7.49999 11.95C7.61933 11.95 7.73379 11.9026 7.81819 11.8182L10.0682 9.56819Z"
-                fill="currentColor"
-                fillRule="evenodd"
-                clipRule="evenodd"
-              />
-            </svg>
-          )}
-        </button>
-      </PopoverTrigger>
-      <PopoverContent
-        className="w-(--radix-popover-trigger-width) p-0"
-        align="start"
-      >
-        {/*
-         * shouldFilter={false}: we manage filtering manually so that "Me" and
-         * "Unassigned" remain visible regardless of the search query.
-         * CommandItems use onSelect for both click and keyboard (Enter) activation.
-         */}
-        <Command shouldFilter={false}>
-          <CommandInput
-            placeholder="Search users..."
-            aria-label="Filter users"
-            data-testid="assignee-search-input"
-            value={query}
-            onValueChange={setQuery}
+          <FieldDrawerHeader
+            title="Assignee"
+            description="Search for a person, or choose Me or Unassigned."
           />
-          <CommandList aria-label="Assignee options">
-            {/* Quick-selects group: "Me" (if current user present) + "Unassigned" */}
-            <CommandGroup>
-              {currentUser ? (
-                <CommandItem
-                  value={`me-${currentUser.id}`}
-                  onSelect={() => handleSelect(currentUser.id)}
-                  data-testid="assignee-option-me"
-                  data-assigned={assignedToId === currentUser.id}
-                  aria-current={
-                    assignedToId === currentUser.id ? "true" : undefined
-                  }
-                >
-                  <User className="size-6 shrink-0 p-0.5 text-primary" />
-                  <span className="font-medium text-primary">Me</span>
-                </CommandItem>
-              ) : null}
-              <CommandItem
-                value="unassigned"
-                onSelect={() => handleSelect(null)}
-                data-testid="assignee-option-unassigned"
-                data-assigned={assignedToId === null}
-                aria-current={assignedToId === null ? "true" : undefined}
-              >
-                <div className="size-6 rounded-full bg-muted flex items-center justify-center text-xs text-muted-foreground">
-                  ?
-                </div>
-                <span className="font-medium">Unassigned</span>
-              </CommandItem>
-            </CommandGroup>
-            {/* Separator between quick-selects and alphabetical user list */}
-            {currentUser ? <CommandSeparator /> : null}
-            {/* Alphabetical user list — manually filtered by query */}
-            <CommandGroup>
-              {filteredUsers.length === 0 ? (
-                <p className="px-2 py-1.5 text-xs text-muted-foreground">
-                  No matches found
-                </p>
-              ) : (
-                filteredUsers.map((user) => (
-                  <CommandItem
-                    key={user.id}
-                    value={user.id}
-                    onSelect={() => handleSelect(user.id)}
-                    data-testid={`assignee-option-${user.id}`}
-                    data-assigned={user.id === assignedToId}
-                    aria-current={user.id === assignedToId ? "true" : undefined}
-                  >
-                    <div className="size-6 rounded-full bg-muted flex items-center justify-center text-xs text-muted-foreground">
-                      {user.name.slice(0, 1).toUpperCase()}
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="font-medium leading-none">
-                        {user.name}
-                      </span>
-                    </div>
-                  </CommandItem>
-                ))
-              )}
-            </CommandGroup>
-          </CommandList>
-        </Command>
+          <div className="flex min-h-0 flex-1 flex-col px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
+            {list}
+          </div>
+        </DrawerContent>
+      </Drawer>
+    );
+  }
+
+  return (
+    <Popover open={open} onOpenChange={handleOpenChange}>
+      <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+      <PopoverContent
+        className="w-(--radix-popover-trigger-width) min-w-64 p-0"
+        align="end"
+        aria-label="Assignee"
+      >
+        {list}
       </PopoverContent>
     </Popover>
+  );
+}
+
+/** The selected assignee's initial, or "?" when unassigned. */
+export function AssigneeInitial({
+  name,
+}: {
+  name: string | null;
+}): React.JSX.Element {
+  return (
+    <span
+      className="flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-xs text-muted-foreground"
+      aria-hidden="true"
+    >
+      {name ? name.slice(0, 1).toUpperCase() : "?"}
+    </span>
   );
 }

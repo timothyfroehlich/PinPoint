@@ -1,10 +1,14 @@
-import { render, screen, fireEvent } from "@testing-library/react";
-import { describe, it, expect, vi } from "vitest";
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { AssigneePicker } from "./AssigneePicker";
 import React from "react";
-
-// Mock dependencies if any
-// (AssigneePicker only uses local state and Lucide icons which are SVG, so simple render is fine)
+import { mockMobileViewport } from "~/test/helpers/viewport";
 
 const mockUsers = [
   { id: "1", name: "Alice" },
@@ -25,7 +29,7 @@ describe("AssigneePicker Accessibility", () => {
     );
 
     const trigger = screen.getByTestId("assignee-picker-trigger");
-    expect(trigger).toHaveAttribute("aria-haspopup", "listbox");
+    expect(trigger).toHaveAttribute("aria-haspopup", "dialog");
 
     // Check hidden SVG
     const svg = trigger.querySelector("svg");
@@ -46,8 +50,12 @@ describe("AssigneePicker Accessibility", () => {
     const trigger = screen.getByTestId("assignee-picker-trigger");
     fireEvent.click(trigger);
 
-    const listbox = screen.getByRole("listbox");
+    // The popup is a named dialog holding the search box and the listbox.
+    const popup = screen.getByRole("dialog", { name: "Assignee" });
+    const listbox = within(popup).getByRole("listbox");
     expect(listbox).toBeInTheDocument();
+    // A listbox may own only options and groups (axe aria-required-children).
+    expect(listbox.querySelector('[role="separator"]')).toBeNull();
 
     const searchInput = screen.getByTestId("assignee-search-input");
     expect(searchInput).toHaveAttribute("aria-label", "Filter users");
@@ -79,14 +87,13 @@ describe("AssigneePicker Accessibility", () => {
       />
     );
 
-    const trigger = screen.getByTestId("assignee-picker-trigger");
-    expect(trigger).toBeDisabled();
-
-    // Ensure loader is present and accessible
-    const loader = screen.getByTestId("assignee-picker-loader");
-    expect(loader).toBeInTheDocument();
-    expect(loader).toHaveAttribute("aria-hidden", "true");
-    expect(loader).toHaveClass("animate-spin");
+    // The row stays named for its value while it saves, and can't reopen.
+    // It is aria-disabled rather than disabled so it keeps keyboard focus.
+    const trigger = screen.getByRole("button", { name: "Assignee: Alice" });
+    expect(trigger).toHaveAttribute("aria-disabled", "true");
+    expect(trigger).not.toBeDisabled();
+    fireEvent.click(trigger);
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
   });
 });
 
@@ -226,5 +233,140 @@ describe("AssigneePicker — Me quick-select", () => {
     fireEvent.click(screen.getByTestId("assignee-picker-trigger"));
 
     expect(screen.queryByTestId("assignee-option-me")).not.toBeInTheDocument();
+  });
+});
+
+describe("AssigneePicker — current assignee", () => {
+  function open(
+    assignedToId: string | null,
+    onAssign: (userId: string | null) => void = vi.fn()
+  ): HTMLElement {
+    render(
+      <AssigneePicker
+        assignedToId={assignedToId}
+        users={mockUsers}
+        isPending={false}
+        onAssign={onAssign}
+        currentUserId="1"
+      />
+    );
+    fireEvent.click(screen.getByTestId("assignee-picker-trigger"));
+    return screen.getByRole("listbox");
+  }
+
+  it.each([
+    ["Bob", "2", "assignee-option-2"],
+    ["Unassigned", null, "assignee-option-unassigned"],
+    ["Me", "1", "assignee-option-me"],
+  ] as const)(
+    "starts the highlight on the current assignee (%s), not the first row",
+    async (_label, assignedToId, testId) => {
+      const listbox = open(assignedToId);
+      await waitFor(() => {
+        expect(
+          within(listbox)
+            .getAllByRole("option")
+            .filter((option) => option.getAttribute("aria-selected") === "true")
+            .map((option) => option.getAttribute("data-testid"))
+        ).toEqual([testId]);
+      });
+    }
+  );
+
+  it("marks only the current assignee's rows with a check", () => {
+    const listbox = open("2");
+    const checked = within(listbox)
+      .getAllByRole("option")
+      .filter((option) => option.querySelector("svg.lucide-check"))
+      .map((option) => option.getAttribute("data-testid"));
+    expect(checked).toEqual(["assignee-option-2"]);
+  });
+
+  it.each([
+    ["Bob, choosing Bob", "2", "assignee-option-2"],
+    ["no one, choosing Unassigned", null, "assignee-option-unassigned"],
+    ["me, choosing Me", "1", "assignee-option-me"],
+    ["me, choosing my own name", "1", "assignee-option-1"],
+  ] as const)(
+    "closes without saving when the choice is who is already assigned (%s)",
+    (_label, assignedToId, testId) => {
+      const onAssign = vi.fn();
+      open(assignedToId, onAssign);
+
+      fireEvent.click(screen.getByTestId(testId));
+
+      expect(onAssign).not.toHaveBeenCalled();
+      expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    }
+  );
+
+  it("keeps the no-matches message out of the listbox (axe aria-required-children)", () => {
+    const listbox = open(null);
+    fireEvent.change(screen.getByTestId("assignee-search-input"), {
+      target: { value: "zed" },
+    });
+
+    const message = screen
+      .getAllByText("No matches")
+      .filter((element) => element.getAttribute("role") !== "status");
+    expect(message).toHaveLength(1);
+    expect(listbox).not.toHaveTextContent("No matches");
+    for (const child of listbox.querySelectorAll("[cmdk-list-sizer] > *")) {
+      expect(child.getAttribute("role")).toMatch(
+        /^(option|group|presentation)$/
+      );
+    }
+  });
+
+  it("announces how many people match the filter", () => {
+    open(null);
+    const search = screen.getByTestId("assignee-search-input");
+
+    fireEvent.change(search, { target: { value: "o" } });
+    expect(screen.getByRole("status")).toHaveTextContent("2 matches");
+    fireEvent.change(search, { target: { value: "car" } });
+    expect(screen.getByRole("status")).toHaveTextContent("1 match");
+    fireEvent.change(search, { target: { value: "zed" } });
+    expect(screen.getByRole("status")).toHaveTextContent("No matches");
+  });
+});
+
+describe("AssigneePicker — phones (spec issue-detail §9.4, §13.2)", () => {
+  let restoreViewport: (() => void) | undefined;
+  afterEach(() => {
+    restoreViewport?.();
+  });
+
+  it("opens a bottom sheet with the search box first", async () => {
+    restoreViewport = mockMobileViewport(true);
+    const onAssign = vi.fn();
+    render(
+      <AssigneePicker
+        assignedToId={null}
+        users={mockUsers}
+        isPending={false}
+        onAssign={onAssign}
+        currentUserId="1"
+      />
+    );
+
+    fireEvent.click(screen.getByTestId("assignee-picker-trigger"));
+
+    const sheet = await screen.findByTestId("assignee-drawer");
+    expect(
+      within(sheet).getByRole("heading", { name: "Assignee" })
+    ).toBeInTheDocument();
+    const search = within(sheet).getByTestId("assignee-search-input");
+    const listbox = within(sheet).getByRole("listbox");
+    // The search box comes before the list.
+    expect(
+      search.compareDocumentPosition(listbox) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    await waitFor(() => {
+      expect(search).toHaveFocus();
+    });
+
+    fireEvent.click(within(sheet).getByTestId("assignee-option-me"));
+    expect(onAssign).toHaveBeenCalledWith("1");
   });
 });

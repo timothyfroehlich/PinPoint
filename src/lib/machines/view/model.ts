@@ -1,4 +1,3 @@
-import { intervalToDuration } from "date-fns";
 import type {
   IssueSeverity,
   MachinePresenceWidgetStatus,
@@ -293,26 +292,4 @@ export function summarizeMachineView(
     presence: summarizePresence(scopeRows),
     playability: summarizePlayability(scopeRows),
   };
-}
-
-export function formatCompactAgeAgo(
-  value: Date | string,
-  now: Date = new Date()
-): string {
-  const date = value instanceof Date ? value : new Date(value);
-  if (date.getTime() > now.getTime()) return "today";
-  const {
-    years = 0,
-    months = 0,
-    days = 0,
-  } = intervalToDuration({
-    start: date,
-    end: now,
-  });
-  if (years > 0)
-    return months > 0 ? `${years}y ${months}mo ago` : `${years}y ago`;
-  if (months > 0)
-    return days > 0 ? `${months}mo ${days}d ago` : `${months}mo ago`;
-  if (days > 0) return `${days}d ago`;
-  return "today";
 }

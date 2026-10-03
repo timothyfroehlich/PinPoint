@@ -30,6 +30,7 @@ export { USER_ROLES, REPORT_MODE_VALUES } from "./user";
 export type {
   IssueCommentWithAuthor,
   IssueListItem,
+  IssueListRow,
   IssueWithAllRelations,
 } from "./issue";
 

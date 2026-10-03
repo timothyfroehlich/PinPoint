@@ -4,6 +4,7 @@ import * as React from "react";
 import * as SheetPrimitive from "@radix-ui/react-dialog";
 import { XIcon } from "lucide-react";
 
+import { useVisualViewportInset } from "~/hooks/use-visual-viewport-inset";
 import { cn } from "~/lib/utils";
 
 function Sheet({
@@ -48,12 +49,26 @@ function SheetOverlay({
 
 function SheetContent({
   className,
+  closeClassName,
   children,
   side = "right",
+  style,
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: "top" | "right" | "bottom" | "left";
+  /** Extra classes for the close button (e.g. a larger touch target). */
+  closeClassName?: string;
 }): React.JSX.Element {
+  // A bottom sheet rides above the on-screen keyboard, which on iOS covers
+  // the layout viewport rather than shrinking it.
+  const keyboard = useVisualViewportInset();
+  const keyboardStyle: React.CSSProperties | undefined =
+    side === "bottom" && keyboard.visibleHeight !== null
+      ? {
+          bottom: keyboard.bottom,
+          maxHeight: Math.round(keyboard.visibleHeight * 0.9),
+        }
+      : undefined;
   return (
     <SheetPortal>
       <SheetOverlay />
@@ -71,10 +86,16 @@ function SheetContent({
             "data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom inset-x-0 bottom-0 h-auto border-t",
           className
         )}
+        style={keyboardStyle ? { ...style, ...keyboardStyle } : style}
         {...props}
       >
         {children}
-        <SheetPrimitive.Close className="ring-offset-background focus:ring-ring data-[state=open]:bg-secondary absolute top-4 right-4 rounded-xs opacity-70 transition-opacity duration-150 hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none">
+        <SheetPrimitive.Close
+          className={cn(
+            "ring-offset-background focus:ring-ring data-[state=open]:bg-secondary absolute top-4 right-4 rounded-xs opacity-70 transition-opacity duration-150 hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none",
+            closeClassName
+          )}
+        >
           <XIcon className="size-4" />
           <span className="sr-only">Close</span>
         </SheetPrimitive.Close>

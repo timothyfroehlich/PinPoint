@@ -1,6 +1,26 @@
 import { z } from "zod";
 import { ISSUE_STATUS_VALUES } from "~/lib/issues/status";
 import { ISSUE_FREQUENCY_VALUES } from "~/lib/types";
+import { isIssueSort, type IssueSort } from "~/lib/issues/filters";
+
+/**
+ * The Surface an export comes from (issues-list §5.4). The server resolves
+ * the scope's machines itself, with the same access checks the tab uses —
+ * the client names the Surface, never its machine list.
+ */
+export const exportScopeSchema = z.discriminatedUnion("kind", [
+  /** A standard Collection, by the handle in its URL: its id or view token. */
+  z.object({ kind: z.literal("collection"), handle: z.string().min(1) }),
+  /** An owner Collection, by the owner's user id. */
+  z.object({ kind: z.literal("owner"), userId: z.uuid() }),
+  /** A Tag, by its type and slug as they appear in its URL. */
+  z.object({
+    kind: z.literal("tag"),
+    type: z.string().min(1),
+    slug: z.string().min(1),
+  }),
+]);
+export type IssueExportScope = z.infer<typeof exportScopeSchema>;
 
 /**
  * Schema for CSV export action input.
@@ -17,6 +37,9 @@ export const exportIssuesSchema = z.object({
     .string()
     .regex(/^[A-Za-z0-9]{2,6}$/, "Invalid machine initials")
     .optional(),
+
+  /** The Collection or Tag Issues tab the export comes from. */
+  scope: exportScopeSchema.optional(),
 });
 
 /**
@@ -42,5 +65,10 @@ export const exportFiltersSchema = z.object({
   createdTo: z.coerce.date().optional().catch(undefined),
   updatedFrom: z.coerce.date().optional().catch(undefined),
   updatedTo: z.coerce.date().optional().catch(undefined),
-  sort: z.string().optional(),
+  sort: z
+    .custom<IssueSort>(
+      (value) => typeof value === "string" && isIssueSort(value)
+    )
+    .optional()
+    .catch(undefined),
 });

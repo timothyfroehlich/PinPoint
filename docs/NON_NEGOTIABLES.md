@@ -480,7 +480,7 @@
 - **Do:** Use Tailwind breakpoint classes or container queries
 - **Don't:** `window.innerWidth`, `window.matchMedia`, `useMediaQuery` hooks
 - **Boundary:** Component-local geometry observation with `ResizeObserver` is allowed when JavaScript must derive behavior or semantic DOM state that CSS cannot expose (for example, which links belong in an overflow menu). It must not be used to restyle a component based on viewport-like breakpoints; CSS still owns presentation.
-- **Sanctioned exceptions** (behavior swaps CSS can't express, not styling): `use-table-responsive-columns` (PP-rs9); `use-is-mobile` (PP-43q3) — two consumers: it swaps inline cell editing for a bottom-sheet editor, and swaps the arm/confirm-tap delete affordance for a modal confirm in `ConfirmingDeleteButton`
+- **Sanctioned exception** (a behavior swap CSS can't express, not styling): `use-is-mobile` (PP-43q3). Its consumers: machine settings swap inline cell editing for a bottom-sheet editor; `ConfirmingDeleteButton` swaps the arm/confirm-tap delete for a modal confirm; on the issue detail page (read once in `IssueSections` via `IsMobileProvider`), `IssueFieldRow` swaps the anchored field menu for a bottom-sheet picker, `AssigneePicker` swaps its popover for a bottom sheet, `IssueSectionPanel` carries `tabpanel` roles only while the mobile tabs exist, and `EditableIssueTitle` swaps blur-to-cancel for explicit Save and Cancel. The former `use-table-responsive-columns` exception (PP-rs9) is gone: issue rows are two lines at every width (PP-jb9v).
 
 **CORE-RESP-003:** sm: is padding only
 
@@ -541,7 +541,7 @@
 
 - **Severity:** Required
 - **Why:** WCAG 1.3.1 Level A. Without `scope="col"` on header cells, screen readers can't announce the column header for each data cell. Without `aria-sort`, sort state is invisible to AT. Without `<caption>` or `aria-label`, the table has no accessible name in the page outline.
-- **Do:** Every `<th>` carries `scope="col"`. Sortable columns expose `aria-sort="ascending" | "descending" | "none"` synced to the active sort. The `<table>` has either a visible `<caption>` or an `aria-label` describing its contents. The table at `src/components/issues/IssueList.tsx` is the reference implementation — match its semantics for new tables.
+- **Do:** Every `<th>` carries `scope="col"`. Sortable columns expose `aria-sort="ascending" | "descending" | "none"` synced to the active sort. The `<table>` has either a visible `<caption>` or an `aria-label` describing its contents. The table at `src/components/machines/view/MachineViewTable.tsx` is the reference implementation — match its semantics for new tables.
 - **Don't:** Render a `<th>` without `scope`. Don't ship a sortable table with no `aria-sort`. Don't rely on column header text alone — that's not what AT uses.
 
 **CORE-A11Y-004:** No `<div role="button">` — use real `<button>`
