@@ -317,6 +317,38 @@ describe("saveApronCardsAction (PP-o23o)", () => {
     expect(result).toMatchObject({ ok: false, code: "VALIDATION" });
   });
 
+  it("caps a machine's cards even across saves that each send few", async () => {
+    const owner = await makeUser("member");
+    const machineId = await makeMachine(owner);
+    await mockAuth(owner);
+    await seedCards(
+      machineId,
+      Array.from({ length: 20 }, (_, i) => `Card ${i + 1}`)
+    );
+
+    // A client that leaves the saved cards out of its payload still cannot
+    // add a twenty-first.
+    const result = await save(machineId, [card("Extra")]);
+    expect(result).toMatchObject({ ok: false, code: "VALIDATION" });
+    expect(await savedCards(machineId)).toHaveLength(20);
+  });
+
+  it("rejects card text padded past the stored size limit", async () => {
+    const owner = await makeUser("member");
+    const machineId = await makeMachine(owner);
+    await mockAuth(owner);
+
+    const result = await save(machineId, [
+      card("Card 1", {
+        description: {
+          type: "doc",
+          content: Array.from({ length: 5000 }, () => ({ type: "paragraph" })),
+        },
+      }),
+    ]);
+    expect(result).toMatchObject({ ok: false, code: "VALIDATION" });
+  });
+
   it("rejects two cards with the same name (§11.2)", async () => {
     const owner = await makeUser("member");
     const machineId = await makeMachine(owner);

@@ -11,8 +11,19 @@ export const APRON_CARDS_MAX = 20;
 /** Most characters of description or tip a card stores. */
 const CARD_TEXT_MAX = 1500;
 
+/**
+ * A stored doc's serialized size cap. The character limit below counts only
+ * printable text, so without this a doc padded with empty or non-printing
+ * nodes would pass it at any size.
+ */
+const CARD_DOC_JSON_MAX = 50_000;
+
 const cardText = proseMirrorDocValueSchema
   .nullable()
+  .refine(
+    (doc) => JSON.stringify(doc).length <= CARD_DOC_JSON_MAX,
+    "Card text is too long"
+  )
   .refine(
     (doc) => cardTextLength(cardTextBlocks(doc)) <= CARD_TEXT_MAX,
     `Card text is limited to ${CARD_TEXT_MAX} characters`

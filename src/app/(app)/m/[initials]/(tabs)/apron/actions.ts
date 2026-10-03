@@ -13,6 +13,7 @@ import { cardTextDoc } from "~/lib/machines/apron-card-text";
 import type { SavedApronCard } from "~/lib/machines/apron-card";
 import { getMachineApronCards } from "~/app/(app)/m/[initials]/_data";
 import {
+  APRON_CARDS_MAX,
   saveApronCardsSchema,
   type SaveApronCardsInput,
 } from "~/app/(app)/m/[initials]/(tabs)/apron/schemas";
@@ -69,7 +70,7 @@ export async function saveApronCardsAction(
     }
 
     const savedAt = new Date();
-    const conflict = await db.transaction(async (tx) => {
+    const outcome = await db.transaction(async (tx) => {
       const existing = await tx
         .select({ id: machineApronCards.id, name: machineApronCards.name })
         .from(machineApronCards)
@@ -79,10 +80,15 @@ export async function saveApronCardsAction(
       // A card someone else deleted since this page loaded cannot be updated.
       const updates = cards.filter((card) => card.id !== undefined);
       if (updates.some((card) => card.id && !existingNames.has(card.id))) {
-        return true;
+        return "conflict";
       }
 
       const deleting = deletedIds.filter((id) => existingNames.has(id));
+      // The payload cap alone does not bound a machine's cards: cards left
+      // out of the payload stay, so count what the save would leave.
+      const remaining =
+        existing.length - deleting.length + (cards.length - updates.length);
+      if (remaining > APRON_CARDS_MAX) return "too-many";
       if (deleting.length > 0) {
         await tx
           .delete(machineApronCards)
@@ -140,9 +146,15 @@ export async function saveApronCardsAction(
           });
         }
       }
-      return false;
+      return "saved";
     });
-    if (conflict) return err("CONFLICT", CONFLICT_MESSAGE);
+    if (outcome === "conflict") return err("CONFLICT", CONFLICT_MESSAGE);
+    if (outcome === "too-many") {
+      return err(
+        "VALIDATION",
+        `A machine keeps at most ${APRON_CARDS_MAX} apron cards.`
+      );
+    }
 
     revalidatePath(`/m/${machine.initials}/apron`);
     revalidatePath(`/m/${machine.initials}/apron/print`);
