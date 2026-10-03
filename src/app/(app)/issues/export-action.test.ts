@@ -53,6 +53,14 @@ vi.mock("~/server/db/schema", () => ({
   issues: {},
 }));
 
+// Scoped (Collection/Tag tab) exports are covered against PGlite in
+// src/test/integration/issue-export-scope.test.ts.
+const mockResolveExportScopeInitials = vi.fn();
+vi.mock("./export-scope", () => ({
+  resolveExportScopeInitials: (...args: unknown[]) =>
+    mockResolveExportScopeInitials(...args),
+}));
+
 vi.mock("~/lib/logger", () => ({
   log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
@@ -133,6 +141,18 @@ describe("exportIssuesAction", () => {
       if (!result.ok) {
         expect(result.code).toBe("VALIDATION");
       }
+    });
+
+    it("returns VALIDATION rather than exporting everything when filters fail the schema", async () => {
+      const result = await exportIssuesAction({
+        filtersJson: JSON.stringify({ status: "open" }),
+      });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("VALIDATION");
+      }
+      expect(mockFindManyIssues).not.toHaveBeenCalled();
     });
   });
 
@@ -277,21 +297,6 @@ describe("exportIssuesAction", () => {
       );
     });
 
-    it("uses empty filters when filtersJson contains an invalid enum value", async () => {
-      // z.array(z.enum(...)) rejects the whole input on an invalid value,
-      // so safeParse fails and the action falls back to empty filters rather
-      // than crashing — the export proceeds with no filter constraints.
-      const filters = { status: ["invalid-status"], q: "search term" };
-
-      await exportIssuesAction({ filtersJson: JSON.stringify(filters) });
-
-      expect(mockBuildWhereConditions).toHaveBeenCalledOnce();
-      const [passedFilters] = mockBuildWhereConditions.mock.calls[0];
-      // Both fields dropped because the whole parse fails on invalid enum
-      expect(passedFilters.status).toBeUndefined();
-      expect(passedFilters.q).toBeUndefined();
-    });
-
     it("injects currentUserId from the authenticated user", async () => {
       await exportIssuesAction({});
 
@@ -328,6 +333,22 @@ describe("exportIssuesAction", () => {
       if (!result.ok) {
         expect(result.code).toBe("SERVER");
       }
+    });
+
+    it("returns SERVER error when a scope loader throws", async () => {
+      mockResolveExportScopeInitials.mockRejectedValue(
+        new Error("Connection timeout")
+      );
+
+      const result = await exportIssuesAction({
+        scope: { kind: "tag", type: "location", slug: "back-room" },
+      });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("SERVER");
+      }
+      expect(mockFindManyIssues).not.toHaveBeenCalled();
     });
   });
 });

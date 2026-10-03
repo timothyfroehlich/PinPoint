@@ -43,8 +43,9 @@ test.describe("Issue List Features", () => {
       .poll(() => new URL(page.url()).searchParams.get("q"), { timeout: 60000 })
       .toBe("Thing flips the bird");
     await expect(page.getByText("Showing 1 of 1 issues")).toBeVisible();
-    await expect(page.getByRole("row", { name: title1 })).toBeVisible();
-    await expect(page.getByRole("row", { name: title2 })).toBeHidden();
+    const issues = page.getByRole("list", { name: "Issues" });
+    await expect(issues.getByRole("link", { name: title1 })).toBeVisible();
+    await expect(issues.getByRole("link", { name: title2 })).toBeHidden();
 
     // Clear Search (Wait for search badge or clear button to be stable)
     const clearProps = page.getByRole("button", { name: "Clear", exact: true });
