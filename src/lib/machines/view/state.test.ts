@@ -29,8 +29,6 @@ describe("machine view URL state", () => {
         "lastActivity",
       ],
       severity: [],
-      presenceWidget: "all",
-      playabilityWidget: "all",
     });
   });
 
@@ -51,7 +49,6 @@ describe("machine view URL state", () => {
       presence: "all",
       status: "unplayable,operational,invalid",
       severity: "major,bogus,cosmetic,major",
-      presenceWidget: "sideways",
       owner: "owner-2,unassigned,owner-2",
       columns: "machine,year,invalid,owner",
       pageSize: "50",
@@ -61,19 +58,25 @@ describe("machine view URL state", () => {
     expect(state.presence).toBe("all");
     expect(state.status).toEqual(["unplayable", "operational"]);
     expect(state.severity).toEqual(["major", "cosmetic"]);
-    expect(state.presenceWidget).toBe("all");
     expect(state.owner).toEqual(["owner-2", "unassigned"]);
     expect(state.columns).toEqual(["machine", "year", "owner"]);
     expect(state.pageSize).toBe(50);
   });
 
-  it("ignores a legacy issuesWidget parameter from a retired widget", () => {
-    const state = parseMachineViewState(
-      new URLSearchParams({ issuesWidget: "filtered" }),
-      "machines"
-    );
+  it("ignores retired widget parameters and drops them from the canonical URL", () => {
+    // issuesWidget belonged to the retired Open Issues Widget; the population
+    // parameters to the retired All/Filtered choice (machine-widgets §2.2).
+    const params = new URLSearchParams({
+      issuesWidget: "filtered",
+      presenceWidget: "filtered",
+      playabilityWidget: "filtered",
+    });
+    const state = parseMachineViewState(params, "machines");
 
-    expect(state).not.toHaveProperty("issuesWidget");
+    expect(state).toEqual(
+      parseMachineViewState(new URLSearchParams(), "machines")
+    );
+    expect(serializeMachineViewState(state, "machines").toString()).toBe("");
   });
 
   it("ignores invalid enums, pages, page sizes, sorts, and columns", () => {
@@ -123,11 +126,10 @@ describe("machine view URL state", () => {
       page: 3,
       pageSize: 100 as const,
       columns: ["machine" as const, "year" as const],
-      presenceWidget: "filtered" as const,
     };
     const serialized = serializeMachineViewState(state, "machines");
     expect(serialized.toString()).toBe(
-      "q=mars&presence=all&status=needs_service&severity=minor%2Cunplayable&owner=unassigned&sort=year&dir=desc&page=3&pageSize=100&columns=machine%2Cyear&presenceWidget=filtered"
+      "q=mars&presence=all&status=needs_service&severity=minor%2Cunplayable&owner=unassigned&sort=year&dir=desc&page=3&pageSize=100&columns=machine%2Cyear"
     );
     expect(parseMachineViewState(serialized, "machines")).toEqual(state);
   });
@@ -155,9 +157,17 @@ describe("stored Saved View configuration (list-views §10.14)", () => {
       status: ["unplayable", "retired_status"],
       columns: ["machine", "retiredField", "year"],
       sort: "retiredField",
-      issuesWidget: "filtered",
+      // Views saved before the All/Filtered choice was retired still carry
+      // these keys (machine-widgets §2.2); they load harmlessly and are never
+      // written back, because saving stores the normalized configuration.
+      presenceWidget: "filtered",
+      playabilityWidget: "all",
     };
-    const { issuesWidget: _retired, ...expected } = {
+    const {
+      presenceWidget: _presence,
+      playabilityWidget: _playability,
+      ...expected
+    } = {
       ...stored,
       status: ["unplayable"],
       columns: ["machine", "year"],

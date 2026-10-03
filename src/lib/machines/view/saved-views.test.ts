@@ -32,8 +32,6 @@ const savedView: MachineViewSavedViewSummary = {
       "lastServiced",
       "lastActivity",
     ],
-    presenceWidget: "all",
-    playabilityWidget: "all",
   },
 };
 
@@ -114,7 +112,6 @@ describe("saved view URL helpers", () => {
       "status",
       "severity",
       "columns",
-      "playabilityWidget",
       "view",
     ]) {
       expect(

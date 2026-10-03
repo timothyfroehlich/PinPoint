@@ -98,13 +98,15 @@ describe("parseIssueFilters", () => {
     expect(filters.includeInactiveMachines).toBe(true);
   });
 
-  it("parses Summary Widget populations, treating anything but filtered as All", () => {
+  it("ignores the retired Summary Widget population parameters (issue-widgets §2.3)", () => {
     const filters = parseIssueFilters(
-      new URLSearchParams("status_widget=filtered&severity_widget=bogus")
+      new URLSearchParams(
+        "q=flipper&status_widget=filtered&severity_widget=filtered&priority_widget=filtered"
+      )
     );
-    expect(filters.statusWidget).toBe("filtered");
-    expect(filters.severityWidget).toBeUndefined();
-    expect(filters.priorityWidget).toBeUndefined();
+    expect(filters).toEqual(
+      parseIssueFilters(new URLSearchParams("q=flipper"))
+    );
   });
 });
 

@@ -131,8 +131,6 @@ export const MACHINE_VIEW_PRESETS: Record<
       page: 1,
       pageSize: 25,
       columns: DEFAULT_COLUMNS,
-      presenceWidget: "all",
-      playabilityWidget: "all",
     },
   },
   collection: {
@@ -149,8 +147,6 @@ export const MACHINE_VIEW_PRESETS: Record<
       page: 1,
       pageSize: 25,
       columns: DEFAULT_COLUMNS,
-      presenceWidget: "all",
-      playabilityWidget: "all",
     },
   },
 };

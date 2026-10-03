@@ -41,8 +41,6 @@ const brokenView: MachineViewSavedViewSummary = {
     dir: "asc",
     pageSize: 25,
     columns: presetState.columns,
-    presenceWidget: "all",
-    playabilityWidget: "all",
   },
 };
 

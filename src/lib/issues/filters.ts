@@ -4,7 +4,7 @@ import type {
   IssuePriority,
   IssueFrequency,
 } from "~/lib/types";
-import { ISSUE_FREQUENCY_VALUES, type WidgetPopulation } from "~/lib/types";
+import { ISSUE_FREQUENCY_VALUES } from "~/lib/types";
 import { ALL_ISSUE_STATUSES } from "~/lib/issues/status";
 
 export const ISSUE_PAGE_SIZES = [15, 25, 50] as const;
@@ -56,18 +56,7 @@ export interface IssueFilters {
   page?: number | undefined;
   pageSize?: number | undefined;
   currentUserId?: string | undefined; // Server-side only, for watching filter
-  /** Summary Widget populations (issue-widgets §2.3); absent means All. */
-  statusWidget?: WidgetPopulation | undefined;
-  severityWidget?: WidgetPopulation | undefined;
-  priorityWidget?: WidgetPopulation | undefined;
 }
-
-/** URL parameter for each issue Summary Widget's population. */
-export const ISSUE_WIDGET_PARAMS = {
-  statusWidget: "status_widget",
-  severityWidget: "severity_widget",
-  priorityWidget: "priority_widget",
-} as const;
 
 const VALID_SEVERITIES: IssueSeverity[] = [
   "cosmetic",
@@ -168,13 +157,9 @@ export function parseIssueFilters(params: URLSearchParams): IssueFilters {
     filters.includeInactiveMachines = true;
   }
 
-  for (const [key, param] of Object.entries(ISSUE_WIDGET_PARAMS) as [
-    keyof typeof ISSUE_WIDGET_PARAMS,
-    string,
-  ][]) {
-    if (params.get(param) === "filtered") filters[key] = "filtered";
-  }
-
+  // The retired Widget Population parameters (`status_widget`,
+  // `severity_widget`, `priority_widget`; issue-widgets §2.3) are ignored, so
+  // the next URL the list writes drops them.
   return filters;
 }
 
