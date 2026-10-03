@@ -14,6 +14,7 @@ import {
 import { getDiscordBotToken } from "~/lib/discord/config";
 import { sanitizeDiscordText } from "~/lib/discord/messages";
 import { ACTIVITY_SUMMARY_EVENT_KEYS } from "~/lib/discord/activity-summary/events";
+import { sendActivitySummaryNow } from "~/lib/discord/activity-summary/runner";
 import { log } from "~/lib/logger";
 import { reportError } from "~/lib/observability/report-error";
 import { getUserAccessLevel } from "~/lib/permissions/access";
@@ -310,23 +311,61 @@ export async function sendActivitySummaryTestAction(
 
 export type SendActivitySummaryNowResult =
   | { ok: true }
-  | { ok: false; reason: "unauthorized" | "unavailable"; message: string };
+  | {
+      ok: false;
+      reason:
+        | "unauthorized"
+        | "unavailable"
+        | "needs_discord"
+        | "cant_post"
+        | "couldnt_check"
+        | "server_error";
+      message: string;
+    };
 
-/** Send summary now (discord-activity-summary §3.8–§3.10). */
+/**
+ * Send summary now (discord-activity-summary §3.8–§3.10): posts the summary
+ * for the interval ending now with the saved settings, and on success ends the
+ * current period. Unavailable without a saved summary channel.
+ */
 export async function sendActivitySummaryNowAction(): Promise<SendActivitySummaryNowResult> {
-  const authorization = await authorizeIntegrationsAdmin();
-  if (!authorization.ok) {
+  try {
+    const authorization = await authorizeIntegrationsAdmin();
+    if (!authorization.ok) {
+      return {
+        ok: false,
+        reason: "unauthorized",
+        message: "You no longer have permission to manage integrations.",
+      };
+    }
+
+    const outcome = await sendActivitySummaryNow();
+    // A post, or a failed one, moves the channel status the page shows.
+    if (outcome.ok || outcome.reason !== "no_channel") {
+      revalidatePath(INTEGRATIONS_PATH);
+    }
+    if (outcome.ok) return { ok: true };
+    if (outcome.reason === "no_channel") {
+      return {
+        ok: false,
+        reason: "unavailable",
+        message: "Set a summary channel first.",
+      };
+    }
     return {
       ok: false,
-      reason: "unauthorized",
-      message: "You no longer have permission to manage integrations.",
+      reason: outcome.reason,
+      message: `Summary not sent. ${outcome.statusDetail}.`,
+    };
+  } catch (error) {
+    reportError(error, {
+      action: "sendActivitySummaryNowAction",
+      bestEffort: false,
+    });
+    return {
+      ok: false,
+      reason: "server_error",
+      message: "Couldn't send the summary. Try again.",
     };
   }
-  // PP-ogup scheduling phase: build and post the summary for the interval
-  // ending now, and end the current period on success.
-  return {
-    ok: false,
-    reason: "unavailable",
-    message: "Send summary now is not available yet.",
-  };
 }

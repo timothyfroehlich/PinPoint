@@ -76,11 +76,7 @@ beforeEach(() => {
     status: "posting",
     statusDetail: null,
   });
-  sendNowActionMock.mockResolvedValue({
-    ok: false,
-    reason: "unavailable",
-    message: "Send summary now is not available yet.",
-  });
+  sendNowActionMock.mockResolvedValue({ ok: true });
 });
 
 describe("ActivitySummaryForm", () => {

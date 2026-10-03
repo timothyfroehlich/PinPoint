@@ -109,9 +109,7 @@
 
 ## Known divergences (code vs spec)
 
-| Spec | Code today | Resolution |
-| :-- | :-- | :-- |
-| §3, §4–§7 | Settings save and show (§2, §8), but nothing posts: no scheduler, and Send summary now (§3.8) reports it is not available yet | PP-ogup |
+_None — the current implementation matches this spec._
 
 ---
 

@@ -208,10 +208,11 @@ export function ActivitySummaryForm({
       const res = await sendActivitySummaryNowAction();
       if (res.ok) {
         setAnnouncement({ tone: "success", message: "Summary sent." });
-        router.refresh();
       } else {
         setAnnouncement({ tone: "error", message: res.message });
       }
+      // A post, or a failed one, moves the channel status (spec §3.10).
+      router.refresh();
     });
   }
 
