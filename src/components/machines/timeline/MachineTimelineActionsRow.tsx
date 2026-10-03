@@ -8,7 +8,8 @@ interface Props {
   machineId: string;
   machineName: string;
   currentTags: TimelineTag[];
-  canCompose: boolean;
+  /** The signed-in person, when they may post notes; `null` hides New Note. */
+  composerUserId: string | null;
 }
 
 /**
@@ -22,15 +23,16 @@ export function MachineTimelineActionsRow({
   machineId,
   machineName,
   currentTags,
-  canCompose,
+  composerUserId,
 }: Props): React.ReactElement {
   return (
     <div className="flex items-center justify-between gap-2">
       <MachineTimelineFilter currentTags={currentTags} />
-      {canCompose ? (
+      {composerUserId !== null ? (
         <MachineNoteComposerSheet
           machineId={machineId}
           machineName={machineName}
+          userId={composerUserId}
         />
       ) : null}
     </div>

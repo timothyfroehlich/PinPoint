@@ -30,13 +30,13 @@ vi.mock("next/navigation", () => ({
 }));
 
 describe("MachineTimelineActionsRow", () => {
-  it("renders the filter trigger and the New Note action when canCompose", () => {
+  it("renders the filter trigger and the New Note action for a person who may post", () => {
     render(
       <MachineTimelineActionsRow
         machineId="m1"
         machineName="Attack From Mars"
         currentTags={[]}
-        canCompose={true}
+        composerUserId="user-1"
       />
     );
     expect(
@@ -47,13 +47,13 @@ describe("MachineTimelineActionsRow", () => {
     ).toBeInTheDocument();
   });
 
-  it("hides the New Note action when canCompose is false", () => {
+  it("hides the New Note action from someone who may not post", () => {
     render(
       <MachineTimelineActionsRow
         machineId="m1"
         machineName="Attack From Mars"
         currentTags={[]}
-        canCompose={false}
+        composerUserId={null}
       />
     );
     expect(
@@ -72,7 +72,7 @@ describe("MachineTimelineActionsRow", () => {
         machineId="m1"
         machineName="Attack From Mars"
         currentTags={[]}
-        canCompose={true}
+        composerUserId="user-1"
       />
     );
     // Sheet is closed initially — no Post button mounted.
