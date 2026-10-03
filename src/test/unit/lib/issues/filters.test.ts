@@ -76,6 +76,22 @@ describe("parseIssueFilters", () => {
     expect(filters.sort).toBe("updated_desc");
   });
 
+  it.each(["severity_desc", "priority_asc", "assignee_desc"])(
+    "accepts the %s sort",
+    (sort) => {
+      expect(parseIssueFilters(new URLSearchParams({ sort })).sort).toBe(sort);
+    }
+  );
+
+  it.each(["status_desc", "id_asc", "bogus"])(
+    "falls back to updated_desc for the unsupported %s sort",
+    (sort) => {
+      expect(parseIssueFilters(new URLSearchParams({ sort })).sort).toBe(
+        "updated_desc"
+      );
+    }
+  );
+
   it("parses include_inactive_machines=true", () => {
     const params = new URLSearchParams("include_inactive_machines=true");
     const filters = parseIssueFilters(params);

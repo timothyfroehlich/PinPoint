@@ -10,7 +10,6 @@ export {
 } from "./config";
 export {
   applyMachineViewState,
-  formatCompactAgeAgo,
   healthFromSeverityCounts,
   summarizeMachineView,
   type MachineViewCandidate,

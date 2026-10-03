@@ -182,38 +182,9 @@ None.
 
 | Requirement | Code today | Resolution |
 | :-- | :-- | :-- |
-| §4.3, §13.2 | The Edit title button is revealed only on hover or keyboard focus at every size, so desktop users must hover to find it and touch users never see it; it is 32px. | PP-t4h1 |
-| §4.5, §13.2 | At every size Move is the only item in a ⋯ More actions menu (32px trigger): desktop has no labeled Move button, and the mobile menu lacks Edit title. | PP-t4h1 |
-| §4.2 | Titles longer than 60 characters are cut to 60 with "...", and the full title is only in a hover tooltip, which touch screens never show. | PP-t4h1 |
-| §4.4 | Editing a title allows up to 100 characters (`editable-issue-title.tsx`, `issues/schemas.ts`), while reporting allows 60. | PP-t4h1 |
-| §4.4 | Title editing has no Save or Cancel buttons on mobile, and leaving the field cancels the edit at every size. | PP-t4h1 |
-| §5.1, §7.4 | The exact time is only in a hover tooltip, so tapping a relative time shows nothing. | PP-t4h1 |
-| §4.7 | No summary line; status, severity, and priority appear only as controls in the metadata grid. | PP-t4h1 |
-| §4.9 | The identity row also shows "Game Owner: <name>", and a subtitle line shows "by <reporter>" with owner badge, "Updated <time>", "<N> watching", and an icon-only Watch toggle. | PP-t4h1 |
-| §4.10 | Mobile shows a Back to Issues link above the header, returning to the last-visited issue list. | PP-t4h1 |
-| §5.1–§5.2 | The initial report is the first Activity entry: a card with a primary-tinted border and an "Initial report" label. | PP-t4h1 |
-| §5.3 | No frequency line under the description, so no Not specified line either; frequency appears only in the metadata grid. | PP-t4h1 |
 | §5.4 | The report's photos include every photo on the issue, so a comment's photos also appear in the initial report. | PP-buwx |
-| §6.1, §6.4 | The callout sits directly under the header, before the metadata grid and the initial report, and its title includes the machine's name. | PP-t4h1 |
-| §7.1 | The Activity heading is hidden when the content column is narrower than 448px (every phone). | PP-t4h1 |
-| §8.7 | Closing the comment composer or reloading the page discards the draft and its uploaded photos. | PP-t4h1 |
-| §7.3 | No Comments only toggle. | PP-t4h1 |
-| §7.5 | A system event takes two lines: actor and time, then a sentence ("Priority changed from Medium to High"). | PP-t4h1 |
-| §7.7 | When the content column is 576px or wider (desktop), entries show avatars joined by a vertical line, and the comment box shows the viewer's avatar. | PP-t4h1 |
-| §8.3 | The mobile composer trigger is a full-width sticky "Add a comment…" bar above the tab bar. | PP-t4h1 |
-| §3.7, §9.1–§9.2 | Fields are inline dropdown controls in a grid ordered Assignee, Status, Priority, Severity, Frequency (two columns when the grid is 576px or wider), not tappable rows. A signed-in viewer without the capability gets a disabled control with the reason in a hover tooltip; a signed-out viewer gets a plain badge, or a muted box for Assignee. | PP-t4h1 |
-| §9.5–§9.7, §11.4, §12.3 | No context rows: owner, reporter, updated time, watcher count, and Watch toggle are in the header; there are no Machine, Reported, or Updated rows. | PP-t4h1 |
-| §10 | The page shows no other issues on the machine. | PP-t4h1 |
-| §2.6, §11.1–§11.5, §11.7 | No section tabs on mobile; everything is one scrolling column. | PP-t4h1 |
-| §11.6 | At 320×568 the back link, header, subtitle, owner's requirements, and five-row metadata grid push the initial report below the fold. | PP-t4h1 |
-| §12.1–§12.4 | Desktop is one narrow column (at most 768px) with no right column; the metadata grid sits above Activity. | PP-t4h1 |
 | §2.2 | A number with trailing characters (`/i/1abc`, `/i/1.5`) is read as its leading digits and shows issue 1 instead of Issue not found. | PP-xlod |
-| §2.5–§2.6 | Email and in-app notification links are the bare issue URL; only Discord links add the comment's anchor. | PP-t4h1 |
-| §2.6 | System events have no anchor; only comments do, so a field-change link cannot scroll to its change. | PP-t4h1 |
-| §7.8 | The empty state appears only when there are no comments and no system events. | PP-t4h1 |
-| §11.7 | Design bible §5's tabbed-page convention says every tab is a URL-driven route, with no exception for issue detail. | Update the design bible in the redesign PR |
-| §12.5 | Design bible §5 still assigns issue detail the "Detail Page with Inline Metadata" archetype and says it migrated off the sidebar archetype. | Update the design bible in the redesign PR |
-| §13.2 | Controls under 44px on mobile, including the Watch toggle (28px), Edit title and More actions (32px), each comment's actions button (32px), and the field select triggers (36px). | PP-t4h1 |
+| §2.5–§2.6 | Email and in-app notification links are the bare issue URL; only Discord links add the comment's anchor, and field-change notifications carry no system event id to anchor to. | PP-4g43 |
 
 ---
 

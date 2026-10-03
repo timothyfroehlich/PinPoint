@@ -15,7 +15,7 @@ import {
   MACHINE_STATUS_COLORS,
   type MachineStatus,
 } from "~/lib/machines/status";
-import { formatCompactAgeAgo } from "~/lib/machines/view/model";
+import { formatCompactAgeAgo } from "~/lib/dates";
 import type { MachineViewFieldId, MachineViewRow } from "~/lib/types";
 import { cn } from "~/lib/utils";
 

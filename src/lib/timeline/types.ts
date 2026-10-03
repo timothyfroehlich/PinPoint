@@ -56,12 +56,44 @@ export function formatTimelineEvent(event: TimelineEventData): string {
       return `Frequency changed from ${frequencyLabel(event.from)} to ${frequencyLabel(event.to)}`;
     case "comment_deleted":
       return event.deletedBy === "author"
-        ? "User deleted their comment"
+        ? "Comment deleted by author"
         : "Comment removed by admin";
     case "title_changed":
       return `Title changed from "${event.from}" to "${event.to}"`;
     case "machine_reassigned":
       return `Moved from ${formatIssueId(event.fromInitials, event.fromIssueNumber)} (${event.fromMachineName}) to ${formatIssueId(event.toInitials, event.toIssueNumber)} (${event.toMachineName})`;
+    default:
+      return assertUnreachableEvent(event);
+  }
+}
+
+/**
+ * The same event as a verb phrase that follows the actor's name on one line
+ * ("changed priority Medium → High"), for the issue page's Activity (spec
+ * issue-detail §7.5). Without an actor, use `formatTimelineEvent`.
+ */
+export function formatTimelineEventAction(event: TimelineEventData): string {
+  switch (event.type) {
+    case "assigned":
+      return `assigned ${event.assigneeName}`;
+    case "unassigned":
+      return "unassigned the issue";
+    case "status_changed":
+      return `changed status ${statusLabel(event.from)} → ${statusLabel(event.to)}`;
+    case "severity_changed":
+      return `changed severity ${severityLabel(event.from)} → ${severityLabel(event.to)}`;
+    case "priority_changed":
+      return `changed priority ${priorityLabel(event.from)} → ${priorityLabel(event.to)}`;
+    case "frequency_changed":
+      return `changed frequency ${frequencyLabel(event.from)} → ${frequencyLabel(event.to)}`;
+    case "comment_deleted":
+      return event.deletedBy === "author"
+        ? "deleted their comment"
+        : "removed a comment";
+    case "title_changed":
+      return `changed the title "${event.from}" → "${event.to}"`;
+    case "machine_reassigned":
+      return `moved this from ${formatIssueId(event.fromInitials, event.fromIssueNumber)} (${event.fromMachineName}) → ${formatIssueId(event.toInitials, event.toIssueNumber)} (${event.toMachineName})`;
     default:
       return assertUnreachableEvent(event);
   }

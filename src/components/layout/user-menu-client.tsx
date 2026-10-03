@@ -20,6 +20,7 @@ import {
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { logoutAction } from "~/app/(auth)/actions";
+import { clearStoredCommentDrafts } from "~/components/issues/comment-draft";
 import type { UserRole } from "~/lib/types/user";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 
@@ -192,6 +193,8 @@ export function UserMenu({
           data-testid="user-menu-signout"
           onSelect={async (event) => {
             event.preventDefault();
+            // A shared device keeps no one's unposted comments.
+            clearStoredCommentDrafts();
             await logoutAction();
           }}
         >

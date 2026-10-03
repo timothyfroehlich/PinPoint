@@ -82,11 +82,9 @@ test.describe("Machine Details - Extended", () => {
     const firstIssueCard = page.getByTestId("issue-card").first();
     await firstIssueCard.click();
 
-    // Owner requirements callout should be visible
-    const callout = page
-      .getByTestId("owner-requirements-callout")
-      .filter({ visible: true })
-      .first();
+    // The Owner's requirements callout sits on the Issue tab, the one every
+    // arrival opens on.
+    const callout = page.getByRole("note", { name: "Owner's requirements" });
     await expect(callout).toBeVisible();
     await expect(callout).toContainText(
       "Please handle with care - vintage machine"

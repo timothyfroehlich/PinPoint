@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { getMachineViewPreset } from "./config";
 import {
   applyMachineViewState,
-  formatCompactAgeAgo,
   healthFromSeverityCounts,
   summarizeMachineView,
   type MachineViewCandidate,
@@ -298,20 +297,5 @@ describe("summarizeMachineView", () => {
     expect(summary.presence.total).toBe(5);
     expect(filteredRows.map((row) => row.id)).toEqual(["b", "d"]);
     expect(summary.playability.onTheFloor).toBe(1);
-  });
-});
-
-describe("formatCompactAgeAgo", () => {
-  const now = new Date("2026-09-21T12:00:00.000Z");
-
-  it("formats compact service ages", () => {
-    expect(formatCompactAgeAgo("2026-09-19T12:00:00.000Z", now)).toBe("2d ago");
-    expect(formatCompactAgeAgo("2026-08-19T12:00:00.000Z", now)).toBe(
-      "1mo 2d ago"
-    );
-    expect(formatCompactAgeAgo("2024-08-19T12:00:00.000Z", now)).toBe(
-      "2y 1mo ago"
-    );
-    expect(formatCompactAgeAgo(now, now)).toBe("today");
   });
 });

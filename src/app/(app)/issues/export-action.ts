@@ -21,11 +21,16 @@ import {
   getIssueFrequencyLabel,
 } from "~/lib/issues/status";
 import { formatIssueId } from "~/lib/issues/utils";
-import { exportIssuesSchema, exportFiltersSchema } from "./export-schema";
+import {
+  exportIssuesSchema,
+  exportFiltersSchema,
+  type IssueExportScope,
+} from "./export-schema";
+import { resolveExportScopeInitials } from "./export-scope";
 
 export type ExportIssuesResult = Result<
   { csv: string; fileName: string },
-  "UNAUTHORIZED" | "VALIDATION" | "SERVER" | "EMPTY"
+  "UNAUTHORIZED" | "VALIDATION" | "NOT_FOUND" | "SERVER" | "EMPTY"
 >;
 
 const CSV_HEADERS = [
@@ -49,9 +54,15 @@ function formatDate(date: Date | null): string {
   return format(date, "yyyy-MM-dd");
 }
 
+/**
+ * Exports every issue matching the list's filters across all pages, within
+ * the Surface's scope (issues-list §5.4): all issues on `/issues`, one
+ * machine's issues from its page, or a Collection or Tag tab's issues.
+ */
 export async function exportIssuesAction(input: {
   filtersJson?: string;
   machineInitials?: string;
+  scope?: IssueExportScope;
 }): Promise<ExportIssuesResult> {
   // 1. Auth
   const supabase = await createClient();
@@ -71,7 +82,7 @@ export async function exportIssuesAction(input: {
       inputValidation.error.issues[0]?.message ?? "Invalid input"
     );
   }
-  const { filtersJson, machineInitials } = inputValidation.data;
+  const { filtersJson, machineInitials, scope } = inputValidation.data;
 
   // 3. Parse filters
   let filters: IssueFilters = {};
@@ -83,32 +94,54 @@ export async function exportIssuesAction(input: {
       return err("VALIDATION", "Invalid filter data.");
     }
     const filterValidation = exportFiltersSchema.safeParse(parsed);
-    if (filterValidation.success) {
-      filters = filterValidation.data;
+    // An unreadable filter must not widen the export to every issue.
+    if (!filterValidation.success) {
+      return err("VALIDATION", "Invalid filter data.");
     }
+    filters = filterValidation.data;
   }
-
-  // Machine-page export: override machine filter
-  if (machineInitials) {
-    filters.machine = [machineInitials];
-    // Machine page exports ALL issues (no default status filter)
-    // Set status to empty array to mean "all statuses"
-    filters.status = [];
-    // Machine detail pages can show machines regardless of presence status
-    filters.includeInactiveMachines = true;
-  }
-
-  // Add currentUserId for watching filter
-  filters.currentUserId = user.id;
-
-  // Fetch user role for isAdmin check in buildWhereConditions
-  const userProfile = await db.query.userProfiles.findFirst({
-    where: eq(userProfiles.id, user.id),
-    columns: { role: true },
-  });
-  const isAdmin = userProfile?.role === "admin"; // permissions-audit-allow: SQL row-level filtering, not a request gate
 
   try {
+    // Machine-page export: override machine filter
+    if (machineInitials) {
+      filters.machine = [machineInitials];
+      // Machine page exports ALL issues (no default status filter)
+      // Set status to empty array to mean "all statuses"
+      filters.status = [];
+      // Machine detail pages can show machines regardless of presence status
+      filters.includeInactiveMachines = true;
+    } else if (scope) {
+      // Collection or Tag Issues tab (issues-list §2.2, §5.4): the server
+      // resolves the tab's machines itself, and a requested machine filter
+      // narrows within them but never widens them.
+      // The scope loaders run inside the try so a loader failure is reported
+      // and returned as SERVER rather than thrown to the client.
+      const scopeInitials = await resolveExportScopeInitials(scope);
+      if (scopeInitials === null) {
+        return err("NOT_FOUND", "This list is not available.");
+      }
+      const requested = filters.machine ?? [];
+      const scoped =
+        requested.length > 0
+          ? requested.filter((initials) => scopeInitials.includes(initials))
+          : scopeInitials;
+      // An empty machine filter would unscope the query, so stop here.
+      if (scoped.length === 0) {
+        return err("EMPTY", "No issues match the current filters.");
+      }
+      filters.machine = scoped;
+    }
+
+    // Add currentUserId for watching filter
+    filters.currentUserId = user.id;
+
+    // Fetch user role for isAdmin check in buildWhereConditions
+    const userProfile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, user.id),
+      columns: { role: true },
+    });
+    const isAdmin = userProfile?.role === "admin"; // permissions-audit-allow: SQL row-level filtering, not a request gate
+
     // 4. Query issues
     const where = buildWhereConditions(filters, db, { isAdmin });
     const orderBy = buildOrderBy(filters.sort);

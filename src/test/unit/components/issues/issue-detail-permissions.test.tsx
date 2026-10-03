@@ -1,13 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { renderToString } from "react-dom/server";
 import type { ReactElement } from "react";
 import type { IssueWithAllRelations } from "~/lib/types";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
-import { UpdateIssueStatusForm } from "~/app/(app)/m/[initials]/i/[issueNumber]/update-issue-status-form";
-import { AssignIssueForm } from "~/app/(app)/m/[initials]/i/[issueNumber]/assign-issue-form";
-import { IssueTimeline } from "~/components/issues/IssueTimeline";
-import { IssueMetadata } from "~/components/issues/IssueMetadata";
+import { IssueActivity } from "~/components/issues/IssueActivity";
+import { IssueDetails } from "~/components/issues/IssueDetails";
+import { IssueSummaryLine } from "~/components/issues/IssueSummaryLine";
+import { deleteCommentAction } from "~/app/(app)/issues/actions";
 import { TooltipProvider } from "~/components/ui/tooltip";
 
 // Wrap renders in TooltipProvider since the global provider lives in the root
@@ -17,11 +18,53 @@ function renderWithProviders(ui: ReactElement) {
 }
 
 vi.mock("~/app/(app)/issues/actions", () => ({
+  deleteCommentAction: vi.fn(),
+  editCommentAction: vi.fn(),
   assignIssueAction: vi.fn(),
   updateIssueStatusAction: vi.fn(),
   updateIssueSeverityAction: vi.fn(),
   updateIssuePriorityAction: vi.fn(),
   updateIssueFrequencyAction: vi.fn(),
+}));
+
+vi.mock("~/app/(app)/issues/watcher-actions", () => ({
+  toggleWatcherAction: vi.fn(),
+}));
+
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
+// The real editor is a lazy TipTap bundle; a textarea stands in for it,
+// reporting what is typed as a one-paragraph document.
+vi.mock("~/components/editor/RichTextEditorDynamic", () => ({
+  RichTextEditor: ({
+    ariaLabel,
+    autoFocus,
+    onChange,
+  }: {
+    ariaLabel?: string;
+    autoFocus?: boolean;
+    onChange?: (doc: ProseMirrorDoc) => void;
+  }) => (
+    <textarea
+      aria-label={ariaLabel}
+      autoFocus={autoFocus}
+      onChange={(event) =>
+        onChange?.({
+          type: "doc",
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: event.target.value }],
+            },
+          ],
+        })
+      }
+    />
+  ),
 }));
 
 vi.mock("~/components/issues/AddCommentForm", () => ({
@@ -75,258 +118,457 @@ function createIssue(
   };
 }
 
-const fixtureIssue = {
-  id: "issue-1",
-  assignedTo: null,
-  status: "new" as const,
-  priority: "medium" as const,
-  severity: "major" as const,
-  frequency: "frequent" as const,
+const systemEvent = {
+  id: "event-1",
+  isSystem: true,
+  author: { id: "member-1", name: "Member User" },
+  content: null,
+  eventData: { type: "status_changed", from: "new", to: "fixed" },
+  images: [],
+  createdAt: new Date("2026-02-02T14:30:00.000Z"),
+  updatedAt: new Date("2026-02-02T14:30:00.000Z"),
 };
 
-const fixtureUsers = [{ id: "member-1", name: "Member User" }];
+const comment = {
+  id: "comment-1",
+  isSystem: false,
+  author: { id: "member-1", name: "Member User" },
+  content: {
+    type: "doc",
+    content: [{ type: "paragraph", content: [{ type: "text", text: "Hi" }] }],
+  },
+  eventData: null,
+  images: [],
+  createdAt: new Date("2026-02-03T14:30:00.000Z"),
+  updatedAt: new Date("2026-02-03T15:45:00.000Z"),
+};
 
-describe("Issue detail permission-aware UI", () => {
-  it("renders status as read-only badge for unauthenticated users", () => {
+function withComments(...comments: unknown[]): Partial<IssueWithAllRelations> {
+  return { comments: comments as IssueWithAllRelations["comments"] };
+}
+
+const allUsers = [{ id: "assignee-1", name: "Assignee One" }];
+
+function renderDetails(
+  accessLevel: "unauthenticated" | "guest" | "member",
+  ownershipContext: Parameters<typeof IssueDetails>[0]["ownershipContext"],
+  currentUserId: string | null
+) {
+  return renderWithProviders(
+    <IssueDetails
+      issue={createIssue()}
+      allUsers={allUsers}
+      currentUserId={currentUserId}
+      accessLevel={accessLevel}
+      ownershipContext={ownershipContext}
+    />
+  );
+}
+
+const FIELDS = ["Status", "Severity", "Priority", "Frequency", "Assignee"];
+
+function editableFields(): string[] {
+  return FIELDS.filter(
+    (field) =>
+      screen.queryByRole("button", { name: new RegExp(`^${field}: `) }) !== null
+  );
+}
+
+describe("Issue detail Details (spec §3, §9)", () => {
+  it("shows every field read-only to a signed-out visitor, with the watcher count but no Watch toggle", () => {
+    renderDetails("unauthenticated", {}, null);
+
+    expect(editableFields()).toEqual([]);
+    expect(screen.getByText("Assignee One")).toBeInTheDocument();
+    const watching = screen.getByTestId("details-watching");
+    expect(within(watching).getByTestId("watcher-count")).toHaveTextContent(
+      "1"
+    );
+    expect(within(watching).queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("lets a member change every field", () => {
+    renderDetails(
+      "member",
+      { userId: "member-1", reporterId: "reporter-1" },
+      "member-1"
+    );
+    expect(editableFields()).toEqual(FIELDS);
+  });
+
+  it("lets a guest change only the reporting fields, only on their own issue", () => {
+    const { unmount } = renderDetails(
+      "guest",
+      { userId: "guest-1", reporterId: "guest-1" },
+      "guest-1"
+    );
+    expect(editableFields()).toEqual(["Status", "Severity", "Frequency"]);
+    unmount();
+
+    renderDetails(
+      "guest",
+      { userId: "guest-1", reporterId: "reporter-1" },
+      "guest-1"
+    );
+    expect(editableFields()).toEqual([]);
+  });
+
+  it("shows the context rows in order, linking the owner to their machines' issues", () => {
+    renderDetails("unauthenticated", {}, null);
+
+    const rows = screen.getByTestId("issue-context-rows");
+    expect(
+      [...rows.children].map((row) => row.firstElementChild?.textContent)
+    ).toEqual(["Machine", "Owner", "Reported", "Updated", "Watching"]);
+    expect(
+      within(screen.getByTestId("details-owner")).getByRole("link", {
+        name: "Owner One",
+      })
+    ).toHaveAttribute("href", "/issues?owner=owner-1");
+    expect(
+      within(screen.getByTestId("details-reported")).getByRole("link", {
+        name: "Reporter One",
+      })
+    ).toHaveAttribute("href", "/u/reporter-1");
+  });
+
+  it("shows an invited reporter's name in Reported as plain text", () => {
     renderWithProviders(
-      <UpdateIssueStatusForm
-        issueId="issue-1"
-        currentStatus="new"
+      <IssueDetails
+        issue={createIssue({
+          reportedByUser: null,
+          invitedReporter: { id: "invited-1", name: "Invited Reporter" },
+        })}
+        allUsers={allUsers}
+        currentUserId={null}
         accessLevel="unauthenticated"
         ownershipContext={{}}
       />
     );
 
-    expect(screen.getByTestId("issue-status-badge")).toBeInTheDocument();
-    expect(screen.queryByTestId("issue-status-select")).not.toBeInTheDocument();
+    const reported = screen.getByTestId("details-reported");
+    expect(within(reported).getByText("Invited Reporter")).toBeInTheDocument();
+    expect(within(reported).queryByRole("link")).not.toBeInTheDocument();
   });
+});
 
-  it("disables status control for guest users on others' issues", () => {
-    renderWithProviders(
-      <UpdateIssueStatusForm
-        issueId="issue-1"
-        currentStatus="new"
-        accessLevel="guest"
-        ownershipContext={{ userId: "guest-1", reporterId: "reporter-1" }}
+describe("Issue detail summary line (spec §4.7)", () => {
+  it("links the assignee's name to their profile after a screen-reader prefix", () => {
+    render(
+      <IssueSummaryLine
+        status="new"
+        severity="minor"
+        priority="medium"
+        assignee={{ id: "assignee-1", name: "Assignee One" }}
       />
     );
 
-    const statusControl = screen.getByTestId("issue-status-select");
-    expect(statusControl.closest("div[title]")).toHaveAttribute(
-      "title",
-      "Only the owner can perform this action"
+    expect(screen.getByRole("link", { name: "Assignee One" })).toHaveAttribute(
+      "href",
+      "/u/assignee-1"
+    );
+    expect(screen.getByTestId("issue-summary-line")).toHaveTextContent(
+      /^Assignee: Assignee One/
     );
   });
 
-  it("shows a login prompt instead of the add-comment form when unauthenticated", () => {
-    const issue = createIssue();
+  it("states Unassigned as plain text", () => {
+    render(
+      <IssueSummaryLine
+        status="new"
+        severity="minor"
+        priority="medium"
+        assignee={null}
+      />
+    );
 
+    expect(screen.getByTestId("issue-summary-line")).toHaveTextContent(
+      /^Assignee: Unassigned/
+    );
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+  });
+});
+
+describe("Issue detail Activity (spec §7–§8)", () => {
+  it("shows a login prompt instead of the comment box when signed out", () => {
     renderWithProviders(
-      <IssueTimeline
-        issue={issue}
+      <IssueActivity
+        issue={createIssue()}
         currentUserId={null}
         currentUserRole="unauthenticated"
-        currentUserInitials="??"
       />
     );
 
-    expect(screen.getByText("Log in to comment")).toBeInTheDocument();
+    // A link to log in that comes back to this issue.
+    expect(
+      screen.getByRole("link", { name: "Log in to comment" })
+    ).toHaveAttribute("href", "/login?next=%2Fm%2FAFM%2Fi%2F1");
     expect(
       screen.queryByTestId("mock-add-comment-form")
     ).not.toBeInTheDocument();
   });
 
-  it("renders the metadata grid for unauthenticated users", () => {
+  it.each(["guest", "member"] as const)(
+    "shows the comment box, not the login prompt, to a signed-in %s",
+    (role) => {
+      renderWithProviders(
+        <IssueActivity
+          issue={createIssue()}
+          currentUserId={`${role}-1`}
+          currentUserRole={role}
+        />
+      );
+
+      expect(screen.queryByText("Log in to comment")).not.toBeInTheDocument();
+      expect(screen.getByTestId("mock-add-comment-form")).toBeInTheDocument();
+    }
+  );
+
+  it("writes a system event as one line: who, what changed, when", () => {
     renderWithProviders(
-      <IssueMetadata
-        issue={createIssue()}
-        allUsers={[]}
+      <IssueActivity
+        issue={createIssue(withComments(systemEvent))}
         currentUserId={null}
-        accessLevel="unauthenticated"
-        ownershipContext={{}}
+        currentUserRole="unauthenticated"
       />
     );
 
-    expect(screen.getByTestId("issue-metadata-grid")).toBeInTheDocument();
+    const row = screen.getByTestId("timeline-item-event-1");
+    expect(row).toHaveAttribute("id", "comment-event-1");
+    expect(row).toHaveTextContent("Member User changed status New → Fixed");
   });
 
-  // H-class: guest on another user's issue — assignee picker rendered but disabled
-  it("renders assignee picker as disabled for guest on another user's issue", () => {
+  it("shows the empty state while there are no comments, even with system events", () => {
     renderWithProviders(
-      <AssignIssueForm
-        issueId="issue-1"
-        assignedToId={null}
-        users={fixtureUsers}
-        currentUserId="guest-1"
-        accessLevel="guest"
-        ownershipContext={{ userId: "guest-1", reporterId: "reporter-1" }}
+      <IssueActivity
+        issue={createIssue(withComments(systemEvent))}
+        currentUserId={null}
+        currentUserRole="unauthenticated"
       />
     );
-
-    // AssignIssueForm renders AssigneePicker (not the readonly div) when
-    // accessLevel !== "unauthenticated". The picker trigger is disabled because
-    // issues.update.triage = false for guests.
-    const trigger = screen.getByTestId("assignee-picker-trigger");
-    expect(trigger).toBeDisabled();
+    expect(screen.getByText("No comments yet")).toBeInTheDocument();
   });
 
-  // H-class: guest on own issue — assignee picker still disabled (triage = role-gated)
-  it("renders assignee picker as disabled even for guest on their own issue", () => {
-    // Guest is the reporter of the issue — "own" conditional on reporting fields
-    // allows status/severity/frequency edits. But triage (priority, assignee)
-    // is unconditionally denied for guests regardless of ownership.
+  it("Comments only hides system events and starts off", async () => {
+    const user = userEvent.setup();
     renderWithProviders(
-      <AssignIssueForm
-        issueId="issue-1"
-        assignedToId={null}
-        users={fixtureUsers}
-        currentUserId="guest-reporter"
-        accessLevel="guest"
-        ownershipContext={{
-          userId: "guest-reporter",
-          reporterId: "guest-reporter",
-        }}
+      <IssueActivity
+        issue={createIssue(withComments(systemEvent, comment))}
+        currentUserId={null}
+        currentUserRole="unauthenticated"
       />
     );
+    const toggle = screen.getByRole("button", { name: "Comments only" });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByTestId("timeline-item-event-1")).toBeInTheDocument();
 
-    const trigger = screen.getByTestId("assignee-picker-trigger");
-    expect(trigger).toBeDisabled();
-  });
+    await user.click(toggle);
 
-  // H-class: member sees all controls enabled (all fields interactive)
-  it("renders all metadata controls as enabled for member", () => {
-    renderWithProviders(
-      <IssueMetadata
-        issue={fixtureIssue}
-        allUsers={fixtureUsers}
-        currentUserId="member-1"
-        accessLevel="member"
-        ownershipContext={{ userId: "member-1", reporterId: "reporter-1" }}
-      />
-    );
-
-    // For members, all update forms render interactive controls (not readonly
-    // badges). Query directly from the grid element — closest("div") always
-    // returns the element itself, so an extra nullable hop adds no safety and
-    // hides failures behind a confusing matcher error.
-    const grid = screen.getByTestId("issue-metadata-grid");
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
     expect(
-      grid.querySelectorAll('form[data-form="update-status"]')
-    ).toHaveLength(1);
-    expect(
-      grid.querySelectorAll('form[data-form="update-priority"]')
-    ).toHaveLength(1);
-    expect(
-      grid.querySelectorAll('form[data-form="update-severity"]')
-    ).toHaveLength(1);
-    expect(
-      grid.querySelectorAll('form[data-form="update-frequency"]')
-    ).toHaveLength(1);
-    // Assignee picker trigger enabled (triage allowed for members)
-    const trigger = screen.getByTestId("assignee-picker-trigger");
-    expect(trigger).not.toBeDisabled();
+      screen.queryByTestId("timeline-item-event-1")
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("timeline-item-comment-1")).toBeInTheDocument();
   });
 
-  // H-class: authenticated users (guest or member) see comment form, not login prompt
-  it("shows comment form instead of login prompt for authenticated guest", () => {
-    const issue = createIssue();
-
-    renderWithProviders(
-      <IssueTimeline
-        issue={issue}
-        currentUserId="guest-1"
-        currentUserRole="guest"
-        currentUserInitials="GU"
-      />
-    );
-
-    expect(screen.queryByText("Log in to comment")).not.toBeInTheDocument();
-    expect(screen.getByTestId("mock-add-comment-form")).toBeInTheDocument();
-  });
-
-  it("shows comment form instead of login prompt for authenticated member", () => {
-    const issue = createIssue();
-
-    renderWithProviders(
-      <IssueTimeline
-        issue={issue}
-        currentUserId="member-1"
-        currentUserRole="member"
-        currentUserInitials="MU"
-      />
-    );
-
-    expect(screen.queryByText("Log in to comment")).not.toBeInTheDocument();
-    expect(screen.getByTestId("mock-add-comment-form")).toBeInTheDocument();
-  });
-
-  it("names the timestamp triggers without a zone-dependent SSR attribute", () => {
-    // Regression (PP-h490). Two things have to hold at once here:
-    //
-    // 1. The buttons must have an accessible name even while `<RelativeTime>`
-    //    is still empty (pre-tick), or axe's `button-name` fires — that is the
-    //    bug this PR's first fix introduced.
-    // 2. That name must not be `formatDateTime(...)` evaluated during SSR.
-    //    `Intl.DateTimeFormat(undefined, …)` resolves the *runtime's* zone, so
-    //    a UTC-hosted server and a UTC-5 browser produce different strings, and
-    //    React does not patch a mismatched attribute the way it patches text.
-    //    The label would stay wrong for the life of the page.
-    //
-    // The server snapshot of the shared ticker is `null`, so this asserts the
-    // pre-tick label specifically.
-    // The default fixture has no comments, so it renders only the "issue"
-    // branch. Both timestamp-trigger branches have to be on screen for this to
-    // mean anything — a system event reaches the first, an edited comment the
-    // second and third.
-    const issue = createIssue({
-      comments: [
-        {
-          id: "comment-sys",
-          isSystem: true,
-          author: null,
-          content: null,
-          eventData: { kind: "status_changed", from: "new", to: "fixed" },
-          createdAt: new Date("2026-02-02T14:30:00.000Z"),
-          updatedAt: new Date("2026-02-02T14:30:00.000Z"),
-        },
-        {
-          id: "comment-1",
-          isSystem: false,
-          author: { id: "member-1", name: "Member User" },
-          content: {
-            type: "doc",
-            content: [
-              { type: "paragraph", content: [{ type: "text", text: "Hi" }] },
-            ],
-          },
-          eventData: null,
-          createdAt: new Date("2026-02-03T14:30:00.000Z"),
-          updatedAt: new Date("2026-02-03T15:45:00.000Z"),
-        },
-      ] as IssueWithAllRelations["comments"],
-    });
-
+  it("names the timestamp triggers before hydration without a zone-dependent attribute", () => {
+    // Regression (PP-h490). Server HTML must not carry `formatDateTime(...)`
+    // in an attribute: it resolves the runtime's zone (UTC on Vercel), and
+    // React never patches a mismatched attribute on hydration. The triggers
+    // are named by their visible text — the server-built fallback until the
+    // ticker mounts — with no aria-label replacing it (WCAG 2.5.3).
     const html = renderToString(
       <TooltipProvider>
-        <IssueTimeline
-          issue={issue}
+        <IssueActivity
+          issue={createIssue(withComments(systemEvent, comment))}
           currentUserId="member-1"
           currentUserRole="member"
-          currentUserInitials="MU"
         />
       </TooltipProvider>
     );
+    const container = document.createElement("div");
+    container.innerHTML = html;
 
-    const labels = [...html.matchAll(/aria-label="([^"]*)"/g)].map((m) => m[1]);
-    // Three labelled triggers: the system row uses one branch, the issue row
-    // and the comment row the other. If this count drops, the fixture stopped
-    // covering a branch and the zone assertion below is no longer watching it.
-    const timestampLabels = labels.filter((l) => l === "Show exact time");
-    expect(timestampLabels).toHaveLength(3);
-    // No rendered label may carry a formatted absolute time. "2:30 PM" is the
-    // shape `formatDateTime` produces; matching it means SSR baked in a zone.
-    for (const label of labels) {
-      expect(label).not.toMatch(/\d{1,2}:\d{2}\s?(AM|PM)/i);
+    const triggers = [...container.querySelectorAll("button")].filter(
+      (button) => button.querySelector("time") !== null
+    );
+    // The system event, the comment, and its edited marker. If this drops,
+    // the fixture stopped covering a row and the checks below aren't watching.
+    expect(triggers).toHaveLength(3);
+    for (const trigger of triggers) {
+      expect(trigger.textContent?.trim()).not.toBe("");
+      expect(trigger).not.toHaveAttribute("aria-label");
     }
+    expect(container.querySelector("time")).toHaveAttribute(
+      "datetime",
+      systemEvent.createdAt.toISOString()
+    );
+
+    // "2:30 PM" is the shape `formatDateTime` produces.
+    for (const element of container.querySelectorAll("*")) {
+      for (const attribute of element.attributes) {
+        expect(attribute.value).not.toMatch(/\d{1,2}:\d{2}\s?(AM|PM)/i);
+      }
+    }
+  });
+
+  it("names each comment by its author and time", () => {
+    renderWithProviders(
+      <IssueActivity
+        issue={createIssue(withComments(comment))}
+        currentUserId={null}
+        currentUserRole="unauthenticated"
+      />
+    );
+    expect(
+      screen.getByRole("article", { name: /^Member User/ })
+    ).toBeInTheDocument();
+  });
+
+  it("announces what Comments only leaves showing", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <IssueActivity
+        issue={createIssue(withComments(systemEvent, comment))}
+        currentUserId={null}
+        currentUserRole="unauthenticated"
+      />
+    );
+    const toggle = screen.getByRole("button", { name: "Comments only" });
+
+    await user.click(toggle);
+    expect(screen.getByText("Showing 1 comment")).toHaveAttribute(
+      "role",
+      "status"
+    );
+
+    await user.click(toggle);
+    expect(screen.getByText("Showing all activity")).toHaveAttribute(
+      "role",
+      "status"
+    );
+  });
+
+  it("lists entries in order and offers Comments only only when there are entries", () => {
+    const { unmount } = renderWithProviders(
+      <IssueActivity
+        issue={createIssue(withComments(systemEvent, comment))}
+        currentUserId={null}
+        currentUserRole="unauthenticated"
+      />
+    );
+    const list = screen.getByRole("list");
+    expect(list.tagName).toBe("OL");
+    expect(within(list).getAllByRole("listitem")).toHaveLength(2);
+    unmount();
+
+    renderWithProviders(
+      <IssueActivity
+        issue={createIssue()}
+        currentUserId={null}
+        currentUserRole="unauthenticated"
+      />
+    );
+    expect(
+      screen.queryByRole("button", { name: "Comments only" })
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("No comments yet")).toBeInTheDocument();
+  });
+
+  describe("comment actions keep focus on the page", () => {
+    function renderOwnComment() {
+      renderWithProviders(
+        <IssueActivity
+          issue={createIssue(withComments(comment))}
+          currentUserId="member-1"
+          currentUserRole="member"
+        />
+      );
+      return screen.getByRole("button", { name: "Comment actions" });
+    }
+
+    it("says which comment the actions button belongs to", () => {
+      const trigger = renderOwnComment();
+      expect(trigger).toHaveAccessibleDescription(/^Member User/);
+    });
+
+    it("Edit focuses the editor; Cancel returns focus to the actions button", async () => {
+      const user = userEvent.setup();
+      const trigger = renderOwnComment();
+
+      await user.click(trigger);
+      await user.click(await screen.findByRole("menuitem", { name: "Edit" }));
+      await waitFor(() => {
+        expect(
+          screen.getByRole("textbox", { name: "Edit comment" })
+        ).toHaveFocus();
+      });
+
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+      await waitFor(() => {
+        expect(trigger).toHaveFocus();
+      });
+    });
+
+    it("asks before leaving the page with an unsaved edit", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <>
+          <IssueActivity
+            issue={createIssue(withComments(comment))}
+            currentUserId="member-1"
+            currentUserRole="member"
+          />
+          <a href="/issues">All issues</a>
+        </>
+      );
+
+      await user.click(screen.getByRole("button", { name: "Comment actions" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Edit" }));
+      await user.type(
+        screen.getByRole("textbox", { name: "Edit comment" }),
+        "Also the right flipper"
+      );
+      await user.click(screen.getByRole("link", { name: "All issues" }));
+
+      expect(
+        await screen.findByRole("alertdialog", {
+          name: "Discard unsaved changes?",
+        })
+      ).toBeInTheDocument();
+    });
+
+    it("canceling a delete returns focus to the actions button", async () => {
+      const user = userEvent.setup();
+      const trigger = renderOwnComment();
+
+      await user.click(trigger);
+      await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
+      const dialog = await screen.findByRole("alertdialog");
+      await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+      await waitFor(() => {
+        expect(trigger).toHaveFocus();
+      });
+      expect(deleteCommentAction).not.toHaveBeenCalled();
+    });
+
+    it("a completed delete moves focus to the Activity heading", async () => {
+      vi.mocked(deleteCommentAction).mockResolvedValue({
+        ok: true,
+        value: { commentId: "comment-1" },
+      });
+      const user = userEvent.setup();
+      const trigger = renderOwnComment();
+
+      await user.click(trigger);
+      await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
+      const dialog = await screen.findByRole("alertdialog");
+      await user.click(within(dialog).getByRole("button", { name: "Delete" }));
+
+      await waitFor(() => {
+        expect(screen.getByRole("heading", { name: "Activity" })).toHaveFocus();
+      });
+    });
   });
 });

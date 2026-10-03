@@ -11,7 +11,11 @@
  */
 
 import type { Page, Locator } from "@playwright/test";
-import { selectOption } from "./actions.js";
+import {
+  hasIssueSectionTabs,
+  selectOption,
+  showIssueSection,
+} from "./actions.js";
 import { HydrationTimeoutError, waitForHydration } from "./fixtures.js";
 
 declare global {
@@ -360,9 +364,6 @@ export async function fillReportForm(
   }
 }
 
-/** The Tailwind `md` breakpoint, which is what decides the layout below. */
-const MD_BREAKPOINT_PX = 768;
-
 // Budgets for the comment Sheet, bounded rather than inheriting the 30s CI
 // `actionTimeout`, so the worst path (click + wait + click + wait) stays inside
 // the 60s CI test timeout. The first click absorbs a trigger still becoming
@@ -377,14 +378,15 @@ const SHEET_OPEN_TIMEOUT = process.env["CI"] ? 10_000 : 3_000;
  * mobile sheet when that is the branch in play.
  *
  * Both branches are in the DOM at once: the inline `issue-comment-form` carries
- * `hidden md:flex`, and below `md` a StickyCommentComposer button opens the same
- * form inside a Sheet. So a test has to work out which one is live.
+ * `hidden md:block`, and below `md` the floating "Comment" button opens the same
+ * form inside a Sheet titled "Add a comment". So a test has to work out which
+ * one is live.
  *
  * It has to *know*, not sample. Two specs used to decide with
  * `sheetTrigger.isVisible({ timeout: 3000 })`, which reads like a 3s wait and is
  * not one — `isVisible()` never retries, and its `timeout` option is deprecated
  * and ignored. The check therefore fired at whatever instant the Server Action
- * redirect happened to land on, so a sticky composer that had not hydrated yet
+ * redirect happened to land on, so a mobile composer that had not hydrated yet
  * would read as "desktop" and send the test at the inline form that is
  * `display: none` on mobile. Deciding on viewport width removes the sampling:
  * it is the same input the CSS uses, and it cannot be raced.
@@ -398,14 +400,20 @@ const SHEET_OPEN_TIMEOUT = process.env["CI"] ? 10_000 : 3_000;
 export async function openIssueCommentForm(
   page: Page
 ): Promise<{ form: Locator; isSheet: boolean }> {
-  const viewportWidth = page.viewportSize()?.width ?? MD_BREAKPOINT_PX;
-  const isSheet = viewportWidth < MD_BREAKPOINT_PX;
+  const isSheet = hasIssueSectionTabs(page);
 
   if (!isSheet) {
     return { form: page.getByTestId("issue-comment-form"), isSheet: false };
   }
 
-  const sheetTrigger = page.getByRole("button", { name: "Add a comment" });
+  // The floating Comment button only shows on the Issue tab, the one with
+  // Activity.
+  await showIssueSection(page, "Issue");
+
+  const sheetTrigger = page.getByRole("button", {
+    name: "Comment",
+    exact: true,
+  });
   await sheetTrigger.waitFor({ state: "visible", timeout: 15000 });
 
   const dialog = page.getByRole("dialog", { name: "Add a comment" });
