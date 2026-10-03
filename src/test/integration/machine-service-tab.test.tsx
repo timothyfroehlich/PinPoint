@@ -37,7 +37,7 @@ interface RecentActivityProps {
   machineId: string;
   machineInitials: string;
   machineName: string;
-  canCompose: boolean;
+  composerUserId: string | null;
 }
 const mockRecentActivity = vi.fn<
   (p: RecentActivityProps) => React.ReactElement
@@ -136,8 +136,8 @@ describe("Machine Service (maintenance) tab", () => {
     const props = mockRecentActivity.mock.calls[0][0];
     expect(props.machineId).toBe(machine.id);
     expect(props.machineInitials).toBe("GZ");
-    // members may post notes
-    expect(props.canCompose).toBe(true);
+    // members may post notes, as themselves
+    expect(props.composerUserId).toBe(memberId);
   });
 
   it("denies the compose gate to anonymous viewers", async () => {
@@ -150,7 +150,7 @@ describe("Machine Service (maintenance) tab", () => {
       })
     );
 
-    expect(mockRecentActivity.mock.calls[0][0].canCompose).toBe(false);
+    expect(mockRecentActivity.mock.calls[0][0].composerUserId).toBeNull();
   });
 
   it("shows only open issues by default", async () => {
