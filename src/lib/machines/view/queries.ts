@@ -285,8 +285,10 @@ export async function loadMachineViewFromDatabase(
   const dependencyPlan = planMachineViewDependencies(validatedState);
   const machineIds = baseRows.map((row) => row.id);
   const machineInitials = baseRows.map((row) => row.initials);
-  // Summary Widgets always need health across the whole scope
-  // (machine-widgets §2.3), so it loads regardless of the row plan.
+  // Health loads for the whole scope on every request: the Summary Widgets
+  // count it across the scope (machine-widgets §2.3) and every row carries it
+  // to the browser (machine-views §5.3). Service and activity dates load only
+  // when a displayed field or the sort needs them.
   const [health, serviceDates, activityDates] = await Promise.all([
     getMachineViewHealth(tx, machineInitials),
     dependencyPlan.service

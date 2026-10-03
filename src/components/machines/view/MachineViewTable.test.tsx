@@ -78,8 +78,12 @@ describe("MachineViewTable", () => {
     );
 
     const issueLink = screen.getByRole("link", {
-      name: "View 2 open issues for Attack from Mars",
+      name: "View 2 open issues for Attack from Mars, worst Major",
     });
+    expect(issueLink).toHaveTextContent(/^2$/);
+    expect(issueLink).toHaveAttribute("title", "Worst severity: Major");
+    // The phone hit area belongs to the Compact row only.
+    expect(issueLink).not.toHaveClass("before:-inset-y-3.5");
     const href = new URL(
       issueLink.getAttribute("href") ?? "",
       "https://pinpoint.test"
@@ -126,6 +130,28 @@ describe("MachineViewTable", () => {
     expect(
       screen.queryByRole("link", { name: /service history/i })
     ).not.toBeInTheDocument();
+  });
+
+  it("keeps the pinned Machine cell opaque on hover so scrolled cells never show through", () => {
+    render(
+      <MachineViewTable
+        rows={[machine()]}
+        state={getMachineViewPreset("machines").defaultState}
+        mobileMode="table"
+        onSort={vi.fn()}
+      />
+    );
+
+    const pinned = screen.getByRole("rowheader");
+    expect(pinned).toHaveClass("sticky", "bg-card");
+    // The hover tint is a translucent image layered over the opaque card
+    // color, never a translucent background color.
+    expect(pinned).toHaveClass(
+      "group-hover:bg-linear-to-r",
+      "group-hover:from-muted/50",
+      "group-hover:to-muted/50"
+    );
+    expect(pinned).not.toHaveClass("group-hover:bg-muted/50");
   });
 
   it("reports sort state and delegates keyboard-operable sorting", async () => {

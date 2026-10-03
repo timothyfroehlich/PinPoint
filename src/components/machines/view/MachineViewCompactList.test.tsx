@@ -45,9 +45,9 @@ describe("MachineViewCompactList", () => {
     expect(within(row).getByText("EHOH")).toBeInTheDocument();
 
     const count = within(row).getByRole("link", {
-      name: "View 2 open issues for Elvira's House of Horrors (Blood Red Kiss Edition)",
+      name: "View 2 open issues for Elvira's House of Horrors (Blood Red Kiss Edition), worst Unplayable",
     });
-    expect(count).toHaveTextContent("2 open");
+    expect(count).toHaveTextContent(/^2 open$/);
     expect(count).toHaveClass(SEVERITY_CONFIG.unplayable.iconColor);
     expect(count.getAttribute("href")).toBe(
       "/issues?machine=EHOH&include_inactive_machines=true"
@@ -103,6 +103,53 @@ describe("MachineViewCompactList", () => {
         name: "Needs Service",
       })
     ).toBeInTheDocument();
+  });
+
+  it("names the worst open severity, since every severity shares one icon", () => {
+    render(
+      <MachineViewCompactList
+        rows={[
+          machine({
+            id: "machine-3",
+            initials: "MM",
+            title: "Medieval Madness",
+            health: {
+              openIssues: 1,
+              bySeverity: { cosmetic: 0, minor: 0, major: 1, unplayable: 0 },
+              worstSeverity: "major",
+              oldestOpenIssueAt: null,
+              playability: "needs_service",
+            },
+          }),
+        ]}
+      />
+    );
+
+    const count = screen.getByRole("link", {
+      name: "View 1 open issue for Medieval Madness, worst Major",
+    });
+    // Sighted users get the severity as a tooltip; the text stays compact.
+    expect(count).toHaveAttribute("title", "Worst severity: Major");
+    expect(count).toHaveTextContent(/^1 open$/);
+  });
+
+  it("gives the count a 44px-tall hit area that stays clear of the title", () => {
+    render(<MachineViewCompactList rows={[machine()]} />);
+
+    const count = screen.getByRole("link", { name: /^View 2 open issues/ });
+    // A 16px link plus 14px above and below is 44px (list-views §7.9).
+    expect(count).toHaveClass(
+      "relative",
+      "before:absolute",
+      "before:-inset-y-3.5"
+    );
+    // The hit area keeps the link's width, so it never reaches the title.
+    expect(count).toHaveClass("before:inset-x-0");
+    expect(count).not.toContainElement(
+      screen.getByRole("link", {
+        name: "Elvira's House of Horrors (Blood Red Kiss Edition)",
+      })
+    );
   });
 
   it("keeps a machine with no open issues neutral and unlinked", () => {

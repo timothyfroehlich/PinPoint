@@ -44,13 +44,12 @@ describe("planMachineViewDependencies", () => {
     };
 
     expect(planMachineViewDependencies(state)).toEqual({
-      health: false,
       service: false,
       activity: false,
     });
   });
 
-  it("includes dependencies required by sorting and filters", () => {
+  it("includes dependencies required by sorting", () => {
     const state = {
       ...getMachineViewPreset("machines").defaultState,
       columns: ["machine" as const],
@@ -60,20 +59,9 @@ describe("planMachineViewDependencies", () => {
     };
 
     expect(planMachineViewDependencies(state)).toEqual({
-      health: true,
       service: false,
       activity: true,
     });
-  });
-
-  it("loads health for the Open Issue Severity filter", () => {
-    const state = {
-      ...getMachineViewPreset("machines").defaultState,
-      columns: ["machine" as const],
-      severity: ["cosmetic" as const],
-    };
-
-    expect(planMachineViewDependencies(state).health).toBe(true);
   });
 });
 

@@ -121,9 +121,12 @@ export function MachineViewTable({
           <tbody className="divide-y divide-border">
             {rows.map((row) => (
               <tr key={row.id} className="group hover:bg-muted/50">
+                {/* The pinned cell keeps its opaque card background on hover
+                    and layers the row's muted tint over it as an image, so
+                    cells scrolled beneath it never show through. */}
                 <th
                   scope="row"
-                  className="sticky left-0 z-10 h-11 w-full max-w-0 min-w-52 border-r border-outline-variant bg-card py-1 pr-3 pl-4 text-left font-normal group-hover:bg-muted/50"
+                  className="sticky left-0 z-10 h-11 w-full max-w-0 min-w-52 border-r border-outline-variant bg-card py-1 pr-3 pl-4 text-left font-normal group-hover:bg-linear-to-r group-hover:from-muted/50 group-hover:to-muted/50"
                 >
                   <MachineIdentity
                     row={row}

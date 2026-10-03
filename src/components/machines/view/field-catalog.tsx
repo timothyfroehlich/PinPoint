@@ -118,6 +118,13 @@ function Playability({ status }: { status: MachineStatus }): React.JSX.Element {
  * color of the machine's worst open severity and links to its issues in every
  * presence state (issues-list §7.4); zero stays neutral and unlinked. The
  * table shows the number; the phone Compact row shows "N open".
+ *
+ * Every severity shares one icon, so color is never the only cue: the link's
+ * accessible name and its tooltip both name the worst severity.
+ *
+ * On the phone Compact row the link stays visually compact but an invisible
+ * `::before` grows its hit area to 44px tall (list-views §7.9). The hit area
+ * keeps the link's own width, so it never reaches under the title beside it.
  */
 export function OpenIssueCount({
   row,
@@ -138,14 +145,22 @@ export function OpenIssueCount({
   const severity =
     worst === null || worst === undefined ? null : SEVERITY_CONFIG[worst];
   const Icon = severity?.icon;
+  const issues = `${count} open ${count === 1 ? "issue" : "issues"}`;
+  const worstLabel = severity === null ? "" : `, worst ${severity.label}`;
 
   return (
     <Link
       href={machineIssuesHref(row.initials)}
-      aria-label={`View ${count} open ${count === 1 ? "issue" : "issues"} for ${row.title}`}
+      aria-label={`View ${issues} for ${row.title}${worstLabel}`}
+      {...(severity === null
+        ? {}
+        : { title: `Worst severity: ${severity.label}` })}
       className={cn(
         "inline-flex items-center gap-1.5 rounded-sm text-xs font-medium whitespace-nowrap underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        severity?.iconColor ?? "text-foreground"
+        severity?.iconColor ?? "text-foreground",
+        // 16px link → 44px tall hit area; its width already exceeds 44px.
+        variant === "compact" &&
+          "relative before:absolute before:inset-x-0 before:-inset-y-3.5"
       )}
     >
       {Icon ? (
