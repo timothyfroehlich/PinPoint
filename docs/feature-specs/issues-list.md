@@ -26,7 +26,7 @@
 
 ## 3. Rows
 
-- **3.1** Every issue row has two lines at every screen size, and the full title is always shown, wrapping rather than truncating.
+- **3.1** Every issue row has two lines at every screen size, and the full title is always shown, wrapping rather than truncating. On a narrow phone the second line also wraps rather than truncating, so the row may run longer.
 - **3.2** Line 1 shows the status icon, the title (linking to the issue), the severity badge, and the priority badge.
 - **3.3** Line 2 shows the issue ID, the machine name (linking to the machine), the status name, and how long ago the issue was updated.
 - **3.4** On desktop the row's right side shows the comment count (when nonzero) and the assignee's avatar; on phones the assignee's initials end line 2.
@@ -100,4 +100,5 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-03 | §3.1: on a narrow phone the second line wraps rather than truncating. |
 | 2026-10-02 | Created from the approved list-framework design: two-line rows with inline editing, Primary and Secondary Filters including Machine Presence, sorting and export rules, the Open issues Page Preset and four Built-in Views, and canonical URL state with aliases for older parameters. |
