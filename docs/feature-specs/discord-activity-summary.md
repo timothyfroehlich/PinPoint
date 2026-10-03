@@ -4,14 +4,14 @@
 
 **What this document is.** The requirements for the activity summary: a scheduled Discord post that lists what changed in PinPoint (issues, machines, and the Pinball Map lineup) over a configurable period. It describes the intended final state only; what the code does lives solely in the Known divergences table. When code and spec disagree, either the code is wrong or this document gets amended — never silently neither.
 
-**Related records.** `docs/feature-specs/discord.md` (the bot token and the Discord section), `docs/feature-specs/admin-integrations.md` (the page), `docs/feature-specs/pinballmap-region-alerts.md` (the channel-status rules reused here), `docs/feature-specs/pinballmap-sync-report.md` (the separate weekly Pinball Map post), `docs/feature-specs/pinballmap-lineup.md` (the rows to review). Bead PP-ogup, which records the approved message copy.
+**Related records.** `docs/feature-specs/discord.md` (the bot token and the Discord section), `docs/feature-specs/admin-integrations.md` (the page), `docs/feature-specs/pinballmap-region-alerts.md` (the channel-status rules reused here), `docs/feature-specs/pinballmap-lineup.md` (the rows to review), `docs/feature-specs/pinballmap-sync-report.md` (the retired weekly report this summary replaces). Bead PP-ogup, which records the approved message copy.
 
 ---
 
 ## 1. Concepts
 
 - **Activity summary** — a Discord post listing the changes in one period.
-- **Summary channel** — the Discord channel the activity summary posts to. It is separate from the region-alert and sync-report channels.
+- **Summary channel** — the Discord channel the activity summary posts to. It is separate from the region-alert channel.
 - **Interval** — the length of one period: 1, 2, 4, 6, 12, or 24 hours, or **Disabled**, which turns the summary off.
 - **Start time** — the hour of day, in US Central time, that anchors the schedule. Every post time is the start time plus a whole number of intervals.
 - **Period** — the span of time one summary covers. It ends at the summary's post time.
@@ -70,9 +70,14 @@
   - **Reopened** — closed at the start of the period and open at its end. Shows the issue's severity.
 - **5.3** Machine status is inferred from open issues, as everywhere else in PinPoint, and compared at the start and end of the period.
 - **5.4** A machine added in the period gets a New machines row showing its current availability, and no availability row. Its status is compared against Operational.
-- **5.5** The Pinball Map section reports every row the lineup page shows needs review at the post time, with the sync report's content rules (`pinballmap-sync-report.md` §4.2–§4.4, §4.6), and links to the lineup page.
-- **5.6** The Pinball Map section causes a post only when the rows to review changed during the period: a row was added or resolved. Unchanged rows to review appear only when the summary posts for another reason. While Pinball Map is not configured, the section never appears.
-- **5.7** The summary reads only stored data. Producing it never calls Pinball Map (`pinballmap.md` §3.4).
+- **5.5** The Pinball Map section reports the lineup page's rows to review at the post time: the total to review, then each lineup section that has rows, in the lineup page's order (`pinballmap-lineup.md` §5.1), with its count. When nothing needs review, it says so.
+- **5.6** Out of sync names its titles grouped by tag: To add, To remove, To update. In PinPoint, not linked names its machines. On Pinball Map, not linked names its entries' titles. Availability conflict names each machine's title with its tag (Alert or Note) and its availability. Section names and tags are the lineup page's (`pinballmap-lineup.md` §7.3).
+- **5.7** Each Pinball Map list names at most ten items and states how many more there are.
+- **5.8** When the most recent Pinball Map refresh failed, the section says so and states the date of the lineup it uses.
+- **5.9** While Pinball Map is Waiting (`pinballmap.md` §3.5), the section states the lineup has not loaded yet.
+- **5.10** The section links to the lineup page and carries Pinball Map attribution with a link to the tracked location's page (`pinballmap.md` §9.1).
+- **5.11** The Pinball Map section causes a post only when the rows to review changed during the period: a row was added or resolved. Unchanged rows to review appear only when the summary posts for another reason. While Pinball Map is not configured, the section never appears.
+- **5.12** The summary reads only stored data. Producing it never calls Pinball Map (`pinballmap.md` §3.4).
 
 ## 6. Layout
 
@@ -114,4 +119,4 @@
 
 | Date | Change |
 | :-- | :-- |
-| 2026-10-03 | Created. Configuration in the Discord section (§2), interval and Central start-time schedule with Send summary now (§3), event types and defaults (§4), net-change reporting (§5), direction-sorted layout (§6), message splitting up to two messages (§7), permissions (§8). |
+| 2026-10-03 | Created. Configuration in the Discord section (§2), interval and Central start-time schedule with Send summary now (§3), event types and defaults (§4), net-change reporting and the Pinball Map rows to review, replacing the weekly sync report (§5), direction-sorted layout (§6), message splitting up to two messages (§7), permissions (§8). |
