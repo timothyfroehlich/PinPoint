@@ -349,6 +349,22 @@ describe("saveApronCardsAction (PP-o23o)", () => {
     expect(result).toMatchObject({ ok: false, code: "VALIDATION" });
   });
 
+  it("rejects a card that is both updated and deleted", async () => {
+    const owner = await makeUser("member");
+    const machineId = await makeMachine(owner);
+    await mockAuth(owner);
+    const [only] = await seedCards(machineId, ["Card 1"]);
+    if (!only) throw new Error("seed failed");
+
+    const result = await save(
+      machineId,
+      [card("Card 1", { id: only.id })],
+      [only.id]
+    );
+    expect(result).toMatchObject({ ok: false, code: "VALIDATION" });
+    expect(await savedCards(machineId)).toHaveLength(1);
+  });
+
   it("rejects two cards with the same name (§11.2)", async () => {
     const owner = await makeUser("member");
     const machineId = await makeMachine(owner);

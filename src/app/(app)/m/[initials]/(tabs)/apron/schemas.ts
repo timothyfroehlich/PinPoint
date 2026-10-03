@@ -60,6 +60,15 @@ export const saveApronCardsSchema = z
     deletedIds: z.array(z.uuid()).max(APRON_CARDS_MAX),
   })
   .superRefine((value, ctx) => {
+    // Each saved card appears once: updated, or deleted, never both.
+    const ids = [
+      ...value.cards.flatMap((card) => (card.id ? [card.id] : [])),
+      ...value.deletedIds,
+    ];
+    if (new Set(ids).size !== ids.length) {
+      ctx.addIssue({ code: "custom", message: "A card is listed twice" });
+      return;
+    }
     const names = new Set<string>();
     for (const card of value.cards) {
       if (names.has(card.name)) {

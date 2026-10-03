@@ -71,6 +71,14 @@ export async function saveApronCardsAction(
 
     const savedAt = new Date();
     const outcome = await db.transaction(async (tx) => {
+      // One save per machine at a time: the card count and name checks below
+      // read the machine's cards, and two concurrent saves would each pass
+      // them against the same snapshot.
+      await tx
+        .select({ id: machines.id })
+        .from(machines)
+        .where(eq(machines.id, machine.id))
+        .for("update");
       const existing = await tx
         .select({ id: machineApronCards.id, name: machineApronCards.name })
         .from(machineApronCards)
