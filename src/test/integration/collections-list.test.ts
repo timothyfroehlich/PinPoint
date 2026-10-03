@@ -60,19 +60,23 @@ describe("getMyCollections", () => {
 describe("getOwnedMachineCount", () => {
   setupTestDb();
 
-  it("counts only the machines owned by the given user", async () => {
+  it("counts only the machines owned by the given user, leaving out Removed ones", async () => {
     const db = await getTestDb();
     const owner = createTestUser({ firstName: "Ann", lastName: "Owner" });
     const other = createTestUser({ firstName: "Bob", lastName: "Other" });
     await db.insert(userProfiles).values([owner, other]);
 
-    await db
-      .insert(machines)
-      .values([
-        createTestMachine({ initials: "M1", name: "One", ownerId: owner.id }),
-        createTestMachine({ initials: "M2", name: "Two", ownerId: owner.id }),
-        createTestMachine({ initials: "M3", name: "Three", ownerId: other.id }),
-      ]);
+    await db.insert(machines).values([
+      createTestMachine({ initials: "M1", name: "One", ownerId: owner.id }),
+      createTestMachine({ initials: "M2", name: "Two", ownerId: owner.id }),
+      createTestMachine({ initials: "M3", name: "Three", ownerId: other.id }),
+      createTestMachine({
+        initials: "M4",
+        name: "Sold",
+        ownerId: owner.id,
+        presenceStatus: "removed",
+      }),
+    ]);
 
     expect(await getOwnedMachineCount(asDbOrTx(db), owner.id)).toBe(2);
   });
