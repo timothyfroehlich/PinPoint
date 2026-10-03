@@ -445,12 +445,33 @@ describe("deleteAccountAction — DB integration (PGlite)", () => {
     if (!result.ok) {
       expect(result.code).toBe("SOLE_ADMIN");
     }
+
+    // Row survives and is not anonymized; auth mocks not called
+    const profile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, userId),
+    });
+    expect(profile).toBeDefined();
+    expect(profile?.email).toBe("sole@example.com");
+    expect(profile?.name).not.toBe("Former Member");
+    expect(mockDeleteUser).not.toHaveBeenCalled();
+    expect(mockAdminSignOut).not.toHaveBeenCalled();
   });
 
   it("returns UNAUTHORIZED when not logged in", async () => {
     const { deleteAccountAction } =
       await import("~/app/(app)/settings/actions");
+    const db = await getTestDb();
     mockGetUser.mockResolvedValue({ data: { user: null } });
+
+    const userId = randomUUID();
+    await db.insert(userProfiles).values(
+      createTestUser({
+        id: userId,
+        email: "unauthed@example.com",
+        firstName: "Unauthed",
+        lastName: "User",
+      })
+    );
 
     const fd = new FormData();
     fd.set("confirmation", "DELETE");
@@ -460,13 +481,32 @@ describe("deleteAccountAction — DB integration (PGlite)", () => {
     if (!result.ok) {
       expect(result.code).toBe("UNAUTHORIZED");
     }
+
+    // Row survives and is not anonymized; auth mocks not called
+    const profile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, userId),
+    });
+    expect(profile).toBeDefined();
+    expect(profile?.email).toBe("unauthed@example.com");
+    expect(mockDeleteUser).not.toHaveBeenCalled();
+    expect(mockAdminSignOut).not.toHaveBeenCalled();
   });
 
   it("returns VALIDATION when confirmation is wrong", async () => {
     const { deleteAccountAction } =
       await import("~/app/(app)/settings/actions");
+    const db = await getTestDb();
     const userId = randomUUID();
     mockGetUser.mockResolvedValue({ data: { user: { id: userId } } });
+
+    await db.insert(userProfiles).values(
+      createTestUser({
+        id: userId,
+        email: "wrong-confirm@example.com",
+        firstName: "Wrong",
+        lastName: "Confirm",
+      })
+    );
 
     const fd = new FormData();
     fd.set("confirmation", "WRONG");
@@ -476,6 +516,15 @@ describe("deleteAccountAction — DB integration (PGlite)", () => {
     if (!result.ok) {
       expect(result.code).toBe("VALIDATION");
     }
+
+    // Row survives and is not anonymized; auth mocks not called
+    const profile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, userId),
+    });
+    expect(profile).toBeDefined();
+    expect(profile?.email).toBe("wrong-confirm@example.com");
+    expect(mockDeleteUser).not.toHaveBeenCalled();
+    expect(mockAdminSignOut).not.toHaveBeenCalled();
   });
 
   it("still redirects when auth deletion fails (best-effort)", async () => {

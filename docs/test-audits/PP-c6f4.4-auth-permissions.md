@@ -2,7 +2,7 @@
 
 **Lane:** Auth and permissions (`PP-c6f4.4`)
 **Files:** 64 authoritative files from epic `PP-c6f4` baseline map (63 active, 1 deleted on `main` in PR #2281)
-**Total Test Declarations Audited:** 507 declarations
+**Total Test Declarations Audited:** 507 baseline declarations audited across 64 files (532 entries in ledger including keeper additions and consolidated targets)
 
 ## 1. Executive Summary & Layer Plan
 
@@ -200,32 +200,32 @@ _File deleted on `main` in PR #2281 (PP-zl00.3) during earlier E2E audit wave. L
 
 ### `src/app/(auth)/actions.test.ts`
 
-| #   | Status | Bug Class | Test Name                                                         | Rationale / Target Keeper                                                  |
-| --- | ------ | --------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| 1   | **F**  | B         | should fallback to localhost when NEXT_PUBLIC_SITE_URL is not set | Fix: remove unsafe as any, verify origin fallback logic at action boundary |
-| 2   | **F**  | B         | should use NEXT_PUBLIC_SITE_URL when set                          | Fix: remove unsafe as any, verify origin fallback logic at action boundary |
-| 3   | **F**  | B         | should ignore other headers and use NEXT_PUBLIC_SITE_URL          | Fix: remove unsafe as any, verify origin fallback logic at action boundary |
-| 4   | **F**  | B         | should accept localhost:3000 when configured as site URL          | Fix: remove unsafe as any, verify origin fallback logic at action boundary |
-| 5   | **F**  | B         | should accept localhost:3100 when configured as site URL          | Fix: remove unsafe as any, verify origin fallback logic at action boundary |
-| 6   | **F**  | B         | should accept any valid URL configured in NEXT_PUBLIC_SITE_URL    | Fix: remove unsafe as any, verify origin fallback logic at action boundary |
+| #   | Status | Bug Class | Test Name                                                         | Rationale / Target Keeper                                                                         |
+| --- | ------ | --------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| 1   | **R**  | B         | should fallback to localhost when NEXT_PUBLIC_SITE_URL is not set | Retain: Site URL resolution fallback logic at action boundary                                     |
+| 2   | **R**  | B         | should use NEXT_PUBLIC_SITE_URL when set                          | Retain: Site URL resolution logic at action boundary                                              |
+| 3   | **D**  | B         | should ignore other headers and use NEXT_PUBLIC_SITE_URL          | Delete: vacuous header-injection mock; forgotPasswordAction never calls headers() (CORE-TEST-009) |
+| 4   | **R**  | B         | should accept localhost:3000 when configured as site URL          | Retain: Site URL allowlist validation                                                             |
+| 5   | **R**  | B         | should accept localhost:3100 when configured as site URL          | Retain: Site URL allowlist validation                                                             |
+| 6   | **R**  | B         | should accept any valid URL configured in NEXT_PUBLIC_SITE_URL    | Retain: Site URL allowlist validation                                                             |
 
 ### `src/app/(auth)/auth/callback/route.test.ts`
 
 | #   | Status | Bug Class | Test Name                                                                                       | Rationale / Target Keeper                                                     |
 | --- | ------ | --------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| 1   | **R**  | G         | should return true for root path                                                                | Retain: Pure logic / unit validation of authentication or authorization rules |
-| 2   | **R**  | G         | should return true for internal paths                                                           | Retain: Pure logic / unit validation of authentication or authorization rules |
-| 3   | **R**  | G         | should return false for external URLs                                                           | Retain: Pure logic / unit validation of authentication or authorization rules |
-| 4   | **R**  | G         | should return false for protocol-relative URLs                                                  | Retain: Pure logic / unit validation of authentication or authorization rules |
-| 5   | **R**  | G         | should accept valid internal path                                                               | Retain: Pure logic / unit validation of authentication or authorization rules |
-| 6   | **R**  | G         | should reject external URL (open redirect prevention)                                           | Retain: Pure logic / unit validation of authentication or authorization rules |
-| 7   | **R**  | G         | should reject protocol-relative URL                                                             | Retain: Pure logic / unit validation of authentication or authorization rules |
-| 8   | **R**  | G         | should handle paths with query params and hash                                                  | Retain: Pure logic / unit validation of authentication or authorization rules |
-| 9   | **R**  | G         | should return fallback when nextParam is null                                                   | Retain: Pure logic / unit validation of authentication or authorization rules |
-| 10  | **R**  | G         | should accept absolute URL matching site url                                                    | Retain: Pure logic / unit validation of authentication or authorization rules |
-| 11  | **R**  | G         | should reject absolute URL matching a different host (even if it was forwarded host previously) | Retain: Pure logic / unit validation of authentication or authorization rules |
-| 12  | **R**  | G         | should accept absolute URL matching configured production site url                              | Retain: Pure logic / unit validation of authentication or authorization rules |
-| 13  | **R**  | G         | should reject mismatching site url when production url is configured                            | Retain: Pure logic / unit validation of authentication or authorization rules |
+| 1   | **D**  | G         | should return true for root path                                                                | Delete: redundant unit duplicate of src/lib/url.test.ts:66-87 (CORE-TEST-009) |
+| 2   | **D**  | G         | should return true for internal paths                                                           | Delete: redundant unit duplicate of src/lib/url.test.ts:66-87 (CORE-TEST-009) |
+| 3   | **D**  | G         | should return false for external URLs                                                           | Delete: redundant unit duplicate of src/lib/url.test.ts:66-87 (CORE-TEST-009) |
+| 4   | **D**  | G         | should return false for protocol-relative URLs                                                  | Delete: redundant unit duplicate of src/lib/url.test.ts:66-87 (CORE-TEST-009) |
+| 5   | **R**  | G         | should accept valid internal path                                                               | Retain: Callback route redirect path resolution                               |
+| 6   | **R**  | G         | should reject external URL (open redirect prevention)                                           | Retain: Callback route open-redirect prevention                               |
+| 7   | **R**  | G         | should reject protocol-relative URL                                                             | Retain: Callback route open-redirect prevention                               |
+| 8   | **R**  | G         | should handle paths with query params and hash                                                  | Retain: Callback route redirect path resolution                               |
+| 9   | **R**  | G         | should return fallback when nextParam is null                                                   | Retain: Callback route redirect path resolution                               |
+| 10  | **R**  | G         | should accept absolute URL matching site url                                                    | Retain: Callback route redirect path resolution                               |
+| 11  | **R**  | G         | should reject absolute URL matching a different host (even if it was forwarded host previously) | Retain: Callback route host validation                                        |
+| 12  | **R**  | G         | should accept absolute URL matching configured production site url                              | Retain: Callback route production site url validation                         |
+| 13  | **R**  | G         | should reject mismatching site url when production url is configured                            | Retain: Callback route production site url validation                         |
 
 ### `src/app/(auth)/forgot-password/forgot-password-form.test.tsx`
 
@@ -247,24 +247,25 @@ _File deleted on `main` in PR #2281 (PP-zl00.3) during earlier E2E audit wave. L
 
 ### `src/app/(auth)/oauth-actions.integration.test.ts`
 
-| #   | Status | Bug Class | Test Name                                               | Rationale / Target Keeper                                                                                        |
-| --- | ------ | --------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| 1   | **F**  | B         | refuses second unlink once user is back to one identity | Fix/Upgrade: replace canned Drizzle mock with worker-scoped PGlite and verify real discord_user_id nullification |
+| #   | Status | Bug Class | Test Name                                                                         | Rationale / Target Keeper                                                                     |
+| --- | ------ | --------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| 1   | **R**  | B         | unlinkProviderAction clears discordUserId in real database upon successful unlink | Retain/Upgrade: worker-scoped PGlite verifying real discord_user_id nullification in database |
+| 2   | **R**  | B         | refuses second unlink once user is back to one identity                           | Retain/Upgrade: worker-scoped PGlite verifying guard behavior and DB state                    |
 
 ### `src/app/(auth)/oauth-actions.test.ts`
 
-| #   | Status | Bug Class | Test Name                                                       | Rationale / Target Keeper                                                                                        |
-| --- | ------ | --------- | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| 1   | **F**  | B         | refuses when provider is not available                          | Fix: remove unsafe as any, verify origin fallback logic at action boundary                                       |
-| 2   | **F**  | B         | returns redirect URL from supabase.auth.signInWithOAuth         | Fix: remove unsafe as any, verify origin fallback logic at action boundary                                       |
-| 3   | **F**  | B         | refuses when unlink would leave user with zero identities       | Fix: remove unsafe as any, verify origin fallback logic at action boundary                                       |
-| 4   | **F**  | B         | unlinks when user has >=2 identities                            | Fix: replace Drizzle canned mock with direct action execution; real DB check verified in PGlite integration test |
-| 5   | **F**  | B         | refuses when user is not logged in                              | Fix: remove unsafe as any, verify origin fallback logic at action boundary                                       |
-| 6   | **F**  | B         | returns redirect URL from supabase.auth.linkIdentity            | Fix: remove unsafe as any, verify origin fallback logic at action boundary                                       |
-| 7   | **F**  | B         | redirects to the provider URL on success                        | Fix: remove unsafe as any, verify origin fallback logic at action boundary                                       |
-| 8   | **F**  | B         | redirects to /login?oauth_error=PROVIDER_UNAVAILABLE on failure | Fix: remove unsafe as any, verify origin fallback logic at action boundary                                       |
-| 9   | **F**  | B         | redirects to /settings?oauth_status=unlinked on success         | Fix: remove unsafe as any, verify origin fallback logic at action boundary                                       |
-| 10  | **F**  | B         | redirects to /settings?oauth_error=ONLY_IDENTITY when refused   | Fix: remove unsafe as any, verify origin fallback logic at action boundary                                       |
+| #   | Status | Bug Class | Test Name                                                       | Rationale / Target Keeper                                                                                         |
+| --- | ------ | --------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| 1   | **R**  | B         | refuses when provider is not available                          | Retain: Provider availability guard check                                                                         |
+| 2   | **R**  | B         | returns redirect URL from supabase.auth.signInWithOAuth         | Retain: OAuth redirect URL generation                                                                             |
+| 3   | **R**  | B         | refuses when unlink would leave user with zero identities       | Retain: Last identity guard check (CORE-SEC-*)                                                                    |
+| 4   | **R**  | B         | unlinks when user has >=2 identities                            | Retain: Multi-identity unlink flow (real DB row check verified in PGlite integration test)                        |
+| 5   | **R**  | B         | refuses when user is not logged in                              | Retain: Auth guard check                                                                                          |
+| 6   | **R**  | B         | returns redirect URL from supabase.auth.linkIdentity            | Retain: Identity link redirect URL generation                                                                     |
+| 7   | **R**  | B         | redirects to the provider URL on success                        | Retain: Server Action sign-in wrapper redirect                                                                    |
+| 8   | **R**  | B         | redirects to /login?oauth_error=PROVIDER_UNAVAILABLE on failure | Retain: Server Action unavailable redirect                                                                        |
+| 9   | **R**  | B         | redirects to /settings?oauth_status=unlinked on success         | Retain: Server Action unlink success redirect (real DB persistence verified in oauth-actions.integration.test.ts) |
+| 10  | **R**  | B         | redirects to /settings?oauth_error=ONLY_IDENTITY when refused   | Retain: Server Action unlink only-identity redirect                                                               |
 
 ### `src/app/(auth)/oauth-button-list.test.tsx`
 
@@ -275,14 +276,14 @@ _File deleted on `main` in PR #2281 (PP-zl00.3) during earlier E2E audit wave. L
 
 ### `src/app/(auth)/oauth/consent/actions.test.ts`
 
-| #   | Status | Bug Class | Test Name                                                           | Rationale / Target Keeper                                                  |
-| --- | ------ | --------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| 1   | **F**  | B         | approve: admin → approveAuthorization then redirect to redirect_url | Fix: remove unsafe as any, verify origin fallback logic at action boundary |
-| 2   | **F**  | B         | deny: admin → denyAuthorization then redirect to redirect_url       | Fix: remove unsafe as any, verify origin fallback logic at action boundary |
-| 3   | **F**  | B         | missing authorization_id → redirect to /oauth/consent               | Fix: remove unsafe as any, verify origin fallback logic at action boundary |
-| 4   | **F**  | B         | unauthenticated → redirect to login with encoded next               | Fix: remove unsafe as any, verify origin fallback logic at action boundary |
-| 5   | **F**  | B         | non-admin → redirect back to consent page (no error flag)           | Fix: remove unsafe as any, verify origin fallback logic at action boundary |
-| 6   | **F**  | B         | approve error → redirect back to the consent page                   | Fix: remove unsafe as any, verify origin fallback logic at action boundary |
+| #   | Status | Bug Class | Test Name                                                           | Rationale / Target Keeper                                                          |
+| --- | ------ | --------- | ------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| 1   | **R**  | B         | approve: admin → approveAuthorization then redirect to redirect_url | Retain: OAuth consent server action permission and redirect validation (CORE-SEC-) |
+| 2   | **R**  | B         | deny: admin → denyAuthorization then redirect to redirect_url       | Retain: OAuth consent server action permission and redirect validation (CORE-SEC-) |
+| 3   | **R**  | B         | missing authorization_id → redirect to /oauth/consent               | Retain: OAuth consent server action input validation and redirect (CORE-SEC-)      |
+| 4   | **R**  | B         | unauthenticated → redirect to login with encoded next               | Retain: OAuth consent server action auth guard and redirect (CORE-SEC-)            |
+| 5   | **R**  | B         | non-admin → redirect back to consent page (no error flag)           | Retain: OAuth consent server action admin guard and redirect (CORE-SEC-)           |
+| 6   | **R**  | B         | approve error → redirect back to the consent page                   | Retain: OAuth consent server action error handling and redirect (CORE-SEC-)        |
 
 ### `src/app/(auth)/oauth/consent/page.test.tsx`
 
@@ -298,25 +299,40 @@ _File deleted on `main` in PR #2281 (PP-zl00.3) during earlier E2E audit wave. L
 
 ### `src/app/(auth)/schemas.test.ts`
 
-| #   | Status | Bug Class | Test Name                                              | Rationale / Target Keeper                                                     |
-| --- | ------ | --------- | ------------------------------------------------------ | ----------------------------------------------------------------------------- |
-| 1   | **R**  | G         | should accept valid email with password                | Retain: Pure logic / unit validation of authentication or authorization rules |
-| 2   | **R**  | G         | should accept plain username (no @) with password      | Retain: Pure logic / unit validation of authentication or authorization rules |
-| 3   | **R**  | G         | should accept alphanumeric username with underscores   | Retain: Pure logic / unit validation of authentication or authorization rules |
-| 4   | **R**  | G         | should reject empty email/username                     | Retain: Pure logic / unit validation of authentication or authorization rules |
-| 5   | **R**  | G         | should reject single-character username                | Retain: Pure logic / unit validation of authentication or authorization rules |
-| 6   | **R**  | G         | should accept two-character username                   | Retain: Pure logic / unit validation of authentication or authorization rules |
-| 7   | **R**  | G         | should reject password-only (no email)                 | Retain: Pure logic / unit validation of authentication or authorization rules |
-| 8   | **R**  | G         | should accept valid standard email                     | Retain: Pure logic / unit validation of authentication or authorization rules |
-| 9   | **R**  | G         | should accept email with + sign (gmail aliases)        | Retain: Pure logic / unit validation of authentication or authorization rules |
-| 10  | **R**  | G         | should accept email with subdomain                     | Retain: Pure logic / unit validation of authentication or authorization rules |
-| 11  | **R**  | G         | should reject email without @                          | Retain: Pure logic / unit validation of authentication or authorization rules |
-| 12  | **R**  | G         | should reject email without domain                     | Retain: Pure logic / unit validation of authentication or authorization rules |
-| 13  | **R**  | G         | should accept valid password and matching confirmation | Retain: Pure logic / unit validation of authentication or authorization rules |
-| 14  | **R**  | G         | should accept password at minimum length (8 chars)     | Retain: Pure logic / unit validation of authentication or authorization rules |
-| 15  | **R**  | G         | should reject password below minimum length (7 chars)  | Retain: Pure logic / unit validation of authentication or authorization rules |
-| 16  | **R**  | G         | should reject password mismatch                        | Retain: Pure logic / unit validation of authentication or authorization rules |
-| 17  | **R**  | G         | should accept password with unicode characters         | Retain: Pure logic / unit validation of authentication or authorization rules |
+| #   | Status | Bug Class | Test Name                                                | Rationale / Target Keeper                                                     |
+| --- | ------ | --------- | -------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| 1   | **R**  | G         | should accept valid email with password                  | Retain: Pure logic / unit validation of authentication or authorization rules |
+| 2   | **R**  | G         | should accept plain username (no @) with password        | Retain: Pure logic / unit validation of authentication or authorization rules |
+| 3   | **R**  | G         | should accept alphanumeric username with underscores     | Retain: Pure logic / unit validation of authentication or authorization rules |
+| 4   | **R**  | G         | should reject empty email/username                       | Retain: Pure logic / unit validation of authentication or authorization rules |
+| 5   | **R**  | G         | should reject single-character username                  | Retain: Pure logic / unit validation of authentication or authorization rules |
+| 6   | **R**  | G         | should accept two-character username                     | Retain: Pure logic / unit validation of authentication or authorization rules |
+| 7   | **R**  | G         | should validate with rememberMe option                   | Retain: Consolidated from retired src/test/unit/auth-validation.test.ts       |
+| 8   | **R**  | G         | should reject empty password                             | Retain: Consolidated from retired src/test/unit/auth-validation.test.ts       |
+| 9   | **R**  | G         | should reject password-only (no email)                   | Retain: Pure logic / unit validation of authentication or authorization rules |
+| 10  | **R**  | G         | should accept valid standard email                       | Retain: Pure logic / unit validation of authentication or authorization rules |
+| 11  | **R**  | G         | should accept email with + sign (gmail aliases)          | Retain: Pure logic / unit validation of authentication or authorization rules |
+| 12  | **R**  | G         | should accept email with subdomain                       | Retain: Pure logic / unit validation of authentication or authorization rules |
+| 13  | **R**  | G         | should reject email without @                            | Retain: Pure logic / unit validation of authentication or authorization rules |
+| 14  | **R**  | G         | should reject email without domain                       | Retain: Pure logic / unit validation of authentication or authorization rules |
+| 15  | **R**  | G         | should accept valid password and matching confirmation   | Retain: Pure logic / unit validation of authentication or authorization rules |
+| 16  | **R**  | G         | should accept password at minimum length (8 chars)       | Retain: Pure logic / unit validation of authentication or authorization rules |
+| 17  | **R**  | G         | should reject password below minimum length (7 chars)    | Retain: Pure logic / unit validation of authentication or authorization rules |
+| 18  | **R**  | G         | should reject password mismatch                          | Retain: Pure logic / unit validation of authentication or authorization rules |
+| 19  | **R**  | G         | should accept password with unicode characters           | Retain: Pure logic / unit validation of authentication or authorization rules |
+| 20  | **R**  | G         | should validate correct name, email, password, and terms | Retain: Consolidated from retired src/test/unit/auth-validation.test.ts       |
+| 21  | **R**  | G         | should trim whitespace from names                        | Retain: Consolidated from retired src/test/unit/auth-validation.test.ts       |
+| 22  | **R**  | G         | should reject empty names                                | Retain: Consolidated from retired src/test/unit/auth-validation.test.ts       |
+| 23  | **R**  | G         | should reject names longer than 50 characters            | Retain: Consolidated from retired src/test/unit/auth-validation.test.ts       |
+| 24  | **R**  | G         | should reject invalid email format                       | Retain: Consolidated from retired src/test/unit/auth-validation.test.ts       |
+| 25  | **R**  | G         | should reject password shorter than 8 characters         | Retain: Consolidated from retired src/test/unit/auth-validation.test.ts       |
+| 26  | **R**  | G         | should reject password longer than 128 characters        | Retain: Consolidated from retired src/test/unit/auth-validation.test.ts       |
+| 27  | **R**  | G         | should accept password exactly 8 characters              | Retain: Consolidated from retired src/test/unit/auth-validation.test.ts       |
+| 28  | **R**  | G         | should accept password exactly 128 characters            | Retain: Consolidated from retired src/test/unit/auth-validation.test.ts       |
+| 29  | **R**  | G         | should reject mismatched passwords                       | Retain: Consolidated from retired src/test/unit/auth-validation.test.ts       |
+| 30  | **R**  | G         | should reject confirmPassword exceeding 128 characters   | Retain: Consolidated from retired src/test/unit/auth-validation.test.ts       |
+| 31  | **R**  | G         | should reject when terms are not accepted                | Retain: Consolidated from retired src/test/unit/auth-validation.test.ts       |
+| 32  | **R**  | G         | should reject when terms field is missing                | Retain: Consolidated from retired src/test/unit/auth-validation.test.ts       |
 
 ### `src/app/(auth)/signup/signup-form.test.tsx`
 
@@ -337,11 +353,12 @@ _File deleted on `main` in PR #2281 (PP-zl00.3) during earlier E2E audit wave. L
 
 ### `src/components/people/PersonHoverCard.test.tsx`
 
-| #   | Status | Bug Class | Test Name                                        | Rationale / Target Keeper                                                     |
-| --- | ------ | --------- | ------------------------------------------------ | ----------------------------------------------------------------------------- |
-| 1   | **R**  | G         | renders a profile link for a real user           | Retain: Pure logic / unit validation of authentication or authorization rules |
-| 2   | **R**  | G         | renders plain text (no link) for an invited user | Retain: Pure logic / unit validation of authentication or authorization rules |
-| 3   | **R**  | G         | renders plain text for a former user             | Retain: Pure logic / unit validation of authentication or authorization rules |
+| #   | Status | Bug Class | Test Name                                          | Rationale / Target Keeper                                                                    |
+| --- | ------ | --------- | -------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| 1   | **R**  | G         | renders a profile link for a real user             | Retain: Pure logic / unit validation of authentication or authorization rules                |
+| 2   | **R**  | G         | renders plain text (no link) for an invited user   | Retain: Pure logic / unit validation of authentication or authorization rules                |
+| 3   | **R**  | G         | renders plain text for a former user               | Retain: Pure logic / unit validation of authentication or authorization rules                |
+| 4   | **R**  | C         | shows a capitalized role pill after fetch on hover | Retain: Consolidated from retired src/test/unit/components/people/person-hover-card.test.tsx |
 
 ### `src/lib/auth/derive-name.test.ts`
 
@@ -483,15 +500,19 @@ _File deleted on `main` in PR #2281 (PP-zl00.3) during earlier E2E audit wave. L
 
 ### `src/test/integration/account-deletion.test.ts`
 
-| #   | Status | Bug Class | Test Name                                                                  | Rationale / Target Keeper                                                         |
-| --- | ------ | --------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| 1   | **R**  | I         | should anonymize issues, comments, and images when user is deleted         | Retain: Real PGlite integration test validating data correctness or action wiring |
-| 2   | **R**  | I         | should reassign machines to another user if requested                      | Retain: Real PGlite integration test validating data correctness or action wiring |
-| 3   | **R**  | I         | should throw SoleAdminError if the last admin tries to delete account      | Retain: Real PGlite integration test validating data correctness or action wiring |
-| 4   | **R**  | I         | should allow admin deletion if another admin exists                        | Retain: Real PGlite integration test validating data correctness or action wiring |
-| 5   | **R**  | I         | reassign picker query excludes guests and includes member/technician/admin | Retain: Real PGlite integration test validating data correctness or action wiring |
-| 6   | **R**  | I         | anonymizes DB references and redirects on successful account deletion      | Retain: Real PGlite integration test validating data correctness or action wiring |
-| 7   | **R**  | I         | returns SOLE_ADMIN from action when user is last admin in real DB          | Retain: Real PGlite integration test validating data correctness or action wiring |
+| #   | Status | Bug Class | Test Name                                                                  | Rationale / Target Keeper                                                              |
+| --- | ------ | --------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| 1   | **R**  | I         | should anonymize issues, comments, and images when user is deleted         | Retain: Real PGlite integration test validating data correctness or action wiring      |
+| 2   | **R**  | I         | should reassign machines to another user if requested                      | Retain: Real PGlite integration test validating data correctness or action wiring      |
+| 3   | **R**  | I         | should throw SoleAdminError if the last admin tries to delete account      | Retain: Real PGlite integration test validating data correctness or action wiring      |
+| 4   | **R**  | I         | should allow admin deletion if another admin exists                        | Retain: Real PGlite integration test validating data correctness or action wiring      |
+| 5   | **R**  | I         | reassign picker query excludes guests and includes member/technician/admin | Retain: Real PGlite integration test validating data correctness or action wiring      |
+| 6   | **R**  | I         | anonymizes DB references and redirects on successful account deletion      | Retain: Real PGlite integration test validating data correctness or action wiring      |
+| 7   | **R**  | I         | returns SOLE_ADMIN from action when user is last admin in real DB          | Retain: Real PGlite integration test validating data correctness or action wiring      |
+| 8   | **R**  | I         | returns UNAUTHORIZED when not logged in                                    | Retain: Consolidated from retired src/app/(app)/settings/delete-account-action.test.ts |
+| 9   | **R**  | I         | returns VALIDATION when confirmation is wrong                              | Retain: Consolidated from retired src/app/(app)/settings/delete-account-action.test.ts |
+| 10  | **R**  | I         | still redirects when auth deletion fails (best-effort)                     | Retain: Consolidated from retired src/app/(app)/settings/delete-account-action.test.ts |
+| 11  | **R**  | I         | reports admin signOut errors but still proceeds with deletion              | Retain: Consolidated from retired src/app/(app)/settings/delete-account-action.test.ts |
 
 ### `src/test/integration/admin/user-management.test.ts`
 
@@ -508,6 +529,10 @@ _File deleted on `main` in PR #2281 (PP-zl00.3) during earlier E2E audit wave. L
 | 9   | **R**  | I         | should throw error when email sending fails                                              | Retain: Real PGlite integration test validating data correctness or action wiring |
 | 10  | **R**  | I         | should allow admin to resend an invitation                                               | Retain: Real PGlite integration test validating data correctness or action wiring |
 | 11  | **R**  | I         | should throw error when resending fails                                                  | Retain: Real PGlite integration test validating data correctness or action wiring |
+| 12  | **R**  | I         | should allow admin to remove an invited user                                             | Retain: PGlite integration test for removeInvitedUser action                      |
+| 13  | **R**  | I         | should prevent non-admin from removing an invited user                                   | Retain: PGlite integration test for removeInvitedUser action                      |
+| 14  | **R**  | I         | should throw error if invited user not found                                             | Retain: PGlite integration test for removeInvitedUser action                      |
+| 15  | **R**  | I         | should disassociate machine and issue references when removing invited user              | Retain: PGlite integration test for removeInvitedUser action                      |
 
 ### `src/test/integration/invited_users.test.ts`
 

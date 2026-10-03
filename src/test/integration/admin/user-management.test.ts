@@ -402,8 +402,18 @@ describe("Admin User Management Integration", () => {
   });
 
   describe("removeInvitedUser", () => {
+    function getAdminUser(): { id: string; email: string } {
+      if (!adminUser) throw new Error("adminUser is undefined");
+      return adminUser;
+    }
+
+    function getTargetUser(): { id: string; email: string } {
+      if (!targetUser) throw new Error("targetUser is undefined");
+      return targetUser;
+    }
+
     it("should allow admin to remove an invited user", async () => {
-      mockGetUser.mockResolvedValue({ data: { user: adminUser! } });
+      mockGetUser.mockResolvedValue({ data: { user: getAdminUser() } });
 
       const [invited] = await (
         await getTestDb()
@@ -428,7 +438,7 @@ describe("Admin User Management Integration", () => {
     });
 
     it("should prevent non-admin from removing an invited user", async () => {
-      mockGetUser.mockResolvedValue({ data: { user: targetUser! } });
+      mockGetUser.mockResolvedValue({ data: { user: getTargetUser() } });
 
       const [invited] = await (
         await getTestDb()
@@ -452,7 +462,7 @@ describe("Admin User Management Integration", () => {
     });
 
     it("should throw error if invited user not found", async () => {
-      mockGetUser.mockResolvedValue({ data: { user: adminUser! } });
+      mockGetUser.mockResolvedValue({ data: { user: getAdminUser() } });
 
       await expect(removeInvitedUser(randomUUID())).rejects.toThrow(
         "Invited user not found"
@@ -460,7 +470,7 @@ describe("Admin User Management Integration", () => {
     });
 
     it("should disassociate machine and issue references when removing invited user", async () => {
-      mockGetUser.mockResolvedValue({ data: { user: adminUser! } });
+      mockGetUser.mockResolvedValue({ data: { user: getAdminUser() } });
 
       const [invited] = await (
         await getTestDb()

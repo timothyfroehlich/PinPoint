@@ -66,6 +66,29 @@ describe("loginSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it("should validate with rememberMe option", () => {
+    const result = loginSchema.safeParse({
+      email: "user@example.com",
+      password: "TestPassword123",
+      rememberMe: true,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.rememberMe).toBe(true);
+    }
+  });
+
+  it("should reject empty password", () => {
+    const result = loginSchema.safeParse({
+      email: "user@example.com",
+      password: "",
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0]?.message).toContain("Password is required");
+    }
+  });
+
   it("should reject password-only (no email)", () => {
     const result = loginSchema.safeParse({
       password: "TestPassword123",
