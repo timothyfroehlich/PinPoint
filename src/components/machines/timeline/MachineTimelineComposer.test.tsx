@@ -4,6 +4,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import { MachineTimelineComposer } from "./MachineTimelineComposer";
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
 const addMachineCommentAction = vi.fn(() =>
   Promise.resolve({ success: true as const })
 );
@@ -153,5 +157,54 @@ describe("MachineTimelineComposer", () => {
     expect(
       screen.queryByRole("option", { name: /^event$/i })
     ).not.toBeInTheDocument();
+  });
+
+  it("does not intercept navigation when composer has no body text even if formatting or tag is changed", async () => {
+    const user = userEvent.setup();
+    render(
+      <div>
+        <MachineTimelineComposer machineId="m1" onPosted={vi.fn()} />
+        <a href="/other">Other Page</a>
+      </div>
+    );
+
+    // Toggle formatting
+    await user.click(screen.getByRole("button", { name: /show formatting/i }));
+    // Change tag
+    await user.click(screen.getByRole("combobox", { name: /tag/i }));
+    await user.click(screen.getByRole("option", { name: /maintenance/i }));
+
+    // Click link — should NOT trigger unsaved changes guard because body is empty
+    await user.click(screen.getByRole("link", { name: /other page/i }));
+    expect(
+      screen.queryByText(/discard unsaved changes\?/i)
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not submit the note when Cmd/Ctrl+Enter is pressed while the discard dialog is open", async () => {
+    const user = userEvent.setup();
+    render(
+      <div>
+        <MachineTimelineComposer machineId="m1" onPosted={vi.fn()} />
+        <a href="/other">Other Page</a>
+      </div>
+    );
+
+    // Type a note
+    await user.click(screen.getByRole("button", { name: /sim-type/i }));
+
+    // Click link to trigger discard dialog
+    await user.click(screen.getByRole("link", { name: /other page/i }));
+    expect(screen.getByText("Discard unsaved changes?")).toBeInTheDocument();
+
+    // Press Cmd+Enter while focus is inside the dialog
+    const dialog = screen.getByRole("alertdialog");
+    dialog.focus();
+    await user.keyboard("{Meta>}{Enter}{/Meta}");
+
+    // Should NOT have posted
+    expect(addMachineCommentAction).not.toHaveBeenCalled();
+    // Dialog should still be open
+    expect(screen.getByText("Discard unsaved changes?")).toBeInTheDocument();
   });
 });

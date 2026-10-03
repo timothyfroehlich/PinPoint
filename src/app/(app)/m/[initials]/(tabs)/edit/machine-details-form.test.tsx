@@ -661,6 +661,27 @@ describe("MachineDetailsForm", () => {
       });
     });
 
+    it("does not stop click event propagation so link handlers still execute (PP-kny4)", async () => {
+      const user = userEvent.setup();
+      const linkClickSpy = vi.fn();
+      render(
+        <DetailsDirtyProvider>
+          <a href="/m/TAF/settings" onClick={linkClickSpy}>
+            Settings
+          </a>
+          <MachineDetailsForm {...baseProps} />
+        </DetailsDirtyProvider>
+      );
+
+      await user.type(screen.getByLabelText(/Machine Name/), "!");
+      await user.click(screen.getByRole("link", { name: "Settings" }));
+
+      expect(linkClickSpy).toHaveBeenCalled();
+      expect(
+        await screen.findByRole("button", { name: "Discard changes" })
+      ).toBeInTheDocument();
+    });
+
     it("lets a link to the current page through", async () => {
       const user = userEvent.setup();
       render(
