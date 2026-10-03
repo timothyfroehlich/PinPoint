@@ -157,14 +157,13 @@ describe("ActivitySummaryForm", () => {
     expect(screen.getByRole("combobox", { name: "Start time" })).toBeDisabled();
   });
 
-  it("disables Send summary now while the saved interval is Disabled", () => {
+  it("keeps Send summary now available while the saved interval is Disabled", () => {
     renderForm({ ...CONFIGURED, intervalHours: null });
 
     expect(screen.getByRole("combobox", { name: "Start time" })).toBeDisabled();
     expect(
       screen.getByRole("button", { name: "Send summary now" })
-    ).toBeDisabled();
-    expect(screen.getByText("Summaries are off.")).toBeInTheDocument();
+    ).toBeEnabled();
   });
 
   it("disables Send summary now while no summary channel is saved", () => {

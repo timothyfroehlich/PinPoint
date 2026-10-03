@@ -227,7 +227,7 @@ describe("Activity summary settings actions", () => {
       expect(fetchSpy).not.toHaveBeenCalled();
     });
 
-    it("keeps an unchanged channel's status without re-checking it", async () => {
+    it("re-checks an unchanged channel on every save and keeps its last post time", async () => {
       await saveActivitySummaryConfigAction(VALID_INPUT);
       await sendActivitySummaryTestAction(CHANNEL_ID);
       fetchSpy.mockClear();
@@ -236,9 +236,9 @@ describe("Activity summary settings actions", () => {
 
       const row = await readRow();
       expect(row?.summaryStartHour).toBe(10);
-      expect(row?.summaryStatusDetail).toBe("Test message delivered");
+      expect(row?.summaryStatus).toBe("posting");
       expect(row?.summaryLastPostAt).not.toBeNull();
-      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(fetchSpy).toHaveBeenCalled();
     });
 
     it("rejects a member without writing", async () => {

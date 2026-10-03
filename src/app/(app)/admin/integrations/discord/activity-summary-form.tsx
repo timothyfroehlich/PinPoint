@@ -126,15 +126,14 @@ export function ActivitySummaryForm({
     Number(startHour)
   );
 
-  // Send summary now uses the SAVED settings (spec §3.8).
+  // Send summary now uses the SAVED settings, and works while the interval is
+  // Disabled (spec §3.8).
   const sendNowBlocker =
-    initialState.intervalHours === null
-      ? "Summaries are off."
-      : baselineChannel.length === 0
-        ? "Set a summary channel first."
-        : isDirty
-          ? "Save changes first."
-          : null;
+    baselineChannel.length === 0
+      ? "Set a summary channel first."
+      : isDirty
+        ? "Save changes first."
+        : null;
 
   function toggleEvent(key: string, checked: boolean): void {
     setEvents((current) =>
@@ -256,7 +255,7 @@ export function ActivitySummaryForm({
             }}
             disabled={anyPending}
             aria-describedby="activity-summary-channel-hint activity-summary-channel-status"
-            className="min-w-0 max-w-[360px] flex-1"
+            className="min-w-0 max-w-[360px] flex-1 basis-56"
           />
           <Button
             type="button"

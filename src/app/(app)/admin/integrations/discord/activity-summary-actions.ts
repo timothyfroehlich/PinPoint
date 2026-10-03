@@ -84,10 +84,10 @@ export type SaveActivitySummaryConfigResult =
  * Save the activity summary settings (discord-activity-summary §2). Saves on
  * its own: never reads or writes the bot credentials (§2.5).
  *
- * A newly entered channel is checked against Discord (§2.6), and the settings
+ * Every save with a channel checks it against Discord (§2.6), and the settings
  * persist whatever the check finds (CORE-ARCH-012). The check runs before the
- * write and outside any transaction (CORE-ARCH-011). An unchanged channel keeps
- * its stored status; clearing it stores Not configured.
+ * write and outside any transaction (CORE-ARCH-011). Clearing the channel
+ * stores Not configured.
  */
 export async function saveActivitySummaryConfigAction(
   input: unknown
@@ -137,7 +137,7 @@ export async function saveActivitySummaryConfigAction(
     if (channelId === null) {
       status = "not_configured";
       statusDetail = null;
-    } else if (channelChanged || status === "not_configured") {
+    } else {
       const token = await readBotToken("saveActivitySummaryConfigAction");
       if (token.ok) {
         ({ status, statusDetail } = await checkDiscordChannel(

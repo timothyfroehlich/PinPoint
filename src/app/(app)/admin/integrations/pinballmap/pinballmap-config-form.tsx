@@ -732,7 +732,7 @@ export function PinballMapConfigForm({
               disabled={anyPending}
               aria-describedby="pinballmap-location-hint pinballmap-location-result"
               aria-invalid={feedback?.invalidField ?? undefined}
-              className="min-w-0 max-w-[360px] flex-1"
+              className="min-w-0 max-w-[360px] flex-1 basis-56"
             />
             <Button
               type="submit"
@@ -942,7 +942,7 @@ export function PinballMapConfigForm({
                   }}
                   disabled={anyPending}
                   aria-describedby="pinballmap-alert-channel-hint pinballmap-region-alert-status"
-                  className="min-w-0 max-w-[360px] flex-1"
+                  className="min-w-0 max-w-[360px] flex-1 basis-56"
                 />
                 <Button
                   type="button"
