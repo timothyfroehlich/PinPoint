@@ -125,7 +125,7 @@
 - **10.5** A Saved View appears on every Surface of its List Host: a machine Saved View on Machines and every Collection and Tag Machines tab, an issue Saved View on Issues and every Issues tab.
 - **10.6** Applying a Saved View or Built-in View opens it at page 1.
 - **10.7** A Saved View name is required and must be unique, ignoring case, among the account's Saved Views for that List Host. A colliding name is rejected, never silently overwritten.
-- **10.8** Manage views lets the account rename or delete its Saved Views and set or clear its Default View.
+- **10.8** Manage views lets the account rename or delete its Saved Views. On the Machines and Issues pages it also lets the account set or clear its Default View.
 - **10.9** An account has at most one Default View per List Host.
 - **10.10** The Machines or Issues page, opened with no view configuration other than page, shows the account's Default View if one exists, otherwise the Page Preset. A Collection or Tag tab opened that way always shows its Page Preset. A URL carrying any view configuration opens exactly as written.
 - **10.11** When the Default View opens, the address bar shows its canonical URL.
@@ -165,7 +165,7 @@
 | §3–§8, §12 | Neither list uses the shared layout, List Header, phone sheets, or overflow rules. | PP-jb9v |
 | §5.7 | Issues offers 15, 25, and 50 per page, defaulting to 15. | PP-jb9v |
 | §9.2, §9.4 | Issues uses snake_case parameters and a composite sort value. | PP-jb9v |
-| §10 | Issues has no Saved Views; machine Saved Views and defaults belong to one Surface each and appear in a menu rather than List Header tabs. | PP-jb9v |
+| §10 | Issues has no Saved Views; machine Saved Views appear in a menu rather than List Header tabs. | PP-jb9v |
 | §11 | Issues restores the last URL from a cookie across sessions; Machines does not restore. | PP-jb9v |
 
 ---
@@ -174,4 +174,5 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-02 | Default View controls appear only on the Machines and Issues pages (§10.8). |
 | 2026-10-02 | Created from the approved list-framework design: shared layout, filters, List Header with Saved View tabs, compact and bottom pagers, phone sheets and pinned pager, overflow rules, URL state, Saved Views shared across each host's Surfaces with a Default View on the main page only (moved from machine-views §8), returning to a list, and accessibility. |

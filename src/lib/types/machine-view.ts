@@ -99,21 +99,10 @@ export interface MachineViewResult {
 }
 
 /**
- * The configuration a Saved View stores (spec §8.2): everything in
+ * The configuration a Saved View stores (list-views §10.2): everything in
  * {@link MachineViewState} except the page number.
  */
 export type MachineViewSavedState = Omit<MachineViewState, "page">;
-
-/**
- * Where Machine View appears and where Saved Views belong (spec §1 Surface),
- * as the page and its Server Actions name it. A standard Collection is named
- * by the handle in its URL (its id or its view token), so a view-token visitor
- * never learns the internal id; the server resolves it and checks access.
- */
-export type MachineViewSurfaceRef =
-  | { kind: "machines" }
-  | { kind: "collection"; handle: string }
-  | { kind: "owner"; ownerId: string };
 
 export interface MachineViewSavedViewSummary {
   id: string;
@@ -121,7 +110,7 @@ export interface MachineViewSavedViewSummary {
   state: MachineViewSavedState;
 }
 
-/** A Built-in View as the menu shows it (spec §9). */
+/** A Built-in View as the menu shows it (machine-views §9). */
 export interface MachineViewBuiltInView {
   id: string;
   name: string;
@@ -129,15 +118,22 @@ export interface MachineViewBuiltInView {
 }
 
 /**
- * The views one Surface offers a viewer (spec §8, §9). `activeViewId` is the
- * validated `view` URL reference (§4.11) — an owned Saved View id or a
- * Built-in View id — or null, which means the Page Preset's baseline.
- * `defaultViewId` is the account's default on this Surface (§8.10).
+ * The views one machine Surface offers a viewer (list-views §10,
+ * machine-views §9): the Surface's Built-in Views and, for an account that can
+ * save, every machine Saved View. `activeViewId` is the validated `view` URL
+ * reference (list-views §9.6) — an owned Saved View id or a Built-in View id
+ * — or null, which means the Page Preset's baseline. `defaultViewId` is the
+ * account's machine Default View, which only the Machines page opens
+ * (§10.10).
  */
 export interface MachineViewSavedViews {
-  surface: MachineViewSurfaceRef;
-  /** Whether the viewer can save, change, and choose defaults (§8.1). */
+  /** Whether the viewer can save, change, and delete Saved Views (§10.1). */
   canSave: boolean;
+  /**
+   * Whether this Surface is the Machines page, where the Default View is
+   * chosen and opens (§10.10); other Surfaces do not offer defaults.
+   */
+  offersDefault: boolean;
   builtInViews: MachineViewBuiltInView[];
   views: MachineViewSavedViewSummary[];
   defaultViewId: string | null;

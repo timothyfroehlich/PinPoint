@@ -9,6 +9,7 @@ import {
 import {
   collections,
   collectionMachines,
+  invitedUsers,
   issues,
   machines,
   timelineEvents,
@@ -206,18 +207,75 @@ describe("machine view database pipeline", () => {
     expect(result.rows.every((row) => row.health === undefined)).toBe(true);
   });
 
-  it("ignores owner IDs that are not available in the active scope", async () => {
+  it("keeps an owner with no machines in the scope, matching nothing (list-views §10.18)", async () => {
+    const db = await getTestDb();
+    const invitedId = randomUUID();
+    await db.insert(invitedUsers).values({
+      id: invitedId,
+      firstName: "Invited",
+      lastName: "Owner",
+      email: `invited-${invitedId}@example.com`,
+      role: "member",
+    });
+
+    // Owner Two's only machine is outside Owner One's Collection, and the
+    // invited person and Unassigned own nothing at all.
+    const result = await loadMachineViewFromDatabase(asDbOrTx(db), {
+      scope: { kind: "owner", ownerId: ownerOneId },
+      preset: "collection",
+      searchParams: new URLSearchParams({
+        owner: `${ownerTwoId},${invitedId},unassigned`,
+        columns: "machine",
+      }),
+    });
+
+    expect(result.state.owner).toEqual([ownerTwoId, invitedId, "unassigned"]);
+    expect(result.rows).toEqual([]);
+    expect(result.totalCount).toBe(0);
+    // The scope still bounds the tab; the filter never widens it.
+    expect(result.scopeCount).toBe(2);
+    expect(result.ownerOptions).toEqual([
+      { id: invitedId, name: "Invited Owner" },
+      { id: ownerOneId, name: "Owner One" },
+      { id: ownerTwoId, name: "Owner Two" },
+      { id: "unassigned", name: "Unassigned" },
+    ]);
+    expect(
+      result.ownerOptions.some((option) => Object.hasOwn(option, "email"))
+    ).toBe(false);
+  });
+
+  it("narrows a Collection tab to an in-scope owner alongside an out-of-scope one", async () => {
+    const db = await getTestDb();
+    const result = await loadMachineViewFromDatabase(asDbOrTx(db), {
+      scope: { kind: "collection", collectionId },
+      preset: "collection",
+      searchParams: new URLSearchParams({
+        owner: `${ownerOneId},${ownerTwoId}`,
+        columns: "machine",
+      }),
+    });
+
+    expect(result.state.owner).toEqual([ownerOneId, ownerTwoId]);
+    // Beta belongs to Owner One but is outside the Collection.
+    expect(result.rows.map((row) => row.initials)).toEqual(["AAA", "CCC"]);
+  });
+
+  it("drops owner values that name no one (list-views §10.14)", async () => {
     const db = await getTestDb();
     const result = await loadMachineViewFromDatabase(asDbOrTx(db), {
       scope: { kind: "owner", ownerId: ownerOneId },
       preset: "collection",
       searchParams: new URLSearchParams({
-        owner: `${ownerOneId},not-in-this-scope`,
+        owner: `${ownerOneId},${randomUUID()},not-a-person`,
         columns: "machine",
       }),
     });
 
     expect(result.state.owner).toEqual([ownerOneId]);
     expect(result.rows.map((row) => row.initials)).toEqual(["AAA", "BBB"]);
+    expect(result.ownerOptions).toEqual([
+      { id: ownerOneId, name: "Owner One" },
+    ]);
   });
 });

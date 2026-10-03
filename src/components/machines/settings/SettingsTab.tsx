@@ -191,7 +191,8 @@ function useUnsavedChangesGuard({
         const ok = window.confirm(message);
         if (!ok) {
           e.preventDefault();
-          e.stopPropagation();
+          // Do not call e.stopPropagation() so component-level React onClick handlers
+          // (like closing drawers or dropdown menus) still execute (PP-kny4).
         }
         return;
       }

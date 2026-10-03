@@ -50,11 +50,18 @@ export {
   type MachineViewSavedViews,
   type MachineViewSavedViewSummary,
   type MachineViewScope,
-  type MachineViewSurfaceRef,
   type MachineViewSortDirection,
   type MachineViewState,
   type MachineViewSummary,
 } from "./machine-view";
+
+export {
+  LIST_HOSTS,
+  type DefaultViewTarget,
+  type ListHost,
+  type SavedViewError,
+  type StoredSavedView,
+} from "./list-view";
 
 export {
   WIDGET_POPULATIONS,

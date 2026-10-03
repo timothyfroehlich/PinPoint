@@ -162,8 +162,8 @@ export function parseMachineViewState(
 }
 
 /**
- * Serializes view state relative to the Page Preset (spec §4.3, §4.10). `view`
- * is the validated `view` reference (§4.11): an owned Saved View id or a
+ * Serializes view state relative to the Page Preset (list-views §9.3, §9.5). `view`
+ * is the validated `view` reference (§9.6): an owned Saved View id or a
  * Built-in View id; it is appended last and never changes the other
  * parameters.
  */
@@ -221,8 +221,8 @@ const MACHINE_VIEW_CONFIGURATION_PARAMS = [
 ] as const;
 
 /**
- * Whether a URL carries view configuration other than `page` (spec §8.11).
- * A URL without any opens the account's Default View.
+ * Whether a URL carries view configuration other than `page` (list-views §10.10).
+ * On the Machines page a URL without any opens the account's Default View.
  */
 export function hasMachineViewConfiguration(
   searchParams: MachineViewSearchParams
@@ -232,7 +232,7 @@ export function hasMachineViewConfiguration(
   );
 }
 
-/** The configuration a Saved View stores: everything but the page (§8.2). */
+/** The configuration a Saved View stores: everything but the page (§10.2). */
 export function toMachineViewSavedState(
   state: MachineViewState
 ): MachineViewSavedState {
@@ -242,7 +242,7 @@ export function toMachineViewSavedState(
 
 /**
  * The canonical URL parameters that open a Saved View: its configuration at
- * page 1 (spec §8.6), relative to the Page Preset (§4.10), naming the view.
+ * page 1 (list-views §10.6), relative to the Page Preset (§9.5), naming the view.
  */
 export function savedMachineViewSearchParams(
   saved: MachineViewSavedState,
@@ -252,16 +252,62 @@ export function savedMachineViewSearchParams(
   return serializeMachineViewState({ ...saved, page: 1 }, presetId, viewId);
 }
 
+/** The keys of a stored configuration, which are also its URL parameters. */
+const SAVED_STATE_KEYS = [
+  "q",
+  "presence",
+  "status",
+  "severity",
+  "owner",
+  "sort",
+  "dir",
+  "pageSize",
+  "columns",
+  ...WIDGET_POPULATION_PARAMS,
+] as const satisfies readonly (keyof MachineViewSavedState)[];
+
 /**
- * Re-validates a configuration exactly as URL parameters are (spec §4.10,
- * §8.15): fields the preset does not permit are dropped.
+ * A Saved View belongs to the Machine View host, not a Surface (list-views
+ * §10.5), so one preset fills any key a stored configuration lacks. The
+ * stored configuration is absolute, so this choice never changes a value it
+ * carries.
+ */
+const SAVED_STATE_PRESET: MachineViewPresetId = "machines";
+
+function storedParamValue(value: unknown): string | null {
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return String(value);
+  if (Array.isArray(value)) {
+    return value
+      .filter((item): item is string => typeof item === "string")
+      .join(",");
+  }
+  return null;
+}
+
+/**
+ * Validates a configuration to store or one read back from storage exactly as
+ * URL parameters are validated (list-views §9.3, §10.14): values that no
+ * longer exist are dropped, keys the parser does not know are ignored, and a
+ * missing key takes the preset's default. Owners are checked against the
+ * people who exist on read and again when the view is applied; fields a
+ * particular Surface does not permit are dropped when it is applied there.
  */
 export function normalizeMachineViewSavedState(
-  saved: MachineViewSavedState,
-  presetId: MachineViewPresetId
+  stored: unknown
 ): MachineViewSavedState {
-  const params = serializeMachineViewState({ ...saved, page: 1 }, presetId);
-  return toMachineViewSavedState(parseMachineViewState(params, presetId));
+  const params = new URLSearchParams();
+  if (typeof stored === "object" && stored !== null) {
+    for (const key of SAVED_STATE_KEYS) {
+      const value = storedParamValue(
+        Object.getOwnPropertyDescriptor(stored, key)?.value
+      );
+      if (value !== null) params.set(key, value);
+    }
+  }
+  return toMachineViewSavedState(
+    parseMachineViewState(params, SAVED_STATE_PRESET)
+  );
 }
 
 /** Whether two configurations are the same view, ignoring the page. */
