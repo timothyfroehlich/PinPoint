@@ -18,6 +18,10 @@ import { pinballmapState } from "~/server/db/schema";
 import { log } from "~/lib/logger";
 import { getDiscordBotToken } from "~/lib/discord/config";
 import { postChannelMessage } from "~/lib/discord/client";
+import {
+  checkDiscordChannel,
+  fetchDiscordChannelName,
+} from "~/lib/discord/channel-check";
 import { getPinballMapState } from "~/lib/pinballmap/state";
 import { normalizeRegion } from "~/lib/pinballmap/config";
 import { bootstrapRegion } from "~/lib/pinballmap/region-alerts";
@@ -268,69 +272,11 @@ export async function saveRegionAlertConfigAction(
     let status: RegionAlertChannelStatus = "not_configured";
     let statusDetail: string | null = null;
 
-    if (alertChannelId === null) {
-      status = "not_configured";
-      statusDetail = null;
-    } else {
-      const botToken = await getDiscordBotToken();
-      if (!botToken) {
-        status = "needs_discord";
-        statusDetail = "Discord bot token not configured";
-      } else {
-        try {
-          const res = await fetch(
-            `https://discord.com/api/v10/channels/${alertChannelId}`,
-            {
-              headers: { Authorization: `Bot ${botToken}` },
-            }
-          );
-          if (res.status === 401) {
-            status = "needs_discord";
-            statusDetail = "Discord bot token is invalid";
-          } else if (res.status === 403 || res.status === 404) {
-            status = "cant_post";
-            statusDetail = "Channel not found or bot lacks access";
-          } else if (res.status === 429 || res.status >= 500) {
-            status = "couldnt_check";
-            statusDetail = "Discord was unreachable";
-          } else if (res.ok) {
-            const body = (await res.json()) as {
-              permissions?: string;
-              type?: number;
-            };
-            if (body.type === 4 || body.type === 15) {
-              status = "cant_post";
-              statusDetail =
-                "Selected channel cannot receive direct text messages";
-            } else if (body.permissions !== undefined) {
-              const perms = BigInt(body.permissions);
-              // SEND_MESSAGES is bit 11 (2048)
-              const canSend = (perms & BigInt(2048)) !== 0n;
-              if (!canSend) {
-                status = "cant_post";
-                statusDetail =
-                  "Bot missing Send Messages permission in this channel";
-              } else {
-                status = "posting";
-                statusDetail = null;
-              }
-            } else {
-              status = "posting";
-              statusDetail = null;
-            }
-          } else {
-            status = "couldnt_check";
-            statusDetail = "Discord returned an unexpected response";
-          }
-        } catch (err) {
-          log.warn(
-            { err, action: "saveRegionAlertConfigAction.validateChannel" },
-            "Discord channel check failed"
-          );
-          status = "couldnt_check";
-          statusDetail = "Discord was unreachable";
-        }
-      }
+    if (alertChannelId !== null) {
+      ({ status, statusDetail } = await checkDiscordChannel(
+        await getDiscordBotToken(),
+        alertChannelId
+      ));
     }
 
     const currentState = await getPinballMapState();
@@ -463,22 +409,7 @@ export async function sendRegionAlertTestAction(
       };
     }
 
-    let channelName: string | undefined;
-    try {
-      const res = await fetch(
-        `https://discord.com/api/v10/channels/${channelId}`,
-        {
-          headers: { Authorization: `Bot ${botToken}` },
-        }
-      );
-      if (res.ok) {
-        const body = (await res.json()) as { name?: string };
-        if (body.name) channelName = body.name;
-      }
-    } catch {
-      // Best-effort channel name lookup
-    }
-
+    const channelName = await fetchDiscordChannelName(botToken, channelId);
     const content = channelName
       ? `[PinPoint] Test alert: Region alerts are connected to #${channelName}.\nData from Pinball Map (CC BY-SA 4.0).`
       : `[PinPoint] Test alert: Region alerts are connected to this channel.\nData from Pinball Map (CC BY-SA 4.0).`;

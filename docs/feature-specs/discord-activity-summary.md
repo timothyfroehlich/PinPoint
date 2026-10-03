@@ -109,9 +109,10 @@
 
 ## Known divergences (code vs spec)
 
-| Spec  | Code today | Resolution |
-| :---- | :--------- | :--------- |
-| §1–§8 | Not built  | PP-ogup    |
+| Spec | Code today | Resolution |
+| :-- | :-- | :-- |
+| §2.6 | Saving checks the summary channel only when it changed; an unchanged channel keeps its stored status until Send test message or a post updates it | PP-ogup |
+| §3, §4–§7 | Settings save and show (§2, §8), but nothing posts: no scheduler, and Send summary now (§3.8) reports it is not available yet | PP-ogup |
 
 ---
 

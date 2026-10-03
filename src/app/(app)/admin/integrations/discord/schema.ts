@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  ACTIVITY_SUMMARY_EVENT_KEYS,
+  isActivitySummaryEventKey,
+} from "~/lib/discord/activity-summary/events";
 
 /**
  * Save the full Discord integration config in one action.
@@ -60,3 +64,38 @@ export const validateServerIdSchema = z.object({
 });
 
 export type ValidateServerIdInput = z.infer<typeof validateServerIdSchema>;
+
+/** A Discord channel snowflake, as the region-alert channel accepts it. */
+const discordChannelIdRegex = /^\d{17,20}$/;
+
+/**
+ * Activity summary settings (discord-activity-summary spec §2). The interval
+ * arrives as the Select's string value; "disabled" stores NULL.
+ */
+export const saveActivitySummaryConfigSchema = z.object({
+  channelId: z
+    .string()
+    .trim()
+    .refine((v) => v === "" || discordChannelIdRegex.test(v), {
+      message: "Channel ID must be numeric or empty",
+    }),
+  interval: z
+    .enum(["24", "12", "6", "4", "2", "1", "disabled"])
+    .transform((v) => (v === "disabled" ? null : Number(v))),
+  startHour: z.number().int().min(0).max(23),
+  events: z
+    .array(z.string())
+    .max(ACTIVITY_SUMMARY_EVENT_KEYS.length * 2)
+    .refine((keys) => keys.every(isActivitySummaryEventKey), {
+      message: "Unknown event type",
+    }),
+});
+
+export type SaveActivitySummaryConfigInput = z.input<
+  typeof saveActivitySummaryConfigSchema
+>;
+
+export const sendActivitySummaryTestSchema = z
+  .string()
+  .trim()
+  .regex(discordChannelIdRegex, "Channel ID must be numeric");

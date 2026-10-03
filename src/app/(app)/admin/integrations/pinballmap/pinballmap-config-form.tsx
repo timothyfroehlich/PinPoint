@@ -25,9 +25,16 @@ import {
 } from "~/components/ui/select";
 import { Separator } from "~/components/ui/separator";
 import { RelativeTime } from "~/components/issues/RelativeTime";
+import { DiscordChannelStatusReadout } from "~/components/integrations/DiscordChannelStatusReadout";
+import {
+  FeedbackMessage,
+  type Feedback,
+} from "~/components/integrations/FeedbackMessage";
 import { pinballmapLocationUrl } from "~/lib/pinballmap/public-url";
 import { cn } from "~/lib/utils";
+import { SectionAnchor } from "~/components/machines/machine-form/SectionAnchor";
 import { useIntegrationDirtyState } from "../integrations-dirty-state";
+import { INTEGRATIONS_SECTION_IDS } from "../section-ids";
 import {
   checkPinballMapLocationAction,
   clearPinballMapLocationAction,
@@ -44,16 +51,8 @@ import type {
   PinballMapAdminViewState,
   PinballMapAllowanceView,
   PinballMapLocationPreview,
-  RegionAlertChannelStatus,
   SyncPinballMapNowActionResult,
 } from "./types";
-
-interface Feedback {
-  tone: "success" | "warning" | "error";
-  title?: string;
-  message: string;
-  invalidField?: boolean;
-}
 
 type Confirmation = "clear" | "replace" | null;
 
@@ -698,6 +697,7 @@ export function PinballMapConfigForm({
     <>
       <form onSubmit={handleCheck} className="space-y-6" noValidate>
         <section className="space-y-2">
+          <SectionAnchor id={INTEGRATIONS_SECTION_IDS.pinballMapLocation} />
           <div className="flex flex-wrap items-baseline gap-2">
             <Label
               id="pinballmap-location-label"
@@ -861,6 +861,7 @@ export function PinballMapConfigForm({
           className="space-y-4"
           aria-labelledby="pinballmap-region-alerts"
         >
+          <SectionAnchor id={INTEGRATIONS_SECTION_IDS.regionAlerts} />
           <h3 id="pinballmap-region-alerts" className="font-medium">
             Region alerts
           </h3>
@@ -965,10 +966,11 @@ export function PinballMapConfigForm({
                 {alertFeedback ? (
                   <FeedbackMessage feedback={alertFeedback} />
                 ) : (
-                  <RegionAlertStatusReadout
+                  <DiscordChannelStatusReadout
                     status={initialState.alertChannelStatus}
                     statusDetail={initialState.alertChannelStatusDetail}
                     lastPostAtIso={initialState.alertLastPostAtIso}
+                    postNoun="alert"
                   />
                 )}
               </div>
@@ -1102,33 +1104,6 @@ function LocationResult({
       {pendingLine && (
         <p className="text-muted-foreground pl-5">{pendingLine}</p>
       )}
-    </div>
-  );
-}
-
-function FeedbackMessage({
-  feedback,
-}: {
-  feedback: Feedback;
-}): React.JSX.Element {
-  return (
-    <div
-      className={cn(
-        "flex items-start gap-1.5 text-xs",
-        feedback.tone === "error" && "text-destructive-text",
-        feedback.tone === "warning" && "text-warning",
-        feedback.tone === "success" && "text-success"
-      )}
-    >
-      {feedback.tone === "success" ? (
-        <CheckCircle2 className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-      ) : (
-        <AlertCircle className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-      )}
-      <span>
-        {feedback.title && <strong className="block">{feedback.title}</strong>}
-        {feedback.message}
-      </span>
     </div>
   );
 }
@@ -1313,69 +1288,4 @@ function ReplacementConfirmation({
       </AlertDialogFooter>
     </>
   );
-}
-
-function RegionAlertStatusReadout({
-  status,
-  statusDetail,
-  lastPostAtIso,
-}: {
-  status: RegionAlertChannelStatus;
-  statusDetail: string | null;
-  lastPostAtIso: string | null;
-}): React.JSX.Element | null {
-  switch (status) {
-    case "posting": {
-      return (
-        <p className="text-success flex items-center gap-1.5 text-xs">
-          <CheckCircle2 className="size-3.5 shrink-0" aria-hidden />
-          <span>
-            {statusDetail === "Test message delivered" && lastPostAtIso ? (
-              <>
-                Test message delivered <RelativeTime value={lastPostAtIso} />.
-              </>
-            ) : lastPostAtIso ? (
-              <>
-                Posting · Last alert <RelativeTime value={lastPostAtIso} />
-                {statusDetail ? ` (${statusDetail})` : ""}.
-              </>
-            ) : (
-              "Posting · Channel connected."
-            )}
-          </span>
-        </p>
-      );
-    }
-    case "cant_post":
-      return (
-        <p className="text-destructive-text flex items-center gap-1.5 text-xs">
-          <AlertCircle className="size-3.5 shrink-0" aria-hidden />
-          <span>
-            Can&apos;t post:{" "}
-            {statusDetail ?? "Channel not found or bot lacks permissions."}
-          </span>
-        </p>
-      );
-    case "couldnt_check":
-      return (
-        <p className="text-warning flex items-center gap-1.5 text-xs">
-          <AlertCircle className="size-3.5 shrink-0" aria-hidden />
-          <span>
-            Couldn&apos;t check: {statusDetail ?? "Discord was unreachable."}
-          </span>
-        </p>
-      );
-    case "needs_discord":
-      return (
-        <p className="text-warning flex items-center gap-1.5 text-xs">
-          <AlertCircle className="size-3.5 shrink-0" aria-hidden />
-          <span>
-            Needs Discord:{" "}
-            {statusDetail ?? "Discord bot token not configured in Vault."}
-          </span>
-        </p>
-      );
-    case "not_configured":
-      return <p className="text-muted-foreground text-xs">Not configured</p>;
-  }
 }
