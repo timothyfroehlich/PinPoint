@@ -83,6 +83,18 @@ describe("profile queries", () => {
       );
     }
 
+    // A sold machine, newest of all: Removed is archived (PP-s363), so it is
+    // left out of both the list and the total.
+    await db.insert(machines).values(
+      createTestMachine({
+        initials: "SOLD",
+        name: "Sold Machine",
+        ownerId: USER,
+        presenceStatus: "removed",
+        createdAt: new Date(Date.UTC(2026, 1, 1)),
+      })
+    );
+
     // Seed 2 reported issues on OWN0
     await db.insert(issues).values(
       createTestIssue("OWN0", {
