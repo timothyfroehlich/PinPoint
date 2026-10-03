@@ -8,6 +8,7 @@ import {
 } from "~/components/ui/popover";
 import { cn } from "~/lib/utils";
 import { fitBreakdown } from "./fit-breakdown";
+import { SummaryWidgetLayoutContext } from "./layout";
 
 export interface SummaryWidgetSegment<T extends string> {
   value: T;
@@ -55,7 +56,7 @@ function SegmentEntryContent<T extends string>({
 }): React.JSX.Element {
   return (
     <>
-      {/* Phones show no swatches (widgets §5.7). */}
+      {/* Only phones drop the swatches (widgets §5.7). */}
       <span
         aria-hidden="true"
         className={cn(
@@ -188,7 +189,9 @@ function SummaryWidgetBreakdown<T extends string>({
     };
 
     measure();
-    // The lane resizes when fonts load or the breakpoint changes entry sizes.
+    // The line resizes when the breakdown moves between the label line and
+    // its own line under the bar (§5.7); the lane resizes when fonts load or
+    // the breakpoint changes entry sizes.
     const observer = new ResizeObserver(measure);
     observer.observe(line);
     observer.observe(lane);
@@ -291,11 +294,13 @@ function SummaryWidgetBreakdown<T extends string>({
 }
 
 /**
- * One Summary Widget (widgets spec §5): a group label, a headline, one
- * segmented bar, and a breakdown of every Segment. Wider layouts put the
- * headline on the label line and the breakdown under the bar; phones put the
- * breakdown on the label line and nothing beneath the bar (§5.7).
- * Host-neutral; a host maps its counts and filters onto these props.
+ * One Summary Widget (widgets spec §5): a group label, one segmented bar, and
+ * a breakdown of every Segment. Stacked, the breakdown sits on the label line
+ * with nothing beneath the bar and no headline; side by side, the headline
+ * takes the label line and the breakdown moves under the bar (§5.1, §5.7).
+ * The enclosing group decides which through container-query classes; phones
+ * also drop the swatches. Host-neutral; a host maps its counts and filters
+ * onto these props.
  */
 export function SummaryWidget<T extends string>({
   id,
@@ -306,6 +311,7 @@ export function SummaryWidget<T extends string>({
   onSegmentSelect,
 }: SummaryWidgetProps<T>): React.JSX.Element {
   const labelId = `${id}-label`;
+  const sideBySide = React.useContext(SummaryWidgetLayoutContext);
   // Zero-count Segments take no bar width and are left out of the breakdown
   // and "N other" (widgets §5.5), so they can never be selected (§6.4).
   const nonzeroSegments = segments.filter((segment) => segment.count > 0);
@@ -315,7 +321,10 @@ export function SummaryWidget<T extends string>({
       aria-labelledby={labelId}
       // Flex order, not DOM order, moves the breakdown: DOM order stays
       // label, headline, bar, breakdown for screen readers.
-      className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 py-1.5 md:gap-y-1.5 md:px-4 md:py-3"
+      className={cn(
+        "flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 py-1.5 md:gap-y-1.5 md:px-4 md:py-3",
+        sideBySide?.section
+      )}
     >
       <h2
         id={labelId}
@@ -323,7 +332,13 @@ export function SummaryWidget<T extends string>({
       >
         {label}
       </h2>
-      <p className="order-3 mt-0 min-w-0 basis-full text-[13px] text-muted-foreground md:order-2 md:flex-1 md:basis-0">
+      {/* display:none while stacked, so it is not announced either (§5.1). */}
+      <p
+        className={cn(
+          "mt-0 hidden min-w-0 flex-1 basis-0 text-[13px] text-muted-foreground",
+          sideBySide?.headline
+        )}
+      >
         <span
           className={cn(
             "text-[15px] font-semibold tabular-nums",
@@ -337,7 +352,8 @@ export function SummaryWidget<T extends string>({
       <div
         aria-hidden="true"
         className={cn(
-          "order-4 flex h-1.5 basis-full gap-0.5 overflow-hidden rounded-full md:order-3",
+          "order-4 flex h-1.5 basis-full gap-0.5 overflow-hidden rounded-full",
+          sideBySide?.bar,
           nonzeroSegments.length === 0 && "bg-muted"
         )}
       >
@@ -354,7 +370,7 @@ export function SummaryWidget<T extends string>({
         segments={nonzeroSegments}
         selectedValue={selectedValue}
         onSegmentSelect={onSegmentSelect}
-        className="order-2 flex-1 basis-0 md:order-4 md:basis-full"
+        className={cn("order-2 flex-1 basis-0", sideBySide?.breakdown)}
       />
     </section>
   );

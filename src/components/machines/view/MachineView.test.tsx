@@ -291,6 +291,22 @@ describe("MachineView", () => {
     ).toHaveAttribute("aria-controls");
   });
 
+  it("collapses and hides headlines unless both widgets fit side by side (widgets §2.3, §5.1)", () => {
+    render(<MachineView result={result()} preset="machines" />);
+    const presence = screen.getByRole("region", { name: "Presence" });
+    const playability = screen.getByRole("region", { name: "Playability" });
+
+    expect(
+      screen.getByRole("button", { name: "Summary: 2 of 2 playable" })
+    ).toHaveClass("md:@min-[40rem]:hidden");
+    for (const headline of [
+      within(presence).getByText(/^on the floor of/),
+      within(playability).getByText("of 2 playable"),
+    ]) {
+      expect(headline).toHaveClass("hidden", "md:@min-[40rem]:block");
+    }
+  });
+
   it("restores and updates the phone display preference", async () => {
     const user = userEvent.setup();
     storage.set("pinpoint:machine-view:mobile-mode", "table");

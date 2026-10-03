@@ -3,25 +3,21 @@
 import * as React from "react";
 import { ChevronDown } from "lucide-react";
 import { cn } from "~/lib/utils";
+import {
+  SIDE_BY_SIDE_LAYOUT,
+  type SummaryWidgetCount,
+  SummaryWidgetLayoutContext,
+} from "./layout";
 
 /**
- * The container width a host's widgets need to sit side by side, about 20rem
- * each (widgets §2.3). Static class names, so Tailwind generates them.
- */
-const SIDE_BY_SIDE_CLASSES = {
-  2: "md:@min-[40rem]:grid-cols-2 md:@min-[40rem]:divide-x md:@min-[40rem]:divide-y-0",
-  3: "md:@min-[60rem]:grid-cols-3 md:@min-[60rem]:divide-x md:@min-[60rem]:divide-y-0",
-} as const;
-
-/**
- * Phones: until the person chooses, CSS opens the section on screens at least
- * 390px wide (widgets §2.4), so the first paint needs no script. On wider
- * layouts the widgets always show and the toggle is hidden (§2.3).
+ * Until the person chooses, CSS opens the stacked section on screens at least
+ * 390px wide (widgets §2.4), so the first paint needs no script. Side-by-side
+ * widgets always show (§2.3): the group adds its `shown` class to each state.
  */
 const CONTENT_VISIBILITY = {
-  default: "hidden min-[390px]:grid md:grid",
+  default: "hidden min-[390px]:grid",
   open: "grid",
-  closed: "hidden md:grid",
+  closed: "hidden",
 } as const;
 
 interface SummaryWidgetGroupProps {
@@ -30,7 +26,7 @@ interface SummaryWidgetGroupProps {
   /** The Summary Row: the host's short figures (widgets §2.5). */
   summaryRow: React.ReactNode;
   /** How many widgets the host shows (its widgets spec §2.1). */
-  widgetCount: keyof typeof SIDE_BY_SIDE_CLASSES;
+  widgetCount: SummaryWidgetCount;
   children: React.ReactNode;
 }
 
@@ -57,12 +53,15 @@ function writeChoice(storageKey: string, expanded: boolean): void {
 }
 
 /**
- * Lays out a host's Summary Widgets (widgets spec §2). Wider layouts show
- * them expanded with no collapse control, side by side when the container
- * fits them and stacked full-width when it does not (a container query, not
- * a viewport breakpoint). Phones stack them in one collapsible section headed
- * by the Summary Row; the person's choice is remembered per host in this
- * browser, never in the URL or a Saved View (§2.6).
+ * Lays out a host's Summary Widgets (widgets spec §2). At md+, when the
+ * group's container fits them (a container query, not a viewport
+ * breakpoint), they sit side by side, always expanded, with no collapse
+ * control. Everywhere else, phones included, they stack full-width in one
+ * collapsible section headed by the Summary Row; the person's choice is
+ * remembered per host in this browser, never in the URL or a Saved View
+ * (§2.6), and never hides side-by-side widgets. The widgets read the same
+ * side-by-side condition from context, so the headline and breakdown follow
+ * it (§5.1, §5.7).
  */
 export function SummaryWidgetGroup({
   storageKey,
@@ -110,40 +109,49 @@ export function SummaryWidgetGroup({
   }
 
   const visibility = choice === null ? "default" : choice ? "open" : "closed";
+  const layout = SIDE_BY_SIDE_LAYOUT[widgetCount];
 
   return (
-    <div
-      ref={rootRef}
-      className="@container border-b border-border md:border-b-0"
-    >
-      <button
-        type="button"
-        aria-expanded={expanded ?? undefined}
-        aria-controls={contentId}
-        onClick={toggle}
-        className="flex min-h-11 w-full items-center gap-2 py-2 text-left text-sm text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none md:hidden"
-      >
-        <span className="sr-only">Summary:</span>{" "}
-        <span className="min-w-0 flex-1">{summaryRow}</span>
-        <ChevronDown
-          aria-hidden="true"
+    // The container the side-by-side queries measure; a container cannot
+    // query itself, so the card and rules live on the wrapper inside.
+    <div ref={rootRef} className="@container">
+      <div className="border-b border-border md:rounded-lg md:border md:bg-card">
+        <button
+          type="button"
+          aria-expanded={expanded ?? undefined}
+          aria-controls={contentId}
+          onClick={toggle}
           className={cn(
-            "size-4 shrink-0 transition-transform",
-            visibility === "default" && "min-[390px]:rotate-180",
-            visibility === "open" && "rotate-180"
+            "flex min-h-11 w-full items-center gap-2 py-2 text-left text-sm text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none md:px-4 md:focus-visible:ring-inset",
+            layout.toggleHidden
           )}
-        />
-      </button>
-      <div
-        id={contentId}
-        ref={contentRef}
-        className={cn(
-          "grid-cols-1 pb-2 md:divide-y md:divide-border md:rounded-lg md:border md:border-border md:bg-card md:pb-0",
-          CONTENT_VISIBILITY[visibility],
-          SIDE_BY_SIDE_CLASSES[widgetCount]
-        )}
-      >
-        {children}
+        >
+          <span className="sr-only">Summary:</span>{" "}
+          <span className="min-w-0 flex-1">{summaryRow}</span>
+          <ChevronDown
+            aria-hidden="true"
+            className={cn(
+              "size-4 shrink-0 transition-transform",
+              visibility === "default" && "min-[390px]:rotate-180",
+              visibility === "open" && "rotate-180"
+            )}
+          />
+        </button>
+        <div
+          id={contentId}
+          ref={contentRef}
+          className={cn(
+            "grid-cols-1 pb-2 md:divide-y md:divide-border md:border-t md:border-border md:pb-0",
+            layout.noTopRule,
+            CONTENT_VISIBILITY[visibility],
+            layout.shown,
+            layout.grid
+          )}
+        >
+          <SummaryWidgetLayoutContext.Provider value={layout}>
+            {children}
+          </SummaryWidgetLayoutContext.Provider>
+        </div>
       </div>
     </div>
   );

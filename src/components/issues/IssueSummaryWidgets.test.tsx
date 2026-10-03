@@ -80,6 +80,24 @@ describe("IssueSummaryWidgets", () => {
     ).toHaveAttribute("aria-controls");
   });
 
+  it("collapses and hides headlines unless all three widgets fit side by side (widgets §2.3, §5.1)", () => {
+    render(<IssueSummaryWidgets summary={summary} />);
+    const status = screen.getByRole("region", { name: "Status" });
+    const severity = screen.getByRole("region", { name: "Severity" });
+    const priority = screen.getByRole("region", { name: "Priority" });
+
+    expect(
+      screen.getByRole("button", { name: "Summary: 7 open · 3 unplayable" })
+    ).toHaveClass("md:@min-[60rem]:hidden");
+    for (const headline of [
+      within(status).getByText("open of 9 issues"),
+      within(severity).getByText("open across 2 machines"),
+      within(priority).getByText("open across 2 machines"),
+    ]) {
+      expect(headline).toHaveClass("hidden", "md:@min-[60rem]:block");
+    }
+  });
+
   it("sets only that widget's filter from a Segment and returns to page 1", async () => {
     mockSearch = "page=3&q=flipper&priority=high";
     render(<IssueSummaryWidgets summary={summary} />);
