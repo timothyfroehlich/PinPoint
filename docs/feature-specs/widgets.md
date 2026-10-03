@@ -14,7 +14,7 @@
 - **Widget Host** — a searchable, filterable, paginated list whose view state lives in the URL, such as Machine View or the Issues list. The host's widgets spec names the widgets it shows, their URL parameters, and the filters their Segments set.
 - **Widget Population** — the records one Summary Widget summarizes: the host's complete authoritative scope, whatever search and filters are set. The Filtered population was retired 2026-10-02.
 - **Segment** — one category in a widget's bar and breakdown, with one count.
-- **Summary Row** — the single collapsed line that stands in for a host's Summary Widgets on phones.
+- **Summary Row** — the single line that stands in for a host's Summary Widgets when their stacked section is collapsed.
 
 ---
 
@@ -80,6 +80,6 @@
 
 | Date | Change |
 | :-- | :-- |
-| 2026-10-03 | Zero-count Segments are left out of the breakdown and of "N other" (§5.5). Stacked widgets collapse at every width (§2.3, §2.4); headlines show only when widgets sit side by side (§5.1); stacked breakdowns sit on the label line above the bar (§5.7). |
+| 2026-10-03 | Zero-count Segments are left out of the breakdown and of "N other" (§5.5). Stacked widgets collapse at every width (§2.3, §2.4); headlines show only when widgets sit side by side (§5.1); stacked breakdowns sit on the label line above the bar (§5.7). The Summary Row stands in for any collapsed stacked section, not only on phones (§1). |
 | 2026-10-02 | The Summary Row shows the figures its host defines (§2.5); Summary Widget filters show on their filter control (§6.3). Retired the Filtered population and the All/Filtered choice (§1, §3, §5.1). Widgets stack when a wide layout cannot fit them side by side (§2.3); the phone section starts open at 390px and wider (§2.4); breakdowns run worst first and roll overflow into "N other" (§5.5, §5.6); phone breakdowns sit on the label line (§5.7). |
 | 2026-09-26 | Created. Establishes fixed Summary Widgets between a Widget Host's heading and toolbar, a collapsed-by-default Summary Row on phones, per-widget All/Filtered Widget Population as URL state, whole-population server-computed counts, single-count Segments in existing category colors, and Segment selection as a host filter. |
