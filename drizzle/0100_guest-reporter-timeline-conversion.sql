@@ -1,24 +1,22 @@
--- Auto-create user profiles when new users sign up
--- This runs automatically on `supabase db reset` and `supabase start`
-
--- Add foreign key constraint from user_profiles.id to auth.users.id
--- Note: This constraint is added manually because Drizzle doesn't support cross-schema references
-ALTER TABLE public.user_profiles
-  DROP CONSTRAINT IF EXISTS user_profiles_id_fkey;
-
-ALTER TABLE public.user_profiles
-  ADD CONSTRAINT user_profiles_id_fkey
-  FOREIGN KEY (id)
-  REFERENCES auth.users(id)
-  ON DELETE CASCADE;
-
--- Function to handle new user creation
+-- PP-0fg0.3: a guest who signs up shows as the issue's reporter on the machine
+-- timeline.
+--
+-- Signup already moves a guest's issues to the new account (issues.reported_by)
+-- but left their machine-timeline `issue_opened` events as the guest: no
+-- `reporter` person-reference, just the typed `guestReporterName`, so the
+-- timeline kept saying "Name (guest)". handle_new_user now gives those events
+-- the same `reporter` reference an account-backed open carries and drops the
+-- typed name, in the same statement sequence as the issue transfer. The app
+-- mirror is ensureUserProfile → attachSignedUpGuestReporter, and supabase/seed.sql
+-- carries the same body for local databases.
+--
+-- Body is unchanged from 0064 apart from the guest-issue transfer block.
 CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER
+RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
-AS $$
+SET search_path TO 'public'
+AS $function$
 DECLARE
   v_invited_user_id uuid;
   v_role text;
@@ -28,17 +26,13 @@ DECLARE
   v_guest_issue_ids text[];
 BEGIN
   -- Handle legacy invited_users (if any exist) first to get role
-  -- Find matching invited user by email
   SELECT id, role INTO v_invited_user_id, v_role
   FROM public.invited_users
   WHERE lower(email) = lower(NEW.email)
   LIMIT 1;
 
-  -- Derive a usable name (PP-if48). This file re-defines handle_new_user on
-  -- every `supabase db reset`, AFTER the drizzle migrations have run — so if
-  -- this copy drifts back to COALESCE(...->>'first_name', ''), it silently
-  -- undoes 0064 on every local database while prod stays correct.
-  -- `derive_profile_name` is created by drizzle/0064.
+  -- Derive a usable name. Was COALESCE(...->>'first_name', ''), which no OAuth
+  -- provider ever satisfies (PP-if48).
   SELECT d.first_name, d.last_name, d.derived
   INTO v_first_name, v_last_name, v_derived
   FROM public.derive_profile_name(NEW.raw_user_meta_data, NEW.email::text) d;
@@ -52,7 +46,6 @@ BEGIN
     WHERE iu.id = v_invited_user_id;
   END IF;
 
-  -- Create user profile
   INSERT INTO public.user_profiles (id, email, first_name, last_name, avatar_url, role)
   VALUES (
     NEW.id,
@@ -60,15 +53,14 @@ BEGIN
     v_first_name,
     v_last_name,
     NEW.raw_user_meta_data->>'avatar_url',
-    COALESCE(v_role, 'guest') -- Use invited role if exists, else default to guest
+    COALESCE(v_role, 'guest')
   );
 
   -- Create default notification preferences
   -- New user defaults: only assigned + new issue on owned machines (email) are ON.
   -- Discord columns (discord_enabled, discord_notify_on_*, discord_watch_*) are
   -- intentionally omitted from this column list — they pick up DB-level
-  -- DEFAULTs (added in 0031, with new_issue tweaked in 0032). The production
-  -- trigger in 0033 follows the same pattern.
+  -- DEFAULTs (added in 0031, with new_issue tweaked in 0032).
   INSERT INTO public.notification_preferences (
     user_id,
     email_enabled,
@@ -96,8 +88,7 @@ BEGIN
     false, false  -- Global watch
   );
 
-  -- Transfer guest issues (reporter_email matches the new user's email) to
-  -- the newly created account, and make the account the
+  -- Transfer guest issues to newly created account, and make the account the
   -- reporter on those issues' machine-timeline issue_opened events: add the
   -- `reporter` person-reference an account-backed open carries, and drop the
   -- typed guestReporterName it replaces (PP-0fg0.3). Mirrored by
@@ -137,16 +128,14 @@ BEGIN
       AND te.event_data->>'guestReporterName' IS NOT NULL;
   END IF;
 
-  -- Handle legacy invited_users transfer (v_invited_user_id already populated above)
+  -- Handle legacy invited_users transfer
   IF v_invited_user_id IS NOT NULL THEN
-    -- Transfer machines owned by invited user
     UPDATE public.machines
     SET
       owner_id = NEW.id,
       invited_owner_id = NULL
     WHERE invited_owner_id = v_invited_user_id;
 
-    -- Transfer issues reported by invited user
     UPDATE public.issues
     SET
       reported_by = NEW.id,
@@ -155,59 +144,46 @@ BEGIN
       reporter_email = NULL
     WHERE invited_reported_by = v_invited_user_id;
 
-    -- Transfer timeline person-references owned by invited user (PP-tv9l).
     -- Must run BEFORE the invited_users DELETE: the ON DELETE RESTRICT FK on
-    -- timeline_event_people.invited_id makes the delete fail otherwise.
+    -- timeline_event_people.invited_id makes the delete fail otherwise (PP-tv9l).
     UPDATE public.timeline_event_people
     SET
       user_id = NEW.id,
       invited_id = NULL
     WHERE invited_id = v_invited_user_id;
 
-    -- Delete the invited user record (no longer needed)
     DELETE FROM public.invited_users
     WHERE id = v_invited_user_id;
   END IF;
 
   RETURN NEW;
 END;
-$$;
-
--- Trigger on auth.users table (AFTER INSERT)
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW
-  EXECUTE FUNCTION public.handle_new_user();
-
--- Add helpful comments
-COMMENT ON FUNCTION public.handle_new_user() IS
-  'Automatically creates a user_profile and notification_preferences when a new user signs up via Supabase Auth. Works for both email/password and OAuth (Google, GitHub). Also transfers guest issues (by reporter_email) and handles legacy invited_users cleanup by transferring their machines/issues and removing the invited_users record. Non-invited signups default to guest role. Invited users inherit their role (guest, member, technician, or admin).';
-
-COMMENT ON CONSTRAINT user_profiles_id_fkey ON public.user_profiles IS
-  'Foreign key constraint to auth.users. Ensures user_profiles.id always references a valid auth.users.id. CASCADE delete removes profile when auth user is deleted.';
-
--- ============================================================================
--- Test Users, Machines, and Issues
--- ============================================================================
--- Note: All seed data is now handled in supabase/seed-users.mjs to ensure
--- proper foreign key relationships (machines need owners which are auth users).
-
--- Ensure public schema permissions for PostgREST/Supabase roles
--- These tables are created via Drizzle and need explicit grants
-SET client_min_messages TO error;
-GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
-GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
-GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
-GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated, service_role;
-
--- The MCP OAuth client allowlist is server-only. Restore its migration-level
--- privilege boundary after the broad local-development grants above.
-REVOKE ALL ON TABLE public.mcp_oauth_clients FROM anon, authenticated, public;
-GRANT SELECT ON TABLE public.mcp_oauth_clients TO supabase_auth_admin;
-
--- Ensure default privileges for future tables created in public schema
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;
-RESET client_min_messages;
+$function$;
+--> statement-breakpoint
+-- 0035 locked handle_new_user down; re-assert after CREATE OR REPLACE.
+REVOKE ALL ON FUNCTION public.handle_new_user() FROM PUBLIC, anon, authenticated;--> statement-breakpoint
+-- Backfill: guests who signed up before this fix. Any issue_opened event that
+-- still carries a guestReporterName while its issue now has a reporter identity
+-- gets that identity as its `reporter` reference (a real user, or an invited
+-- user for a seed-only legacy state no app path reaches), then loses the typed
+-- name. Idempotent: the NOT EXISTS skips events that already have a reporter.
+INSERT INTO public.timeline_event_people (event_id, role, user_id, invited_id)
+SELECT te.id, 'reporter', i.reported_by, i.invited_reported_by
+FROM public.timeline_events te
+JOIN public.issues i ON i.id::text = te.event_data->>'issueId'
+WHERE te.source_type = 'issue'
+  AND te.event_data->>'kind' = 'issue_opened'
+  AND te.event_data->>'guestReporterName' IS NOT NULL
+  AND (i.reported_by IS NOT NULL OR i.invited_reported_by IS NOT NULL)
+  AND NOT EXISTS (
+    SELECT 1 FROM public.timeline_event_people tep
+    WHERE tep.event_id = te.id AND tep.role = 'reporter'
+  );--> statement-breakpoint
+UPDATE public.timeline_events te
+SET event_data = te.event_data - 'guestReporterName'
+FROM public.issues i
+WHERE i.id::text = te.event_data->>'issueId'
+  AND te.source_type = 'issue'
+  AND te.event_data->>'kind' = 'issue_opened'
+  AND te.event_data->>'guestReporterName' IS NOT NULL
+  AND (i.reported_by IS NOT NULL OR i.invited_reported_by IS NOT NULL);

@@ -9,6 +9,8 @@
  * - `emitIssueAssigned` / `emitIssueUnassigned` — used by `assignIssue`
  * - `emitIssueReassignedOut` / `emitIssueReassignedIn` — used by
  *   `reassignIssueMachine` (dual-write: one row on source, one on destination)
+ * - `attachSignedUpGuestReporter` — used by `ensureUserProfile` when a guest
+ *   signs up and takes over their issues (rewrites existing events, no emit)
  *
  * All helpers:
  * - Run inside the caller's transaction (pass `tx`).
@@ -33,6 +35,8 @@ import {
 import type { MachineTimelineEventData } from "~/lib/timeline/machine-event-types";
 import type { IssueFrequency, IssueSeverity, IssueStatus } from "~/lib/types";
 import type { DbTransaction } from "~/server/db";
+import { timelineEventPeople, timelineEvents } from "~/server/db/schema";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
 export interface IssueEventCommon {
   machineId: string;
@@ -87,6 +91,63 @@ export async function emitIssueOpened(
   }
 
   await emit(tx, args, eventData, people);
+}
+
+/**
+ * Attach a newly signed-up account as the reporter of the guest issues it
+ * just took over (PP-0fg0.3).
+ *
+ * A guest's `issue_opened` event has no person-reference — only the typed
+ * `guestReporterName`. Once signup moves the issue to the account
+ * (`issues.reported_by`), the event gets the same `reporter` reference
+ * `emitIssueOpened` writes for an account-backed open, and the typed name is
+ * dropped so the live account name is the only one shown. Run it in the same
+ * transaction as the issue transfer. Mirrors `handle_new_user` (drizzle/0100).
+ */
+export async function attachSignedUpGuestReporter(
+  tx: DbTransaction,
+  args: { issueIds: string[]; userId: string }
+): Promise<void> {
+  if (args.issueIds.length === 0) return;
+
+  const opened = await tx
+    .select({ id: timelineEvents.id })
+    .from(timelineEvents)
+    .where(
+      and(
+        eq(timelineEvents.sourceType, "issue"),
+        sql`${timelineEvents.eventData}->>'kind' = 'issue_opened'`,
+        inArray(sql`${timelineEvents.eventData}->>'issueId'`, args.issueIds)
+      )
+    );
+  if (opened.length === 0) return;
+  const eventIds = opened.map((event) => event.id);
+
+  const existing = await tx
+    .select({ eventId: timelineEventPeople.eventId })
+    .from(timelineEventPeople)
+    .where(
+      and(
+        inArray(timelineEventPeople.eventId, eventIds),
+        eq(timelineEventPeople.role, "reporter")
+      )
+    );
+  const hasReporter = new Set(existing.map((row) => row.eventId));
+  const missing = eventIds.filter((id) => !hasReporter.has(id));
+  if (missing.length > 0) {
+    await tx.insert(timelineEventPeople).values(
+      missing.map((eventId) => ({
+        eventId,
+        role: "reporter",
+        userId: args.userId,
+      }))
+    );
+  }
+
+  await tx
+    .update(timelineEvents)
+    .set({ eventData: sql`${timelineEvents.eventData} - 'guestReporterName'` })
+    .where(inArray(timelineEvents.id, eventIds));
 }
 
 export async function emitIssueClosed(

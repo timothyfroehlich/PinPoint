@@ -13,6 +13,7 @@ import { log } from "~/lib/logger";
 import { errorMessage } from "~/lib/errors";
 import { reportError } from "~/lib/observability/report-error";
 import { deriveName } from "~/lib/auth/derive-name";
+import { attachSignedUpGuestReporter } from "~/lib/timeline/issue-timeline-helpers";
 import type { UserRole } from "~/lib/types";
 
 /**
@@ -114,22 +115,32 @@ export async function ensureUserProfile(user: User): Promise<void> {
     // Transfer guest issues (by email)
     // Matches SQL: WHERE reporter_email = NEW.email AND reported_by IS NULL AND invited_reported_by IS NULL
     const issueIdsToWatch = new Set<string>();
-    if (user.email) {
-      const transferredGuestIssues = await db
-        .update(issues)
-        .set({
-          reportedBy: user.id,
-          reporterName: null,
-          reporterEmail: null,
-        })
-        .where(
-          and(
-            eq(issues.reporterEmail, user.email.toLowerCase()),
-            isNull(issues.reportedBy),
-            isNull(issues.invitedReportedBy)
+    // The machine timeline's issue_opened events move to the account in the
+    // same transaction (PP-0fg0.3).
+    const guestEmail = user.email;
+    if (guestEmail) {
+      const transferredGuestIssues = await db.transaction(async (tx) => {
+        const transferred = await tx
+          .update(issues)
+          .set({
+            reportedBy: user.id,
+            reporterName: null,
+            reporterEmail: null,
+          })
+          .where(
+            and(
+              eq(issues.reporterEmail, guestEmail.toLowerCase()),
+              isNull(issues.reportedBy),
+              isNull(issues.invitedReportedBy)
+            )
           )
-        )
-        .returning({ id: issues.id });
+          .returning({ id: issues.id });
+        await attachSignedUpGuestReporter(tx, {
+          issueIds: transferred.map((issue) => issue.id),
+          userId: user.id,
+        });
+        return transferred;
+      });
       transferredGuestIssues.forEach((issue) => issueIdsToWatch.add(issue.id));
     }
 
