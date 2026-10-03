@@ -111,9 +111,9 @@ describe("PinballmapDirtyGate", () => {
 
     // The note names why everything below it is unavailable, so it has to
     // survive the same treatment it is describing.
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "Unavailable — unsaved changes"
-    );
+    const explanation = screen.getByRole("status");
+    expect(explanation).toHaveTextContent("Unavailable — unsaved changes");
+    expect(explanation.closest("[inert]")).toBeNull();
   });
 
   it("keeps input events from its controls out of the surrounding form", async () => {

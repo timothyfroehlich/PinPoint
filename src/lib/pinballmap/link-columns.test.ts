@@ -22,7 +22,6 @@ vi.mock("./state", () => ({
 import { getCatalogEntry } from "./catalog";
 import { getPinballMapState } from "./state";
 import {
-  normalizeCreditNames,
   resolvePbmLinkColumnsForCreate,
   resolvePbmLinkColumnsForUpdate,
 } from "./link-columns";
@@ -353,6 +352,29 @@ describe("hand-entered type, display, players and credits", () => {
     });
   });
 
+  it.each([
+    {
+      label: "punctuation and hand-entered order",
+      names: ["Lawlor, Pat", " John Youssi "],
+      expected: ["Lawlor, Pat", "John Youssi"],
+    },
+    { label: "absent credits", names: undefined, expected: null },
+    { label: "an empty credit list", names: [], expected: null },
+    { label: "blank-only credits", names: ["", "  "], expected: null },
+  ])(
+    "stores $label through the excluded-model boundary",
+    async ({ names, expected }) => {
+      const result = await resolvePbmLinkColumnsForUpdate(
+        { pinballmapExcluded: true, designers: names, artists: names },
+        stored
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error(result.message);
+      expect(result.columns.designers).toEqual(expected);
+      expect(result.columns.artists).toEqual(expected);
+    }
+  );
+
   it("nulls them when a catalog title is chosen", async () => {
     const result = await resolvePbmLinkColumnsForUpdate(
       { pinballmapMachineId: 6221, ...manual },
@@ -368,20 +390,5 @@ describe("hand-entered type, display, players and credits", () => {
       designers: null,
       artists: null,
     });
-  });
-});
-
-describe("normalizeCreditNames", () => {
-  it("keeps order and never splits a name on punctuation", () => {
-    expect(normalizeCreditNames(["Lawlor, Pat", " John Youssi "])).toEqual([
-      "Lawlor, Pat",
-      "John Youssi",
-    ]);
-  });
-
-  it("reads absent or empty as null", () => {
-    expect(normalizeCreditNames(undefined)).toBeNull();
-    expect(normalizeCreditNames([])).toBeNull();
-    expect(normalizeCreditNames(["", "  "])).toBeNull();
   });
 });
