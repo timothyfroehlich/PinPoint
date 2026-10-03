@@ -169,9 +169,9 @@ test.describe("Issue List Features - Extended", () => {
     // Wait for navigation to issue detail
     await expect(page).toHaveURL(/\/m\/[A-Z]+\/i\/\d+/);
 
-    // 3. Return to the filtered issue list. The issue detail page keeps its
-    // explicit back link mobile-only; desktop path persistence is covered by
-    // the AppHeader Issues link test below.
+    // 3. Return to the filtered issue list. The issue detail page has no back
+    // link of its own; AppHeader path persistence is covered by the Issues
+    // link test below.
     await page.goBack();
     await expect(page).toHaveURL(/severity=major/);
 

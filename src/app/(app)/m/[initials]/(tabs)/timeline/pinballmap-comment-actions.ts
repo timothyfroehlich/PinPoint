@@ -15,6 +15,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { z } from "zod";
+import { ISSUE_TITLE_MAX, ISSUE_TITLE_MAX_MESSAGE } from "~/lib/issues/title";
 
 import { formatIssueId } from "~/lib/issues/utils";
 import { log } from "~/lib/logger";
@@ -43,7 +44,7 @@ const convertSchema = z.object({
     .string()
     .trim()
     .min(1, "Title is required")
-    .max(60, "Title must be 60 characters or less"),
+    .max(ISSUE_TITLE_MAX, ISSUE_TITLE_MAX_MESSAGE),
   severity: z.enum(["cosmetic", "minor", "major", "unplayable"], {
     message: "Select a severity",
   }),

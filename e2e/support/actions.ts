@@ -191,7 +191,7 @@ export async function logout(page: Page, _testInfo: TestInfo): Promise<void> {
  * 5s is also thin for this suite specifically: the E2E `webServer` runs
  * `pnpm run dev`, so a route pays an on-demand Next compile on its first
  * request, and mobile viewports render component trees a chromium run never
- * compiles (`MetadataDrawer`, `StickyCommentComposer`, `RowEditSheet`).
+ * compiles (`MetadataDrawer`, `FloatingCommentButton`, `RowEditSheet`).
  *
  * **This is a latent-defect fix, not the cause of anything observed.** The
  * Mobile Chrome full-suite failures were dropped clicks, fixed by the hydration
@@ -228,7 +228,7 @@ const DROPDOWN_OPEN_TIMEOUT = process.env["CI"] ? 10_000 : 3_000;
  *
  * The two clicks get different budgets because they are doing different jobs.
  * The FIRST has to absorb a trigger that is still becoming actionable — under
- * `--workers=3` the Mobile Chrome sticky-composer trigger genuinely needs more
+ * `--workers=3` the Mobile Chrome comment-composer trigger genuinely needs more
  * than 10s while the dev server compiles for other spec files, and bounding it
  * at 10s turned `form-resets:190` and `rich-text:105` red. The RETRY only has
  * to re-hit a control already proven actionable, so it can be tight.
@@ -351,14 +351,9 @@ export async function selectOption(
     ((value: string) => string) | undefined
   > = {
     "issue-status-select": (val) => `status-option-${val}`,
-    "issue-status-trigger": (val) => `status-option-${val}`,
     "issue-severity-select": (val) => `severity-option-${val}`,
-    "issue-severity-trigger": (val) => `severity-option-${val}`,
     "issue-priority-select": (val) => `priority-option-${val}`,
-    "issue-priority-trigger": (val) => `priority-option-${val}`,
     "issue-frequency-select": (val) => `frequency-option-${val}`,
-    "issue-frequency-trigger": (val) => `frequency-option-${val}`,
-    "issue-assignee-select": (val) => `assignee-option-${val}`,
     "machine-select": (val) => `machine-option-${val}`,
     "filter-status": (val) => `status-option-${val}`,
     "filter-machine": (val) => `machine-option-${val}`,
@@ -396,17 +391,19 @@ export async function selectOption(
   // Wait for the option to be visible in the popover
   const optionTestId = getOptionTestId(optionValue);
   const option = page.getByTestId(optionTestId);
-  if (triggerTestId.endsWith("-trigger")) {
-    // Drawer items use dispatchEvent — they respond to synthetic clicks.
-    // Wait for visibility first so the drawer open animation has completed.
-    await expect(option).toBeVisible({ timeout: PORTAL_MOUNT_TIMEOUT });
+  // Wait for the portal to mount — options aren't in the DOM until it opens
+  // (async portal render), so clicking without waiting causes a 30s timeout race.
+  await expect(option).toBeVisible({ timeout: PORTAL_MOUNT_TIMEOUT });
+  // On phones the issue page's field rows open a vaul bottom-sheet Drawer
+  // (role=dialog) instead of an anchored menu. Its option buttons respond to a
+  // synthetic click, which sidesteps the drawer's slide-in transform never
+  // reading as "stable" to Playwright's actionability check.
+  const drawerOption = page.getByRole("dialog").getByTestId(optionTestId);
+  if ((await drawerOption.count()) > 0) {
     await option.dispatchEvent("click");
   } else {
-    // Wait for the Radix Select portal to mount — options aren't in the DOM until the portal
-    // opens (async portal render), so clicking without waiting causes a 30s timeout race.
     // force:true is still needed because shadcn/ui Select options can be positioned outside
     // the visible viewport but are still technically "visible" per Playwright's CSS check.
-    await expect(option).toBeVisible({ timeout: PORTAL_MOUNT_TIMEOUT });
     await option.click({ force: true });
   }
 
@@ -450,42 +447,91 @@ export function machineSelectValue(page: Page): Locator {
 
 type IssueFieldName = "status" | "severity" | "priority" | "frequency";
 
+/** The Tailwind `md` breakpoint; below it the issue page splits into tabs. */
+const ISSUE_TABS_BREAKPOINT_PX = 768;
+
+/** True when the viewport is narrow enough for the issue page's section tabs. */
+export function hasIssueSectionTabs(page: Page): boolean {
+  const width = page.viewportSize()?.width ?? ISSUE_TABS_BREAKPOINT_PX;
+  return width < ISSUE_TABS_BREAKPOINT_PX;
+}
+
+type IssueSectionName = "Issue" | "Details" | "Other issues";
+
+/**
+ * Shows one section of the issue detail page. Below `md` the page splits into
+ * Issue / Details / Other issues tabs and hides the inactive panels; from `md`
+ * up every section is visible and this is a no-op.
+ *
+ * Decided on viewport width, not by sampling the tablist's visibility — the
+ * same input the CSS uses, so it cannot race hydration. The click is retried
+ * until the tab reports `aria-selected`, because a click that lands before
+ * React attaches the handler is silently dropped.
+ */
+export async function showIssueSection(
+  page: Page,
+  section: IssueSectionName
+): Promise<void> {
+  if (!hasIssueSectionTabs(page)) return;
+  const tab = page
+    .getByRole("tablist", { name: "Issue sections" })
+    .getByRole("tab", { name: new RegExp(`^${section}`) });
+  await expect(async () => {
+    await tab.click({ timeout: 5_000 });
+    await expect(tab).toHaveAttribute("aria-selected", "true", {
+      timeout: 2_000,
+    });
+  }).toPass({ timeout: 20_000 });
+}
+
+/** The editable field row for an issue field (a button that opens its picker). */
 export function visibleIssueFieldControl(page: Page, field: IssueFieldName) {
-  return page
-    .locator(
-      `[data-testid="issue-${field}-select"],[data-testid="issue-${field}-trigger"]`
-    )
-    .filter({ visible: true })
-    .first();
+  return page.getByTestId(`issue-${field}-select`);
 }
 
-export async function expectIssueFieldEnabled(
-  page: Page,
-  field: IssueFieldName
-): Promise<void> {
-  await expect(visibleIssueFieldControl(page, field)).toBeEnabled();
-}
-
-export async function expectIssueFieldDisabled(
-  page: Page,
-  field: IssueFieldName
-): Promise<void> {
-  await expect(visibleIssueFieldControl(page, field)).toBeDisabled();
-}
-
+/**
+ * Changes an issue field from the Details card, switching to the Details tab
+ * first on phones.
+ */
 export async function updateIssueField(
   page: Page,
   field: IssueFieldName,
   value: string
 ): Promise<void> {
-  const control = visibleIssueFieldControl(page, field);
-  const testId = await control.getAttribute("data-testid");
+  await showIssueSection(page, "Details");
+  await selectOption(page, `issue-${field}-select`, value);
+}
 
-  if (!testId) {
-    throw new Error(`Missing data-testid for issue ${field} control`);
+/**
+ * Opens the issue's "Move to another machine" dialog: the labeled Move button
+ * from `md` up, the header's ⋯ menu below it.
+ */
+export async function openMoveIssueDialog(page: Page): Promise<void> {
+  const dialog = page.getByRole("alertdialog", {
+    name: "Move issue to another machine",
+  });
+  if (hasIssueSectionTabs(page)) {
+    // By test id, not role: the open menu aria-hides everything outside it,
+    // trigger included, so a role locator stops matching the moment the click
+    // works and openDropdownMenu's aria-expanded check could never pass.
+    await openDropdownMenu(page.getByTestId("issue-actions-menu-trigger"));
+    await page
+      .getByRole("menuitem", { name: "Move to another machine" })
+      .click();
+  } else {
+    const moveButton = page.getByRole("button", {
+      name: "Move to another machine",
+    });
+    // A click before hydration is dropped; re-click only while the dialog is
+    // still closed (once open it aria-hides the button anyway).
+    await expect(async () => {
+      if (!(await dialog.isVisible())) {
+        await moveButton.click({ timeout: 5_000 });
+      }
+      await expect(dialog).toBeVisible({ timeout: 2_000 });
+    }).toPass({ timeout: 20_000 });
   }
-
-  await selectOption(page, testId, value);
+  await expect(dialog).toBeVisible();
 }
 
 /**

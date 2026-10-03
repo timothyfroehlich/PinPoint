@@ -1,86 +1,98 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import userEvent from "@testing-library/user-event";
 import { WatchButton } from "~/components/issues/WatchButton";
 import { toggleWatcherAction } from "~/app/(app)/issues/watcher-actions";
 
-// Mock the server action
 vi.mock("~/app/(app)/issues/watcher-actions", () => ({
   toggleWatcherAction: vi.fn(),
 }));
 
-describe("WatchButton", () => {
-  it("renders correctly when not watching", () => {
-    render(<WatchButton issueId="123" initialIsWatching={false} />);
-    expect(screen.getByRole("button")).toHaveTextContent("Watch Issue");
-    expect(screen.queryByText("Unwatch Issue")).not.toBeInTheDocument();
+vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
+
+describe("WatchButton (Details › Watching, spec §9.6)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  it("renders correctly when watching", () => {
-    render(<WatchButton issueId="123" initialIsWatching={true} />);
-    expect(screen.getByRole("button")).toHaveTextContent("Unwatch Issue");
-    expect(screen.queryByText("Watch Issue")).not.toBeInTheDocument();
+  it("shows the count and a Watch toggle for a signed-in viewer", () => {
+    render(
+      <WatchButton
+        issueId="123"
+        watcherCount={2}
+        initialIsWatching={false}
+        canWatch
+      />
+    );
+    expect(screen.getByTestId("watcher-count")).toHaveTextContent("2");
+    const toggle = screen.getByRole("button", { name: "Watch" });
+    // The visible text is the whole name (WCAG 2.5.3): no aria-label.
+    expect(toggle).not.toHaveAttribute("aria-label");
+    expect(toggle).not.toHaveAttribute("aria-pressed");
   });
 
-  it("supports icon-only mode with an accessible label", () => {
-    render(<WatchButton issueId="123" initialIsWatching={false} iconOnly />);
-
-    const button = screen.getByRole("button", { name: "Watch Issue" });
-    expect(button).not.toHaveTextContent("Watch Issue");
+  it("shows the count only for a signed-out visitor", () => {
+    render(
+      <WatchButton
+        issueId="123"
+        watcherCount={2}
+        initialIsWatching={false}
+        canWatch={false}
+      />
+    );
+    expect(screen.getByTestId("watcher-count")).toHaveTextContent("2");
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
-  it("calls toggleWatcherAction on click", async () => {
+  it("watching updates the toggle and the count without waiting for a reload", async () => {
     vi.mocked(toggleWatcherAction).mockResolvedValue({
       ok: true,
       value: { isWatching: true },
     });
+    render(
+      <WatchButton
+        issueId="123"
+        watcherCount={2}
+        initialIsWatching={false}
+        canWatch
+      />
+    );
 
-    render(<WatchButton issueId="123" initialIsWatching={false} />);
+    const user = userEvent.setup();
+    const toggle = screen.getByRole("button", { name: "Watch" });
+    await user.click(toggle);
 
-    fireEvent.click(screen.getByRole("button"));
-
+    // The button now offers the opposite action, by its visible text.
     await waitFor(() => {
-      expect(toggleWatcherAction).toHaveBeenCalledWith("123");
+      expect(toggle).toHaveAccessibleName("Unwatch");
     });
+    // Saving never disables the button, which would drop focus to <body>.
+    expect(toggle).toHaveFocus();
+    expect(screen.getByTestId("watcher-count")).toHaveTextContent("3");
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Watching. 3 watchers"
+    );
+    expect(toggleWatcherAction).toHaveBeenCalledWith("123");
   });
 
-  it("shows loading spinner and keeps text static during pending state", async () => {
-    // We can't easily control the pending state of useTransition in a unit test
-    // without triggering an async action that pauses.
-    // However, we can mock the action to delay, and verify state during that delay.
-
-    let resolveAction: (value: any) => void;
-    const actionPromise = new Promise((resolve) => {
-      resolveAction = resolve;
+  it("unwatching lowers the count", async () => {
+    vi.mocked(toggleWatcherAction).mockResolvedValue({
+      ok: true,
+      value: { isWatching: false },
     });
+    render(
+      <WatchButton issueId="123" watcherCount={3} initialIsWatching canWatch />
+    );
 
-    vi.mocked(toggleWatcherAction).mockReturnValue(actionPromise as any);
+    const toggle = screen.getByRole("button", { name: "Unwatch" });
+    fireEvent.click(toggle);
 
-    render(<WatchButton issueId="123" initialIsWatching={false} />);
-
-    const button = screen.getByRole("button");
-    fireEvent.click(button);
-
-    // It should be disabled/loading immediately
     await waitFor(() => {
-      expect(button).toBeDisabled();
+      expect(screen.getByTestId("watcher-count")).toHaveTextContent("2");
     });
-
-    // Check for spinner (Button implementation uses Loader2 with animate-spin class)
-    // We can search by the class if we can't find by icon role easily
-    const spinner = button.querySelector(".animate-spin");
-    expect(spinner).toBeInTheDocument();
-
-    // Text should REMAIN "Watch Issue" (not "Watching...")
-    expect(button).toHaveTextContent("Watch Issue");
-    expect(button).not.toHaveTextContent("Watching...");
-
-    // Resolve the action to finish
-    resolveAction!({ ok: true, value: { isWatching: true } });
-
-    // Wait for final state
-    await waitFor(() => {
-      expect(button).not.toBeDisabled();
-      expect(button).toHaveTextContent("Unwatch Issue");
-    });
+    expect(toggle).toHaveAccessibleName("Watch");
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Not watching. 2 watchers"
+    );
   });
 });

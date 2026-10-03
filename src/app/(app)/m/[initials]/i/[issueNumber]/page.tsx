@@ -4,27 +4,27 @@ import Link from "next/link";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { issues, machines, userProfiles } from "~/server/db/schema";
-import { eq, asc, and, notInArray } from "drizzle-orm";
-import { IssueTimeline } from "~/components/issues/IssueTimeline";
-import { IssueMetadata } from "~/components/issues/IssueMetadata";
-import { StickyCommentComposer } from "~/components/issues/StickyCommentComposer";
-import { OwnerBadge } from "~/components/issues/OwnerBadge";
-import { WatchButton } from "~/components/issues/WatchButton";
+import { eq, asc, and, ne, notInArray, sql } from "drizzle-orm";
+import { IssueActivity } from "~/components/issues/IssueActivity";
+import { IssueDetails } from "~/components/issues/IssueDetails";
+import { InitialReport } from "~/components/issues/InitialReport";
+import { IssueSummaryLine } from "~/components/issues/IssueSummaryLine";
 import {
-  getMachineOwnerId,
-  getMachineOwnerName,
-  isUserMachineOwner,
-} from "~/lib/issues/owner";
-import { formatIssueId, resolveIssueReporter } from "~/lib/issues/utils";
+  OTHER_ISSUES_LIMIT,
+  OtherIssues,
+} from "~/components/issues/OtherIssues";
+import { FloatingCommentButton } from "~/components/issues/FloatingCommentButton";
+import {
+  IssueSectionPanel,
+  IssueSectionTabList,
+  IssueSections,
+} from "~/components/issues/IssueSectionTabs";
+import { getMachineOwnerId } from "~/lib/issues/owner";
+import { CLOSED_STATUSES } from "~/lib/issues/status";
+import { formatIssueId } from "~/lib/issues/utils";
 import type { IssueWithAllRelations } from "~/lib/types";
-import { BackToIssuesLink } from "~/components/issues/BackToIssuesLink";
-import { getLastIssuesPath } from "~/lib/cookies/preferences";
 import { EditableIssueTitle } from "./editable-issue-title";
-import { IssueActionsMenu } from "./issue-actions-menu";
 import { PageContainer } from "~/components/layout/PageContainer";
-import { PageHeader } from "~/components/layout/PageHeader";
-import { formatDateTime } from "~/lib/dates";
-import { IssueUpdatedTimestamp } from "~/components/issues/IssueUpdatedTimestamp";
 import { OwnerRequirementsCallout } from "~/components/machines/OwnerRequirementsCallout";
 import {
   type OwnershipContext,
@@ -36,7 +36,9 @@ import { reportAuthError } from "~/lib/observability/report-error";
 /**
  * Issue Detail Page
  *
- * Displays issue details, timeline, and update actions.
+ * Spec: docs/feature-specs/issue-detail.md. Mobile splits the page below the
+ * header into Issue / Details / Other issues tabs; desktop shows two panes,
+ * with Details and Other issues in the right column.
  */
 export default async function IssueDetailPage({
   params,
@@ -45,9 +47,6 @@ export default async function IssueDetailPage({
 }): Promise<React.JSX.Element> {
   // Get params (Next.js 16: params is a Promise)
   const { initials, issueNumber } = await params;
-
-  // Read user preferences from cookies
-  const issuesPath = await getLastIssuesPath();
 
   // Load auth context for permission-aware rendering
   const supabase = await createClient();
@@ -74,89 +73,120 @@ export default async function IssueDetailPage({
 
   // CORE-PERF-003: parallelize what's safe before role is known; the roster
   // and machine-list fetches are gated below on permission.
-  const [issue, currentUserProfile] = await Promise.all([
-    // Query issue with all relations
-    db.query.issues.findFirst({
-      where: and(
-        eq(issues.machineInitials, initials),
-        eq(issues.issueNumber, issueNum)
-      ),
-      columns: { reporterEmail: false },
-      with: {
-        machine: {
-          columns: {
-            id: true,
-            name: true,
-            initials: true,
-            ownerRequirements: true,
-          },
-          with: {
-            owner: {
-              columns: {
-                id: true,
-                name: true,
+  const otherOpenIssues = and(
+    eq(issues.machineInitials, initials),
+    ne(issues.issueNumber, issueNum),
+    notInArray(issues.status, [...CLOSED_STATUSES])
+  );
+
+  const [issue, currentUserProfile, otherIssues, otherIssuesCount] =
+    await Promise.all([
+      // Query issue with all relations
+      db.query.issues.findFirst({
+        where: and(
+          eq(issues.machineInitials, initials),
+          eq(issues.issueNumber, issueNum)
+        ),
+        columns: { reporterEmail: false },
+        with: {
+          machine: {
+            columns: {
+              id: true,
+              name: true,
+              initials: true,
+              ownerRequirements: true,
+            },
+            with: {
+              owner: {
+                columns: {
+                  id: true,
+                  name: true,
+                },
+              },
+              invitedOwner: {
+                columns: {
+                  id: true,
+                  name: true,
+                },
               },
             },
-            invitedOwner: {
-              columns: {
-                id: true,
-                name: true,
+          },
+          reportedByUser: {
+            columns: {
+              id: true,
+              name: true,
+            },
+          },
+          assignedToUser: {
+            columns: {
+              id: true,
+              name: true,
+            },
+          },
+          invitedReporter: {
+            columns: {
+              id: true,
+              name: true,
+            },
+          },
+          comments: {
+            orderBy: (comments, { asc: orderAsc }) => [
+              orderAsc(comments.createdAt),
+            ],
+            with: {
+              author: {
+                columns: {
+                  id: true,
+                  name: true,
+                },
+              },
+              images: {
+                where: (images, { isNull }) => isNull(images.deletedAt),
               },
             },
           },
-        },
-        reportedByUser: {
-          columns: {
-            id: true,
-            name: true,
+          images: {
+            where: (images, { isNull }) => isNull(images.deletedAt),
+          },
+          watchers: {
+            columns: { userId: true },
           },
         },
-        assignedToUser: {
-          columns: {
-            id: true,
-            name: true,
-          },
+      }),
+      // Fetch current user's profile for permission-aware rendering and to
+      // gate the (potentially expensive + privacy-sensitive) assignee roster
+      // fetch below.
+      user?.id
+        ? db.query.userProfiles.findFirst({
+            where: eq(userProfiles.id, user.id),
+            columns: { role: true },
+          })
+        : Promise.resolve(null),
+      // The machine's other open issues: the newest few, and how many in all
+      // (spec §10.5, §11.1).
+      db.query.issues.findMany({
+        where: otherOpenIssues,
+        columns: {
+          id: true,
+          issueNumber: true,
+          title: true,
+          status: true,
+          severity: true,
+          priority: true,
+          frequency: true,
+          machineInitials: true,
+          createdAt: true,
+          reporterName: true,
         },
-        invitedReporter: {
-          columns: {
-            id: true,
-            name: true,
-          },
-        },
-        comments: {
-          orderBy: (comments, { asc: orderAsc }) => [
-            orderAsc(comments.createdAt),
-          ],
-          with: {
-            author: {
-              columns: {
-                id: true,
-                name: true,
-              },
-            },
-            images: {
-              where: (images, { isNull }) => isNull(images.deletedAt),
-            },
-          },
-        },
-        images: {
-          where: (images, { isNull }) => isNull(images.deletedAt),
-        },
-        watchers: {
-          columns: { userId: true },
-        },
-      },
-    }),
-    // Fetch current user's profile for permission-aware rendering and to
-    // gate the (potentially expensive + privacy-sensitive) assignee roster
-    // fetch below.
-    user?.id
-      ? db.query.userProfiles.findFirst({
-          where: eq(userProfiles.id, user.id),
-          columns: { name: true, role: true },
-        })
-      : Promise.resolve(null),
-  ]);
+        orderBy: (otherIssue, { desc }) => [desc(otherIssue.createdAt)],
+        limit: OTHER_ISSUES_LIMIT,
+      }),
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(issues)
+        .where(otherOpenIssues)
+        .then((rows) => rows[0]?.count ?? 0),
+    ]);
 
   if (!issue) {
     notFound();
@@ -203,143 +233,101 @@ export default async function IssueDetailPage({
       : Promise.resolve([]),
   ]);
 
-  const ownerName = getMachineOwnerName(issueWithRelations);
-  const reporter = resolveIssueReporter(issueWithRelations);
   const ownerRequirements = user
     ? (issue.machine.ownerRequirements ?? undefined)
     : undefined;
-
-  // Compute title edit permission
   const userCanEditTitle = checkPermission(
     "issues.update.reporting",
     accessLevel,
     ownershipContext
   );
-  const isWatching = user?.id
-    ? issue.watchers.some((watcher) => watcher.userId === user.id)
-    : false;
 
   return (
-    <>
-      <PageContainer size="narrow" className="pb-16 md:pb-10">
-        <div className="space-y-2">
-          <BackToIssuesLink href={issuesPath} className="md:hidden" />
-          <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-            <span className="inline-flex rounded-full border border-outline-variant bg-muted/40 px-2.5 py-0.5 font-mono text-xs font-bold">
-              {formatIssueId(initials, issue.issueNumber)}
-            </span>
-            <span className="text-muted-foreground/50">·</span>
-            <Link
-              href={`/m/${initials}`}
-              data-testid="machine-link"
-              className="font-medium text-foreground transition-colors duration-150 hover:text-primary"
-            >
-              {issue.machine.name}
-            </Link>
-            {ownerName ? (
-              <>
-                <span className="text-muted-foreground/50">·</span>
-                <span>Game Owner:</span>
-                {issue.machine.owner?.id ? (
-                  <Link
-                    href={`/issues?owner=${issue.machine.owner.id}`}
-                    className="font-medium text-foreground transition-colors duration-150 hover:text-primary"
-                  >
-                    {ownerName}
-                  </Link>
-                ) : (
-                  <span className="font-medium text-foreground">
-                    {ownerName}
-                  </span>
-                )}
-              </>
-            ) : null}
-          </div>
-
-          <PageHeader
-            title={
+    // pb-10 on top of the shell's own bottom padding lets the last content
+    // scroll clear of the floating Comment button on mobile.
+    <PageContainer size="wide" className="max-w-[1120px] pb-10">
+      <IssueSections>
+        <div className="md:grid md:grid-cols-[minmax(0,1fr)_320px] md:gap-10">
+          <div className="min-w-0 space-y-5">
+            <header className="space-y-2 md:border-b md:border-outline-variant md:pb-5">
               <EditableIssueTitle
                 issueId={issue.id}
                 title={issue.title}
                 canEdit={userCanEditTitle}
-                className="text-balance text-3xl font-bold tracking-tight"
+                eyebrow={
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <span className="inline-flex rounded-full border border-outline-variant bg-muted/40 px-2.5 py-0.5 font-mono text-xs font-bold text-muted-foreground">
+                      {formatIssueId(initials, issue.issueNumber)}
+                    </span>
+                    <Link
+                      href={`/m/${initials}`}
+                      data-testid="machine-link"
+                      className="font-semibold text-primary transition-colors duration-150 hover:text-primary/80"
+                    >
+                      {issue.machine.name}
+                    </Link>
+                  </div>
+                }
+                {...(userCanReassign
+                  ? {
+                      move: {
+                        currentInitials: initials,
+                        machines: allMachines,
+                      },
+                    }
+                  : {})}
               />
-            }
-            actions={
-              userCanReassign ? (
-                <IssueActionsMenu
-                  issueId={issue.id}
-                  currentInitials={initials}
-                  machines={allMachines}
-                />
-              ) : undefined
-            }
-          />
+              <IssueSummaryLine
+                status={issue.status}
+                severity={issue.severity}
+                priority={issue.priority}
+                assignee={issue.assignedToUser ?? null}
+              />
+            </header>
 
-          <div
-            data-testid="issue-detail-subtitle"
-            className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
-          >
-            <span>
-              by{" "}
-              <span className="font-medium text-foreground">
-                {reporter.name}
-              </span>
-            </span>
-            {isUserMachineOwner(issueWithRelations, reporter.id) && (
-              <OwnerBadge size="sm" />
-            )}
-            <span className="text-muted-foreground/50">·</span>
-            <IssueUpdatedTimestamp
-              value={issue.updatedAt.toISOString()}
-              fallback={formatDateTime(issue.updatedAt)}
-            />
-            <span className="text-muted-foreground/50">·</span>
-            <span>{issue.watchers.length} watching</span>
-            {accessLevel !== "unauthenticated" && (
-              <WatchButton
-                issueId={issue.id}
-                initialIsWatching={isWatching}
-                iconOnly
-                className="ml-1 h-7 w-7 rounded-full"
+            <IssueSectionTabList otherIssuesCount={otherIssuesCount} />
+
+            <IssueSectionPanel section="issue" className="space-y-6">
+              <InitialReport issue={issueWithRelations} />
+              {ownerRequirements && (
+                <OwnerRequirementsCallout
+                  ownerRequirements={ownerRequirements}
+                />
+              )}
+              <IssueActivity
+                issue={issueWithRelations}
+                currentUserId={user?.id ?? null}
+                currentUserRole={accessLevel}
               />
-            )}
+            </IssueSectionPanel>
+          </div>
+
+          <div className="min-w-0 space-y-6 max-md:mt-5">
+            <IssueSectionPanel section="details" className="space-y-3">
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground max-md:sr-only">
+                Details
+              </h2>
+              <IssueDetails
+                issue={issueWithRelations}
+                allUsers={allUsers}
+                currentUserId={user?.id ?? null}
+                accessLevel={accessLevel}
+                ownershipContext={ownershipContext}
+              />
+            </IssueSectionPanel>
+            <IssueSectionPanel section="other">
+              <OtherIssues
+                issues={otherIssues}
+                machineName={issue.machine.name}
+                machineInitials={initials}
+              />
+            </IssueSectionPanel>
           </div>
         </div>
-
-        {ownerRequirements && (
-          <OwnerRequirementsCallout
-            ownerRequirements={ownerRequirements}
-            machineName={issue.machine.name}
-          />
-        )}
-
-        <IssueMetadata
-          issue={issueWithRelations}
-          allUsers={allUsers}
-          currentUserId={user?.id ?? null}
-          accessLevel={accessLevel}
-          ownershipContext={ownershipContext}
-        />
-
-        <section className="@container">
-          <h2 className="hidden @md:block text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-5">
-            Activity
-          </h2>
-          <IssueTimeline
-            issue={issueWithRelations}
-            currentUserId={user?.id ?? null}
-            currentUserRole={accessLevel}
-            currentUserInitials={
-              currentUserProfile?.name.slice(0, 2).toUpperCase() ?? "??"
-            }
-          />
-        </section>
-      </PageContainer>
-
-      {accessLevel !== "unauthenticated" && (
-        <StickyCommentComposer issueId={issue.id} />
-      )}
-    </>
+        {accessLevel !== "unauthenticated" && user ? (
+          <FloatingCommentButton issueId={issue.id} userId={user.id} />
+        ) : null}
+      </IssueSections>
+    </PageContainer>
   );
 }

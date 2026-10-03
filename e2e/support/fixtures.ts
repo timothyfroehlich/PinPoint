@@ -23,7 +23,7 @@
  * and the victim rotates. Mobile Chrome is the only project affected because
  * the E2E `webServer` runs `pnpm run dev` — routes compile on first request —
  * and mobile renders component trees chromium never compiles
- * (`MetadataDrawer`, `StickyCommentComposer`, `RowEditSheet`), so it pays extra
+ * (`MetadataDrawer`, `FloatingCommentButton`, `RowEditSheet`), so it pays extra
  * compiles while two other workers keep the server busy. (PP-jxhy.)
  *
  * ## Why a fixture rather than per-site retries

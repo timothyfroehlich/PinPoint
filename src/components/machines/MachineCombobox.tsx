@@ -67,6 +67,10 @@ interface MachinePickerListProps {
   emptyText?: string;
   /** Extra classes for the `Command` wrapper (e.g. a border in a dialog). */
   className?: string;
+  /** Extra classes for the scrolling list (e.g. letting it shrink). */
+  listClassName?: string;
+  /** Extra classes for each option row (e.g. 44px touch targets). */
+  itemClassName?: string;
   commandTestId?: string;
   /** Builds the `data-testid` for each option row. */
   optionTestId?: (machine: MachineOption) => string;
@@ -87,6 +91,8 @@ export function MachinePickerList({
   searchPlaceholder = "Search machines…",
   emptyText = "No machines found.",
   className,
+  listClassName,
+  itemClassName,
   commandTestId,
   optionTestId,
 }: MachinePickerListProps): React.JSX.Element {
@@ -96,7 +102,7 @@ export function MachinePickerList({
       {...(commandTestId ? { "data-testid": commandTestId } : {})}
     >
       <CommandInput placeholder={searchPlaceholder} />
-      <CommandList>
+      <CommandList className={listClassName}>
         <CommandEmpty>{emptyText}</CommandEmpty>
         <CommandGroup>
           {machines.map((machine) => {
@@ -110,6 +116,7 @@ export function MachinePickerList({
                 value={`${machine.name} ${machine.initials}`}
                 onSelect={() => onSelect(machine.value)}
                 aria-current={isSelected ? "true" : undefined}
+                className={itemClassName}
                 {...(optionTestId
                   ? { "data-testid": optionTestId(machine) }
                   : {})}

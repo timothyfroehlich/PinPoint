@@ -1,13 +1,14 @@
 import { z } from "zod";
 import { ISSUE_STATUS_VALUES } from "~/lib/issues/status";
 import { ISSUE_FREQUENCY_VALUES } from "~/lib/types";
+import { ISSUE_TITLE_MAX, ISSUE_TITLE_MAX_MESSAGE } from "~/lib/issues/title";
 
 export const publicIssueSchema = z.object({
   machineId: z.string().uuid({ message: "Please select a machine" }),
   title: z
     .string()
     .min(1, "Title is required")
-    .max(60, "Title must be 60 characters or less")
+    .max(ISSUE_TITLE_MAX, ISSUE_TITLE_MAX_MESSAGE)
     .trim(),
   description: z
     .string()

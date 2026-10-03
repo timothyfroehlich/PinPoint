@@ -9,6 +9,7 @@ import { test, expect, attachHydrationWait } from "../support/fixtures.js";
 import { MailpitClient } from "../support/mailpit.js";
 import {
   ensureLoggedIn,
+  showIssueSection,
   updateIssueField,
   selectMachine,
   machineSelectValue,
@@ -236,9 +237,14 @@ test.describe("Notifications", () => {
       );
     }
 
-    // Ensure reporter is watching (should be auto-watching own report)
+    // Ensure reporter is watching (should be auto-watching own report): the
+    // Watching row in Details offers Unwatch.
+    await showIssueSection(page, "Details");
     await expect(
-      page.getByRole("button", { name: "Unwatch Issue" })
+      page.getByTestId("details-watching").getByRole("button", {
+        name: "Unwatch",
+        exact: true,
+      })
     ).toBeVisible();
 
     // 2. Action: Admin (Owner) changes status
