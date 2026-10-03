@@ -1,13 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { randomUUID } from "node:crypto";
-import { invitedUsers, userProfiles } from "~/server/db/schema";
+import {
+  invitedUsers,
+  userProfiles,
+  machines,
+  issues,
+} from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 import {
   updateUserRole,
   inviteUser,
   resendInvite,
+  removeInvitedUser,
 } from "~/app/(app)/admin/users/actions";
-import { createTestUser } from "~/test/helpers/factories";
+import {
+  createTestUser,
+  createTestMachine,
+  createTestIssue,
+} from "~/test/helpers/factories";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { sendInviteEmail } from "~/lib/email/invite";
 
@@ -388,6 +398,120 @@ describe("Admin User Management Integration", () => {
       await expect(resendInvite(ucUser.id)).rejects.toThrow(
         "Failed to send invitation email"
       );
+    });
+  });
+
+  describe("removeInvitedUser", () => {
+    function getAdminUser(): { id: string; email: string } {
+      if (!adminUser) throw new Error("adminUser is undefined");
+      return adminUser;
+    }
+
+    function getTargetUser(): { id: string; email: string } {
+      if (!targetUser) throw new Error("targetUser is undefined");
+      return targetUser;
+    }
+
+    it("should allow admin to remove an invited user", async () => {
+      mockGetUser.mockResolvedValue({ data: { user: getAdminUser() } });
+
+      const [invited] = await (
+        await getTestDb()
+      )
+        .insert(invitedUsers)
+        .values({
+          firstName: "Pending",
+          lastName: "Removal",
+          email: "remove-me@test.com",
+        })
+        .returning();
+
+      const result = await removeInvitedUser(invited.id);
+      expect(result.ok).toBe(true);
+
+      const dbUser = await (
+        await getTestDb()
+      ).query.invitedUsers.findFirst({
+        where: eq(invitedUsers.id, invited.id),
+      });
+      expect(dbUser).toBeUndefined();
+    });
+
+    it("should prevent non-admin from removing an invited user", async () => {
+      mockGetUser.mockResolvedValue({ data: { user: getTargetUser() } });
+
+      const [invited] = await (
+        await getTestDb()
+      )
+        .insert(invitedUsers)
+        .values({
+          firstName: "Keep",
+          lastName: "Me",
+          email: "keep-me@test.com",
+        })
+        .returning();
+
+      await expect(removeInvitedUser(invited.id)).rejects.toThrow(/Forbidden/);
+
+      const dbUser = await (
+        await getTestDb()
+      ).query.invitedUsers.findFirst({
+        where: eq(invitedUsers.id, invited.id),
+      });
+      expect(dbUser).toBeDefined();
+    });
+
+    it("should throw error if invited user not found", async () => {
+      mockGetUser.mockResolvedValue({ data: { user: getAdminUser() } });
+
+      await expect(removeInvitedUser(randomUUID())).rejects.toThrow(
+        "Invited user not found"
+      );
+    });
+
+    it("should disassociate machine and issue references when removing invited user", async () => {
+      mockGetUser.mockResolvedValue({ data: { user: getAdminUser() } });
+
+      const [invited] = await (
+        await getTestDb()
+      )
+        .insert(invitedUsers)
+        .values({
+          firstName: "Owner",
+          lastName: "Reporter",
+          email: "owner-reporter@test.com",
+        })
+        .returning();
+
+      const machine = createTestMachine({
+        initials: "RIU",
+        name: "Remove Invited User Pinball",
+        invitedOwnerId: invited.id,
+      });
+      await (await getTestDb()).insert(machines).values(machine);
+
+      const issue = createTestIssue("RIU", {
+        title: "Issue by invited user",
+        invitedReportedBy: invited.id,
+      });
+      await (await getTestDb()).insert(issues).values(issue);
+
+      const result = await removeInvitedUser(invited.id);
+      expect(result.ok).toBe(true);
+
+      const updatedMachine = await (
+        await getTestDb()
+      ).query.machines.findFirst({
+        where: eq(machines.initials, "RIU"),
+      });
+      expect(updatedMachine?.invitedOwnerId).toBeNull();
+
+      const updatedIssue = await (
+        await getTestDb()
+      ).query.issues.findFirst({
+        where: eq(issues.id, issue.id),
+      });
+      expect(updatedIssue?.invitedReportedBy).toBeNull();
     });
   });
 });

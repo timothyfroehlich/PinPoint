@@ -1,33 +1,45 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
+import { randomUUID } from "node:crypto";
+import { eq } from "drizzle-orm";
 import type { UserIdentity } from "@supabase/supabase-js";
+import { getTestDb, setupTestDb } from "~/test/setup/pglite";
+import { userProfiles } from "~/server/db/schema";
+import { createTestUser } from "~/test/helpers/factories";
+import { runUnlinkProvider } from "./oauth-actions-core";
+import { unlinkProviderAction } from "./oauth-actions";
 
-import type * as OAuthCoreModule from "./oauth-actions-core";
+vi.mock("~/server/db", async () => {
+  const { getTestDb } = await import("~/test/setup/pglite");
+  return { db: await getTestDb() };
+});
+
+const mockGetUser = vi.fn();
+const mockGetUserIdentities = vi.fn();
+const mockUnlinkIdentity = vi.fn();
 
 vi.mock("~/lib/supabase/server", () => ({
-  createClient: vi.fn(),
+  createClient: vi.fn(() =>
+    Promise.resolve({
+      auth: {
+        getUser: mockGetUser,
+        getUserIdentities: mockGetUserIdentities,
+        unlinkIdentity: mockUnlinkIdentity,
+      },
+    })
+  ),
 }));
+
 vi.mock("next/navigation", () => ({
   redirect: vi.fn((url: string) => {
     throw new Error(`NEXT_REDIRECT:${url}`);
   }),
 }));
-vi.mock("~/server/db", () => {
-  const where = vi.fn().mockResolvedValue(undefined);
-  const set = vi.fn(() => ({ where }));
-  const update = vi.fn(() => ({ set }));
-  return { db: { update } };
-});
 
-async function loadCore(): Promise<typeof OAuthCoreModule> {
-  vi.resetModules();
-  return import("./oauth-actions-core");
-}
-
-function makeIdentity(provider: string): UserIdentity {
+function makeIdentity(provider: string, userId: string): UserIdentity {
   return {
     identity_id: `id-${provider}`,
     id: `row-${provider}`,
-    user_id: "u1",
+    user_id: userId,
     identity_data: {},
     provider,
     created_at: new Date().toISOString(),
@@ -36,45 +48,77 @@ function makeIdentity(provider: string): UserIdentity {
   };
 }
 
-describe("link -> unlink round-trip", () => {
+describe("OAuth actions integration (PGlite)", () => {
+  setupTestDb();
+
   beforeEach(() => {
+    vi.clearAllMocks();
     process.env.DISCORD_CLIENT_ID = "abc";
     process.env.DISCORD_CLIENT_SECRET = "def";
   });
 
+  it("unlinkProviderAction clears discordUserId in real database upon successful unlink", async () => {
+    const db = await getTestDb();
+    const userId = randomUUID();
+
+    await db.insert(userProfiles).values(
+      createTestUser({
+        id: userId,
+        email: "discord-user@example.com",
+        discordUserId: "discord-snowflake-12345",
+      })
+    );
+
+    const identities = [
+      makeIdentity("email", userId),
+      makeIdentity("discord", userId),
+    ];
+
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: userId } },
+      error: null,
+    });
+    mockGetUserIdentities.mockResolvedValue({
+      data: { identities },
+      error: null,
+    });
+    mockUnlinkIdentity.mockResolvedValue({ error: null });
+
+    await expect(unlinkProviderAction("discord")).rejects.toThrow(
+      "NEXT_REDIRECT:/settings?oauth_status=unlinked"
+    );
+
+    const updated = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, userId),
+    });
+    expect(updated?.discordUserId).toBeNull();
+  });
+
   it("refuses second unlink once user is back to one identity", async () => {
-    const state = {
-      identities: [makeIdentity("email"), makeIdentity("discord")],
-    };
+    const userId = randomUUID();
+    let identities = [
+      makeIdentity("email", userId),
+      makeIdentity("discord", userId),
+    ];
 
-    const { createClient } = await import("~/lib/supabase/server");
-    const fakeClient = {
-      auth: {
-        getUser: () =>
-          Promise.resolve({
-            data: { user: { id: "u1" } },
-            error: null,
-          }),
-        getUserIdentities: () =>
-          Promise.resolve({
-            data: { identities: [...state.identities] },
-            error: null,
-          }),
-        unlinkIdentity: (identity: UserIdentity) => {
-          state.identities = state.identities.filter(
-            (i) => i.provider !== identity.provider
-          );
-          return Promise.resolve({ error: null });
-        },
-      },
-    };
-    (createClient as ReturnType<typeof vi.fn>).mockResolvedValue(fakeClient);
-
-    const { runUnlinkProvider } = await loadCore();
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: userId } },
+      error: null,
+    });
+    mockGetUserIdentities.mockImplementation(() =>
+      Promise.resolve({
+        data: { identities },
+        error: null,
+      })
+    );
+    mockUnlinkIdentity.mockImplementation((idToUnlink: UserIdentity) => {
+      identities = identities.filter((i) => i.provider !== idToUnlink.provider);
+      return Promise.resolve({ error: null });
+    });
 
     const first = await runUnlinkProvider("discord");
     expect(first.ok).toBe(true);
-    expect(state.identities.map((i) => i.provider)).toEqual(["email"]);
+    expect(identities.map((i) => i.provider)).toEqual(["email"]);
 
     const second = await runUnlinkProvider("discord");
     expect(second.ok).toBe(false);
