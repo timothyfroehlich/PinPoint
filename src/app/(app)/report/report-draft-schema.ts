@@ -8,6 +8,7 @@ import {
 import type { IssueSeverity, IssuePriority, IssueFrequency } from "~/lib/types";
 import { proseMirrorDocValueSchema } from "~/lib/tiptap/types";
 import type { ImageMetadata } from "~/types/images";
+import { isValidImageMetadata } from "~/lib/blob/validation";
 
 /**
  * Unified report draft (PP-idrb) — the shape persisted to `localStorage` for
@@ -58,26 +59,6 @@ export const sharedEntrySchema = z.object({
   idempotencyKey: z.string().uuid(),
 });
 export type SharedEntry = z.infer<typeof sharedEntrySchema>;
-
-/**
- * Image-metadata guard mirroring unified-report-form.tsx: only rows carrying
- * every field `imagesMetadataArraySchema` requires survive, so a malformed
- * legacy draft can't silently poison submission (PP-2053.6).
- */
-export function isValidImageMetadata(img: unknown): img is ImageMetadata {
-  if (typeof img !== "object" || img === null) return false;
-  const m = img as Record<string, unknown>;
-  return (
-    typeof m["blobUrl"] === "string" &&
-    typeof m["blobPathname"] === "string" &&
-    typeof m["originalFilename"] === "string" &&
-    m["originalFilename"].length > 0 &&
-    typeof m["fileSizeBytes"] === "number" &&
-    m["fileSizeBytes"] > 0 &&
-    typeof m["mimeType"] === "string" &&
-    m["mimeType"].startsWith("image/")
-  );
-}
 
 export const singleOnlySchema = z.object({
   firstName: z.string(),

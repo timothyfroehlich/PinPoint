@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import { ISSUE_TITLE_MAX } from "~/lib/issues/title";
 import {
   convertedIssueDescription,
-  ISSUE_TITLE_MAX,
   pinballmapCommenterName,
   suggestIssueTitle,
 } from "./comment-conversion";

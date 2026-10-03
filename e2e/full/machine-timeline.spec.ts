@@ -25,7 +25,7 @@
  */
 
 import { test, expect } from "../support/fixtures.js";
-import { openDropdownMenu } from "../support/actions.js";
+import { openMoveIssueDialog } from "../support/actions.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
 import { cleanupTestEntities } from "../support/cleanup.js";
 import { seededMachines } from "../support/constants.js";
@@ -192,20 +192,17 @@ test.describe("Machine Timeline (PP-0x98)", () => {
       );
       await expect(page).toHaveURL(new RegExp(`/m/${machineA}/i/[0-9]+$`));
 
-      // 2. Reassign via kebab menu → reassign → pick destination → confirm.
-      // openDropdownMenu, not a bare click: we arrive here straight off the
-      // report form's redirect, and the report form's ProseMirror editor can
-      // still hold focus when the first click lands — the trigger reports
-      // clickable, the click is swallowed, and the menu never opens. The helper
-      // asserts aria-expanded and retries once. (issues-reassign-machine.spec.ts
-      // opens this same menu the same way after the same flow.)
-      await openDropdownMenu(page.getByTestId("issue-actions-menu-trigger"));
-      await page.getByTestId("issue-actions-menu-reassign").click();
+      // 2. Move → pick destination → confirm. The helper opens the dialog
+      // through the Move button (desktop) or the ⋯ menu (mobile) and retries
+      // a click swallowed on arrival: we come straight off the report form's
+      // redirect, and its ProseMirror editor can still hold focus when the
+      // first click lands. (issues-reassign-machine.spec.ts opens the same
+      // dialog the same way after the same flow.)
+      await openMoveIssueDialog(page);
 
       // The reassign dialog renders a searchable combobox — filter by the
       // destination's initials so the option becomes selectable.
       const dialog = page.getByRole("alertdialog");
-      await expect(dialog).toBeVisible();
       await dialog.getByPlaceholder("Search machines…").fill(machineB);
       await page.getByTestId(`reassign-option-${machineB}`).click();
       await page.getByTestId("reassign-confirm").click();

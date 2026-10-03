@@ -1,18 +1,17 @@
 "use client";
 
-import type React from "react";
-import { Check } from "lucide-react";
+import React from "react";
+import { X } from "lucide-react";
 import {
   Drawer,
   DrawerClose,
   DrawerContent,
   DrawerDescription,
-  DrawerFooter,
   DrawerHeader,
   DrawerTitle,
   DrawerTrigger,
 } from "~/components/ui/drawer";
-import { Button } from "~/components/ui/button";
+import { groupOptions } from "~/components/issues/fields/group-options";
 import { cn } from "~/lib/utils";
 
 interface MetadataDrawerOption<T extends string> {
@@ -21,6 +20,8 @@ interface MetadataDrawerOption<T extends string> {
   description?: string;
   icon?: React.ElementType;
   iconColor?: string;
+  /** Options sharing a group render under one heading, in order. */
+  group?: string;
   testId?: string;
 }
 
@@ -30,9 +31,58 @@ interface MetadataDrawerProps<T extends string> {
   currentValue: T;
   onSelect: (value: T) => void;
   trigger: React.ReactNode;
+  /** While a save is in flight the trigger stays focusable but won't open. */
   disabled?: boolean;
 }
 
+/**
+ * The one-line header of an issue field's bottom sheet: the field's name and a
+ * close button (spec issue-detail §13.2). Shared by the enum pickers and the
+ * Assignee picker so every field sheet has the same chrome.
+ */
+export function FieldDrawerHeader({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}): React.JSX.Element {
+  return (
+    <DrawerHeader className="flex flex-row items-center justify-between gap-2 px-4 py-0 text-left">
+      <DrawerTitle className="text-base">{title}</DrawerTitle>
+      <DrawerDescription className="sr-only">{description}</DrawerDescription>
+      <DrawerClose asChild>
+        <button
+          type="button"
+          aria-label="Close"
+          className="-mr-3 flex size-11 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <X className="size-5" aria-hidden="true" />
+        </button>
+      </DrawerClose>
+    </DrawerHeader>
+  );
+}
+
+/** Classes for a field sheet's content: capped to the dynamic viewport. */
+export const fieldDrawerContentClassName =
+  "mx-auto max-h-[85dvh] w-full max-w-md";
+
+/**
+ * Bottom-sheet picker for an issue field on phones. Built to fit a 320×568
+ * screen without scrolling: a one-line header, small group labels, and the
+ * options as a two-column grid of 44px tiles (spec issue-detail §13.2).
+ *
+ * One listbox per field (APG listbox, single select): Status's Open / In
+ * Progress / Closed runs are labeled groups inside it. Choosing saves at once,
+ * so selection does not follow focus — the APG pattern for a listbox whose
+ * selection has side effects. Only the focused option is in the Tab order;
+ * the arrow keys, Home, and End move focus through every option, across
+ * groups, without changing anything. Space, Enter, or a tap chooses the
+ * focused option: the sheet closes and the field saves. Choosing the current
+ * value closes the sheet without saving. Opening the sheet focuses the current
+ * value.
+ */
 export function MetadataDrawer<T extends string>({
   title,
   options,
@@ -41,82 +91,139 @@ export function MetadataDrawer<T extends string>({
   trigger,
   disabled = false,
 }: MetadataDrawerProps<T>): React.JSX.Element {
-  return (
-    <Drawer>
-      <DrawerTrigger asChild disabled={disabled}>
-        {trigger}
-      </DrawerTrigger>
-      <DrawerContent className="mx-auto max-h-[85vh] w-full max-w-md">
-        <DrawerHeader className="space-y-2 text-left">
-          <DrawerTitle className="text-lg">{title}</DrawerTitle>
-          <DrawerDescription className="sr-only">
-            Choose a new {title.toLowerCase()} value.
-          </DrawerDescription>
-        </DrawerHeader>
-        <div className="space-y-2 overflow-y-auto px-4 pb-4">
-          {options.map((option) => {
-            const Icon = option.icon;
-            const isSelected = option.value === currentValue;
+  const [open, setOpen] = React.useState(false);
+  // The option keyboard focus is on; Space, Enter, or a tap chooses it.
+  const [active, setActive] = React.useState<T>(currentValue);
+  const optionRefs = React.useRef(new Map<T, HTMLButtonElement>());
+  const idPrefix = React.useId();
 
+  const choose = (value: T): void => {
+    setOpen(false);
+    // Re-choosing the current value is not a change.
+    if (value !== currentValue) onSelect(value);
+  };
+
+  const onKeyDown = (event: React.KeyboardEvent, value: T): void => {
+    const index = options.findIndex((option) => option.value === value);
+    let nextIndex: number;
+    if (event.key === "ArrowDown" || event.key === "ArrowRight") {
+      nextIndex = (index + 1) % options.length;
+    } else if (event.key === "ArrowUp" || event.key === "ArrowLeft") {
+      nextIndex = (index - 1 + options.length) % options.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = options.length - 1;
+    } else {
+      return;
+    }
+    event.preventDefault();
+    const next = options[nextIndex];
+    if (!next) return;
+    setActive(next.value);
+    optionRefs.current.get(next.value)?.focus();
+  };
+
+  return (
+    <Drawer
+      open={open}
+      onOpenChange={(next) => {
+        if (next && disabled) return;
+        // Every open starts from the saved value.
+        if (next) setActive(currentValue);
+        setOpen(next);
+      }}
+    >
+      <DrawerTrigger asChild>{trigger}</DrawerTrigger>
+      <DrawerContent
+        className={fieldDrawerContentClassName}
+        // vaul doesn't move focus into a drawer by default; start on the
+        // current value.
+        onOpenAutoFocus={(event) => {
+          const current = optionRefs.current.get(currentValue);
+          if (current) {
+            event.preventDefault();
+            current.focus();
+          }
+        }}
+      >
+        <FieldDrawerHeader
+          title={title}
+          description={`Choose a new ${title.toLowerCase()} value.`}
+        />
+        <div
+          role="listbox"
+          aria-label={title}
+          className="space-y-2.5 overflow-y-auto px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
+        >
+          {groupOptions(options).map(({ group, items }, index) => {
+            const labelId = `${idPrefix}-group-${index}`;
+            const tiles = (
+              <div className="grid grid-cols-2 gap-1.5">
+                {items.map((option) => {
+                  const Icon = option.icon;
+                  const isCurrent = option.value === currentValue;
+                  return (
+                    <button
+                      key={option.value}
+                      ref={(element) => {
+                        if (element) {
+                          optionRefs.current.set(option.value, element);
+                        } else {
+                          optionRefs.current.delete(option.value);
+                        }
+                      }}
+                      type="button"
+                      role="option"
+                      aria-selected={isCurrent}
+                      // Roving tabindex: only the focused option is a Tab stop.
+                      tabIndex={option.value === active ? 0 : -1}
+                      data-testid={option.testId}
+                      className={cn(
+                        "flex min-h-11 min-w-0 items-center gap-1.5 rounded-lg border px-2.5 py-1 text-left text-sm font-medium leading-tight transition-colors duration-150",
+                        "hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                        isCurrent
+                          ? "border-primary bg-primary/10 text-foreground"
+                          : "border-outline-variant bg-background text-foreground"
+                      )}
+                      onKeyDown={(event) => onKeyDown(event, option.value)}
+                      onClick={() => choose(option.value)}
+                    >
+                      {Icon ? (
+                        <Icon
+                          className={cn("size-4 shrink-0", option.iconColor)}
+                          aria-hidden="true"
+                        />
+                      ) : null}
+                      <span className="min-w-0 break-words">
+                        {option.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            );
+            if (!group) {
+              return <React.Fragment key="options">{tiles}</React.Fragment>;
+            }
             return (
-              <DrawerClose asChild key={option.value}>
-                <button
-                  type="button"
-                  data-testid={option.testId}
-                  className={cn(
-                    "flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors duration-150",
-                    "hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    isSelected
-                      ? "border-primary bg-primary/5"
-                      : "border-border bg-background"
-                  )}
-                  onClick={() => onSelect(option.value)}
+              <div
+                key={group}
+                role="group"
+                aria-labelledby={labelId}
+                className="space-y-1"
+              >
+                <div
+                  id={labelId}
+                  className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
                 >
-                  <div
-                    className={cn(
-                      "flex size-10 shrink-0 items-center justify-center rounded-full bg-muted",
-                      isSelected && "bg-primary/10"
-                    )}
-                  >
-                    {Icon ? (
-                      <Icon
-                        className={cn(
-                          "size-4",
-                          option.iconColor,
-                          isSelected && "text-primary"
-                        )}
-                      />
-                    ) : null}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="font-medium text-foreground">
-                      {option.label}
-                    </div>
-                    {option.description ? (
-                      <p className="text-sm text-muted-foreground">
-                        {option.description}
-                      </p>
-                    ) : null}
-                  </div>
-                  <Check
-                    className={cn(
-                      "size-4 shrink-0 text-primary transition-opacity duration-150",
-                      isSelected ? "opacity-100" : "opacity-0"
-                    )}
-                    aria-hidden="true"
-                  />
-                </button>
-              </DrawerClose>
+                  {group}
+                </div>
+                {tiles}
+              </div>
             );
           })}
         </div>
-        <DrawerFooter>
-          <DrawerClose asChild>
-            <Button type="button" variant="outline" className="w-full">
-              Cancel
-            </Button>
-          </DrawerClose>
-        </DrawerFooter>
       </DrawerContent>
     </Drawer>
   );

@@ -37,16 +37,20 @@ function CardHeader({
 function CardTitle({
   className,
   children,
+  as: Heading = "h2",
   ...props
-}: React.ComponentProps<"h2">): React.JSX.Element {
+}: React.ComponentProps<"h2"> & {
+  /** Heading level, for a card nested under another `h2`. Defaults to h2. */
+  as?: "h2" | "h3";
+}): React.JSX.Element {
   return (
-    <h2
+    <Heading
       data-slot="card-title"
       className={cn("text-balance leading-none font-semibold", className)}
       {...props}
     >
       {children}
-    </h2>
+    </Heading>
   );
 }
 

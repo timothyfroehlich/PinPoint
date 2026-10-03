@@ -123,7 +123,18 @@ test.describe("Rich Text and Mentions", () => {
     await expect(page).toHaveURL(new RegExp(`/m/${machine.initials}/i/1`));
 
     await page.waitForLoadState("domcontentloaded");
-    const { form: commentForm } = await openIssueCommentForm(page);
+    const { form: commentForm, isSheet } = await openIssueCommentForm(page);
+
+    // The mobile sheet opens in quick mode with the toolbar hidden; "Aa"
+    // reveals it. Pressed from the keyboard: the toggle sits bottom-left, under
+    // the `next dev` indicator, which swallows a pointer click there.
+    if (isSheet) {
+      const formatting = commentForm.getByRole("button", {
+        name: "Aa formatting",
+      });
+      await formatting.press("Enter");
+      await expect(formatting).toHaveAttribute("aria-pressed", "true");
+    }
 
     // Add rich text comment
     const editor = commentForm.locator(".ProseMirror");
@@ -140,7 +151,7 @@ test.describe("Rich Text and Mentions", () => {
     await commentForm.getByRole("button", { name: "Add Comment" }).click();
 
     // Verify rendered comment — after submit, the Sheet closes on mobile
-    // and the comment appears in the timeline below.
+    // and the comment appears in Activity.
     const lastComment = page.locator(".prose").last();
     await expect(lastComment.locator("em")).toContainText("rich text");
   });

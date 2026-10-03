@@ -182,11 +182,18 @@ export async function MainLayout({
 
         {/* Main Content */}
         {/* scroll-pt-14: reserves space for the 56px sticky AppHeader so
-            browser scroll-into-view doesn't place interactive elements under it. */}
+            browser scroll-into-view doesn't place interactive elements under it.
+            Mobile scroll-pb: the same for the fixed bottom tab bar, plus a
+            floating action's clearance when a page shows one (WCAG 2.4.11;
+            globals.css defines it).
+            relative: <main> is the scroller, so it must also be the containing
+            block for absolutely positioned content (sr-only live regions
+            included). Otherwise that content overflows the document, which
+            then scrolls the app header away. */}
         <main
           id="main-content"
           tabIndex={-1}
-          className="flex-1 overflow-y-auto scroll-pt-14 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+          className="relative flex-1 overflow-y-auto scroll-pt-14 max-md:scroll-pb-[calc(56px+env(safe-area-inset-bottom)+8px+var(--floating-action-clearance,0px))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
         >
           {/* Extra bottom padding on mobile so content isn't hidden behind the fixed tab bar */}
           <div className="@container px-4 sm:px-8 lg:px-10 pb-[calc(88px+env(safe-area-inset-bottom))] [&:has([data-machine-scan-hub])]:pb-0 md:pb-0">
