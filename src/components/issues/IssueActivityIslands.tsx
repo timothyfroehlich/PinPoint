@@ -330,7 +330,9 @@ export function CommentShell({
       ref={articleRef}
       id={`comment-${commentId}`}
       aria-labelledby={labelledBy}
-      className="rounded-lg border border-outline-variant bg-card p-3 md:p-4"
+      // Positioned, so a keyboard-holding field (ios-keyboard) sits inside
+      // the comment rather than at the top of the page.
+      className="relative rounded-lg border border-outline-variant bg-card p-3 md:p-4"
       data-testid={`timeline-item-${commentId}`}
     >
       <div className="mb-2 flex items-start gap-2">
