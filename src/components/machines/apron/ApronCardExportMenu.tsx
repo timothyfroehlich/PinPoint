@@ -78,14 +78,17 @@ export function ApronCardExportMenu({
   const [override, setOverride] = useState(false);
   // Measured while the menu is open, one hidden face per card (§9.4).
   const [overflowing, setOverflowing] = useState<Record<string, boolean>>({});
+  // Cards whose hidden face has loaded its fonts and fitted its title; an
+  // earlier overflow report may come from the fallback font.
+  const [ready, setReady] = useState<Record<string, true>>({});
   const [pending, setPending] = useState<Format | null>(null);
   const nodeRef = useRef<HTMLDivElement>(null);
   const startedRef = useRef(false);
 
   const chosen = cards.find((card) => card.id === chosenId) ?? cards[0] ?? null;
   const chosenOverflows = chosen ? overflowing[chosen.id] === true : false;
-  // Until its hidden face has been measured, a card is not known to fit.
-  const measured = chosen ? chosen.id in overflowing : false;
+  // Until its hidden face is ready, a card is not known to fit.
+  const measured = chosen ? ready[chosen.id] === true : false;
   const blocked =
     chosen === null || !measured || (chosenOverflows && !override);
   const filename = chosen
@@ -101,6 +104,7 @@ export function ApronCardExportMenu({
       );
       setOverride(false);
       setOverflowing({});
+      setReady({});
     }
     setOpen(next);
   };
@@ -275,6 +279,13 @@ export function ApronCardExportMenu({
                   content={card.content}
                   size={card.size}
                   scanUrl={scanUrl}
+                  onReady={() => {
+                    setReady((current) =>
+                      current[card.id]
+                        ? current
+                        : { ...current, [card.id]: true }
+                    );
+                  }}
                   onOverflowChange={(value) => {
                     setOverflowing((current) =>
                       current[card.id] === value
