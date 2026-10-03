@@ -104,7 +104,7 @@ export async function exportIssuesAction(input: {
   try {
     // Machine-page export: override machine filter
     if (machineInitials) {
-      filters.machine = [machineInitials];
+      filters.machine = [machineInitials.toUpperCase()];
       // Machine page exports ALL issues (no default status filter)
       // Set status to empty array to mean "all statuses"
       filters.status = [];
