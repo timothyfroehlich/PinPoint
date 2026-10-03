@@ -108,7 +108,6 @@ export function ApronCardTab({
   const [editorEpoch, setEditorEpoch] = useState(0);
   const [newCount, setNewCount] = useState(0);
   const [overflowing, setOverflowing] = useState(false);
-  const [actualSize, setActualSize] = useState(true);
   const [renameOpen, setRenameOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [isSaving, startSaving] = useTransition();
@@ -287,11 +286,6 @@ export function ApronCardTab({
     <div className="flex flex-col gap-2.5 lg:sticky lg:top-4">
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm font-medium">Preview</span>
-        {actualSize ? (
-          <span className="hidden text-xs text-muted-foreground lg:inline">
-            Actual size
-          </span>
-        ) : null}
         {exportMenu("lg:hidden")}
       </div>
       <div className="flex justify-center rounded-lg bg-card p-3 sm:p-5">
@@ -302,7 +296,6 @@ export function ApronCardTab({
             size={selected.size}
             scanUrl={scanUrl}
             onOverflowChange={setOverflowing}
-            onActualSizeChange={setActualSize}
             outlined
             className="flex justify-center"
           />

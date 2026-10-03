@@ -24,8 +24,6 @@ interface ApronCardPreviewProps {
    * Screen only; the printed and exported card has no outline.
    */
   outlined?: boolean;
-  /** Reports whether the card shows at its printed size (scale 1). */
-  onActualSizeChange?: (actualSize: boolean) => void;
   className?: string;
 }
 
@@ -41,7 +39,6 @@ export function ApronCardPreview({
   maxScale = 1,
   onOverflowChange,
   outlined = false,
-  onActualSizeChange,
   className,
 }: ApronCardPreviewProps): React.JSX.Element {
   const frameRef = useRef<HTMLDivElement>(null);
@@ -64,11 +61,6 @@ export function ApronCardPreview({
     maxScale,
     (available ?? natural.width) / natural.width
   );
-  // Sub-pixel rounding of the frame width leaves a scale a hair under 1.
-  const actualSize = scale >= 0.995;
-  useLayoutEffect(() => {
-    onActualSizeChange?.(actualSize);
-  }, [actualSize, onActualSizeChange]);
 
   return (
     <div ref={frameRef} className={cn("w-full", className)}>
