@@ -28,6 +28,11 @@ import {
   summarizeMachineView,
   type MachineViewCandidate,
 } from "./model";
+import {
+  getExistingMachineViewOwners,
+  UNASSIGNED_OWNER_ID,
+  UNASSIGNED_OWNER_NAME,
+} from "./owners";
 import { parseMachineViewState } from "./state";
 
 export const MACHINE_VIEW_SERVICE_TAGS = [
@@ -124,7 +129,7 @@ export async function getMachineViewBaseRows(
       presence: machine.presenceStatus,
       createdAt: machine.createdAt,
       ownerId: owner?.id ?? null,
-      ownerName: owner?.name ?? "Unassigned",
+      ownerName: owner?.name ?? UNASSIGNED_OWNER_NAME,
       manufacturer: manufacturer ?? "Unknown",
       year: machine.pinballmapTitle?.year ?? machine.year,
       canonicalModelName: machine.pinballmapTitle?.name ?? "",
@@ -266,13 +271,17 @@ export async function loadMachineViewFromDatabase(
   { scope, preset, searchParams }: LoadMachineViewArgs
 ): Promise<MachineViewResult> {
   const parsedState = parseMachineViewState(searchParams, preset);
-  const baseRows = await getMachineViewBaseRows(tx, scope);
-  const validOwnerIds = new Set(
-    baseRows.map((row) => row.ownerId ?? "unassigned")
-  );
+  // Owner values are checked against people who exist, not against the
+  // scope's machines: a person who owns nothing here stays selected and
+  // matches nothing, since the scope's base rows bound every filter
+  // (list-views §10.14, §10.18).
+  const [baseRows, selectedOwners] = await Promise.all([
+    getMachineViewBaseRows(tx, scope),
+    getExistingMachineViewOwners(tx, parsedState.owner),
+  ]);
   const validatedState = {
     ...parsedState,
-    owner: parsedState.owner.filter((ownerId) => validOwnerIds.has(ownerId)),
+    owner: parsedState.owner.filter((ownerId) => selectedOwners.has(ownerId)),
   };
   const dependencyPlan = planMachineViewDependencies(validatedState);
   const machineIds = baseRows.map((row) => row.id);
@@ -320,9 +329,11 @@ export async function loadMachineViewFromDatabase(
     }
     return row;
   });
-  const ownerOptionsById = new Map<string, string>();
+  // The scope's owners, plus any selected owner with nothing here, so the
+  // filter control can still show the selection.
+  const ownerOptionsById = new Map<string, string>(selectedOwners);
   for (const row of baseRows) {
-    ownerOptionsById.set(row.ownerId ?? "unassigned", row.ownerName);
+    ownerOptionsById.set(row.ownerId ?? UNASSIGNED_OWNER_ID, row.ownerName);
   }
   const applied = applyMachineViewState(candidates, validatedState);
   const state = { ...validatedState, page: applied.page };

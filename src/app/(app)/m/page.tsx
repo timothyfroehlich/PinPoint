@@ -13,7 +13,7 @@ import { loadMachineView } from "~/lib/machines/view/queries";
 import { lineupToReviewCount } from "~/lib/pinballmap/lineup-comparison";
 import { loadLineupData } from "~/lib/pinballmap/lineup-data";
 import { toMachineViewSearchParams } from "~/lib/machines/view/state";
-import { loadMachineViewSurfacePageState } from "./saved-view-surface";
+import { loadMachineViewSavedViews } from "~/lib/machines/view/saved-views";
 
 interface MachinesPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -39,8 +39,8 @@ export default async function MachinesPage({
     accessLevel
   );
   const viewSearchParams = toMachineViewSearchParams(rawSearchParams);
-  const { savedViews, redirectTo } = await loadMachineViewSurfacePageState(
-    { kind: "machines" },
+  const { savedViews, redirectTo } = await loadMachineViewSavedViews(
+    "machines",
     viewSearchParams
   );
   if (redirectTo) redirect(redirectTo);

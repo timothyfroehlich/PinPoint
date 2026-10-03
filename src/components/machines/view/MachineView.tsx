@@ -34,7 +34,7 @@ interface MachineViewProps {
   result: MachineViewResult;
   preset: MachineViewPresetId;
   onMachineSelect?: MachineSelectionHandler | undefined;
-  /** The signed-in account's Saved Views for this Surface (spec §8). */
+  /** The views this Surface offers the viewer (list-views §10). */
   savedViews?: MachineViewSavedViews | null | undefined;
 }
 
@@ -55,7 +55,7 @@ export function MachineView({
   const [mobileMode, setMobileMode] = React.useState<"compact" | "table">(
     "compact"
   );
-  // The `view` URL reference (spec §4.11) carried by every navigation until
+  // The `view` URL reference (list-views §9.6) carried by every navigation until
   // another Saved View or the Page Preset is chosen.
   const serverViewReference = savedViews?.activeViewId ?? null;
   const viewReference = React.useRef(serverViewReference);
@@ -180,7 +180,6 @@ export function MachineView({
                   savedViews={savedViews}
                   activeViewId={activeViewId}
                   state={state}
-                  ownerIds={result.ownerOptions.map((owner) => owner.id)}
                   preset={preset}
                   onApply={applyView}
                   onViewSaved={(viewId) => navigate(state, viewId)}

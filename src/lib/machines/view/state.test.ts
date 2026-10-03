@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   nextMachineViewSort,
+  normalizeMachineViewSavedState,
   parseMachineViewState,
   serializeMachineViewState,
+  toMachineViewSavedState,
 } from "./state";
 
 describe("machine view URL state", () => {
@@ -119,6 +121,54 @@ describe("machine view URL state", () => {
       "q=mars&presence=all&status=needs_service&severity=minor%2Cunplayable&owner=unassigned&sort=year&dir=desc&page=3&pageSize=100&columns=machine%2Cyear&presenceWidget=filtered"
     );
     expect(parseMachineViewState(serialized, "machines")).toEqual(state);
+  });
+});
+
+describe("stored Saved View configuration (list-views §10.14)", () => {
+  it("keeps every value of a valid configuration, whichever Surface saved it", () => {
+    // A Collection-tab configuration differs from the Machines preset on
+    // presence and sorting; it must survive storage unchanged so it applies
+    // the same way on every Surface (list-views §10.5).
+    const collection = toMachineViewSavedState(
+      parseMachineViewState(
+        new URLSearchParams("owner=unassigned&pageSize=50"),
+        "collection"
+      )
+    );
+    expect(normalizeMachineViewSavedState(collection)).toEqual(collection);
+  });
+
+  it("drops stored values that no longer exist and ignores unknown keys", () => {
+    const stored = {
+      ...toMachineViewSavedState(
+        parseMachineViewState(new URLSearchParams(), "machines")
+      ),
+      status: ["unplayable", "retired_status"],
+      columns: ["machine", "retiredField", "year"],
+      sort: "retiredField",
+      issuesWidget: "filtered",
+    };
+    const { issuesWidget: _retired, ...expected } = {
+      ...stored,
+      status: ["unplayable"],
+      columns: ["machine", "year"],
+      sort: "machine",
+    };
+    expect(normalizeMachineViewSavedState(stored)).toEqual(expected);
+  });
+
+  it("fills missing keys from the Machines preset", () => {
+    expect(normalizeMachineViewSavedState({ q: "stern" })).toEqual({
+      ...toMachineViewSavedState(
+        parseMachineViewState(new URLSearchParams(), "machines")
+      ),
+      q: "stern",
+    });
+    expect(normalizeMachineViewSavedState(null)).toEqual(
+      toMachineViewSavedState(
+        parseMachineViewState(new URLSearchParams(), "machines")
+      )
+    );
   });
 });
 
