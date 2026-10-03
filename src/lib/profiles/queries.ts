@@ -11,6 +11,7 @@ import {
   type MachineTimelineRow,
 } from "~/lib/timeline/machine-events";
 import { CLOSED_STATUSES, OPEN_STATUSES } from "~/lib/issues/status";
+import { machineNotRemoved } from "~/lib/machines/queries";
 
 export const PROFILE_MACHINE_CAP = 8;
 /** Mobile shows fewer; the extra desktop cards are CSS-hidden below `@lg`. */
@@ -108,6 +109,7 @@ export async function getOpenIssueCountsByInitials(
   return map;
 }
 
+/** Machines the user owns, newest first, leaving out Removed ones. */
 export async function getCappedOwnedMachines(userId: string): Promise<{
   machines: { id: string; initials: string; name: string }[];
   total: number;
@@ -121,13 +123,13 @@ export async function getCappedOwnedMachines(userId: string): Promise<{
         name: machines.name,
       })
       .from(machines)
-      .where(eq(machines.ownerId, userId))
+      .where(and(eq(machines.ownerId, userId), machineNotRemoved()))
       .orderBy(desc(machines.createdAt))
       .limit(PROFILE_MACHINE_CAP + 1),
     db
       .select({ c: count() })
       .from(machines)
-      .where(eq(machines.ownerId, userId)),
+      .where(and(eq(machines.ownerId, userId), machineNotRemoved())),
   ]);
   const total = totalRows[0]?.c ?? 0;
   return {

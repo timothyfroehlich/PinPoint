@@ -24,7 +24,14 @@ const savedView: MachineViewSavedViewSummary = {
     sort: "playability",
     dir: "desc",
     pageSize: 50,
-    columns: ["machine", "playability", "openIssues", "lastServiced"],
+    columns: [
+      "machine",
+      "playability",
+      "presence",
+      "openIssues",
+      "lastServiced",
+      "lastActivity",
+    ],
   },
 };
 

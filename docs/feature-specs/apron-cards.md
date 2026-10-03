@@ -4,15 +4,16 @@
 
 **What this document is.** The requirements for PinPoint's printed apron cards: what the card shows, what data it draws on, and how that data is authored. No implementation detail — design records and code carry that. It describes the intended final state only; what the code does or used to do lives solely in the Known divergences table. Each requirement is numbered for citation. When code and spec disagree, either the code is wrong or this document gets amended — never silently neither.
 
-**Related records.** [apron-cards-mockup.html](apron-cards-mockup.html) (card face, both size variants). [apron-cards-editor-mockup.html](apron-cards-editor-mockup.html) (authoring surface — Service/Manage entry points, overflow handling, Export menu, mobile). Bead PP-esta (build tracking); PP-esta.1 (edition-name parsing survey, informs §7). [Credits placement canvas](https://claude.ai/artifact/XJMscXb6HAoHvpMTiKpbCy) (option A, both sizes); bead PP-tv2u (credits).
+**Related records.** [apron-cards-mockup.html](apron-cards-mockup.html) (card face, both size variants). [apron-cards-editor-mockup.html](apron-cards-editor-mockup.html) (authoring surface — Service/Manage entry points, overflow handling, Export menu, mobile). Bead PP-esta (build tracking); PP-esta.1 (edition-name parsing survey, informs §7). [Credits placement canvas](https://claude.ai/artifact/XJMscXb6HAoHvpMTiKpbCy) (option A, both sizes); bead PP-tv2u (credits). [Card templates canvas](https://claude.ai/artifact/NLAnYXFFC4j3748otKxoPq) (Side rail is option A, Header band option B); bead PP-s3fa (templates).
 
 ---
 
 ## 1. Concepts
 
 - **Card** — the printed artifact mounted in a machine's apron card holder. One card renders one machine. Once printed, it is the machine's sole on-cabinet entry point for reporting an issue or posting a score, replacing the existing iScored QR sticker.
-- **Saved card** — one complete, named set of card settings: apron size, card text choice, card description, tip, and credit display settings. A machine keeps zero or more saved cards, listed in the order they were created.
+- **Saved card** — one complete, named set of card settings: apron size, template, card text choice, card description, tip, and credit display settings. A machine keeps zero or more saved cards, listed in the order they were created.
 - **Apron size** — which physical dimensions a card renders at. Stern/SPIKE (140×75mm) and WPC (6×3.25in) are the two sizes supported at launch; more may be added later as new cabinet families need them. Stored per saved card, independent of card content — the same title, edition, description, and tip render at any size a machine supports.
+- **Template** — which layout a card face uses: Standard, Side rail, or Header band. Stored per saved card, independent of apron size and content; every template renders at every supported apron size. Side rail and Header band give the description and tip more room than Standard.
 - **Card description** — an optional override of the card's description text, distinct from the machine's main description. A saved card keeps at most one. It is rich text limited to bold, italic, and lists.
 - **Tip** — an optional second block of card text, shown under Description. Carries its own enabled/disabled toggle, independent of whether it has content. It is rich text limited to bold, italic, and lists.
 - **Credits** — the people credited for a machine's game, in two roles: design and art. They come from the Open Pinball Database (OPDB), or are entered by hand for an uncataloged machine. Each role has its own per-card display setting.
@@ -24,16 +25,16 @@
 
 - **2.1** A card face renders one machine, drawing on: name, manufacturer, year, owner display name, apron size, an edition line when one applies (§7), design and art credits (§10), a description, and a tip when enabled.
 - **2.2** A card uses the card description when one is set, and falls back to the machine's main description when it is not.
-- **2.3** Apron size affects only which physical layout a card renders at — content (title, edition, owner, description, tip) is identical across a machine's size variants.
+- **2.3** Apron size and template affect only how a card is laid out — content (title, edition, owner, description, tip) is identical across them. Only the Standard template shows credits (§10.2).
 
 ## 3. Authoring card content
 
-- **3.1** Saved cards and their settings (apron size, credit display settings, card description, tip) are edited on the machine's Apron card tab, which has its own Save. There is no other card editor, and the New Machine page has none: cards are added once the machine exists.
+- **3.1** Saved cards and their settings (apron size, template, credit display settings, card description, tip) are edited on the machine's Apron card tab, which has its own Save. There is no other card editor, and the New Machine page has none: cards are added once the machine exists.
 - **3.2** The Apron card tab offers an explicit choice for the card text: the machine's main description (edited on the Manage tab; the card uses its saved value), or a card description just for the card. Switching back to the main description discards nothing — the card description is kept, only unused.
 - **3.3** Tip has an enabled/disabled toggle, independent of its saved text. When disabled, the card shows a single Description block and no Tip heading, regardless of saved tip content.
 - **3.4** Preview shows the card face rendered from the tab's current values, including unsaved ones. Description and tip share one flowing region on the card rather than two independently sized boxes: growing one narrows the room available to the other in the preview, matching what the printed card will do.
 - **3.5** Description and tip are checked as one combined region, not measured line by line: PinPoint knows only whether the combined content still fits the card, not how many lines over it runs. While it does not fit, the Apron card tab shows one card-level notice rather than a per-field message, and exporting it requires the override in §9.5. The card can still be saved.
-- **3.6** Changing apron size, card description, tip, or a credit display setting requires the machine-management capability: machine owner, technician, or administrator.
+- **3.6** Changing apron size, template, card description, tip, or a credit display setting requires the machine-management capability: machine owner, technician, or administrator.
 - **3.7** The card description and tip offer bold, italic, bulleted lists, and numbered lists, and the card prints that formatting. When the card uses the machine's main description, it prints bold, italic, and lists, and prints headings and links as plain text.
 - **3.8** Every signed-in member sees the Apron card tab. A member without the machine-management capability sees each saved card's Preview and Export and no editing controls.
 
@@ -45,10 +46,13 @@
 
 ## 5. Layout
 
-- **5.1** A card face is two regions side by side: a dark identity panel (title, edition, manufacturer · year, design and art credits, owner, APC logo) and a light action-and-description column.
-- **5.2** The action column's top portion holds a "Scan this machine" header and up to three action rows (report a problem, post a score, playing tips) on the left, with the QR code to their right. A divider separates this from the description (and tip, when enabled) below.
-- **5.3** Card copy names every destination reachable through the QR: reporting an issue, posting a score via iScored, and reading playing tips — in that order.
+- **5.1** On the Standard template, a card face is two regions side by side: a dark identity panel (title, edition, manufacturer · year, design and art credits, owner, APC logo) and a light action-and-description column.
+- **5.2** On the Standard template, the action column's top portion holds a "Scan this machine" header and up to three action rows (report a problem, post a score, playing tips) on the left, with the QR code to their right. A divider separates this from the description (and tip, when enabled) below.
+- **5.3** In every template, card copy names every destination reachable through the QR: reporting an issue, posting a score via iScored, and reading playing tips — in that order.
 - **5.4** The playing tips row appears only when the machine has tips (pintips §3.6).
+- **5.5** Every saved card has a template (§1). A new saved card starts on Standard; a person can change it at any time without losing any of the card's content.
+- **5.6** On the Side rail template, a card face is a narrower dark identity panel (title, edition, manufacturer · year, owner, APC logo) beside a light column. The QR code sits at the column's top right with the destinations named as short captions beneath it, and the description and tip fill the rest of the column, wrapping around the QR.
+- **5.7** On the Header band template, a dark band across the top holds the title, then edition, manufacturer · year, and owner on one line, with the APC logo at its right end. Below it, the description and tip flow through two columns beside a column holding the QR code, with the destinations named as short captions beneath it.
 
 ## 6. Title fit
 
@@ -56,6 +60,7 @@
 - **6.2** The edition line, when present, renders under the title at a fixed size — it does not participate in the title's shrink rule.
 - **6.3** The APC logo keeps its place at the bottom of the identity panel. When the panel's other content would reach it, the title shrinks further (§1) instead.
 - **6.4** When the identity panel's content still reaches the logo with the title at its floor size, the card does not fit: as with description and tip (§3.5), the same card-level notice shows and exporting it requires the override in §9.5.
+- **6.5** On the Header band template, the fit rule sizes the title to the band's width with a two-line limit in place of three, and the band's own content must fit beside the logo; a title that still does not fit at its floor size makes the card not fit (§6.4).
 
 ## 7. Edition
 
@@ -77,10 +82,10 @@
 ## 10. Credits
 
 - **10.1** A machine linked to a Pinball Map catalog title takes its credits from that title's OPDB record, read from the copy of OPDB's published data that PinPoint stores and refreshes on a schedule (collections-and-tags §9.1). A machine declared uncataloged uses its hand-entered designers and artists (pinballmap §2.4). Rendering a card never contacts OPDB.
-- **10.2** The card shows credits as two rows in the identity panel, Design then Art, below manufacturer · year and above the owner line.
+- **10.2** On the Standard template, the card shows credits as two rows in the identity panel, Design then Art, below manufacturer · year and above the owner line.
 - **10.3** A row lists the role's names in their source's order, comma-separated. When a role has more than two names, the row shows the first two followed by a count of the rest.
 - **10.4** A role with no credits shows "Unknown". This includes both roles for a machine that is neither linked nor uncataloged, or whose catalog title has no OPDB record.
-- **10.5** Each role's row has its own per-card display setting, on by default for every machine, including machines with no credits. Turning a setting off removes that row from the card.
+- **10.5** Each role's row has its own per-card display setting, on by default for every machine, including machines with no credits. Turning a setting off removes that row from the card. The Side rail and Header band templates show no credits; a card keeps its display settings while it uses one of them, and the Apron card tab hides those settings there.
 - **10.6** While any credit row shows, the APC logo renders smaller to give the identity panel room.
 
 ## 11. Saved cards
@@ -97,12 +102,14 @@
 
 | Requirement | Current implementation gap |
 | :-- | :-- |
+| §1, §5.5–§5.7, §6.5 | Templates are not built yet (PP-s3fa): every card renders on the Standard template, and the Apron card tab has no template setting. |
 | §4.2 | Automatic apron-size fill from a Pinball Map match is intentionally deferred. Editors choose Stern/SPIKE or WPC manually for now; unmatched machines still have no default. |
 
 ## Changelog
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-03 | Card templates: each saved card chooses Standard, Side rail, or Header band; the two new templates give description and tip more room and show no credits (§1, §2.3, §3.1, §3.6, §5.1–§5.7, §6.5, §10.2, §10.5). |
 | 2026-10-02 | Card editing moves from the machine form to its own Apron card tab with its own Save; the New Machine page has no card; the Service tab thumbnail is replaced by the tab (§3.1–3.5, §3.8, §11.6). |
 | 2026-09-28 | Multiple saved cards per machine, each with a required size; an overflowing card saves and exports only with an explicit override (§1, §3.1, §3.5, §3.8, §4.1–4.3, §6.4, §9.1, §9.4, §9.5, §10.5, §11). |
 | 2026-09-28 | §5.2–§5.3: the card names playing tips as a third QR destination. §5.4 added: the playing tips row appears only for a machine with tips. |
