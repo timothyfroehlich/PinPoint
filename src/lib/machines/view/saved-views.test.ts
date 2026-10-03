@@ -25,8 +25,6 @@ const savedView: MachineViewSavedViewSummary = {
     dir: "desc",
     pageSize: 50,
     columns: ["machine", "playability", "openIssues", "lastServiced"],
-    presenceWidget: "all",
-    playabilityWidget: "all",
   },
 };
 
@@ -107,7 +105,6 @@ describe("saved view URL helpers", () => {
       "status",
       "severity",
       "columns",
-      "playabilityWidget",
       "view",
     ]) {
       expect(

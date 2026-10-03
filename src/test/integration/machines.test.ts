@@ -696,4 +696,18 @@ describe("Machine Watcher Service (PGlite)", () => {
     });
     expect(row?.watchMode).toBe("subscribe");
   });
+
+  it("should validate watch mode and reject invalid values", async () => {
+    const result = await updateMachineWatchMode({
+      machineId: "00000000-0000-0000-0000-000000000001",
+      userId: "00000000-0000-0000-0000-000000000002",
+      // @ts-expect-error -- an untrusted client can send any string
+      watchMode: "invalid-mode",
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("VALIDATION");
+    }
+  });
 });

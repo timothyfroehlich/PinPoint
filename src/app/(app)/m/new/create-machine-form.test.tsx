@@ -204,3 +204,37 @@ describe("CreateMachineForm — opened from a lineup entry (pinballmap 4.11)", (
     ).toBeInTheDocument();
   });
 });
+
+describe("CreateMachineForm — a failed create must not revert Availability (PP-1ajq)", () => {
+  it("keeps the chosen Availability after the action fails", async () => {
+    vi.mocked(createMachineAction).mockResolvedValue({
+      ok: false,
+      code: "VALIDATION",
+      message: "Initials are already taken.",
+    });
+
+    const user = userEvent.setup();
+    render(<CreateMachineForm allUsers={[]} canSelectOwner={false} />);
+
+    await user.type(screen.getByLabelText(/Machine Name/), "Twilight Zone");
+    await user.type(screen.getByLabelText(/Initials/), "TZ");
+
+    const availabilityTrigger = screen.getByLabelText("Availability");
+    await user.click(availabilityTrigger);
+    await user.click(screen.getByRole("option", { name: "Pending Arrival" }));
+    expect(availabilityTrigger).toHaveTextContent("Pending Arrival");
+
+    await user.click(screen.getByRole("button", { name: /Create Machine/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Initials are already taken.")
+      ).toBeInTheDocument();
+    });
+
+    // Let React's post-action reset commit before asserting it didn't land.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(availabilityTrigger).toHaveTextContent("Pending Arrival");
+  });
+});

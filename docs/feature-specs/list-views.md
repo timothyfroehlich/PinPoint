@@ -98,7 +98,7 @@
 - **8.1** When the Primary Filters do not fit beside search, they move into More from the right, one at a time, in the host's order.
 - **8.2** When the List Header's tabs do not fit, Saved View tabs move into More views from the right; the Applied View's tab always stays visible.
 - **8.3** When the List Header is still crowded, the compact pager drops its range text, then disappears; the pager below the list remains.
-- **8.4** When the Summary Widgets do not fit side by side, they stack full-width (widgets §2.3).
+- **8.4** When the Summary Widgets do not fit side by side, they stack full-width in a collapsible section (widgets §2.4).
 - **8.5** No List View width between 320px and 1440px scrolls the page horizontally.
 
 ---
@@ -174,5 +174,6 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-03 | Stacked Summary Widgets sit in a collapsible section (§8.4). |
 | 2026-10-02 | Default View controls appear only on the Machines and Issues pages (§10.8). |
 | 2026-10-02 | Created from the approved list-framework design: shared layout, filters, List Header with Saved View tabs, compact and bottom pagers, phone sheets and pinned pager, overflow rules, URL state, Saved Views shared across each host's Surfaces with a Default View on the main page only (moved from machine-views §8), returning to a list, and accessibility. |

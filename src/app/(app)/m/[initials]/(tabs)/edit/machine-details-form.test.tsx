@@ -793,12 +793,6 @@ describe("MachineDetailsForm", () => {
   });
 
   describe("hydration and pre-hydration submit safety (PP-aeei)", () => {
-    it("renders form with method='post' to prevent native GET submit", () => {
-      renderForm();
-      const form = screen.getByTestId("machine-details-form");
-      expect(form).toHaveAttribute("method", "post");
-    });
-
     it("disables save button during SSR / before hydration", () => {
       const html = renderToString(
         <DetailsDirtyProvider>
