@@ -209,8 +209,12 @@ function EditTagMachinesForm({
                           toggle(machine.id, checked === true)
                         }
                       />
-                      <span className="min-w-0 flex-1 truncate text-sm">
-                        {machine.name}
+                      <span className="flex min-w-0 flex-1 items-center gap-2">
+                        <span className="truncate text-sm">{machine.name}</span>
+                        {/* Names repeat (three Godzillas); initials tell them apart. */}
+                        <span className="shrink-0 rounded border border-outline-variant px-1.5 text-[11px] font-semibold text-muted-foreground">
+                          {machine.initials}
+                        </span>
                       </span>
                       {otherTag !== undefined ? (
                         <span className="shrink-0 text-xs text-muted-foreground">
