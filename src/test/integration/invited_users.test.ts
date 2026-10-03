@@ -9,11 +9,14 @@ import {
   authUsers,
   issues,
   notificationPreferences,
+  timelineEventPeople,
 } from "~/server/db/schema";
 import { getUnifiedUsers, compareUnifiedUsers } from "~/lib/users/queries";
 import { getMachineOwner } from "~/lib/machines/queries";
 import { createTestMachine } from "~/test/helpers/factories";
 import { ensureUserProfile } from "~/lib/auth/profile";
+import { createMachineTimelineEvent } from "~/lib/timeline/machine-events";
+import type { User } from "@supabase/supabase-js";
 import type { UnifiedUser } from "~/lib/types";
 
 // Mock the database to use the PGlite instance
@@ -505,6 +508,77 @@ describe("Invited Users Integration", () => {
       where: eq(invitedUsers.id, invited.id),
     });
     expect(deletedInvited).toBeUndefined();
+  });
+
+  // PP-tv9l: timeline_event_people.invited_id is ON DELETE RESTRICT, so the
+  // invited_users delete fails unless the person-refs are rewritten first —
+  // exactly what handle_new_user does in drizzle/0064.
+  it("should rewrite timeline person-refs before deleting the invited user via ensureUserProfile", async () => {
+    const db = await getTestDb();
+
+    const [invited] = await db
+      .insert(invitedUsers)
+      .values({
+        firstName: "Timeline",
+        lastName: "Owner",
+        email: "timeline-owner@example.com",
+        role: "member",
+      })
+      .returning();
+    if (!invited) throw new Error("Failed to create invited user");
+
+    const [machine] = await db
+      .insert(machines)
+      .values(
+        createTestMachine({ initials: "TLOW", invitedOwnerId: invited.id })
+      )
+      .returning();
+    if (!machine) throw new Error("Failed to create machine");
+
+    const eventId = await createMachineTimelineEvent(machine.id, {
+      sourceType: "lifecycle",
+      tag: "lifecycle",
+      eventData: { kind: "owner_set" },
+      people: [{ role: "to_owner", invitedId: invited.id }],
+    });
+
+    const userId = randomUUID();
+    await db.insert(authUsers).values({
+      id: userId,
+      email: "timeline-owner@example.com",
+    });
+    const user: User = {
+      id: userId,
+      email: "timeline-owner@example.com",
+      user_metadata: {},
+      app_metadata: {},
+      aud: "authenticated",
+      created_at: new Date().toISOString(),
+    };
+
+    await ensureUserProfile(user);
+
+    const refs = await db
+      .select()
+      .from(timelineEventPeople)
+      .where(eq(timelineEventPeople.eventId, eventId));
+    expect(refs).toEqual([
+      expect.objectContaining({
+        role: "to_owner",
+        userId,
+        invitedId: null,
+      }),
+    ]);
+
+    const deletedInvited = await db.query.invitedUsers.findFirst({
+      where: eq(invitedUsers.id, invited.id),
+    });
+    expect(deletedInvited).toBeUndefined();
+
+    const updatedMachine = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    expect(updatedMachine?.ownerId).toBe(userId);
   });
 
   it("should transfer role from invited user when creating profile", async () => {
