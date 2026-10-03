@@ -635,14 +635,14 @@ _File deleted on `main` in PR #2281 (PP-zl00.3) during earlier E2E audit wave. L
 
 ### `src/test/integration/supabase/auth-actions.test.ts`
 
-| #   | Status | Bug Class | Test Name                              | Rationale / Target Keeper                                                  |
-| --- | ------ | --------- | -------------------------------------- | -------------------------------------------------------------------------- |
-| 1   | **F**  | B         | should create a new user with Supabase | Fix: remove unsafe as any, verify origin fallback logic at action boundary |
-| 2   | **F**  | B         | should reject duplicate email          | Fix: remove unsafe as any, verify origin fallback logic at action boundary |
-| 3   | **F**  | B         | should authenticate existing user      | Fix: remove unsafe as any, verify origin fallback logic at action boundary |
-| 4   | **F**  | B         | should reject wrong password           | Fix: remove unsafe as any, verify origin fallback logic at action boundary |
-| 5   | **F**  | B         | should reject non-existent email       | Fix: remove unsafe as any, verify origin fallback logic at action boundary |
-| 6   | **F**  | B         | should sign out authenticated user     | Fix: remove unsafe as any, verify origin fallback logic at action boundary |
+| #   | Status | Bug Class | Test Name                              | Rationale / Target Keeper                                                                |
+| --- | ------ | --------- | -------------------------------------- | ---------------------------------------------------------------------------------------- |
+| 1   | **R**  | I         | should create a new user with Supabase | Retain: Supabase integration test for user creation, auth, duplicate rejection, sign out |
+| 2   | **R**  | I         | should reject duplicate email          | Retain: Supabase integration test for user creation, auth, duplicate rejection, sign out |
+| 3   | **R**  | I         | should authenticate existing user      | Retain: Supabase integration test for user creation, auth, duplicate rejection, sign out |
+| 4   | **R**  | I         | should reject wrong password           | Retain: Supabase integration test for user creation, auth, duplicate rejection, sign out |
+| 5   | **R**  | I         | should reject non-existent email       | Retain: Supabase integration test for user creation, auth, duplicate rejection, sign out |
+| 6   | **R**  | I         | should sign out authenticated user     | Retain: Supabase integration test for user creation, auth, duplicate rejection, sign out |
 
 ### `src/test/integration/supabase/auth-pages.test.ts`
 

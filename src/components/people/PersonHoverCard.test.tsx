@@ -5,10 +5,9 @@
  *  - real user (userId set)  → Link trigger with href="/u/<id>"
  *  - invited user (userId null) → plain text, no link
  *  - former user (userId null)  → plain text, no link
- *
- * Hover-reveal behaviour is NOT asserted (Radix portal + hover is flaky in
- * jsdom). The !userId branch never renders any Radix at all, making those
- * two cases trivial.
+ * Hover-reveal behavior (fetching user profile and rendering role pill on
+ * hover) is asserted alongside dispatcher branches, consolidated from the
+ * retired unit test.
  */
 
 import React from "react";

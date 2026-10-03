@@ -336,8 +336,9 @@ describe("Account Deletion Reassign Picker — guest filter (PP-hci / PP-aby)", 
 // machine unassigned).  The unit layer cannot make that assertion — it only
 // verified that the mock transaction callback was invoked.
 //
-// External-boundary checks (signOut/deleteUser call order) remain in the
-// unit file where they belong.
+// External-boundary checks (signOut/deleteUser call order and admin signOut
+// failure tolerance) are verified directly in this integration block alongside
+// real DB anonymization.
 // ---------------------------------------------------------------------------
 
 describe("deleteAccountAction — DB integration (PGlite)", () => {
