@@ -1,6 +1,7 @@
 import { db } from "~/server/db";
 import { userProfiles, invitedUsers, machines } from "~/server/db/schema";
-import { sql, eq, count } from "drizzle-orm";
+import { sql, eq, count, and } from "drizzle-orm";
+import { machineNotRemoved } from "~/lib/machines/queries";
 import type { UnifiedUser, UserStatus } from "~/lib/types";
 
 // Import comparator from its own module (safe for client-side imports)
@@ -13,14 +14,14 @@ export async function getUnifiedUsers(
 ): Promise<UnifiedUser[]> {
   const { includeEmails = false } = options;
 
-  // Subquery to count machines for activated users
+  // Subquery to count machines for activated users (Removed ones left out)
   const activatedMachineCount = db
     .select({
       ownerId: machines.ownerId,
       count: count().as("count"),
     })
     .from(machines)
-    .where(sql`${machines.ownerId} IS NOT NULL`)
+    .where(and(sql`${machines.ownerId} IS NOT NULL`, machineNotRemoved()))
     .groupBy(machines.ownerId)
     .as("activated_machine_count");
 
@@ -31,7 +32,9 @@ export async function getUnifiedUsers(
       count: count().as("count"),
     })
     .from(machines)
-    .where(sql`${machines.invitedOwnerId} IS NOT NULL`)
+    .where(
+      and(sql`${machines.invitedOwnerId} IS NOT NULL`, machineNotRemoved())
+    )
     .groupBy(machines.invitedOwnerId)
     .as("invited_machine_count");
 
