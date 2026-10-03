@@ -161,6 +161,30 @@ describe("quick search queries", () => {
     );
   });
 
+  it("leaves out Removed machines and the issues on them", async () => {
+    const db = await getTestDb();
+    await db.insert(machines).values([
+      createTestMachine({ initials: "TZ", name: "Twilight Zone" }),
+      createTestMachine({
+        initials: "TZ2",
+        name: "Twilight Zone Sold",
+        presenceStatus: "removed",
+      }),
+    ]);
+    await db
+      .insert(issues)
+      .values([
+        createTestIssue("TZ", { issueNumber: 1, title: "Twilight clock" }),
+        createTestIssue("TZ2", { issueNumber: 1, title: "Twilight magnet" }),
+      ]);
+
+    const results = await searchQuickNavigation("Twilight");
+    expect(results.machines.map((machine) => machine.initials)).toEqual(["TZ"]);
+    expect(results.issues.map((issue) => issue.machineInitials)).toEqual([
+      "TZ",
+    ]);
+  });
+
   it("preserves three-digit issue numbers in identifier matches", async () => {
     const db = await getTestDb();
     await db

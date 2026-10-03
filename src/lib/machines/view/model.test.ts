@@ -287,6 +287,7 @@ describe("summarizeMachineView", () => {
   it("counts each widget over its own All or Filtered population", () => {
     const state = {
       ...getMachineViewPreset("collection").defaultState,
+      presence: "all" as const,
       severity: ["unplayable" as const],
       playabilityWidget: "filtered" as const,
     };

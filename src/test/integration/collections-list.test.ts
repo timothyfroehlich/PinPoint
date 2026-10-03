@@ -17,7 +17,7 @@ import {
 describe("getMyCollections", () => {
   setupTestDb();
 
-  it("returns the owner's collections sorted by name with machine counts, excluding others'", async () => {
+  it("returns the owner's collections sorted by name with machine counts, excluding others' and Removed machines", async () => {
     const db = await getTestDb();
     const a = createTestUser({ firstName: "Ann", lastName: "Owner" });
     const b = createTestUser({ firstName: "Bob", lastName: "Other" });
@@ -25,7 +25,12 @@ describe("getMyCollections", () => {
 
     const m1 = createTestMachine({ initials: "M1", name: "One" });
     const m2 = createTestMachine({ initials: "M2", name: "Two" });
-    await db.insert(machines).values([m1, m2]);
+    const sold = createTestMachine({
+      initials: "M3",
+      name: "Sold",
+      presenceStatus: "removed",
+    });
+    await db.insert(machines).values([m1, m2, sold]);
 
     const inserted = await db
       .insert(collections)
@@ -38,10 +43,12 @@ describe("getMyCollections", () => {
     const zephyr = inserted.find((c) => c.name === "Zephyr");
     if (!zephyr) throw new Error("seed failed");
 
-    // Zephyr has 2 machines; Aurora is empty; Bob's belongs to another owner.
+    // Zephyr has 2 counted machines and a Removed one; Aurora is empty; Bob's
+    // belongs to another owner.
     await db.insert(collectionMachines).values([
       { collectionId: zephyr.id, machineId: m1.id },
       { collectionId: zephyr.id, machineId: m2.id },
+      { collectionId: zephyr.id, machineId: sold.id },
     ]);
 
     const result = await getMyCollections(asDbOrTx(db), a.id);
@@ -60,19 +67,23 @@ describe("getMyCollections", () => {
 describe("getOwnedMachineCount", () => {
   setupTestDb();
 
-  it("counts only the machines owned by the given user", async () => {
+  it("counts only the machines owned by the given user, leaving out Removed ones", async () => {
     const db = await getTestDb();
     const owner = createTestUser({ firstName: "Ann", lastName: "Owner" });
     const other = createTestUser({ firstName: "Bob", lastName: "Other" });
     await db.insert(userProfiles).values([owner, other]);
 
-    await db
-      .insert(machines)
-      .values([
-        createTestMachine({ initials: "M1", name: "One", ownerId: owner.id }),
-        createTestMachine({ initials: "M2", name: "Two", ownerId: owner.id }),
-        createTestMachine({ initials: "M3", name: "Three", ownerId: other.id }),
-      ]);
+    await db.insert(machines).values([
+      createTestMachine({ initials: "M1", name: "One", ownerId: owner.id }),
+      createTestMachine({ initials: "M2", name: "Two", ownerId: owner.id }),
+      createTestMachine({ initials: "M3", name: "Three", ownerId: other.id }),
+      createTestMachine({
+        initials: "M4",
+        name: "Sold",
+        ownerId: owner.id,
+        presenceStatus: "removed",
+      }),
+    ]);
 
     expect(await getOwnedMachineCount(asDbOrTx(db), owner.id)).toBe(2);
   });
@@ -88,21 +99,27 @@ describe("getOwnedMachineCount", () => {
 describe("getSharedWithMe", () => {
   setupTestDb();
 
-  it("returns collections shared with the user, with owner name + machine count", async () => {
+  it("returns collections shared with the user, with owner name + machine count leaving out Removed machines", async () => {
     const db = await getTestDb();
     const owner = createTestUser({ firstName: "Owner", lastName: "One" });
     const me = createTestUser({ firstName: "Me", lastName: "User" });
     await db.insert(userProfiles).values([owner, me]);
     const m1 = createTestMachine({ initials: "M1", name: "One" });
-    await db.insert(machines).values(m1);
+    const sold = createTestMachine({
+      initials: "M2",
+      name: "Sold",
+      presenceStatus: "removed",
+    });
+    await db.insert(machines).values([m1, sold]);
     const [shared] = await db
       .insert(collections)
       .values({ name: "Shared C", ownerId: owner.id })
       .returning();
     if (!shared) throw new Error("seed failed");
-    await db
-      .insert(collectionMachines)
-      .values({ collectionId: shared.id, machineId: m1.id });
+    await db.insert(collectionMachines).values([
+      { collectionId: shared.id, machineId: m1.id },
+      { collectionId: shared.id, machineId: sold.id },
+    ]);
     await db.insert(collectionCollaborators).values({
       collectionId: shared.id,
       userId: me.id,

@@ -249,9 +249,14 @@ describe("MachineView", () => {
     const state = {
       ...getMachineViewPreset("collection").defaultState,
       q: "mars",
+      presence: "all" as const,
       page: 3,
     };
-    navigation.searchParams = new URLSearchParams({ q: "mars", page: "3" });
+    navigation.searchParams = new URLSearchParams({
+      q: "mars",
+      presence: "all",
+      page: "3",
+    });
     render(<MachineView result={result({ state })} preset="collection" />);
     const playability = screen.getByRole("region", { name: "Playability" });
 
@@ -259,7 +264,7 @@ describe("MachineView", () => {
       within(playability).getByRole("button", { name: "Filtered" })
     );
     expect(navigation.replace).toHaveBeenLastCalledWith(
-      "/m?q=mars&page=3&playabilityWidget=filtered",
+      "/m?q=mars&presence=all&page=3&playabilityWidget=filtered",
       { scroll: false }
     );
 
@@ -267,7 +272,8 @@ describe("MachineView", () => {
       within(playability).getByRole("button", { name: "1 Needs Service" })
     );
     expect(navigation.replace).toHaveBeenLastCalledWith(
-      "/m?q=mars&presence=on_the_floor&status=needs_service&playabilityWidget=filtered",
+      // On the Floor is the Collections Page Preset, so it leaves the URL.
+      "/m?q=mars&status=needs_service&playabilityWidget=filtered",
       { scroll: false }
     );
   });

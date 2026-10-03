@@ -106,7 +106,7 @@
 ## 9. Built-in Views
 
 - **9.1** Machines offers five Built-in Views, in order: **On the floor** (On the Floor, by name — the Page Preset); **Needs attention** (On the Floor, Playability Needs service or Unplayable, worst first); **Service due** (On the Floor, oldest Last Serviced first); **All machines** (every presence state, by name, adding the Presence field); **Recently added** (every presence state except Removed, newest Date Added first, adding the Presence and Date Added fields).
-- **9.2** Collections offer three Built-in Views, in order: **On the floor** (On the Floor, worst playability first); **Needs attention** (On the Floor, Playability Needs service or Unplayable, worst first); **All machines** (every presence state, worst playability first — the Page Preset).
+- **9.2** Collections offer three Built-in Views, in order: **On the floor** (On the Floor, worst playability first — the Page Preset); **Needs attention** (On the Floor, Playability Needs service or Unplayable, worst first); **All machines** (every presence state, worst playability first, adding the Presence field).
 - **9.3** Unless 9.1 or 9.2 says otherwise, a Built-in View displays the Page Preset's fields at the Page Preset's page size.
 - **9.4** _Moved 2026-10-02_ to list-views §10.16.
 - **9.5** _Moved 2026-10-02_ to list-views §5.3 and §10.6.
@@ -132,6 +132,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-03 | Collections' Page Preset becomes On the floor; All machines adds the Presence field (§9.2). |
 | 2026-10-02 | Machine View became a List Host on the shared List View (§2.4): moved the generic concepts, URL rules, shared controls, and Saved Views to list-views (§1, §4.3–§4.5, §4.9–§4.11, §5.1, §7.6, §8, §9.4, §9.5); one-line machine identity and rows (§3.2, §5.2, §5.3); dropped Widget Population parameters (§4.1); Recently added leaves out Removed machines (§9.1); Primary Filters, Owner shortcuts, and the sort control (§3.12–§3.14); more default fields (§4.6); right-aligned Open Issues that link to the machine's issues in every presence state (§5.6); an Owner `me` sentinel (§4.2). |
 | 2026-09-27 | §7.4: unmatched Pinball Map entries now appear on the Pinball Map lineup page rather than being deferred. |
 | 2026-09-26 | Added the Open Issue Severity filter (§3.11) and Widget Population URL state (§4.1, §4.2, §4.4, §4.9); Saved Views store Widget Populations (§8.2); moved widgets to their own specs (§7.2); deferred Integrations widgets (§7.3). |

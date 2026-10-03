@@ -46,7 +46,7 @@ export default async function TagsPage(): Promise<React.JSX.Element> {
                   tags={tags[type].map((tag) => ({
                     href: tagHref(tag.type, tag.slug),
                     name: tag.name,
-                    machineCount: tag.machines.length,
+                    machineCount: tag.machineCount,
                   }))}
                 />
               </section>

@@ -7,6 +7,7 @@ import {
   collectionCollaborators,
   userProfiles,
 } from "~/server/db/schema";
+import { machineNotRemoved } from "~/lib/machines/queries";
 
 export interface CollectionListItem {
   id: string;
@@ -21,6 +22,7 @@ export interface SharedCollectionListItem {
   ownerName: string;
 }
 
+// Machine counts leave out Removed machines (collections-and-tags 5.2).
 export async function getMyCollections(
   tx: DbTransaction = db,
   ownerId: string
@@ -29,12 +31,16 @@ export async function getMyCollections(
     .select({
       id: collections.id,
       name: collections.name,
-      machineCount: count(collectionMachines.machineId),
+      machineCount: count(machines.id),
     })
     .from(collections)
     .leftJoin(
       collectionMachines,
       eq(collectionMachines.collectionId, collections.id)
+    )
+    .leftJoin(
+      machines,
+      and(eq(machines.id, collectionMachines.machineId), machineNotRemoved())
     )
     .where(eq(collections.ownerId, ownerId))
     .groupBy(collections.id, collections.name)
@@ -47,9 +53,8 @@ export async function getMyCollections(
 }
 
 /**
- * Count the machines owned by `ownerId` — the size of that user's owner-type
- * collection (/c/owner/[ownerId]). A dedicated count rather than
- * `getOwnerCollection`, which eagerly loads every machine and its open issues.
+ * Count the machines owned by `ownerId`, leaving out Removed ones (PP-s363).
+ * A dedicated count rather than `getOwnerCollection`, which eagerly loads every machine and its open issues.
  */
 export async function getOwnedMachineCount(
   tx: DbTransaction = db,
@@ -58,7 +63,7 @@ export async function getOwnedMachineCount(
   const [row] = await tx
     .select({ value: count() })
     .from(machines)
-    .where(eq(machines.ownerId, ownerId));
+    .where(and(eq(machines.ownerId, ownerId), machineNotRemoved()));
   return Number(row?.value ?? 0);
 }
 
@@ -77,7 +82,7 @@ export async function getSharedWithMe(
       id: collections.id,
       name: collections.name,
       ownerName: userProfiles.name,
-      machineCount: count(collectionMachines.machineId),
+      machineCount: count(machines.id),
     })
     .from(collectionCollaborators)
     .innerJoin(
@@ -88,6 +93,10 @@ export async function getSharedWithMe(
     .leftJoin(
       collectionMachines,
       eq(collectionMachines.collectionId, collections.id)
+    )
+    .leftJoin(
+      machines,
+      and(eq(machines.id, collectionMachines.machineId), machineNotRemoved())
     )
     .where(
       and(

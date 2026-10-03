@@ -329,10 +329,10 @@ const MACHINE_PLAN: MachinePlan[] = [
     // Off-lineup + intent Off + Removed → Blocked: availability disallows the On
     // position, with the reason beside it (6.2). EBD carries Blocked rather than
     // TAF because a Removed machine drops out of the default issue list, and the
-    // suite leans on TAF's issues staying listed while nothing lists EBD's. The
-    // reassign picker and direct /m/EBD routes ignore presence, so EBD stays
-    // usable as machine-timeline's reassign target and responsive-overflow's
-    // member-owned edit surface.
+    // suite leans on TAF's issues staying listed while nothing lists EBD's.
+    // Direct /m/EBD routes ignore presence, so EBD stays usable as
+    // responsive-overflow's member-owned edit surface; pickers leave it out
+    // (PP-s363).
     pinballmapIntent: "off",
     pinballmapExcluded: false,
     presenceStatus: "removed",

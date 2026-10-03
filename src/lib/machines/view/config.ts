@@ -130,7 +130,7 @@ export const MACHINE_VIEW_PRESETS: Record<
     permittedFields: PERMITTED_FIELDS,
     defaultState: {
       q: "",
-      presence: "all",
+      presence: ["on_the_floor"],
       status: [],
       severity: [],
       owner: [],
@@ -199,16 +199,17 @@ export const MACHINE_VIEW_BUILT_IN_VIEWS: Record<
     }),
   ],
   collection: [
-    builtIn("collection", "on-the-floor", "On the floor", {
-      presence: ["on_the_floor"],
-    }),
+    builtIn("collection", "on-the-floor", "On the floor", {}),
     builtIn(
       "collection",
       "needs-attention",
       "Needs attention",
       NEEDS_ATTENTION
     ),
-    builtIn("collection", "all-machines", "All machines", {}),
+    builtIn("collection", "all-machines", "All machines", {
+      presence: "all",
+      columns: [...DEFAULT_COLUMNS, "presence"],
+    }),
   ],
 };
 
@@ -218,7 +219,7 @@ export const MACHINE_VIEW_PAGE_PRESET_VIEW_ID: Record<
   string
 > = {
   machines: "on-the-floor",
-  collection: "all-machines",
+  collection: "on-the-floor",
 };
 
 export function getMachineViewBuiltInViews(

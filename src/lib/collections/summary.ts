@@ -9,19 +9,25 @@ export interface CollectionSummary {
   openIssues: number;
 }
 
-/** Header counts from the same compact health aggregates Machine View uses. */
+/**
+ * Header counts from the same compact health aggregates Machine View uses.
+ * Removed machines and their issues are left out (collections-and-tags 4.2).
+ */
 export function summarizeCollection(
   machines: CollectionMachine[],
   healthByInitials: ReadonlyMap<string, MachineViewHealth>
 ): CollectionSummary {
+  const counted = machines.filter(
+    (machine) => machine.presenceStatus !== "removed"
+  );
   const summary: CollectionSummary = {
-    total: machines.length,
+    total: counted.length,
     operational: 0,
     needsService: 0,
     unplayable: 0,
     openIssues: 0,
   };
-  for (const machine of machines) {
+  for (const machine of counted) {
     const health = healthByInitials.get(machine.initials);
     summary.openIssues += health?.openIssues ?? 0;
     const status = health?.playability ?? "operational";

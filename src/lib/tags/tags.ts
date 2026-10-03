@@ -19,7 +19,15 @@ export interface MachineTag {
   type: TagTypeId;
   slug: string;
   name: string;
+  /** Every member, in any presence state; membership ignores presence. */
   machines: CollectionMachine[];
+  /** Members other than Removed ones: the count shown for the tag (spec 7.9). */
+  machineCount: number;
+}
+
+function countNotRemoved(tagged: readonly CollectionMachine[]): number {
+  return tagged.filter((machine) => machine.presenceStatus !== "removed")
+    .length;
 }
 
 export type TagsByType = Record<TagTypeId, MachineTag[]>;
@@ -61,6 +69,7 @@ function groupByLabel(
       slug: label.slug,
       name: label.name,
       machines: tagged,
+      machineCount: countNotRemoved(tagged),
     }));
 }
 
@@ -130,12 +139,16 @@ async function loadTags(tx: DbTransaction): Promise<TagsByType> {
   });
 
   return {
-    manufacturer: groupManufacturerTags(members).map((group) => ({
-      type: "manufacturer",
-      slug: group.slug,
-      name: group.name,
-      machines: group.machines.map((member) => member.machine),
-    })),
+    manufacturer: groupManufacturerTags(members).map((group) => {
+      const tagged = group.machines.map((member) => member.machine);
+      return {
+        type: "manufacturer",
+        slug: group.slug,
+        name: group.name,
+        machines: tagged,
+        machineCount: countNotRemoved(tagged),
+      };
+    }),
     type: groupByLabel("type", members, (model) => typeTag(model.type)),
     display: groupByLabel("display", members, (model) =>
       displayTag(model.display)

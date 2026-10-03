@@ -143,6 +143,11 @@
 - **9.5** The panel has explicit loading, failure, no-machine, and no-open- issues states.
 - **9.6** The recent-open-issues section is always visible and visually prominent whenever it is shown; it is not collapsible.
 
+## 10. Machine choice
+
+- **10.1** Every reporting mode's machine choice leaves out Removed machines.
+- **10.2** PinPoint refuses to create an issue on a Removed machine, whatever path submits it.
+
 ## Known divergences
 
 | Requirement | Code today | Resolution |
@@ -154,6 +159,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-03 | Added machine choice (§10): Removed machines are not offered, and no path creates an issue on one. |
 | 2026-09-22 | Split the report-mode preference into mobile bottom-bar and tablet/desktop header settings with distinct defaults and fallbacks; clarified that direct `/report` links remain Quick. |
 | 2026-09-12 | Added a per-user default report mode with a capability-safe fallback, and made recent open issues always visible. |
 | 2026-09-06 | Aligned batch-row behavior and divergence coverage with the existing report flow after conformance review. |

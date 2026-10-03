@@ -27,7 +27,7 @@ describe("machine view URL state", () => {
 
   it("uses the Collection preset defaults independently", () => {
     const state = parseMachineViewState(new URLSearchParams(), "collection");
-    expect(state.presence).toBe("all");
+    expect(state.presence).toEqual(["on_the_floor"]);
     expect({ sort: state.sort, dir: state.dir }).toEqual({
       sort: "playability",
       dir: "desc",

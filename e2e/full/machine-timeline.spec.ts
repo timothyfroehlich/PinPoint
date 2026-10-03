@@ -35,7 +35,7 @@ import {
 } from "../support/page-helpers.js";
 
 const machineA = seededMachines.addamsFamily.initials;
-const machineB = seededMachines.eightBallDeluxe.initials;
+const machineB = seededMachines.medievalMadness.initials;
 
 // PREFIX tags note bodies; REASSIGN_PREFIX is the human-readable stem of the
 // reassign journey's issue title (the run appends its own unique suffix).

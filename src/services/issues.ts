@@ -124,6 +124,21 @@ export class PinballMapCommentAlreadyConvertedError extends Error {
   }
 }
 
+/** User-facing message for an attempt to report on a Removed machine. */
+export const REMOVED_MACHINE_REPORT_ERROR =
+  "This machine is Removed and can't take new issues.";
+
+/**
+ * The machine is Removed, PinPoint's archived presence state, so no path may
+ * create an issue on it (reporting §10.2). Nothing is written.
+ */
+export class MachineRemovedError extends Error {
+  constructor(readonly machineInitials: string) {
+    super(REMOVED_MACHINE_REPORT_ERROR);
+    this.name = "MachineRemovedError";
+  }
+}
+
 export interface UpdateIssueStatusParams {
   issueId: string;
   status: IssueStatus;
@@ -274,10 +289,15 @@ export async function createIssue({
         nextIssueNumber: machines.nextIssueNumber,
         name: machines.name,
         ownerId: machines.ownerId,
+        presenceStatus: machines.presenceStatus,
       });
 
     if (!updatedMachine) {
       throw new Error(`Machine not found: ${machineInitials}`);
+    }
+    // Throwing rolls the number reservation above back with the transaction.
+    if (updatedMachine.presenceStatus === "removed") {
+      throw new MachineRemovedError(machineInitials);
     }
 
     // The number we just reserved is (nextIssueNumber - 1) because we incremented it
