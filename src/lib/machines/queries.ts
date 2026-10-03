@@ -1,6 +1,6 @@
-import { db } from "~/server/db";
+import { db, type DbTransaction } from "~/server/db";
 import { machines, userProfiles, invitedUsers } from "~/server/db/schema";
-import { eq, ne, type SQL } from "drizzle-orm";
+import { and, asc, eq, inArray, ne, or, type SQL } from "drizzle-orm";
 import type { MachineOwner } from "~/lib/types";
 
 /**
@@ -10,6 +10,47 @@ import type { MachineOwner } from "~/lib/types";
  */
 export function machineNotRemoved(): SQL {
   return ne(machines.presenceStatus, "removed");
+}
+
+export interface MachineChoice {
+  id: string;
+  initials: string;
+  name: string;
+}
+
+/**
+ * The machines a picker or filter offers, alphabetical by name. Removed
+ * machines are left out unless `includeRemoved` is set; `keepInitials` keeps
+ * specific machines listed anyway, such as ones already selected.
+ */
+export async function getMachineChoices(
+  tx: DbTransaction = db,
+  options: { includeRemoved?: boolean; keepInitials?: readonly string[] } = {}
+): Promise<MachineChoice[]> {
+  const keep = options.keepInitials ?? [];
+  const where = options.includeRemoved
+    ? undefined
+    : keep.length > 0
+      ? or(machineNotRemoved(), inArray(machines.initials, [...keep]))
+      : machineNotRemoved();
+  return tx.query.machines.findMany({
+    where,
+    columns: { id: true, initials: true, name: true },
+    orderBy: [asc(machines.name)],
+  });
+}
+
+/** Initials of the machines `ownerId` owns, other than Removed ones. */
+export async function getOwnedMachineInitials(
+  tx: DbTransaction = db,
+  ownerId: string
+): Promise<string[]> {
+  const rows = await tx.query.machines.findMany({
+    where: and(eq(machines.ownerId, ownerId), machineNotRemoved()),
+    columns: { initials: true },
+    orderBy: [asc(machines.initials)],
+  });
+  return rows.map((row) => row.initials);
 }
 
 export async function getMachineOwner(
