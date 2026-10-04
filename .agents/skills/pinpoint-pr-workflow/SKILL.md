@@ -149,7 +149,7 @@ The reviewer is Claude Code's built-in `/code-review`, run by the owning agent i
    ```bash
    bash scripts/workflow/claude-review-level.sh
    ```
-   Line 1 is `low`, `medium`, `high`, or `ask`. On `ask` (over 3,000 weighted lines), stop and ask Tim which level to run, or whether to split the PR.
+   Line 1 is `low`, `medium`, `high`, or `ask`. On `ask` (over 3,000 weighted lines), stop and ask Tim whether to run `xhigh` or `max`, or to split the PR. The record accepts all five levels; record the level the review actually ran at.
 2. **Review.** Invoke the `code-review` skill with the level first, then the PR number: `medium 1234`. The reverse order (`1234 medium`) silently runs at the last-used level.
 3. **Adjudicate every finding.** Fix it, or decline it with a one-sentence reason. Keep one findings file across all rounds (format in the header of `record-claude-review.sh`): each finding's round, file, line and summary, with `fixed` plus the fixing commit or `declined` plus the reason.
 4. **Re-review until clean.** After pushing fixes, wait for replacement CI, then repeat step 2 on the new head at the same level. The loop ends on a round that raises nothing new; a finding re-raised after a decline stays declined.

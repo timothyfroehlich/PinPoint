@@ -30,8 +30,10 @@ readonly CODEX_REACTION_WITNESS_PREFIX="<!-- pinpoint-codex-reaction-witness:"
 # The review record the owning agent posts after a clean local Claude Code
 # /code-review (spec pr-lifecycle-monitoring §8.18). record-claude-review.sh writes it;
 # only a record posted from the owner's account counts (§8.3), and it covers exactly
-# the head its marker names.
-readonly CLAUDE_REVIEW_MARKER_RE='\A<!-- pinpoint-claude-review: (?<sha>[0-9a-f]{40}) level=(?<level>low|medium|high) -->'
+# the head its marker names. CLAUDE_REVIEW_LEVELS is the one list of levels a record
+# may carry; record-claude-review.sh validates --level against it.
+readonly CLAUDE_REVIEW_LEVELS='low|medium|high|xhigh|max'
+readonly CLAUDE_REVIEW_MARKER_RE="\\A<!-- pinpoint-claude-review: (?<sha>[0-9a-f]{40}) level=(?<level>${CLAUDE_REVIEW_LEVELS}) -->"
 
 # Parse owner/repo dynamically — avoid hardcoded slug. Memoized: several gates ask for
 # it and pr-dashboard.sh runs them once per open PR, so an unmemoized call was one

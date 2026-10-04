@@ -128,7 +128,7 @@ chromium-only smoke. `pnpm run preflight` wraps it in `quiet-run.py`;
 
 ### Review state (`reviewed`)
 
-**The reviewer is a local Claude Code `/code-review`** (spec `docs/feature-specs/pr-lifecycle-monitoring.md` §8). `claude-review-level.sh` picks the level; after a clean round, `record-claude-review.sh` posts the review record: an issue comment from the repository owner whose first line is `<!-- pinpoint-claude-review: <40-char head> level=<low|medium|high> -->`. The gate trusts only the owner's account and only a marker at the very start of the body. Codex evidence (below) still counts until its subscription ends; nothing requests it any more. A PR with no coverage merges only through `merge-pr.sh --force` at Tim's explicit direction.
+**The reviewer is a local Claude Code `/code-review`** (spec `docs/feature-specs/pr-lifecycle-monitoring.md` §8). `claude-review-level.sh` picks the level; after a clean round, `record-claude-review.sh` posts the review record: an issue comment from the repository owner whose first line is `<!-- pinpoint-claude-review: <40-char head> level=<low|medium|high|xhigh|max> -->`. The gate trusts only the owner's account and only a marker at the very start of the body. Codex evidence (below) still counts until its subscription ends; nothing requests it any more. A PR with no coverage merges only through `merge-pr.sh --force` at Tim's explicit direction.
 
 `_review_summary` in `_pr-gates.sh` runs two independent checkers over one fetch of the PR's reviews and comments. Each answers for its own reviewer only:
 
