@@ -344,8 +344,9 @@ function FiltersSheet({
 
   let title = "Filter & sort";
   let body: React.ReactNode = null;
+  // Reset stays enabled at the Page Preset, where it does nothing, so
+  // pressing it never drops focus (§4.9).
   let reset: (() => void) | null = null;
-  let resetDisabled = false;
   if (panel.kind === "top") {
     body = (
       <>
@@ -428,7 +429,6 @@ function FiltersSheet({
   } else if (activeFilter) {
     title = activeFilter.label;
     reset = activeFilter.onReset;
-    resetDisabled = activeFilter.atPreset;
     body = (
       <div className="pt-2">
         <FilterPicker filter={activeFilter} variant="sheet" />
@@ -535,8 +535,7 @@ function FiltersSheet({
             <button
               type="button"
               onClick={reset}
-              disabled={resetDisabled}
-              className="min-h-11 rounded-md px-3 text-sm text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-50"
+              className="min-h-11 rounded-md px-3 text-sm text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             >
               Reset
             </button>

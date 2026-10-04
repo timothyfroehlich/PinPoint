@@ -21,16 +21,16 @@ import {
 } from "~/lib/machines/view/config";
 
 /** Playability values in their canonical order (machine-views §3.12). */
-export const MACHINE_STATUS_VALUES: readonly MachineStatus[] = [
+export const MACHINE_STATUS_VALUES = [
   "operational",
   "needs_service",
   "unplayable",
-];
+] as const satisfies readonly MachineStatus[];
 
 /** Page sizes (list-views §5.7). */
-export const MACHINE_VIEW_PAGE_SIZES: readonly MachineViewPageSize[] = [
+export const MACHINE_VIEW_PAGE_SIZES = [
   25, 50, 100,
-];
+] as const satisfies readonly MachineViewPageSize[];
 
 export function isMachineViewField(
   value: string | null
@@ -97,7 +97,7 @@ export function canonicalOwnerValues(values: readonly string[]): string[] {
   const unique = [...new Set(values)].filter(Boolean);
   const people = unique
     .filter((value) => !OWNER_SHORTCUTS.includes(value))
-    .sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
+    .sort();
   return [...canonicalFilterValues(unique, OWNER_SHORTCUTS), ...people];
 }
 

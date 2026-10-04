@@ -49,6 +49,7 @@ function views(overrides: Partial<ListViewsModel> = {}): ListViewsModel {
     appliedName: "Broken games",
     appliedIsSaved: true,
     edited: false,
+    configurationKey: "",
     canSave: true,
     offersDefault: true,
     defaultPageName: "Issues",

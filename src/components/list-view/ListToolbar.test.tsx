@@ -1,5 +1,5 @@
 import * as React from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ListToolbar } from "./ListToolbar";
@@ -28,8 +28,12 @@ function stubLayout(): void {
   );
 }
 
-function Host(): React.JSX.Element {
-  const [owner, setOwner] = React.useState<string[]>([]);
+function Host({
+  initialOwner = [],
+}: {
+  initialOwner?: string[];
+}): React.JSX.Element {
+  const [owner, setOwner] = React.useState<string[]>(initialOwner);
   const options = [{ value: "person-1", label: LONG_NAME }];
   const filters: ListFilterModel[] = [
     {
@@ -82,43 +86,60 @@ describe("ListToolbar", () => {
     expect(screen.getByTestId("list-filter-more")).toBeInTheDocument();
   });
 
-  it("resets a filter to its Page Preset value rather than emptying it (list-views §4.9)", async () => {
+  it("moves focus to More when closing a filter from the keyboard moves it there (list-views §8.1)", async () => {
     const user = userEvent.setup();
-    const onChange = vi.fn();
-    const onReset = vi.fn();
-    const presence: ListFilterModel = {
-      id: "presence",
-      label: "Presence",
-      options: [
-        { value: "on_the_floor", label: "On the Floor" },
-        { value: "removed", label: "Removed" },
-      ],
-      selected: ["removed"],
-      valueLabel: "Removed",
-      atPreset: false,
-      onChange,
-      onReset,
-    };
-    const { rerender } = render(
-      <ListToolbar
-        search={<input aria-label="Search" />}
-        primaryFilters={[presence]}
-      />
-    );
+    render(<Host />);
 
-    await user.click(screen.getByTestId("list-filter-presence"));
+    await user.click(screen.getByTestId("list-filter-owner"));
+    await user.click(screen.getByRole("checkbox", { name: LONG_NAME }));
+    await user.keyboard("{Escape}");
+
+    // Owner's own trigger left the row with it, so focus follows to More
+    // rather than falling to the page.
+    await waitFor(() =>
+      expect(screen.getByTestId("list-filter-more")).toHaveFocus()
+    );
+  });
+
+  it("moves focus to the filter that was open in More when closing More removes it (list-views §8.1)", async () => {
+    const user = userEvent.setup();
+    render(<Host initialOwner={["person-1"]} />);
+
+    await user.click(screen.getByTestId("list-filter-more"));
+    await user.click(screen.getByRole("button", { name: /^Owner/ }));
     await user.click(screen.getByRole("button", { name: "Reset" }));
-    expect(onReset).toHaveBeenCalledOnce();
-    expect(onChange).not.toHaveBeenCalled();
+    // Owner fits again, but the row holds while More is open.
+    expect(screen.getByTestId("list-filter-more")).toBeInTheDocument();
+    await user.keyboard("{Escape}");
 
-    rerender(
-      <ListToolbar
-        search={<input aria-label="Search" />}
-        primaryFilters={[
-          { ...presence, selected: ["on_the_floor"], atPreset: true },
-        ]}
-      />
+    expect(screen.queryByTestId("list-filter-more")).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByTestId("list-filter-owner")).toHaveFocus()
     );
-    expect(screen.getByRole("button", { name: "Reset" })).toBeDisabled();
+  });
+
+  it("closes a filter's options on a press outside only once its click lands, so the row never moves under it (list-views §8.1)", async () => {
+    const user = userEvent.setup();
+    render(<Host />);
+
+    await user.click(screen.getByTestId("list-filter-owner"));
+    await user.click(screen.getByRole("checkbox", { name: LONG_NAME }));
+    const search = screen.getByRole("textbox", { name: "Search" });
+    const clicked = vi.fn();
+    search.addEventListener("click", clicked);
+
+    // Pressed: Owner's options stay open and the row keeps its arrangement.
+    await user.pointer({ keys: "[MouseLeft>]", target: search });
+    expect(screen.getByRole("checkbox", { name: LONG_NAME })).toBeVisible();
+    expect(screen.queryByTestId("list-filter-more")).not.toBeInTheDocument();
+
+    // Released: the click lands where it was pressed, then the row moves.
+    await user.pointer({ keys: "[/MouseLeft]", target: search });
+    expect(clicked).toHaveBeenCalledOnce();
+    expect(
+      screen.queryByRole("checkbox", { name: LONG_NAME })
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("list-filter-more")).toBeInTheDocument();
+    expect(search).toHaveFocus();
   });
 });

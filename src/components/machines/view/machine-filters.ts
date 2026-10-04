@@ -12,7 +12,12 @@ import {
   getMachineStatusLabel,
   MACHINE_STATUS_COLORS,
 } from "~/lib/machines/status";
-import { ME_OWNER_ID, UNASSIGNED_OWNER_ID } from "~/lib/machines/view/config";
+import {
+  ME_OWNER_ID,
+  ME_OWNER_NAME,
+  UNASSIGNED_OWNER_ID,
+  UNASSIGNED_OWNER_NAME,
+} from "~/lib/machines/view/config";
 import {
   arraysEqual,
   canonicalFilterValues,
@@ -67,8 +72,8 @@ export function buildMachineFilters({
     label: SEVERITY_CONFIG[value].label,
   }));
   const ownerShortcuts: ListOption[] = [
-    ...(offersMe ? [{ value: ME_OWNER_ID, label: "Me" }] : []),
-    { value: UNASSIGNED_OWNER_ID, label: "Unassigned" },
+    ...(offersMe ? [{ value: ME_OWNER_ID, label: ME_OWNER_NAME }] : []),
+    { value: UNASSIGNED_OWNER_ID, label: UNASSIGNED_OWNER_NAME },
   ];
   const people: ListOption[] = ownerOptions
     .filter(

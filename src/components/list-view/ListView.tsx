@@ -65,7 +65,11 @@ interface ListViewProps {
   titleRow?: React.ReactNode;
   /** The host's Summary Widgets (§3.1, §8.4). */
   summary?: React.ReactNode;
-  /** The search field (§4.1, §4.2). */
+  /**
+   * The search field (§4.1, §4.2). It is mounted afresh whenever a view is
+   * applied or changes are discarded, so a search still waiting to run is
+   * dropped and never undoes that move.
+   */
   search: React.ReactNode;
   primaryFilters: readonly ListFilterModel[];
   secondaryFilters?: readonly ListFilterModel[] | undefined;
@@ -79,8 +83,11 @@ interface ListViewProps {
   busy: boolean;
   /** Returns every filter to its Page Preset value (§7.5). */
   onResetAll: () => void;
-  /** Shown in place of the rows when nothing matches (§3.6). */
-  emptyState: React.ReactNode;
+  /**
+   * Shown in place of the rows when nothing matches (§3.6). `discard`
+   * returns to the Applied View, as Discard changes does.
+   */
+  emptyState: (discard: () => void) => React.ReactNode;
   /** The rows. */
   children: React.ReactNode;
 }
@@ -113,9 +120,12 @@ export function ListView({
 }: ListViewProps): React.JSX.Element {
   const [saveOpen, setSaveOpen] = React.useState(false);
   const [manageOpen, setManageOpen] = React.useState(false);
-  // A Save changes failure belongs to the view and edits it was made from;
-  // applying a view, discarding, or saving clears it.
-  const viewKey = `${views.appliedId}:${String(views.edited)}`;
+  // Counts moves of the whole configuration (a view applied, changes
+  // discarded); the search field is keyed on it.
+  const [searchEpoch, setSearchEpoch] = React.useState(0);
+  // A Save changes failure belongs to the view and configuration it was made
+  // from; any other configuration, applying a view, or discarding hides it.
+  const viewKey = `${views.appliedId}:${views.configurationKey}`;
   const [saveFailure, setSaveFailure] = React.useState<{
     message: string;
     viewKey: string;
@@ -131,15 +141,28 @@ export function ListView({
   const empty = pagination.totalCount === 0;
 
   function saveChanges(): void {
-    const savedFrom = viewKey;
     setSaveFailure(null);
     startSaving(async () => {
       const result = await views.actions.saveChanges();
-      if (!result.ok) {
-        setSaveFailure({ message: result.message, viewKey: savedFrom });
-      }
+      if (!result.ok) setSaveFailure({ message: result.message, viewKey });
     });
   }
+
+  function moveWhole(): void {
+    setSearchEpoch((epoch) => epoch + 1);
+    setSaveFailure(null);
+  }
+  const listViews: ListViewsModel = {
+    ...views,
+    onApply: (id) => {
+      moveWhole();
+      views.onApply(id);
+    },
+    onDiscard: () => {
+      moveWhole();
+      views.onDiscard();
+    },
+  };
 
   const openSaveAsNew = (): void => setSaveOpen(true);
   const openManage = (): void => setManageOpen(true);
@@ -149,7 +172,7 @@ export function ListView({
       {titleRow}
       {summary}
       <ListToolbar
-        search={search}
+        search={<React.Fragment key={searchEpoch}>{search}</React.Fragment>}
         primaryFilters={primaryFilters}
         secondaryFilters={secondaryFilters}
       />
@@ -159,7 +182,7 @@ export function ListView({
         className="border-y border-outline-variant bg-card max-md:-mx-4 sm:max-md:-mx-8 md:overflow-hidden md:rounded-lg md:border"
       >
         <ListHeader
-          views={views}
+          views={listViews}
           sort={sort}
           pagination={pagination}
           display={display}
@@ -169,7 +192,7 @@ export function ListView({
           onManage={openManage}
         />
         <PhoneListHeader
-          views={views}
+          views={listViews}
           primaryFilters={primaryFilters}
           secondaryFilters={secondaryFilters}
           sort={sort}
@@ -195,7 +218,7 @@ export function ListView({
             busy && "opacity-60"
           )}
         >
-          {empty ? emptyState : children}
+          {empty ? emptyState(listViews.onDiscard) : children}
         </div>
       </section>
       {empty ? null : (
@@ -215,12 +238,12 @@ export function ListView({
       <SaveViewDialog
         open={saveOpen}
         onOpenChange={setSaveOpen}
-        views={views}
+        views={listViews}
       />
       <ManageViewsDialog
         open={manageOpen}
         onOpenChange={setManageOpen}
-        views={views}
+        views={listViews}
       />
     </div>
   );

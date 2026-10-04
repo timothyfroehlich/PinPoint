@@ -16,12 +16,6 @@ interface ListSearchFieldProps {
    * changed while it waited.
    */
   onSearch: (query: string) => void;
-  /**
-   * Changes when the list moves to another configuration as a whole (a view
-   * applied, changes discarded). A search still waiting is dropped and the
-   * field shows `value`, so typing never undoes that move.
-   */
-  resetKey?: string | number | undefined;
   /** Accessible name, such as "Search machines". */
   label: string;
   /** Names what the search covers (§4.2). */
@@ -31,14 +25,14 @@ interface ListSearchFieldProps {
 /**
  * The List View search field (list-views §4.1, §4.2). It keeps the person's
  * typing while an earlier search's results arrive, and takes a new value
- * only when the list's search changes from elsewhere (a view applied,
- * changes discarded).
+ * only when the list's search changes from elsewhere. List View mounts it
+ * afresh when a view is applied or changes are discarded, which drops a
+ * search still waiting to run.
  */
 export function ListSearchField({
   id,
   value,
   onSearch,
-  resetKey,
   label,
   placeholder,
 }: ListSearchFieldProps): React.JSX.Element {
@@ -61,15 +55,6 @@ export function ListSearchField({
     submitted.current = value;
     setText(value);
   }, [clearPending, value]);
-
-  const lastResetKey = React.useRef(resetKey);
-  React.useEffect(() => {
-    if (resetKey === lastResetKey.current) return;
-    lastResetKey.current = resetKey;
-    clearPending();
-    submitted.current = value;
-    setText(value);
-  }, [clearPending, resetKey, value]);
 
   const submit = React.useCallback(
     (raw: string): void => {

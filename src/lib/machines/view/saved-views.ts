@@ -18,7 +18,8 @@ import { getExistingMachineViewOwners } from "./owners";
 import {
   hasMachineViewConfiguration,
   normalizeMachineViewSavedState,
-  savedMachineViewSearchParams,
+  parseMachineViewState,
+  serializeMachineViewState,
   type MachineViewSearchParams,
 } from "./state";
 
@@ -113,13 +114,14 @@ export function resolveSavedMachineViewRequest({
     if (defaultView.id === MACHINE_VIEW_PAGE_PRESET_VIEW_ID[preset]) {
       return { activeViewId: null, redirectTo: null };
     }
-    const params = savedMachineViewSearchParams(
-      defaultView.state,
+    // The canonical URL the list itself writes, so the client never
+    // rewrites it again: the default's configuration at the URL's page.
+    const { page } = parseMachineViewState(searchParams, preset);
+    const params = serializeMachineViewState(
+      { ...defaultView.state, page },
       preset,
       defaultView.id
     );
-    const page = searchParams.get("page");
-    if (page !== null) params.set("page", page);
     return {
       activeViewId: defaultView.id,
       redirectTo: `${pathname}?${params.toString()}`,

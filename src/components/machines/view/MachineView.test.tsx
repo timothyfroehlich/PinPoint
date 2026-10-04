@@ -305,6 +305,16 @@ describe("MachineView", () => {
     );
   });
 
+  it("names the Applied View of an unedited empty list without a supporting line (list-views §3.6)", () => {
+    renderView({ result: result({ rows: [], totalCount: 0 }) });
+
+    expect(screen.getByText("No machines in On the floor")).toBeInTheDocument();
+    expect(screen.queryByText("No machines match")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^Back to/ })
+    ).not.toBeInTheDocument();
+  });
+
   it("keeps the compact and bottom pagers on one page and scrolls to the list from the bottom", async () => {
     const user = userEvent.setup();
     const scrollIntoView = vi.spyOn(HTMLElement.prototype, "scrollIntoView");
@@ -392,15 +402,14 @@ describe("MachineView", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "Machines" })
     ).toBeInTheDocument();
-    // The title row's toggle shows "2/2 playable" and reads "2 of 2".
-    const [toggle, groupToggle] = screen.getAllByRole("button", {
+    // The title row's toggle is named by the "2/2 playable" it shows
+    // (WCAG 2.5.3); the group's own reads the wider "2 of 2 playable".
+    const toggle = screen.getByRole("button", {
+      name: "Summary: 2/2 playable",
+    });
+    const groupToggle = screen.getByRole("button", {
       name: "Summary: 2 of 2 playable",
     });
-    if (!toggle || !groupToggle) throw new Error("Summary Row toggles missing");
-    expect(within(toggle).getByText("2/2")).toHaveAttribute(
-      "aria-hidden",
-      "true"
-    );
     // Both control the same section; the group's own hides on phones.
     expect(toggle.getAttribute("aria-controls")).toBe(
       groupToggle.getAttribute("aria-controls")
@@ -551,7 +560,10 @@ describe("MachineView", () => {
       "/m?view=on-the-floor",
       { scroll: false }
     );
-    expect(search).toHaveValue("");
+    // The field is mounted afresh with the Applied View's search.
+    expect(
+      screen.getByRole("searchbox", { name: /search machines/i })
+    ).toHaveValue("");
   });
 
   it("names the Page Preset's view when it rewrites a URL to its canonical form while a Default View exists (list-views §9.3, §10.10)", () => {
@@ -671,6 +683,14 @@ describe("MachineView", () => {
 
     await user.click(screen.getByRole("button", { name: "Discard changes" }));
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+    // A new edit is not the configuration that failed to save.
+    await user.click(screen.getByTestId("list-filter-severity"));
+    await user.click(screen.getByRole("checkbox", { name: "Major" }));
+    expect(
+      screen.getByRole("button", { name: "Discard changes" })
+    ).toBeVisible();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("keeps the Save view dialog open with the error when the name is taken (list-views §10.7)", async () => {
@@ -722,7 +742,7 @@ describe("MachineView", () => {
     await vi.waitFor(() => expect(navigation.refresh).toHaveBeenCalled());
   });
 
-  it("makes a Built-in View the default from Manage views (list-views §10.9)", async () => {
+  it("makes a Built-in View the default from Manage views and keeps the list it shows (list-views §10.9, §10.10)", async () => {
     const user = userEvent.setup();
     actions.setMachineViewDefaultAction.mockResolvedValue({ ok: true });
     renderView();
@@ -738,6 +758,57 @@ describe("MachineView", () => {
       target: { kind: "builtIn", id: "service-due" },
     });
     await vi.waitFor(() => expect(navigation.refresh).toHaveBeenCalled());
+    // A bare /m now opens Service due, so the list names its own view
+    // before the refresh reaches the server.
+    expect(navigation.replace).toHaveBeenLastCalledWith(
+      "/m?view=on-the-floor",
+      { scroll: false }
+    );
+    expect(navigation.replace.mock.invocationCallOrder.at(-1)).toBeLessThan(
+      navigation.refresh.mock.invocationCallOrder.at(-1) ?? 0
+    );
+  });
+
+  it("keeps a bare URL when the Default View is the Page Preset's own view (list-views §10.10)", async () => {
+    const user = userEvent.setup();
+    navigation.searchParams = new URLSearchParams({ q: "mars" });
+    renderView({
+      result: result({ state: { ...presetState, q: "mars" } }),
+      views: savedViews({ defaultViewId: "on-the-floor" }),
+    });
+
+    await user.clear(screen.getByRole("searchbox", { name: /search/i }));
+    await user.keyboard("{Enter}");
+    // The server opens a bare /m at the Page Preset already.
+    expect(navigation.replace).toHaveBeenLastCalledWith("/m", {
+      scroll: false,
+    });
+  });
+
+  it("leaves a bare URL as written when the Default View is the Page Preset's own view", () => {
+    renderView({ views: savedViews({ defaultViewId: "on-the-floor" }) });
+
+    expect(navigation.replace).not.toHaveBeenCalled();
+  });
+
+  it("resets a filter to its Page Preset value rather than emptying it, and keeps Reset enabled there (list-views §4.9)", async () => {
+    const user = userEvent.setup();
+    navigation.searchParams = new URLSearchParams({ presence: "removed" });
+    renderView({
+      result: result({ state: { ...presetState, presence: ["removed"] } }),
+    });
+
+    await user.click(screen.getByTestId("list-filter-presence"));
+    const reset = screen.getByRole("button", { name: "Reset" });
+    await user.click(reset);
+
+    // Back to On the Floor, not every presence state (presence=all).
+    expect(navigation.replace).toHaveBeenLastCalledWith("/m", {
+      scroll: false,
+    });
+    // At the Page Preset, Reset does nothing but keeps focus.
+    expect(reset).toBeEnabled();
+    expect(reset).toHaveFocus();
   });
 
   it("offers no Default View controls off the Machines page (list-views §10.8)", async () => {

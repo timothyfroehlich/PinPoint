@@ -128,7 +128,7 @@ test.describe("Machines Public Access", () => {
     }) => {
       await page.goto("/m");
       const summaryRow = page.getByRole("button", {
-        name: /^Summary: \d+ of \d+ playable$/,
+        name: /^Summary: \d+\/\d+ playable$/,
       });
       const presence = page.getByRole("region", { name: "Presence" });
       await expect(summaryRow).toHaveAttribute("aria-expanded", "false");
@@ -152,7 +152,7 @@ test.describe("Machines Public Access", () => {
     }) => {
       await page.goto("/m");
       const summaryRow = page.getByRole("button", {
-        name: /^Summary: \d+ of \d+ playable$/,
+        name: /^Summary: \d+\/\d+ playable$/,
       });
       const presence = page.getByRole("region", { name: "Presence" });
       await expect(summaryRow).toHaveAttribute("aria-expanded", "true");

@@ -116,9 +116,8 @@
 
 ## Known divergences (code vs spec)
 
-| Requirement | Divergence                                | Resolution |
-| :---------- | :---------------------------------------- | :--------- |
-| §9.2        | Collections' Page Preset is All machines. | PP-s363    |
+| Requirement | Divergence | Resolution |
+| :---------- | :--------- | :--------- |
 
 ---
 

@@ -28,6 +28,7 @@ import {
   ME_OWNER_ID,
   planMachineViewDependencies,
   UNASSIGNED_OWNER_ID,
+  UNASSIGNED_OWNER_NAME,
 } from "./config";
 import {
   applyMachineViewState,
@@ -35,7 +36,7 @@ import {
   summarizeMachineView,
   type MachineViewCandidate,
 } from "./model";
-import { getExistingMachineViewOwners, UNASSIGNED_OWNER_NAME } from "./owners";
+import { getExistingMachineViewOwners } from "./owners";
 import { parseMachineViewState } from "./state";
 
 export const MACHINE_VIEW_SERVICE_TAGS = [

@@ -68,6 +68,12 @@ export interface ListViewsModel {
   /** The Applied View is one of the account's own Saved Views (§5.3). */
   appliedIsSaved: boolean;
   edited: boolean;
+  /**
+   * The current View Configuration in a stable serialized form. A Save
+   * changes failure shows only while the configuration it was made from is
+   * unchanged (§5.3).
+   */
+  configurationKey: string;
   /** Signed-in accounts with the Save views permission (§10.1). */
   canSave: boolean;
   /** Default View controls show only on the host's main page (§10.8). */

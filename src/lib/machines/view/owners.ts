@@ -3,10 +3,12 @@ import "server-only";
 import { inArray } from "drizzle-orm";
 import type { DbTransaction } from "~/server/db";
 import { invitedUsers, userProfiles } from "~/server/db/schema";
-import { ME_OWNER_ID, UNASSIGNED_OWNER_ID } from "./config";
-
-export const UNASSIGNED_OWNER_NAME = "Unassigned";
-const ME_OWNER_NAME = "Me";
+import {
+  ME_OWNER_ID,
+  ME_OWNER_NAME,
+  UNASSIGNED_OWNER_ID,
+  UNASSIGNED_OWNER_NAME,
+} from "./config";
 
 // Postgres rejects a malformed uuid literal, so only UUID-shaped values are
 // looked up; anything else cannot name a person.

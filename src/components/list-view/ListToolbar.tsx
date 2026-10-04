@@ -74,6 +74,10 @@ function FilterButtonFace({
   );
 }
 
+/**
+ * The filter's name and Reset (§4.9). Reset stays enabled at the Page
+ * Preset, where it does nothing, so pressing it never drops focus.
+ */
 function FilterPopoverHeader({
   filter,
 }: {
@@ -85,8 +89,7 @@ function FilterPopoverHeader({
       <button
         type="button"
         onClick={filter.onReset}
-        disabled={filter.atPreset}
-        className="min-h-7 rounded-sm px-1 text-xs font-normal text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-50"
+        className="min-h-7 rounded-sm px-1 text-xs font-normal text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
       >
         Reset
       </button>
@@ -94,22 +97,31 @@ function FilterPopoverHeader({
   );
 }
 
-function FilterDropdown({
-  filter,
-  open,
-  onOpenChange,
-}: {
-  filter: ListFilterModel;
+/** How the toolbar opens and closes one popover. */
+interface PopoverWiring {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onInteractOutside: () => void;
+  onEscapeKeyDown: () => void;
+}
+
+function FilterDropdown({
+  filter,
+  wiring,
+  onCloseAutoFocus,
+}: {
+  filter: ListFilterModel;
+  wiring: PopoverWiring;
+  onCloseAutoFocus: (event: Event) => void;
 }): React.JSX.Element {
   return (
-    <Popover open={open} onOpenChange={onOpenChange}>
+    <Popover open={wiring.open} onOpenChange={wiring.onOpenChange}>
       <PopoverTrigger
         type="button"
         aria-label={filterButtonName(filter)}
         className={filterButtonClass}
         data-testid={`list-filter-${filter.id}`}
+        data-filter-trigger={filter.id}
       >
         <FilterButtonFace filter={filter} />
       </PopoverTrigger>
@@ -117,6 +129,9 @@ function FilterDropdown({
         align="end"
         aria-label={`Filter by ${filter.label.toLowerCase()}`}
         className="w-72 overflow-hidden p-0"
+        onInteractOutside={wiring.onInteractOutside}
+        onEscapeKeyDown={wiring.onEscapeKeyDown}
+        onCloseAutoFocus={onCloseAutoFocus}
       >
         <FilterPopoverHeader filter={filter} />
         <FilterPicker filter={filter} variant="popover" />
@@ -131,27 +146,34 @@ function FilterDropdown({
  */
 function MoreFilters({
   filters,
-  open,
-  onOpenChange,
+  wiring,
+  onCloseAutoFocus,
 }: {
   filters: readonly ListFilterModel[];
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  wiring: PopoverWiring;
+  /** `activeId` is the filter whose options were open in More, if any. */
+  onCloseAutoFocus: (event: Event, activeId: string | null) => void;
 }): React.JSX.Element {
   const [openId, setOpenId] = React.useState<string | null>(null);
+  // The filter open when More closed, which focus can return to.
+  const closedFrom = React.useRef<string | null>(null);
   const active = filters.find((filter) => filter.id === openId) ?? null;
   return (
     <Popover
-      open={open}
+      open={wiring.open}
       onOpenChange={(next) => {
-        if (!next) setOpenId(null);
-        onOpenChange(next);
+        if (!next) {
+          closedFrom.current = openId;
+          setOpenId(null);
+        }
+        wiring.onOpenChange(next);
       }}
     >
       <PopoverTrigger
         type="button"
         className={filterButtonClass}
         data-testid="list-filter-more"
+        data-filter-trigger={MORE_ID}
       >
         <span>More</span>
         <span className="sr-only">
@@ -166,6 +188,11 @@ function MoreFilters({
         align="end"
         aria-label="More filters"
         className="w-72 overflow-hidden p-0"
+        onInteractOutside={wiring.onInteractOutside}
+        onEscapeKeyDown={wiring.onEscapeKeyDown}
+        onCloseAutoFocus={(event) =>
+          onCloseAutoFocus(event, closedFrom.current)
+        }
       >
         {active ? (
           <>
@@ -182,8 +209,7 @@ function MoreFilters({
               <button
                 type="button"
                 onClick={active.onReset}
-                disabled={active.atPreset}
-                className="min-h-7 rounded-sm px-2 text-xs font-normal text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-50"
+                className="min-h-7 rounded-sm px-2 text-xs font-normal text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
               >
                 Reset
               </button>
@@ -239,7 +265,11 @@ interface ListToolbarProps {
  * Between phone and desktop, Primary Filters that do not fit move into More
  * from the right, one at a time (§8.1). While a filter's options are open the
  * row keeps its arrangement, so a choice that widens the filter never moves
- * the open filter into More and closes it mid-selection.
+ * the open filter into More and closes it mid-selection. A press outside
+ * closes the options only once its click has landed (Radix defers that
+ * dismissal), so the row never moves under a click. When closing from the
+ * keyboard rearranges the row, focus moves to where the closed control
+ * went: More, or the filter that was open in More.
  */
 export function ListToolbar({
   search,
@@ -261,6 +291,10 @@ export function ListToolbar({
     id: string;
     inlineCount: number;
   } | null>(null);
+  // The closing popover was dismissed from outside: the click or focus that
+  // dismissed it places focus, so closing must not move it.
+  const interactedOutside = React.useRef(false);
+  const closedOutside = React.useRef(false);
   // Filters that are not laid out (display: none below md) measure zero and
   // stay inline until they are shown.
   const fittedCount =
@@ -281,11 +315,52 @@ export function ListToolbar({
   );
   const inline = primaryFilters.slice(0, inlineCount);
   const overflow = [...primaryFilters.slice(inlineCount), ...secondaryFilters];
-  const openChange =
-    (id: string) =>
-    (next: boolean): void => {
-      if (next) setOpen({ id, inlineCount });
-      else setOpen((current) => (current?.id === id ? null : current));
+
+  const wiring = (id: string): PopoverWiring => ({
+    open: open?.id === id,
+    onOpenChange: (next) => {
+      if (next) {
+        interactedOutside.current = false;
+        setOpen({ id, inlineCount });
+        return;
+      }
+      closedOutside.current = interactedOutside.current;
+      interactedOutside.current = false;
+      setOpen((current) => (current?.id === id ? null : current));
+    },
+    onInteractOutside: () => {
+      interactedOutside.current = true;
+    },
+    // A press outside that never became a click leaves the popover open;
+    // Escape is still a keyboard close.
+    onEscapeKeyDown: () => {
+      interactedOutside.current = false;
+    },
+  });
+
+  // Focus after a popover closes: the first of `ids` still in the row, else
+  // the first filter. Nothing moves focus when a click or focus outside
+  // closed the popover.
+  const focusAfterClose =
+    (ids: readonly (string | null)[]) =>
+    (event: Event): void => {
+      if (closedOutside.current) return;
+      const triggers = [
+        ...(rowRef.current?.querySelectorAll<HTMLElement>(
+          "[data-filter-trigger]"
+        ) ?? []),
+      ];
+      const target =
+        ids
+          .map((id) =>
+            triggers.find(
+              (trigger) => trigger.getAttribute("data-filter-trigger") === id
+            )
+          )
+          .find((trigger) => trigger !== undefined) ?? triggers[0];
+      if (!target) return;
+      event.preventDefault();
+      target.focus();
     };
 
   return (
@@ -300,15 +375,17 @@ export function ListToolbar({
           <FilterDropdown
             key={filter.id}
             filter={filter}
-            open={open?.id === filter.id}
-            onOpenChange={openChange(filter.id)}
+            wiring={wiring(filter.id)}
+            onCloseAutoFocus={focusAfterClose([filter.id, MORE_ID])}
           />
         ))}
         {overflow.length > 0 ? (
           <MoreFilters
             filters={overflow}
-            open={open?.id === MORE_ID}
-            onOpenChange={openChange(MORE_ID)}
+            wiring={wiring(MORE_ID)}
+            onCloseAutoFocus={(event, activeId) =>
+              focusAfterClose([MORE_ID, activeId])(event)
+            }
           />
         ) : null}
       </div>

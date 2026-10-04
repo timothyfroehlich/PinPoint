@@ -18,6 +18,8 @@ export type MachineViewDependency = "service" | "activity";
 
 /** The owner filter value for machines with no owner (machine-views §4.2). */
 export const UNASSIGNED_OWNER_ID = "unassigned";
+/** How the Unassigned shortcut and an ownerless machine are named (§3.13). */
+export const UNASSIGNED_OWNER_NAME = "Unassigned";
 /**
  * The owner filter value for whoever is viewing (machine-views §4.2). It is
  * resolved per viewer when the filter runs, so one URL or Saved View means
@@ -25,6 +27,8 @@ export const UNASSIGNED_OWNER_ID = "unassigned";
  * is dropped, so the list shows every machine in the rest of the view.
  */
 export const ME_OWNER_ID = "me";
+/** How the Me shortcut is named (machine-views §3.13). */
+export const ME_OWNER_NAME = "Me";
 
 type DirectionLabels = Record<MachineViewSortDirection, string>;
 
