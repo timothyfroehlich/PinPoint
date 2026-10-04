@@ -53,6 +53,7 @@
 - **5.6** A failure leaves the search field and current query available for another attempt.
 - **5.7** A response for an older query never replaces results for a newer query.
 - **5.8** Desktop and mobile search use the same query behavior and produce the same results.
+- **5.9** Machine results update as the person types, without waiting for issue results.
 
 ## 6. Accessibility and responsiveness
 
@@ -67,19 +68,21 @@
 
 - **7.1** Search evaluates machine and issue viewing permissions on the server.
 - **7.2** Search returns only the fields required to identify and navigate to a result.
-- **7.3** Search work is bounded by the minimum query length and per-group result limits.
+- **7.3** Server search work is bounded by the minimum query length and per-group result limits.
 - **7.4** Search input is treated as data and cannot alter the structure or authorization scope of the underlying query.
+- **7.5** Machine matching may run in the browser against the machines the viewer can view; that list carries only the fields needed to match and identify a machine.
 
 ## Known divergences
 
 | Requirement | Divergence | Resolution |
 | :-- | :-- | :-- |
-| 3.4 | Search includes Removed machines and their issues. | PP-s363 |
+| 5.9 | Machine results wait on the same debounced server lookup as issue results. | PP-l9qv |
 
 ## Changelog
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-04 | Machine results update as the person types (5.9); machine matching may run in the browser (7.3, 7.5). |
 | 2026-10-03 | Search leaves out Removed machines and their issues (3.4). |
 | 2026-09-22 | Clarified inline desktop search, focus behavior, failure state, and the mobile dialog focus boundary. |
 | 2026-09-20 | Created the quick-search requirements for machines and issues. |
