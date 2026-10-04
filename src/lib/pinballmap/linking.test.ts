@@ -39,14 +39,13 @@ describe("validatePbmLinkSelection", () => {
     expect(validatePbmLinkSelection(neither, false)).toBeNull();
   });
 
-  it("defaults to the (currently off) PBM_LINKING_REQUIRED flag", () => {
-    expect(PBM_LINKING_REQUIRED).toBe(false);
-    // With the flag off, an empty selection is valid by default.
+  it("defaults to the PBM_LINKING_REQUIRED flag, which is on", () => {
+    expect(PBM_LINKING_REQUIRED).toBe(true);
     expect(
       validatePbmLinkSelection({
         pinballmapMachineId: null,
         pinballmapExcluded: false,
       })
-    ).toBeNull();
+    ).toBe("link_required");
   });
 });

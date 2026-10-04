@@ -9,6 +9,7 @@ import { dispatchNotification } from "~/lib/notifications";
 import { checkPermission } from "~/lib/permissions/helpers";
 import { VALID_MACHINE_PRESENCE_STATUSES } from "~/lib/machines/presence";
 import { resolvePbmLinkColumnsForCreate } from "~/lib/pinballmap/link-columns";
+import { validatePbmLinkSelection } from "~/lib/pinballmap/linking";
 import { createMachine } from "~/services/machines";
 
 import {
@@ -98,18 +99,29 @@ export async function runAddMachine(
 
   const owner = await resolveOwner(args.owner);
 
-  let pbmColumns = null;
-  if (linkPbm) {
-    const resolved = await resolvePbmLinkColumnsForCreate({
-      pinballmapMachineId: args.pinballmapMachineId,
-      pinballmapExcluded: args.pinballmapExcluded,
-      pinballmapExcludedReason: args.pinballmapExcludedReason,
-    });
-    if (!resolved.ok) {
-      throw new McpToolError("invalid", resolved.message);
-    }
-    pbmColumns = resolved.columns;
+  // Always resolved, like the New Machine form: the linked-or-uncataloged
+  // requirement (PBM_LINKING_REQUIRED) applies to a call that names neither.
+  // The resolver's message names form controls, so a tool caller gets its own.
+  if (
+    validatePbmLinkSelection({
+      pinballmapMachineId: args.pinballmapMachineId ?? null,
+      pinballmapExcluded: args.pinballmapExcluded ?? false,
+    }) === "link_required"
+  ) {
+    throw new McpToolError(
+      "invalid",
+      "Pass pinballmapMachineId (find it with search_pinballmap_catalog), or pinballmapExcluded: true for a machine Pinball Map does not list."
+    );
   }
+  const resolved = await resolvePbmLinkColumnsForCreate({
+    pinballmapMachineId: args.pinballmapMachineId,
+    pinballmapExcluded: args.pinballmapExcluded,
+    pinballmapExcludedReason: args.pinballmapExcludedReason,
+  });
+  if (!resolved.ok) {
+    throw new McpToolError("invalid", resolved.message);
+  }
+  const pbmColumns = resolved.columns;
 
   let created;
   try {
@@ -154,7 +166,7 @@ export function registerAddMachine(server: McpServer): void {
     {
       title: "Add machine",
       description:
-        "Create a machine: name and unique initials, optional owner (member name or UUID), optional initial availability, and optional Pinball Map linking (a catalog id, or mark it excluded with a reason). Returns the new machine and its URL.",
+        "Create a machine: name and unique initials, optional owner (member name or UUID), optional initial availability, and its Pinball Map link: a catalog id, or pinballmapExcluded true (with an optional reason) for a machine Pinball Map does not list. One of the two is required. Returns the new machine and its URL.",
       inputSchema: addMachineSchema,
       annotations: WRITE_TOOL_ANNOTATIONS,
     },

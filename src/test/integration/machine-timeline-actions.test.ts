@@ -74,6 +74,18 @@ vi.mock("~/lib/logger", () => ({
   },
 }));
 
+/**
+ * A New Machine form. Marked not on Pinball Map because every create needs a
+ * catalog title or that flag, and this file's subject is the timeline.
+ */
+function newMachineForm(name: string, initials: string): FormData {
+  const formData = new FormData();
+  formData.append("name", name);
+  formData.append("initials", initials);
+  formData.append("pinballmapExcluded", "on");
+  return formData;
+}
+
 describe("createMachineAction — timeline event emission (PP-0x98)", () => {
   setupTestDb();
 
@@ -114,9 +126,7 @@ describe("createMachineAction — timeline event emission (PP-0x98)", () => {
     await mockAuth(admin.id);
     const { createMachineAction } = await import("~/app/(app)/m/actions");
 
-    const formData = new FormData();
-    formData.append("name", "Stranger Things");
-    formData.append("initials", "STR");
+    const formData = newMachineForm("Stranger Things", "STR");
 
     const result = await createMachineAction(undefined, formData);
     expect(result.ok).toBe(true);
@@ -139,9 +149,7 @@ describe("createMachineAction — timeline event emission (PP-0x98)", () => {
     await mockAuth(admin.id);
     const { createMachineAction } = await import("~/app/(app)/m/actions");
 
-    const formData = new FormData();
-    formData.append("name", "Iron Maiden");
-    formData.append("initials", "IM");
+    const formData = newMachineForm("Iron Maiden", "IM");
     formData.append("ownerId", owner.id);
 
     const result = await createMachineAction(undefined, formData);
@@ -187,9 +195,7 @@ describe("createMachineAction — timeline event emission (PP-0x98)", () => {
     await mockAuth(admin.id);
     const { createMachineAction } = await import("~/app/(app)/m/actions");
 
-    const formData = new FormData();
-    formData.append("name", "Cactus Canyon");
-    formData.append("initials", "CC");
+    const formData = newMachineForm("Cactus Canyon", "CC");
     formData.append("ownerId", invitee.id);
 
     const result = await createMachineAction(undefined, formData);
@@ -223,9 +229,7 @@ describe("createMachineAction — timeline event emission (PP-0x98)", () => {
     await mockAuth(admin.id);
     const { createMachineAction } = await import("~/app/(app)/m/actions");
 
-    const formData = new FormData();
-    formData.append("name", "Tron Legacy");
-    formData.append("initials", "TRN");
+    const formData = newMachineForm("Tron Legacy", "TRN");
     formData.append("ownerId", guest.id);
     formData.append("forcePromoteUserId", guest.id);
 
@@ -263,9 +267,7 @@ describe("createMachineAction — timeline event emission (PP-0x98)", () => {
     await mockAuth(admin.id);
     const { createMachineAction } = await import("~/app/(app)/m/actions");
 
-    const formData = new FormData();
-    formData.append("name", "Sequence Test");
-    formData.append("initials", "SEQ");
+    const formData = newMachineForm("Sequence Test", "SEQ");
     formData.append("ownerId", owner.id);
     const result = await createMachineAction(undefined, formData);
     expect(result.ok).toBe(true);
