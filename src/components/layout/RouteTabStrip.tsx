@@ -22,6 +22,12 @@ import { planTabLayout } from "~/components/layout/route-tab-strip-layout";
 export interface RouteTab {
   /** URL slug appended to `basePath`; "" is the index tab. */
   slug: string;
+  /**
+   * Where the tab links, when not `basePath` plus `slug`, such as a list
+   * tab that reopens its last view (list-views §11.1). The slug still
+   * decides which tab is active.
+   */
+  href?: string | undefined;
   label: string;
   /**
    * Optional count badge (e.g. open issues). The badge is hidden when
@@ -295,6 +301,7 @@ function getTabKey(tab: RouteTab): string {
 }
 
 function getTabHref(basePath: string, tab: RouteTab): string {
+  if (tab.href !== undefined) return tab.href;
   return tab.slug ? `${basePath}/${tab.slug}` : basePath;
 }
 
