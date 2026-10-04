@@ -197,19 +197,23 @@ export function MachineView({
     () => ({ preset, pagePresetId, offersDefault, defaultViewId }),
     [defaultViewId, offersDefault, pagePresetId, preset]
   );
+  // In place: no history entry per change and no scroll (§9.7).
+  const replaceQuery = React.useCallback(
+    (query: string): void => {
+      router.replace(query ? `${pathname}?${query}` : pathname, {
+        scroll: false,
+      });
+    },
+    [pathname, router]
+  );
   const navigate = React.useCallback(
     (next: MachineViewState, view: string | null): void => {
       const url = listUrl(next, view, surface);
       setViewId(url.view);
       setState(next);
-      startTransition(() => {
-        // In place: no history entry per change and no scroll (§9.7).
-        router.replace(url.query ? `${pathname}?${url.query}` : pathname, {
-          scroll: false,
-        });
-      });
+      startTransition(() => replaceQuery(url.query));
     },
-    [pathname, router, surface]
+    [replaceQuery, surface]
   );
 
   const update = (partial: Partial<MachineViewState>, resetPage = true): void =>
@@ -227,10 +231,8 @@ export function MachineView({
   React.useEffect(() => {
     const { query } = listUrl(result.state, serverViewId, surface);
     if (query === searchParams.toString()) return;
-    router.replace(query ? `${pathname}?${query}` : pathname, {
-      scroll: false,
-    });
-  }, [pathname, result.state, router, searchParams, serverViewId, surface]);
+    replaceQuery(query);
+  }, [replaceQuery, result.state, searchParams, serverViewId, surface]);
 
   // Returning to this list within the tab session reopens this URL (§11.1).
   React.useEffect(() => {
@@ -403,9 +405,7 @@ export function MachineView({
         });
         if (url.query !== searchParams.toString()) {
           setViewId(url.view);
-          router.replace(url.query ? `${pathname}?${url.query}` : pathname, {
-            scroll: false,
-          });
+          startTransition(() => replaceQuery(url.query));
         }
         router.refresh();
         return outcome;

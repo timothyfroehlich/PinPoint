@@ -402,14 +402,16 @@ describe("MachineView", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "Machines" })
     ).toBeInTheDocument();
-    // The title row's toggle is named by the "2/2 playable" it shows
-    // (WCAG 2.5.3); the group's own reads the wider "2 of 2 playable".
-    const toggle = screen.getByRole("button", {
-      name: "Summary: 2/2 playable",
-    });
-    const groupToggle = screen.getByRole("button", {
+    // The title row's toggle shows "2/2 playable" and reads "2 of 2"
+    // (machine-widgets §2.4).
+    const [toggle, groupToggle] = screen.getAllByRole("button", {
       name: "Summary: 2 of 2 playable",
     });
+    if (!toggle || !groupToggle) throw new Error("Summary Row toggles missing");
+    expect(within(toggle).getByText("2/2")).toHaveAttribute(
+      "aria-hidden",
+      "true"
+    );
     // Both control the same section; the group's own hides on phones.
     expect(toggle.getAttribute("aria-controls")).toBe(
       groupToggle.getAttribute("aria-controls")
@@ -693,6 +695,38 @@ describe("MachineView", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
+  it("never shows a Save changes failure again once the configuration has changed (list-views §5.3)", async () => {
+    const user = userEvent.setup();
+    actions.updateSavedMachineViewAction.mockResolvedValue({
+      ok: false,
+      message: "View not found.",
+    });
+    navigation.searchParams = new URLSearchParams([
+      ["q", "stern"],
+      ["status", "unplayable"],
+      ["view", brokenView.id],
+    ]);
+    renderView({
+      result: result({
+        state: { ...presetState, q: "stern", status: ["unplayable"] },
+      }),
+      views: savedViews({ activeViewId: brokenView.id }),
+    });
+
+    await user.click(screen.getByTestId("list-save-view"));
+    await user.click(screen.getByRole("menuitem", { name: "Save changes" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "View not found."
+    );
+
+    // Away from the configuration that failed, then back to it.
+    await user.click(screen.getByTestId("list-filter-severity"));
+    await user.click(screen.getByRole("checkbox", { name: "Major" }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("checkbox", { name: "Major" }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("keeps the Save view dialog open with the error when the name is taken (list-views §10.7)", async () => {
     const user = userEvent.setup();
     actions.createSavedMachineViewAction.mockResolvedValue({
@@ -809,6 +843,20 @@ describe("MachineView", () => {
     // At the Page Preset, Reset does nothing but keeps focus.
     expect(reset).toBeEnabled();
     expect(reset).toHaveFocus();
+  });
+
+  it("leaves the page and URL alone when Reset is pressed at the Page Preset (list-views §4.9)", async () => {
+    const user = userEvent.setup();
+    navigation.searchParams = new URLSearchParams({ page: "3" });
+    renderView({
+      result: result({ state: { ...presetState, page: 3 }, totalCount: 100 }),
+    });
+
+    await user.click(screen.getByTestId("list-filter-status"));
+    await user.click(screen.getByRole("button", { name: "Reset" }));
+
+    expect(navigation.replace).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Reset" })).toHaveFocus();
   });
 
   it("offers no Default View controls off the Machines page (list-views §10.8)", async () => {

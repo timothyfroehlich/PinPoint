@@ -25,6 +25,7 @@ import {
   filterSelectionText,
   nounFor,
   offersManageViews,
+  resetFilter,
   sortDirectionOptions,
   type ListDisplayModel,
   type ListFilterModel,
@@ -428,7 +429,7 @@ function FiltersSheet({
     );
   } else if (activeFilter) {
     title = activeFilter.label;
-    reset = activeFilter.onReset;
+    reset = () => resetFilter(activeFilter);
     body = (
       <div className="pt-2">
         <FilterPicker filter={activeFilter} variant="sheet" />

@@ -10,7 +10,11 @@ import {
 import { fitPrimaryFilters } from "~/lib/list-view/overflow";
 import { cn } from "~/lib/utils";
 import { FilterPicker } from "./FilterPicker";
-import { filterSelectionText, type ListFilterModel } from "./types";
+import {
+  filterSelectionText,
+  resetFilter,
+  type ListFilterModel,
+} from "./types";
 import { useMeasuredWidths } from "./use-measured-widths";
 
 /** Search keeps at least this much of the row before filters move to More. */
@@ -74,10 +78,7 @@ function FilterButtonFace({
   );
 }
 
-/**
- * The filter's name and Reset (§4.9). Reset stays enabled at the Page
- * Preset, where it does nothing, so pressing it never drops focus.
- */
+/** The filter's name and Reset (§4.9). */
 function FilterPopoverHeader({
   filter,
 }: {
@@ -88,7 +89,7 @@ function FilterPopoverHeader({
       {filter.label}
       <button
         type="button"
-        onClick={filter.onReset}
+        onClick={() => resetFilter(filter)}
         className="min-h-7 rounded-sm px-1 text-xs font-normal text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
       >
         Reset
@@ -208,7 +209,7 @@ function MoreFilters({
               <span className="flex-1">{active.label}</span>
               <button
                 type="button"
-                onClick={active.onReset}
+                onClick={() => resetFilter(active)}
                 className="min-h-7 rounded-sm px-2 text-xs font-normal text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
               >
                 Reset

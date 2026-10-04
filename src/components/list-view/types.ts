@@ -172,6 +172,15 @@ export function filterSelectionText(
 }
 
 /**
+ * A filter's Reset (§4.9). Reset stays enabled at the Page Preset so
+ * pressing it keeps focus, and there it does nothing: no page change and no
+ * navigation.
+ */
+export function resetFilter(filter: ListFilterModel): void {
+  if (!filter.atPreset) filter.onReset();
+}
+
+/**
  * Whether Manage views has anything to offer: the Default View on the host's
  * main page, or a Saved View to rename or delete (§10.8).
  */

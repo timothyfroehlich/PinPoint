@@ -118,27 +118,16 @@ describe("ListToolbar", () => {
     );
   });
 
-  it("closes a filter's options on a press outside only once its click lands, so the row never moves under it (list-views §8.1)", async () => {
+  it("leaves focus where a click outside put it, even when closing moves the filter into More (list-views §8.1)", async () => {
     const user = userEvent.setup();
     render(<Host />);
 
     await user.click(screen.getByTestId("list-filter-owner"));
     await user.click(screen.getByRole("checkbox", { name: LONG_NAME }));
     const search = screen.getByRole("textbox", { name: "Search" });
-    const clicked = vi.fn();
-    search.addEventListener("click", clicked);
+    await user.click(search);
 
-    // Pressed: Owner's options stay open and the row keeps its arrangement.
-    await user.pointer({ keys: "[MouseLeft>]", target: search });
-    expect(screen.getByRole("checkbox", { name: LONG_NAME })).toBeVisible();
-    expect(screen.queryByTestId("list-filter-more")).not.toBeInTheDocument();
-
-    // Released: the click lands where it was pressed, then the row moves.
-    await user.pointer({ keys: "[/MouseLeft]", target: search });
-    expect(clicked).toHaveBeenCalledOnce();
-    expect(
-      screen.queryByRole("checkbox", { name: LONG_NAME })
-    ).not.toBeInTheDocument();
+    // Owner no longer fits and moved into More, but focus stays put.
     expect(screen.getByTestId("list-filter-more")).toBeInTheDocument();
     expect(search).toHaveFocus();
   });

@@ -124,12 +124,14 @@ export function ListView({
   // discarded); the search field is keyed on it.
   const [searchEpoch, setSearchEpoch] = React.useState(0);
   // A Save changes failure belongs to the view and configuration it was made
-  // from; any other configuration, applying a view, or discarding hides it.
+  // from. Any change after it clears it for good, so returning to that
+  // configuration never shows it again without a new attempt.
   const viewKey = `${views.appliedId}:${views.configurationKey}`;
   const [saveFailure, setSaveFailure] = React.useState<{
     message: string;
     viewKey: string;
   } | null>(null);
+  React.useEffect(() => setSaveFailure(null), [viewKey]);
   const saveError =
     saveFailure?.viewKey === viewKey ? saveFailure.message : null;
   const [isSaving, startSaving] = React.useTransition();
