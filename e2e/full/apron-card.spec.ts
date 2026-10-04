@@ -3,8 +3,9 @@
  *
  * Class-F journeys only an end-to-end run can prove:
  * - an editor adds cards, sees the live preview report text that does not fit
- *   (a layout measurement jsdom cannot make), names and sizes two cards, saves
- *   them with one Save, and they persist across a reload; deleting one sticks;
+ *   (a layout measurement jsdom cannot make), names, sizes, and picks a
+ *   template for two cards, saves them with one Save, and they persist across
+ *   a reload; deleting one sticks;
  * - a member who cannot edit the machine gets Preview and Export only, and
  *   Export prints the chosen card;
  * - Export marks a saved card that does not fit and needs the override;
@@ -87,6 +88,11 @@ test.describe("Apron card tab as an editor", () => {
     await rename.getByRole("button", { name: "Rename" }).click();
     await page.getByRole("combobox", { name: "Apron size" }).click();
     await page.getByRole("option", { name: /WPC/ }).click();
+    // Only the Standard template shows credits (§5.5, §10.5).
+    await expect(page.getByRole("group", { name: "Credits" })).toBeVisible();
+    await page.getByRole("combobox", { name: "Template" }).click();
+    await page.getByRole("option", { name: "Header band" }).click();
+    await expect(page.getByRole("group", { name: "Credits" })).toHaveCount(0);
 
     await save.click();
     await expect(page.getByText("Cards saved")).toBeVisible();
@@ -105,6 +111,9 @@ test.describe("Apron card tab as an editor", () => {
     await page.getByRole("option", { name: "Tournament" }).click();
     await expect(page.getByRole("combobox", { name: "Apron size" })).toHaveText(
       /WPC/
+    );
+    await expect(page.getByRole("combobox", { name: "Template" })).toHaveText(
+      "Header band"
     );
 
     await page.getByRole("button", { name: "Card actions" }).click();

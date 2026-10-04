@@ -1,6 +1,6 @@
 {
-  "id": "e8b53ca3-b8f8-46eb-a6ab-a241d7cae7fc",
-  "prevId": "fa777552-8ff3-4110-8801-fe4bded57b00",
+  "id": "b1b28471-c425-46e5-a358-a1ead7c12780",
+  "prevId": "e8b53ca3-b8f8-46eb-a6ab-a241d7cae7fc",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1564,6 +1564,142 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
+      "isRLSEnabled": true
+    },
+    "public.machine_tags": {
+      "name": "machine_tags",
+      "schema": "",
+      "columns": {
+        "machine_id": {
+          "name": "machine_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tag_id": {
+          "name": "tag_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tag_type_id": {
+          "name": "tag_type_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "type_exclusive": {
+          "name": "type_exclusive",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "added_at": {
+          "name": "added_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "added_by": {
+          "name": "added_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "uq_machine_tags_exclusive_type": {
+          "name": "uq_machine_tags_exclusive_type",
+          "columns": [
+            {
+              "expression": "machine_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "tag_type_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"machine_tags\".\"type_exclusive\"",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_machine_tags_tag": {
+          "name": "idx_machine_tags_tag",
+          "columns": [
+            {
+              "expression": "tag_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "machine_tags_machine_id_machines_id_fk": {
+          "name": "machine_tags_machine_id_machines_id_fk",
+          "tableFrom": "machine_tags",
+          "tableTo": "machines",
+          "columnsFrom": ["machine_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "machine_tags_tag_id_tags_id_fk": {
+          "name": "machine_tags_tag_id_tags_id_fk",
+          "tableFrom": "machine_tags",
+          "tableTo": "tags",
+          "columnsFrom": ["tag_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "machine_tags_added_by_user_profiles_id_fk": {
+          "name": "machine_tags_added_by_user_profiles_id_fk",
+          "tableFrom": "machine_tags",
+          "tableTo": "user_profiles",
+          "columnsFrom": ["added_by"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "machine_tags_tag_type_fk": {
+          "name": "machine_tags_tag_type_fk",
+          "tableFrom": "machine_tags",
+          "tableTo": "tags",
+          "columnsFrom": ["tag_id", "tag_type_id", "type_exclusive"],
+          "columnsTo": ["id", "tag_type_id", "type_exclusive"],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {
+        "machine_tags_machine_id_tag_id_pk": {
+          "name": "machine_tags_machine_id_tag_id_pk",
+          "columns": ["machine_id", "tag_id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "machine_tags_untyped_not_exclusive": {
+          "name": "machine_tags_untyped_not_exclusive",
+          "value": "\"machine_tags\".\"tag_type_id\" IS NOT NULL OR NOT \"machine_tags\".\"type_exclusive\""
+        }
+      },
       "isRLSEnabled": true
     },
     "public.machine_watchers": {
@@ -3777,6 +3913,211 @@
         "machine_view_saved_views_name_not_blank": {
           "name": "machine_view_saved_views_name_not_blank",
           "value": "length(btrim(\"machine_view_saved_views\".\"name\")) > 0"
+        }
+      },
+      "isRLSEnabled": true
+    },
+    "public.tag_types": {
+      "name": "tag_types",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "exclusive": {
+          "name": "exclusive",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "uq_tag_types_name": {
+          "name": "uq_tag_types_name",
+          "columns": [
+            {
+              "expression": "lower(\"name\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "uq_tag_types_slug": {
+          "name": "uq_tag_types_slug",
+          "nullsNotDistinct": false,
+          "columns": ["slug"]
+        },
+        "uq_tag_types_id_exclusive": {
+          "name": "uq_tag_types_id_exclusive",
+          "nullsNotDistinct": false,
+          "columns": ["id", "exclusive"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "tag_types_name_normalized": {
+          "name": "tag_types_name_normalized",
+          "value": "\"tag_types\".\"name\" = btrim(regexp_replace(\"tag_types\".\"name\", '\\s+', ' ', 'g')) AND char_length(\"tag_types\".\"name\") BETWEEN 1 AND 20"
+        },
+        "tag_types_slug_format": {
+          "name": "tag_types_slug_format",
+          "value": "\"tag_types\".\"slug\" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'"
+        }
+      },
+      "isRLSEnabled": true
+    },
+    "public.tags": {
+      "name": "tags",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tag_type_id": {
+          "name": "tag_type_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "type_exclusive": {
+          "name": "type_exclusive",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "uq_tags_type_name": {
+          "name": "uq_tags_type_name",
+          "columns": [
+            {
+              "expression": "coalesce(\"tag_type_id\", '00000000-0000-0000-0000-000000000000'::uuid)",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "lower(\"name\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_tags_tag_type": {
+          "name": "idx_tags_tag_type",
+          "columns": [
+            {
+              "expression": "tag_type_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "tags_tag_type_fk": {
+          "name": "tags_tag_type_fk",
+          "tableFrom": "tags",
+          "tableTo": "tag_types",
+          "columnsFrom": ["tag_type_id", "type_exclusive"],
+          "columnsTo": ["id", "exclusive"],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "uq_tags_slug": {
+          "name": "uq_tags_slug",
+          "nullsNotDistinct": false,
+          "columns": ["slug"]
+        },
+        "uq_tags_id_type": {
+          "name": "uq_tags_id_type",
+          "nullsNotDistinct": false,
+          "columns": ["id", "tag_type_id", "type_exclusive"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "tags_name_normalized": {
+          "name": "tags_name_normalized",
+          "value": "\"tags\".\"name\" = btrim(regexp_replace(\"tags\".\"name\", '\\s+', ' ', 'g')) AND char_length(\"tags\".\"name\") BETWEEN 1 AND 20"
+        },
+        "tags_slug_format": {
+          "name": "tags_slug_format",
+          "value": "\"tags\".\"slug\" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'"
+        },
+        "tags_untyped_not_exclusive": {
+          "name": "tags_untyped_not_exclusive",
+          "value": "\"tags\".\"tag_type_id\" IS NOT NULL OR NOT \"tags\".\"type_exclusive\""
         }
       },
       "isRLSEnabled": true

@@ -11,6 +11,7 @@ import {
   APRON_CARD_SIZES,
   type ApronCardContent,
   type ApronCardSize,
+  type ApronCardTemplate,
 } from "~/lib/machines/apron-card";
 import "./print.css";
 
@@ -19,6 +20,7 @@ interface ApronCardPrintSheetProps {
   machineInitials: string;
   content: ApronCardContent;
   size: ApronCardSize;
+  template: ApronCardTemplate;
   scanUrl: string;
 }
 
@@ -28,6 +30,7 @@ export function ApronCardPrintSheet({
   machineInitials,
   content,
   size,
+  template,
   scanUrl,
 }: ApronCardPrintSheetProps): React.JSX.Element {
   const printedRef = useRef(false);
@@ -66,6 +69,7 @@ export function ApronCardPrintSheet({
         <ApronCardSheet
           content={content}
           size={size}
+          template={template}
           scanUrl={scanUrl}
           onReady={() => {
             if (printedRef.current) return;
