@@ -6,6 +6,7 @@ import {
   machines,
   issues,
   issueWatchers,
+  timelineEventPeople,
 } from "~/server/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import type { User } from "@supabase/supabase-js";
@@ -50,15 +51,17 @@ export async function ensureUserProfile(user: User): Promise<void> {
     // Check for existing invited user to inherit role and name
     // Default to "guest" for non-invited signups (least-privilege)
     let role: UserRole = "guest";
-    let invited: { firstName: string; lastName: string } | undefined;
+    let invited:
+      { id: string; firstName: string; lastName: string } | undefined;
     if (user.email) {
       const invitedUser = await db.query.invitedUsers.findFirst({
         where: eq(invitedUsers.email, user.email.toLowerCase()),
-        columns: { role: true, firstName: true, lastName: true },
+        columns: { id: true, role: true, firstName: true, lastName: true },
       });
       if (invitedUser) {
         role = invitedUser.role;
         invited = {
+          id: invitedUser.id,
           firstName: invitedUser.firstName,
           lastName: invitedUser.lastName,
         };
@@ -89,79 +92,72 @@ export async function ensureUserProfile(user: User): Promise<void> {
     const { firstName, lastName } =
       invited && derivedName.derived ? invited : derivedName;
 
-    await db.insert(userProfiles).values({
-      id: user.id,
-      email,
-      firstName,
-      lastName,
-      avatarUrl,
-      role, // Inherited from invited user or default "guest"
-    });
-
-    // Recreate notification preferences
-    // Check if they exist first (just in case)
-    const prefs = await db.query.notificationPreferences.findFirst({
-      where: eq(notificationPreferences.userId, user.id),
-    });
-
-    if (!prefs) {
-      // Only userId is required — schema defaults handle all preference values.
-      // This keeps a single source of truth for defaults in the schema.
-      await db.insert(notificationPreferences).values({
-        userId: user.id,
+    // One transaction, like the trigger: a failure part-way through must not
+    // leave a profile behind, because the early return above would then skip
+    // the invited-user conversion on every later request.
+    await db.transaction(async (tx) => {
+      await tx.insert(userProfiles).values({
+        id: user.id,
+        email,
+        firstName,
+        lastName,
+        avatarUrl,
+        role, // Inherited from invited user or default "guest"
       });
-    }
 
-    // Transfer guest issues (by email)
-    // Matches SQL: WHERE reporter_email = NEW.email AND reported_by IS NULL AND invited_reported_by IS NULL
-    const issueIdsToWatch = new Set<string>();
-    // The machine timeline's issue_opened events move to the account in the
-    // same transaction (PP-0fg0.3).
-    const guestEmail = user.email;
-    if (guestEmail) {
-      const transferredGuestIssues = await db.transaction(async (tx) => {
-        const transferred = await tx
-          .update(issues)
-          .set({
-            reportedBy: user.id,
-            reporterName: null,
-            reporterEmail: null,
-          })
-          .where(
-            and(
-              eq(issues.reporterEmail, guestEmail.toLowerCase()),
-              isNull(issues.reportedBy),
-              isNull(issues.invitedReportedBy)
-            )
-          )
-          .returning({ id: issues.id });
-        await attachSignedUpGuestReporter(tx, {
-          issueIds: transferred.map((issue) => issue.id),
+      // Recreate notification preferences
+      // Check if they exist first (just in case)
+      const prefs = await tx.query.notificationPreferences.findFirst({
+        where: eq(notificationPreferences.userId, user.id),
+      });
+
+      if (!prefs) {
+        // Only userId is required — schema defaults handle all preference values.
+        // This keeps a single source of truth for defaults in the schema.
+        await tx.insert(notificationPreferences).values({
           userId: user.id,
         });
-        return transferred;
-      });
+      }
+
+      // Transfer guest issues (by email)
+      // Matches SQL: WHERE reporter_email = NEW.email AND reported_by IS NULL AND invited_reported_by IS NULL
+      const issueIdsToWatch = new Set<string>();
+      const transferredGuestIssues = await tx
+        .update(issues)
+        .set({
+          reportedBy: user.id,
+          reporterName: null,
+          reporterEmail: null,
+        })
+        .where(
+          and(
+            eq(issues.reporterEmail, email.toLowerCase()),
+            isNull(issues.reportedBy),
+            isNull(issues.invitedReportedBy)
+          )
+        )
+        .returning({ id: issues.id });
       transferredGuestIssues.forEach((issue) => issueIdsToWatch.add(issue.id));
-    }
-
-    // Handle invited users transfer
-    if (user.email) {
-      const invitedUser = await db.query.invitedUsers.findFirst({
-        where: eq(invitedUsers.email, user.email.toLowerCase()),
+      // The account becomes the reporter on those issues' machine-timeline
+      // issue_opened events (PP-0fg0.3).
+      await attachSignedUpGuestReporter(tx, {
+        issueIds: transferredGuestIssues.map((issue) => issue.id),
+        userId: user.id,
       });
 
-      if (invitedUser) {
+      // Handle invited users transfer
+      if (invited) {
         // Transfer machines
-        await db
+        await tx
           .update(machines)
           .set({
             ownerId: user.id,
             invitedOwnerId: null,
           })
-          .where(eq(machines.invitedOwnerId, invitedUser.id));
+          .where(eq(machines.invitedOwnerId, invited.id));
 
         // Transfer issues reported by invited user
-        const transferredInvitedIssues = await db
+        const transferredInvitedIssues = await tx
           .update(issues)
           .set({
             reportedBy: user.id,
@@ -169,31 +165,40 @@ export async function ensureUserProfile(user: User): Promise<void> {
             reporterName: null,
             reporterEmail: null,
           })
-          .where(eq(issues.invitedReportedBy, invitedUser.id))
+          .where(eq(issues.invitedReportedBy, invited.id))
           .returning({ id: issues.id });
 
+        // Must run BEFORE the invited_users DELETE: the ON DELETE RESTRICT FK
+        // on timeline_event_people.invited_id makes the delete fail otherwise
+        // (PP-tv9l). Mirrors the trigger in drizzle/0064.
+        await tx
+          .update(timelineEventPeople)
+          .set({
+            userId: user.id,
+            invitedId: null,
+          })
+          .where(eq(timelineEventPeople.invitedId, invited.id));
+
         // Delete the invited user record
-        await db
-          .delete(invitedUsers)
-          .where(eq(invitedUsers.id, invitedUser.id));
+        await tx.delete(invitedUsers).where(eq(invitedUsers.id, invited.id));
 
         transferredInvitedIssues.forEach((issue) =>
           issueIdsToWatch.add(issue.id)
         );
       }
-    }
 
-    if (issueIdsToWatch.size > 0) {
-      await db
-        .insert(issueWatchers)
-        .values(
-          [...issueIdsToWatch].map((issueId) => ({
-            issueId,
-            userId: user.id,
-          }))
-        )
-        .onConflictDoNothing();
-    }
+      if (issueIdsToWatch.size > 0) {
+        await tx
+          .insert(issueWatchers)
+          .values(
+            [...issueIdsToWatch].map((issueId) => ({
+              issueId,
+              userId: user.id,
+            }))
+          )
+          .onConflictDoNothing();
+      }
+    });
 
     log.info({ userId: user.id }, "User profile auto-healed successfully");
   } catch (error) {
