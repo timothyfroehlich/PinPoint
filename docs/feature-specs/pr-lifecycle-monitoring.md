@@ -16,7 +16,7 @@
 - **Terminal verdict** — an authoritative, machine-readable JSON object emitted upon completion that gives the main agent everything needed to take its next step without follow-up queries.
 - **Failure artifact** — a targeted markdown summary of failed CI steps and errors written to disk, sparing the main agent from fetching or parsing raw workflow logs.
 - **Local review** — a Claude Code `/code-review` run by the owning agent in its own session against the pull request's exact head.
-- **Review level** — the effort a local review runs at (low, medium, or high), chosen from the weighted diff size.
+- **Review level** — the effort a local review runs at (low, medium, high, xhigh, or max), chosen from the weighted diff size.
 - **Weighted diff size** — the pull request's changed lines against its base branch, with generated and fixture content left out and test code counted at half weight (§8.15).
 - **Review record** — the pull request comment the owning agent posts after a clean local review, pinned to the reviewed head and listing every finding with its disposition.
 - **Draft gate** — the policy boundary that keeps a pull request a GitHub draft until a review record covers its head.
@@ -99,7 +99,7 @@
 - **8.11** _Retired 2026-09-24._ Anchoring review requests to a head; the review record names its reviewed head instead (8.18). Number kept so older citations don't dangle.
 - **8.12** Pushing new commits to a pull request branch invalidates previous review coverage, and the updated head requires a new local review. The one exception: a head whose only new commits are clean merges of the base branch keeps the earlier coverage.
 - **8.13** The owning agent runs a local review after CI passes on the current head.
-- **8.14** The review level follows the weighted diff size: low below 50 lines, medium from 50 up to 1,500, and high from 1,500 through 3,000. Above 3,000, the owning agent asks the owner before reviewing.
+- **8.14** The review level follows the weighted diff size: low below 50 lines, medium from 50 up to 1,500, and high from 1,500 through 3,000. Above 3,000, the owning agent asks the owner whether to review at xhigh or max, or to split the pull request.
 - **8.15** The weighted diff size counts added plus deleted lines against the base branch. It leaves out the lockfile, migration snapshots, test fixtures, binary files, and feature specs, and counts test code at half weight.
 - **8.16** The owning agent fixes or declines every finding; a decline carries a one-sentence reason.
 - **8.17** After fixing findings, the owning agent re-runs the local review on the new head at the same level, and repeats until a round raises no finding that is not already declined. A finding re-raised after being declined stays declined.
@@ -135,7 +135,6 @@
 | 6.1–6.3 | Host coordination: concurrent watches coalesce under one polling leader | Removed 2026-09-24 in the watcher simplification: each watch polls GitHub on its own. The XDG lock, state-file, and leader/follower machinery cost more code than the duplicate polling it saved. | Delete §6 (requirement diff needs Tim's approval) |
 | 7.4 | Local execution telemetry (harness, model, wake count, elapsed duration) | Removed 2026-09-24 with the MCP wrapper and watcher agents, the only sources of harness, model, and wake data; nothing read the `tmp/gh-monitor/watcher-run-*.json` records. | Delete 7.4 (requirement diff needs Tim's approval) |
 | 8.3 | Only a review record provides coverage | The gate still accepts a Codex review on the exact head | Remove the Codex checker once its subscription ends |
-| Concepts (Review level), 8.14 | A review runs at low, medium, or high | The review record and the gate also accept `xhigh` and `max`, the levels the owner picks when `claude-review-level.sh` answers `ask` (PP-vusb) | Amend the Review level concept and 8.14 to name xhigh and max as the owner's choices above 3,000 lines (requirement diff needs Tim's approval) |
 
 ---
 
@@ -143,6 +142,7 @@
 
 | Date | Amendment |
 | :-- | :-- |
+| 2026-10-03 | Add xhigh and max review levels (Concepts, §8.14): above 3,000 weighted lines the owner chooses xhigh or max, or splits the pull request. |
 | 2026-09-27 | Retire CodeRabbit checker from review gates and handoff scripts; only review record and Codex remain during transition. |
 | 2026-09-24 | Replace CodeRabbit and Codex with a local Claude Code review (§1, §3.2, §8, §9–§11): the owning agent reviews at a level set by weighted diff size, re-reviews after fixes until clean, posts a review record pinned to the head, then promotes; a forced merge promotes a draft first; §8.12 keeps coverage across clean base-branch merges; §9–§11 retired. |
 | 2026-09-24 | Drop local owner attestation as a review provider (§1, §8.3, §8.4, §9.3): only CodeRabbit and Codex cover a head; the owner merges a PR without that coverage by directing a forced merge. |
