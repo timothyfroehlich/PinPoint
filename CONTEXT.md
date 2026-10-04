@@ -39,6 +39,9 @@ rather than managed as a separate fact.
 **Availability**:
 Whether the machine is at the venue and available for play: On the Floor, Off
 the Floor, On Loan, Pending Arrival, or Removed. Independent of machine status.
+Removed is the archived state: a Removed machine is left out of machine lists,
+counts, pickers, and search unless a person asks for Removed machines; its own
+page and history stay reachable.
 _Avoid_: Presence, location
 
 ## People and access
