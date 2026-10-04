@@ -146,24 +146,24 @@ _Status: Retired on main in prior PR._
 
 Total Declarations: 16
 
-| Line | Mark  | Class | Declaration                                                        | Rationale                                                                                                          |
-| ---: | :---: | :---: | :----------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------- |
-|  102 | **F** |   B   | returns UNAUTHORIZED when user is not signed in                    | Upgrade to worker-scoped PGlite integration test src/test/integration/export-issues-action.test.ts (CORE-TEST-004) |
-|  119 | **F** |   B   | returns VALIDATION for invalid machineInitials                     | Upgrade to worker-scoped PGlite integration test src/test/integration/export-issues-action.test.ts (CORE-TEST-004) |
-|  129 | **F** |   B   | returns VALIDATION for malformed filtersJson                       | Upgrade to worker-scoped PGlite integration test src/test/integration/export-issues-action.test.ts (CORE-TEST-004) |
-|  143 | **F** |   B   | returns EMPTY when no issues match filters                         | Upgrade to worker-scoped PGlite integration test src/test/integration/export-issues-action.test.ts (CORE-TEST-004) |
-|  159 | **F** |   B   | produces correct headers in order                                  | Upgrade to worker-scoped PGlite integration test src/test/integration/export-issues-action.test.ts (CORE-TEST-004) |
-|  171 | **F** |   B   | maps row values to correct columns                                 | Upgrade to worker-scoped PGlite integration test src/test/integration/export-issues-action.test.ts (CORE-TEST-004) |
-|  190 | **F** |   B   | formats general export filename as pinpoint-issues-YYYY-MM-DD.csv  | Upgrade to worker-scoped PGlite integration test src/test/integration/export-issues-action.test.ts (CORE-TEST-004) |
-|  201 | **F** |   B   | formats machine export filename with uppercased initials           | Upgrade to worker-scoped PGlite integration test src/test/integration/export-issues-action.test.ts (CORE-TEST-004) |
-|  212 | **F** |   B   | uses Anonymous for issues with no reporter                         | Upgrade to worker-scoped PGlite integration test src/test/integration/export-issues-action.test.ts (CORE-TEST-004) |
-|  230 | **F** |   B   | uses invitedReporter name when reportedByUser is absent            | Upgrade to worker-scoped PGlite integration test src/test/integration/export-issues-action.test.ts (CORE-TEST-004) |
-|  252 | **F** |   B   | passes parsed filters to buildWhereConditions                      | Upgrade to worker-scoped PGlite integration test src/test/integration/export-issues-action.test.ts (CORE-TEST-004) |
-|  263 | **F** |   B   | coerces ISO date strings in filtersJson into Date objects          | Upgrade to worker-scoped PGlite integration test src/test/integration/export-issues-action.test.ts (CORE-TEST-004) |
-|  280 | **F** |   B   | uses empty filters when filtersJson contains an invalid enum value | Upgrade to worker-scoped PGlite integration test src/test/integration/export-issues-action.test.ts (CORE-TEST-004) |
-|  295 | **F** |   B   | injects currentUserId from the authenticated user                  | Upgrade to worker-scoped PGlite integration test src/test/integration/export-issues-action.test.ts (CORE-TEST-004) |
-|  307 | **F** |   B   | sets machine filter, clears status, and enables inactive machines  | Upgrade to worker-scoped PGlite integration test src/test/integration/export-issues-action.test.ts (CORE-TEST-004) |
-|  322 | **F** |   B   | returns SERVER error when db.query.issues.findMany throws          | Upgrade to worker-scoped PGlite integration test src/test/integration/export-issues-action.test.ts (CORE-TEST-004) |
+| Line | Mark  | Class | Declaration                                                       | Rationale                                                                                                        |
+| ---: | :---: | :---: | :---------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------- |
+|  102 | **F** |   B   | returns UNAUTHORIZED when user is not signed in                   | Upgrade to worker-scoped PGlite integration test src/test/integration/issue-export-scope.test.ts (CORE-TEST-004) |
+|  119 | **F** |   B   | returns VALIDATION for invalid machineInitials                    | Upgrade to worker-scoped PGlite integration test src/test/integration/issue-export-scope.test.ts (CORE-TEST-004) |
+|  129 | **F** |   B   | returns VALIDATION for malformed filtersJson                      | Upgrade to worker-scoped PGlite integration test src/test/integration/issue-export-scope.test.ts (CORE-TEST-004) |
+|  143 | **F** |   B   | returns EMPTY when no issues match filters                        | Upgrade to worker-scoped PGlite integration test src/test/integration/issue-export-scope.test.ts (CORE-TEST-004) |
+|  155 | **F** |   B   | produces correct headers in order                                 | Upgrade to worker-scoped PGlite integration test src/test/integration/issue-export-scope.test.ts (CORE-TEST-004) |
+|  171 | **F** |   B   | maps row values to correct columns                                | Upgrade to worker-scoped PGlite integration test src/test/integration/issue-export-scope.test.ts (CORE-TEST-004) |
+|  190 | **F** |   B   | formats general export filename as pinpoint-issues-YYYY-MM-DD.csv | Upgrade to worker-scoped PGlite integration test src/test/integration/issue-export-scope.test.ts (CORE-TEST-004) |
+|  201 | **F** |   B   | formats machine export filename with machine initials             | Upgrade to worker-scoped PGlite integration test src/test/integration/issue-export-scope.test.ts (CORE-TEST-004) |
+|  212 | **F** |   B   | uses Anonymous for issues with no reporter                        | Upgrade to worker-scoped PGlite integration test src/test/integration/issue-export-scope.test.ts (CORE-TEST-004) |
+|  230 | **F** |   B   | uses invitedReporter name when reportedByUser is absent           | Upgrade to worker-scoped PGlite integration test src/test/integration/issue-export-scope.test.ts (CORE-TEST-004) |
+|  252 | **F** |   B   | passes parsed filters to buildWhereConditions                     | Upgrade to worker-scoped PGlite integration test src/test/integration/issue-export-scope.test.ts (CORE-TEST-004) |
+|  263 | **F** |   B   | coerces ISO date strings in filtersJson into Date objects         | Upgrade to worker-scoped PGlite integration test src/test/integration/issue-export-scope.test.ts (CORE-TEST-004) |
+|  280 | **F** |   B   | returns VALIDATION rather than exporting on invalid filters       | Upgrade to worker-scoped PGlite integration test src/test/integration/issue-export-scope.test.ts (CORE-TEST-004) |
+|  295 | **F** |   B   | injects currentUserId from the authenticated user                 | Upgrade to worker-scoped PGlite integration test src/test/integration/issue-export-scope.test.ts (CORE-TEST-004) |
+|  307 | **F** |   B   | sets machine filter, clears status, and enables inactive machines | Upgrade to worker-scoped PGlite integration test src/test/integration/issue-export-scope.test.ts (CORE-TEST-004) |
+|  322 | **F** |   B   | returns SERVER error when db.query.issues.findMany throws         | Upgrade to worker-scoped PGlite integration test src/test/integration/issue-export-scope.test.ts (CORE-TEST-004) |
 
 ### `src/app/(app)/issues/frequency-schema.test.ts`
 

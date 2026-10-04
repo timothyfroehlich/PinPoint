@@ -25,11 +25,10 @@
  *     editCommentAction:
  *       8. author edits own comment → content updated in real DB
  *       9. non-author (including admin) → UNAUTHORIZED + read-only invariant
- *
- *   KEEP-unit (2 blocks, stayed in source):
+ *   CONSOLIDATED (from retired delete-comment-audit.test.ts):
  *     deleteCommentAction:
- *       - "should return VALIDATION error for invalid commentId"   (pure Zod)
- *       - "should return VALIDATION error for missing commentId"   (pure Zod)
+ *       - "returns VALIDATION error for invalid commentId and leaves database untouched"
+ *       - "returns VALIDATION error for missing commentId and leaves database untouched"
  *
  * Permissions: deleteCommentAction uses checkPermission("comments.delete") and
  * checkPermission("comments.delete.any"). We drive those with REAL permission
@@ -612,27 +611,29 @@ describe("addCommentAction — integration (PP-x4li.1.4)", () => {
       .spyOn(issuesService, "addIssueComment")
       .mockRejectedValueOnce(new Error("Database connection failure"));
 
-    const { addCommentAction } = await import("~/app/(app)/issues/actions");
+    try {
+      const { addCommentAction } = await import("~/app/(app)/issues/actions");
 
-    const formData = new FormData();
-    formData.append("issueId", issueId);
-    formData.append("comment", JSON.stringify(validCommentDoc));
+      const formData = new FormData();
+      formData.append("issueId", issueId);
+      formData.append("comment", JSON.stringify(validCommentDoc));
 
-    const result = await addCommentAction(undefined, formData);
+      const result = await addCommentAction(undefined, formData);
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.code).toBe("SERVER");
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("SERVER");
+      }
+
+      const db = await getTestDb();
+      const rows = await db
+        .select()
+        .from(issueComments)
+        .where(eq(issueComments.issueId, issueId));
+      expect(rows).toHaveLength(0);
+    } finally {
+      spy.mockRestore();
     }
-
-    const db = await getTestDb();
-    const rows = await db
-      .select()
-      .from(issueComments)
-      .where(eq(issueComments.issueId, issueId));
-    expect(rows).toHaveLength(0);
-
-    spy.mockRestore();
   });
 });
 

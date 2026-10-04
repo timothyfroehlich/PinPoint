@@ -378,14 +378,19 @@ describe("submitPublicIssueAction — anonymous and guest status/priority enforc
         )
       );
 
-    const result = await submitPublicIssueAction(
-      { error: "" },
-      makeFormData({ machineId: machine.id })
-    );
+    try {
+      const result = await submitPublicIssueAction(
+        { error: "" },
+        makeFormData({ machineId: machine.id })
+      );
 
-    expect(result).toHaveProperty("error");
-    expect(result.error).toBe("Unable to submit the issue. Please try again.");
-    expect(result.error).not.toContain("duplicate key");
-    spy.mockRestore();
+      expect(result).toHaveProperty("error");
+      expect(result.error).toBe(
+        "Unable to submit the issue. Please try again."
+      );
+      expect(result.error).not.toContain("duplicate key");
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
