@@ -317,6 +317,42 @@ export async function deleteTestMachine(machineId: string) {
   if (error) throw error;
 }
 
+/** A tag name's slug, in the format the tags tables' CHECK constraints require. */
+function testTagSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+/**
+ * Create a hand-applied tag type and its tags directly in the database, for
+ * specs that tag machines rather than test creating the type. Names must be
+ * unique per run (`getTestPrefix()`) and at most 20 characters; slugs derive
+ * from them. Remove it with {@link deleteTestTagType}.
+ */
+export async function createTestTagType(
+  name: string,
+  options: { exclusive: boolean; tags: string[] }
+): Promise<void> {
+  const { data: type, error: typeError } = await supabaseAdmin
+    .from("tag_types")
+    .insert({ slug: testTagSlug(name), name, exclusive: options.exclusive })
+    .select("id")
+    .single<{ id: string }>();
+  if (typeError) throw typeError;
+
+  const { error: tagsError } = await supabaseAdmin.from("tags").insert(
+    options.tags.map((tagName) => ({
+      tag_type_id: type.id,
+      type_exclusive: options.exclusive,
+      slug: testTagSlug(tagName),
+      name: tagName,
+    }))
+  );
+  if (tagsError) throw tagsError;
+}
+
 /**
  * Delete a hand-applied tag type by its exact name. Its tags and their machine
  * memberships go with it (ON DELETE CASCADE). A safety net for specs that
