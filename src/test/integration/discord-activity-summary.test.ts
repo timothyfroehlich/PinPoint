@@ -34,6 +34,7 @@ import { getSiteUrl } from "~/lib/url";
 import {
   authUsers,
   discordIntegrationConfig,
+  issueComments,
   issues,
   machines,
   pinballmapCatalog,
@@ -111,6 +112,8 @@ const {
 } = await import("~/services/issues");
 const { updateMachineOwner, updateMachinePresence } =
   await import("~/services/machines");
+const { anonymizeUserReferences } =
+  await import("~/app/(app)/settings/account-deletion");
 
 const TWO_DAYS_AGO = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
 
@@ -416,6 +419,78 @@ describe("activity summary history (PGlite, real services)", () => {
     }).join("\n");
     expect(rendered).not.toContain("@example.com");
     expect(rendered).toContain("Riley Chen");
+  });
+
+  /**
+   * Assignments name people as issue Activity does (PP-0fg0.1): by account,
+   * so a rename shows the current name and is not itself a reassignment, and
+   * a deleted assignee shows as Former user rather than vanishing.
+   */
+  it("names assignees by their current account, and a deleted one as Former user", async () => {
+    const db = await getTestDb();
+    const actor = await makeUser("Alex", "Admin");
+    const bob = await makeUser("Bob", "Smith");
+    const carol = await makeUser("Carol", "Diaz");
+    const dana = await makeUser("Dana", "Park");
+    await makeMachine("RN", "Rollergames");
+    const rn1 = await open("RN", "Flipper weak", "minor", actor);
+    const rn2 = await open("RN", "Lamp out", "minor", actor);
+    const rn3 = await open("RN", "Coil hot", "minor", actor);
+    const rn4 = await open("RN", "Switch flaky", "minor", actor);
+    await assignIssue({ issueId: rn1, assignedTo: bob, actorId: actor });
+    await assignIssue({ issueId: rn2, assignedTo: carol, actorId: actor });
+
+    await tick();
+    const start = new Date();
+    await tick();
+
+    // Assigned while still "Bob Smith"; reported under the current name.
+    await assignIssue({ issueId: rn4, assignedTo: bob, actorId: actor });
+    // A rename alone: RN-01 keeps the same assignee, so no row.
+    await db
+      .update(userProfiles)
+      .set({ firstName: "Robert" })
+      .where(eq(userProfiles.id, bob));
+    // Reassigned to Dana, who then deletes her account: the change stays.
+    await assignIssue({ issueId: rn2, assignedTo: dana, actorId: actor });
+    await anonymizeUserReferences(dana, null);
+    // An account deleted outside the app: the id no longer resolves, and the
+    // stored name is never shown.
+    await db.insert(issueComments).values({
+      issueId: rn3,
+      isSystem: true,
+      eventData: {
+        type: "assigned",
+        assigneeId: randomUUID(),
+        assigneeName: "Gone Elsewhere",
+      },
+    });
+
+    await tick();
+    const end = new Date();
+
+    const history = await loadActivityHistory(
+      { start, end },
+      ACTIVITY_SUMMARY_EVENT_KEYS
+    );
+    const model = buildSummaryModel(history, ACTIVITY_SUMMARY_EVENT_KEYS);
+    const assignments = [
+      ...model.needsAttention,
+      ...model.backInService,
+      ...model.otherChanges,
+    ]
+      .flatMap((entry) => entry.rows)
+      .flatMap((row) =>
+        row.kind === "assignment"
+          ? [`${row.issue.formattedId} ${String(row.assigneeName)}`]
+          : []
+      )
+      .sort();
+    expect(assignments).toEqual([
+      "RN-02 Former user",
+      "RN-03 Former user",
+      "RN-04 Robert Smith",
+    ]);
   });
 
   it("reports only what the default event types cover", async () => {

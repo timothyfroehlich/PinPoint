@@ -55,7 +55,7 @@ function state(
     status: "new",
     severity: "minor",
     machineInitials: initials,
-    assigneeName: null,
+    assignee: null,
     ...overrides,
   };
 }
@@ -198,7 +198,7 @@ describe("activity summary layout (§6)", () => {
             {
               status: "need_parts",
               severity: "major",
-              assigneeName: "Bob Smith",
+              assignee: { key: "u:bob", name: "Bob Smith" },
             },
             3
           ),
@@ -207,7 +207,7 @@ describe("activity summary layout (§6)", () => {
             "PIN",
             2,
             "Lamp out",
-            { assigneeName: "Bob Smith" },
+            { assignee: { key: "u:bob", name: "Bob Smith" } },
             { status: "fixed" }
           ),
         ],
@@ -317,7 +317,7 @@ describe("activity summary layout (§6)", () => {
         ],
         issues: [
           issue("BAD", 1, "@here `code` <#999> _x_", null, {
-            assigneeName: "@everyone",
+            assignee: { key: "u:mallory", name: "@everyone" },
           }),
         ],
         newMembers: ["@everyone"],

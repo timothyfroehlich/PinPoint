@@ -74,16 +74,24 @@ export function resolveTimelineEvent(
   accountNames: ReadonlyMap<string, string>
 ): ResolvedTimelineEvent {
   if (event.type !== "assigned") return event;
+  return {
+    type: "assigned",
+    assigneeDisplayName: assigneeDisplayName(event, accountNames),
+  };
+}
+
+/** The display name for an assignment event's assignee; see above. */
+export function assigneeDisplayName(
+  event: Extract<TimelineEventData, { type: "assigned" }>,
+  accountNames: ReadonlyMap<string, string>
+): string {
   // `typeof`, not `!== null`: an event written by the previous release while
   // migration 0101 deployed has no `assigneeId` key at all.
   const displayName =
     typeof event.assigneeId === "string"
       ? accountNames.get(event.assigneeId)
       : event.assigneeName;
-  return {
-    type: "assigned",
-    assigneeDisplayName: displayName ?? FORMER_USER_NAME,
-  };
+  return displayName ?? FORMER_USER_NAME;
 }
 
 /**
