@@ -26,7 +26,7 @@ No parameters. Returns the user id, access level (`admin`), client id and auth m
 ### `list_machines`
 
 - `search`: text matched against name or initials, ignoring case.
-- `presence`: one presence value or a list of them. Without it, `removed` and `pending_arrival` machines are included.
+- `presence`: one presence value or a list of them. Without it, every presence except `removed` is included; list `removed` to see Removed machines. Under `pinballmap: out_of_sync` every presence is included.
 - `pinballmap`: `unlinked`, `linked`, `excluded` or `out_of_sync`.
 - `limit` (1–100, default 50), `offset`.
 
@@ -41,8 +41,9 @@ Returns name, presence, owner, iScored id, open issues, and a `pinballmap` block
 
 ### `list_issues`
 
-- `machine`: initials or UUID. Without it, lists every machine.
+- `machine`: initials or UUID. Without it, lists every machine except Removed ones.
 - `status`: `open` (default), `closed`, one status, or a list of statuses.
+- `presence`: only issues on machines in these presence states, one value or a list. Without it, issues on Removed machines are left out unless `machine` names one.
 - `severity`, `assignee` (exact full name or UUID), `limit` (1–100, default 50), `offset`.
 
 ### `get_issue`
@@ -83,11 +84,11 @@ PERMANENT: the machine cannot be deleted and its initials can never change.
 - `initials` (required, 2–6 letters or digits). Check with `list_machines` first that nothing uses them.
 - `owner`: exact full name or UUID. Adds the owner as a watcher. The owner is **not** notified.
 - `presence` (default `on_the_floor`).
-- `pinballmapMachineId`, or `pinballmapExcluded: true` with `pinballmapExcludedReason`.
+- **Required:** `pinballmapMachineId`, or `pinballmapExcluded: true` (with an optional `pinballmapExcludedReason`). A call with neither is refused. Find the id first ([`pinballmap.md`](pinballmap.md)).
 
 There is no `intent` (lineup setting) or iScored parameter; set those afterwards with `update_machine`. The lineup setting starts as `off`.
 
-Trap: `pinballmapExcludedReason` is silently dropped unless `pinballmapExcluded: true` is sent in the same call.
+Trap: `pinballmapExcludedReason` without `pinballmapExcluded: true` does not mark the machine excluded, so the call is refused.
 
 Trap: "Initials 'X' are already taken" is the answer to any duplicate, not only initials. Read the machine list before trying again.
 
@@ -95,7 +96,7 @@ Trap: "Initials 'X' are already taken" is the answer to any duplicate, not only 
 
 PERMANENT: the issue cannot be deleted and its number is used up.
 
-- `machine` (required), `title` (required, 1–200 characters).
+- `machine` (required), `title` (required, 1–200 characters). A Removed machine refuses new issues with an `invalid` error.
 - `description`: plain text. Writing "@Name" does not notify that person.
 - `severity` (default `minor`), `priority` (default `medium`), `frequency` (default `intermittent`).
 

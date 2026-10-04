@@ -11,16 +11,19 @@ import {
   type IssueStatus,
 } from "~/lib/issues/status";
 import { checkPermission } from "~/lib/permissions/helpers";
+import { issueMachineMatches, machineNotRemoved } from "~/lib/machines/queries";
 import { db } from "~/server/db";
-import { issues } from "~/server/db/schema";
+import { issues, machines } from "~/server/db/schema";
 import { ISSUE_SEVERITY_VALUES } from "~/lib/types";
 
 import {
   issueUrl,
   McpToolError,
+  presenceFilterSchema,
   READ_ONLY_TOOL_ANNOTATIONS,
   resolveAssigneeFilter,
   resolveMachine,
+  resolvePresence,
   runTool,
   type ToolOutcome,
 } from "./shared";
@@ -71,6 +74,11 @@ const listIssuesSchema = z.object({
     .enum(ISSUE_SEVERITY_VALUES)
     .optional()
     .describe("Only issues at this severity."),
+  presence: presenceFilterSchema
+    .optional()
+    .describe(
+      "Only issues on machines with these availability statuses: a single status or an array (on_the_floor, off_the_floor, on_loan, pending_arrival, removed). Omitted, issues on Removed machines are left out unless 'machine' names one; name 'removed' to include them."
+    ),
   assignee: z
     .string()
     .trim()
@@ -113,6 +121,17 @@ export async function runListIssues(
   if (args.machine) {
     const machine = await resolveMachine(args.machine);
     conditions.push(eq(issues.machineInitials, machine.initials));
+  }
+  // Removed is the archived state: its issues are left out unless the caller
+  // names the machine or includes 'removed' in `presence` (PP-s363).
+  const machinePresence =
+    args.presence !== undefined
+      ? inArray(machines.presenceStatus, resolvePresence(args.presence))
+      : args.machine
+        ? null
+        : machineNotRemoved();
+  if (machinePresence) {
+    conditions.push(issueMachineMatches(machinePresence));
   }
   if (args.severity) {
     conditions.push(eq(issues.severity, args.severity));
@@ -202,7 +221,7 @@ export function registerListIssues(server: McpServer): void {
     {
       title: "List issues",
       description:
-        "List issues across the entire collection or on a specific machine. Supports filtering by machine (initials/UUID), status ('open', 'closed', or specific statuses), severity, and assignee. Returns paginated results with total count and hasMore.",
+        "List issues across the entire collection or on a specific machine. Supports filtering by machine (initials/UUID), status ('open', 'closed', or specific statuses), severity, assignee, and machine presence. Issues on Removed machines are left out unless 'machine' names one or presence includes 'removed'. Returns paginated results with total count and hasMore.",
       inputSchema: listIssuesSchema,
       annotations: READ_ONLY_TOOL_ANNOTATIONS,
     },

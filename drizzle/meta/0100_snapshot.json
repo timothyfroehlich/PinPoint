@@ -1,5 +1,5 @@
 {
-  "id": "4e276563-673b-4324-96f9-32f8391a24a7",
+  "id": "fa777552-8ff3-4110-8801-fe4bded57b00",
   "prevId": "351c2971-9cf5-453c-8bd7-bd33eb5ea4eb",
   "version": "7",
   "dialect": "postgresql",
@@ -342,6 +342,64 @@
           "primaryKey": false,
           "notNull": false
         },
+        "summary_channel_id": {
+          "name": "summary_channel_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "summary_interval_hours": {
+          "name": "summary_interval_hours",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 24
+        },
+        "summary_start_hour": {
+          "name": "summary_start_hour",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 18
+        },
+        "summary_events": {
+          "name": "summary_events",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{\"issues_opened\",\"issues_closed\",\"machine_status\",\"availability\",\"new_machines\",\"pinball_map_sync\"}'"
+        },
+        "summary_status": {
+          "name": "summary_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'not_configured'"
+        },
+        "summary_status_detail": {
+          "name": "summary_status_detail",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "summary_last_post_at": {
+          "name": "summary_last_post_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "summary_period_end": {
+          "name": "summary_period_end",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "summary_pinball_map_review_keys": {
+          "name": "summary_pinball_map_review_keys",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
+        },
         "updated_at": {
           "name": "updated_at",
           "type": "timestamp with time zone",
@@ -369,6 +427,18 @@
         "discord_integration_config_health_check": {
           "name": "discord_integration_config_health_check",
           "value": "bot_health_status IN ('unknown', 'healthy', 'degraded')"
+        },
+        "discord_integration_config_summary_interval_check": {
+          "name": "discord_integration_config_summary_interval_check",
+          "value": "summary_interval_hours IS NULL OR summary_interval_hours IN (1, 2, 4, 6, 12, 24)"
+        },
+        "discord_integration_config_summary_start_hour_check": {
+          "name": "discord_integration_config_summary_start_hour_check",
+          "value": "summary_start_hour BETWEEN 0 AND 23"
+        },
+        "discord_integration_config_summary_status_check": {
+          "name": "discord_integration_config_summary_status_check",
+          "value": "summary_status IN ('not_configured', 'posting', 'cant_post', 'couldnt_check', 'needs_discord')"
         }
       },
       "isRLSEnabled": false
@@ -1199,13 +1269,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
-        },
-        "template": {
-          "name": "template",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'standard'"
         },
         "use_custom_description": {
           "name": "use_custom_description",

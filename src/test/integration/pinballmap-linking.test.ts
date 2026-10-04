@@ -121,6 +121,9 @@ async function seedCatalogEntry(overrides: {
   });
 }
 
+/** The form's message for a selection that is neither linked nor excluded. */
+const LINK_REQUIRED = "Choose a model, or set Source to Manual Entry.";
+
 describe("PinballMap catalog mirror (PGlite)", () => {
   setupTestDb();
 
@@ -361,6 +364,27 @@ describe("createMachineAction — PinballMap link (PGlite)", () => {
     if (!result.ok) expect(result.code).toBe("VALIDATION");
   });
 
+  it("rejects a selection that is neither linked nor excluded, creating nothing", async () => {
+    const db = await getTestDb();
+    const { createMachineAction } = await import("~/app/(app)/m/actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+
+    const fd = new FormData();
+    fd.append("name", "Unpicked");
+    fd.append("initials", "UNP");
+
+    const result = await createMachineAction(undefined, fd);
+    expect(result).toMatchObject({
+      ok: false,
+      code: "VALIDATION",
+      message: LINK_REQUIRED,
+    });
+    expect(
+      await db.query.machines.findFirst({ where: eq(machines.initials, "UNP") })
+    ).toBeUndefined();
+  });
+
   it("rejects a link to a machine id that is not in the catalog mirror", async () => {
     const { createMachineAction } = await import("~/app/(app)/m/actions");
     const admin = await createUser("admin");
@@ -394,6 +418,7 @@ describe("createMachineAction — PinballMap link (PGlite)", () => {
     const fd = new FormData();
     fd.append("name", "Attack from Mars");
     fd.append("initials", "AFM");
+    fd.append("pinballmapExcluded", "on");
     fd.append("presenceStatus", "on_loan");
     fd.append("description", JSON.stringify(doc));
 
@@ -416,6 +441,7 @@ describe("createMachineAction — PinballMap link (PGlite)", () => {
     const fd = new FormData();
     fd.append("name", "Cactus Canyon");
     fd.append("initials", "CC");
+    fd.append("pinballmapExcluded", "on");
 
     const result = await createMachineAction(undefined, fd);
     expect(result.ok).toBe(true);
@@ -462,6 +488,51 @@ describe("updateMachineAction — PinballMap link (PGlite)", () => {
     expect(updated?.pinballmapMachineId).toBe(21);
     expect(updated?.manufacturer).toBe("Bally");
     expect(updated?.year).toBe(1995);
+  });
+
+  it("rejects a save that clears the link to neither and leaves the row unchanged", async () => {
+    const db = await getTestDb();
+    const { updateMachineAction } = await import("~/app/(app)/m/actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    await seedCatalogEntry({
+      pinballmapMachineId: 33,
+      name: "Cirqus Voltaire",
+    });
+    const [machine] = await db
+      .insert(machines)
+      .values({
+        name: "Cirqus",
+        initials: "CV",
+        pinballmapMachineId: 33,
+        manufacturer: "Bally",
+        year: 1997,
+      })
+      .returning();
+
+    // The picker posted, with no title and no "not on Pinball Map" flag.
+    const fd = new FormData();
+    fd.append("id", machine.id);
+    fd.append("name", "Cirqus Renamed");
+    fd.append("pbmLinkPresent", "1");
+
+    const result = await updateMachineAction(undefined, fd);
+    expect(result).toMatchObject({
+      ok: false,
+      code: "VALIDATION",
+      message: LINK_REQUIRED,
+    });
+
+    const after = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    expect(after).toMatchObject({
+      name: "Cirqus",
+      pinballmapMachineId: 33,
+      pinballmapExcluded: false,
+      manufacturer: "Bally",
+      year: 1997,
+    });
   });
 
   it("leaves link columns untouched when the picker marker is absent", async () => {

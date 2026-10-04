@@ -43,13 +43,9 @@ export type PinballMapHealthView =
     };
 
 import type { PinballMapRegion } from "~/lib/pinballmap/types";
+import type { DiscordChannelStatus } from "~/lib/discord/channel-check";
 
-export type RegionAlertChannelStatus =
-  | "not_configured"
-  | "posting"
-  | "cant_post"
-  | "couldnt_check"
-  | "needs_discord";
+export type RegionAlertChannelStatus = DiscordChannelStatus;
 
 export interface PinballMapAdminViewState {
   configuredLocationId: number | null;

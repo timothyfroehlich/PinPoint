@@ -705,8 +705,15 @@
     {
       "idx": 100,
       "version": "7",
-      "when": 1791070180502,
-      "tag": "0100_apron-card-template",
+      "when": 1791069006186,
+      "tag": "0100_activity-summary-settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "7",
+      "when": 1791083222453,
+      "tag": "0101_apron-card-template",
       "breakpoints": true
     }
   ]

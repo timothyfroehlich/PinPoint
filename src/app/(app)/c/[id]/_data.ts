@@ -1,9 +1,10 @@
 import { cache } from "react";
-import { asc } from "drizzle-orm";
 import { z } from "zod";
 import {
   getCollection,
   getCollectionByViewToken,
+  getCollectionPickerMachines,
+  type PickerMachine,
   type UserCollection,
 } from "~/lib/collections/user";
 import {
@@ -14,7 +15,6 @@ import {
 import { isEditorCollaborator } from "~/lib/collections/collaborators";
 import { getViewer } from "~/lib/collections/viewer";
 import { db } from "~/server/db";
-import { machines as machinesTable } from "~/server/db/schema";
 
 export interface CollectionForLayout {
   collection: UserCollection;
@@ -42,16 +42,14 @@ export interface CollectionForLayout {
 const uuidSchema = z.uuid();
 
 /**
- * Request-deduped list of all machines for the collection edit/add pickers
- * (id + initials + name, alphabetical). The layout's Edit modal and the empty
- * Overview's inline picker both need it; caching collapses them to one query.
+ * Request-deduped machine choice for the collection edit/add pickers: every
+ * machine not marked Removed, plus the collection's own (spec 2.7). The
+ * layout's Edit modal and the empty Overview's inline picker both need it;
+ * caching collapses them to one query.
  */
 export const getPickerMachines = cache(
-  async (): Promise<{ id: string; initials: string; name: string }[]> =>
-    db.query.machines.findMany({
-      columns: { id: true, initials: true, name: true },
-      orderBy: [asc(machinesTable.name)],
-    })
+  async (collectionId: string): Promise<PickerMachine[]> =>
+    getCollectionPickerMachines(db, collectionId)
 );
 
 /**

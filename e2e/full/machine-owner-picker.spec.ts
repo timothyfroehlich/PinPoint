@@ -163,6 +163,9 @@ test.describe("Machine Owner Picker — promote-dialog journeys (PP-6oi)", () =>
     // Fill required fields
     await page.getByLabel(/Initials/i).fill(machineInitials);
     await page.getByLabel(/Machine Name/i).fill(`Owner Picker Test ${testId}`);
+    // Every new machine needs a Pinball Map title or Manual Entry (not on
+    // Pinball Map); this spec is not about Pinball Map, so take Manual Entry.
+    await page.getByRole("radio", { name: "Manual Entry" }).click();
 
     // Open picker and select guest via search (search bypasses the
     // "Show guests" checkbox filter — more robust on mobile viewports).
@@ -216,6 +219,9 @@ test.describe("Machine Owner Picker — promote-dialog journeys (PP-6oi)", () =>
     await page
       .getByLabel(/Machine Name/i)
       .fill(`Owner Picker Confirm ${testId}`);
+    // Every new machine needs a Pinball Map title or Manual Entry (not on
+    // Pinball Map); this spec is not about Pinball Map, so take Manual Entry.
+    await page.getByRole("radio", { name: "Manual Entry" }).click();
 
     // Open picker and select guest via search (search bypasses the
     // "Show guests" checkbox filter — more robust on mobile viewports).
