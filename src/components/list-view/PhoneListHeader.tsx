@@ -613,6 +613,10 @@ export function PhoneListHeader({
     <button
       type="button"
       aria-haspopup="dialog"
+      // Explicit, because the computed name puts a space before the comma.
+      aria-label={
+        views.edited ? `${views.appliedName}, edited` : views.appliedName
+      }
       data-testid="list-phone-views-trigger"
       className="inline-flex min-h-11 min-w-0 items-center gap-1.5 rounded-md px-2 text-sm font-semibold text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
     >
@@ -624,7 +628,6 @@ export function PhoneListHeader({
             aria-hidden="true"
             className="size-2 shrink-0 rounded-full bg-warning"
           />
-          <span className="sr-only">, edited</span>
         </>
       ) : null}
       <ChevronDown aria-hidden="true" className="size-4 shrink-0" />

@@ -59,7 +59,7 @@ function phoneViews(page: Page): ViewsUi {
   // the flex layout may put a space before the comma.
   const appliedButton = (name: string, edited: boolean) =>
     page.getByRole("button", {
-      name: new RegExp(`^${name}${edited ? "\\s*, edited" : ""}$`),
+      name: new RegExp(`^${name}${edited ? ", edited" : ""}$`),
     });
   return {
     async expectApplied(name, edited = false) {

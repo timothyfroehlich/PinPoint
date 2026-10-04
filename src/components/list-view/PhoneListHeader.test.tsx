@@ -184,7 +184,7 @@ describe("PhoneListHeader", () => {
       secondary: [filter({ id: "owner", label: "Owner", atPreset: false })],
     });
 
-    expect(screen.getByTestId("list-phone-views-trigger")).toHaveTextContent(
+    expect(screen.getByTestId("list-phone-views-trigger")).toHaveAccessibleName(
       "Broken games, edited"
     );
     expect(

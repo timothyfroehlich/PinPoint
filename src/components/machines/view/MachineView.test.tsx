@@ -551,7 +551,7 @@ describe("MachineView", () => {
     expect(
       screen.getByRole("button", { name: "Filters, 2 active" })
     ).toBeInTheDocument();
-    expect(screen.getByTestId("list-phone-views-trigger")).toHaveTextContent(
+    expect(screen.getByTestId("list-phone-views-trigger")).toHaveAccessibleName(
       "On the floor, edited"
     );
   });

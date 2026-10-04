@@ -85,7 +85,7 @@
 - **7.2** The title row holds the title, the Summary Row toggle (widgets §2.5), and the host's page actions; actions that do not fit become icon buttons with accessible names. On a Collection or Tag tab, whose title row belongs to the Collection or Tag page, the Summary Row toggle sits on its own row between the page's tabs and the search field.
 - **7.3** The phone List Header holds the Applied View's name as a button that opens the Saved Views sheet, and a Filters icon button showing a count of filters not at their Page Preset value.
 - **7.4** When the List View is Edited, the Applied View's name carries a marker that is announced as "edited".
-- **7.5** The Filters button opens one sheet holding Sort, the Primary Filters, the Secondary Filters under More filters, and Display (page size). Selecting a filter opens its options inside the sheet; the sheet's footer offers Reset all and a button that shows the result count and closes the sheet.
+- **7.5** The Filters button opens one sheet holding Sort, the Primary Filters, the Secondary Filters under More filters, and Display (page size). Selecting a filter opens its options inside the sheet; the sheet's footer offers Reset all, which returns every filter to the Page Preset's values and keeps search, sort, and page size, and a button that shows the result count and closes the sheet.
 - **7.6** The Saved Views sheet offers, when Edited, Save changes (own Saved View only), Save as new, and Discard changes; then the Built-in Views, then the account's Saved Views, then Manage views.
 - **7.7** The list box runs edge to edge with no card border; rows align with the page's horizontal padding.
 - **7.8** The pager is a 44px bar pinned above the tab bar, with Previous, the range ("1–25 of 84"), and Next. The list leaves room so its last row can scroll clear of the pager.
@@ -129,7 +129,7 @@
 - **10.9** An account has at most one Default View per List Host.
 - **10.10** The Machines or Issues page, opened with no view configuration other than page, shows the account's Default View if one exists, otherwise the Page Preset. A Collection or Tag tab opened that way always shows its Page Preset. A URL carrying any view configuration opens exactly as written.
 - **10.11** When the Default View opens, the address bar shows its canonical URL.
-- **10.12** More views always offers every Built-in View, so an account with a default can still reach the Page Preset.
+- **10.12** Every Built-in View is always reachable, as a List Header tab or in More views, so an account with a default can still reach the Page Preset.
 - **10.13** Deleting the Default View leaves its host without a default; the main page then opens to the Page Preset.
 - **10.14** A stored field, filter value, or person that no longer exists or is not permitted on the Surface is dropped when the view is applied, exactly as an invalid URL value is (§9.3).
 - **10.15** _Retired 2026-10-02._ Saved Views belong to a List Host, not a Surface, so deleting a Collection or Tag deletes none. Number kept so older citations don't dangle.
@@ -174,6 +174,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-04 | Reset all returns filters to the Page Preset (§7.5); Built-in Views stay reachable as tabs or in More views (§10.12). |
 | 2026-10-03 | On a Collection or Tag tab the Summary Row toggle sits on its own row between the page's tabs and search (§7.2). |
 | 2026-10-03 | Stacked Summary Widgets sit in a collapsible section (§8.4). |
 | 2026-10-02 | Default View controls appear only on the Machines and Issues pages (§10.8). |

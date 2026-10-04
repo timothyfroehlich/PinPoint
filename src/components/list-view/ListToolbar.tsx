@@ -40,6 +40,18 @@ function CountPill({
   );
 }
 
+/**
+ * A filter button's accessible name. Set explicitly because the browser's
+ * name computation inserts a space between the face's flex items, which
+ * reads "Playability : Needs Service".
+ */
+function filterButtonName(filter: ListFilterModel): string {
+  const count = filter.selected.length;
+  if (count > 1) return `${filter.label}: ${String(count)} selected`;
+  if (filter.valueLabel) return `${filter.label}: ${filter.valueLabel}`;
+  return filter.label;
+}
+
 /** A filter button's face (§4.3): the name, then the value or a count. */
 function FilterButtonFace({
   filter,
@@ -52,13 +64,10 @@ function FilterButtonFace({
       <span>{filter.label}</span>
       {count > 1 ? (
         <>
-          <span className="sr-only">:</span>
           <CountPill count={count} active />
-          <span className="sr-only"> selected</span>
         </>
       ) : filter.valueLabel ? (
         <>
-          <span className="sr-only">:</span>
           <span className="max-w-40 truncate text-foreground">
             {filter.valueLabel}
           </span>
@@ -98,6 +107,7 @@ function FilterDropdown({
     <Popover>
       <PopoverTrigger
         type="button"
+        aria-label={filterButtonName(filter)}
         className={filterButtonClass}
         data-testid={`list-filter-${filter.id}`}
       >

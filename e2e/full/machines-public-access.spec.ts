@@ -94,7 +94,7 @@ test.describe("Machines Public Access", () => {
     // The Playability filter button shows the selected value (list-views §4.3).
     await expect(
       page.getByRole("button", {
-        name: new RegExp(`^Playability\\s*:\\s*${label}$`),
+        name: new RegExp(`^Playability: ${label}$`),
       })
     ).toBeVisible();
     await expect(segment).toHaveAttribute("aria-pressed", "true");
