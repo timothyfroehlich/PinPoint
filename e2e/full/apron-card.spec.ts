@@ -60,7 +60,9 @@ test.describe("Apron card tab as an editor", () => {
     await expect(save).toBeDisabled();
 
     await page.getByRole("combobox", { name: "Apron size" }).click();
-    await page.getByRole("option", { name: /Stern \/ SPIKE/ }).click();
+    await page
+      .getByRole("option", { name: /Stern \/ Data East \/ Sega/ })
+      .click();
     await page.getByRole("radio", { name: "Card description" }).click();
     const description = page.getByLabel("Card description", { exact: true });
     await description.fill(LONG_TEXT);
@@ -101,7 +103,7 @@ test.describe("Apron card tab as an editor", () => {
     const picker = page.getByRole("combobox", { name: "Saved card" });
     await expect(picker).toHaveText("Card 1");
     await expect(page.getByRole("combobox", { name: "Apron size" })).toHaveText(
-      /Stern \/ SPIKE/
+      /Stern \/ Data East \/ Sega/
     );
     await expect(
       page.getByText("Shoot the ramps to light the lock.").first()

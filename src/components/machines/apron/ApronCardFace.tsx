@@ -6,6 +6,7 @@ import { Lightbulb, Trophy, Wrench } from "lucide-react";
 
 import {
   APRON_CARD_LAYOUTS,
+  APRON_CARD_SIZES,
   APRON_HEADER_BAND_LAYOUTS,
   APRON_SIDE_RAIL_LAYOUTS,
   apronCreditRows,
@@ -244,7 +245,12 @@ export function ApronCardFace({
       "--apron-body-font": `${layout.bodyFontPx}px`,
     };
     return (
-      <div className={cardClass} style={style} data-apron-size={size}>
+      <div
+        className={cardClass}
+        style={style}
+        data-apron-size={size}
+        data-apron-geometry={APRON_CARD_SIZES[size].geometry}
+      >
         <div className="apron-card__band">
           <div className="apron-card__identity" ref={identityRef}>
             <div className="apron-card__band-lines">
@@ -287,7 +293,12 @@ export function ApronCardFace({
   };
 
   return (
-    <div className={cardClass} style={style} data-apron-size={size}>
+    <div
+      className={cardClass}
+      style={style}
+      data-apron-size={size}
+      data-apron-geometry={APRON_CARD_SIZES[size].geometry}
+    >
       <div className="apron-card__panel">
         <div className="apron-card__identity" ref={identityRef}>
           {title}

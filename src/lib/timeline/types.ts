@@ -12,13 +12,31 @@ import {
   FREQUENCY_CONFIG,
 } from "~/lib/issues/status";
 import { formatIssueId } from "~/lib/issues/utils";
+import { FORMER_USER_NAME } from "~/lib/timeline/resolve-person";
 
 /**
  * Structured timeline event payload.
  * Discriminated union on `type` — stored as jsonb in the `event_data` column.
  */
 export type TimelineEventData =
-  | { type: "assigned"; assigneeName: string }
+  | {
+      type: "assigned";
+      /**
+       * The assignee's account (PP-0fg0.1). Null once that account is
+       * deleted, and on a legacy event whose name matched no single account.
+       */
+      assigneeId: string | null;
+      /**
+       * The assignee's name when the event was written. A rollback copy: it
+       * lets a release that predates `assigneeId` render the event. Activity
+       * shows it only when `assigneeId` is null or absent (a legacy name that
+       * matched no single account, or an event written by the previous
+       * release during the deploy). With an id, Activity never shows it: the
+       * live name, or "Former user" once the account is gone. Account
+       * deletion removes it.
+       */
+      assigneeName?: string;
+    }
   | { type: "unassigned" }
   | { type: "status_changed"; from: string; to: string }
   | { type: "severity_changed"; from: string; to: string }
@@ -37,13 +55,53 @@ export type TimelineEventData =
     };
 
 /**
+ * A stored event with its person references resolved to display names: what
+ * the formatters render. Only an assignment refers to a person.
+ */
+export type ResolvedTimelineEvent =
+  | Exclude<TimelineEventData, { type: "assigned" }>
+  | { type: "assigned"; assigneeDisplayName: string };
+
+/**
+ * Resolve an event's person references against current account names (id →
+ * name). An assignee with an id shows that account's current name, or the
+ * deleted-account placeholder once the account is gone: never the stored
+ * name, which would outlive an account deleted outside the app. Only an
+ * event without an id falls back to its stored name.
+ */
+export function resolveTimelineEvent(
+  event: TimelineEventData,
+  accountNames: ReadonlyMap<string, string>
+): ResolvedTimelineEvent {
+  if (event.type !== "assigned") return event;
+  return {
+    type: "assigned",
+    assigneeDisplayName: assigneeDisplayName(event, accountNames),
+  };
+}
+
+/** The display name for an assignment event's assignee; see above. */
+export function assigneeDisplayName(
+  event: Extract<TimelineEventData, { type: "assigned" }>,
+  accountNames: ReadonlyMap<string, string>
+): string {
+  // `typeof`, not `!== null`: an event written by the previous release while
+  // migration 0104 deployed has no `assigneeId` key at all.
+  const displayName =
+    typeof event.assigneeId === "string"
+      ? accountNames.get(event.assigneeId)
+      : event.assigneeName;
+  return displayName ?? FORMER_USER_NAME;
+}
+
+/**
  * Convert a structured timeline event to a human-readable string.
  * Used by the timeline UI to display system events.
  */
-export function formatTimelineEvent(event: TimelineEventData): string {
+export function formatTimelineEvent(event: ResolvedTimelineEvent): string {
   switch (event.type) {
     case "assigned":
-      return `Assigned to ${event.assigneeName}`;
+      return `Assigned to ${event.assigneeDisplayName}`;
     case "unassigned":
       return "Unassigned";
     case "status_changed":
@@ -72,10 +130,12 @@ export function formatTimelineEvent(event: TimelineEventData): string {
  * ("changed priority Medium → High"), for the issue page's Activity (spec
  * issue-detail §7.5). Without an actor, use `formatTimelineEvent`.
  */
-export function formatTimelineEventAction(event: TimelineEventData): string {
+export function formatTimelineEventAction(
+  event: ResolvedTimelineEvent
+): string {
   switch (event.type) {
     case "assigned":
-      return `assigned ${event.assigneeName}`;
+      return `assigned ${event.assigneeDisplayName}`;
     case "unassigned":
       return "unassigned the issue";
     case "status_changed":

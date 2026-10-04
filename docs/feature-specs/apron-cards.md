@@ -12,7 +12,7 @@
 
 - **Card** — the printed artifact mounted in a machine's apron card holder. One card renders one machine. Once printed, it is the machine's sole on-cabinet entry point for reporting an issue or posting a score, replacing the existing iScored QR sticker.
 - **Saved card** — one complete, named set of card settings: apron size, template, card text choice, card description, tip, and credit display settings. A machine keeps zero or more saved cards, listed in the order they were created.
-- **Apron size** — which physical dimensions a card renders at. Stern/SPIKE (140×75mm) and WPC (6×3.25in) are the two sizes supported at launch; more may be added later as new cabinet families need them. Stored per saved card, independent of card content — the same title, edition, description, and tip render at any size a machine supports.
+- **Apron size** — which physical dimensions a card renders at. The supported sizes are Stern / Data East / Sega (140×75mm), Williams / WPC (6×3.25in), Bally solid state (5.5×3.25in), Bally EM (5.5×3.75in), Gottlieb EM (6×3in), and Williams EM (6×3.5in); more may be added as new cabinet families need them. Stored per saved card, independent of card content — the same title, edition, description, and tip render at any size a machine supports.
 - **Template** — which layout a card face uses: Standard, Side rail, or Header band. Stored per saved card, independent of apron size and content; every template renders at every supported apron size. Side rail and Header band give the description and tip more room than Standard.
 - **Card description** — an optional override of the card's description text, distinct from the machine's main description. A saved card keeps at most one. It is rich text limited to bold, italic, and lists.
 - **Tip** — an optional second block of card text, shown under Description. Carries its own enabled/disabled toggle, independent of whether it has content. It is rich text limited to bold, italic, and lists.
@@ -40,7 +40,7 @@
 
 ## 4. Apron size
 
-- **4.1** Apron size is a field stored per saved card, drawn from the supported set (§1) — Stern/SPIKE and WPC at launch.
+- **4.1** Apron size is a field stored per saved card, drawn from the supported set (§1).
 - **4.2** When a machine's Pinball Map match implies a size, PinPoint fills it for each new saved card; a person can always override it.
 - **4.3** An unmatched machine's apron size is set directly, with no default. Every saved card has an apron size; a card without one cannot be saved. A machine with no saved cards has no card to export; its card entry point says so.
 
@@ -102,12 +102,13 @@
 
 | Requirement | Current implementation gap |
 | :-- | :-- |
-| §4.2 | Automatic apron-size fill from a Pinball Map match is intentionally deferred. Editors choose Stern/SPIKE or WPC manually for now; unmatched machines still have no default. |
+| §4.2 | Automatic apron-size fill from a Pinball Map match is intentionally deferred. Editors choose a size manually for now; unmatched machines still have no default. |
 
 ## Changelog
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-04 | Apron sizes: Stern/SPIKE becomes Stern / Data East / Sega and WPC becomes Williams / WPC; adds Bally solid state, Bally EM, Gottlieb EM, and Williams EM (§1, §4.1). |
 | 2026-10-03 | Card templates: each saved card chooses Standard, Side rail, or Header band; the two new templates give description and tip more room and show no credits (§1, §2.3, §3.1, §3.6, §5.1–§5.7, §6.5, §10.2, §10.5). |
 | 2026-10-02 | Card editing moves from the machine form to its own Apron card tab with its own Save; the New Machine page has no card; the Service tab thumbnail is replaced by the tab (§3.1–3.5, §3.8, §11.6). |
 | 2026-09-28 | Multiple saved cards per machine, each with a required size; an overflowing card saves and exports only with an explicit override (§1, §3.1, §3.5, §3.8, §4.1–4.3, §6.4, §9.1, §9.4, §9.5, §10.5, §11). |

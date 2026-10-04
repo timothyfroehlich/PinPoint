@@ -6,7 +6,7 @@ import {
   type SQL,
   sql,
 } from "drizzle-orm";
-import { db } from "~/server/db";
+import { db, type DbTransaction } from "~/server/db";
 import {
   issues,
   issueWatchers,
@@ -53,6 +53,26 @@ import {
   docToPlainText,
 } from "~/lib/tiptap/types";
 import { loadMentionNames } from "~/lib/tiptap/mention-names";
+
+/**
+ * An Activity "assigned" event. Activity shows the account's current name by
+ * `assigneeId` (PP-0fg0.1); `assigneeName` is a rollback/fallback copy so a
+ * release that predates the id still renders the event.
+ */
+async function assignedEvent(
+  tx: DbTransaction,
+  assigneeId: string
+): Promise<TimelineEventData> {
+  const assignee = await tx.query.userProfiles.findFirst({
+    where: eq(userProfiles.id, assigneeId),
+    columns: { name: true },
+  });
+  return {
+    type: "assigned",
+    assigneeId,
+    ...(assignee !== undefined && { assigneeName: assignee.name }),
+  };
+}
 
 // --- Errors ---
 
@@ -398,15 +418,9 @@ export async function createIssue({
 
     // 3. Assignment Logic (if applicable)
     if (assignedTo) {
-      // Create timeline event
-      const assignee = await tx.query.userProfiles.findFirst({
-        where: eq(userProfiles.id, assignedTo),
-        columns: { name: true },
-      });
-      const assigneeName = assignee?.name ?? "Unknown User";
       await createTimelineEvent(
         issue.id,
-        { type: "assigned", assigneeName },
+        await assignedEvent(tx, assignedTo),
         tx,
         reportedBy ?? null
       );
@@ -1110,16 +1124,6 @@ export async function assignIssue({
       };
     }
 
-    // Get new assignee name if assigning to someone
-    let assigneeName = "Unassigned";
-    if (assignedTo) {
-      const assignee = await tx.query.userProfiles.findFirst({
-        where: eq(userProfiles.id, assignedTo),
-        columns: { name: true },
-      });
-      assigneeName = assignee?.name ?? "Unknown User";
-    }
-
     // Update assignment
     await tx
       .update(issues)
@@ -1137,9 +1141,8 @@ export async function assignIssue({
         .onConflictDoNothing();
     }
 
-    // Create timeline event
     const event: TimelineEventData = assignedTo
-      ? { type: "assigned", assigneeName }
+      ? await assignedEvent(tx, assignedTo)
       : { type: "unassigned" };
     const assignmentEventId = await createTimelineEvent(
       issueId,
@@ -1171,7 +1174,7 @@ export async function assignIssue({
     }
 
     log.info(
-      { issueId, assignedTo, assigneeName, action: "assignIssue" },
+      { issueId, assignedTo, action: "assignIssue" },
       "Issue assignment updated"
     );
 

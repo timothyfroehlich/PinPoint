@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { eq } from "drizzle-orm";
 import { asDbOrTx, getTestDb, setupTestDb } from "~/test/setup/pglite";
 import {
   createTestComment,
@@ -19,6 +20,7 @@ import {
 } from "~/lib/machines/queries";
 import type { IssueSort } from "~/lib/issues/filters";
 import { formatIssueId } from "~/lib/issues/utils";
+import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 
 vi.mock("~/server/db", async () => {
   const { getTestDb } = await import("~/test/setup/pglite");
@@ -178,6 +180,60 @@ describe("issue list page: sorting and comment counts", () => {
       "BB-01": 0,
       "BB-02": 0,
     });
+  });
+
+  // The list loader runs search through the relational query API, which
+  // rewrites columns in raw SQL fragments; this pins the mention join there
+  // (PP-0fg0.4). Matching rules themselves: issue-filtering.test.ts.
+  it("searches mentions by the person's current name", async () => {
+    const db = await getTestDb();
+    const rows = await db.query.issues.findMany({
+      columns: { id: true, machineInitials: true, issueNumber: true },
+    });
+    const idOf = (initials: string, n: number): string => {
+      const row = rows.find(
+        (r) => r.machineInitials === initials && r.issueNumber === n
+      );
+      if (!row) throw new Error(`seed missing ${initials}-${n}`);
+      return row.id;
+    };
+    const mention = (id: string, label: string): ProseMirrorDoc => ({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "Ask " },
+            { type: "mention", attrs: { id, label } },
+          ],
+        },
+      ],
+    });
+    // Neither issue is assigned to or reported by the person mentioned.
+    await db
+      .update(issues)
+      .set({ description: mention(ALICE, "Alicia Old") })
+      .where(eq(issues.id, idOf("AA", 3)));
+    await db.insert(issueComments).values(
+      createTestComment(idOf("AA", 2), {
+        authorId: ALICE,
+        content: mention(BOB, "Robert Old"),
+      })
+    );
+
+    const search = async (q: string): Promise<string[]> => {
+      const { issuesList } = await loadIssueListPage(
+        { q, sort: "issue_asc", pageSize: 50 },
+        { isAdmin: false }
+      );
+      return issuesList.map((i) =>
+        formatIssueId(i.machineInitials, i.issueNumber)
+      );
+    };
+    expect(await search("Alice Zed")).toContain("AA-03");
+    expect(await search("Bob Young")).toContain("AA-02");
+    expect(await search("Alicia Old")).toEqual([]);
+    expect(await search("Robert Old")).toEqual([]);
   });
 });
 

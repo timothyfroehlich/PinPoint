@@ -13,6 +13,7 @@ import {
   isNull,
   sql,
 } from "drizzle-orm";
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import type { Schema } from "~/server/db";
 
@@ -25,7 +26,50 @@ import {
   issueComments,
 } from "~/server/db/schema";
 import { OPEN_STATUSES } from "~/lib/issues/status";
+import { FORMER_USER_NAME } from "~/lib/timeline/resolve-person";
 import type { IssueFilters, IssueSort } from "./filters";
+
+/**
+ * Whether a ProseMirror doc column reads, as displayed, like `search` (an
+ * ILIKE pattern). Matches what a reader sees, not the stored JSON:
+ *
+ * - Text nodes match on their text. Node types, attribute names, and link
+ *   targets do not.
+ * - A mention matches on the name it displays (`loadMentionNames`): the
+ *   mentioned profile's current name, "Former user" when that account was
+ *   deleted, or the stored label when the id is not UUID-shaped. The label
+ *   frozen into the doc never matches once the person has a different name.
+ *
+ * Names only, never emails (CORE-SEC-007).
+ *
+ * The joined profile is referenced by a literal alias, not `${userProfiles.id}`:
+ * the relational query API (`db.query.issues.findMany`) rewrites every column
+ * in a raw fragment to the root table's alias, which would turn it into
+ * `"issues"."id"`.
+ */
+function proseMatches(doc: AnyPgColumn, search: string): SQL {
+  return sql`(
+    exists (
+      select 1
+      from jsonb_path_query(${doc}, 'lax $.** ? (@.type == "text").text') as node(value)
+      where node.value #>> '{}' ilike ${search}
+    )
+    or exists (
+      select 1
+      from jsonb_path_query(${doc}, 'lax $.** ? (@.type == "mention").attrs') as mention(attrs)
+      left join ${userProfiles} as mentioned
+        on mentioned.id::text = lower(mention.attrs ->> 'id')
+      where coalesce(
+        mentioned.name,
+        case
+          when mention.attrs ->> 'id' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+            then ${FORMER_USER_NAME}
+          else mention.attrs ->> 'label'
+        end
+      ) ilike ${search}
+    )
+  )`;
+}
 
 /**
  * Builds an array of Drizzle SQL conditions from filters
@@ -45,7 +89,7 @@ export function buildWhereConditions(
     const searchConditions = [
       // Issue fields
       ilike(issues.title, search),
-      sql`${issues.description}::text ilike ${search}`,
+      proseMatches(issues.description, search),
       ilike(issues.machineInitials, search),
       ilike(issues.reporterName, search),
     ];
@@ -162,7 +206,7 @@ export function buildWhereConditions(
           .where(
             and(
               eq(issueComments.issueId, issues.id),
-              sql`${issueComments.content}::text ilike ${search}`
+              proseMatches(issueComments.content, search)
             )
           )
       )
