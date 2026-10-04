@@ -365,6 +365,35 @@ describe("submitPublicIssueAction — anonymous and guest status/priority enforc
     expect(persisted.status).toBe("new");
     expect(persisted.priority).toBe("medium");
   });
+
+  it("does not expose sensitive database error messages to client on unexpected error", async () => {
+    const owner = await seedUser("member");
+    const machine = await seedMachine(owner.id);
+
+    const issuesService = await import("~/services/issues");
+    const spy = vi
+      .spyOn(issuesService, "createIssue")
+      .mockRejectedValueOnce(
+        new Error(
+          "duplicate key value violates unique constraint 'users_email_key'"
+        )
+      );
+
+    try {
+      const result = await submitPublicIssueAction(
+        { error: "" },
+        makeFormData({ machineId: machine.id })
+      );
+
+      expect(result).toHaveProperty("error");
+      expect(result.error).toBe(
+        "Unable to submit the issue. Please try again."
+      );
+      expect(result.error).not.toContain("duplicate key");
+    } finally {
+      spy.mockRestore();
+    }
+  });
 });
 
 describe("submitPublicIssueAction — Removed machines (integration)", () => {

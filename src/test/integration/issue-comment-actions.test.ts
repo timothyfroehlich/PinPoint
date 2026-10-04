@@ -25,11 +25,10 @@
  *     editCommentAction:
  *       8. author edits own comment → content updated in real DB
  *       9. non-author (including admin) → UNAUTHORIZED + read-only invariant
- *
- *   KEEP-unit (2 blocks, stayed in source):
+ *   CONSOLIDATED (from retired delete-comment-audit.test.ts):
  *     deleteCommentAction:
- *       - "should return VALIDATION error for invalid commentId"   (pure Zod)
- *       - "should return VALIDATION error for missing commentId"   (pure Zod)
+ *       - "returns VALIDATION error for invalid commentId and leaves database untouched"
+ *       - "returns VALIDATION error for missing commentId and leaves database untouched"
  *
  * Permissions: deleteCommentAction uses checkPermission("comments.delete") and
  * checkPermission("comments.delete.any"). We drive those with REAL permission
@@ -400,6 +399,49 @@ describe("deleteCommentAction — integration (PP-x4li.1.4)", () => {
     expect(row.isSystem).toBe(false);
     expect(row.authorId).toBe(MEMBER_ID);
   });
+
+  it("returns VALIDATION error for invalid commentId and leaves database untouched", async () => {
+    await mockAuth(MEMBER_ID);
+    const { deleteCommentAction } = await import("~/app/(app)/issues/actions");
+
+    const formData = new FormData();
+    formData.append("commentId", "not-a-uuid");
+
+    const result = await deleteCommentAction(undefined, formData);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("VALIDATION");
+    }
+
+    const db = await getTestDb();
+    const [row] = await db
+      .select()
+      .from(issueComments)
+      .where(eq(issueComments.id, commentId));
+    expect(row.isSystem).toBe(false);
+  });
+
+  it("returns VALIDATION error for missing commentId and leaves database untouched", async () => {
+    await mockAuth(MEMBER_ID);
+    const { deleteCommentAction } = await import("~/app/(app)/issues/actions");
+
+    const formData = new FormData();
+
+    const result = await deleteCommentAction(undefined, formData);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("VALIDATION");
+    }
+
+    const db = await getTestDb();
+    const [row] = await db
+      .select()
+      .from(issueComments)
+      .where(eq(issueComments.id, commentId));
+    expect(row.isSystem).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -481,6 +523,117 @@ describe("addCommentAction — integration (PP-x4li.1.4)", () => {
       ok: true,
       value: { issueId, commentId: rows[0].id },
     });
+  });
+
+  it("returns UNAUTHORIZED when caller is not authenticated and leaves DB untouched", async () => {
+    await mockAuth(null);
+    const { addCommentAction } = await import("~/app/(app)/issues/actions");
+
+    const formData = new FormData();
+    formData.append("issueId", issueId);
+    formData.append("comment", JSON.stringify(validCommentDoc));
+
+    const result = await addCommentAction(undefined, formData);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("UNAUTHORIZED");
+    }
+
+    const db = await getTestDb();
+    const rows = await db
+      .select()
+      .from(issueComments)
+      .where(eq(issueComments.issueId, issueId));
+    expect(rows).toHaveLength(0);
+  });
+
+  it("validates input and returns VALIDATION for empty comment", async () => {
+    await mockAuth(MEMBER_ID);
+    const { addCommentAction } = await import("~/app/(app)/issues/actions");
+
+    const formData = new FormData();
+    formData.append("issueId", issueId);
+    formData.append("comment", "");
+
+    const result = await addCommentAction(undefined, formData);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("VALIDATION");
+    }
+
+    const db = await getTestDb();
+    const rows = await db
+      .select()
+      .from(issueComments)
+      .where(eq(issueComments.issueId, issueId));
+    expect(rows).toHaveLength(0);
+  });
+
+  it("rejects comments exceeding COMMENT_MAX images with VALIDATION error", async () => {
+    await mockAuth(MEMBER_ID);
+    const { addCommentAction } = await import("~/app/(app)/issues/actions");
+
+    const excessiveImages = Array.from({ length: 5 }, (_, i) => ({
+      blobUrl: `https://test-blob.public.blob.vercel-storage.com/test-${i}.jpg`,
+      blobPathname: `issue-images/test-${i}.jpg`,
+      originalFilename: `test-${i}.jpg`,
+      fileSizeBytes: 1024,
+      mimeType: "image/jpeg",
+    }));
+
+    const formData = new FormData();
+    formData.append("issueId", issueId);
+    formData.append("comment", JSON.stringify(validCommentDoc));
+    formData.append("imagesMetadata", JSON.stringify(excessiveImages));
+
+    const result = await addCommentAction(undefined, formData);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("VALIDATION");
+      expect(result.message).toContain("Maximum 4 images allowed per comment");
+    }
+
+    const db = await getTestDb();
+    const rows = await db
+      .select()
+      .from(issueComments)
+      .where(eq(issueComments.issueId, issueId));
+    expect(rows).toHaveLength(0);
+  });
+
+  it("returns SERVER error and does not mutate database when addIssueComment fails", async () => {
+    await mockAuth(MEMBER_ID);
+    const issuesService = await import("~/services/issues");
+    const spy = vi
+      .spyOn(issuesService, "addIssueComment")
+      .mockRejectedValueOnce(new Error("Database connection failure"));
+
+    try {
+      const { addCommentAction } = await import("~/app/(app)/issues/actions");
+
+      const formData = new FormData();
+      formData.append("issueId", issueId);
+      formData.append("comment", JSON.stringify(validCommentDoc));
+
+      const result = await addCommentAction(undefined, formData);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("SERVER");
+      }
+
+      const db = await getTestDb();
+      const rows = await db
+        .select()
+        .from(issueComments)
+        .where(eq(issueComments.issueId, issueId));
+      expect(rows).toHaveLength(0);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 

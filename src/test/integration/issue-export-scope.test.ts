@@ -8,10 +8,13 @@ import {
 import {
   collectionMachines,
   collections,
+  invitedUsers,
   issues,
+  issueWatchers,
   machines,
   userProfiles,
 } from "~/server/db/schema";
+import { plainTextToDoc } from "~/lib/tiptap/types";
 import type { ExportIssuesResult } from "~/app/(app)/issues/export-action";
 
 // --- boundary mocks -------------------------------------------------------
@@ -48,11 +51,12 @@ function exportedIds(result: ExportIssuesResult): string[] {
  * within the tab's scope, resolved on the server with the tab's own access
  * checks, never from a machine list the client sends.
  */
-describe("exportIssuesAction scope", () => {
+describe("exportIssuesAction — PGlite integration (CORE-TEST-004, CORE-TEST-009)", () => {
   setupTestDb();
 
   const OWNER = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
   const STRANGER = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const GUEST = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
   let collectionId = "";
   const VIEW_TOKEN = "share-token-for-tests";
 
@@ -66,6 +70,15 @@ describe("exportIssuesAction scope", () => {
         firstName: "Sam",
         lastName: "Stranger",
       }),
+    ]);
+    await db.insert(invitedUsers).values([
+      {
+        id: GUEST,
+        firstName: "Guest",
+        lastName: "Bob",
+        email: "guest-bob@test.com",
+        role: "guest",
+      },
     ]);
     const inside = createTestMachine({
       initials: "IN",
@@ -95,16 +108,51 @@ describe("exportIssuesAction scope", () => {
       presenceStatus: "off_the_floor",
     });
     await db.insert(machines).values([inside, alsoIn, outside, offFloor]);
-    await db.insert(issues).values([
-      createTestIssue("IN", { issueNumber: 1, title: "inside one" }),
-      createTestIssue("AL", { issueNumber: 1, title: "also inside" }),
-      createTestIssue("OUT", { issueNumber: 1, title: "outside" }),
-      createTestIssue("OFF", {
-        issueNumber: 1,
-        title: "off the floor, fixed",
-        status: "fixed",
-      }),
-    ]);
+    const [insideIssue] = await db
+      .insert(issues)
+      .values([
+        createTestIssue("IN", {
+          issueNumber: 1,
+          title: "inside one",
+          description: plainTextToDoc("Detailed issue description"),
+          status: "new",
+          severity: "major",
+          priority: "high",
+          frequency: "constant",
+          reportedBy: OWNER,
+          assignedTo: STRANGER,
+          createdAt: new Date("2026-01-10T12:00:00Z"),
+          updatedAt: new Date("2026-01-15T12:00:00Z"),
+        }),
+        createTestIssue("AL", {
+          issueNumber: 1,
+          title: "also inside",
+          invitedReportedBy: GUEST,
+          createdAt: new Date("2026-01-20T00:00:00Z"),
+        }),
+        createTestIssue("OUT", {
+          issueNumber: 1,
+          title: "outside",
+          reportedBy: null,
+          invitedReportedBy: null,
+          createdAt: new Date("2026-01-05T00:00:00Z"),
+        }),
+        createTestIssue("OFF", {
+          issueNumber: 1,
+          title: "off the floor, fixed",
+          status: "fixed",
+        }),
+      ])
+      .returning();
+
+    if (insideIssue) {
+      await db.insert(issueWatchers).values([
+        {
+          issueId: insideIssue.id,
+          userId: STRANGER,
+        },
+      ]);
+    }
     const [collection] = await db
       .insert(collections)
       .values({ name: "Mine", ownerId: OWNER, viewToken: VIEW_TOKEN })
@@ -187,5 +235,244 @@ describe("exportIssuesAction scope", () => {
     signIn(STRANGER);
     const result = await exportIssuesAction({ machineInitials: "OFF" });
     expect(exportedIds(result)).toEqual(["OFF-01"]);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Authentication & Validation
+  // ---------------------------------------------------------------------------
+  describe("authentication and validation", () => {
+    it("returns UNAUTHORIZED when user is not signed in", async () => {
+      mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
+
+      const result = await exportIssuesAction({});
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("UNAUTHORIZED");
+      }
+    });
+
+    it("returns VALIDATION for invalid machineInitials", async () => {
+      signIn(STRANGER);
+
+      const result = await exportIssuesAction({ machineInitials: "AB@CD" });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("VALIDATION");
+      }
+    });
+
+    it("returns VALIDATION for malformed filtersJson", async () => {
+      signIn(STRANGER);
+
+      const result = await exportIssuesAction({ filtersJson: "not-json" });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("VALIDATION");
+      }
+    });
+
+    it("returns VALIDATION rather than exporting everything when filters fail the schema", async () => {
+      signIn(STRANGER);
+
+      const result = await exportIssuesAction({
+        filtersJson: JSON.stringify({ status: ["invalid-status"] }),
+      });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("VALIDATION");
+        expect(result.message).toBe("Invalid filter data.");
+      }
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Empty results
+  // ---------------------------------------------------------------------------
+  describe("empty results", () => {
+    it("returns EMPTY when no issues match filters", async () => {
+      signIn(STRANGER);
+
+      const result = await exportIssuesAction({
+        filtersJson: JSON.stringify({ q: "nonexistent-query-string" }),
+      });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("EMPTY");
+      }
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // CSV Output and Filenames
+  // ---------------------------------------------------------------------------
+  describe("CSV output and formatting", () => {
+    it("produces correct headers in order", async () => {
+      signIn(STRANGER);
+
+      const result = await exportIssuesAction({});
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      const firstLine = result.value.csv.split("\r\n")[0];
+      expect(firstLine).toBe(
+        "\uFEFFIssue ID,Machine,Title,Description,Status,Severity,Priority,Frequency,Reporter,Assigned To,Created,Updated,Closed"
+      );
+    });
+
+    it("formats general export filename as pinpoint-issues-YYYY-MM-DD.csv", async () => {
+      signIn(STRANGER);
+
+      const result = await exportIssuesAction({});
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      expect(result.value.fileName).toMatch(
+        /^pinpoint-issues-\d{4}-\d{2}-\d{2}\.csv$/
+      );
+    });
+
+    it("formats machine export filename with machine initials", async () => {
+      signIn(STRANGER);
+
+      const result = await exportIssuesAction({ machineInitials: "IN" });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      expect(result.value.fileName).toMatch(
+        /^pinpoint-IN-issues-\d{4}-\d{2}-\d{2}\.csv$/
+      );
+    });
+
+    it("formats reporters correctly: user name, invited name, and Anonymous", async () => {
+      signIn(STRANGER);
+
+      const result = await exportIssuesAction({
+        filtersJson: JSON.stringify({ sort: "issue_asc" }),
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      // IN-01 has reportedBy: OWNER (Olive Owner)
+      expect(result.value.csv).toContain("Olive Owner");
+      // AL-01 has invitedReportedBy: GUEST (Guest Bob)
+      expect(result.value.csv).toContain("Guest Bob");
+      // OUT-01 has no reporter
+      expect(result.value.csv).toContain("Anonymous");
+    });
+
+    it("maps row values to correct columns", async () => {
+      signIn(STRANGER);
+
+      const result = await exportIssuesAction({ machineInitials: "IN" });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      const lines = result.value.csv.split("\r\n");
+      const dataCols = lines[1]?.split(",") ?? [];
+
+      expect(dataCols[0]).toBe("IN-01");
+      expect(dataCols[1]).toBe("Inside");
+      expect(dataCols[2]).toBe("inside one");
+      expect(dataCols[3]).toBe("Detailed issue description");
+      expect(dataCols[4]).toBe("New");
+      expect(dataCols[5]).toBe("Major");
+      expect(dataCols[6]).toBe("High");
+      expect(dataCols[7]).toBe("Constant");
+      expect(dataCols[8]).toBe("Olive Owner");
+      expect(dataCols[9]).toBe("Sam Stranger");
+      expect(dataCols[10]).toBe("2026-01-10");
+      expect(dataCols[11]).toBe("2026-01-15");
+      expect(dataCols[12]).toBe("");
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Filter parsing & coercion
+  // ---------------------------------------------------------------------------
+  describe("filter parsing", () => {
+    it("coerces ISO date strings in filtersJson into Date objects", async () => {
+      signIn(STRANGER);
+
+      const result = await exportIssuesAction({
+        filtersJson: JSON.stringify({
+          createdFrom: "2026-01-15T00:00:00.000Z",
+        }),
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      // Only AL-01 was created on 2026-01-20 (after 2026-01-15)
+      expect(exportedIds(result)).toEqual(["AL-01"]);
+    });
+
+    it("filters by watched issues for the signed-in user", async () => {
+      signIn(STRANGER);
+
+      const result = await exportIssuesAction({
+        filtersJson: JSON.stringify({ watching: true, sort: "issue_asc" }),
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      // STRANGER only watches IN-01, so only IN-01 is returned
+      expect(exportedIds(result)).toEqual(["IN-01"]);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Server error handling
+  // ---------------------------------------------------------------------------
+  describe("server errors", () => {
+    it("returns SERVER error when database query throws", async () => {
+      signIn(STRANGER);
+      const db = await getTestDb();
+      const spy = vi
+        .spyOn(db.query.issues, "findMany")
+        .mockRejectedValueOnce(new Error("Database connection failure"));
+
+      try {
+        const result = await exportIssuesAction({});
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+          expect(result.code).toBe("SERVER");
+        }
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    it("returns SERVER error when a scope loader throws", async () => {
+      signIn(STRANGER);
+      const exportScope = await import("~/app/(app)/issues/export-scope");
+      const spy = vi
+        .spyOn(exportScope, "resolveExportScopeInitials")
+        .mockRejectedValueOnce(new Error("Scope loader crashed"));
+
+      try {
+        const result = await exportIssuesAction({
+          scope: { kind: "tag", type: "manufacturer", slug: "williams" },
+        });
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+          expect(result.code).toBe("SERVER");
+        }
+      } finally {
+        spy.mockRestore();
+      }
+    });
   });
 });

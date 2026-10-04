@@ -44,8 +44,8 @@ export const exportIssuesSchema = z.object({
 
 /**
  * Schema for parsing the filters JSON string into typed filters.
- * Intentionally permissive — unknown fields are stripped, invalid enum values
- * are filtered out. This avoids coupling the export to the exact filter shape.
+ * Unknown fields are stripped; invalid values fail validation to prevent
+ * widening the export unexpectedly.
  */
 export const exportFiltersSchema = z.object({
   q: z.string().optional(),
