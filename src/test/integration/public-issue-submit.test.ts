@@ -108,6 +108,7 @@ vi.mock("~/server/db", async () => {
 
 // Import AFTER the db mock so the action and createIssue pick up PGlite
 const { submitPublicIssueAction } = await import("~/app/(app)/report/actions");
+const { REMOVED_MACHINE_REPORT_ERROR } = await import("~/services/issues");
 
 // ---------------------------------------------------------------------------
 // Fixtures — IDs generated per-test so they are valid Zod UUIDs
@@ -392,5 +393,36 @@ describe("submitPublicIssueAction — anonymous and guest status/priority enforc
     } finally {
       spy.mockRestore();
     }
+  });
+});
+
+describe("submitPublicIssueAction — Removed machines (integration)", () => {
+  setupTestDb();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("refuses a report on a Removed machine with a clear error and writes nothing", async () => {
+    const reporter = await seedUser("member");
+    const machine = await seedMachine(reporter.id);
+    const db = await getTestDb();
+    await db
+      .update(machines)
+      .set({ presenceStatus: "removed" })
+      .where(eq(machines.id, machine.id));
+    mockGetUser.mockResolvedValue({ data: { user: { id: reporter.id } } });
+
+    const result = await submitPublicIssueAction(
+      { error: "" },
+      makeFormData({ machineId: machine.id })
+    );
+
+    expect(result).toEqual({ error: REMOVED_MACHINE_REPORT_ERROR });
+    expect(
+      await db.query.issues.findMany({
+        where: eq(issues.machineInitials, machine.initials),
+      })
+    ).toEqual([]);
   });
 });

@@ -1,18 +1,17 @@
 import type React from "react";
 import type { Metadata } from "next";
-import { asc } from "drizzle-orm";
 import { Gamepad2 } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { machines as machinesTable } from "~/server/db/schema";
 import { getLoginUrl } from "~/lib/url";
 import {
   getMyCollections,
   getOwnedMachineCount,
   getSharedWithMe,
 } from "~/lib/collections/list";
+import { getCollectionPickerMachines } from "~/lib/collections/user";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
 import { CreateCollectionDialog } from "~/components/collections/CreateCollectionDialog";
@@ -33,10 +32,7 @@ export default async function MyCollectionsPage(): Promise<React.JSX.Element> {
   const [owned, shared, allMachines, ownedMachineCount] = await Promise.all([
     getMyCollections(undefined, user.id),
     getSharedWithMe(undefined, user.id),
-    db.query.machines.findMany({
-      columns: { id: true, initials: true, name: true },
-      orderBy: [asc(machinesTable.name)],
-    }),
+    getCollectionPickerMachines(db, null),
     getOwnedMachineCount(undefined, user.id),
   ]);
 

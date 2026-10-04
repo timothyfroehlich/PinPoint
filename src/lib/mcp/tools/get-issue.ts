@@ -5,7 +5,12 @@ import { and, count, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import { checkPermission } from "~/lib/permissions/helpers";
-import { docToPlainText, type ProseMirrorDoc } from "~/lib/tiptap/types";
+import { loadMentionNames } from "~/lib/tiptap/mention-names";
+import {
+  applyMentionNames,
+  docToPlainText,
+  type ProseMirrorDoc,
+} from "~/lib/tiptap/types";
 import { db } from "~/server/db";
 import { issueComments, userProfiles } from "~/server/db/schema";
 
@@ -134,13 +139,21 @@ export async function runGetIssue(
   const { rows: commentRows, total: commentCount } = canReadComments
     ? await loadComments()
     : { rows: [], total: 0 };
+  // Mentions read as the mentioned person's current name — one lookup for the
+  // description and the whole comment window.
+  const mentionNames = await loadMentionNames([
+    issue.description,
+    ...commentRows.map((c) => c.content),
+  ]);
 
   return {
     result: {
       machine: issue.machineInitials,
       number: issue.issueNumber,
       title: issue.title,
-      description: docToPlainText(issue.description),
+      description: docToPlainText(
+        applyMentionNames(issue.description, mentionNames)
+      ),
       status: issue.status,
       severity: issue.severity,
       priority: issue.priority,
@@ -162,7 +175,7 @@ export async function runGetIssue(
       ...(canReadComments ? {} : { commentsWithheld: true }),
       comments: commentRows.map((c) => ({
         author: c.author?.name ?? "Anonymous",
-        text: docToPlainText(c.content),
+        text: docToPlainText(applyMentionNames(c.content, mentionNames)),
         createdAt: c.createdAt.toISOString(),
       })),
     },

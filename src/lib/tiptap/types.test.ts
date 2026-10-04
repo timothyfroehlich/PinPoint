@@ -1,12 +1,14 @@
 // src/lib/tiptap/types.test.ts
 import { describe, expect, it } from "vitest";
 import {
+  applyMentionNames,
   plainTextToDoc,
   extractMentions,
   docToPlainText,
   docIsEmpty,
   docsEqualByText,
   isProseMirrorDoc,
+  withoutMentionLabels,
   type ProseMirrorDoc,
 } from "./types";
 
@@ -140,6 +142,137 @@ describe("extractMentions", () => {
     expect(extractMentions({ type: "doc" } as never)).toEqual([]);
   });
 });
+
+describe("applyMentionNames", () => {
+  const mention = (
+    id: string,
+    label: string
+  ): ProseMirrorDoc["content"][0] => ({
+    type: "mention",
+    attrs: { id, label },
+  });
+  const names = new Map([
+    ["user-1", "Timothy Froehlich"],
+    ["user-2", "Former user"],
+  ]);
+
+  it("replaces a known id's stored label and keeps an unknown id's", () => {
+    const doc: ProseMirrorDoc = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "Ask " },
+            mention("user-1", "Tim"),
+            { type: "text", text: " or " },
+            mention("user-9", "Sam"),
+          ],
+        },
+      ],
+    };
+
+    expect(docToPlainText(applyMentionNames(doc, names))).toBe(
+      "Ask @Timothy Froehlich or @Sam"
+    );
+  });
+
+  it("reaches mentions nested inside lists and blockquotes", () => {
+    const doc: ProseMirrorDoc = {
+      type: "doc",
+      content: [
+        {
+          type: "bulletList",
+          content: [
+            {
+              type: "listItem",
+              content: [
+                { type: "paragraph", content: [mention("user-1", "Tim")] },
+              ],
+            },
+          ],
+        },
+        {
+          type: "blockquote",
+          content: [{ type: "paragraph", content: [mention("user-2", "Ex")] }],
+        },
+      ],
+    };
+
+    expect(extractMentionLabels(applyMentionNames(doc, names))).toEqual([
+      "Timothy Froehlich",
+      "Former user",
+    ]);
+  });
+
+  it("does not mutate the stored doc", () => {
+    const doc: ProseMirrorDoc = {
+      type: "doc",
+      content: [{ type: "paragraph", content: [mention("user-1", "Tim")] }],
+    };
+    applyMentionNames(doc, names);
+    expect(extractMentionLabels(doc)).toEqual(["Tim"]);
+  });
+
+  it("leaves a doc without mentions, and empty or malformed values, unchanged", () => {
+    const doc = plainTextToDoc("No people here");
+    expect(applyMentionNames(doc, names)).toEqual(doc);
+    expect(applyMentionNames(null, names)).toBeNull();
+    expect(applyMentionNames(undefined, names)).toBeUndefined();
+    const malformed = { type: "doc" } as never;
+    expect(applyMentionNames(malformed, names)).toBe(malformed);
+  });
+});
+
+describe("withoutMentionLabels", () => {
+  const withLabel = (label: string): ProseMirrorDoc => ({
+    type: "doc",
+    content: [
+      {
+        type: "bulletList",
+        content: [
+          {
+            type: "listItem",
+            content: [
+              {
+                type: "paragraph",
+                content: [
+                  { type: "text", text: "Ask " },
+                  { type: "mention", attrs: { id: "user-1", label } },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  });
+
+  it("makes docs that differ only in a mention's label equal, and keeps the id", () => {
+    const stripped = withoutMentionLabels(withLabel("Tim"));
+    expect(stripped).toEqual(withoutMentionLabels(withLabel("Timothy")));
+    expect(extractMentions(stripped)).toEqual(["user-1"]);
+    expect(extractMentionLabels(withLabel("Tim"))).toEqual(["Tim"]);
+  });
+
+  it("passes empty values through", () => {
+    expect(withoutMentionLabels(null)).toBeNull();
+    expect(withoutMentionLabels(undefined)).toBeUndefined();
+  });
+});
+
+/** Every mention label in document order. */
+function extractMentionLabels(doc: ProseMirrorDoc): unknown[] {
+  const labels: unknown[] = [];
+  const walk = (nodes: ProseMirrorDoc["content"] | undefined): void => {
+    for (const node of nodes ?? []) {
+      if (node.type === "mention") labels.push(node.attrs?.label);
+      walk(node.content);
+    }
+  };
+  walk(doc.content);
+  return labels;
+}
 
 describe("docToPlainText", () => {
   it("extracts text from paragraphs", () => {

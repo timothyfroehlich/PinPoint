@@ -203,7 +203,7 @@ export function DiscordConfigForm({
               // server-membership validation.
               setServerStatus({ kind: "idle" });
             }}
-            className="flex-1 max-w-[360px]"
+            className="min-w-0 max-w-[360px] flex-1 basis-56"
           />
           <Button
             type="button"
@@ -298,7 +298,7 @@ export function DiscordConfigForm({
                 setGuildIdInput(e.target.value);
                 setServerStatus({ kind: "idle" });
               }}
-              className="flex-1 max-w-[360px]"
+              className="min-w-0 max-w-[360px] flex-1 basis-56"
             />
             <Button
               type="button"

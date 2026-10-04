@@ -34,6 +34,7 @@ import {
 } from "~/server/db/schema";
 import {
   createIssue,
+  MachineRemovedError,
   PinballMapCommentAlreadyConvertedError,
 } from "~/services/issues";
 
@@ -154,6 +155,9 @@ export async function convertPinballMapCommentAction(
     if (error instanceof PinballMapCommentAlreadyConvertedError) {
       revalidatePath("/m", "layout");
       return err("ALREADY_CONVERTED", "Already converted by someone else");
+    }
+    if (error instanceof MachineRemovedError) {
+      return err("VALIDATION", error.message);
     }
     log.error(
       {

@@ -12,7 +12,7 @@
 
 import { describe, it, expect, beforeEach, vi, beforeAll } from "vitest";
 import { eq, desc } from "drizzle-orm";
-import { getTestDb, setupTestDb } from "~/test/setup/pglite";
+import { asDb, getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { createTestUser } from "~/test/helpers/factories";
 import {
   issues,
@@ -31,10 +31,12 @@ import {
   addIssueComment,
   reassignIssueMachine,
   updateIssueTitle,
+  MachineRemovedError,
 } from "~/services/issues";
 import { planNotification, planNotifications } from "~/lib/notifications";
 import { plainTextToDoc, type ProseMirrorDoc } from "~/lib/tiptap/types";
 import { resolveIssueReporter } from "~/lib/issues/utils";
+import { resolveIssueActivityEvents } from "~/lib/timeline/events";
 
 // ---------------------------------------------------------------------------
 // External delivery / side-effect boundaries — mocked so we can assert
@@ -500,11 +502,95 @@ describe("Issue Service Functions (Integration)", () => {
         (e) => e.isSystem && e.eventData?.type === "assigned"
       );
       expect(assignEvent).toBeDefined();
+      // The account id, plus the name as a rollback copy (PP-0fg0.1).
       expect(assignEvent?.eventData).toEqual({
         type: "assigned",
+        assigneeId: testUser2.id,
         assigneeName: "Second User",
       });
       expect(assignEvent?.authorId).toBe(testUser.id);
+    });
+
+    it("createIssue with an assignee records the assignee's id", async () => {
+      const db = await getTestDb();
+
+      const { issue } = await createIssue({
+        title: "Assigned at creation",
+        machineInitials: testMachine.initials,
+        severity: "minor" as const,
+        reportedBy: testUser.id,
+        assignedTo: testUser2.id,
+      });
+
+      const events = await db.query.issueComments.findMany({
+        where: eq(issueComments.issueId, issue.id),
+      });
+      expect(
+        events
+          .filter((e) => e.eventData?.type === "assigned")
+          .map((e) => e.eventData)
+      ).toEqual([
+        {
+          type: "assigned",
+          assigneeId: testUser2.id,
+          assigneeName: "Second User",
+        },
+      ]);
+    });
+
+    /**
+     * Activity resolves an assignment to the account's current name when it
+     * loads (PP-0fg0.1), over the stored "Second User" rollback copy. An id
+     * whose profile row is gone (an account deleted outside the app) shows
+     * "Former user", never its stored name. Only a legacy event with no id
+     * shows its stored name.
+     */
+    it("Activity shows the assignee's current name after a rename", async () => {
+      const db = await getTestDb();
+
+      await assignIssue({
+        issueId: testIssue.id,
+        assignedTo: testUser2.id,
+        actorId: testUser.id,
+      });
+      await db.insert(issueComments).values([
+        {
+          issueId: testIssue.id,
+          isSystem: true,
+          eventData: {
+            type: "assigned",
+            assigneeId: null,
+            assigneeName: "Departed Member",
+          },
+        },
+        {
+          issueId: testIssue.id,
+          isSystem: true,
+          eventData: {
+            type: "assigned",
+            assigneeId: "00000000-0000-0000-0000-0000000000ff",
+            assigneeName: "Deleted Elsewhere",
+          },
+        },
+      ]);
+      await db
+        .update(userProfiles)
+        .set({ firstName: "Renamed" })
+        .where(eq(userProfiles.id, testUser2.id));
+
+      const rows = await db.query.issueComments.findMany({
+        where: eq(issueComments.issueId, testIssue.id),
+      });
+      const activity = await resolveIssueActivityEvents(rows, asDb(db));
+      expect(
+        activity
+          .flatMap((e) =>
+            e.eventData?.type === "assigned"
+              ? [e.eventData.assigneeDisplayName]
+              : []
+          )
+          .sort()
+      ).toEqual(["Departed Member", "Former user", "Renamed User"]);
     });
 
     /**
@@ -887,6 +973,45 @@ describe("Issue Service Functions (Integration)", () => {
       );
     });
 
+    it("names a mentioned person by their current name in the description (PP-0fg0.2)", async () => {
+      const db = await getTestDb();
+      const description: ProseMirrorDoc = {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              { type: "text", text: "Ask " },
+              // The label as it was when the description was written.
+              {
+                type: "mention",
+                attrs: { id: testUser2.id, label: "Old Name" },
+              },
+            ],
+          },
+        ],
+      };
+      await db
+        .update(issues)
+        .set({ description })
+        .where(eq(issues.id, testIssue.id));
+
+      await assignIssue({
+        issueId: testIssue.id,
+        assignedTo: testUser2.id,
+        actorId: testUser.id,
+      });
+
+      expect(vi.mocked(planNotification)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "issue_assigned",
+          issueDescription: "Ask @New Assignee",
+        }),
+        expect.anything(),
+        expect.anything()
+      );
+    });
+
     it("uses a new persisted event ID when an assignee returns", async () => {
       const db = await getTestDb();
       await assignIssue({
@@ -1065,6 +1190,42 @@ describe("Issue Service Functions (Integration)", () => {
             issueTitle: testIssue.title,
             machineName: testMachine.name,
             commentContent: "My comment",
+          }),
+        ]),
+        expect.anything(),
+        expect.anything()
+      );
+    });
+
+    it("names a mentioned person by their current name in the comment body (PP-0fg0.2)", async () => {
+      // A draft can carry a label that went stale before it was posted.
+      const content: ProseMirrorDoc = {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              { type: "text", text: "Thanks " },
+              {
+                type: "mention",
+                attrs: { id: testUser.id, label: "Old Name" },
+              },
+            ],
+          },
+        ],
+      };
+
+      await addIssueComment({
+        issueId: testIssue.id,
+        content,
+        userId: testUser.id,
+      });
+
+      expect(vi.mocked(planNotifications)).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            type: "new_comment",
+            commentContent: "Thanks @Test User",
           }),
         ]),
         expect.anything(),
@@ -1513,6 +1674,29 @@ describe("Issue Service Functions (Integration)", () => {
           userId: testUser.id,
         })
       ).rejects.toThrow("Machine not found");
+    });
+
+    it("refuses a Removed destination and leaves the issue and counter untouched", async () => {
+      const db = await getTestDb();
+      await db
+        .update(machines)
+        .set({ presenceStatus: "removed" })
+        .where(eq(machines.initials, "KP"));
+
+      await expect(
+        reassignIssueMachine({
+          issueId: testIssue.id,
+          newMachineInitials: "KP",
+          userId: testUser.id,
+        })
+      ).rejects.toBeInstanceOf(MachineRemovedError);
+
+      const issue = await db.query.issues.findFirst({
+        where: eq(issues.id, testIssue.id),
+      });
+      // This file's db.transaction is a pass-through mock, so the counter
+      // rollback is not observable here; quick-report-action covers it.
+      expect(issue?.machineInitials).not.toBe("KP");
     });
 
     it("throws when issue does not exist (block 17)", async () => {

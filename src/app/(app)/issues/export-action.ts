@@ -14,6 +14,8 @@ import {
 import type { IssueFilters } from "~/lib/issues/filters";
 import { generateCsv } from "~/lib/export/csv";
 import { extractFirstParagraph } from "~/lib/tiptap/first-paragraph";
+import { loadMentionNames } from "~/lib/tiptap/mention-names";
+import { applyMentionNames } from "~/lib/tiptap/types";
 import {
   getIssueStatusLabel,
   getIssueSeverityLabel,
@@ -161,7 +163,11 @@ export async function exportIssuesAction(input: {
       return err("EMPTY", "No issues match the current filters.");
     }
 
-    // 5. Build CSV rows
+    // 5. Build CSV rows. Mentions read as the mentioned person's current
+    // name — one lookup for every exported description.
+    const mentionNames = await loadMentionNames(
+      issueRows.map((issue) => issue.description)
+    );
     const rows = issueRows.map((issue) => {
       const reporterName =
         issue.reportedByUser?.name ??
@@ -173,7 +179,9 @@ export async function exportIssuesAction(input: {
         formatIssueId(issue.machineInitials, issue.issueNumber),
         issue.machine.name,
         issue.title,
-        extractFirstParagraph(issue.description),
+        extractFirstParagraph(
+          applyMentionNames(issue.description, mentionNames)
+        ),
         getIssueStatusLabel(issue.status),
         getIssueSeverityLabel(issue.severity),
         getIssuePriorityLabel(issue.priority),

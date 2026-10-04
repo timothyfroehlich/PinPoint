@@ -59,7 +59,7 @@
 - **4.3** On desktop an Edit title button sits beside the title and is always visible — never revealed only on hover. On mobile, Edit title is in the ⋯ menu (§4.5).
 - **4.4** Edit title edits the title in place. On desktop, Enter saves, Escape cancels, and leaving the field cancels unless the save just failed. On mobile, Save and Cancel buttons sit under the field, the keyboard's Done key saves, and leaving the field keeps the edit open. An empty or unchanged title saves nothing. A title holds at most 60 characters, the same limit as when the issue is reported. An older title over 60 characters is never shortened automatically; it saves only once edited down to 60 or fewer.
 - **4.5** On desktop a labeled Move button sits beside Edit title. On mobile a ⋯ menu at the end of the header's first row holds Edit title and Move to another machine, offering only the actions the viewer can use.
-- **4.6** Move opens a dialog that lists every other machine, warns that the issue's URL will change, and on confirmation moves the issue and opens it at its new URL. The issue takes the next number on the destination machine; its old number is not reused.
+- **4.6** Move opens a dialog that lists every other machine not marked Removed, warns that the issue's URL will change, and on confirmation moves the issue and opens it at its new URL. The issue takes the next number on the destination machine; its old number is not reused.
 - **4.7** The summary line sits under the title and states the assignee (or Unassigned), status, severity, and priority, each with its icon, with priority worded as "<level> priority". It wraps onto a second line when it doesn't fit. It is read-only.
 - **4.8** Frequency is not in the header.
 - **4.9** The header shows nothing else: the reporter, the machine's owner, the watcher count, the Watch toggle, and any updated time are not in it.
@@ -92,7 +92,7 @@
 - **7.2** Activity lists comments and system events together, oldest first.
 - **7.3** A Comments only toggle beside the heading hides system events while on. It starts off on every visit; the page never remembers it. It is absent while Activity has no entries.
 - **7.4** A comment shows its author's name, an owner badge when the author is the machine's owner, its relative time with the exact time available on hover and on tap, an edited marker when it has been edited, its rich-text body, and its photos.
-- **7.5** A system event is one line: who made the change, what changed (from → to where there is a before and after), and when.
+- **7.5** A system event is one line: who made the change, what changed (from → to where there is a before and after), and when. A person it names appears under their current name, or as Former user once their account is deleted.
 - **7.6** System events are recorded for: assigning and unassigning; status, severity, priority, frequency, and title changes; moving the issue (from which Issue ID and machine to which); and a comment's deletion (by its author or by an admin).
 - **7.7** Activity shows no avatars and no connecting line between entries.
 - **7.8** With no comments, Activity shows an empty state inviting the first comment.
@@ -182,6 +182,7 @@ None.
 
 | Requirement | Code today | Resolution |
 | :-- | :-- | :-- |
+| §4.6 | Move lists Removed machines. | PP-s363 |
 | §5.4 | The report's photos include every photo on the issue, so a comment's photos also appear in the initial report. | PP-buwx |
 | §2.2 | A number with trailing characters (`/i/1abc`, `/i/1.5`) is read as its leading digits and shows issue 1 instead of Issue not found. | PP-xlod |
 | §2.5–§2.6 | Email and in-app notification links are the bare issue URL; only Discord links add the comment's anchor, and field-change notifications carry no system event id to anchor to. | PP-4g43 |
@@ -194,6 +195,8 @@ Changes to this document. Divergence-table rows are working state and are not lo
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-03 | §7.5 names a person in a system event by their current name, or Former user once their account is deleted. |
+| 2026-10-03 | §4.6 Move leaves out Removed machines. |
 | 2026-10-02 | §8.7 keeps an unposted comment draft, with its photos, until it posts. |
 | 2026-10-02 | §1 Summary line and §4.7 add the assignee to the summary line, which may wrap to a second line; §4.1 and §4.5 move the mobile ⋯ menu to the end of the header's first row; §7.3 hides Comments only while Activity is empty. |
 | 2026-10-01 | Design-review decisions: §4.4 gives mobile Save and Cancel buttons and keeps the edit open when the field loses focus; §5.1 and §7.4 make the exact time available on tap; §8.3 shows the Comment button on the Issue tab only; §11.1 shows the Other issues count as a badge; §13.2 adds relative times and exempts links inside a line of text. |

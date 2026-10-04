@@ -22,7 +22,7 @@ import {
   not,
   exists,
 } from "drizzle-orm";
-import { getTestDb, setupTestDb } from "~/test/setup/pglite";
+import { asDbOrTx, getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { machines, issues, userProfiles } from "~/server/db/schema";
 import {
   createTestMachine,
@@ -31,6 +31,7 @@ import {
 } from "~/test/helpers/factories";
 import { deriveMachineStatus } from "~/lib/machines/status";
 import { CLOSED_STATUSES } from "~/lib/issues/status";
+import { loadDashboardData } from "~/lib/dashboard/queries";
 
 describe("Dashboard Queries (PGlite)", () => {
   // Set up worker-scoped PGlite and auto-cleanup after each test
@@ -560,5 +561,89 @@ describe("Dashboard Queries (PGlite)", () => {
 
       expect(myIssuesCount).toBe(2); // Only open issues
     });
+  });
+});
+
+/**
+ * The dashboard's own loader, run against PGlite: Removed machines and the
+ * issues on them drop out of every list and count (PP-s363).
+ */
+describe("loadDashboardData: Removed machines", () => {
+  setupTestDb();
+
+  it("leaves Removed machines and their issues out of every list and count", async () => {
+    const db = await getTestDb();
+    const [me] = await db
+      .insert(userProfiles)
+      .values(createTestUser({ firstName: "Dee", lastName: "Shboard" }))
+      .returning();
+    if (!me) throw new Error("seed failed");
+
+    const older = new Date("2026-01-01T00:00:00Z");
+    const newer = new Date("2026-02-01T00:00:00Z");
+    await db.insert(machines).values([
+      createTestMachine({ initials: "LV", name: "Live", createdAt: older }),
+      createTestMachine({
+        initials: "RM",
+        name: "Removed",
+        presenceStatus: "removed",
+        createdAt: newer,
+      }),
+    ]);
+    await db.insert(issues).values(
+      ["LV", "RM"].flatMap((initials) => [
+        // Open minor issue assigned to me.
+        createTestIssue(initials, {
+          issueNumber: 1,
+          title: `${initials} open`,
+          severity: "minor",
+          status: "new",
+          assignedTo: me.id,
+        }),
+        // A closed unplayable issue and nothing major open: "recently fixed".
+        createTestIssue(initials, {
+          issueNumber: 2,
+          title: `${initials} fixed`,
+          severity: "unplayable",
+          status: "fixed",
+        }),
+      ])
+    );
+
+    const data = await loadDashboardData(asDbOrTx(db), me.id);
+
+    expect(data.newestMachines.map((m) => m.initials)).toEqual(["LV"]);
+    expect(data.recentlyFixedMachines.map((m) => m.initials)).toEqual(["LV"]);
+    expect(data.recentIssues.map((i) => i.machineInitials).sort()).toEqual([
+      "LV",
+      "LV",
+    ]);
+    expect(data.assignedIssues.map((i) => i.machineInitials)).toEqual(["LV"]);
+    expect(data.myIssuesCount).toBe(1);
+    expect(data.totalOpenIssues).toBe(1);
+    expect(data.machinesNeedingService).toBe(0);
+  });
+
+  it("counts machines needing service without Removed ones", async () => {
+    const db = await getTestDb();
+    await db.insert(machines).values([
+      createTestMachine({ initials: "LV", name: "Live" }),
+      createTestMachine({
+        initials: "RM",
+        name: "Removed",
+        presenceStatus: "removed",
+      }),
+    ]);
+    await db
+      .insert(issues)
+      .values([
+        createTestIssue("LV", { issueNumber: 1, severity: "major" }),
+        createTestIssue("RM", { issueNumber: 1, severity: "unplayable" }),
+      ]);
+
+    const data = await loadDashboardData(asDbOrTx(db));
+
+    expect(data.machinesNeedingService).toBe(1);
+    expect(data.totalOpenIssues).toBe(1);
   });
 });

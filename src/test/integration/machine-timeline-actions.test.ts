@@ -19,7 +19,7 @@ import { describe, it, expect, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { asDbOrTx, getTestDb, setupTestDb } from "~/test/setup/pglite";
-import type { ProseMirrorDoc } from "~/lib/tiptap/types";
+import { docToPlainText, type ProseMirrorDoc } from "~/lib/tiptap/types";
 import {
   authUsers,
   invitedUsers,
@@ -74,6 +74,18 @@ vi.mock("~/lib/logger", () => ({
   },
 }));
 
+/**
+ * A New Machine form. Marked not on Pinball Map because every create needs a
+ * catalog title or that flag, and this file's subject is the timeline.
+ */
+function newMachineForm(name: string, initials: string): FormData {
+  const formData = new FormData();
+  formData.append("name", name);
+  formData.append("initials", initials);
+  formData.append("pinballmapExcluded", "on");
+  return formData;
+}
+
 describe("createMachineAction — timeline event emission (PP-0x98)", () => {
   setupTestDb();
 
@@ -114,9 +126,7 @@ describe("createMachineAction — timeline event emission (PP-0x98)", () => {
     await mockAuth(admin.id);
     const { createMachineAction } = await import("~/app/(app)/m/actions");
 
-    const formData = new FormData();
-    formData.append("name", "Stranger Things");
-    formData.append("initials", "STR");
+    const formData = newMachineForm("Stranger Things", "STR");
 
     const result = await createMachineAction(undefined, formData);
     expect(result.ok).toBe(true);
@@ -139,9 +149,7 @@ describe("createMachineAction — timeline event emission (PP-0x98)", () => {
     await mockAuth(admin.id);
     const { createMachineAction } = await import("~/app/(app)/m/actions");
 
-    const formData = new FormData();
-    formData.append("name", "Iron Maiden");
-    formData.append("initials", "IM");
+    const formData = newMachineForm("Iron Maiden", "IM");
     formData.append("ownerId", owner.id);
 
     const result = await createMachineAction(undefined, formData);
@@ -187,9 +195,7 @@ describe("createMachineAction — timeline event emission (PP-0x98)", () => {
     await mockAuth(admin.id);
     const { createMachineAction } = await import("~/app/(app)/m/actions");
 
-    const formData = new FormData();
-    formData.append("name", "Cactus Canyon");
-    formData.append("initials", "CC");
+    const formData = newMachineForm("Cactus Canyon", "CC");
     formData.append("ownerId", invitee.id);
 
     const result = await createMachineAction(undefined, formData);
@@ -223,9 +229,7 @@ describe("createMachineAction — timeline event emission (PP-0x98)", () => {
     await mockAuth(admin.id);
     const { createMachineAction } = await import("~/app/(app)/m/actions");
 
-    const formData = new FormData();
-    formData.append("name", "Tron Legacy");
-    formData.append("initials", "TRN");
+    const formData = newMachineForm("Tron Legacy", "TRN");
     formData.append("ownerId", guest.id);
     formData.append("forcePromoteUserId", guest.id);
 
@@ -263,9 +267,7 @@ describe("createMachineAction — timeline event emission (PP-0x98)", () => {
     await mockAuth(admin.id);
     const { createMachineAction } = await import("~/app/(app)/m/actions");
 
-    const formData = new FormData();
-    formData.append("name", "Sequence Test");
-    formData.append("initials", "SEQ");
+    const formData = newMachineForm("Sequence Test", "SEQ");
     formData.append("ownerId", owner.id);
     const result = await createMachineAction(undefined, formData);
     expect(result.ok).toBe(true);
@@ -662,5 +664,86 @@ describe("prose-field actions emit marker events (PP-0x98)", () => {
         "owner_requirements_updated"
     );
     expect(markers).toHaveLength(1);
+  });
+
+  it("an untouched save after a mentioned person's rename is not an edit (PP-0fg0.2)", async () => {
+    const db = await getTestDb();
+    const owner = await makeUser("member");
+    const mentioned = await makeUser("member", {
+      firstName: "Ana",
+      lastName: "Lee",
+    });
+    await mockAuth(owner.id);
+    const machine = await makeMachine(owner.id);
+    const stored: ProseMirrorDoc = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "Ask " },
+            { type: "mention", attrs: { id: mentioned.id, label: "Ana Lee" } },
+          ],
+        },
+      ],
+    };
+    await db
+      .update(machines)
+      .set({ ownerRequirements: stored })
+      .where(eq(machines.id, machine.id));
+    await db
+      .update(userProfiles)
+      .set({ firstName: "Anastasia" })
+      .where(eq(userProfiles.id, mentioned.id));
+    const { updateMachineOwnerRequirements } =
+      await import("~/app/(app)/m/actions");
+    const { getMachineForLayout } =
+      await import("~/app/(app)/m/[initials]/_data");
+    const markerCount = async (): Promise<number> =>
+      (
+        await db
+          .select()
+          .from(timelineEvents)
+          .where(eq(timelineEvents.machineId, machine.id))
+      ).filter(
+        (r) =>
+          (r.eventData as { kind: string } | null)?.kind ===
+          "owner_requirements_updated"
+      ).length;
+    const storedValue = async (): Promise<ProseMirrorDoc | null> =>
+      (
+        await db.query.machines.findFirst({
+          where: eq(machines.id, machine.id),
+        })
+      )?.ownerRequirements ?? null;
+
+    // The editor opens on the loader's doc, which carries the new name.
+    const opened = (await getMachineForLayout(machine.initials)).machine
+      ?.ownerRequirements;
+    if (!opened) throw new Error("owner requirements did not load");
+    expect(docToPlainText(opened)).toBe("Ask @Anastasia Lee");
+
+    // Saved untouched: nothing written, nothing on the timeline.
+    expect((await updateMachineOwnerRequirements(machine.id, opened)).ok).toBe(
+      true
+    );
+    expect(await storedValue()).toEqual(stored);
+    expect(await markerCount()).toBe(0);
+
+    // A real edit is written with the current name, and is on the timeline.
+    const edited: ProseMirrorDoc = {
+      ...opened,
+      content: [
+        ...opened.content,
+        { type: "paragraph", content: [{ type: "text", text: "No tilt" }] },
+      ],
+    };
+    expect((await updateMachineOwnerRequirements(machine.id, edited)).ok).toBe(
+      true
+    );
+    expect(docToPlainText(await storedValue())).toBe(
+      "Ask @Anastasia Lee\nNo tilt"
+    );
+    expect(await markerCount()).toBe(1);
   });
 });

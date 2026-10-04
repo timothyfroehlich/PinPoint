@@ -42,6 +42,9 @@ test.describe("Machine with Inline Invite (Smoke)", () => {
     // 1. Fill machine details
     await page.getByLabel(/Initials/i).fill(machineInitials);
     await page.getByLabel(/Machine Name/i).fill(`Smoke Test Machine ${testId}`);
+    // Every new machine needs a Pinball Map title or Manual Entry (not on
+    // Pinball Map); this spec is not about Pinball Map, so take Manual Entry.
+    await page.getByRole("radio", { name: "Manual Entry" }).click();
 
     // 2. Click "+ Invite New"
     await page.getByRole("button", { name: /Invite New/i }).click();

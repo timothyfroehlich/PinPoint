@@ -1,28 +1,41 @@
 import "server-only";
 
 import { cache } from "react";
-import { asc } from "drizzle-orm";
+import { asc, eq, inArray, or } from "drizzle-orm";
 import { db, type DbTransaction } from "~/server/db";
-import { machines } from "~/server/db/schema";
+import { machines, machineTags, tags, tagTypes } from "~/server/db/schema";
 import type { CollectionMachine } from "~/lib/collections/owner";
+import type { PickerMachine } from "~/lib/collections/user";
+import { isRemoved } from "~/lib/machines/presence";
+import { machineNotRemoved } from "~/lib/machines/queries";
 import {
   getCurrentManufacturer,
   groupManufacturerTags,
 } from "~/lib/machines/manufacturer";
 import { getOpdbRecords } from "~/lib/opdb/records";
 import type { OpdbMachine } from "~/lib/opdb/types";
+import { buildTagGroups } from "./groups";
 import { displayTag, playersTag, typeTag, type TagLabel } from "./opdb";
-import { TAG_TYPE_IDS, type TagTypeId } from "./types";
+import {
+  handTagHref,
+  handTagTypeHref,
+  isTagTypeId,
+  tagHref,
+  type AutomaticTag,
+  type HandTag,
+  type HandTagGroup,
+  type HandTagType,
+  type MachineTag,
+  type TagGroup,
+  type TagTypeId,
+} from "./types";
 
-/** One tag and its machines, alphabetical by machine name. */
-export interface MachineTag {
-  type: TagTypeId;
-  slug: string;
-  name: string;
-  machines: CollectionMachine[];
+type AutomaticTagsByType = Record<TagTypeId, AutomaticTag[]>;
+
+/** Members other than Removed ones: the count a tag shows (spec 7.9). */
+function countNotRemoved(tagged: readonly CollectionMachine[]): number {
+  return tagged.filter((machine) => !isRemoved(machine.presenceStatus)).length;
 }
-
-export type TagsByType = Record<TagTypeId, MachineTag[]>;
 
 /**
  * The model facts the Type, Display and Player Count tags read. A catalog-linked
@@ -42,7 +55,7 @@ function groupByLabel(
   type: TagTypeId,
   members: readonly Member[],
   labelOf: (model: ModelFacts) => TagLabel | null
-): MachineTag[] {
+): AutomaticTag[] {
   const groups = new Map<
     string,
     { label: TagLabel; machines: CollectionMachine[] }
@@ -56,11 +69,14 @@ function groupByLabel(
   }
   return [...groups.values()]
     .sort((left, right) => left.label.rank - right.label.rank)
-    .map(({ label, machines: tagged }) => ({
+    .map(({ label, machines: tagged }): AutomaticTag => ({
+      kind: "automatic",
       type,
       slug: label.slug,
       name: label.name,
+      href: tagHref(type, label.slug),
       machines: tagged,
+      machineCount: countNotRemoved(tagged),
     }));
 }
 
@@ -72,7 +88,9 @@ function groupByLabel(
  * OPDB record of a machine's catalog title, or from the hand-entered model of
  * an uncataloged machine (spec 9.1–9.2).
  */
-async function loadTags(tx: DbTransaction): Promise<TagsByType> {
+async function loadAutomaticTags(
+  tx: DbTransaction
+): Promise<AutomaticTagsByType> {
   const rows = await tx.query.machines.findMany({
     columns: {
       id: true,
@@ -130,12 +148,18 @@ async function loadTags(tx: DbTransaction): Promise<TagsByType> {
   });
 
   return {
-    manufacturer: groupManufacturerTags(members).map((group) => ({
-      type: "manufacturer",
-      slug: group.slug,
-      name: group.name,
-      machines: group.machines.map((member) => member.machine),
-    })),
+    manufacturer: groupManufacturerTags(members).map((group): AutomaticTag => {
+      const tagged = group.machines.map((member) => member.machine);
+      return {
+        kind: "automatic",
+        type: "manufacturer",
+        slug: group.slug,
+        name: group.name,
+        href: tagHref("manufacturer", group.slug),
+        machines: tagged,
+        machineCount: countNotRemoved(tagged),
+      };
+    }),
     type: groupByLabel("type", members, (model) => typeTag(model.type)),
     display: groupByLabel("display", members, (model) =>
       displayTag(model.display)
@@ -147,35 +171,179 @@ async function loadTags(tx: DbTransaction): Promise<TagsByType> {
 }
 
 /**
+ * Every hand-applied tag type and tag with its machines (spec §11). A tag's
+ * machines come from the rows applying it, in every presence state.
+ */
+async function loadHandTags(
+  tx: DbTransaction
+): Promise<{ types: HandTagType[]; tags: HandTag[] }> {
+  const typeRows = await tx
+    .select({
+      id: tagTypes.id,
+      slug: tagTypes.slug,
+      name: tagTypes.name,
+      exclusive: tagTypes.exclusive,
+    })
+    .from(tagTypes);
+  const tagRows = await tx
+    .select({
+      id: tags.id,
+      typeId: tags.tagTypeId,
+      slug: tags.slug,
+      name: tags.name,
+    })
+    .from(tags);
+  const memberRows = await tx
+    .select({
+      tagId: machineTags.tagId,
+      id: machines.id,
+      initials: machines.initials,
+      name: machines.name,
+      presenceStatus: machines.presenceStatus,
+    })
+    .from(machineTags)
+    .innerJoin(machines, eq(machines.id, machineTags.machineId))
+    .orderBy(asc(machines.name));
+
+  const membersByTag = new Map<string, CollectionMachine[]>();
+  for (const { tagId, ...machine } of memberRows) {
+    const list = membersByTag.get(tagId);
+    if (list) list.push(machine);
+    else membersByTag.set(tagId, [machine]);
+  }
+  const types = typeRows.map((row): HandTagType => ({
+    ...row,
+    href: handTagTypeHref(row.slug),
+  }));
+  const typeSlugs = new Map(types.map((type) => [type.id, type.slug]));
+  return {
+    types,
+    tags: tagRows.map((row): HandTag => ({
+      kind: "hand",
+      id: row.id,
+      typeId: row.typeId,
+      slug: row.slug,
+      name: row.name,
+      href: handTagHref(
+        row.typeId === null ? null : (typeSlugs.get(row.typeId) ?? null),
+        row.slug
+      ),
+      machines: membersByTag.get(row.id) ?? [],
+      machineCount: countNotRemoved(membersByTag.get(row.id) ?? []),
+    })),
+  };
+}
+
+async function loadTagGroups(tx: DbTransaction): Promise<TagGroup[]> {
+  const automatic = await loadAutomaticTags(tx);
+  const hand = await loadHandTags(tx);
+  return buildTagGroups(automatic, hand.types, hand.tags);
+}
+
+/**
  * Request-deduped: a tag page's layout and its Machine View both need the tags,
  * and each read scans every machine. `cache()` keys on the `tx` argument, so
  * reads in different transactions stay separate (CORE-PERF-001).
  */
-const loadTagsCached = cache(loadTags);
+const loadTagGroupsCached = cache(loadTagGroups);
 
-export function listTags(tx: DbTransaction = db): Promise<TagsByType> {
-  return loadTagsCached(tx);
+/** Every tag group in browse order (spec 7.3, 11.13–11.14). */
+export function listTags(tx: DbTransaction = db): Promise<TagGroup[]> {
+  return loadTagGroupsCached(tx);
 }
 
-/** The tag at `type`/`slug`, or null when no machine currently carries it. */
+/** The automatic tag at `type`/`slug`, or null when no machine carries it. */
 export async function getTag(
   tx: DbTransaction,
   type: TagTypeId,
   slug: string
-): Promise<MachineTag | null> {
-  const tags = await listTags(tx);
-  return tags[type].find((tag) => tag.slug === slug) ?? null;
+): Promise<AutomaticTag | null> {
+  for (const group of await listTags(tx)) {
+    if (group.kind !== "automatic" || group.type.id !== type) continue;
+    return group.tags.find((tag) => tag.slug === slug) ?? null;
+  }
+  return null;
 }
 
-/** Every tag a machine belongs to, in tag type order (spec 7.4). */
+/** A tag found from its page address, with the group it is listed in. */
+export type ResolvedTag =
+  | {
+      tag: AutomaticTag;
+      group: Extract<TagGroup, { kind: "automatic" }>;
+    }
+  | { tag: HandTag; group: HandTagGroup };
+
+function findHandTag(
+  groups: readonly TagGroup[],
+  slug: string
+): ResolvedTag | null {
+  for (const group of groups) {
+    if (group.kind === "automatic") continue;
+    const tag = group.tags.find((candidate) => candidate.slug === slug);
+    if (tag) return { tag, group };
+  }
+  return null;
+}
+
+/**
+ * The tag at `/c/tags/<typeSegment>/<slug>`, or null when there is none. An
+ * automatic tag exists only while a machine carries it (spec 7.3). A
+ * hand-applied tag's slug is unique on its own, so it resolves whatever the
+ * type segment says; the caller redirects when `tag.href` is not the address
+ * it was reached by.
+ */
+export async function resolveTag(
+  tx: DbTransaction,
+  typeSegment: string,
+  slug: string
+): Promise<ResolvedTag | null> {
+  const groups = await listTags(tx);
+  if (isTagTypeId(typeSegment)) {
+    for (const group of groups) {
+      if (group.kind !== "automatic" || group.type.id !== typeSegment) continue;
+      const tag = group.tags.find((candidate) => candidate.slug === slug);
+      if (tag) return { tag, group };
+    }
+  }
+  // A hand-applied tag reached under any other segment, including an
+  // automatic type's, is still that tag; the page redirects to its address.
+  return findHandTag(groups, slug);
+}
+
+/** Every tag a machine belongs to, in browse order (spec 7.4, 11.14). */
 export async function getTagsForMachine(
   tx: DbTransaction,
   machineId: string
 ): Promise<MachineTag[]> {
-  const tags = await listTags(tx);
-  return TAG_TYPE_IDS.flatMap((type) =>
-    tags[type].filter((tag) =>
+  const groups = await listTags(tx);
+  return groups.flatMap((group): MachineTag[] =>
+    group.tags.filter((tag) =>
       tag.machines.some((machine) => machine.id === machineId)
     )
   );
+}
+
+/**
+ * The machines offered on a hand-applied tag's Edit machines dialog,
+ * alphabetical. Removed machines are left out, except ones already carrying
+ * the tag, the same rule a Collection's machine choice follows (spec 2.7).
+ */
+export function getTagPickerMachines(
+  tagId: string,
+  tx: DbTransaction = db
+): Promise<PickerMachine[]> {
+  return tx.query.machines.findMany({
+    where: or(
+      machineNotRemoved(),
+      inArray(
+        machines.id,
+        tx
+          .select({ id: machineTags.machineId })
+          .from(machineTags)
+          .where(eq(machineTags.tagId, tagId))
+      )
+    ),
+    columns: { id: true, initials: true, name: true },
+    orderBy: [asc(machines.name)],
+  });
 }

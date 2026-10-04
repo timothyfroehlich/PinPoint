@@ -25,6 +25,7 @@ import {
   getReassignmentTargets,
 } from "~/app/(app)/settings/account-deletion";
 import { plainTextToDoc } from "~/lib/tiptap/types";
+import { resolveIssueActivityEvents } from "~/lib/timeline/events";
 import { randomUUID } from "node:crypto";
 
 // ---------------------------------------------------------------------------
@@ -182,6 +183,76 @@ describe("Account Deletion Anonymization (PGlite)", () => {
       where: eq(machines.id, machine.id),
     });
     expect(updatedMachine?.ownerId).toBeNull();
+  });
+
+  /**
+   * Activity's assignment events must stop naming a deleted account
+   * (PP-0fg0.1) — including where its profile row outlives the account, as
+   * prod's missing auth.users cascade allows, which is why the profile is
+   * left in place here.
+   */
+  it("assignment events show the deleted-account placeholder in Activity", async () => {
+    const db = await getTestDb();
+    const leavingId = randomUUID();
+    const stayingId = randomUUID();
+    await db.insert(userProfiles).values([
+      createTestUser({
+        id: leavingId,
+        firstName: "Leaving",
+        lastName: "Member",
+      }),
+      createTestUser({
+        id: stayingId,
+        firstName: "Staying",
+        lastName: "Member",
+      }),
+    ]);
+    const machine = createTestMachine();
+    await db.insert(machines).values(machine);
+    const issue = createTestIssue(machine.initials, { issueNumber: 1 });
+    await db.insert(issues).values(issue);
+
+    const assigned = (
+      assigneeId: string | null,
+      assigneeName?: string
+    ): typeof issueComments.$inferInsert => ({
+      issueId: issue.id,
+      isSystem: true,
+      eventData: {
+        type: "assigned",
+        assigneeId,
+        ...(assigneeName !== undefined && { assigneeName }),
+      },
+    });
+    const [byId, legacyName, other, legacyOther] = await db
+      .insert(issueComments)
+      .values([
+        // The shape new events take: the id plus a rollback copy of the name.
+        assigned(leavingId, "Leaving Member"),
+        // A legacy event the backfill could not tie to one account.
+        assigned(null, "Leaving Member"),
+        assigned(stayingId, "Staying Member"),
+        assigned(null, "Someone Else"),
+      ])
+      .returning({ id: issueComments.id });
+
+    await anonymizeUserReferences(leavingId, null, asDb(db));
+
+    const rows = await db.query.issueComments.findMany({
+      where: eq(issueComments.issueId, issue.id),
+    });
+    const names = new Map(
+      (await resolveIssueActivityEvents(rows, asDb(db))).map((e) => [
+        e.id,
+        e.eventData?.type === "assigned"
+          ? e.eventData.assigneeDisplayName
+          : null,
+      ])
+    );
+    expect(names.get(byId.id)).toBe("Former user");
+    expect(names.get(legacyName.id)).toBe("Former user");
+    expect(names.get(other.id)).toBe("Staying Member");
+    expect(names.get(legacyOther.id)).toBe("Someone Else");
   });
 
   it("should reassign machines to another user if requested", async () => {

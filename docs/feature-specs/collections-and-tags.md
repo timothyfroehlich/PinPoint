@@ -30,6 +30,7 @@
 - **2.4** Renaming a Collection and changing its machines save together as one change; a failed save changes nothing.
 - **2.5** A Collection can include machines in any presence state.
 - **2.6** Only the owner can delete a Collection. Deleting it removes the Collection, its machine list, its Editors, and its View Link; the machines and their issues are unaffected. Deletion asks for confirmation and cannot be undone.
+- **2.7** The machine choice for adding to a Collection leaves out Removed machines, except ones already in the Collection.
 
 ---
 
@@ -50,7 +51,7 @@
 ## 4. Machine Group Pages
 
 - **4.1** Every Machine Group page has Overview, Issues, and Timeline tabs under one header.
-- **4.2** The header shows the group's name, its machine count, and how many machines are operational, need service, or are unplayable, plus the open-issue count.
+- **4.2** The header shows the group's name, its machine count, and how many machines are operational, need service, or are unplayable, plus the open-issue count. None of these counts include Removed machines or their issues.
 - **4.3** Overview is the shared Machine View (machine-views.md) scoped to the group's machines, using the Collections Page Preset.
 - **4.4** The Issues tab shows only issues on the group's machines. Its filters can narrow that set but never widen it.
 - **4.5** The Timeline tab shows one chronological feed across the group's machines, each entry labeled with its machine. Its filters can narrow that set but never widen it. The feed is read-only.
@@ -61,7 +62,7 @@
 ## 5. My Collections
 
 - **5.1** A signed-in person has a My Collections page listing Collections they own and Collections they are an Editor of, as separate groups ordered by name.
-- **5.2** Each listed Collection shows its machine count. Collections shared with the person also show the owner's name and their Editor access.
+- **5.2** Each listed Collection shows its machine count, leaving out Removed machines. Collections shared with the person also show the owner's name and their Editor access.
 - **5.3** When the person owns at least one machine, My Collections also links to their Owner Collection.
 - **5.4** My Collections offers Collection creation and opens the new Collection once it is created.
 - **5.5** My Collections requires sign-in.
@@ -79,13 +80,14 @@
 ## 7. Tags
 
 - **7.1** Tags are public: anyone, including anonymous visitors, can open a tag's page.
-- **7.2** A tag's page is a Machine Group page (§4) whose machines are exactly the tag's members, in every presence state by default. An automatic tag's members follow its tag type's rule; a hand-applied tag's members are the machines it was applied to (11.4).
+- **7.2** A tag's page is a Machine Group page (§4) whose machines are exactly the tag's members. An automatic tag's members follow its tag type's rule; a hand-applied tag's members are the machines it was applied to (11.4).
 - **7.3** A public tag browse lists every tag, grouped by tag type, and links to each tag's page. Hand-applied tags with no tag type form their own group. Automatic tags exist only while at least one machine belongs to them (§8, §9). A hand-applied tag is listed even when it has no machines.
 - **7.4** A machine's page links to each tag the machine belongs to.
 - **7.5** A tag's page and address stay the same while its membership changes.
 - **7.6** Tag membership is computed from data PinPoint already stores. Showing a tag, a tag page, or the tag browse never calls an external service.
 - **7.7** Each tag type has a public page listing its tags. A tag's page identifies it as a tag and links to its tag type's page when it has one. The tag browse links each tag type's section to that page.
 - **7.8** A tag type whose membership PinPoint derives from machine data, rather than people assigning it, is marked automatic on its page and in the tag browse.
+- **7.9** Machine counts shown for tags in the tag browse and on tag type pages leave out Removed machines.
 
 ---
 
@@ -150,7 +152,8 @@
 | Requirement | Divergence | Resolution |
 | :-- | :-- | :-- |
 | 6.2 | Owner Collections require sign-in. | PP-wqit.9 |
-| 7.2, 7.3, 7.7, §11 | Hand-applied tags and tag types do not exist; every tag is automatic. | PP-wqit.3, PP-wqit.4 |
+| 11.4, 11.10, 11.15 | A machine's page lists its hand-applied tags but has no control to apply or remove them, so machine owners cannot tag their machines and nobody can create a tag while tagging a machine. | PP-wqit.3 |
+| 11.7, 11.16 | A tag type's exclusivity is fixed when it is created, and a tag cannot move into, between, or out of tag types. | PP-wqit.3, PP-wqit.4 |
 
 ---
 
@@ -158,6 +161,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-03 | Removed machines are archived: left out of the add-machine choice (2.7), header counts (4.2), Collection counts (5.2), and tag counts (7.9); 7.2 drops its every-presence default, which machine-views §9.2 now sets. |
 | 2026-10-02 | Added hand-applied tags, with or without a hand-applied tag type, curated by technicians and admins and applied by machine owners to their own machines. Tag types can be exclusive. Names are capped at 20 characters. The tag browse lists hand-applied tags with no machines. Retired deferred items 10.1–10.2 and deferred tag merging. |
 | 2026-09-26 | Uncataloged machines join Type, Display, and Player Count tags through hand-entered values. |
 | 2026-09-25 | Added Type, Display, and Player Count tag types from OPDB data; dropped deferred era tags. |

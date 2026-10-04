@@ -652,7 +652,7 @@ def test_review_summary_shape() -> None:
 # ---------------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("level", ["low", "medium", "high"])
+@pytest.mark.parametrize("level", ["low", "medium", "high", "xhigh", "max"])
 def test_owner_review_record_of_head_passes(level: str) -> None:
     with gate_env(comment_pages=[[claude_review_record(level=level)]]) as env:
         result = run_gate("check_review_happened", env)
@@ -676,7 +676,7 @@ def test_owner_review_record_of_head_passes(level: str) -> None:
     "record",
     [
         pytest.param(claude_review_record(login="someone-else"), id="not-the-owner"),
-        pytest.param(claude_review_record(level="max"), id="unknown-level"),
+        pytest.param(claude_review_record(level="ultra"), id="unknown-level"),
         pytest.param(claude_review_record(HEAD_SHA[:10]), id="short-sha"),
         pytest.param(claude_review_record(prefix="quoted:\n"), id="marker-not-first"),
     ],

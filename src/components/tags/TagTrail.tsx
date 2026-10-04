@@ -1,11 +1,13 @@
 import type React from "react";
 import Link from "next/link";
 import { Tag } from "lucide-react";
-import type { TagTypeInfo } from "~/lib/tags/types";
 
 interface TagTrailProps {
-  /** The tag type to link after "Tags"; omit on the tag type's own page. */
-  type?: TagTypeInfo;
+  /**
+   * The tag type to link after "Tags"; omit on a tag type's own page and for a
+   * hand-applied tag with no tag type.
+   */
+  type?: { label: string; href: string } | undefined;
 }
 
 /** "Tags / Manufacturer" above a tag or tag type title (spec 7.7). */

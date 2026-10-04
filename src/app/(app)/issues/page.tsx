@@ -10,6 +10,10 @@ import { createClient } from "~/lib/supabase/server";
 import { DEFAULT_ISSUE_SORT, parseIssueFilters } from "~/lib/issues/filters";
 import { getAccessLevel } from "~/lib/permissions/helpers";
 import { loadIssueListPage } from "~/lib/issues/list-page";
+import {
+  getMachineChoices,
+  getOwnedMachineInitials,
+} from "~/lib/machines/queries";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
 export const metadata: Metadata = {
@@ -60,16 +64,14 @@ export default async function IssuesPage({
   // shared issues-list load so everything still resolves in parallel.
   // Owned initials are computed server-side so no user IDs reach the client
   // (CORE-SEC-006).
-  const machinesPromise = db.query.machines.findMany({
-    orderBy: (m, { asc }) => [asc(m.name)],
-    columns: { initials: true, name: true },
-  });
+  // Removed machines are offered only when the presence filter includes
+  // them; a machine already selected stays listed (issues-list 4.5).
+  const machinesPromise = getMachineChoices(db, {
+    includeRemoved: filters.includeInactiveMachines === true,
+    keepInitials: filters.machine ?? [],
+  }).then((rows) => rows.map(({ initials, name }) => ({ initials, name })));
   const ownedMachineInitialsPromise = user?.id
-    ? db.query.machines.findMany({
-        where: (m, { eq }) => eq(m.ownerId, user.id),
-        columns: { initials: true },
-        orderBy: (m, { asc }) => [asc(m.initials)],
-      })
+    ? getOwnedMachineInitials(db, user.id)
     : Promise.resolve([]);
 
   const [
@@ -83,14 +85,12 @@ export default async function IssuesPage({
       summary,
     },
     allMachines,
-    ownedMachineRows,
+    ownedMachineInitials,
   ] = await Promise.all([
     loadIssueListPage(filters, { isAdmin }),
     machinesPromise,
     ownedMachineInitialsPromise,
   ]);
-
-  const ownedMachineInitials = ownedMachineRows.map((m) => m.initials);
 
   return (
     <PageContainer size="wide">

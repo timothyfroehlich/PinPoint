@@ -701,6 +701,41 @@
       "when": 1791066883805,
       "tag": "0099_drop-machine-apron-columns",
       "breakpoints": true
+    },
+    {
+      "idx": 100,
+      "version": "7",
+      "when": 1791069006186,
+      "tag": "0100_activity-summary-settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "7",
+      "when": 1791083222453,
+      "tag": "0101_apron-card-template",
+      "breakpoints": true
+    },
+    {
+      "idx": 102,
+      "version": "7",
+      "when": 1791084746092,
+      "tag": "0102_guest-reporter-timeline-conversion",
+      "breakpoints": true
+    },
+    {
+      "idx": 103,
+      "version": "7",
+      "when": 1791086011508,
+      "tag": "0103_hand-applied-tags",
+      "breakpoints": true
+    },
+    {
+      "idx": 104,
+      "version": "7",
+      "when": 1791087419613,
+      "tag": "0104_assigned-event-assignee-ids",
+      "breakpoints": true
     }
   ]
 }

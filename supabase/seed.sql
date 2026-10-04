@@ -25,6 +25,7 @@ DECLARE
   v_first_name text;
   v_last_name text;
   v_derived boolean;
+  v_guest_issue_ids text[];
 BEGIN
   -- Handle legacy invited_users (if any exist) first to get role
   -- Find matching invited user by email
@@ -95,16 +96,52 @@ BEGIN
     false, false  -- Global watch
   );
 
-  -- Transfer guest issues to newly created account
-  -- Link issues where reporter_email matches the new user's email
-  UPDATE public.issues
-  SET
-    reported_by = NEW.id,
-    reporter_name = NULL,
-    reporter_email = NULL
-  WHERE lower(reporter_email) = lower(NEW.email)
-    AND reported_by IS NULL
-    AND invited_reported_by IS NULL;
+  -- Transfer guest issues (reporter_email matches the new user's email) to
+  -- the newly created account, and make the account the
+  -- reporter on those issues' machine-timeline issue_opened events: add the
+  -- `reporter` person-reference and author_id (where unset) an account-backed
+  -- open carries, and drop the typed guestReporterName it replaces
+  -- (PP-0fg0.3). Mirrored by
+  -- ensureUserProfile → attachSignedUpGuestReporter.
+  WITH transferred AS (
+    UPDATE public.issues
+    SET
+      reported_by = NEW.id,
+      reporter_name = NULL,
+      reporter_email = NULL
+    WHERE lower(reporter_email) = lower(NEW.email)
+      AND reported_by IS NULL
+      AND invited_reported_by IS NULL
+    RETURNING id
+  )
+  SELECT COALESCE(array_agg(id::text), '{}')
+  INTO v_guest_issue_ids
+  FROM transferred;
+
+  IF cardinality(v_guest_issue_ids) > 0 THEN
+    INSERT INTO public.timeline_event_people (event_id, role, user_id)
+    SELECT te.id, 'reporter', NEW.id
+    FROM public.timeline_events te
+    WHERE te.source_type = 'issue'
+      AND te.event_data->>'kind' = 'issue_opened'
+      AND te.event_data->>'issueId' = ANY (v_guest_issue_ids)
+      AND NOT EXISTS (
+        SELECT 1 FROM public.timeline_event_people tep
+        WHERE tep.event_id = te.id AND tep.role = 'reporter'
+      );
+
+    UPDATE public.timeline_events te
+    SET
+      event_data = te.event_data - 'guestReporterName',
+      author_id = COALESCE(te.author_id, NEW.id)
+    WHERE te.source_type = 'issue'
+      AND te.event_data->>'kind' = 'issue_opened'
+      AND te.event_data->>'issueId' = ANY (v_guest_issue_ids)
+      AND (
+        te.event_data->>'guestReporterName' IS NOT NULL
+        OR te.author_id IS NULL
+      );
+  END IF;
 
   -- Handle legacy invited_users transfer (v_invited_user_id already populated above)
   IF v_invited_user_id IS NOT NULL THEN

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { getTestDb, setupTestDb } from "~/test/setup/pglite";
+import { asDbOrTx, getTestDb, setupTestDb } from "~/test/setup/pglite";
 import {
   invitedUsers,
   userProfiles,
@@ -9,11 +9,16 @@ import {
   authUsers,
   issues,
   notificationPreferences,
+  timelineEventPeople,
+  timelineEvents,
 } from "~/server/db/schema";
+import { emitIssueOpened } from "~/lib/timeline/issue-timeline-helpers";
 import { getUnifiedUsers, compareUnifiedUsers } from "~/lib/users/queries";
 import { getMachineOwner } from "~/lib/machines/queries";
 import { createTestMachine } from "~/test/helpers/factories";
 import { ensureUserProfile } from "~/lib/auth/profile";
+import { createMachineTimelineEvent } from "~/lib/timeline/machine-events";
+import type { User } from "@supabase/supabase-js";
 import type { UnifiedUser } from "~/lib/types";
 
 // Mock the database to use the PGlite instance
@@ -517,6 +522,142 @@ describe("Invited Users Integration", () => {
       where: eq(invitedUsers.id, invited.id),
     });
     expect(deletedInvited).toBeUndefined();
+  });
+
+  it("makes a signed-up guest the reporter on their issue_opened timeline event (PP-0fg0.3)", async () => {
+    const db = await getTestDb();
+    const [machine] = await db
+      .insert(machines)
+      .values(createTestMachine({ initials: "GST" }))
+      .returning();
+    if (!machine) throw new Error("Failed to create machine");
+
+    // A guest's public report and the issue_opened event createIssue writes
+    // for it: the typed name, no reporter person-reference.
+    const [guestIssue] = await db
+      .insert(issues)
+      .values({
+        machineInitials: machine.initials,
+        issueNumber: 1,
+        title: "Guest Issue",
+        reporterName: "Gus Guest",
+        reporterEmail: "gus@example.com",
+      })
+      .returning();
+    if (!guestIssue) throw new Error("Failed to create guest issue");
+    await db.transaction((tx) =>
+      emitIssueOpened(asDbOrTx(tx), {
+        machineId: machine.id,
+        issueId: guestIssue.id,
+        issueNumber: guestIssue.issueNumber,
+        title: guestIssue.title,
+        severity: guestIssue.severity,
+        frequency: guestIssue.frequency,
+        guestReporterName: "Gus Guest",
+      })
+    );
+
+    const userId = randomUUID();
+    await db.insert(authUsers).values({ id: userId, email: "gus@example.com" });
+    await ensureUserProfile({
+      id: userId,
+      email: "gus@example.com",
+      user_metadata: { first_name: "Gus", last_name: "Account" },
+      app_metadata: {},
+      aud: "authenticated",
+      created_at: new Date().toISOString(),
+    });
+
+    const [opened] = await db
+      .select()
+      .from(timelineEvents)
+      .where(eq(timelineEvents.machineId, machine.id));
+    expect(opened?.eventData).toMatchObject({
+      kind: "issue_opened",
+      issueId: guestIssue.id,
+    });
+    expect(opened?.eventData).not.toHaveProperty("guestReporterName");
+    // Like an account-backed open: the reporter is also the event's author.
+    expect(opened?.authorId).toBe(userId);
+
+    const people = await db
+      .select()
+      .from(timelineEventPeople)
+      .where(eq(timelineEventPeople.eventId, opened?.id ?? ""));
+    expect(people).toEqual([
+      expect.objectContaining({ role: "reporter", userId, invitedId: null }),
+    ]);
+  });
+
+  // PP-tv9l: timeline_event_people.invited_id is ON DELETE RESTRICT, so the
+  // invited_users delete fails unless the person-refs are rewritten first —
+  // exactly what handle_new_user does in drizzle/0064.
+  it("should rewrite timeline person-refs before deleting the invited user via ensureUserProfile", async () => {
+    const db = await getTestDb();
+
+    const [invited] = await db
+      .insert(invitedUsers)
+      .values({
+        firstName: "Timeline",
+        lastName: "Owner",
+        email: "timeline-owner@example.com",
+        role: "member",
+      })
+      .returning();
+    if (!invited) throw new Error("Failed to create invited user");
+
+    const [machine] = await db
+      .insert(machines)
+      .values(
+        createTestMachine({ initials: "TLOW", invitedOwnerId: invited.id })
+      )
+      .returning();
+    if (!machine) throw new Error("Failed to create machine");
+
+    const eventId = await createMachineTimelineEvent(machine.id, {
+      sourceType: "lifecycle",
+      tag: "lifecycle",
+      eventData: { kind: "owner_set" },
+      people: [{ role: "to_owner", invitedId: invited.id }],
+    });
+
+    const userId = randomUUID();
+    await db.insert(authUsers).values({
+      id: userId,
+      email: "timeline-owner@example.com",
+    });
+    const user: User = {
+      id: userId,
+      email: "timeline-owner@example.com",
+      user_metadata: {},
+      app_metadata: {},
+      aud: "authenticated",
+      created_at: new Date().toISOString(),
+    };
+
+    await ensureUserProfile(user);
+
+    const refs = await db
+      .select()
+      .from(timelineEventPeople)
+      .where(eq(timelineEventPeople.eventId, eventId));
+    expect(refs).toEqual([
+      expect.objectContaining({
+        role: "to_owner",
+        userId,
+        invitedId: null,
+      }),
+    ]);
+
+    const deletedInvited = await db.query.invitedUsers.findFirst({
+      where: eq(invitedUsers.id, invited.id),
+    });
+    expect(deletedInvited).toBeUndefined();
+
+    const updatedMachine = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    expect(updatedMachine?.ownerId).toBe(userId);
   });
 
   it("should transfer role from invited user when creating profile", async () => {

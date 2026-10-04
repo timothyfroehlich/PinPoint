@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { issues, machines, userProfiles } from "~/server/db/schema";
+import { issues, userProfiles } from "~/server/db/schema";
 import { eq, asc, and, ne, notInArray, sql } from "drizzle-orm";
 import { IssueActivity } from "~/components/issues/IssueActivity";
 import { IssueDetails } from "~/components/issues/IssueDetails";
@@ -20,10 +20,12 @@ import {
   IssueSections,
 } from "~/components/issues/IssueSectionTabs";
 import { getMachineOwnerId } from "~/lib/issues/owner";
+import { getMachineChoices } from "~/lib/machines/queries";
 import { CLOSED_STATUSES } from "~/lib/issues/status";
 import { formatIssueId } from "~/lib/issues/utils";
 import type { IssueWithAllRelations } from "~/lib/types";
 import { EditableIssueTitle } from "./editable-issue-title";
+import { getIssueForDetail } from "./_data";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { OwnerRequirementsCallout } from "~/components/machines/OwnerRequirementsCallout";
 import {
@@ -81,78 +83,8 @@ export default async function IssueDetailPage({
 
   const [issue, currentUserProfile, otherIssues, otherIssuesCount] =
     await Promise.all([
-      // Query issue with all relations
-      db.query.issues.findFirst({
-        where: and(
-          eq(issues.machineInitials, initials),
-          eq(issues.issueNumber, issueNum)
-        ),
-        columns: { reporterEmail: false },
-        with: {
-          machine: {
-            columns: {
-              id: true,
-              name: true,
-              initials: true,
-              ownerRequirements: true,
-            },
-            with: {
-              owner: {
-                columns: {
-                  id: true,
-                  name: true,
-                },
-              },
-              invitedOwner: {
-                columns: {
-                  id: true,
-                  name: true,
-                },
-              },
-            },
-          },
-          reportedByUser: {
-            columns: {
-              id: true,
-              name: true,
-            },
-          },
-          assignedToUser: {
-            columns: {
-              id: true,
-              name: true,
-            },
-          },
-          invitedReporter: {
-            columns: {
-              id: true,
-              name: true,
-            },
-          },
-          comments: {
-            orderBy: (comments, { asc: orderAsc }) => [
-              orderAsc(comments.createdAt),
-            ],
-            with: {
-              author: {
-                columns: {
-                  id: true,
-                  name: true,
-                },
-              },
-              images: {
-                where: (images, { isNull }) => isNull(images.deletedAt),
-              },
-            },
-          },
-          images: {
-            where: (images, { isNull }) => isNull(images.deletedAt),
-          },
-          watchers: {
-            columns: { userId: true },
-          },
-        },
-      }),
+      // Query issue with all relations; mentions carry current names
+      getIssueForDetail(initials, issueNum),
       // Fetch current user's profile for permission-aware rendering and to
       // gate the (potentially expensive + privacy-sensitive) assignee roster
       // fetch below.
@@ -225,11 +157,11 @@ export default async function IssueDetailPage({
           .where(notInArray(userProfiles.role, ["guest"]))
           .orderBy(asc(userProfiles.name))
       : Promise.resolve(issue.assignedToUser ? [issue.assignedToUser] : []),
+    // Move lists machines not marked Removed (issue-detail §4.6).
     userCanReassign
-      ? db.query.machines.findMany({
-          columns: { initials: true, name: true },
-          orderBy: asc(machines.name),
-        })
+      ? getMachineChoices(db).then((rows) =>
+          rows.map(({ initials, name }) => ({ initials, name }))
+        )
       : Promise.resolve([]),
   ]);
 

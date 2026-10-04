@@ -15,6 +15,8 @@ import { getOpdbRecords } from "~/lib/opdb/records";
 import { opdbGroupId, pinTipsPageUrl } from "~/lib/pintips/parse";
 import { pickWeightedTipIndex } from "~/lib/pintips/pick";
 import { getPinTipsForGroup } from "~/lib/pintips/records";
+import { loadMentionNames } from "~/lib/tiptap/mention-names";
+import { applyMentionNames } from "~/lib/tiptap/types";
 import type { PinTipForCard } from "~/lib/pintips/types";
 
 /**
@@ -88,10 +90,32 @@ export const getMachineForLayout = cache(async (initials: string) => {
       .where(eq(issues.machineInitials, initials)),
   ]);
 
+  // Mentions in the machine's rich-text fields carry the mentioned person's
+  // current name — one lookup for all four, and only when one holds a mention.
+  // The inline editors open on these same docs.
+  const names = machine
+    ? await loadMentionNames([
+        machine.description,
+        machine.ownerRequirements,
+        machine.settingsRequests,
+        machine.settingsInstructions,
+      ])
+    : new Map<string, string>();
+
   return {
     machine: machine
       ? {
           ...machine,
+          description: applyMentionNames(machine.description, names),
+          ownerRequirements: applyMentionNames(
+            machine.ownerRequirements,
+            names
+          ),
+          settingsRequests: applyMentionNames(machine.settingsRequests, names),
+          settingsInstructions: applyMentionNames(
+            machine.settingsInstructions,
+            names
+          ),
           artwork: resolveArtwork(machine.pinballmapTitle),
           modelTitle: resolveModelTitle(machine),
           // Displayed everywhere on the machine's page so it always matches
@@ -253,6 +277,7 @@ export async function getMachineApronCards(
       id: true,
       name: true,
       size: true,
+      template: true,
       useCustomDescription: true,
       description: true,
       tip: true,
