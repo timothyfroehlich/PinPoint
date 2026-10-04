@@ -12,7 +12,7 @@
 
 import { describe, it, expect, beforeEach, vi, beforeAll } from "vitest";
 import { eq, desc } from "drizzle-orm";
-import { getTestDb, setupTestDb } from "~/test/setup/pglite";
+import { asDb, getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { createTestUser } from "~/test/helpers/factories";
 import {
   issues,
@@ -36,6 +36,7 @@ import {
 import { planNotification, planNotifications } from "~/lib/notifications";
 import { plainTextToDoc, type ProseMirrorDoc } from "~/lib/tiptap/types";
 import { resolveIssueReporter } from "~/lib/issues/utils";
+import { resolveIssueActivityEvents } from "~/lib/timeline/events";
 
 // ---------------------------------------------------------------------------
 // External delivery / side-effect boundaries — mocked so we can assert
@@ -501,11 +502,95 @@ describe("Issue Service Functions (Integration)", () => {
         (e) => e.isSystem && e.eventData?.type === "assigned"
       );
       expect(assignEvent).toBeDefined();
+      // The account id, plus the name as a rollback copy (PP-0fg0.1).
       expect(assignEvent?.eventData).toEqual({
         type: "assigned",
+        assigneeId: testUser2.id,
         assigneeName: "Second User",
       });
       expect(assignEvent?.authorId).toBe(testUser.id);
+    });
+
+    it("createIssue with an assignee records the assignee's id", async () => {
+      const db = await getTestDb();
+
+      const { issue } = await createIssue({
+        title: "Assigned at creation",
+        machineInitials: testMachine.initials,
+        severity: "minor" as const,
+        reportedBy: testUser.id,
+        assignedTo: testUser2.id,
+      });
+
+      const events = await db.query.issueComments.findMany({
+        where: eq(issueComments.issueId, issue.id),
+      });
+      expect(
+        events
+          .filter((e) => e.eventData?.type === "assigned")
+          .map((e) => e.eventData)
+      ).toEqual([
+        {
+          type: "assigned",
+          assigneeId: testUser2.id,
+          assigneeName: "Second User",
+        },
+      ]);
+    });
+
+    /**
+     * Activity resolves an assignment to the account's current name when it
+     * loads (PP-0fg0.1), over the stored "Second User" rollback copy. An id
+     * whose profile row is gone (an account deleted outside the app) shows
+     * "Former user", never its stored name. Only a legacy event with no id
+     * shows its stored name.
+     */
+    it("Activity shows the assignee's current name after a rename", async () => {
+      const db = await getTestDb();
+
+      await assignIssue({
+        issueId: testIssue.id,
+        assignedTo: testUser2.id,
+        actorId: testUser.id,
+      });
+      await db.insert(issueComments).values([
+        {
+          issueId: testIssue.id,
+          isSystem: true,
+          eventData: {
+            type: "assigned",
+            assigneeId: null,
+            assigneeName: "Departed Member",
+          },
+        },
+        {
+          issueId: testIssue.id,
+          isSystem: true,
+          eventData: {
+            type: "assigned",
+            assigneeId: "00000000-0000-0000-0000-0000000000ff",
+            assigneeName: "Deleted Elsewhere",
+          },
+        },
+      ]);
+      await db
+        .update(userProfiles)
+        .set({ firstName: "Renamed" })
+        .where(eq(userProfiles.id, testUser2.id));
+
+      const rows = await db.query.issueComments.findMany({
+        where: eq(issueComments.issueId, testIssue.id),
+      });
+      const activity = await resolveIssueActivityEvents(rows, asDb(db));
+      expect(
+        activity
+          .flatMap((e) =>
+            e.eventData?.type === "assigned"
+              ? [e.eventData.assigneeDisplayName]
+              : []
+          )
+          .sort()
+      ).toEqual(["Departed Member", "Former user", "Renamed User"]);
     });
 
     /**

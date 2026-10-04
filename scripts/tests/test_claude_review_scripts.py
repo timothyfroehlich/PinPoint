@@ -93,6 +93,14 @@ def test_level_bands_are_exclusive(
     assert level(repo)[0] == expected
 
 
+def test_ask_names_the_levels_to_offer(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path)
+    commit_lines(repo, {"src/app.ts": 3001})
+    word, detail = level(repo)
+    assert word == "ask"
+    assert detail.endswith("; ask Tim: xhigh, max, or split the PR")
+
+
 def test_tests_count_at_half_weight(tmp_path: Path) -> None:
     repo = make_repo(tmp_path)
     commit_lines(
@@ -237,16 +245,19 @@ def run_record(
     return result, posted, call_lines
 
 
+@pytest.mark.parametrize("level_arg", ["low", "medium", "high", "xhigh", "max"])
 def test_clean_review_posts_a_pinned_record_and_promotes_the_draft(
-    tmp_path: Path,
+    tmp_path: Path, level_arg: str
 ) -> None:
     repo = make_repo(tmp_path)
     head = commit_lines(repo, {"src/app.ts": 5})
-    result, posted, calls = run_record(tmp_path, repo, [])
+    result, posted, calls = run_record(tmp_path, repo, [], level_arg=level_arg)
     assert result.returncode == 0, result.stderr
     assert len(posted) == 1
     body = posted[0]
-    assert body.startswith(f"<!-- pinpoint-claude-review: {head} level=medium -->\n")
+    assert body.startswith(
+        f"<!-- pinpoint-claude-review: {head} level={level_arg} -->\n"
+    )
     assert "No findings." in body
     assert "pr ready 123" in calls
 
@@ -455,6 +466,6 @@ def test_record_refuses_a_duplicate_for_the_same_head(tmp_path: Path) -> None:
 def test_invalid_level_is_a_usage_error(tmp_path: Path) -> None:
     repo = make_repo(tmp_path)
     commit_lines(repo, {"src/app.ts": 5})
-    result, posted, _ = run_record(tmp_path, repo, [], level_arg="max")
+    result, posted, _ = run_record(tmp_path, repo, [], level_arg="ultra")
     assert result.returncode == 2
     assert posted == []

@@ -3,7 +3,7 @@
 # out of draft (spec pr-lifecycle-monitoring §8.16–8.20). The merge gate counts the
 # record as review coverage of exactly the head it names.
 #
-# Usage: record-claude-review.sh <PR> --level low|medium|high --findings <file> [--dry-run]
+# Usage: record-claude-review.sh <PR> --level low|medium|high|xhigh|max --findings <file> [--dry-run]
 #
 # <file> is a JSON array with one entry per finding from every review round:
 #   { "round": 1, "file": "src/a.ts", "line": 12, "summary": "…",
@@ -17,8 +17,13 @@
 # (§8.19). --dry-run checks everything and prints the record without posting it.
 set -euo pipefail
 
+script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+readonly script_dir
+# shellcheck source=scripts/workflow/_pr-gates.sh
+source "${script_dir}/_pr-gates.sh"
+
 usage() {
-  echo "Usage: $0 <PR> --level low|medium|high --findings <file> [--dry-run]" >&2
+  echo "Usage: $0 <PR> --level ${CLAUDE_REVIEW_LEVELS} --findings <file> [--dry-run]" >&2
   exit 2
 }
 
@@ -34,7 +39,7 @@ while [[ $# -gt 0 ]]; do
     *) usage ;;
   esac
 done
-[[ $level =~ ^(low|medium|high)$ ]] || usage
+[[ $level =~ ^(${CLAUDE_REVIEW_LEVELS})$ ]] || usage
 [[ -n $findings_file ]] || usage
 
 block() {
@@ -44,11 +49,6 @@ block() {
 
 [[ -r $findings_file ]] || block "cannot read findings file ${findings_file}"
 findings=$(jq -c . "$findings_file" 2> /dev/null) || block "findings file is not valid JSON"
-
-script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-readonly script_dir
-# shellcheck source=scripts/workflow/_pr-gates.sh
-source "${script_dir}/_pr-gates.sh"
 
 # Every finding is fixed (with the commit) or declined (with a reason) — §8.16.
 problems=$(jq -r '
