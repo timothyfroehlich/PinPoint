@@ -91,8 +91,11 @@ test.describe("Machines Public Access", () => {
     // On the Floor is the /m default, so the canonical URL drops `presence`
     // once the Segment replaces the starting `presence=all`.
     expect(new URL(page.url()).searchParams.has("presence")).toBe(false);
+    // The Playability filter button shows the selected value (list-views §4.3).
     await expect(
-      page.getByRole("button", { name: `Remove ${label} filter` })
+      page.getByRole("button", {
+        name: new RegExp(`^Playability\\s*:\\s*${label}$`),
+      })
     ).toBeVisible();
     await expect(segment).toHaveAttribute("aria-pressed", "true");
     // Widget counts use the same derivation as the rows (widgets §4.3). The
@@ -125,7 +128,7 @@ test.describe("Machines Public Access", () => {
     }) => {
       await page.goto("/m");
       const summaryRow = page.getByRole("button", {
-        name: /^Summary: \d+ of \d+ playable$/,
+        name: /^Summary: \d+\/\d+ playable$/,
       });
       const presence = page.getByRole("region", { name: "Presence" });
       await expect(summaryRow).toHaveAttribute("aria-expanded", "false");
@@ -149,7 +152,7 @@ test.describe("Machines Public Access", () => {
     }) => {
       await page.goto("/m");
       const summaryRow = page.getByRole("button", {
-        name: /^Summary: \d+ of \d+ playable$/,
+        name: /^Summary: \d+\/\d+ playable$/,
       });
       const presence = page.getByRole("region", { name: "Presence" });
       await expect(summaryRow).toHaveAttribute("aria-expanded", "true");
