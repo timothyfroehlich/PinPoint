@@ -1,23 +1,29 @@
 /**
- * E2E: hand-applied tags managed from the tag pages (PP-wqit.3, spec
- * collections-and-tags §11).
+ * E2E: hand-applied tags managed from the tag pages and from a machine's page
+ * (PP-wqit.3, spec collections-and-tags §11).
  *
- * The journey crosses four page renders — tag browse, tag type page, tag page,
- * machine Info tab — so it belongs here rather than in an integration test.
- * Action wiring, permissions, and exclusivity rules are covered in
- * src/test/integration/tag-actions.test.ts and hand-tags.test.ts.
+ * The tag-page journey crosses four page renders — tag browse, tag type page,
+ * tag page, machine Info tab — and the machine-page editor saves each click
+ * through a Server Action and revalidates the Tags card behind it, so both
+ * belong here rather than in an integration test. Action wiring, permissions,
+ * and exclusivity rules are covered in src/test/integration/tag-actions.test.ts
+ * and hand-tags.test.ts.
  *
- * Isolation: the tag type, its tag, and the machine are created per run and
- * removed in afterAll; the read-only checks use seeded tags and never mutate
- * them.
+ * Isolation: tag types, tags, and machines that a test changes are created per
+ * run and removed in afterAll; the read-only checks use seeded tags and
+ * machines and never mutate them.
  */
 
 import { test, expect } from "../support/fixtures.js";
-import { assertNoA11yViolations } from "../support/actions.js";
+import {
+  assertNoA11yViolations,
+  assertNoHorizontalOverflow,
+} from "../support/actions.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
-import { TEST_USERS } from "../support/constants.js";
+import { seededMachines, TEST_USERS } from "../support/constants.js";
 import {
   createTestMachine,
+  createTestTagType,
   deleteTestMachine,
   deleteTestTagType,
   getProfileIdByEmail,
@@ -28,7 +34,7 @@ test.describe("Hand-applied tags", () => {
   test.describe("technician", () => {
     test.use({ storageState: STORAGE_STATE.technician });
 
-    // Names are capped at 20 characters; the prefix is ~7.
+    // Names are capped at 20 characters; the prefix is ~11.
     const typeName = `Zone ${getTestPrefix()}`;
     const tagName = `Bay ${getTestPrefix()}`;
     let machine: { id: string; initials: string; name: string } | null = null;
@@ -188,6 +194,217 @@ test.describe("Hand-applied tags", () => {
       await expect(
         page.getByRole("button", { name: "Tag type actions" })
       ).toHaveCount(0);
+    });
+  });
+});
+
+test.describe("Machine tag editor", () => {
+  const desktop = { width: 1280, height: 800 };
+  /** Admin-owned and carries seeded hand-applied tags (seed-tags.mjs). */
+  const seededInitials = seededMachines.medievalMadness.initials;
+
+  /** A tag row's accessible name reads "<name>, <count> machines". */
+  function tagRow(name: string): RegExp {
+    return new RegExp(`^${name},`);
+  }
+
+  test.describe("technician", () => {
+    test.use({ storageState: STORAGE_STATE.technician, viewport: desktop });
+
+    const prefix = getTestPrefix();
+    const openType = `Kit ${prefix}`;
+    const lamp = `Lamp ${prefix}`;
+    const exclusiveType = `Spot ${prefix}`;
+    const left = `Left ${prefix}`;
+    const right = `Right ${prefix}`;
+    const created = `New ${prefix}`;
+    let machine: { id: string; initials: string } | null = null;
+
+    test.beforeAll(async () => {
+      const ownerId = await getProfileIdByEmail(TEST_USERS.admin.email);
+      machine = await createTestMachine(ownerId);
+      await createTestTagType(openType, { exclusive: false, tags: [lamp] });
+      await createTestTagType(exclusiveType, {
+        exclusive: true,
+        tags: [left, right],
+      });
+    });
+
+    test.afterAll(async () => {
+      await deleteTestTagType(openType).catch(() => undefined);
+      await deleteTestTagType(exclusiveType).catch(() => undefined);
+      if (machine) await deleteTestMachine(machine.id).catch(() => undefined);
+    });
+
+    test("applies, swaps, clears, and creates tags from the machine page", async ({
+      page,
+    }) => {
+      if (!machine) throw new Error("Test machine was not created");
+      await page.goto(`/m/${machine.initials}`);
+
+      const tagsCard = page.getByTestId("machine-tags");
+      const cardTag = (name: string) =>
+        tagsCard.getByRole("link", { name, exact: true });
+      const editor = page.getByRole("dialog", { name: "Edit tags" });
+
+      // --- An open type: a checkbox, saved on click ------------------------
+      await tagsCard.getByRole("button", { name: "Edit tags" }).click();
+      await expect(editor).toBeVisible();
+      await editor.getByRole("checkbox", { name: tagRow(lamp) }).check();
+      await expect(editor.getByRole("status")).toHaveText("Saved");
+      await editor.getByRole("button", { name: "Done" }).click();
+      await expect(editor).toBeHidden();
+      await expect(cardTag(lamp)).toBeVisible();
+
+      // --- An exclusive type: one choice, then another, then None ----------
+      await tagsCard.getByRole("button", { name: "Edit tags" }).click();
+      const exclusiveGroup = editor.getByRole("group", {
+        name: new RegExp(`^${exclusiveType}`),
+      });
+      await exclusiveGroup.getByRole("radio", { name: tagRow(left) }).check();
+      await expect(cardTag(left)).toBeVisible();
+
+      await exclusiveGroup.getByRole("radio", { name: tagRow(right) }).check();
+      await expect(cardTag(right)).toBeVisible();
+      await expect(cardTag(left)).toHaveCount(0);
+      await expect(
+        exclusiveGroup.getByRole("radio", { name: tagRow(left) })
+      ).not.toBeChecked();
+
+      await exclusiveGroup.getByRole("radio", { name: "None" }).check();
+      await expect(cardTag(right)).toHaveCount(0);
+
+      // --- Create a tag into a type while tagging ---------------------------
+      await editor.getByLabel("Find or create a tag").fill(created);
+      await editor
+        .getByLabel("Tag type for the new tag")
+        .selectOption({ label: openType });
+      await editor.getByRole("button", { name: `Create “${created}”` }).click();
+      await expect(
+        editor
+          .getByRole("group", { name: new RegExp(`^${openType}`) })
+          .getByRole("checkbox", { name: tagRow(created) })
+      ).toBeChecked();
+      await expect(cardTag(created)).toBeVisible();
+      await editor.getByRole("button", { name: "Done" }).click();
+      await expect(editor).toBeHidden();
+
+      // --- The saved set survives a fresh render ----------------------------
+      await page.reload();
+      await expect(cardTag(lamp)).toBeVisible();
+      await expect(cardTag(created)).toBeVisible();
+      await expect(cardTag(left)).toHaveCount(0);
+      await expect(cardTag(right)).toHaveCount(0);
+    });
+  });
+
+  test.describe("member", () => {
+    test.use({ storageState: STORAGE_STATE.member, viewport: desktop });
+
+    const prefix = getTestPrefix();
+    const ownType = `Own ${prefix}`;
+    const mine = `Mine ${prefix}`;
+    let machine: { id: string; initials: string } | null = null;
+
+    test.beforeAll(async () => {
+      const ownerId = await getProfileIdByEmail(TEST_USERS.member.email);
+      machine = await createTestMachine(ownerId);
+      await createTestTagType(ownType, { exclusive: false, tags: [mine] });
+    });
+
+    test.afterAll(async () => {
+      await deleteTestTagType(ownType).catch(() => undefined);
+      if (machine) await deleteTestMachine(machine.id).catch(() => undefined);
+    });
+
+    test("tags a machine they own without creating tags; cannot tag others", async ({
+      page,
+    }) => {
+      if (!machine) throw new Error("Test machine was not created");
+      await page.goto(`/m/${machine.initials}`);
+
+      const tagsCard = page.getByTestId("machine-tags");
+      const editor = page.getByRole("dialog", { name: "Edit tags" });
+      await tagsCard.getByRole("button", { name: "Edit tags" }).click();
+      await expect(editor).toBeVisible();
+
+      // Members find tags; only tags.manage holders may create one.
+      const search = editor.getByLabel("Find a tag");
+      await search.fill(`Nope ${prefix}`);
+      await expect(editor.getByText("No matching tags")).toBeVisible();
+      await expect(editor.getByRole("button", { name: /^Create/ })).toHaveCount(
+        0
+      );
+      await search.fill("");
+
+      await editor.getByRole("checkbox", { name: tagRow(mine) }).check();
+      await expect(editor.getByRole("status")).toHaveText("Saved");
+      await editor.getByRole("button", { name: "Done" }).click();
+      await expect(editor).toBeHidden();
+      await expect(
+        tagsCard.getByRole("link", { name: mine, exact: true })
+      ).toBeVisible();
+
+      // A machine the member does not own shows its tags, not the editor.
+      await page.goto(`/m/${seededInitials}`);
+      await expect(page.getByTestId("machine-tags")).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Edit tags", includeHidden: true })
+      ).toHaveCount(0);
+    });
+  });
+
+  test.describe("anonymous visitor", () => {
+    test("sees a machine's tags without the editor", async ({ page }) => {
+      await page.goto(`/m/${seededInitials}`);
+      await expect(page.getByTestId("machine-tags")).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Edit tags", includeHidden: true })
+      ).toHaveCount(0);
+    });
+  });
+
+  test.describe("phone", () => {
+    // The narrowest review viewport (pinpoint-design-bible §4).
+    test.use({
+      storageState: STORAGE_STATE.technician,
+      viewport: { width: 320, height: 568 },
+    });
+
+    test("collapses chips behind +N and edits in a bottom sheet", async ({
+      page,
+    }) => {
+      await page.goto(`/m/${seededInitials}`);
+      const tagsCard = page.getByTestId("machine-tags");
+      const chips = tagsCard.getByRole("link");
+
+      // One line of chips; the rest wait behind the "+N" chip.
+      const more = tagsCard.getByRole("button", {
+        name: /^Show \d+ more tags?$/,
+      });
+      await expect(more).toBeVisible();
+      const total = await tagsCard
+        .getByRole("link", { includeHidden: true })
+        .count();
+      const shown = await chips.count();
+      expect(shown).toBeLessThan(total);
+      await expect(more).toHaveText(`+${String(total - shown)}`);
+      await assertNoHorizontalOverflow(page, {
+        scopeTestIds: ["machine-tags"],
+      });
+
+      await more.click();
+      await expect(more).toHaveCount(0);
+      await expect(chips).toHaveCount(total);
+
+      // The editor opens as a bottom sheet and closes with Done.
+      await tagsCard.getByRole("button", { name: "Edit tags" }).click();
+      const sheet = page.getByRole("dialog", { name: "Edit tags" });
+      await expect(sheet).toBeVisible();
+      await expect(sheet.getByLabel("Find or create a tag")).toBeVisible();
+      await assertNoA11yViolations(page);
+      await sheet.getByRole("button", { name: "Done" }).click();
+      await expect(sheet).toBeHidden();
     });
   });
 });
