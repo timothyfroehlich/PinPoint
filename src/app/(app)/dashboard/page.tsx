@@ -93,7 +93,7 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                 </Link>
 
                 {/* Machines Needing Service */}
-                <Link href="/m?status=unplayable,needs_service">
+                <Link href="/m?status=needs_service,unplayable">
                   <Card className="border-outline-variant bg-card hover:border-primary/50 hover:glow-primary transition-[color,background-color,border-color,box-shadow] duration-150 cursor-pointer h-full">
                     <CardHeader>
                       <div className="flex items-center justify-between">

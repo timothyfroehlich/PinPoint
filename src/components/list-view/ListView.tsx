@@ -113,7 +113,15 @@ export function ListView({
 }: ListViewProps): React.JSX.Element {
   const [saveOpen, setSaveOpen] = React.useState(false);
   const [manageOpen, setManageOpen] = React.useState(false);
-  const [saveError, setSaveError] = React.useState<string | null>(null);
+  // A Save changes failure belongs to the view and edits it was made from;
+  // applying a view, discarding, or saving clears it.
+  const viewKey = `${views.appliedId}:${String(views.edited)}`;
+  const [saveFailure, setSaveFailure] = React.useState<{
+    message: string;
+    viewKey: string;
+  } | null>(null);
+  const saveError =
+    saveFailure?.viewKey === viewKey ? saveFailure.message : null;
   const [isSaving, startSaving] = React.useTransition();
   const range = getPageRange(
     pagination.page,
@@ -123,10 +131,13 @@ export function ListView({
   const empty = pagination.totalCount === 0;
 
   function saveChanges(): void {
-    setSaveError(null);
+    const savedFrom = viewKey;
+    setSaveFailure(null);
     startSaving(async () => {
       const result = await views.actions.saveChanges();
-      if (!result.ok) setSaveError(result.message);
+      if (!result.ok) {
+        setSaveFailure({ message: result.message, viewKey: savedFrom });
+      }
     });
   }
 

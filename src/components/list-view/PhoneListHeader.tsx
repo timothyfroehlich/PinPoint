@@ -20,9 +20,12 @@ import {
 } from "~/components/ui/drawer";
 import { cn } from "~/lib/utils";
 import { FilterPicker } from "./FilterPicker";
-import { capitalize } from "./ListHeader";
+import { isPlainClick } from "./links";
 import {
+  filterSelectionText,
   nounFor,
+  offersManageViews,
+  sortDirectionOptions,
   type ListDisplayModel,
   type ListFilterModel,
   type ListNoun,
@@ -43,9 +46,7 @@ const groupHeadingClass =
   "mt-4 mb-0.5 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase";
 
 /** How many filters differ from their Page Preset value (§7.3). */
-export function countActiveFilters(
-  filters: readonly ListFilterModel[]
-): number {
+function countActiveFilters(filters: readonly ListFilterModel[]): number {
   return filters.filter((filter) => !filter.atPreset).length;
 }
 
@@ -80,6 +81,7 @@ function SavedViewsSheet({
           href={views.hrefFor(view.id)}
           aria-current={current ? "page" : undefined}
           onClick={(event) => {
+            if (!isPlainClick(event)) return;
             event.preventDefault();
             close(() => views.onApply(view.id));
           }}
@@ -168,7 +170,7 @@ function SavedViewsSheet({
               <ul>{views.savedViews.map(entry)}</ul>
             </>
           ) : null}
-          {views.canSave ? (
+          {offersManageViews(views) ? (
             <button
               type="button"
               onClick={() => close(onManage)}
@@ -264,8 +266,7 @@ function RadioList({
 }
 
 function filterValue(filter: ListFilterModel): string {
-  if (filter.selected.length > 1) return `${filter.selected.length} selected`;
-  return filter.valueLabel ?? "Any";
+  return filterSelectionText(filter) ?? "Any";
 }
 
 /**
@@ -304,8 +305,11 @@ function FiltersSheet({
   const backRef = React.useRef<HTMLButtonElement>(null);
   const returnTo = React.useRef<string | null>(null);
 
+  // A closed sheet reopens at its top level with focus on its first control.
   React.useEffect(() => {
-    if (!open) setPanel({ kind: "top" });
+    if (open) return;
+    returnTo.current = null;
+    setPanel({ kind: "top" });
   }, [open]);
 
   // Moving between panels keeps focus inside the sheet: into the new panel,
@@ -336,13 +340,7 @@ function FiltersSheet({
     panel.kind === "filter"
       ? (allFilters.find((filter) => filter.id === panel.id) ?? null)
       : null;
-  const sortLabels = sort.directionLabels(sort.field);
-  const preferred = sort.preferredDirection(sort.field);
-  const directions: ListOption[] = (
-    preferred === "asc"
-      ? (["asc", "desc"] as const)
-      : (["desc", "asc"] as const)
-  ).map((dir) => ({ value: dir, label: capitalize(sortLabels[dir]) }));
+  const directions: ListOption[] = sortDirectionOptions(sort);
 
   let title = "Filter & sort";
   let body: React.ReactNode = null;
@@ -623,12 +621,10 @@ export function PhoneListHeader({
       <Bookmark aria-hidden="true" className="size-4 shrink-0" />
       <span className="truncate">{views.appliedName}</span>
       {views.edited ? (
-        <>
-          <span
-            aria-hidden="true"
-            className="size-2 shrink-0 rounded-full bg-warning"
-          />
-        </>
+        <span
+          aria-hidden="true"
+          className="size-2 shrink-0 rounded-full bg-warning"
+        />
       ) : null}
       <ChevronDown aria-hidden="true" className="size-4 shrink-0" />
     </button>

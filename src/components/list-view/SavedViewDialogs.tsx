@@ -25,13 +25,9 @@ import {
 } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import { SAVED_VIEW_NAME_MAX, type DefaultViewTarget } from "~/lib/types";
 import { cn } from "~/lib/utils";
-import type {
-  ActionOutcome,
-  DefaultViewTarget,
-  ListViewEntry,
-  ListViewsModel,
-} from "./types";
+import type { ActionOutcome, ListViewEntry, ListViewsModel } from "./types";
 
 /** Save as new (list-views §5.3, §10.1, §10.7, §10.9). */
 export function SaveViewDialog({
@@ -98,7 +94,7 @@ export function SaveViewDialog({
                 setName(event.target.value);
                 setError(null);
               }}
-              maxLength={60}
+              maxLength={SAVED_VIEW_NAME_MAX}
               required
               autoComplete="off"
               enterKeyHint="done"
@@ -239,7 +235,7 @@ function ManageViewRow({
         <Input
           aria-label="View name"
           value={name}
-          maxLength={60}
+          maxLength={SAVED_VIEW_NAME_MAX}
           autoComplete="off"
           enterKeyHint="done"
           aria-invalid={error ? true : undefined}
@@ -277,9 +273,11 @@ function ManageViewRow({
             <AlertDialogHeader>
               <AlertDialogTitle>Delete {view.name}?</AlertDialogTitle>
               <AlertDialogDescription>
-                {isDefault
-                  ? "This is your default view. This page will open to its standard view instead."
-                  : "This view will be removed permanently."}
+                {!isDefault
+                  ? "This view will be removed permanently."
+                  : views.offersDefault
+                    ? "This is your default view. This page will open to its standard view instead."
+                    : `This is your default view. ${views.defaultPageName} will open to its standard view instead.`}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

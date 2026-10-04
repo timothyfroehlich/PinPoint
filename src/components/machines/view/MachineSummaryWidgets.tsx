@@ -74,7 +74,8 @@ function playableCount(summary: MachineViewSummary): number {
 /**
  * The Summary Row: the Playability headline (machine-widgets §2.4). The
  * `compact` form fits the phone title row (list-views §7.2) as "7/9
- * playable", keeping "playable" only for assistive technology below 360px.
+ * playable", read as "7 of 9 playable", keeping "playable" only for
+ * assistive technology below 360px.
  */
 export function MachineSummaryRow({
   summary,
@@ -92,7 +93,12 @@ export function MachineSummaryRow({
             MACHINE_STATUS_COLORS.operational.text
           )}
         >
-          {playableCount(summary)}/{summary.playability.onTheFloor}
+          <span aria-hidden="true">
+            {playableCount(summary)}/{summary.playability.onTheFloor}
+          </span>
+          <span className="sr-only">
+            {`${playableCount(summary)} of ${summary.playability.onTheFloor}`}
+          </span>
         </span>{" "}
         <span className="max-[359px]:sr-only">playable</span>
       </>

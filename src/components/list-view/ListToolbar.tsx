@@ -10,13 +10,15 @@ import {
 import { fitPrimaryFilters } from "~/lib/list-view/overflow";
 import { cn } from "~/lib/utils";
 import { FilterPicker } from "./FilterPicker";
-import type { ListFilterModel } from "./types";
+import { filterSelectionText, type ListFilterModel } from "./types";
 import { useMeasuredWidths } from "./use-measured-widths";
 
 /** Search keeps at least this much of the row before filters move to More. */
 const SEARCH_MIN_WIDTH = 240;
 const GAP = 2;
 const GROUP_MARGIN = 8;
+/** The open-control id of More, which no filter id can take. */
+const MORE_ID = " more";
 
 const filterButtonClass =
   "inline-flex h-8 shrink-0 items-center gap-1 rounded-md px-1.5 text-sm whitespace-nowrap text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none data-[state=open]:bg-muted data-[state=open]:text-foreground motion-reduce:transition-none";
@@ -46,10 +48,8 @@ function CountPill({
  * reads "Playability : Needs Service".
  */
 function filterButtonName(filter: ListFilterModel): string {
-  const count = filter.selected.length;
-  if (count > 1) return `${filter.label}: ${String(count)} selected`;
-  if (filter.valueLabel) return `${filter.label}: ${filter.valueLabel}`;
-  return filter.label;
+  const text = filterSelectionText(filter);
+  return text ? `${filter.label}: ${text}` : filter.label;
 }
 
 /** A filter button's face (§4.3): the name, then the value or a count. */
@@ -63,15 +63,11 @@ function FilterButtonFace({
     <>
       <span>{filter.label}</span>
       {count > 1 ? (
-        <>
-          <CountPill count={count} active />
-        </>
+        <CountPill count={count} active />
       ) : filter.valueLabel ? (
-        <>
-          <span className="max-w-40 truncate text-foreground">
-            {filter.valueLabel}
-          </span>
-        </>
+        <span className="max-w-40 truncate text-foreground">
+          {filter.valueLabel}
+        </span>
       ) : null}
       <ChevronDown aria-hidden="true" className="size-3.5 shrink-0" />
     </>
@@ -100,11 +96,15 @@ function FilterPopoverHeader({
 
 function FilterDropdown({
   filter,
+  open,
+  onOpenChange,
 }: {
   filter: ListFilterModel;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }): React.JSX.Element {
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger
         type="button"
         aria-label={filterButtonName(filter)}
@@ -131,13 +131,23 @@ function FilterDropdown({
  */
 function MoreFilters({
   filters,
+  open,
+  onOpenChange,
 }: {
   filters: readonly ListFilterModel[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }): React.JSX.Element {
   const [openId, setOpenId] = React.useState<string | null>(null);
   const active = filters.find((filter) => filter.id === openId) ?? null;
   return (
-    <Popover onOpenChange={(open) => !open && setOpenId(null)}>
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) setOpenId(null);
+        onOpenChange(next);
+      }}
+    >
       <PopoverTrigger
         type="button"
         className={filterButtonClass}
@@ -198,9 +208,7 @@ function MoreFilters({
                       filter.atPreset ? "text-muted-foreground" : "text-primary"
                     )}
                   >
-                    {filter.selected.length > 1
-                      ? `${filter.selected.length} selected`
-                      : (filter.valueLabel ?? "Any")}
+                    {filterSelectionText(filter) ?? "Any"}
                   </span>
                   <ChevronRight
                     aria-hidden="true"
@@ -229,7 +237,9 @@ interface ListToolbarProps {
  * Search with the Primary Filters beside it (list-views §3.1, §4). Below md
  * the filters leave this row for the phone Filters sheet (§7.1, §7.5).
  * Between phone and desktop, Primary Filters that do not fit move into More
- * from the right, one at a time (§8.1).
+ * from the right, one at a time (§8.1). While a filter's options are open the
+ * row keeps its arrangement, so a choice that widens the filter never moves
+ * the open filter into More and closes it mid-selection.
  */
 export function ListToolbar({
   search,
@@ -245,9 +255,15 @@ export function ListToolbar({
     .join("|");
   const measured = useMeasuredWidths(rowRef, laneRef, contentKey);
   const hasSecondary = secondaryFilters.length > 0;
+  // The open control (More or a filter id) and the inline count it opened
+  // with, held until it closes.
+  const [open, setOpen] = React.useState<{
+    id: string;
+    inlineCount: number;
+  } | null>(null);
   // Filters that are not laid out (display: none below md) measure zero and
   // stay inline until they are shown.
-  const inlineCount =
+  const fittedCount =
     measured && measured.available > 0
       ? fitPrimaryFilters({
           available: measured.available - SEARCH_MIN_WIDTH - GROUP_MARGIN,
@@ -259,8 +275,18 @@ export function ListToolbar({
           gap: GAP,
         })
       : primaryFilters.length;
+  const inlineCount = Math.min(
+    open ? open.inlineCount : fittedCount,
+    primaryFilters.length
+  );
   const inline = primaryFilters.slice(0, inlineCount);
   const overflow = [...primaryFilters.slice(inlineCount), ...secondaryFilters];
+  const openChange =
+    (id: string) =>
+    (next: boolean): void => {
+      if (next) setOpen({ id, inlineCount });
+      else setOpen((current) => (current?.id === id ? null : current));
+    };
 
   return (
     <div ref={rowRef} className="relative flex items-center gap-2">
@@ -271,9 +297,20 @@ export function ListToolbar({
         className="hidden shrink-0 items-center gap-0.5 md:flex"
       >
         {inline.map((filter) => (
-          <FilterDropdown key={filter.id} filter={filter} />
+          <FilterDropdown
+            key={filter.id}
+            filter={filter}
+            open={open?.id === filter.id}
+            onOpenChange={openChange(filter.id)}
+          />
         ))}
-        {overflow.length > 0 ? <MoreFilters filters={overflow} /> : null}
+        {overflow.length > 0 ? (
+          <MoreFilters
+            filters={overflow}
+            open={open?.id === MORE_ID}
+            onOpenChange={openChange(MORE_ID)}
+          />
+        ) : null}
       </div>
       {/* Exact widths of every control, kept out of the accessibility tree
           and clipped so it never widens the page. */}

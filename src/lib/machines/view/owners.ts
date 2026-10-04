@@ -3,17 +3,10 @@ import "server-only";
 import { inArray } from "drizzle-orm";
 import type { DbTransaction } from "~/server/db";
 import { invitedUsers, userProfiles } from "~/server/db/schema";
+import { ME_OWNER_ID, UNASSIGNED_OWNER_ID } from "./config";
 
-/** The owner filter value for machines with no owner. */
-export const UNASSIGNED_OWNER_ID = "unassigned";
 export const UNASSIGNED_OWNER_NAME = "Unassigned";
-/**
- * The owner filter value for whoever is viewing (machine-views §4.2). It is
- * resolved per viewer when the filter runs, so one URL or Saved View means
- * each signed-in person's own machines, and nothing for anonymous visitors.
- */
-export const ME_OWNER_ID = "me";
-export const ME_OWNER_NAME = "Me";
+const ME_OWNER_NAME = "Me";
 
 // Postgres rejects a malformed uuid literal, so only UUID-shaped values are
 // looked up; anything else cannot name a person.

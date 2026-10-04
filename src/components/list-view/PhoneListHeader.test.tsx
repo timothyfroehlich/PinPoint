@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { PhoneListHeader } from "./PhoneListHeader";
@@ -51,6 +51,7 @@ function views(overrides: Partial<ListViewsModel> = {}): ListViewsModel {
     edited: false,
     canSave: true,
     offersDefault: true,
+    defaultPageName: "Issues",
     defaultViewId: "mine",
     hrefFor: (id) => `/list?view=${id}`,
     onApply: vi.fn(),
@@ -173,6 +174,37 @@ describe("PhoneListHeader", () => {
     expect(
       within(sheet).queryByRole("button", { name: "Manage views…" })
     ).not.toBeInTheDocument();
+  });
+
+  it("offers Manage views only when there is something to manage (§10.8)", async () => {
+    const user = userEvent.setup();
+    // Off the main page, with no Saved View to rename or delete.
+    renderHeader({ views: views({ offersDefault: false, savedViews: [] }) });
+
+    await user.click(screen.getByTestId("list-phone-views-trigger"));
+    const sheet = await screen.findByRole("dialog", { name: "Saved views" });
+    expect(
+      within(sheet).queryByRole("button", { name: "Manage views…" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("leaves a modified click on a view to the browser", async () => {
+    const user = userEvent.setup();
+    const model = views();
+    renderHeader({ views: model });
+
+    await user.click(screen.getByTestId("list-phone-views-trigger"));
+    const sheet = await screen.findByRole("dialog", { name: "Saved views" });
+    const link = within(sheet).getByRole("link", { name: "Open issues" });
+    // jsdom cannot open a new tab, so the test stands in for the browser.
+    link.addEventListener("click", (event) => event.preventDefault(), {
+      once: true,
+    });
+    fireEvent.click(link, { metaKey: true });
+    expect(model.onApply).not.toHaveBeenCalled();
+
+    await user.click(link);
+    expect(model.onApply).toHaveBeenCalledWith("open");
   });
 
   it("announces the Edited marker and the count of filters off their preset (§7.3, §7.4)", () => {

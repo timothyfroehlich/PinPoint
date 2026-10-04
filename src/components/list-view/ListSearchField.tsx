@@ -4,14 +4,24 @@ import * as React from "react";
 import { Search } from "lucide-react";
 import { Input } from "~/components/ui/input";
 
-export const SEARCH_DEBOUNCE_MS = 250;
+const SEARCH_DEBOUNCE_MS = 250;
 
 interface ListSearchFieldProps {
   id: string;
   /** The search the list currently shows. */
   value: string;
-  /** Runs a search; called 250 ms after typing stops, or on Enter (§4.1). */
+  /**
+   * Runs a search; called 250 ms after typing stops, or on Enter (§4.1). A
+   * delayed search calls the latest `onSearch`, so it joins whatever else
+   * changed while it waited.
+   */
   onSearch: (query: string) => void;
+  /**
+   * Changes when the list moves to another configuration as a whole (a view
+   * applied, changes discarded). A search still waiting is dropped and the
+   * field shows `value`, so typing never undoes that move.
+   */
+  resetKey?: string | number | undefined;
   /** Accessible name, such as "Search machines". */
   label: string;
   /** Names what the search covers (§4.2). */
@@ -28,12 +38,17 @@ export function ListSearchField({
   id,
   value,
   onSearch,
+  resetKey,
   label,
   placeholder,
 }: ListSearchFieldProps): React.JSX.Element {
   const [text, setText] = React.useState(value);
   const submitted = React.useRef(value);
   const timeout = React.useRef<number | null>(null);
+  const onSearchRef = React.useRef(onSearch);
+  React.useLayoutEffect(() => {
+    onSearchRef.current = onSearch;
+  }, [onSearch]);
 
   const clearPending = React.useCallback((): void => {
     if (timeout.current !== null) window.clearTimeout(timeout.current);
@@ -47,15 +62,24 @@ export function ListSearchField({
     setText(value);
   }, [clearPending, value]);
 
+  const lastResetKey = React.useRef(resetKey);
+  React.useEffect(() => {
+    if (resetKey === lastResetKey.current) return;
+    lastResetKey.current = resetKey;
+    clearPending();
+    submitted.current = value;
+    setText(value);
+  }, [clearPending, resetKey, value]);
+
   const submit = React.useCallback(
     (raw: string): void => {
       clearPending();
       const query = raw.trim();
       if (query === submitted.current) return;
       submitted.current = query;
-      onSearch(query);
+      onSearchRef.current(query);
     },
-    [clearPending, onSearch]
+    [clearPending]
   );
 
   React.useEffect(() => clearPending, [clearPending]);

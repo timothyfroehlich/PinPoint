@@ -4,6 +4,8 @@
  * List View knows nothing about machines or issues.
  */
 
+import type { DefaultViewTarget } from "~/lib/types";
+
 export type SortDirection = "asc" | "desc";
 
 /** One choice in a filter, sort, or display control. */
@@ -40,11 +42,6 @@ export type ActionOutcome = { ok: true } | { ok: false; message: string };
 export type ActionOutcomeWith<T> =
   { ok: true; value: T } | { ok: false; message: string };
 
-export type DefaultViewTarget = {
-  kind: "saved" | "builtIn";
-  id: string;
-} | null;
-
 /** The Saved View writes a host wires to its own Server Actions (§10). */
 export interface SavedViewActions {
   saveChanges: () => Promise<ActionOutcome>;
@@ -75,6 +72,8 @@ export interface ListViewsModel {
   canSave: boolean;
   /** Default View controls show only on the host's main page (§10.8). */
   offersDefault: boolean;
+  /** The host's main page, where the Default View opens, such as "Machines". */
+  defaultPageName: string;
   defaultViewId: string | null;
   /** The canonical URL that opens a view at page 1 (§9.5, §10.6). */
   hrefFor: (id: string) => string;
@@ -140,15 +139,54 @@ export function nounFor(noun: ListNoun, count: number): string {
 }
 
 /**
- * The value a filter control shows (§4.3): the one value's label, or a count
- * of values. Values the options no longer list still count.
+ * A filter's `valueLabel` (§4.3): the label of its one selected value. More
+ * than one value shows as a count instead (`filterSelectionText`). A value
+ * the options no longer list still counts.
  */
 export function describeSelection(
   selected: readonly string[],
   options: readonly ListOption[]
 ): string | null {
-  if (selected.length === 0) return null;
-  if (selected.length > 1) return String(selected.length);
+  if (selected.length !== 1) return null;
   const [only] = selected;
   return options.find((option) => option.value === only)?.label ?? "1";
+}
+
+/**
+ * What a filter's control says it holds (§4.3, §4.6): "3 selected", the one
+ * value, or null when nothing is selected.
+ */
+export function filterSelectionText(
+  filter: Pick<ListFilterModel, "selected" | "valueLabel">
+): string | null {
+  if (filter.selected.length > 1) {
+    return `${filter.selected.length} selected`;
+  }
+  return filter.valueLabel;
+}
+
+/**
+ * Whether Manage views has anything to offer: the Default View on the host's
+ * main page, or a Saved View to rename or delete (§10.8).
+ */
+export function offersManageViews(views: ListViewsModel): boolean {
+  return views.canSave && (views.offersDefault || views.savedViews.length > 0);
+}
+
+/**
+ * The sort directions for the current field, its preferred direction first
+ * (§9.8). Direction words read as a phrase on the trigger ("Name, newest")
+ * and stand alone, capitalized, in menus.
+ */
+export function sortDirectionOptions(
+  sort: ListSortModel
+): { value: SortDirection; label: string }[] {
+  const labels = sort.directionLabels(sort.field);
+  const preferred = sort.preferredDirection(sort.field);
+  const order: SortDirection[] =
+    preferred === "asc" ? ["asc", "desc"] : ["desc", "asc"];
+  return order.map((dir) => ({
+    value: dir,
+    label: labels[dir].charAt(0).toUpperCase() + labels[dir].slice(1),
+  }));
 }

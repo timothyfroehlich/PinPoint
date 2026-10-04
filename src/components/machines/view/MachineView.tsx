@@ -38,6 +38,9 @@ import {
 } from "~/lib/machines/view/sort-labels";
 import {
   hasMachineViewConfiguration,
+  isMachineViewField,
+  isMachineViewPageSize,
+  MACHINE_VIEW_PAGE_SIZES,
   machineViewSavedStatesEqual,
   nextMachineViewSort,
   savedMachineViewSearchParams,
@@ -45,15 +48,12 @@ import {
   toMachineViewSavedState,
 } from "~/lib/machines/view/state";
 import type {
-  MachineViewFieldId,
-  MachineViewPageSize,
   MachineViewPresetId,
   MachineViewResult,
   MachineViewSavedState,
   MachineViewSavedViews,
   MachineViewState,
 } from "~/lib/types";
-import { MACHINE_VIEW_FIELD_IDS } from "~/lib/types";
 import {
   MACHINE_SUMMARY_STORAGE_KEY,
   MachineSummaryRow,
@@ -65,7 +65,6 @@ import type { MachineSelectionHandler } from "./field-catalog";
 import { buildMachineFilters } from "./machine-filters";
 
 const MOBILE_MODE_STORAGE_KEY = "pinpoint:machine-view:mobile-mode";
-const PAGE_SIZES: readonly MachineViewPageSize[] = [25, 50, 100];
 const NOUN = { one: "machine", other: "machines" } as const;
 
 type MobileMode = "compact" | "table";
@@ -93,12 +92,32 @@ interface AppliedView {
   isSaved: boolean;
 }
 
-function isPageSize(value: number): value is MachineViewPageSize {
-  return PAGE_SIZES.some((size) => size === value);
-}
-
-function isFieldId(value: string): value is MachineViewFieldId {
-  return MACHINE_VIEW_FIELD_IDS.some((field) => field === value);
+/**
+ * The `view` reference a list URL carries (list-views §9.6). A URL with no
+ * view configuration opens the account's Default View on the Machines page
+ * (§10.10), so while one exists a list at its Page Preset names the Page
+ * Preset's view rather than send the person to their default.
+ */
+function urlViewReference(
+  state: MachineViewState,
+  view: string | null,
+  surface: {
+    preset: MachineViewPresetId;
+    pagePresetId: string;
+    savedViews: Pick<MachineViewSavedViews, "offersDefault" | "defaultViewId">;
+  }
+): string | null {
+  if (
+    view === null &&
+    surface.savedViews.offersDefault &&
+    surface.savedViews.defaultViewId !== null &&
+    !hasMachineViewConfiguration(
+      serializeMachineViewState(state, surface.preset)
+    )
+  ) {
+    return surface.pagePresetId;
+  }
+  return view;
 }
 
 /**
@@ -121,6 +140,8 @@ export function MachineView({
   const rootRef = React.useRef<HTMLDivElement>(null);
   const [state, setState] = React.useState(result.state);
   const [mobileMode, setMobileMode] = React.useState<MobileMode>("compact");
+  // Changes when a view is applied or changes are discarded (ListSearchField).
+  const [searchReset, setSearchReset] = React.useState(0);
   const summaryController = useSummaryWidgetsController(
     MACHINE_SUMMARY_STORAGE_KEY
   );
@@ -163,18 +184,14 @@ export function MachineView({
     preset
   );
 
+  const { offersDefault, defaultViewId } = savedViews;
   const navigate = React.useCallback(
     (next: MachineViewState, view: string | null): void => {
-      // A URL with no view configuration opens the account's Default View
-      // on the Machines page (§10.10), so a list returned to its Page Preset
-      // names that view rather than send the person to their default.
-      const explicitView =
-        view === null &&
-        savedViews.offersDefault &&
-        savedViews.defaultViewId !== null &&
-        !hasMachineViewConfiguration(serializeMachineViewState(next, preset))
-          ? pagePresetId
-          : view;
+      const explicitView = urlViewReference(next, view, {
+        preset,
+        pagePresetId,
+        savedViews: { offersDefault, defaultViewId },
+      });
       setViewId(explicitView);
       setState(next);
       const query = serializeMachineViewState(
@@ -189,14 +206,7 @@ export function MachineView({
         });
       });
     },
-    [
-      pagePresetId,
-      pathname,
-      preset,
-      router,
-      savedViews.defaultViewId,
-      savedViews.offersDefault,
-    ]
+    [defaultViewId, offersDefault, pagePresetId, pathname, preset, router]
   );
 
   const update = (partial: Partial<MachineViewState>, resetPage = true): void =>
@@ -210,18 +220,32 @@ export function MachineView({
     );
 
   // Rewrites older or invalid parameters and out-of-range pages to the
-  // canonical URL (§9.3, §9.4).
+  // canonical URL (§9.3, §9.4), naming the view as navigation does.
   React.useEffect(() => {
     const canonical = serializeMachineViewState(
       result.state,
       preset,
-      serverViewId
+      urlViewReference(result.state, serverViewId, {
+        preset,
+        pagePresetId,
+        savedViews: { offersDefault, defaultViewId },
+      })
     ).toString();
     if (canonical === searchParams.toString()) return;
     router.replace(canonical ? `${pathname}?${canonical}` : pathname, {
       scroll: false,
     });
-  }, [pathname, preset, result.state, router, searchParams, serverViewId]);
+  }, [
+    defaultViewId,
+    offersDefault,
+    pagePresetId,
+    pathname,
+    preset,
+    result.state,
+    router,
+    searchParams,
+    serverViewId,
+  ]);
 
   // Returning to this list within the tab session reopens this URL (§11.1).
   React.useEffect(() => {
@@ -264,21 +288,23 @@ export function MachineView({
     dir: state.dir,
     label: machineSortLabel(state.sort, state.dir),
     directionLabels: (field) =>
-      isFieldId(field)
+      isMachineViewField(field)
         ? machineSortDirectionLabels(field)
         : { asc: "Ascending", desc: "Descending" },
     preferredDirection: (field) =>
-      isFieldId(field) ? MACHINE_VIEW_FIELDS[field].preferredDirection : "asc",
+      isMachineViewField(field)
+        ? MACHINE_VIEW_FIELDS[field].preferredDirection
+        : "asc",
     onChange: (field, dir) => {
-      if (isFieldId(field)) update({ sort: field, dir });
+      if (isMachineViewField(field)) update({ sort: field, dir });
     },
   };
 
   const display: ListDisplayModel = {
     pageSize: state.pageSize,
-    pageSizes: PAGE_SIZES,
+    pageSizes: MACHINE_VIEW_PAGE_SIZES,
     onPageSizeChange: (pageSize) => {
-      if (isPageSize(pageSize)) update({ pageSize });
+      if (isMachineViewPageSize(pageSize)) update({ pageSize });
     },
     fields: {
       options: result.permittedFields
@@ -290,7 +316,7 @@ export function MachineView({
       selected: state.columns.filter((field) => field !== "machine"),
       // Displayed fields keep the page (§4.8).
       onToggle: (value, checked) => {
-        if (!isFieldId(value)) return;
+        if (!isMachineViewField(value)) return;
         const columns = checked
           ? [...new Set([...state.columns, value])]
           : state.columns.filter((column) => column !== value);
@@ -335,15 +361,22 @@ export function MachineView({
     appliedIsSaved: applied.isSaved,
     edited,
     canSave: savedViews.canSave,
-    offersDefault: savedViews.offersDefault,
-    defaultViewId: savedViews.defaultViewId,
+    offersDefault,
+    defaultPageName: "Machines",
+    defaultViewId,
     hrefFor,
-    // Applying a view opens it at page 1 (§10.6).
+    // Applying a view opens it at page 1 (§10.6). Both moves drop a search
+    // still waiting to run (list-views §4.1).
     onApply: (id) => {
       const view = findView(id);
-      if (view) navigate({ ...view.state, page: 1 }, view.id);
+      if (!view) return;
+      setSearchReset((key) => key + 1);
+      navigate({ ...view.state, page: 1 }, view.id);
     },
-    onDiscard: () => navigate({ ...applied.state, page: 1 }, applied.id),
+    onDiscard: () => {
+      setSearchReset((key) => key + 1);
+      navigate({ ...applied.state, page: 1 }, applied.id);
+    },
     actions: {
       saveChanges: async () => {
         if (!applied.isSaved) {
@@ -416,6 +449,7 @@ export function MachineView({
             id="machine-view-search"
             value={state.q}
             onSearch={(q) => update({ q })}
+            resetKey={searchReset}
             label="Search machines"
             placeholder="Search names, initials, manufacturers"
           />

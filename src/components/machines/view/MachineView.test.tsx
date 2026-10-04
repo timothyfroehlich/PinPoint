@@ -5,6 +5,7 @@ import {
   getMachineViewBuiltInViews,
   getMachineViewPreset,
 } from "~/lib/machines/view/config";
+import { toMachineViewSavedState } from "~/lib/machines/view/state";
 import type {
   MachineViewPresetId,
   MachineViewResult,
@@ -75,6 +76,7 @@ Object.defineProperty(window, "sessionStorage", {
 });
 
 const presetState = getMachineViewPreset("machines").defaultState;
+const collectionState = getMachineViewPreset("collection").defaultState;
 
 const brokenView: MachineViewSavedViewSummary = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -175,6 +177,14 @@ function renderView(
       title={options.title}
     />
   );
+}
+
+async function openManageViews(
+  user: ReturnType<typeof userEvent.setup>
+): Promise<HTMLElement> {
+  await user.click(screen.getByTestId("list-more-views"));
+  await user.click(screen.getByRole("menuitem", { name: "Manage views…" }));
+  return screen.findByRole("dialog", { name: "Manage views" });
 }
 
 describe("MachineView", () => {
@@ -382,12 +392,15 @@ describe("MachineView", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "Machines" })
     ).toBeInTheDocument();
-    const toggle = screen.getByRole("button", {
-      name: "Summary: 2/2 playable",
-    });
-    const groupToggle = screen.getByRole("button", {
+    // The title row's toggle shows "2/2 playable" and reads "2 of 2".
+    const [toggle, groupToggle] = screen.getAllByRole("button", {
       name: "Summary: 2 of 2 playable",
     });
+    if (!toggle || !groupToggle) throw new Error("Summary Row toggles missing");
+    expect(within(toggle).getByText("2/2")).toHaveAttribute(
+      "aria-hidden",
+      "true"
+    );
     // Both control the same section; the group's own hides on phones.
     expect(toggle.getAttribute("aria-controls")).toBe(
       groupToggle.getAttribute("aria-controls")
@@ -498,6 +511,292 @@ describe("MachineView", () => {
       "/m?view=on-the-floor",
       { scroll: false }
     );
+  });
+
+  it("joins a waiting search to a filter chosen meanwhile (list-views §4.1)", () => {
+    vi.useFakeTimers();
+    renderView();
+
+    fireEvent.change(
+      screen.getByRole("searchbox", { name: /search machines/i }),
+      { target: { value: "stern" } }
+    );
+    fireEvent.click(
+      within(screen.getByRole("region", { name: "Playability" })).getByRole(
+        "button",
+        { name: "1 Needs Service" }
+      )
+    );
+    act(() => vi.advanceTimersByTime(250));
+
+    expect(navigation.replace).toHaveBeenLastCalledWith(
+      "/m?q=stern&status=needs_service",
+      { scroll: false }
+    );
+  });
+
+  it("drops a waiting search when changes are discarded (list-views §5.4)", () => {
+    vi.useFakeTimers();
+    navigation.searchParams = new URLSearchParams({ severity: "major" });
+    renderView({
+      result: result({ state: { ...presetState, severity: ["major"] } }),
+    });
+    const search = screen.getByRole("searchbox", { name: /search machines/i });
+
+    fireEvent.change(search, { target: { value: "stern" } });
+    fireEvent.click(screen.getByRole("button", { name: "Discard changes" }));
+    act(() => vi.advanceTimersByTime(250));
+
+    expect(navigation.replace).toHaveBeenLastCalledWith(
+      "/m?view=on-the-floor",
+      { scroll: false }
+    );
+    expect(search).toHaveValue("");
+  });
+
+  it("names the Page Preset's view when it rewrites a URL to its canonical form while a Default View exists (list-views §9.3, §10.10)", () => {
+    // presence=on_the_floor is the Page Preset's own value, so the canonical
+    // URL drops it; a bare /m would open the Default View instead.
+    navigation.searchParams = new URLSearchParams({ presence: "on_the_floor" });
+    renderView({ views: savedViews({ defaultViewId: brokenView.id }) });
+
+    expect(navigation.replace).toHaveBeenLastCalledWith(
+      "/m?view=on-the-floor",
+      { scroll: false }
+    );
+  });
+
+  it("keeps a Saved View unedited when a filter value is turned off and on again (list-views §5.2)", async () => {
+    const user = userEvent.setup();
+    const twoOwners: MachineViewSavedViewSummary = {
+      id: "33333333-3333-4333-8333-333333333333",
+      name: "Two owners",
+      state: { ...brokenView.state, status: [], owner: ["owner-1", "owner-2"] },
+    };
+    navigation.searchParams = new URLSearchParams([
+      ["owner", "owner-1,owner-2"],
+      ["view", twoOwners.id],
+    ]);
+    renderView({
+      result: result({
+        state: { ...presetState, owner: ["owner-1", "owner-2"] },
+        // Listed by name, which is not the owners' canonical order.
+        ownerOptions: [
+          { id: "owner-2", name: "Alex" },
+          { id: "owner-1", name: "Blair" },
+        ],
+      }),
+      views: savedViews({ views: [twoOwners], activeViewId: twoOwners.id }),
+    });
+
+    await user.click(screen.getByTestId("list-filter-owner"));
+    const options = screen.getByRole("group", { name: "Owner options" });
+    await user.click(within(options).getByRole("checkbox", { name: "Blair" }));
+    await user.click(within(options).getByRole("checkbox", { name: "Blair" }));
+
+    expect(navigation.replace).toHaveBeenLastCalledWith(
+      `/m?owner=owner-1%2Cowner-2&view=${twoOwners.id}`,
+      { scroll: false }
+    );
+    const tabs = screen.getByRole("navigation", { name: "Saved views" });
+    expect(
+      within(tabs).getByRole("link", { current: "page" })
+    ).toHaveTextContent(/^Two owners$/);
+  });
+
+  it("keeps the page for displayed fields and returns to page 1 for a new page size (list-views §4.7, §4.8)", async () => {
+    const user = userEvent.setup();
+    navigation.searchParams = new URLSearchParams({ page: "3" });
+    renderView({
+      result: result({ state: { ...presetState, page: 3 }, totalCount: 100 }),
+    });
+    const columns =
+      "machine%2Cplayability%2Cpresence%2CopenIssues%2ClastServiced%2ClastActivity%2Cowner";
+
+    await user.click(screen.getByRole("button", { name: "View options" }));
+    await user.click(screen.getByRole("menuitemcheckbox", { name: "Owner" }));
+    expect(navigation.replace).toHaveBeenLastCalledWith(
+      `/m?page=3&columns=${columns}`,
+      { scroll: false }
+    );
+
+    await user.click(screen.getByRole("menuitemradio", { name: "50" }));
+    expect(navigation.replace).toHaveBeenLastCalledWith(
+      `/m?pageSize=50&columns=${columns}`,
+      { scroll: false }
+    );
+  });
+
+  it("returns to page 1 when a filter changes (list-views §4.7)", async () => {
+    const user = userEvent.setup();
+    navigation.searchParams = new URLSearchParams({ page: "3" });
+    renderView({
+      result: result({ state: { ...presetState, page: 3 }, totalCount: 100 }),
+    });
+
+    await user.click(screen.getByTestId("list-filter-status"));
+    await user.click(screen.getByRole("checkbox", { name: "Unplayable" }));
+
+    expect(navigation.replace).toHaveBeenLastCalledWith(
+      "/m?status=unplayable",
+      {
+        scroll: false,
+      }
+    );
+  });
+
+  it("shows a Save changes failure until the view changes (list-views §5.3)", async () => {
+    const user = userEvent.setup();
+    actions.updateSavedMachineViewAction.mockResolvedValue({
+      ok: false,
+      message: "View not found.",
+    });
+    navigation.searchParams = new URLSearchParams([
+      ["q", "stern"],
+      ["status", "unplayable"],
+      ["view", brokenView.id],
+    ]);
+    renderView({
+      result: result({
+        state: { ...presetState, q: "stern", status: ["unplayable"] },
+      }),
+      views: savedViews({ activeViewId: brokenView.id }),
+    });
+
+    await user.click(screen.getByTestId("list-save-view"));
+    await user.click(screen.getByRole("menuitem", { name: "Save changes" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "View not found."
+    );
+
+    await user.click(screen.getByRole("button", { name: "Discard changes" }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("keeps the Save view dialog open with the error when the name is taken (list-views §10.7)", async () => {
+    const user = userEvent.setup();
+    actions.createSavedMachineViewAction.mockResolvedValue({
+      ok: false,
+      message: "A view with this name already exists",
+    });
+    navigation.searchParams = new URLSearchParams({ q: "mars" });
+    renderView({ result: result({ state: { ...presetState, q: "mars" } }) });
+
+    await user.click(screen.getByTestId("list-save-view"));
+    await user.click(screen.getByRole("menuitem", { name: "Save as new…" }));
+    await user.type(
+      screen.getByRole("textbox", { name: /name/i }),
+      "Broken machines"
+    );
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "A view with this name already exists"
+    );
+    expect(
+      screen.getByRole("dialog", { name: "Save view" })
+    ).toBeInTheDocument();
+    expect(navigation.replace).not.toHaveBeenCalled();
+  });
+
+  it("deletes a Saved View only after confirmation (list-views §10.8)", async () => {
+    const user = userEvent.setup();
+    actions.deleteSavedMachineViewAction.mockResolvedValue({ ok: true });
+    renderView();
+
+    const dialog = await openManageViews(user);
+    await user.click(
+      within(dialog).getByRole("button", { name: "Delete Broken machines" })
+    );
+    expect(actions.deleteSavedMachineViewAction).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(actions.deleteSavedMachineViewAction).not.toHaveBeenCalled();
+
+    await user.click(
+      screen.getByRole("button", { name: "Delete Broken machines" })
+    );
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    expect(actions.deleteSavedMachineViewAction).toHaveBeenCalledWith(
+      brokenView.id
+    );
+    await vi.waitFor(() => expect(navigation.refresh).toHaveBeenCalled());
+  });
+
+  it("makes a Built-in View the default from Manage views (list-views §10.9)", async () => {
+    const user = userEvent.setup();
+    actions.setMachineViewDefaultAction.mockResolvedValue({ ok: true });
+    renderView();
+
+    const dialog = await openManageViews(user);
+    await user.click(
+      within(dialog).getByRole("button", {
+        name: "Open Service due by default",
+      })
+    );
+
+    expect(actions.setMachineViewDefaultAction).toHaveBeenCalledWith({
+      target: { kind: "builtIn", id: "service-due" },
+    });
+    await vi.waitFor(() => expect(navigation.refresh).toHaveBeenCalled());
+  });
+
+  it("offers no Default View controls off the Machines page (list-views §10.8)", async () => {
+    const user = userEvent.setup();
+    actions.createSavedMachineViewAction.mockResolvedValue({
+      ok: true,
+      value: { id: "22222222-2222-4222-8222-222222222222" },
+    });
+    navigation.searchParams = new URLSearchParams({ q: "mars" });
+    renderView({
+      preset: "collection",
+      result: result({ state: { ...collectionState, q: "mars" } }),
+      views: savedViews({ defaultViewId: brokenView.id }, "collection"),
+    });
+
+    // The account's Saved View is listed, but not marked as a default here.
+    await user.click(screen.getByTestId("list-more-views"));
+    expect(
+      screen.getByRole("menuitem", { name: "Broken machines" })
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("menuitem", { name: "Manage views…" }));
+    const dialog = await screen.findByRole("dialog", { name: "Manage views" });
+    expect(
+      within(dialog).queryByRole("button", { name: /by default$/ })
+    ).not.toBeInTheDocument();
+    // Deleting the Default View here names the page it opens on.
+    await user.click(
+      within(dialog).getByRole("button", { name: "Delete Broken machines" })
+    );
+    expect(
+      await screen.findByText(
+        "This is your default view. Machines will open to its standard view instead."
+      )
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await user.click(screen.getByRole("button", { name: "Done" }));
+
+    await user.click(screen.getByTestId("list-save-view"));
+    await user.click(screen.getByRole("menuitem", { name: "Save as new…" }));
+    expect(
+      screen.queryByLabelText("Open this view by default")
+    ).not.toBeInTheDocument();
+    await user.type(screen.getByRole("textbox", { name: /name/i }), "Mine");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expect(actions.createSavedMachineViewAction).toHaveBeenCalledWith({
+      name: "Mine",
+      state: toMachineViewSavedState({ ...collectionState, q: "mars" }),
+      makeDefault: false,
+    });
+  });
+
+  it("offers neither More views nor Manage views off the Machines page without a Saved View (list-views §10.8)", () => {
+    renderView({
+      preset: "collection",
+      result: result({ state: collectionState }),
+      views: savedViews({ views: [] }, "collection"),
+    });
+
+    expect(screen.queryByTestId("list-more-views")).not.toBeInTheDocument();
   });
 
   it("offers Me and Unassigned as Owner shortcuts and writes the me sentinel (machine-views §3.13, §4.2)", async () => {

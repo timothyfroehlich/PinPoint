@@ -6,6 +6,9 @@ export const LIST_HOSTS = ["machines", "issues"] as const;
 
 export type ListHost = (typeof LIST_HOSTS)[number];
 
+/** Longest Saved View name accepted (list-views §10.7). */
+export const SAVED_VIEW_NAME_MAX = 60;
+
 /**
  * A Saved View as storage returns it. `state` is the host's View
  * Configuration exactly as it was stored; each host re-validates it before

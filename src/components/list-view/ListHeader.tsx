@@ -16,14 +16,16 @@ import {
 } from "~/components/ui/dropdown-menu";
 import { planListHeader } from "~/lib/list-view/overflow";
 import { cn } from "~/lib/utils";
+import { isPlainClick } from "./links";
 import { CompactPager, RangeTextFace } from "./ListPager";
-import type {
-  ListDisplayModel,
-  ListPaginationModel,
-  ListSortModel,
-  ListViewEntry,
-  ListViewsModel,
-  SortDirection,
+import {
+  offersManageViews,
+  sortDirectionOptions,
+  type ListDisplayModel,
+  type ListPaginationModel,
+  type ListSortModel,
+  type ListViewEntry,
+  type ListViewsModel,
 } from "./types";
 import { useMeasuredWidths } from "./use-measured-widths";
 
@@ -37,22 +39,6 @@ const ghostButtonClass =
   "inline-flex h-8 shrink-0 items-center gap-1 rounded-md px-1.5 text-sm whitespace-nowrap text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none data-[state=open]:bg-muted data-[state=open]:text-foreground motion-reduce:transition-none";
 const iconButtonClass =
   "inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none data-[state=open]:bg-muted data-[state=open]:text-foreground motion-reduce:transition-none";
-
-/** Direction words read as a phrase on the trigger ("Name, newest") and stand alone in menus. */
-export function capitalize(text: string): string {
-  return text.charAt(0).toUpperCase() + text.slice(1);
-}
-
-/** A plain left click applies in place; modified clicks keep the link's own behavior. */
-function isPlainClick(event: React.MouseEvent): boolean {
-  return (
-    event.button === 0 &&
-    !event.metaKey &&
-    !event.ctrlKey &&
-    !event.shiftKey &&
-    !event.altKey
-  );
-}
 
 function TabFace({
   name,
@@ -74,12 +60,7 @@ function TabFace({
 }
 
 /** The sort control (list-views §5.5; machine-views §3.14). */
-export function SortMenu({ sort }: { sort: ListSortModel }): React.JSX.Element {
-  const labels = sort.directionLabels(sort.field);
-  // The field's preferred direction first (§9.8).
-  const preferred = sort.preferredDirection(sort.field);
-  const directions: SortDirection[] =
-    preferred === "asc" ? ["asc", "desc"] : ["desc", "asc"];
+function SortMenu({ sort }: { sort: ListSortModel }): React.JSX.Element {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -114,9 +95,9 @@ export function SortMenu({ sort }: { sort: ListSortModel }): React.JSX.Element {
             if (dir === "asc" || dir === "desc") sort.onChange(sort.field, dir);
           }}
         >
-          {directions.map((dir) => (
-            <DropdownMenuRadioItem key={dir} value={dir}>
-              {capitalize(labels[dir])}
+          {sortDirectionOptions(sort).map((dir) => (
+            <DropdownMenuRadioItem key={dir.value} value={dir.value}>
+              {dir.label}
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>
@@ -126,7 +107,7 @@ export function SortMenu({ sort }: { sort: ListSortModel }): React.JSX.Element {
 }
 
 /** View options (list-views §5.6, §5.7): page size and displayed fields. */
-export function ViewOptionsMenu({
+function ViewOptionsMenu({
   display,
 }: {
   display: ListDisplayModel;
@@ -239,7 +220,9 @@ function MoreViewsMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-64">
         {overflowBuiltIns.map(entry)}
-        {views.canSave ? (
+        {/* The Saved Views section shows once there is something to manage
+            (§10.8): a Saved View, or the Default View on the main page. */}
+        {offersManageViews(views) ? (
           <>
             {overflowBuiltIns.length > 0 ? <DropdownMenuSeparator /> : null}
             <DropdownMenuLabel>Saved views</DropdownMenuLabel>
@@ -350,11 +333,15 @@ export function ListHeader({
     0,
     tabs.findIndex((view) => view.id === views.appliedId)
   );
+  // More views always holds the Saved Views section once there is anything
+  // to manage; otherwise it shows only for Built-in Views that do not fit.
+  const moreViewsAlways = offersManageViews(views);
   const contentKey = [
     ...tabs.map((tab) => tab.name),
     views.appliedId,
     String(views.edited),
     String(views.canSave),
+    String(moreViewsAlways),
     sort.label,
     String(pagination.totalCount),
     String(pagination.page),
@@ -371,7 +358,7 @@ export function ListHeader({
           tabWidths: tabs.map((_, index) => width(`tab-${index}`)),
           appliedIndex,
           moreViewsWidth: width("more-views"),
-          moreViewsAlways: views.canSave,
+          moreViewsAlways,
           editWidth: views.edited ? width("edit") : 0,
           editCompactWidth: views.edited ? width("edit-compact") : 0,
           pagerWidths: {
@@ -383,7 +370,7 @@ export function ListHeader({
         })
       : {
           visibleTabs: tabs.map((_, index) => index),
-          showMoreViews: views.canSave,
+          showMoreViews: moreViewsAlways,
           pager: "full" as const,
           compactEdit: false,
         };

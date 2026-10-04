@@ -339,7 +339,11 @@ describe("machine view database pipeline", () => {
       }),
     });
 
-    expect(result.state.owner).toEqual([ownerTwoId, invitedId, "unassigned"]);
+    // Canonical order: Unassigned, then people by id.
+    expect(result.state.owner).toEqual([
+      "unassigned",
+      ...[ownerTwoId, invitedId].sort(),
+    ]);
     expect(result.rows).toEqual([]);
     expect(result.totalCount).toBe(0);
     // The scope still bounds the tab; the filter never widens it.
@@ -367,7 +371,7 @@ describe("machine view database pipeline", () => {
       }),
     });
 
-    expect(result.state.owner).toEqual([ownerOneId, ownerTwoId]);
+    expect(result.state.owner).toEqual([ownerOneId, ownerTwoId].sort());
     // Beta belongs to Owner One but is outside the Collection.
     expect(result.rows.map((row) => row.initials)).toEqual(["AAA", "CCC"]);
   });

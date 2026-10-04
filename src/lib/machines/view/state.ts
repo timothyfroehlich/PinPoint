@@ -16,17 +16,34 @@ import type { MachineStatus } from "~/lib/machines/status";
 import {
   getMachineViewPreset,
   MACHINE_VIEW_FIELDS,
+  ME_OWNER_ID,
+  UNASSIGNED_OWNER_ID,
 } from "~/lib/machines/view/config";
 
-const MACHINE_STATUS_VALUES: MachineStatus[] = [
+/** Playability values in their canonical order (machine-views §3.12). */
+export const MACHINE_STATUS_VALUES: readonly MachineStatus[] = [
   "operational",
   "needs_service",
   "unplayable",
 ];
-function isMachineViewField(value: string | null): value is MachineViewFieldId {
+
+/** Page sizes (list-views §5.7). */
+export const MACHINE_VIEW_PAGE_SIZES: readonly MachineViewPageSize[] = [
+  25, 50, 100,
+];
+
+export function isMachineViewField(
+  value: string | null
+): value is MachineViewFieldId {
   return (
     value !== null && MACHINE_VIEW_FIELD_IDS.some((field) => field === value)
   );
+}
+
+export function isMachineViewPageSize(
+  value: number
+): value is MachineViewPageSize {
+  return MACHINE_VIEW_PAGE_SIZES.some((size) => size === value);
 }
 
 export interface MachineViewSearchParams {
@@ -44,7 +61,8 @@ export function toMachineViewSearchParams(
   return params;
 }
 
-function parseCanonicalList<T extends string>(
+/** The values of a URL list that `allowed` names, in the URL's order. */
+function parseList<T extends string>(
   value: string | null,
   allowed: readonly T[]
 ): T[] {
@@ -55,20 +73,51 @@ function parseCanonicalList<T extends string>(
   );
 }
 
+/**
+ * The values of `values` that `allowed` names, in `allowed`'s order. A filter
+ * selection is a set, so one order keeps the same selection the same
+ * configuration however it was made (list-views §9.3, §10.3).
+ */
+export function canonicalFilterValues<T extends string>(
+  values: readonly string[],
+  allowed: readonly T[]
+): T[] {
+  const selected = new Set(values);
+  return allowed.filter((value) => selected.has(value));
+}
+
+const OWNER_SHORTCUTS = [ME_OWNER_ID, UNASSIGNED_OWNER_ID];
+
+/**
+ * An Owner selection in its canonical order: Me, then Unassigned, then
+ * people by id. Ids are the only order every selection shares, since names
+ * can change and an id may name nobody on this Surface (list-views §10.18).
+ */
+export function canonicalOwnerValues(values: readonly string[]): string[] {
+  const unique = [...new Set(values)].filter(Boolean);
+  const people = unique
+    .filter((value) => !OWNER_SHORTCUTS.includes(value))
+    .sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
+  return [...canonicalFilterValues(unique, OWNER_SHORTCUTS), ...people];
+}
+
 function positiveInteger(value: string | null, fallback: number): number {
   if (!value || !/^[1-9]\d*$/.test(value)) return fallback;
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) ? parsed : fallback;
 }
 
-function arraysEqual<T>(left: T[], right: T[]): boolean {
+export function arraysEqual<T>(
+  left: readonly T[],
+  right: readonly T[]
+): boolean {
   return (
     left.length === right.length &&
     left.every((value, index) => value === right[index])
   );
 }
 
-function presenceEqual(
+export function presenceEqual(
   left: MachineViewState["presence"],
   right: MachineViewState["presence"]
 ): boolean {
@@ -86,7 +135,10 @@ export function parseMachineViewState(
   const parsedPresence =
     presenceValue === "all"
       ? "all"
-      : parseCanonicalList(presenceValue, VALID_MACHINE_PRESENCE_STATUSES);
+      : canonicalFilterValues(
+          presenceValue?.split(",") ?? [],
+          VALID_MACHINE_PRESENCE_STATUSES
+        );
   const presence: "all" | MachinePresenceStatus[] =
     parsedPresence === "all" || parsedPresence.length > 0
       ? parsedPresence
@@ -108,13 +160,11 @@ export function parseMachineViewState(
     searchParams.get("pageSize"),
     defaults.pageSize
   );
-  const pageSize: MachineViewPageSize =
-    requestedPageSize === 25 ||
-    requestedPageSize === 50 ||
-    requestedPageSize === 100
-      ? requestedPageSize
-      : defaults.pageSize;
-  const requestedColumns = parseCanonicalList(
+  const pageSize: MachineViewPageSize = isMachineViewPageSize(requestedPageSize)
+    ? requestedPageSize
+    : defaults.pageSize;
+  // Displayed fields keep the URL's order: it is the order they show in.
+  const requestedColumns = parseList(
     searchParams.get("columns"),
     MACHINE_VIEW_FIELD_IDS
   ).filter((field) => preset.permittedFields.includes(field));
@@ -129,17 +179,15 @@ export function parseMachineViewState(
   return {
     q: searchParams.get("q")?.trim() ?? defaults.q,
     presence,
-    status: parseCanonicalList(
-      searchParams.get("status"),
+    status: canonicalFilterValues(
+      searchParams.get("status")?.split(",") ?? [],
       MACHINE_STATUS_VALUES
     ),
-    severity: parseCanonicalList(
-      searchParams.get("severity"),
+    severity: canonicalFilterValues(
+      searchParams.get("severity")?.split(",") ?? [],
       ISSUE_SEVERITY_VALUES
     ),
-    owner: [...new Set(searchParams.get("owner")?.split(",") ?? [])].filter(
-      Boolean
-    ),
+    owner: canonicalOwnerValues(searchParams.get("owner")?.split(",") ?? []),
     sort,
     dir,
     page: positiveInteger(searchParams.get("page"), defaults.page),

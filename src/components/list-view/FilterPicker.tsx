@@ -8,24 +8,17 @@ import { cn } from "~/lib/utils";
 import type { ListFilterModel, ListOption } from "./types";
 
 /**
- * Toggles `value` in a filter's selection, keeping shortcuts first and then
- * the options in the host's order. Values neither lists any more stay at the
- * end, so a stale selection is never silently dropped by an unrelated click.
+ * Toggles `value` in a filter's selection. The host's `onChange` puts the
+ * selection in its canonical order, so this only adds or removes; a value
+ * the options no longer list is never dropped by an unrelated click.
  */
-export function toggleFilterValue(
-  filter: Pick<ListFilterModel, "options" | "shortcuts" | "selected">,
+function toggleFilterValue(
+  selected: readonly string[],
   value: string,
   checked: boolean
 ): string[] {
-  const next = new Set(filter.selected);
-  if (checked) next.add(value);
-  else next.delete(value);
-  const order = [...(filter.shortcuts ?? []), ...filter.options].map(
-    (option) => option.value
-  );
-  const known = order.filter((item) => next.has(item));
-  const unknown = [...next].filter((item) => !order.includes(item));
-  return [...known, ...unknown];
+  const rest = selected.filter((item) => item !== value);
+  return checked ? [...rest, value] : rest;
 }
 
 function matches(option: ListOption, query: string): boolean {
@@ -77,7 +70,7 @@ export function FilterPicker({
           checked={selected.has(option.value)}
           onCheckedChange={(checked) =>
             filter.onChange(
-              toggleFilterValue(filter, option.value, checked === true)
+              toggleFilterValue(filter.selected, option.value, checked === true)
             )
           }
         />

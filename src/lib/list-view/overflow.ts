@@ -126,7 +126,8 @@ const STEPS: readonly { pager: CompactPagerMode; compactEdit: boolean }[] = [
  * Lays out the desktop List Header (§8.2, §8.3). View tabs move into More
  * views from the right first; only when the Applied View's tab alone still
  * does not fit does the compact pager drop its range text, and then
- * disappear. The pager below the list always remains. Past that, Discard
+ * disappear. The pager below the list always remains, and shows the result
+ * range even when there is only one page. Past that, Discard
  * changes shortens to "Discard", and finally the Applied View's tab name
  * truncates (the component lets that one tab shrink).
  */

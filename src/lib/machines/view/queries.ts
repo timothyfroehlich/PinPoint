@@ -23,19 +23,19 @@ import { getCurrentManufacturer } from "~/lib/machines/manufacturer";
 import { getTag } from "~/lib/tags/tags";
 import { isTagTypeId } from "~/lib/tags/types";
 import { getViewer } from "~/lib/collections/viewer";
-import { getMachineViewPreset, planMachineViewDependencies } from "./config";
+import {
+  getMachineViewPreset,
+  ME_OWNER_ID,
+  planMachineViewDependencies,
+  UNASSIGNED_OWNER_ID,
+} from "./config";
 import {
   applyMachineViewState,
   healthFromSeverityCounts,
   summarizeMachineView,
   type MachineViewCandidate,
 } from "./model";
-import {
-  getExistingMachineViewOwners,
-  ME_OWNER_ID,
-  UNASSIGNED_OWNER_ID,
-  UNASSIGNED_OWNER_NAME,
-} from "./owners";
+import { getExistingMachineViewOwners, UNASSIGNED_OWNER_NAME } from "./owners";
 import { parseMachineViewState } from "./state";
 
 export const MACHINE_VIEW_SERVICE_TAGS = [
