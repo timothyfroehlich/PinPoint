@@ -5,7 +5,7 @@
  * changing cards (apron-cards spec §3.6, §11.7: owner, technician, or admin —
  * the `machines.edit` capability), payload rejection (§4.3 size, §11.2 unique
  * names), and that one save adds, updates, renames, and deletes cards together
- * (§11.6).
+ * (§11.6), template included (§5.5).
  */
 
 import { randomUUID } from "node:crypto";
@@ -89,6 +89,7 @@ describe("saveApronCardsAction (PP-o23o)", () => {
     return {
       name,
       size: "stern" as const,
+      template: "side-rail" as const,
       useCustomDescription: true,
       description: plainTextToDoc("Shoot the ramps."),
       tip: plainTextToDoc("Extra ball at 3 modes."),
@@ -130,6 +131,7 @@ describe("saveApronCardsAction (PP-o23o)", () => {
     expect(stored).toMatchObject({
       name: "Card 1",
       size: "stern",
+      template: "side-rail",
       useCustomDescription: true,
       tipEnabled: true,
       designEnabled: false,
@@ -149,7 +151,12 @@ describe("saveApronCardsAction (PP-o23o)", () => {
     const result = await save(
       machineId,
       [
-        card("Card 1", { id: first.id, size: "wpc", tip: null }),
+        card("Card 1", {
+          id: first.id,
+          size: "wpc",
+          template: "header-band",
+          tip: null,
+        }),
         card("Tournament"),
         card("Kids night"),
       ],
@@ -163,7 +170,12 @@ describe("saveApronCardsAction (PP-o23o)", () => {
       "Tournament",
       "Kids night",
     ]);
-    expect(stored[0]).toMatchObject({ id: first.id, size: "wpc", tip: null });
+    expect(stored[0]).toMatchObject({
+      id: first.id,
+      size: "wpc",
+      template: "header-band",
+      tip: null,
+    });
     if (result.ok) {
       expect(result.value.cards.map((c) => c.name)).toEqual(
         stored.map((c) => c.name)

@@ -25,6 +25,7 @@ import {
   APRON_CARD_SIZES,
   type ApronCardContent,
   type ApronCardSize,
+  type ApronCardTemplate,
 } from "~/lib/machines/apron-card";
 import { cn } from "~/lib/utils";
 import { ApronCardFace } from "./ApronCardFace";
@@ -38,6 +39,7 @@ export interface ExportableApronCard {
   id: string;
   name: string;
   size: ApronCardSize;
+  template: ApronCardTemplate;
   content: ApronCardContent;
 }
 
@@ -278,6 +280,7 @@ export function ApronCardExportMenu({
                   key={card.id}
                   content={card.content}
                   size={card.size}
+                  template={card.template}
                   scanUrl={scanUrl}
                   onReady={() => {
                     setReady((current) =>
@@ -310,6 +313,7 @@ export function ApronCardExportMenu({
                   <ApronCardSheet
                     content={chosen.content}
                     size={chosen.size}
+                    template={chosen.template}
                     scanUrl={scanUrl}
                     onReady={handleReady}
                   />
@@ -317,6 +321,7 @@ export function ApronCardExportMenu({
                   <ApronCardFace
                     content={chosen.content}
                     size={chosen.size}
+                    template={chosen.template}
                     scanUrl={scanUrl}
                     onReady={handleReady}
                   />

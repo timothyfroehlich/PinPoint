@@ -140,6 +140,79 @@ export function extractMentions(
 }
 
 /**
+ * Replace each mention's stored `label` with the name `names` holds for its
+ * `id`. A mention whose id is not in `names` keeps its stored label.
+ *
+ * Mention nodes persist the person's name as it was when the mention was
+ * written; the server loads current names (`loadMentionNames`) and applies
+ * them here so every renderer and the editor read the current one. Pure: the
+ * input doc is not mutated.
+ */
+export function applyMentionNames(
+  doc: ProseMirrorDoc,
+  names: ReadonlyMap<string, string>
+): ProseMirrorDoc;
+export function applyMentionNames(
+  doc: ProseMirrorDoc | null,
+  names: ReadonlyMap<string, string>
+): ProseMirrorDoc | null;
+export function applyMentionNames(
+  doc: ProseMirrorDoc | null | undefined,
+  names: ReadonlyMap<string, string>
+): ProseMirrorDoc | null | undefined;
+export function applyMentionNames(
+  doc: ProseMirrorDoc | null | undefined,
+  names: ReadonlyMap<string, string>
+): ProseMirrorDoc | null | undefined {
+  if (!isProseMirrorDoc(doc) || names.size === 0) return doc;
+  return {
+    ...doc,
+    content: mapMentions(doc.content, (mention, id) => {
+      const name = names.get(id);
+      return name === undefined
+        ? mention
+        : { ...mention, attrs: { ...mention.attrs, label: name } };
+    }),
+  };
+}
+
+/**
+ * The doc with every mention's `label` removed, for deciding whether a
+ * submitted doc differs from the stored one. Editors open on docs whose labels
+ * were refreshed to current names (`applyMentionNames`), so an unchanged save
+ * after a rename differs from storage only in labels, which is not an edit.
+ * Pure: the input doc is not mutated.
+ */
+export function withoutMentionLabels(
+  doc: ProseMirrorDoc | null | undefined
+): ProseMirrorDoc | null | undefined {
+  if (!isProseMirrorDoc(doc)) return doc;
+  return {
+    ...doc,
+    content: mapMentions(doc.content, (mention) => {
+      const attrs = Object.fromEntries(
+        Object.entries(mention.attrs ?? {}).filter(([key]) => key !== "label")
+      );
+      return { ...mention, attrs };
+    }),
+  };
+}
+
+/** `nodes` with each mention node (one with a string `id`) replaced by `fn`. */
+function mapMentions(
+  nodes: ProseMirrorNode[],
+  fn: (mention: ProseMirrorNode, id: string) => ProseMirrorNode
+): ProseMirrorNode[] {
+  return nodes.map((node) => {
+    const id = node.attrs?.["id"];
+    if (node.type === "mention" && typeof id === "string") return fn(node, id);
+    return Array.isArray(node.content)
+      ? { ...node, content: mapMentions(node.content, fn) }
+      : node;
+  });
+}
+
+/**
  * Extract plain text from a ProseMirror document (for search, truncation, etc.).
  * Robustly handles legacy plain text strings.
  */

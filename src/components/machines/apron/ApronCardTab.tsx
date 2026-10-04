@@ -36,7 +36,9 @@ import { Switch } from "~/components/ui/switch";
 import { useUnsavedChangesGuard } from "~/hooks/use-unsaved-changes-guard";
 import {
   APRON_CARD_SIZES,
+  APRON_CARD_TEMPLATES,
   apronCardPixelSize,
+  isApronCardTemplate,
   cardFaceContent,
   type ApronCardIdentity,
   type ApronCardSize,
@@ -193,6 +195,7 @@ export function ApronCardTab({
           ...(card.id ? { id: card.id } : {}),
           name: card.name,
           size: card.size,
+          template: card.template,
           useCustomDescription: card.useCustomDescription,
           description: card.description,
           tip: card.tip,
@@ -223,6 +226,7 @@ export function ApronCardTab({
         id: card.id,
         name: card.name,
         size: card.size,
+        template: card.template,
         content: cardFaceContent(identity, mainDescription, card),
       })),
     [saved, identity, mainDescription]
@@ -301,6 +305,7 @@ export function ApronCardTab({
             key={selected.key}
             content={content}
             size={selected.size}
+            template={selected.template}
             scanUrl={scanUrl}
             onOverflowChange={setOverflowing}
             outlined
@@ -416,31 +421,59 @@ export function ApronCardTab({
           style={previewStyle}
         >
           <div className="flex flex-col gap-5">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor={`${id}-size`}>Apron size</Label>
-              <Select
-                value={selected.size ?? ""}
-                onValueChange={(value) => {
-                  if (value === "stern" || value === "wpc") {
-                    update({ size: value });
-                  }
-                }}
-              >
-                <SelectTrigger
-                  id={`${id}-size`}
-                  className="w-full"
-                  aria-invalid={selected.size === null}
-                >
-                  <SelectValue placeholder="Choose a size…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(APRON_CARD_SIZES).map(([key, option]) => (
-                    <SelectItem key={key} value={key}>
-                      {option.label} · {option.dimensions}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="@container">
+              <div className="grid gap-5 @md:grid-cols-2">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor={`${id}-size`}>Apron size</Label>
+                  <Select
+                    value={selected.size ?? ""}
+                    onValueChange={(value) => {
+                      if (value === "stern" || value === "wpc") {
+                        update({ size: value });
+                      }
+                    }}
+                  >
+                    <SelectTrigger
+                      id={`${id}-size`}
+                      className="w-full"
+                      aria-invalid={selected.size === null}
+                    >
+                      <SelectValue placeholder="Choose a size…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(APRON_CARD_SIZES).map(([key, option]) => (
+                        <SelectItem key={key} value={key}>
+                          {option.label} · {option.dimensions}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor={`${id}-template`}>Template</Label>
+                  <Select
+                    value={selected.template}
+                    onValueChange={(value) => {
+                      if (isApronCardTemplate(value))
+                        update({ template: value });
+                    }}
+                  >
+                    <SelectTrigger id={`${id}-template`} className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(APRON_CARD_TEMPLATES).map(
+                        ([key, option]) => (
+                          <SelectItem key={key} value={key}>
+                            {option.label}
+                          </SelectItem>
+                        )
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
 
             <fieldset className="flex flex-col gap-2">
@@ -513,27 +546,30 @@ export function ApronCardTab({
               />
             </div>
 
-            <fieldset className="flex flex-col gap-2.5">
-              <legend className="mb-2 text-sm font-medium">Credits</legend>
-              <CreditCheckbox
-                id={`${id}-design`}
-                label="Design"
-                names={identity.credits.design}
-                checked={selected.designEnabled}
-                onCheckedChange={(checked) => {
-                  update({ designEnabled: checked });
-                }}
-              />
-              <CreditCheckbox
-                id={`${id}-art`}
-                label="Art"
-                names={identity.credits.art}
-                checked={selected.artEnabled}
-                onCheckedChange={(checked) => {
-                  update({ artEnabled: checked });
-                }}
-              />
-            </fieldset>
+            {/* Only the Standard template shows credits (§10.2, §10.5). */}
+            {selected.template === "standard" ? (
+              <fieldset className="flex flex-col gap-2.5">
+                <legend className="mb-2 text-sm font-medium">Credits</legend>
+                <CreditCheckbox
+                  id={`${id}-design`}
+                  label="Design"
+                  names={identity.credits.design}
+                  checked={selected.designEnabled}
+                  onCheckedChange={(checked) => {
+                    update({ designEnabled: checked });
+                  }}
+                />
+                <CreditCheckbox
+                  id={`${id}-art`}
+                  label="Art"
+                  names={identity.credits.art}
+                  checked={selected.artEnabled}
+                  onCheckedChange={(checked) => {
+                    update({ artEnabled: checked });
+                  }}
+                />
+              </fieldset>
+            ) : null}
           </div>
           {preview}
         </div>

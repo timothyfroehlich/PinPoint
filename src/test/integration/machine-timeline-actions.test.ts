@@ -19,7 +19,7 @@ import { describe, it, expect, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { asDbOrTx, getTestDb, setupTestDb } from "~/test/setup/pglite";
-import type { ProseMirrorDoc } from "~/lib/tiptap/types";
+import { docToPlainText, type ProseMirrorDoc } from "~/lib/tiptap/types";
 import {
   authUsers,
   invitedUsers,
@@ -664,5 +664,86 @@ describe("prose-field actions emit marker events (PP-0x98)", () => {
         "owner_requirements_updated"
     );
     expect(markers).toHaveLength(1);
+  });
+
+  it("an untouched save after a mentioned person's rename is not an edit (PP-0fg0.2)", async () => {
+    const db = await getTestDb();
+    const owner = await makeUser("member");
+    const mentioned = await makeUser("member", {
+      firstName: "Ana",
+      lastName: "Lee",
+    });
+    await mockAuth(owner.id);
+    const machine = await makeMachine(owner.id);
+    const stored: ProseMirrorDoc = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "Ask " },
+            { type: "mention", attrs: { id: mentioned.id, label: "Ana Lee" } },
+          ],
+        },
+      ],
+    };
+    await db
+      .update(machines)
+      .set({ ownerRequirements: stored })
+      .where(eq(machines.id, machine.id));
+    await db
+      .update(userProfiles)
+      .set({ firstName: "Anastasia" })
+      .where(eq(userProfiles.id, mentioned.id));
+    const { updateMachineOwnerRequirements } =
+      await import("~/app/(app)/m/actions");
+    const { getMachineForLayout } =
+      await import("~/app/(app)/m/[initials]/_data");
+    const markerCount = async (): Promise<number> =>
+      (
+        await db
+          .select()
+          .from(timelineEvents)
+          .where(eq(timelineEvents.machineId, machine.id))
+      ).filter(
+        (r) =>
+          (r.eventData as { kind: string } | null)?.kind ===
+          "owner_requirements_updated"
+      ).length;
+    const storedValue = async (): Promise<ProseMirrorDoc | null> =>
+      (
+        await db.query.machines.findFirst({
+          where: eq(machines.id, machine.id),
+        })
+      )?.ownerRequirements ?? null;
+
+    // The editor opens on the loader's doc, which carries the new name.
+    const opened = (await getMachineForLayout(machine.initials)).machine
+      ?.ownerRequirements;
+    if (!opened) throw new Error("owner requirements did not load");
+    expect(docToPlainText(opened)).toBe("Ask @Anastasia Lee");
+
+    // Saved untouched: nothing written, nothing on the timeline.
+    expect((await updateMachineOwnerRequirements(machine.id, opened)).ok).toBe(
+      true
+    );
+    expect(await storedValue()).toEqual(stored);
+    expect(await markerCount()).toBe(0);
+
+    // A real edit is written with the current name, and is on the timeline.
+    const edited: ProseMirrorDoc = {
+      ...opened,
+      content: [
+        ...opened.content,
+        { type: "paragraph", content: [{ type: "text", text: "No tilt" }] },
+      ],
+    };
+    expect((await updateMachineOwnerRequirements(machine.id, edited)).ok).toBe(
+      true
+    );
+    expect(docToPlainText(await storedValue())).toBe(
+      "Ask @Anastasia Lee\nNo tilt"
+    );
+    expect(await markerCount()).toBe(1);
   });
 });

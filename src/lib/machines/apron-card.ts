@@ -30,6 +30,23 @@ export function isApronCardSize(value: string): value is ApronCardSize {
   return Object.hasOwn(APRON_CARD_SIZES, value);
 }
 
+/**
+ * Card templates (spec §1, §5.5–5.7): which layout a card face uses. Side
+ * rail and Header band give the description and tip more room than Standard
+ * and show no credits (§10.2).
+ */
+export const APRON_CARD_TEMPLATES = {
+  standard: { label: "Standard" },
+  "side-rail": { label: "Side rail" },
+  "header-band": { label: "Header band" },
+} as const;
+
+export type ApronCardTemplate = keyof typeof APRON_CARD_TEMPLATES;
+
+export function isApronCardTemplate(value: string): value is ApronCardTemplate {
+  return Object.hasOwn(APRON_CARD_TEMPLATES, value);
+}
+
 export interface ApronCardContent {
   name: string;
   edition: string | null;
@@ -63,6 +80,7 @@ export interface ApronMachineSource extends MachineManufacturerSource {
 
 /** The card settings a saved card carries (spec §11). */
 export interface ApronCardSettings {
+  template: ApronCardTemplate;
   useCustomDescription: boolean;
   description: ProseMirrorDoc | null;
   tip: ProseMirrorDoc | null;
@@ -248,7 +266,124 @@ export const APRON_CARD_LAYOUTS: Record<ApronCardSize, ApronCardLayout> = {
   },
 };
 
+/**
+ * Side rail geometry (spec §5.6; canvas NLAnYXFFC4j3748otKxoPq, option A): a
+ * narrower panel with no credits, so the logo and QR keep one size each.
+ */
+export const APRON_SIDE_RAIL_LAYOUTS: Record<ApronCardSize, ApronCardLayout> = {
+  stern: {
+    width: "140mm",
+    height: "75mm",
+    panelWidth: 160,
+    titleMaxWidth: 132,
+    panelPadding: "14px 14px 12px 14px",
+    bodyPadding: "14px 16px 12px 16px",
+    titleMaxPx: 32,
+    titleMinPx: 16,
+    logoWidth: 88,
+    logoWithCreditsWidth: 88,
+    qrPx: 98,
+    qrWithTipPx: 98,
+    bodyFontPx: 12,
+  },
+  wpc: {
+    width: "6in",
+    height: "3.25in",
+    panelWidth: 184,
+    titleMaxWidth: 152,
+    panelPadding: "16px 16px 12px 16px",
+    bodyPadding: "18px 18px 14px 18px",
+    titleMaxPx: 34,
+    titleMinPx: 17,
+    logoWidth: 96,
+    logoWithCreditsWidth: 96,
+    qrPx: 108,
+    qrWithTipPx: 108,
+    bodyFontPx: 12.5,
+  },
+};
+
+/**
+ * Header band geometry (spec §5.7, §6.5; canvas option B). The band has a
+ * fixed height; its title fits the room left of the logo in at most two
+ * lines, then shrinks until the band's content fits.
+ */
+export interface ApronHeaderBandLayout {
+  width: string;
+  height: string;
+  bandHeight: number;
+  bandPadding: string;
+  /** The band's width less its padding, the logo, and the gap before it. */
+  titleMaxWidth: number;
+  titleMaxPx: number;
+  titleMinPx: number;
+  logoWidth: number;
+  qrPx: number;
+  bodyPadding: string;
+  bodyFontPx: number;
+}
+
+export const APRON_HEADER_BAND_LAYOUTS: Record<
+  ApronCardSize,
+  ApronHeaderBandLayout
+> = {
+  stern: {
+    width: "140mm",
+    height: "75mm",
+    bandHeight: 66,
+    bandPadding: "10px 14px 10px 16px",
+    titleMaxWidth: 425,
+    titleMaxPx: 28,
+    titleMinPx: 15,
+    logoWidth: 62,
+    qrPx: 98,
+    bodyPadding: "12px 16px 12px 16px",
+    bodyFontPx: 12,
+  },
+  wpc: {
+    width: "6in",
+    height: "3.25in",
+    bandHeight: 72,
+    bandPadding: "11px 16px 11px 18px",
+    titleMaxWidth: 462,
+    titleMaxPx: 30,
+    titleMinPx: 16,
+    logoWidth: 68,
+    qrPx: 108,
+    bodyPadding: "14px 18px 14px 18px",
+    bodyFontPx: 12.5,
+  },
+};
+
 export const APRON_TITLE_MAX_LINES = 3;
+
+/** The Header band title's line limit, in place of three (spec §6.5). */
+export const APRON_BAND_TITLE_MAX_LINES = 2;
+
+/** What the title fit needs from a template's layout at one size. */
+export interface ApronTitleFit {
+  titleMaxWidth: number;
+  titleMaxPx: number;
+  titleMinPx: number;
+  maxLines: number;
+}
+
+export function apronTitleFit(
+  template: ApronCardTemplate,
+  size: ApronCardSize
+): ApronTitleFit {
+  if (template === "header-band") {
+    return {
+      ...APRON_HEADER_BAND_LAYOUTS[size],
+      maxLines: APRON_BAND_TITLE_MAX_LINES,
+    };
+  }
+  const layout =
+    template === "side-rail"
+      ? APRON_SIDE_RAIL_LAYOUTS[size]
+      : APRON_CARD_LAYOUTS[size];
+  return { ...layout, maxLines: APRON_TITLE_MAX_LINES };
+}
 
 /**
  * White space the print sheet adds around the card on each side, in mm: a 3mm

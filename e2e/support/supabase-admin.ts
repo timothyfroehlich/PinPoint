@@ -318,6 +318,19 @@ export async function deleteTestMachine(machineId: string) {
 }
 
 /**
+ * Delete a hand-applied tag type by its exact name. Its tags and their machine
+ * memberships go with it (ON DELETE CASCADE). A safety net for specs that
+ * create a tag type through the UI and may fail before deleting it there.
+ */
+export async function deleteTestTagType(name: string) {
+  const { error } = await supabaseAdmin
+    .from("tag_types")
+    .delete()
+    .eq("name", name);
+  if (error) throw error;
+}
+
+/**
  * Generate an unsubscribe token for E2E tests.
  * Uses the same HMAC-SHA256 algorithm and signing secret as
  * src/lib/notifications/channels/email-channel.ts. The test client must

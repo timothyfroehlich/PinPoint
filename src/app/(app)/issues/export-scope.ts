@@ -25,8 +25,8 @@ export async function resolveExportScopeInitials(
       return collection ? collection.machines.map((m) => m.initials) : null;
     }
     case "tag": {
-      const tag = await getTagForLayout(scope.type, scope.slug);
-      return tag ? tag.machines.map((m) => m.initials) : null;
+      const resolved = await getTagForLayout(scope.type, scope.slug);
+      return resolved ? resolved.tag.machines.map((m) => m.initials) : null;
     }
   }
 }
