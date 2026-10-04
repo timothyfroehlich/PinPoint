@@ -425,4 +425,55 @@ describe("Owner's Requirements through the machine form (PGlite)", () => {
     await save("Keep the glass clean");
     expect(await markerCount()).toBe(1);
   });
+
+  it("an untouched save after a mentioned person's rename is not an edit (PP-0fg0.2)", async () => {
+    const db = await getTestDb();
+    const { updateMachineAction } = await import("~/app/(app)/m/actions");
+    const { getMachineForLayout } =
+      await import("~/app/(app)/m/[initials]/_data");
+    const admin = await createAdmin();
+    const mentioning = (text: string): ProseMirrorDoc => ({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text },
+            { type: "mention", attrs: { id: admin.id, label: "Test Admin" } },
+          ],
+        },
+      ],
+    });
+    const [machine] = await db
+      .insert(machines)
+      .values({
+        name: "Godzilla",
+        initials: "GZ",
+        description: mentioning("Owned by "),
+        ownerRequirements: mentioning("Ask "),
+      })
+      .returning();
+    if (!machine) throw new Error("failed to seed machine");
+    await db
+      .update(userProfiles)
+      .set({ firstName: "Renamed" })
+      .where(eq(userProfiles.id, admin.id));
+
+    // The Manage form opens on the loader's docs, which carry the new name,
+    // and posts them back untouched.
+    const opened = (await getMachineForLayout("GZ")).machine;
+    const fd = new FormData();
+    fd.append("id", machine.id);
+    fd.append("name", "Godzilla");
+    fd.append("description", JSON.stringify(opened?.description));
+    fd.append("ownerRequirements", JSON.stringify(opened?.ownerRequirements));
+    expect((await updateMachineAction(undefined, fd)).ok).toBe(true);
+
+    const after = await createdMachine();
+    expect(after.description).toEqual(mentioning("Owned by "));
+    expect(after.ownerRequirements).toEqual(mentioning("Ask "));
+    expect(await eventKinds(machine.id)).not.toContainEqual({
+      kind: "owner_requirements_updated",
+    });
+  });
 });
