@@ -100,8 +100,9 @@ export async function emitIssueOpened(
  * A guest's `issue_opened` event has no person-reference — only the typed
  * `guestReporterName`. Once signup moves the issue to the account
  * (`issues.reported_by`), the event gets the same `reporter` reference
- * `emitIssueOpened` writes for an account-backed open, and the typed name is
- * dropped so the live account name is the only one shown. Run it in the same
+ * `emitIssueOpened` writes for an account-backed open, the account becomes the
+ * event's author where none is set, and the typed name is dropped so the live
+ * account name is the only one shown. Run it in the same
  * transaction as the issue transfer. Mirrors `handle_new_user` (drizzle/0100).
  */
 export async function attachSignedUpGuestReporter(
@@ -144,9 +145,14 @@ export async function attachSignedUpGuestReporter(
     );
   }
 
+  // The author becomes the account too, where none is recorded — an
+  // account-backed open has author_id = reporter.
   await tx
     .update(timelineEvents)
-    .set({ eventData: sql`${timelineEvents.eventData} - 'guestReporterName'` })
+    .set({
+      eventData: sql`${timelineEvents.eventData} - 'guestReporterName'`,
+      authorId: sql`coalesce(${timelineEvents.authorId}, ${args.userId}::uuid)`,
+    })
     .where(inArray(timelineEvents.id, eventIds));
 }
 

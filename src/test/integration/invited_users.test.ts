@@ -577,6 +577,8 @@ describe("Invited Users Integration", () => {
       issueId: guestIssue.id,
     });
     expect(opened?.eventData).not.toHaveProperty("guestReporterName");
+    // Like an account-backed open: the reporter is also the event's author.
+    expect(opened?.authorId).toBe(userId);
 
     const people = await db
       .select()

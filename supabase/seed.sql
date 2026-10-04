@@ -99,8 +99,9 @@ BEGIN
   -- Transfer guest issues (reporter_email matches the new user's email) to
   -- the newly created account, and make the account the
   -- reporter on those issues' machine-timeline issue_opened events: add the
-  -- `reporter` person-reference an account-backed open carries, and drop the
-  -- typed guestReporterName it replaces (PP-0fg0.3). Mirrored by
+  -- `reporter` person-reference and author_id (where unset) an account-backed
+  -- open carries, and drop the typed guestReporterName it replaces
+  -- (PP-0fg0.3). Mirrored by
   -- ensureUserProfile → attachSignedUpGuestReporter.
   WITH transferred AS (
     UPDATE public.issues
@@ -130,11 +131,16 @@ BEGIN
       );
 
     UPDATE public.timeline_events te
-    SET event_data = te.event_data - 'guestReporterName'
+    SET
+      event_data = te.event_data - 'guestReporterName',
+      author_id = COALESCE(te.author_id, NEW.id)
     WHERE te.source_type = 'issue'
       AND te.event_data->>'kind' = 'issue_opened'
       AND te.event_data->>'issueId' = ANY (v_guest_issue_ids)
-      AND te.event_data->>'guestReporterName' IS NOT NULL;
+      AND (
+        te.event_data->>'guestReporterName' IS NOT NULL
+        OR te.author_id IS NULL
+      );
   END IF;
 
   -- Handle legacy invited_users transfer (v_invited_user_id already populated above)

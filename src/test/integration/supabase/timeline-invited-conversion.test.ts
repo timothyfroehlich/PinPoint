@@ -228,12 +228,14 @@ describe("guest→real timeline conversion (PP-0fg0.3)", () => {
     });
 
     const [event] = await sql`
-      SELECT event_data FROM timeline_events WHERE id = ${openedEventId}
+      SELECT event_data, author_id FROM timeline_events WHERE id = ${openedEventId}
     `;
     expect(event.event_data).toMatchObject({
       kind: "issue_opened",
       issueId: guestIssueId,
     });
     expect(event.event_data).not.toHaveProperty("guestReporterName");
+    // Like an account-backed open: the reporter is also the event's author.
+    expect(event.author_id).toBe(guestUserId);
   });
 });
