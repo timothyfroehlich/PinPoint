@@ -106,7 +106,7 @@
 ## 9. Built-in Views
 
 - **9.1** Machines offers five Built-in Views, in order: **On the floor** (On the Floor, by name — the Page Preset); **Needs attention** (On the Floor, Playability Needs service or Unplayable, worst first); **Service due** (On the Floor, oldest Last Serviced first); **All machines** (every presence state, by name); **Recently added** (every presence state except Removed, newest Date Added first, adding the Date Added field).
-- **9.2** Collections offer three Built-in Views, in order: **On the floor** (On the Floor, worst playability first); **Needs attention** (On the Floor, Playability Needs service or Unplayable, worst first); **All machines** (every presence state, worst playability first — the Page Preset).
+- **9.2** Collections offer three Built-in Views, in order: **On the floor** (On the Floor, worst playability first — the Page Preset); **Needs attention** (On the Floor, Playability Needs service or Unplayable, worst first); **All machines** (every presence state, worst playability first).
 - **9.3** Unless 9.1 or 9.2 says otherwise, a Built-in View displays the Page Preset's fields at the Page Preset's page size.
 - **9.4** _Moved 2026-10-02_ to list-views §10.16.
 - **9.5** _Moved 2026-10-02_ to list-views §5.3 and §10.6.
@@ -118,6 +118,7 @@
 
 | Requirement | Divergence | Resolution |
 | :-- | :-- | :-- |
+| §9.2 | Collections' Page Preset is All machines. | PP-s363 |
 | §2.4 | Machine View has its own toolbar, chips, and Saved Views menu rather than the shared List View. | PP-jb9v |
 | §3.13 | Owner offers Unassigned but not Me. | PP-jb9v |
 | §3.14 | Sorting is only by column header; phones in Compact mode cannot sort. | PP-jb9v |
@@ -129,6 +130,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-03 | Collections' Page Preset becomes On the floor (§9.2). |
 | 2026-10-03 | Presence and Last Activity join the default fields, Presence after Playability (§4.6); All machines and Recently added no longer add Presence (§9.1). Desktop and tablet rows are two lines, with manufacturer, year, and owner under the name (§3.2, §5.2); Owner, Manufacturer, and Year leave the default fields (§4.6). |
 | 2026-10-02 | Machine View became a List Host on the shared List View (§2.4): moved the generic concepts, URL rules, shared controls, and Saved Views to list-views (§1, §4.3–§4.5, §4.9–§4.11, §5.1, §7.6, §8, §9.4, §9.5); one-line machine identity and rows (§3.2, §5.2, §5.3); dropped Widget Population parameters (§4.1); Recently added leaves out Removed machines (§9.1); Primary Filters, Owner shortcuts, and the sort control (§3.12–§3.14); more default fields (§4.6); right-aligned Open Issues that link to the machine's issues in every presence state (§5.6); an Owner `me` sentinel (§4.2). |
 | 2026-09-27 | §7.4: unmatched Pinball Map entries now appear on the Pinball Map lineup page rather than being deferred. |

@@ -242,7 +242,7 @@ export const machines = pgTable(
     // linked to a PBM catalog title (pinballmapMachineId set) or explicitly
     // excluded ("not on PinballMap"); the mutual-exclusion invariant is the CHECK
     // below. The linked-or-excluded *requirement* is enforced at the action layer
-    // (currently off — see PBM_LINKING_REQUIRED). Model metadata is copied from
+    // (see PBM_LINKING_REQUIRED). Model metadata is copied from
     // the catalog mirror on link, never trusted from the client.
     pinballmapMachineId: integer("pinballmap_machine_id"),
     pinballmapExcluded: boolean("pinballmap_excluded").notNull().default(false),

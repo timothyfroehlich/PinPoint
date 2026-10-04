@@ -83,11 +83,11 @@ PERMANENT: the machine cannot be deleted and its initials can never change.
 - `initials` (required, 2–6 letters or digits). Check with `list_machines` first that nothing uses them.
 - `owner`: exact full name or UUID. Adds the owner as a watcher. The owner is **not** notified.
 - `presence` (default `on_the_floor`).
-- `pinballmapMachineId`, or `pinballmapExcluded: true` with `pinballmapExcludedReason`.
+- **Required:** `pinballmapMachineId`, or `pinballmapExcluded: true` (with an optional `pinballmapExcludedReason`). A call with neither is refused. Find the id first ([`pinballmap.md`](pinballmap.md)).
 
 There is no `intent` (lineup setting) or iScored parameter; set those afterwards with `update_machine`. The lineup setting starts as `off`.
 
-Trap: `pinballmapExcludedReason` is silently dropped unless `pinballmapExcluded: true` is sent in the same call.
+Trap: `pinballmapExcludedReason` without `pinballmapExcluded: true` does not mark the machine excluded, so the call is refused.
 
 Trap: "Initials 'X' are already taken" is the answer to any duplicate, not only initials. Read the machine list before trying again.
 

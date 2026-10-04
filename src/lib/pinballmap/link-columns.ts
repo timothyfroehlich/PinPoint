@@ -153,8 +153,7 @@ async function resolveCore(
   if (validationError === "link_required") {
     return {
       ok: false,
-      message:
-        "Select a Pinball Map title or mark the machine as not on Pinball Map.",
+      message: "Choose a model, or set Source to Manual Entry.",
     };
   }
 
