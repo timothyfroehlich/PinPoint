@@ -452,6 +452,7 @@ describe("machine Saved Views on each Surface (list-views §10.5, §10.10)", () 
     const applied = await loadMachineViewFromDatabase(asDbOrTx(db), {
       scope: { kind: "collection", collectionId },
       preset: "collection",
+      viewerId: null,
       searchParams: savedMachineViewSearchParams(
         offeredView.state,
         "collection",

@@ -163,16 +163,19 @@ describe("machine view database pipeline", () => {
     const all = await loadMachineViewFromDatabase(tx, {
       scope: { kind: "all" },
       preset: "machines",
+      viewerId: null,
       searchParams,
     });
     const collection = await loadMachineViewFromDatabase(tx, {
       scope: { kind: "collection", collectionId },
       preset: "collection",
+      viewerId: null,
       searchParams,
     });
     const owner = await loadMachineViewFromDatabase(tx, {
       scope: { kind: "owner", ownerId: ownerOneId },
       preset: "collection",
+      viewerId: null,
       searchParams,
     });
 
@@ -199,6 +202,7 @@ describe("machine view database pipeline", () => {
     const result = await loadMachineViewFromDatabase(asDbOrTx(db), {
       scope: { kind: "all" },
       preset: "machines",
+      viewerId: null,
       searchParams: new URLSearchParams({
         presence: "all",
         columns: "machine",
@@ -232,6 +236,7 @@ describe("machine view database pipeline", () => {
     const result = await loadMachineViewFromDatabase(asDbOrTx(db), {
       scope: { kind: "all" },
       preset: "machines",
+      viewerId: null,
       searchParams: new URLSearchParams({
         presence: "all",
         columns: "machine",
@@ -280,11 +285,13 @@ describe("machine view database pipeline", () => {
     const all = await loadMachineViewFromDatabase(tx, {
       scope: { kind: "all" },
       preset: "machines",
+      viewerId: null,
       searchParams,
     });
     const collection = await loadMachineViewFromDatabase(tx, {
       scope: { kind: "collection", collectionId },
       preset: "collection",
+      viewerId: null,
       searchParams,
     });
 
@@ -325,6 +332,7 @@ describe("machine view database pipeline", () => {
     const result = await loadMachineViewFromDatabase(asDbOrTx(db), {
       scope: { kind: "owner", ownerId: ownerOneId },
       preset: "collection",
+      viewerId: null,
       searchParams: new URLSearchParams({
         owner: `${ownerTwoId},${invitedId},unassigned`,
         columns: "machine",
@@ -352,6 +360,7 @@ describe("machine view database pipeline", () => {
     const result = await loadMachineViewFromDatabase(asDbOrTx(db), {
       scope: { kind: "collection", collectionId },
       preset: "collection",
+      viewerId: null,
       searchParams: new URLSearchParams({
         owner: `${ownerOneId},${ownerTwoId}`,
         columns: "machine",
@@ -363,11 +372,48 @@ describe("machine view database pipeline", () => {
     expect(result.rows.map((row) => row.initials)).toEqual(["AAA", "CCC"]);
   });
 
+  it("resolves the Owner me value to whoever is viewing (machine-views §4.2)", async () => {
+    const db = await getTestDb();
+    const load = (
+      viewerId: string | null
+    ): ReturnType<typeof loadMachineViewFromDatabase> =>
+      loadMachineViewFromDatabase(asDbOrTx(db), {
+        scope: { kind: "all" },
+        preset: "machines",
+        viewerId,
+        searchParams: new URLSearchParams({
+          owner: "me",
+          presence: "all",
+          columns: "machine",
+        }),
+      });
+
+    const ownerOne = await load(ownerOneId);
+    // The URL keeps `me`; only the filter resolves it.
+    expect(ownerOne.state.owner).toEqual(["me"]);
+    expect(ownerOne.rows.map((row) => row.initials)).toEqual(["AAA", "BBB"]);
+    expect(ownerOne.offersMe).toBe(true);
+    // Me is a shortcut, never a person among the options.
+    expect(ownerOne.ownerOptions.map((option) => option.id)).not.toContain(
+      "me"
+    );
+
+    const ownerTwo = await load(ownerTwoId);
+    expect(ownerTwo.rows.map((row) => row.initials)).not.toContain("AAA");
+
+    // Anonymous visitors have no Me: the value is dropped (list-views §9.3).
+    const anonymous = await load(null);
+    expect(anonymous.state.owner).toEqual([]);
+    expect(anonymous.offersMe).toBe(false);
+    expect(anonymous.totalCount).toBe(anonymous.scopeCount);
+  });
+
   it("drops owner values that name no one (list-views §10.14)", async () => {
     const db = await getTestDb();
     const result = await loadMachineViewFromDatabase(asDbOrTx(db), {
       scope: { kind: "owner", ownerId: ownerOneId },
       preset: "collection",
+      viewerId: null,
       searchParams: new URLSearchParams({
         owner: `${ownerOneId},${randomUUID()},not-a-person`,
         columns: "machine",

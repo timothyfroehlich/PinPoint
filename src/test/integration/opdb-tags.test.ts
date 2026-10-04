@@ -179,6 +179,7 @@ describe("OPDB tags", () => {
       {
         scope: { kind: "tag", tagType: "player-count", slug: "4-players" },
         preset: "collection",
+        viewerId: null,
         searchParams: new URLSearchParams({ columns: "machine" }),
       }
     );

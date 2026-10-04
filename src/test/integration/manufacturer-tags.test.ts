@@ -119,6 +119,7 @@ describe("manufacturer tags", () => {
     const all = await loadMachineViewFromDatabase(tx, {
       scope,
       preset: "collection",
+      viewerId: null,
       searchParams: new URLSearchParams({ columns: "machine" }),
     });
     expect(all.scopeCount).toBe(3);
@@ -135,6 +136,7 @@ describe("manufacturer tags", () => {
     const searched = await loadMachineViewFromDatabase(tx, {
       scope,
       preset: "collection",
+      viewerId: null,
       searchParams: new URLSearchParams({ q: "Williams", columns: "machine" }),
     });
     expect(searched.rows).toEqual([]);
@@ -142,6 +144,7 @@ describe("manufacturer tags", () => {
     const ownerFiltered = await loadMachineViewFromDatabase(tx, {
       scope,
       preset: "collection",
+      viewerId: null,
       searchParams: new URLSearchParams({
         owner: outsiderId,
         columns: "machine",
@@ -159,6 +162,7 @@ describe("manufacturer tags", () => {
     const result = await loadMachineViewFromDatabase(asDbOrTx(db), {
       scope: { kind: "all" },
       preset: "machines",
+      viewerId: null,
       searchParams: new URLSearchParams({
         presence: "all",
         columns: "machine",
@@ -223,6 +227,7 @@ describe("manufacturer tags", () => {
       loadMachineViewFromDatabase(tx, {
         scope: { kind: "tag", tagType: "manufacturer", slug },
         preset: "collection",
+        viewerId: null,
         searchParams: new URLSearchParams({ columns: "machine" }),
       });
     expect(

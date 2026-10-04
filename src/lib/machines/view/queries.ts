@@ -21,6 +21,7 @@ import type { TimelineTag } from "~/lib/timeline/machine-tags";
 import { getCurrentManufacturer } from "~/lib/machines/manufacturer";
 import { getTag } from "~/lib/tags/tags";
 import { isTagTypeId } from "~/lib/tags/types";
+import { getViewer } from "~/lib/collections/viewer";
 import { getMachineViewPreset, planMachineViewDependencies } from "./config";
 import {
   applyMachineViewState,
@@ -30,6 +31,7 @@ import {
 } from "./model";
 import {
   getExistingMachineViewOwners,
+  ME_OWNER_ID,
   UNASSIGNED_OWNER_ID,
   UNASSIGNED_OWNER_NAME,
 } from "./owners";
@@ -48,6 +50,11 @@ export interface LoadMachineViewArgs {
   scope: MachineViewScope;
   preset: MachineViewPresetId;
   searchParams: URLSearchParams;
+}
+
+export interface LoadMachineViewFromDatabaseArgs extends LoadMachineViewArgs {
+  /** The signed-in viewer the Owner `me` value resolves to, or null. */
+  viewerId: string | null;
 }
 
 interface MachineViewBaseRow {
@@ -268,16 +275,17 @@ function publicRow(candidate: MachineViewCandidate): MachineViewRow {
 
 export async function loadMachineViewFromDatabase(
   tx: DbTransaction,
-  { scope, preset, searchParams }: LoadMachineViewArgs
+  { scope, preset, searchParams, viewerId }: LoadMachineViewFromDatabaseArgs
 ): Promise<MachineViewResult> {
   const parsedState = parseMachineViewState(searchParams, preset);
   // Owner values are checked against people who exist, not against the
   // scope's machines: a person who owns nothing here stays selected and
   // matches nothing, since the scope's base rows bound every filter
-  // (list-views §10.14, §10.18).
+  // (list-views §10.14, §10.18). `me` survives only for a signed-in viewer
+  // (machine-views §4.2).
   const [baseRows, selectedOwners] = await Promise.all([
     getMachineViewBaseRows(tx, scope),
-    getExistingMachineViewOwners(tx, parsedState.owner),
+    getExistingMachineViewOwners(tx, parsedState.owner, viewerId),
   ]);
   const validatedState = {
     ...parsedState,
@@ -332,12 +340,21 @@ export async function loadMachineViewFromDatabase(
     return row;
   });
   // The scope's owners, plus any selected owner with nothing here, so the
-  // filter control can still show the selection.
-  const ownerOptionsById = new Map<string, string>(selectedOwners);
+  // filter control can still show the selection. Me is a shortcut the
+  // control offers on its own (machine-views §3.13), never a person.
+  const ownerOptionsById = new Map<string, string>(
+    [...selectedOwners].filter(([id]) => id !== ME_OWNER_ID)
+  );
   for (const row of baseRows) {
     ownerOptionsById.set(row.ownerId ?? UNASSIGNED_OWNER_ID, row.ownerName);
   }
-  const applied = applyMachineViewState(candidates, validatedState);
+  // The URL and the returned state keep `me`; only the filter resolves it.
+  const applied = applyMachineViewState(candidates, {
+    ...validatedState,
+    owner: validatedState.owner.map((ownerId) =>
+      ownerId === ME_OWNER_ID && viewerId !== null ? viewerId : ownerId
+    ),
+  });
   const state = { ...validatedState, page: applied.page };
 
   return {
@@ -350,6 +367,7 @@ export async function loadMachineViewFromDatabase(
       .map(([id, name]) => ({ id, name }))
       .sort((left, right) => left.name.localeCompare(right.name)),
     permittedFields: [...getMachineViewPreset(preset).permittedFields],
+    offersMe: viewerId !== null,
   };
 }
 
@@ -397,24 +415,29 @@ const loadMachineViewCached = cache(
     scopeKind: MachineViewScope["kind"],
     id: string,
     preset: MachineViewPresetId,
-    serializedSearchParams: string
+    serializedSearchParams: string,
+    viewerId: string | null
   ): Promise<MachineViewResult> =>
     loadMachineViewFromDatabase(db, {
       scope: scopeFromId(scopeKind, id),
       preset,
       searchParams: new URLSearchParams(serializedSearchParams),
+      viewerId,
     })
 );
 
-export function loadMachineView({
+/** Loads one Surface's Machine View for the current viewer. */
+export async function loadMachineView({
   scope,
   preset,
   searchParams,
 }: LoadMachineViewArgs): Promise<MachineViewResult> {
+  const viewer = await getViewer();
   return loadMachineViewCached(
     scope.kind,
     scopeId(scope),
     preset,
-    searchParams.toString()
+    searchParams.toString(),
+    viewer.userId ?? null
   );
 }

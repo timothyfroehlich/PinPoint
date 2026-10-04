@@ -54,9 +54,11 @@ export async function listSavedMachineViews(
     name,
     state: normalizeMachineViewSavedState(state),
   }));
+  // The owning account is signed in, so its Me filters stay (§4.2).
   const existingOwners = await getExistingMachineViewOwners(
     tx,
-    views.flatMap((view) => view.state.owner)
+    views.flatMap((view) => view.state.owner),
+    userId
   );
   return views.map((view) => ({
     ...view,

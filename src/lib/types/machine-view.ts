@@ -103,6 +103,8 @@ export interface MachineViewResult {
   state: MachineViewState;
   ownerOptions: MachineViewOwnerOption[];
   permittedFields: MachineViewFieldId[];
+  /** Whether the Owner filter offers Me: the viewer is signed in (machine-views §3.13). */
+  offersMe: boolean;
 }
 
 /**
