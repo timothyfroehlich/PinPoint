@@ -48,9 +48,11 @@ import {
 import { CLOSED_STATUSES } from "~/lib/issues/status";
 import {
   type ProseMirrorDoc,
+  applyMentionNames,
   extractMentions,
   docToPlainText,
 } from "~/lib/tiptap/types";
+import { loadMentionNames } from "~/lib/tiptap/mention-names";
 
 // --- Errors ---
 
@@ -459,8 +461,14 @@ export async function createIssue({
     const deliveries: DeliveryPlan["deliveries"] = [];
     try {
       const formattedId = formatIssueId(machineInitials, issueNumber);
+      // Mentions read as the mentioned person's current name (PP-0fg0.2).
       const plainDescription = description
-        ? docToPlainText(description)
+        ? docToPlainText(
+            applyMentionNames(
+              description,
+              await loadMentionNames([description], tx)
+            )
+          )
         : undefined;
       const notificationEvents: NotificationEvent[] = [
         {
@@ -923,7 +931,10 @@ export async function addIssueComment({
       const formattedId = issue
         ? formatIssueId(issue.machineInitials, issue.issueNumber)
         : undefined;
-      const plainTextContent = docToPlainText(content);
+      // Mentions read as the mentioned person's current name (PP-0fg0.2).
+      const plainTextContent = docToPlainText(
+        applyMentionNames(content, await loadMentionNames([content], tx))
+      );
 
       const notificationEvents: NotificationEvent[] = [
         {
@@ -1179,8 +1190,14 @@ export async function assignIssue({
             additionalRecipientIds: [assignedTo],
             issueTitle: currentIssue.title,
             machineName: currentIssue.machine.name,
+            // Mentions read as the mentioned person's current name (PP-0fg0.2).
             issueDescription: currentIssue.description
-              ? docToPlainText(currentIssue.description)
+              ? docToPlainText(
+                  applyMentionNames(
+                    currentIssue.description,
+                    await loadMentionNames([currentIssue.description], tx)
+                  )
+                )
               : undefined,
             formattedIssueId: formatIssueId(
               currentIssue.machineInitials,
