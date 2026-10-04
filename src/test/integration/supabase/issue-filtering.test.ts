@@ -1,8 +1,14 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { asDbOrTx, getTestDb, setupTestDb } from "~/test/setup/pglite";
-import { issues, machines, userProfiles } from "~/server/db/schema";
+import {
+  issueComments,
+  issues,
+  machines,
+  userProfiles,
+} from "~/server/db/schema";
 import { buildWhereConditions } from "~/lib/issues/filters-queries";
-import { and, type SQL, type InferSelectModel } from "drizzle-orm";
+import { and, eq, type SQL, type InferSelectModel } from "drizzle-orm";
+import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 
 type Issue = InferSelectModel<typeof issues>;
 
@@ -253,5 +259,95 @@ describe("Issue Filtering Integration", () => {
 
     expect(results.map((i) => i.id)).toContain(ISSUE_4_ID);
     expect(results).toHaveLength(4);
+  });
+
+  describe("search over descriptions and comments (PP-0fg0.4)", () => {
+    /** A one-paragraph doc: `text` followed by a mention carrying `label`. */
+    const mentionDoc = (
+      text: string,
+      id: string,
+      label: string
+    ): ProseMirrorDoc => ({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text },
+            { type: "mention", attrs: { id, label } },
+          ],
+        },
+      ],
+    });
+
+    const searchIds = async (q: string): Promise<string[]> => {
+      const db = await getTestDb();
+      return (await queryIssues(buildWhereConditions({ q }, asDbOrTx(db)))).map(
+        (i) => i.id
+      );
+    };
+
+    const describeIssue2 = async (doc: ProseMirrorDoc): Promise<void> => {
+      const db = await getTestDb();
+      await db
+        .update(issues)
+        .set({ description: doc })
+        .where(eq(issues.id, ISSUE_2_ID));
+    };
+
+    it("matches a description's text", async () => {
+      await describeIssue2(mentionDoc("Coil stop fried, ask ", ALICE_ID, "x"));
+      expect(await searchIds("coil stop")).toEqual([ISSUE_2_ID]);
+    });
+
+    it("matches a mention by the person's current name, not the stored label", async () => {
+      // Alice was "Alicia Formername" when mentioned. Issue 2 has no other
+      // connection to her (Bob reported it, nobody is assigned).
+      await describeIssue2(mentionDoc("Ask ", ALICE_ID, "Alicia Formername"));
+      expect(await searchIds("Alice Owner")).toContain(ISSUE_2_ID);
+      expect(await searchIds("Formername")).not.toContain(ISSUE_2_ID);
+    });
+
+    it("matches a mention of a deleted account as Former user", async () => {
+      await describeIssue2(
+        mentionDoc(
+          "Ask ",
+          "00000000-0000-0000-0000-00000000dead",
+          "Gone Person"
+        )
+      );
+      expect(await searchIds("Former user")).toEqual([ISSUE_2_ID]);
+      expect(await searchIds("Gone Person")).toEqual([]);
+    });
+
+    it("matches a mention with a malformed id by its stored label", async () => {
+      await describeIssue2(mentionDoc("Ask ", "not-a-uuid", "Legacy Label"));
+      expect(await searchIds("Legacy Label")).toEqual([ISSUE_2_ID]);
+    });
+
+    it("does not match the stored JSON's node types or attribute names", async () => {
+      await describeIssue2(mentionDoc("Ask ", ALICE_ID, "Alice Owner"));
+      expect(await searchIds("paragraph")).toEqual([]);
+      expect(await searchIds("mention")).toEqual([]);
+      expect(await searchIds("label")).toEqual([]);
+    });
+
+    it("matches a comment's text and its mentions by current name", async () => {
+      const db = await getTestDb();
+      await db.insert(issueComments).values({
+        issueId: ISSUE_2_ID,
+        authorId: BOB_ID,
+        content: mentionDoc(
+          "Replaced the switch, thanks ",
+          CHARLIE_ID,
+          "Chuck"
+        ),
+      });
+
+      expect(await searchIds("replaced the switch")).toEqual([ISSUE_2_ID]);
+      expect(await searchIds("Charlie Assignee")).toContain(ISSUE_2_ID);
+      expect(await searchIds("Chuck")).toEqual([]);
+      expect(await searchIds("paragraph")).toEqual([]);
+    });
   });
 });
