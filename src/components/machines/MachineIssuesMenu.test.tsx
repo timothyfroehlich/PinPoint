@@ -58,10 +58,14 @@ describe("MachineIssuesMenu", () => {
     expect(openItem).toHaveAttribute("aria-current", "true");
     expect(allItem).not.toHaveAttribute("aria-current", "true");
 
-    // View-all link → global issues list, machine-scoped, all statuses.
+    // View-all link → global issues list, machine-scoped, every presence
+    // state so an off-floor machine's issues still show (issues-list §7.4).
     expect(
       screen.getByRole("menuitem", { name: /view all in issues list/i })
-    ).toHaveAttribute("href", "/issues?machine=GZ");
+    ).toHaveAttribute(
+      "href",
+      "/issues?machine=GZ&include_inactive_machines=true"
+    );
 
     // Export item present.
     expect(

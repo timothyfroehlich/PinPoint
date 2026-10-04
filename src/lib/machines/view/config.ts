@@ -6,8 +6,15 @@ import type {
   MachineViewState,
 } from "~/lib/types";
 import { MACHINE_VIEW_FIELD_IDS } from "~/lib/types";
+import { VALID_MACHINE_PRESENCE_STATUSES } from "~/lib/machines/presence";
 
-export type MachineViewDependency = "health" | "service" | "activity";
+/**
+ * Optional per-row enrichment a field needs before it can display or sort.
+ * Health is not one: every load reads it, because the Summary Widgets
+ * (machine-widgets §2.3) and the phone Compact row (machine-views §5.3)
+ * always need it.
+ */
+export type MachineViewDependency = "service" | "activity";
 
 export interface MachineViewFieldDefinition {
   id: MachineViewFieldId;
@@ -30,13 +37,13 @@ export const MACHINE_VIEW_FIELDS: Record<
     id: "playability",
     label: "Playability",
     preferredDirection: "desc",
-    dependencies: ["health"],
+    dependencies: [],
   },
   openIssues: {
     id: "openIssues",
     label: "Open Issues",
     preferredDirection: "desc",
-    dependencies: ["health"],
+    dependencies: [],
   },
   lastServiced: {
     id: "lastServiced",
@@ -72,7 +79,7 @@ export const MACHINE_VIEW_FIELDS: Record<
     id: "oldestOpenIssue",
     label: "Oldest Open Issue",
     preferredDirection: "asc",
-    dependencies: ["health"],
+    dependencies: [],
   },
   lastActivity: {
     id: "lastActivity",
@@ -88,11 +95,14 @@ export const MACHINE_VIEW_FIELDS: Record<
   },
 };
 
+/** Both Page Presets' displayed fields (machine-views §4.6). */
 const DEFAULT_COLUMNS: MachineViewFieldId[] = [
   "machine",
   "playability",
+  "presence",
   "openIssues",
   "lastServiced",
+  "lastActivity",
 ];
 
 export interface MachineViewPreset {
@@ -185,13 +195,15 @@ export const MACHINE_VIEW_BUILT_IN_VIEWS: Record<
     }),
     builtIn("machines", "all-machines", "All machines", {
       presence: "all",
-      columns: [...DEFAULT_COLUMNS, "presence"],
     }),
     builtIn("machines", "recently-added", "Recently added", {
-      presence: "all",
+      // Every presence state except Removed (machine-views §9.1).
+      presence: VALID_MACHINE_PRESENCE_STATUSES.filter(
+        (presence) => presence !== "removed"
+      ),
       sort: "dateAdded",
       dir: "desc",
-      columns: [...DEFAULT_COLUMNS, "presence", "dateAdded"],
+      columns: [...DEFAULT_COLUMNS, "dateAdded"],
     }),
   ],
   collection: [
@@ -230,15 +242,14 @@ export function getMachineViewPreset(
 }
 
 export interface MachineViewDependencyPlan {
-  health: boolean;
   service: boolean;
   activity: boolean;
 }
 
 /**
- * The optional enrichment the visible rows need: displayed fields, sorting,
- * and filters. Summary Widgets need health independently of this plan; the
- * loader always loads health for them (machine-widgets §2.3).
+ * The optional enrichment the displayed fields and the sort need. No filter
+ * needs any: Playability and Open Issue Severity read health, which every
+ * load includes.
  */
 export function planMachineViewDependencies(
   state: MachineViewState
@@ -255,12 +266,7 @@ export function planMachineViewDependencies(
     }
   }
 
-  if (state.status.length > 0 || state.severity.length > 0) {
-    dependencies.add("health");
-  }
-
   return {
-    health: dependencies.has("health"),
     service: dependencies.has("service"),
     activity: dependencies.has("activity"),
   };
