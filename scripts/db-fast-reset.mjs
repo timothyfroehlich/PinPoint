@@ -64,6 +64,9 @@ async function fastReset() {
       "pnpm run db:_seed",
       "pnpm run db:_seed-users",
       "pnpm run db:_seed-collections",
+      // Hand-applied tags: `machines` CASCADE clears machine_tags, so the
+      // memberships need reseeding; the seed replaces its own types and tags.
+      "pnpm run db:_seed-tags",
       "pnpm run db:_seed-machine-settings",
       "pnpm run db:_seed-discord",
       "pnpm run db:_seed-timeline-backfill",

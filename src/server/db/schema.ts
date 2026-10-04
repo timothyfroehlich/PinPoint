@@ -1,4 +1,4 @@
-import { relations, sql } from "drizzle-orm";
+import { relations, sql, type SQL } from "drizzle-orm";
 import {
   pgTable,
   uuid,
@@ -14,6 +14,7 @@ import {
   bigserial,
   check,
   unique,
+  foreignKey,
 } from "drizzle-orm/pg-core";
 import { citext } from "~/server/db/citext";
 import {
@@ -1196,6 +1197,133 @@ export const collectionCollaborators = pgTable(
   (t) => ({
     pk: primaryKey({ columns: [t.collectionId, t.userId] }),
     userIdx: index("idx_collection_collaborators_user").on(t.userId),
+  })
+).enableRLS();
+
+/**
+ * Hand-applied tags (spec collections-and-tags §11, PP-wqit.3).
+ *
+ * Automatic tags (manufacturer, OPDB facts) are derived at read time and have
+ * no rows; these three tables hold only the tags people apply. Names are
+ * stored normalized (trimmed, inner whitespace collapsed, at most 20
+ * characters) and compared ignoring case (11.2, 11.3). Slugs are fixed at
+ * creation, so a rename never moves a tag's page (11.8).
+ *
+ * Exclusivity is enforced by the database: `exclusive` is copied down to
+ * `tags.type_exclusive` and `machine_tags.type_exclusive` through composite
+ * foreign keys with ON UPDATE CASCADE, and a partial unique index lets a
+ * machine hold one tag per exclusive type (11.5). Those composite keys use
+ * MATCH SIMPLE, so a row with a null `tag_type_id` is not checked against
+ * them — moving a tag into a type must update its `machine_tags` rows itself.
+ */
+const TAG_NAME_IS_NORMALIZED = (name: unknown): SQL =>
+  sql`${name} = btrim(regexp_replace(${name}, '\\s+', ' ', 'g')) AND char_length(${name}) BETWEEN 1 AND 20`;
+const TAG_SLUG_FORMAT = (slug: unknown): SQL =>
+  sql`${slug} ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`;
+/** Stands in for "no tag type" so untyped tag names are unique among themselves. */
+const NO_TAG_TYPE = sql`'00000000-0000-0000-0000-000000000000'::uuid`;
+
+export const tagTypes = pgTable(
+  "tag_types",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    slug: text("slug").notNull(),
+    name: text("name").notNull(),
+    exclusive: boolean("exclusive").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    nameNormalized: check(
+      "tag_types_name_normalized",
+      TAG_NAME_IS_NORMALIZED(t.name)
+    ),
+    slugFormat: check("tag_types_slug_format", TAG_SLUG_FORMAT(t.slug)),
+    slugUnique: unique("uq_tag_types_slug").on(t.slug),
+    nameUnique: uniqueIndex("uq_tag_types_name").on(sql`lower(${t.name})`),
+    // Target of tags' composite foreign key, which carries `exclusive` down.
+    idExclusive: unique("uq_tag_types_id_exclusive").on(t.id, t.exclusive),
+  })
+).enableRLS();
+
+export const tags = pgTable(
+  "tags",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tagTypeId: uuid("tag_type_id"),
+    typeExclusive: boolean("type_exclusive").notNull().default(false),
+    slug: text("slug").notNull(),
+    name: text("name").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    tagType: foreignKey({
+      name: "tags_tag_type_fk",
+      columns: [t.tagTypeId, t.typeExclusive],
+      foreignColumns: [tagTypes.id, tagTypes.exclusive],
+    })
+      .onDelete("cascade")
+      .onUpdate("cascade"),
+    nameNormalized: check(
+      "tags_name_normalized",
+      TAG_NAME_IS_NORMALIZED(t.name)
+    ),
+    slugFormat: check("tags_slug_format", TAG_SLUG_FORMAT(t.slug)),
+    untypedNotExclusive: check(
+      "tags_untyped_not_exclusive",
+      sql`${t.tagTypeId} IS NOT NULL OR NOT ${t.typeExclusive}`
+    ),
+    // One page per slug: a hand-applied tag resolves by slug alone.
+    slugUnique: unique("uq_tags_slug").on(t.slug),
+    nameUnique: uniqueIndex("uq_tags_type_name").on(
+      sql`coalesce(${t.tagTypeId}, ${NO_TAG_TYPE})`,
+      sql`lower(${t.name})`
+    ),
+    // Target of machine_tags' composite foreign key.
+    idType: unique("uq_tags_id_type").on(t.id, t.tagTypeId, t.typeExclusive),
+    typeIdx: index("idx_tags_tag_type").on(t.tagTypeId),
+  })
+).enableRLS();
+
+export const machineTags = pgTable(
+  "machine_tags",
+  {
+    machineId: uuid("machine_id")
+      .notNull()
+      .references(() => machines.id, { onDelete: "cascade" }),
+    tagId: uuid("tag_id")
+      .notNull()
+      .references(() => tags.id, { onDelete: "cascade" }),
+    tagTypeId: uuid("tag_type_id"),
+    typeExclusive: boolean("type_exclusive").notNull().default(false),
+    addedAt: timestamp("added_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    addedBy: uuid("added_by").references(() => userProfiles.id, {
+      onDelete: "set null",
+    }),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.machineId, t.tagId] }),
+    tag: foreignKey({
+      name: "machine_tags_tag_type_fk",
+      columns: [t.tagId, t.tagTypeId, t.typeExclusive],
+      foreignColumns: [tags.id, tags.tagTypeId, tags.typeExclusive],
+    })
+      .onDelete("cascade")
+      .onUpdate("cascade"),
+    untypedNotExclusive: check(
+      "machine_tags_untyped_not_exclusive",
+      sql`${t.tagTypeId} IS NOT NULL OR NOT ${t.typeExclusive}`
+    ),
+    // 11.5: at most one tag of an exclusive type per machine.
+    oneExclusivePerType: uniqueIndex("uq_machine_tags_exclusive_type")
+      .on(t.machineId, t.tagTypeId)
+      .where(sql`${t.typeExclusive}`),
+    tagIdx: index("idx_machine_tags_tag").on(t.tagId),
   })
 ).enableRLS();
 

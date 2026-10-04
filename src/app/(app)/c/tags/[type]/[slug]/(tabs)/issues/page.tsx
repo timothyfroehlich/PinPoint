@@ -1,8 +1,11 @@
 import type React from "react";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { MachineGroupIssuesTab } from "~/components/collections/MachineGroupIssuesTab";
 import { getViewer } from "~/lib/collections/viewer";
-import { getTagForLayout } from "~/app/(app)/c/tags/[type]/[slug]/_data";
+import {
+  canonicalTagPath,
+  getTagForLayout,
+} from "~/app/(app)/c/tags/[type]/[slug]/_data";
 
 interface PageProps {
   params: Promise<{ type: string; slug: string }>;
@@ -13,15 +16,25 @@ export default async function TagIssuesPage({
   params,
   searchParams,
 }: PageProps): Promise<React.JSX.Element> {
-  const { type, slug } = await params;
-  const tag = await getTagForLayout(type, slug);
-  if (!tag) notFound();
+  const [{ type, slug }, rawSearchParams] = await Promise.all([
+    params,
+    searchParams,
+  ]);
+  const resolved = await getTagForLayout(type, slug);
+  if (!resolved) notFound();
+  const canonical = canonicalTagPath(
+    resolved,
+    type,
+    "/issues",
+    rawSearchParams
+  );
+  if (canonical !== null) redirect(canonical);
 
   const viewer = await getViewer();
   return (
     <MachineGroupIssuesTab
-      machines={tag.machines}
-      searchParams={await searchParams}
+      machines={resolved.tag.machines}
+      searchParams={rawSearchParams}
       viewer={viewer}
       exportScope={{ kind: "tag", type, slug }}
     />

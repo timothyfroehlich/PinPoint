@@ -70,6 +70,11 @@ const authenticatedRoutes = [
   `/m/${ownedMachineInitials}/apron`,
   `/m/${machineInitials}/i/${issueNum}`,
   "/settings",
+  // Hand-applied tags (spec collections-and-tags §11), from seed-tags.mjs:
+  // the browse, an exclusive tag type, and one of its tags.
+  "/c/tags",
+  "/c/tags/location",
+  "/c/tags/location/front-room",
 ];
 
 const publicRoutes = [

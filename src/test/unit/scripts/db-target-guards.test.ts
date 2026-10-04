@@ -169,7 +169,10 @@ describe("db-target — describeTarget never leaks credentials", () => {
 });
 
 describe("seed scripts — local-only demo seeds refuse remote targets", () => {
-  for (const script of ["supabase/seed-collections.mjs"]) {
+  for (const script of [
+    "supabase/seed-collections.mjs",
+    "supabase/seed-tags.mjs",
+  ]) {
     it(`${script} refuses a production URL`, () => {
       const { status, stderr } = runScript(script, {
         POSTGRES_URL: PROD_POOLER_URL,
