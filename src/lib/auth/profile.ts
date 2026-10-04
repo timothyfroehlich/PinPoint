@@ -14,6 +14,7 @@ import { log } from "~/lib/logger";
 import { errorMessage } from "~/lib/errors";
 import { reportError } from "~/lib/observability/report-error";
 import { deriveName } from "~/lib/auth/derive-name";
+import { attachSignedUpGuestReporter } from "~/lib/timeline/issue-timeline-helpers";
 import type { UserRole } from "~/lib/types";
 
 /**
@@ -137,6 +138,12 @@ export async function ensureUserProfile(user: User): Promise<void> {
         )
         .returning({ id: issues.id });
       transferredGuestIssues.forEach((issue) => issueIdsToWatch.add(issue.id));
+      // The account becomes the reporter on those issues' machine-timeline
+      // issue_opened events (PP-0fg0.3).
+      await attachSignedUpGuestReporter(tx, {
+        issueIds: transferredGuestIssues.map((issue) => issue.id),
+        userId: user.id,
+      });
 
       // Handle invited users transfer
       if (invited) {
