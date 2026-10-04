@@ -152,7 +152,7 @@ export async function loadMachineViewSavedViews(
   const isMachinesPage = preset === MACHINES_PAGE.preset;
   const userId =
     viewer.userId !== undefined &&
-    checkPermission("machines.views.save", getAccessLevel(viewer.role))
+    checkPermission("views.save", getAccessLevel(viewer.role))
       ? viewer.userId
       : null;
   let views: MachineViewSavedViewSummary[] = [];

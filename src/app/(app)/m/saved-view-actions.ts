@@ -78,7 +78,7 @@ const createSchema = z.object({
 const createProtected = createProtectedAction({
   actionName: "createSavedMachineViewAction",
   schema: createSchema,
-  permission: "machines.views.save",
+  permission: "views.save",
   handler: async (input, { user }): Promise<SavedViewActionResult> =>
     withNameConflict(() =>
       db.transaction((tx) =>
@@ -105,7 +105,7 @@ const updateSchema = z.object({ id: z.uuid(), state: savedStateSchema });
 const updateProtected = createProtectedAction({
   actionName: "updateSavedMachineViewAction",
   schema: updateSchema,
-  permission: "machines.views.save",
+  permission: "views.save",
   handler: async (input, { user }): Promise<SavedViewActionResult> =>
     updateSavedViewState(db, {
       userId: user.id,
@@ -127,7 +127,7 @@ const renameSchema = z.object({ id: z.uuid(), name: z.string() });
 const renameProtected = createProtectedAction({
   actionName: "renameSavedMachineViewAction",
   schema: renameSchema,
-  permission: "machines.views.save",
+  permission: "views.save",
   handler: async (input, { user }): Promise<SavedViewActionResult> =>
     withNameConflict(() =>
       db.transaction((tx) =>
@@ -145,7 +145,7 @@ export async function renameSavedMachineViewAction(
 const deleteProtected = createProtectedAction({
   actionName: "deleteSavedMachineViewAction",
   schema: z.uuid(),
-  permission: "machines.views.save",
+  permission: "views.save",
   handler: async (id, { user }): Promise<SavedViewActionResult> =>
     deleteSavedView(db, { userId: user.id, host: "machines", id }),
 });
@@ -168,7 +168,7 @@ const defaultSchema = z.object({
 const defaultProtected = createProtectedAction({
   actionName: "setMachineViewDefaultAction",
   schema: defaultSchema,
-  permission: "machines.views.save",
+  permission: "views.save",
   handler: async (
     input,
     { user }
