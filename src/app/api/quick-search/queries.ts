@@ -2,22 +2,20 @@ import { and, asc, eq, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { CLOSED_STATUSES } from "~/lib/issues/status";
 import { machineNotRemoved } from "~/lib/machines/queries";
-import type { QuickSearchResults } from "~/lib/quick-search/types";
+import {
+  QUICK_SEARCH_MAX_QUERY_LENGTH,
+  QUICK_SEARCH_MIN_QUERY_LENGTH,
+  QUICK_SEARCH_RESULT_LIMIT,
+  normalizeQuickSearchQuery,
+} from "~/lib/quick-search/match";
+import type {
+  QuickSearchIssueResults,
+  QuickSearchMachineIndex,
+} from "~/lib/quick-search/types";
 import { db } from "~/server/db";
 import { issues, machines, pinballmapCatalog } from "~/server/db/schema";
 
-export const QUICK_SEARCH_MIN_QUERY_LENGTH = 2;
-export const QUICK_SEARCH_MAX_QUERY_LENGTH = 80;
-export const QUICK_SEARCH_RESULT_LIMIT = 5;
-
-const EMPTY_RESULTS: QuickSearchResults = { machines: [], issues: [] };
-
-export function normalizeQuickSearchQuery(query: string): string {
-  return query
-    .trim()
-    .replace(/\s+/g, " ")
-    .slice(0, QUICK_SEARCH_MAX_QUERY_LENGTH);
-}
+const EMPTY_ISSUE_RESULTS: QuickSearchIssueResults = { issues: [] };
 
 export const quickSearchQuerySchema = z
   .string()
@@ -28,15 +26,11 @@ function escapeLikePattern(value: string): string {
   return value.replace(/[\\%_]/g, "\\$&");
 }
 
-export async function searchQuickNavigation(
-  rawQuery: string
-): Promise<QuickSearchResults> {
-  const query = normalizeQuickSearchQuery(rawQuery);
-  if (query.length < QUICK_SEARCH_MIN_QUERY_LENGTH) return EMPTY_RESULTS;
-
-  const escapedQuery = escapeLikePattern(query);
-  const prefix = `${escapedQuery}%`;
-  const contains = `%${escapedQuery}%`;
+/**
+ * Every machine the quick search viewer can find, for matching in the browser
+ * (spec 5.9, 7.5). Removed machines are left out (spec 3.4).
+ */
+export async function listQuickSearchMachines(): Promise<QuickSearchMachineIndex> {
   const modelIdentity = sql<
     string | null
   >`coalesce(${pinballmapCatalog.name}, ${machines.modelName})`;
@@ -53,15 +47,36 @@ export async function searchQuickNavigation(
   const modelYear = sql<
     string | null
   >`coalesce(${pinballmapCatalog.year}, ${machines.year})::text`;
-  const machineRank = sql<number>`case
-    when lower(${machines.initials}) = lower(${query}) then 0
-    when ${machines.initials} ilike ${prefix} then 1
-    when ${machines.name} ilike ${prefix} then 2
-    when ${modelIdentity} ilike ${prefix}
-      or ${modelManufacturer} ilike ${prefix}
-      or ${modelYear} ilike ${prefix} then 3
-    else 4
-  end`;
+
+  const machineRows = await db
+    .select({
+      id: machines.id,
+      initials: machines.initials,
+      name: machines.name,
+      modelName: modelIdentity,
+      manufacturer: modelManufacturer,
+      year: modelYear,
+    })
+    .from(machines)
+    .leftJoin(
+      pinballmapCatalog,
+      eq(machines.pinballmapMachineId, pinballmapCatalog.pinballmapMachineId)
+    )
+    .where(machineNotRemoved())
+    .orderBy(asc(machines.name));
+
+  return { machines: machineRows };
+}
+
+export async function searchQuickIssues(
+  rawQuery: string
+): Promise<QuickSearchIssueResults> {
+  const query = normalizeQuickSearchQuery(rawQuery);
+  if (query.length < QUICK_SEARCH_MIN_QUERY_LENGTH) return EMPTY_ISSUE_RESULTS;
+
+  const escapedQuery = escapeLikePattern(query);
+  const prefix = `${escapedQuery}%`;
+  const contains = `%${escapedQuery}%`;
 
   const issueIdentifier = sql<string>`upper(${issues.machineInitials}) || '-' || lpad(${issues.issueNumber}::text, greatest(2, length(${issues.issueNumber}::text)), '0')`;
   const issueRank = sql<number>`case
@@ -78,59 +93,30 @@ export async function searchQuickNavigation(
   );
   const closedRank = sql<number>`case when ${issues.status} in (${closedStatuses}) then 1 else 0 end`;
 
-  const [machineRows, issueRows] = await Promise.all([
-    db
-      .select({
-        id: machines.id,
-        initials: machines.initials,
-        name: machines.name,
-        modelName: modelIdentity,
-      })
-      .from(machines)
-      .leftJoin(
-        pinballmapCatalog,
-        eq(machines.pinballmapMachineId, pinballmapCatalog.pinballmapMachineId)
-      )
-      .where(
-        and(
-          // Removed machines and their issues are left out (spec 3.4).
-          machineNotRemoved(),
-          or(
-            sql`${machines.initials} ilike ${contains}`,
-            sql`${machines.name} ilike ${contains}`,
-            sql`${modelIdentity} ilike ${contains}`,
-            sql`${modelManufacturer} ilike ${contains}`,
-            sql`${modelYear} ilike ${contains}`
-          )
+  const issueRows = await db
+    .select({
+      id: issues.id,
+      issueNumber: issues.issueNumber,
+      machineInitials: issues.machineInitials,
+      machineName: machines.name,
+      status: issues.status,
+      title: issues.title,
+    })
+    .from(issues)
+    .innerJoin(machines, eq(issues.machineInitials, machines.initials))
+    .where(
+      and(
+        machineNotRemoved(),
+        or(
+          sql`${issueIdentifier} ilike ${contains}`,
+          sql`${issues.title} ilike ${contains}`,
+          sql`${issues.machineInitials} ilike ${contains}`,
+          sql`${machines.name} ilike ${contains}`
         )
       )
-      .orderBy(machineRank, asc(machines.name))
-      .limit(QUICK_SEARCH_RESULT_LIMIT),
-    db
-      .select({
-        id: issues.id,
-        issueNumber: issues.issueNumber,
-        machineInitials: issues.machineInitials,
-        machineName: machines.name,
-        status: issues.status,
-        title: issues.title,
-      })
-      .from(issues)
-      .innerJoin(machines, eq(issues.machineInitials, machines.initials))
-      .where(
-        and(
-          machineNotRemoved(),
-          or(
-            sql`${issueIdentifier} ilike ${contains}`,
-            sql`${issues.title} ilike ${contains}`,
-            sql`${issues.machineInitials} ilike ${contains}`,
-            sql`${machines.name} ilike ${contains}`
-          )
-        )
-      )
-      .orderBy(issueRank, closedRank, asc(issues.title))
-      .limit(QUICK_SEARCH_RESULT_LIMIT),
-  ]);
+    )
+    .orderBy(issueRank, closedRank, asc(issues.title))
+    .limit(QUICK_SEARCH_RESULT_LIMIT);
 
-  return { machines: machineRows, issues: issueRows };
+  return { issues: issueRows };
 }

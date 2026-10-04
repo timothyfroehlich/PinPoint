@@ -8,6 +8,16 @@ const quickSearchMachineResultSchema = z.object({
   modelName: z.string().nullable(),
 });
 
+/**
+ * One machine as the browser holds it for matching: the result fields plus
+ * the extra model identity fields a query can match (spec 3.1, 7.5).
+ */
+const quickSearchMachineIndexEntrySchema =
+  quickSearchMachineResultSchema.extend({
+    manufacturer: z.string().nullable(),
+    year: z.string().nullable(),
+  });
+
 const quickSearchIssueResultSchema = z.object({
   id: z.string().min(1),
   issueNumber: z.number().int(),
@@ -17,15 +27,26 @@ const quickSearchIssueResultSchema = z.object({
   title: z.string(),
 });
 
-export const quickSearchResultsSchema = z.object({
-  machines: z.array(quickSearchMachineResultSchema),
+export const quickSearchMachineIndexSchema = z.object({
+  machines: z.array(quickSearchMachineIndexEntrySchema),
+});
+
+export const quickSearchIssueResultsSchema = z.object({
   issues: z.array(quickSearchIssueResultSchema),
 });
 
 export type QuickSearchMachineResult = z.infer<
   typeof quickSearchMachineResultSchema
 >;
+export type QuickSearchMachineIndexEntry = z.infer<
+  typeof quickSearchMachineIndexEntrySchema
+>;
+export type QuickSearchMachineIndex = z.infer<
+  typeof quickSearchMachineIndexSchema
+>;
 export type QuickSearchIssueResult = z.infer<
   typeof quickSearchIssueResultSchema
 >;
-export type QuickSearchResults = z.infer<typeof quickSearchResultsSchema>;
+export type QuickSearchIssueResults = z.infer<
+  typeof quickSearchIssueResultsSchema
+>;
