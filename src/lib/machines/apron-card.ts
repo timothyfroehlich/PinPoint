@@ -9,18 +9,64 @@ import {
 } from "~/lib/machines/manufacturer";
 import { formatCreditNames, type MachineCredits } from "~/lib/opdb/credits";
 
+/**
+ * Apron sizes (spec §1). A size takes its card-face geometry from the design
+ * tuned for its width — 5.5in cards from Stern's, 6in cards from WPC's — so
+ * its height only changes how much room the text gets. The 3in-tall Gottlieb
+ * EM card is the exception: WPC's widths with Stern's vertical sizes, since
+ * WPC's larger title floor and logo leave a long title no room at that height.
+ * The 7×5in Glass corner card keeps WPC's geometry with Stern's narrower
+ * identity panel, giving its extra room to the text.
+ */
 export const APRON_CARD_SIZES = {
   stern: {
-    label: "Stern / SPIKE",
+    label: "Stern / Data East / Sega",
     dimensions: "140 × 75 mm",
     widthMm: 140,
     heightMm: 75,
+    geometry: "narrow",
   },
   wpc: {
-    label: "WPC",
+    label: "Williams / WPC",
     dimensions: "6 × 3.25 in",
     widthMm: 152.4,
     heightMm: 82.55,
+    geometry: "wide",
+  },
+  bally: {
+    label: "Bally solid state",
+    dimensions: "5.5 × 3.25 in",
+    widthMm: 139.7,
+    heightMm: 82.55,
+    geometry: "narrow",
+  },
+  "williams-em": {
+    label: "Williams EM",
+    dimensions: "6 × 3.5 in",
+    widthMm: 152.4,
+    heightMm: 88.9,
+    geometry: "wide",
+  },
+  "gottlieb-em": {
+    label: "Gottlieb EM",
+    dimensions: "6 × 3 in",
+    widthMm: 152.4,
+    heightMm: 76.2,
+    geometry: "short",
+  },
+  "bally-em": {
+    label: "Bally EM",
+    dimensions: "5.5 × 3.75 in",
+    widthMm: 139.7,
+    heightMm: 95.25,
+    geometry: "narrow",
+  },
+  "glass-corner": {
+    label: "Glass corner",
+    dimensions: "7 × 5 in",
+    widthMm: 177.8,
+    heightMm: 127,
+    geometry: "glass",
   },
 } as const;
 
@@ -28,6 +74,35 @@ export type ApronCardSize = keyof typeof APRON_CARD_SIZES;
 
 export function isApronCardSize(value: string): value is ApronCardSize {
   return Object.hasOwn(APRON_CARD_SIZES, value);
+}
+
+/** Which tuned card-face design a size draws its geometry from. */
+export type ApronCardGeometry =
+  (typeof APRON_CARD_SIZES)[ApronCardSize]["geometry"];
+
+type SizedLayout<T> = T & { width: string; height: string };
+
+/** A geometry's layout given a size's physical width and height. */
+function layoutsBySize<T>(
+  byGeometry: Record<ApronCardGeometry, T>
+): Record<ApronCardSize, SizedLayout<T>> {
+  const at = (size: ApronCardSize): SizedLayout<T> => {
+    const { widthMm, heightMm, geometry } = APRON_CARD_SIZES[size];
+    return {
+      ...byGeometry[geometry],
+      width: `${widthMm}mm`,
+      height: `${heightMm}mm`,
+    };
+  };
+  return {
+    stern: at("stern"),
+    wpc: at("wpc"),
+    bally: at("bally"),
+    "williams-em": at("williams-em"),
+    "gottlieb-em": at("gottlieb-em"),
+    "bally-em": at("bally-em"),
+    "glass-corner": at("glass-corner"),
+  };
 }
 
 /**
@@ -211,8 +286,9 @@ export function apronCreditRows(
 /**
  * Card-face geometry per apron size, in CSS px (1px = 1/96in, so the face
  * prints at its physical size). Values come from the approved design canvas
- * (PP-esta, Claude Design artifact 2dbc7ba6): Stern/SPIKE is 529×283 with a
- * 206px identity panel; WPC is 576×312 with a 244px panel. The QR shrinks
+ * (PP-esta, Claude Design artifact 2dbc7ba6): the narrow geometry is Stern's
+ * 529×283 card with a 206px identity panel; the wide one is WPC's 576×312
+ * card with a 244px panel. The QR shrinks
  * when a tip is shown so the description region keeps its room, and the logo
  * shrinks while credit rows show so the identity panel keeps its room (10.6).
  */
@@ -233,10 +309,11 @@ export interface ApronCardLayout {
   bodyFontPx: number;
 }
 
-export const APRON_CARD_LAYOUTS: Record<ApronCardSize, ApronCardLayout> = {
-  stern: {
-    width: "140mm",
-    height: "75mm",
+/** A layout before a size supplies its physical width and height. */
+type ApronGeometryLayout = Omit<ApronCardLayout, "width" | "height">;
+
+export const APRON_CARD_LAYOUTS = layoutsBySize<ApronGeometryLayout>({
+  narrow: {
     panelWidth: 206,
     titleMaxWidth: 174,
     panelPadding: "16px 16px 12px 16px",
@@ -249,9 +326,7 @@ export const APRON_CARD_LAYOUTS: Record<ApronCardSize, ApronCardLayout> = {
     qrWithTipPx: 84,
     bodyFontPx: 12,
   },
-  wpc: {
-    width: "6in",
-    height: "3.25in",
+  wide: {
     panelWidth: 244,
     titleMaxWidth: 208,
     panelPadding: "18px 18px 14px 18px",
@@ -264,16 +339,40 @@ export const APRON_CARD_LAYOUTS: Record<ApronCardSize, ApronCardLayout> = {
     qrWithTipPx: 92,
     bodyFontPx: 12.5,
   },
-};
+  short: {
+    panelWidth: 244,
+    titleMaxWidth: 212,
+    panelPadding: "16px 16px 12px 16px",
+    bodyPadding: "16px 16px 14px 16px",
+    titleMaxPx: 42,
+    titleMinPx: 24,
+    logoWidth: 140,
+    logoWithCreditsWidth: 96,
+    qrPx: 100,
+    qrWithTipPx: 84,
+    bodyFontPx: 12,
+  },
+  glass: {
+    panelWidth: 206,
+    titleMaxWidth: 170,
+    panelPadding: "18px 18px 14px 18px",
+    bodyPadding: "18px 18px 16px 18px",
+    titleMaxPx: 46,
+    titleMinPx: 26,
+    logoWidth: 160,
+    logoWithCreditsWidth: 110,
+    qrPx: 108,
+    qrWithTipPx: 92,
+    bodyFontPx: 12.5,
+  },
+});
 
 /**
  * Side rail geometry (spec §5.6; canvas NLAnYXFFC4j3748otKxoPq, option A): a
  * narrower panel with no credits, so the logo and QR keep one size each.
  */
-export const APRON_SIDE_RAIL_LAYOUTS: Record<ApronCardSize, ApronCardLayout> = {
-  stern: {
-    width: "140mm",
-    height: "75mm",
+export const APRON_SIDE_RAIL_LAYOUTS = layoutsBySize<ApronGeometryLayout>({
+  narrow: {
     panelWidth: 160,
     titleMaxWidth: 132,
     panelPadding: "14px 14px 12px 14px",
@@ -286,9 +385,7 @@ export const APRON_SIDE_RAIL_LAYOUTS: Record<ApronCardSize, ApronCardLayout> = {
     qrWithTipPx: 98,
     bodyFontPx: 12,
   },
-  wpc: {
-    width: "6in",
-    height: "3.25in",
+  wide: {
     panelWidth: 184,
     titleMaxWidth: 152,
     panelPadding: "16px 16px 12px 16px",
@@ -301,7 +398,33 @@ export const APRON_SIDE_RAIL_LAYOUTS: Record<ApronCardSize, ApronCardLayout> = {
     qrWithTipPx: 108,
     bodyFontPx: 12.5,
   },
-};
+  short: {
+    panelWidth: 184,
+    titleMaxWidth: 156,
+    panelPadding: "14px 14px 12px 14px",
+    bodyPadding: "14px 16px 12px 16px",
+    titleMaxPx: 32,
+    titleMinPx: 16,
+    logoWidth: 88,
+    logoWithCreditsWidth: 88,
+    qrPx: 98,
+    qrWithTipPx: 98,
+    bodyFontPx: 12,
+  },
+  glass: {
+    panelWidth: 160,
+    titleMaxWidth: 128,
+    panelPadding: "16px 16px 12px 16px",
+    bodyPadding: "18px 18px 14px 18px",
+    titleMaxPx: 34,
+    titleMinPx: 17,
+    logoWidth: 96,
+    logoWithCreditsWidth: 96,
+    qrPx: 108,
+    qrWithTipPx: 108,
+    bodyFontPx: 12.5,
+  },
+});
 
 /**
  * Header band geometry (spec §5.7, §6.5; canvas option B). The band has a
@@ -323,13 +446,10 @@ export interface ApronHeaderBandLayout {
   bodyFontPx: number;
 }
 
-export const APRON_HEADER_BAND_LAYOUTS: Record<
-  ApronCardSize,
-  ApronHeaderBandLayout
-> = {
-  stern: {
-    width: "140mm",
-    height: "75mm",
+export const APRON_HEADER_BAND_LAYOUTS = layoutsBySize<
+  Omit<ApronHeaderBandLayout, "width" | "height">
+>({
+  narrow: {
     bandHeight: 66,
     bandPadding: "10px 14px 10px 16px",
     titleMaxWidth: 425,
@@ -340,9 +460,7 @@ export const APRON_HEADER_BAND_LAYOUTS: Record<
     bodyPadding: "12px 16px 12px 16px",
     bodyFontPx: 12,
   },
-  wpc: {
-    width: "6in",
-    height: "3.25in",
+  wide: {
     bandHeight: 72,
     bandPadding: "11px 16px 11px 18px",
     titleMaxWidth: 462,
@@ -353,7 +471,29 @@ export const APRON_HEADER_BAND_LAYOUTS: Record<
     bodyPadding: "14px 18px 14px 18px",
     bodyFontPx: 12.5,
   },
-};
+  short: {
+    bandHeight: 66,
+    bandPadding: "10px 14px 10px 16px",
+    titleMaxWidth: 472,
+    titleMaxPx: 28,
+    titleMinPx: 15,
+    logoWidth: 62,
+    qrPx: 98,
+    bodyPadding: "12px 16px 12px 16px",
+    bodyFontPx: 12,
+  },
+  glass: {
+    bandHeight: 72,
+    bandPadding: "11px 16px 11px 18px",
+    titleMaxWidth: 558,
+    titleMaxPx: 30,
+    titleMinPx: 16,
+    logoWidth: 68,
+    qrPx: 108,
+    bodyPadding: "14px 18px 14px 18px",
+    bodyFontPx: 12.5,
+  },
+});
 
 export const APRON_TITLE_MAX_LINES = 3;
 

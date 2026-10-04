@@ -340,12 +340,24 @@
   font-size: 11px;
 }
 
-.apron-card.is-side-rail[data-apron-size="wpc"] .apron-card__edition {
+.apron-card.is-side-rail:is(
+    [data-apron-geometry="wide"],
+    [data-apron-geometry="glass"]
+  )
+  .apron-card__edition {
   font-size: 12.5px;
 }
 
-.apron-card.is-side-rail[data-apron-size="wpc"] .apron-card__meta,
-.apron-card.is-side-rail[data-apron-size="wpc"] .apron-card__owner {
+.apron-card.is-side-rail:is(
+    [data-apron-geometry="wide"],
+    [data-apron-geometry="glass"]
+  )
+  .apron-card__meta,
+.apron-card.is-side-rail:is(
+    [data-apron-geometry="wide"],
+    [data-apron-geometry="glass"]
+  )
+  .apron-card__owner {
   font-size: 12px;
 }
 
@@ -418,13 +430,19 @@
   font-size: 11px;
 }
 
-.apron-card.is-header-band[data-apron-size="wpc"]
+.apron-card.is-header-band:is(
+    [data-apron-geometry="wide"],
+    [data-apron-geometry="glass"]
+  )
   .apron-card__band-meta
   .apron-card__edition {
   font-size: 12.5px;
 }
 
-.apron-card.is-header-band[data-apron-size="wpc"]
+.apron-card.is-header-band:is(
+    [data-apron-geometry="wide"],
+    [data-apron-geometry="glass"]
+  )
   .apron-card__band-meta
   :is(.apron-card__meta, .apron-card__owner) {
   font-size: 12px;
