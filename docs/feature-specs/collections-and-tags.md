@@ -154,7 +154,6 @@
 | 6.2 | Owner Collections require sign-in. | PP-wqit.9 |
 | 11.4, 11.10, 11.15 | A machine's page lists its hand-applied tags but has no control to apply or remove them, so machine owners cannot tag their machines and nobody can create a tag while tagging a machine. | PP-wqit.3 |
 | 11.7, 11.16 | A tag type's exclusivity is fixed when it is created, and a tag cannot move into, between, or out of tag types. | PP-wqit.3, PP-wqit.4 |
-| 2.7, 4.2, 5.2, 7.9 | The add-machine choice, header counts, Collection counts, and tag counts include Removed machines. | PP-s363 |
 
 ---
 

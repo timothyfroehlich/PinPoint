@@ -81,7 +81,7 @@ export interface TagEditor {
 export const getTagEditor = cache(
   async (type: string, slug: string): Promise<TagEditor | null> => {
     const resolved = await getTagForLayout(type, slug);
-    if (resolved?.tag.kind !== "hand" || resolved.group.kind === "automatic") {
+    if (resolved?.tag.kind !== "hand") {
       return null;
     }
     const viewer = await getViewer();

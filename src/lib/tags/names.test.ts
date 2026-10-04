@@ -18,6 +18,12 @@ describe("tag names", () => {
     expect(tagNameSchema.safeParse("   ").success).toBe(false);
   });
 
+  it("counts characters as the database does, an emoji as one", () => {
+    // 19 letters plus one emoji: 20 characters, 21 UTF-16 code units.
+    expect(tagNameSchema.safeParse(`${"a".repeat(19)}🔥`).success).toBe(true);
+    expect(tagNameSchema.safeParse(`${"a".repeat(20)}🔥`).success).toBe(false);
+  });
+
   it.each([
     ["Manufacturer", "Name already used"],
     ["player count", "Name already used"],

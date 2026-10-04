@@ -32,7 +32,8 @@ export default async function TagOverviewPage({
 
   // A hand-applied tag can have no machines; its page stays open and says so
   // (spec 11.13). Automatic tags only exist while a machine carries them.
-  if (tag.kind === "hand" && tag.machines.length === 0) {
+  // Removed machines do not count, as on the browse (spec 7.9).
+  if (tag.kind === "hand" && tag.machineCount === 0) {
     const editor = await getTagEditor(type, slug);
     return (
       <div className="flex flex-col items-center gap-3 rounded-xl border border-outline-variant bg-card px-6 py-12 text-center">

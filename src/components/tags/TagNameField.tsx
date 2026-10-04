@@ -3,7 +3,11 @@
 import type React from "react";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import { TAG_NAME_MAX } from "~/lib/tags/names";
+import {
+  normalizeTagName,
+  TAG_NAME_MAX,
+  tagNameLength,
+} from "~/lib/tags/names";
 
 interface TagNameFieldProps {
   id: string;
@@ -20,6 +24,13 @@ export function TagNameField({
   onChange,
   errorId,
 }: TagNameFieldProps): React.JSX.Element {
+  // The limit applies to the stored name: spaces collapsed, an emoji counting
+  // once. A raw maxLength would cut pasted text short of a valid name.
+  const tooLong = tagNameLength(normalizeTagName(value)) > TAG_NAME_MAX;
+  const describedBy =
+    [tooLong ? `${id}-too-long` : undefined, errorId]
+      .filter((part) => part !== undefined)
+      .join(" ") || undefined;
   return (
     <div className="flex flex-col gap-2">
       <Label htmlFor={id}>
@@ -34,12 +45,16 @@ export function TagNameField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         required
-        maxLength={TAG_NAME_MAX}
         autoComplete="off"
         enterKeyHint="done"
-        aria-invalid={errorId !== undefined}
-        aria-describedby={errorId}
+        aria-invalid={tooLong || errorId !== undefined}
+        aria-describedby={describedBy}
       />
+      {tooLong ? (
+        <p id={`${id}-too-long`} className="text-sm text-destructive-text">
+          Name over {TAG_NAME_MAX} characters
+        </p>
+      ) : null}
     </div>
   );
 }

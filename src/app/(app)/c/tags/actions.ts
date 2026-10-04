@@ -121,8 +121,9 @@ function writeFailure(error: unknown, action: string): TagActionResult<never> {
 /** Tag pages, tag type pages, the browse, and each affected machine's page. */
 function revalidateTags(machineInitials: Iterable<string> = []): void {
   revalidatePath("/c/tags");
-  revalidatePath("/c/tags/[type]", "page");
-  revalidatePath("/c/tags/[type]/[slug]", "layout");
+  // Route patterns name their route groups, or they match no route.
+  revalidatePath("/(app)/c/tags/[type]", "page");
+  revalidatePath("/(app)/c/tags/[type]/[slug]/(tabs)", "layout");
   for (const initials of new Set(machineInitials)) {
     revalidatePath(`/m/${initials}`);
   }
@@ -363,6 +364,11 @@ interface TagKey {
   typeExclusive: boolean;
 }
 
+/**
+ * The tag's type columns, locked until the transaction ends. A membership row
+ * copies them, and the composite foreign key cannot check a copy whose
+ * `tag_type_id` is null, so the tag must not change type in between.
+ */
 async function loadTag(
   tx: DbTransaction,
   tagId: string
@@ -374,7 +380,8 @@ async function loadTag(
       typeExclusive: tags.typeExclusive,
     })
     .from(tags)
-    .where(eq(tags.id, tagId));
+    .where(eq(tags.id, tagId))
+    .for("share");
   return row ?? null;
 }
 

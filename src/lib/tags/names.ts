@@ -68,6 +68,14 @@ export function reservedTagTypeNameError(name: string): string | null {
   return null;
 }
 
+/**
+ * A name's length in characters (code points), as the database's
+ * `char_length` counts it; an emoji is one character, not two.
+ */
+export function tagNameLength(name: string): number {
+  return [...name].length;
+}
+
 /** A tag or tag type name: normalized, required, at most 20 characters. */
 export const tagNameSchema = z
   .string()
@@ -76,7 +84,10 @@ export const tagNameSchema = z
     z
       .string()
       .min(1, "Name required")
-      .max(TAG_NAME_MAX, `Name too long (max ${String(TAG_NAME_MAX)})`)
+      .refine(
+        (name) => tagNameLength(name) <= TAG_NAME_MAX,
+        `Name too long (max ${String(TAG_NAME_MAX)})`
+      )
   );
 
 /** A hand-applied tag type's name, which also may not shadow an automatic one. */
