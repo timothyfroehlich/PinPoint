@@ -22,6 +22,12 @@ export type DiscordSendResult =
         | "transient"
         | "not_configured"
         | "no_shared_server";
+      /**
+       * Set on a 401: Discord rejected the bot token itself, which a channel
+       * status reports as Needs Discord rather than Can't post (region alerts
+       * §3.2, discord-activity-summary §2.7).
+       */
+      invalidToken?: true;
     };
 
 /** Historical alias — `sendDm`'s return type. */
@@ -216,6 +222,9 @@ async function classify(res: Response): Promise<SendDmResult> {
   // Sentry, so nobody learns the channel is misconfigured. `blocked` surfaces it.
   // 429 is handled above; 5xx and the synthetic 599 (network failure) fall
   // through to `transient`, where retrying genuinely can recover.
+  if (res.status === 401) {
+    return { ok: false, reason: "blocked", invalidToken: true };
+  }
   if (res.status >= 400 && res.status < 500) {
     return { ok: false, reason: "blocked" };
   }

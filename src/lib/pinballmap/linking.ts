@@ -10,12 +10,12 @@
  * Whether creating/editing a machine must have a PinballMap catalog link OR the
  * "not on PinballMap" excluded flag set.
  *
- * Hardcoded `false` until the rollout backfill links every existing machine
- * (PP-o355 rollout). Flip to `true` in the follow-up PR after that backfill, so
- * no existing machine is ever caught unsaveable. The mutual-exclusion invariant
- * below is enforced regardless of this flag.
+ * On since the rollout backfill matched or uncataloged every machine, Removed
+ * ones included (PP-o355.10 step 4), so no existing machine is caught
+ * unsaveable. The mutual-exclusion invariant below is enforced regardless of
+ * this flag.
  */
-export const PBM_LINKING_REQUIRED = false;
+export const PBM_LINKING_REQUIRED = true;
 
 /** A machine's PinballMap link selection, as resolved from a create/edit form. */
 export interface PbmLinkSelection {

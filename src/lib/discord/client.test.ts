@@ -217,12 +217,12 @@ describe("sendDm", () => {
   });
 
   it.each([
-    [400, "malformed channel id / bad request body"],
-    [401, "bad bot token"],
-    [451, "unavailable for legal reasons"],
+    [400, "malformed channel id / bad request body", {}],
+    [401, "bad bot token", { invalidToken: true }],
+    [451, "unavailable for legal reasons", {}],
   ])(
     "returns reason='blocked' on a %i client error retrying cannot fix (%s)",
-    async (status) => {
+    async (status, _label, extra) => {
       // A 4xx other than 429 is a client error: looping the hourly channel post
       // will keep failing and never reach Sentry if it reads as `transient`. The
       // 403 path has its own code-based nuance above; every other 4xx is blocked.
@@ -236,7 +236,9 @@ describe("sendDm", () => {
         discordUserId: "u",
         content: "hi",
       });
-      expect(result).toEqual({ ok: false, reason: "blocked" });
+      // A 401 also flags the token itself, so a channel status can say
+      // Needs Discord rather than Can't post.
+      expect(result).toEqual({ ok: false, reason: "blocked", ...extra });
     }
   );
 

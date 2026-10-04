@@ -77,6 +77,19 @@ vi.mock("~/lib/logger", () => ({
   },
 }));
 
+/**
+ * A New Machine form that passes every check except the ones a test adds.
+ * Marked not on Pinball Map because every create needs a catalog title or that
+ * flag; this file's subject is ownership, not Pinball Map.
+ */
+function newMachineForm(name: string, initials: string): FormData {
+  const formData = new FormData();
+  formData.append("name", name);
+  formData.append("initials", initials);
+  formData.append("pinballmapExcluded", "on");
+  return formData;
+}
+
 describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () => {
   setupTestDb();
 
@@ -332,9 +345,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
 
       machineCounter += 1;
       const uniqueInitials = `P${String(machineCounter).padStart(3, "0")}`;
-      const formData = new FormData();
-      formData.append("name", "Test Promote Machine");
-      formData.append("initials", uniqueInitials);
+      const formData = newMachineForm("Test Promote Machine", uniqueInitials);
       formData.append("ownerId", guestUser.id);
       formData.append("forcePromoteUserId", guestUser.id);
 
@@ -376,9 +387,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
 
       machineCounter += 1;
       const uniqueInitials = `T${String(machineCounter).padStart(3, "0")}`;
-      const formData = new FormData();
-      formData.append("name", "Tech Promote Machine");
-      formData.append("initials", uniqueInitials);
+      const formData = newMachineForm("Tech Promote Machine", uniqueInitials);
       formData.append("ownerId", guestUser.id);
       formData.append("forcePromoteUserId", guestUser.id);
 
@@ -416,9 +425,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
 
       machineCounter += 1;
       const uniqueInitials = `R${String(machineCounter).padStart(3, "0")}`;
-      const formData = new FormData();
-      formData.append("name", "Should Be Rejected");
-      formData.append("initials", uniqueInitials);
+      const formData = newMachineForm("Should Be Rejected", uniqueInitials);
       formData.append("ownerId", guestUser.id);
       formData.append("forcePromoteUserId", guestUser.id);
 
@@ -459,9 +466,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
 
       machineCounter += 1;
       const uniqueInitials = `V${String(machineCounter).padStart(3, "0")}`;
-      const formData = new FormData();
-      formData.append("name", "Mismatch Machine");
-      formData.append("initials", uniqueInitials);
+      const formData = newMachineForm("Mismatch Machine", uniqueInitials);
       formData.append("ownerId", guestUser.id);
       // forcePromoteUserId points at a different user than ownerId
       formData.append("forcePromoteUserId", otherGuestUser.id);
@@ -506,9 +511,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
 
       machineCounter += 1;
       const uniqueInitials = `G${String(machineCounter).padStart(3, "0")}`;
-      const formData = new FormData();
-      formData.append("name", "Non-Guest Machine");
-      formData.append("initials", uniqueInitials);
+      const formData = newMachineForm("Non-Guest Machine", uniqueInitials);
       formData.append("ownerId", memberTarget.id);
       // forcePromoteUserId points at a member, not a guest
       formData.append("forcePromoteUserId", memberTarget.id);
@@ -550,9 +553,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
 
       machineCounter += 1;
       const uniqueInitials = `MR${String(machineCounter).padStart(2, "0")}`;
-      const formData = new FormData();
-      formData.append("name", "Medieval Madness");
-      formData.append("initials", uniqueInitials);
+      const formData = newMachineForm("Medieval Madness", uniqueInitials);
 
       const result = await createMachineAction(undefined, formData);
 
@@ -584,9 +585,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
 
       machineCounter += 1;
       const uniqueInitials = `GR${String(machineCounter).padStart(2, "0")}`;
-      const formData = new FormData();
-      formData.append("name", "Medieval Madness");
-      formData.append("initials", uniqueInitials);
+      const formData = newMachineForm("Medieval Madness", uniqueInitials);
 
       const result = await createMachineAction(undefined, formData);
 
@@ -615,9 +614,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
 
       machineCounter += 1;
       const uniqueInitials = `UA${String(machineCounter).padStart(2, "0")}`;
-      const formData = new FormData();
-      formData.append("name", "Medieval Madness");
-      formData.append("initials", uniqueInitials);
+      const formData = newMachineForm("Medieval Madness", uniqueInitials);
 
       const result = await createMachineAction(undefined, formData);
 
@@ -649,9 +646,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
 
       machineCounter += 1;
       const uniqueInitials = `TC${String(machineCounter).padStart(2, "0")}`;
-      const formData = new FormData();
-      formData.append("name", "Medieval Madness");
-      formData.append("initials", uniqueInitials);
+      const formData = newMachineForm("Medieval Madness", uniqueInitials);
 
       const result = await createMachineAction(undefined, formData);
 
@@ -686,9 +681,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
 
       machineCounter += 1;
       const uniqueInitials = `ER${String(machineCounter).padStart(2, "0")}`;
-      const formData = new FormData();
-      formData.append("name", "Empty Owner Machine");
-      formData.append("initials", uniqueInitials);
+      const formData = newMachineForm("Empty Owner Machine", uniqueInitials);
       // Explicitly empty ownerId (not omitted — was previously defaulting to caller)
       formData.append("ownerId", "");
 
@@ -723,9 +716,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
 
       machineCounter += 1;
       const uniqueInitials = `AG${String(machineCounter).padStart(2, "0")}`;
-      const formData = new FormData();
-      formData.append("name", "Medieval Madness");
-      formData.append("initials", uniqueInitials);
+      const formData = newMachineForm("Medieval Madness", uniqueInitials);
       formData.append("ownerId", guestUser.id);
       // No forcePromoteUserId — should fail with ASSIGNEE_NOT_MEMBER
 
@@ -757,9 +748,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
 
       machineCounter += 1;
       const uniqueInitials = `IG${String(machineCounter).padStart(2, "0")}`;
-      const formData = new FormData();
-      formData.append("name", "Medieval Madness");
-      formData.append("initials", uniqueInitials);
+      const formData = newMachineForm("Medieval Madness", uniqueInitials);
       formData.append("ownerId", invitedGuest.id);
 
       const result = await createMachineAction(undefined, formData);
@@ -1756,9 +1745,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
 
       machineCounter += 1;
       const uniqueInitials = `N${String(machineCounter).padStart(3, "0")}`;
-      const formData = new FormData();
-      formData.append("name", "No Owner Machine");
-      formData.append("initials", uniqueInitials);
+      const formData = newMachineForm("No Owner Machine", uniqueInitials);
       // No ownerId — should store NULL
 
       const result = await createMachineAction(undefined, formData);

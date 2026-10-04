@@ -22,6 +22,7 @@ export interface SharedCollectionListItem {
   ownerName: string;
 }
 
+// Machine counts leave out Removed machines (collections-and-tags 5.2).
 export async function getMyCollections(
   tx: DbTransaction = db,
   ownerId: string
@@ -30,12 +31,16 @@ export async function getMyCollections(
     .select({
       id: collections.id,
       name: collections.name,
-      machineCount: count(collectionMachines.machineId),
+      machineCount: count(machines.id),
     })
     .from(collections)
     .leftJoin(
       collectionMachines,
       eq(collectionMachines.collectionId, collections.id)
+    )
+    .leftJoin(
+      machines,
+      and(eq(machines.id, collectionMachines.machineId), machineNotRemoved())
     )
     .where(eq(collections.ownerId, ownerId))
     .groupBy(collections.id, collections.name)
@@ -77,7 +82,7 @@ export async function getSharedWithMe(
       id: collections.id,
       name: collections.name,
       ownerName: userProfiles.name,
-      machineCount: count(collectionMachines.machineId),
+      machineCount: count(machines.id),
     })
     .from(collectionCollaborators)
     .innerJoin(
@@ -88,6 +93,10 @@ export async function getSharedWithMe(
     .leftJoin(
       collectionMachines,
       eq(collectionMachines.collectionId, collections.id)
+    )
+    .leftJoin(
+      machines,
+      and(eq(machines.id, collectionMachines.machineId), machineNotRemoved())
     )
     .where(
       and(

@@ -36,9 +36,9 @@
  * cabinet is matched to its OWN real title (so the machine header reads
  * correctly); the spread across the listing states comes from intent and
  * availability, not from mismatched titles. Of the twelve: seven are matched to
- * a title the captured lineup carries, three to a title it does not, one is
- * matched to nothing (the no-model fixture), and one is hand-entered (the
- * uncataloged fixture). Each id below was verified against both fixtures; see
+ * a title the captured lineup carries, three to a title it does not, and two
+ * are marked not on Pinball Map (uncataloged) — one with nothing hand-entered,
+ * one with a hand-entered model. Each id below was verified against both fixtures; see
  * the table in `MACHINE_PLAN`.
  *
  * Idempotent: singleton upsert plus per-machine updates keyed on initials.
@@ -162,6 +162,8 @@ interface MachinePlan {
   pinballmapMachineId: number | null;
   pinballmapIntent: "on" | "off" | "no_sync";
   pinballmapExcluded: boolean;
+  /** Why an excluded row is not on Pinball Map; excluded rows only. */
+  pinballmapExcludedReason?: string;
   presenceStatus: string | null;
   modelName: string | null;
   /**
@@ -194,7 +196,7 @@ interface MachinePlan {
  * | MM   Medieval Madness  | 642     | no        | on      | on the floor | missing     |
  * | TAF  The Addams Family | 90002   | no        | no_sync | on the floor | sync_off    |
  * | EBD  Eight Ball Deluxe | 90003   | no        | off     | removed      | blocked     |
- * | HD   Humpty Dumpty     | none    | —         | off     | on the floor | no_model    |
+ * | HD   Humpty Dumpty     | none    | —         | off     | on the floor | uncataloged |
  * | HB   Hyperball         | none    | —         | off     | on the floor | uncataloged |
  *
  * **Shared and Covered need three cabinets of one title**, so GDZ / GDZ2 / GDZ3
@@ -209,10 +211,14 @@ interface MachinePlan {
  * added to the lineup fixture (see assertLineup above). MM stays `missing`:
  * matched, intent On, but its title is not on the lineup.
  *
- * **HD is the no-model fixture** (matched to nothing) and **HB the uncataloged
- * one** (hand-entered Williams / 1981 — Hyperball is a real flipperless Williams
- * title with no pinball catalog entry). These two are the deliberate exceptions
- * to "every game gets its correct match".
+ * **HD and HB are the uncataloged fixtures**: both marked not on Pinball Map,
+ * HD with nothing hand-entered and HB with a hand-entered Williams / 1981
+ * (Hyperball is a real flipperless Williams title with no pinball catalog
+ * entry). These two are the deliberate exceptions to "every game gets its
+ * correct match". No seeded machine is `no_model` (neither linked nor
+ * excluded): every create and edit now requires one or the other, so that
+ * state only describes a machine predating the rule. E2E reaches it with a
+ * direct insert (`createTestMachine` in e2e/support/supabase-admin.ts).
  *
  * **Alert is now seeded** (SC): intent On with availability Removed. Spec 6.2
  * blocks entering that from the intent side but allows it from the availability
@@ -329,10 +335,10 @@ const MACHINE_PLAN: MachinePlan[] = [
     // Off-lineup + intent Off + Removed → Blocked: availability disallows the On
     // position, with the reason beside it (6.2). EBD carries Blocked rather than
     // TAF because a Removed machine drops out of the default issue list, and the
-    // suite leans on TAF's issues staying listed while nothing lists EBD's. The
-    // reassign picker and direct /m/EBD routes ignore presence, so EBD stays
-    // usable as machine-timeline's reassign target and responsive-overflow's
-    // member-owned edit surface.
+    // suite leans on TAF's issues staying listed while nothing lists EBD's.
+    // Direct /m/EBD routes ignore presence, so EBD stays usable as
+    // responsive-overflow's member-owned edit surface; pickers leave it out
+    // (PP-s363).
     pinballmapIntent: "off",
     pinballmapExcluded: false,
     presenceStatus: "removed",
@@ -341,14 +347,16 @@ const MACHINE_PLAN: MachinePlan[] = [
   },
   {
     initials: "HD",
-    // The no-model fixture: a cabinet nobody has matched. "No model set" is the
-    // honest state, and a 1947 EM is a plausible thing to leave unmatched.
+    // Uncataloged with nothing hand-entered: a 1947 EM is a plausible title
+    // for Pinball Map's catalog to lack, and the reason is what the Manage tab
+    // shows in place of a match.
     pinballmapMachineId: null,
     pinballmapIntent: "off",
-    pinballmapExcluded: false,
+    pinballmapExcluded: true,
+    pinballmapExcludedReason: "Not in the Pinball Map catalog",
     presenceStatus: "on_the_floor",
     modelName: null,
-    state: "no_model",
+    state: "uncataloged",
   },
   {
     initials: "HB",
@@ -581,6 +589,7 @@ try {
         pinballmap_machine_id = ${m.pinballmapMachineId},
         pinballmap_intent = ${m.pinballmapIntent},
         pinballmap_excluded = ${m.pinballmapExcluded},
+        pinballmap_excluded_reason = ${m.pinballmapExcludedReason ?? null},
         presence_status = COALESCE(${m.presenceStatus}, presence_status),
         model_name = ${m.modelName},
         manufacturer = ${manufacturer},

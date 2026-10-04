@@ -14,7 +14,8 @@ export {
   formatDiscordWelcomeMessage,
 } from "~/lib/discord/system-messages";
 
-const DISCORD_MAX_MESSAGE_LENGTH = 2000;
+/** Discord's message length limit, in characters. */
+export const DISCORD_MAX_MESSAGE_LENGTH = 2000;
 const DISCORD_MAX_ACTOR_LABEL_LENGTH = 256;
 
 interface DiscordIssueMessageBase {
@@ -351,4 +352,14 @@ export function sanitizeDiscordText(value: string): string {
     .replace(/@/g, `@${ZERO_WIDTH_SPACE}`)
     .replace(/</g, `<${ZERO_WIDTH_SPACE}`)
     .replace(/[\\*_~`|>[\]]/g, (m) => `\\${m}`);
+}
+
+/** Bound an untrusted label without splitting a Unicode code point. */
+export function truncateDiscordLabel(
+  value: string,
+  maxCodePoints: number
+): string {
+  const codePoints = [...value];
+  if (codePoints.length <= maxCodePoints) return value;
+  return `${codePoints.slice(0, maxCodePoints - 1).join("")}…`;
 }

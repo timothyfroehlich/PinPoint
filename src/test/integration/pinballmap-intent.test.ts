@@ -531,31 +531,6 @@ describe("updateMachineAction intent carry-over (PGlite)", () => {
     expect(row?.pinballmapMachineId).toBeNull();
   });
 
-  it("clears intent when the save clears the link entirely", async () => {
-    const db = await getTestDb();
-    const { updateMachineAction } = await import("~/app/(app)/m/actions");
-    const admin = await createUser("admin");
-    await mockAuthAs(admin.id);
-    await seedCatalog(42);
-    const machine = await seedMachine({
-      initials: "GZ",
-      pinballmapMachineId: 42,
-      pinballmapIntent: "on",
-    });
-
-    const res = await updateMachineAction(
-      undefined,
-      editFormData(machine.id, null)
-    );
-    expectOk(res);
-
-    const row = await db.query.machines.findFirst({
-      where: eq(machines.id, machine.id),
-    });
-    expect(row?.pinballmapIntent).toBe("off");
-    expect(row?.pinballmapMachineId).toBeNull();
-  });
-
   it("keeps a Don't-sync setting across a re-match (spec 2.3)", async () => {
     // Don't sync says "leave this cabinet out of the integration", which is a
     // standing preference about the cabinet rather than a claim about a title.

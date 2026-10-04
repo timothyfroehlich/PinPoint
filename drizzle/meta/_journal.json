@@ -705,8 +705,15 @@
     {
       "idx": 100,
       "version": "7",
-      "when": 1791069966888,
-      "tag": "0100_guest-reporter-timeline-conversion",
+      "when": 1791069006186,
+      "tag": "0100_activity-summary-settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "7",
+      "when": 1791083585601,
+      "tag": "0101_guest-reporter-timeline-conversion",
       "breakpoints": true
     }
   ]

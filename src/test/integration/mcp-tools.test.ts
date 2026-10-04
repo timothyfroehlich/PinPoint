@@ -76,6 +76,7 @@ import type {
 import type { McpMachinePinballmap } from "~/lib/mcp/tools/pinballmap-block";
 import { updateMachineSchema as updateMachineFormSchema } from "~/app/(app)/m/schemas";
 import { updateMachinePbmLink } from "~/services/machines";
+import { REMOVED_MACHINE_REPORT_ERROR } from "~/services/issues";
 import { runUpdateIssue } from "~/lib/mcp/tools/update-issue";
 import {
   runUpdateMachine,
@@ -748,6 +749,27 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
         expect(result.total).toBe(1);
       });
 
+      it("leaves out Removed machines unless presence names them (PP-s363)", async () => {
+        const admin = await makeUser("admin");
+        const byState = await seedOnePerState("Default Presence");
+
+        const byDefault = await list({ search: "Default Presence" }, admin);
+        expect(byDefault.machines.map((m) => m.presence)).not.toContain(
+          "removed"
+        );
+        expect(byDefault.total).toBe(
+          VALID_MACHINE_PRESENCE_STATUSES.length - 1
+        );
+
+        const optedIn = await list(
+          { search: "Default Presence", presence: ["on_the_floor", "removed"] },
+          admin
+        );
+        expect(optedIn.machines.map((m) => m.initials).sort()).toEqual(
+          [byState.on_the_floor, byState.removed].sort()
+        );
+      });
+
       it("accepts a set and returns exactly the listed states", async () => {
         const admin = await makeUser("admin");
         const byState = await seedOnePerState("Set Presence");
@@ -804,9 +826,10 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
 
         // This is the bead: 'unlinked' alone keeps handing back the cabinets
         // nobody will ever link, so they sit in every page of every sweep and
-        // hold `total` above zero permanently.
-        expect(wide.total).toBe(VALID_MACHINE_PRESENCE_STATUSES.length);
-        expect(wide.machines.map((m) => m.presence)).toContain("removed");
+        // hold `total` above zero permanently. Removed is left out by default
+        // (PP-s363); Pending Arrival is not.
+        expect(wide.total).toBe(VALID_MACHINE_PRESENCE_STATUSES.length - 1);
+        expect(wide.machines.map((m) => m.presence)).not.toContain("removed");
         expect(wide.machines.map((m) => m.presence)).toContain(
           "pending_arrival"
         );
@@ -1396,7 +1419,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       const initials = nextInitials();
 
       const outcome = await runAddMachine(
-        { name: "Medieval Madness", initials },
+        { name: "Medieval Madness", initials, pinballmapExcluded: true },
         ctx("admin", admin)
       );
       const result = outcome.result as { initials: string; name: string };
@@ -1413,7 +1436,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       const member = await makeUser("member");
       await expect(
         runAddMachine(
-          { name: "Nope", initials: nextInitials() },
+          { name: "Nope", initials: nextInitials(), pinballmapExcluded: true },
           ctx("member", member)
         )
       ).rejects.toMatchObject({ reason: "denied" });
@@ -1424,10 +1447,33 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       const machine = await seedMachine();
       await expect(
         runAddMachine(
-          { name: "Dup", initials: machine.initials },
+          {
+            name: "Dup",
+            initials: machine.initials,
+            pinballmapExcluded: true,
+          },
           ctx("admin", admin)
         )
       ).rejects.toMatchObject({ reason: "invalid" });
+    });
+
+    it("rejects a machine that is neither linked nor marked not on Pinball Map", async () => {
+      const admin = await makeUser("admin");
+      const initials = nextInitials();
+
+      await expect(
+        runAddMachine({ name: "Unpicked", initials }, ctx("admin", admin))
+      ).rejects.toMatchObject({
+        reason: "invalid",
+        message:
+          "Pass pinballmapMachineId (find it with search_pinballmap_catalog), or pinballmapExcluded: true for a machine Pinball Map does not list.",
+      });
+      const db = await getTestDb();
+      expect(
+        await db.query.machines.findFirst({
+          where: eq(machines.initials, initials),
+        })
+      ).toBeUndefined();
     });
   });
 
@@ -1473,6 +1519,29 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       await expect(
         runCreateIssue({ machine: "NOPE", title: "x" }, ctx("admin", admin))
       ).rejects.toBeInstanceOf(McpToolError);
+    });
+
+    it("refuses a Removed machine as invalid and files nothing (reporting §10.2)", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ presenceStatus: "removed" });
+
+      await expect(
+        runCreateIssue(
+          { machine: machine.initials, title: "sold game" },
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({
+        name: "McpToolError",
+        reason: "invalid",
+        message: REMOVED_MACHINE_REPORT_ERROR,
+      });
+      const db = await getTestDb();
+      expect(
+        await db
+          .select()
+          .from(issues)
+          .where(eq(issues.machineInitials, machine.initials))
+      ).toEqual([]);
     });
 
     it("returns the original issue when an identical call is retried (PP-u4ab.4)", async () => {
@@ -1820,6 +1889,42 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       };
       expect(result.total).toBe(1);
       expect(result.issues[0]?.title).toBe("open one");
+    });
+
+    it("leaves out issues on Removed machines unless asked for (PP-s363)", async () => {
+      const admin = await makeUser("admin");
+      const live = await seedMachine({ name: "Live Game" });
+      const sold = await seedMachine({ name: "Sold Game" });
+      await runCreateIssue(
+        { machine: live.initials, title: "live issue" },
+        ctx("admin", admin)
+      );
+      await runCreateIssue(
+        { machine: sold.initials, title: "sold issue" },
+        ctx("admin", admin)
+      );
+      const db = await getTestDb();
+      await db
+        .update(machines)
+        .set({ presenceStatus: "removed" })
+        .where(eq(machines.id, sold.id));
+
+      const titles = async (
+        args: Parameters<typeof runListIssues>[0]
+      ): Promise<string[]> => {
+        const outcome = await runListIssues(args, ctx("admin", admin));
+        const result = outcome.result as { issues: { title: string }[] };
+        return result.issues.map((issue) => issue.title).sort();
+      };
+
+      expect(await titles({})).toEqual(["live issue"]);
+      // Naming the machine is a direct lookup; its issues stay reachable.
+      expect(await titles({ machine: sold.initials })).toEqual(["sold issue"]);
+      expect(await titles({ presence: ["on_the_floor", "removed"] })).toEqual([
+        "live issue",
+        "sold issue",
+      ]);
+      expect(await titles({ presence: "removed" })).toEqual(["sold issue"]);
     });
 
     it("accepts the 'closed' shorthand and an explicit status set", async () => {

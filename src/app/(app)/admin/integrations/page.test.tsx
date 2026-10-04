@@ -1,6 +1,6 @@
 import * as React from "react";
-import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { findDiscordConfigMock, getPinballMapStateMock, redirectMock } =
   vi.hoisted(() => ({
@@ -32,6 +32,14 @@ vi.mock("./discord/discord-config-form", () => ({
   }) => <div data-testid="discord-form">{JSON.stringify(props)}</div>,
 }));
 
+vi.mock("./discord/activity-summary-form", () => ({
+  ActivitySummaryForm: (props: { initialState: unknown }) => (
+    <div data-testid="activity-summary-form">
+      {JSON.stringify(props.initialState)}
+    </div>
+  ),
+}));
+
 vi.mock("./pinballmap/read-model", () => ({
   getPinballMapAdminViewState: getPinballMapStateMock,
 }));
@@ -43,8 +51,19 @@ vi.mock("./pinballmap/pinballmap-config-form", () => ({
 import AdminIntegrationsPage from "./page";
 import AdminDiscordIntegrationPage from "./discord/page";
 
+/** The section list's in-view tracking; jsdom has no IntersectionObserver. */
+class NoopIntersectionObserver {
+  observe(): void {}
+  disconnect(): void {}
+}
+
 describe("Admin Integrations routes", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   beforeEach(() => {
+    vi.stubGlobal("IntersectionObserver", NoopIntersectionObserver);
     findDiscordConfigMock.mockReset();
     getPinballMapStateMock.mockReset();
     redirectMock.mockClear();
@@ -52,6 +71,13 @@ describe("Admin Integrations routes", () => {
       guildId: "1084526293445124096",
       inviteLink: "https://discord.gg/pinpoint",
       botTokenVaultId: "saved-vault-id",
+      summaryChannelId: "123456789012345678",
+      summaryIntervalHours: 6,
+      summaryStartHour: 9,
+      summaryEvents: ["issues_opened", "new_members"],
+      summaryStatus: "posting",
+      summaryStatusDetail: null,
+      summaryLastPostAt: new Date("2026-10-03T15:00:00.000Z"),
     });
     getPinballMapStateMock.mockResolvedValue({
       configuredLocationId: null,
@@ -73,7 +99,7 @@ describe("Admin Integrations routes", () => {
     });
   });
 
-  it("renders Discord then Pinball Map in the combined narrow page frame", async () => {
+  it("renders Discord then Pinball Map in the combined page frame", async () => {
     render(await AdminIntegrationsPage());
 
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
@@ -107,6 +133,85 @@ describe("Admin Integrations routes", () => {
         "Syncs the tracked location's lineup and watches a region for new machines."
       )
     ).toBeInTheDocument();
+  });
+
+  it("groups the Discord card into Connection and Activity summary", async () => {
+    render(await AdminIntegrationsPage());
+
+    const discordCard = screen.getByTestId("discord-integration-card");
+    const headings = within(discordCard).getAllByRole("heading", { level: 3 });
+    expect(headings.map((h) => h.textContent)).toEqual([
+      "Connection",
+      "Activity summary",
+    ]);
+    expect(
+      within(discordCard).getByRole("region", { name: "Activity summary" })
+    ).toContainElement(screen.getByTestId("activity-summary-form"));
+    expect(screen.getByTestId("activity-summary-form")).toHaveTextContent(
+      JSON.stringify({
+        channelId: "123456789012345678",
+        intervalHours: 6,
+        startHour: 9,
+        events: ["issues_opened", "new_members"],
+        status: "posting",
+        statusDetail: null,
+        lastPostAtIso: "2026-10-03T15:00:00.000Z",
+      })
+    );
+  });
+
+  it("reads a missing Discord row as the activity summary defaults", async () => {
+    findDiscordConfigMock.mockResolvedValue(undefined);
+    render(await AdminIntegrationsPage());
+
+    expect(screen.getByTestId("activity-summary-form")).toHaveTextContent(
+      JSON.stringify({
+        channelId: null,
+        intervalHours: 24,
+        startHour: 18,
+        events: [
+          "issues_opened",
+          "issues_closed",
+          "machine_status",
+          "availability",
+          "new_machines",
+          "pinball_map_sync",
+        ],
+        status: "not_configured",
+        statusDetail: null,
+        lastPostAtIso: null,
+      })
+    );
+  });
+
+  it("lists every section, each jumping to an anchor on the page", async () => {
+    render(await AdminIntegrationsPage());
+
+    const nav = screen.getByTestId("section-nav");
+    const links = within(nav).getAllByRole("link");
+    expect(
+      links.map((link) => [link.textContent, link.getAttribute("href")])
+    ).toEqual([
+      ["Discord", "#discord"],
+      ["Connection", "#discord-connection"],
+      ["Activity summary", "#activity-summary"],
+      ["Pinball Map", "#pinball-map"],
+      ["Location", "#pinball-map-location"],
+      ["Region alerts", "#region-alerts"],
+    ]);
+    // The page places the Discord and Pinball Map anchors; the Pinball Map
+    // form places Location and Region alerts (its own test covers them).
+    expect(screen.getByTestId("discord-integration-card")).toContainElement(
+      document.getElementById("discord")
+    );
+    for (const id of ["discord-connection", "activity-summary"]) {
+      expect(screen.getByTestId("discord-integration-card")).toContainElement(
+        document.getElementById(id)
+      );
+    }
+    expect(screen.getByTestId("pinballmap-integration-card")).toContainElement(
+      document.getElementById("pinball-map")
+    );
   });
 
   it("redirects the legacy Discord route to the combined page", () => {

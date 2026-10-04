@@ -38,7 +38,7 @@
 - **3.5** Each period posts at most once, even when the scheduler runs more than once.
 - **3.6** A period with nothing to report posts nothing. It still counts as covered.
 - **3.7** A failed post is not retried; the next period starts where the failed one ended. The failure shows in the channel status (§2.7).
-- **3.8** A **Send summary now** action posts a summary immediately, covering one interval ending at that moment, using the saved settings. It is unavailable while the interval is Disabled or no summary channel is set.
+- **3.8** A **Send summary now** action posts a summary immediately, covering one interval ending at that moment, using the saved settings. While the interval is Disabled, it covers the 24 hours ending at that moment. It is unavailable while no summary channel is set.
 - **3.9** When Send summary now has nothing to report, it posts a line saying so.
 - **3.10** A successful Send summary now ends the current period: the next scheduled summary covers only what changed after it. A failed one changes nothing and shows in the channel status (§2.7).
 
@@ -109,9 +109,7 @@
 
 ## Known divergences (code vs spec)
 
-| Spec  | Code today | Resolution |
-| :---- | :--------- | :--------- |
-| §1–§8 | Not built  | PP-ogup    |
+_None — the current implementation matches this spec._
 
 ---
 
@@ -119,4 +117,5 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-03 | §3.8: Send summary now works while the interval is Disabled, covering the last 24 hours. |
 | 2026-10-03 | Created. Configuration in the Discord section (§2), interval and Central start-time schedule with Send summary now (§3), event types and defaults (§4), net-change reporting and the Pinball Map rows to review, replacing the weekly sync report (§5), direction-sorted layout (§6), message splitting up to two messages (§7), permissions (§8). |
