@@ -90,6 +90,18 @@
     "authRole": "member",
     "seedNeeds": "OPDB seed: machines whose catalog title's OPDB display is dmd"
   },
+  "tag-type-location": {
+    "label": "Hand-applied tag type (Location)",
+    "route": "/c/tags/location",
+    "authRole": "technician",
+    "seedNeeds": "seed-tags.mjs: exclusive Location type with an empty Storage tag"
+  },
+  "tag-front-room": {
+    "label": "Hand-applied tag (Location / Front room)",
+    "route": "/c/tags/location/front-room",
+    "authRole": "technician",
+    "seedNeeds": "seed-tags.mjs: Front room tag on seeded machines"
+  },
   "pinball-map-lineup": {
     "label": "Pinball Map lineup",
     "route": "/m/pinball-map",
