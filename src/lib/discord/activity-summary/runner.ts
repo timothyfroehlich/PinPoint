@@ -225,7 +225,9 @@ async function configuredBotToken(): Promise<string | null> {
   return config?.botToken ?? null;
 }
 
-const DISCORD_NOT_CONFIGURED = "Discord bot token or server ID not configured";
+/** Channel status detail while Discord is not configured (§2.4). */
+export const DISCORD_NOT_CONFIGURED =
+  "Discord bot token or server ID not configured";
 
 // ─── Scheduled ────────────────────────────────────────────────────────
 

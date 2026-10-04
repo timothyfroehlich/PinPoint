@@ -29,12 +29,17 @@ const {
   getUserAccessLevelMock,
   getDiscordBotTokenMock,
   postChannelMessageMock,
-} = vi.hoisted(() => ({
-  createClientMock: vi.fn(),
-  getUserAccessLevelMock: vi.fn(),
-  getDiscordBotTokenMock: vi.fn(),
-  postChannelMessageMock: vi.fn(),
-}));
+  discordServer,
+} = vi.hoisted(() => {
+  const discordServer: { id: string | null } = { id: "guild" };
+  return {
+    discordServer,
+    createClientMock: vi.fn(),
+    getUserAccessLevelMock: vi.fn(),
+    getDiscordBotTokenMock: vi.fn(),
+    postChannelMessageMock: vi.fn(),
+  };
+});
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("~/lib/supabase/server", () => ({ createClient: createClientMock }));
@@ -44,8 +49,11 @@ vi.mock("~/lib/permissions/access", () => ({
 vi.mock("~/lib/discord/config", () => ({
   getDiscordBotToken: getDiscordBotTokenMock,
   getDiscordConfig: async () => {
+    // Configured only with a token AND a server ID (discord.md §2.2).
     const botToken: unknown = await getDiscordBotTokenMock();
-    return typeof botToken === "string" ? { botToken, guildId: "guild" } : null;
+    return typeof botToken === "string" && discordServer.id !== null
+      ? { botToken, guildId: discordServer.id }
+      : null;
   },
 }));
 vi.mock("~/lib/discord/client", () => ({
@@ -101,6 +109,7 @@ describe("Activity summary settings actions", () => {
     });
     getUserAccessLevelMock.mockResolvedValue("admin");
     getDiscordBotTokenMock.mockResolvedValue("mock-bot-token");
+    discordServer.id = "guild";
     postChannelMessageMock.mockResolvedValue({ ok: true });
     fetchSpy = vi
       .spyOn(globalThis, "fetch")
@@ -219,6 +228,21 @@ describe("Activity summary settings actions", () => {
         summaryIntervalHours: 12,
         summaryStatus: "cant_post",
       });
+    });
+
+    it("stores Needs Discord, and the test message refuses, once the server ID is cleared (§2.4)", async () => {
+      discordServer.id = null;
+
+      const saved = await saveActivitySummaryConfigAction(VALID_INPUT);
+      expect(saved).toMatchObject({ ok: true, status: "needs_discord" });
+      expect((await readRow())?.summaryStatus).toBe("needs_discord");
+
+      expect(await sendActivitySummaryTestAction(CHANNEL_ID)).toMatchObject({
+        ok: false,
+        reason: "needs_discord",
+      });
+      expect(postChannelMessageMock).not.toHaveBeenCalled();
+      expect(fetchSpy).not.toHaveBeenCalled();
     });
 
     it("stores Needs Discord when no bot token is saved", async () => {

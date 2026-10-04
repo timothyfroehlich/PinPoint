@@ -11,10 +11,11 @@ import {
   DISCORD_MESSAGE_FLAGS,
   postChannelMessage,
 } from "~/lib/discord/client";
-import { getDiscordBotToken } from "~/lib/discord/config";
+import { getDiscordConfig } from "~/lib/discord/config";
 import { sanitizeDiscordText } from "~/lib/discord/messages";
 import { ACTIVITY_SUMMARY_EVENT_KEYS } from "~/lib/discord/activity-summary/events";
 import {
+  DISCORD_NOT_CONFIGURED,
   failureStatus,
   sendActivitySummaryNow,
 } from "~/lib/discord/activity-summary/runner";
@@ -31,15 +32,18 @@ import {
 const INTEGRATIONS_PATH = "/admin/integrations";
 
 /**
- * The bot token for a channel check or test post. A Vault read failure is
- * reported and treated as "couldn't check" rather than as a missing token, so
- * a transient outage never tells the admin to reconfigure Discord.
+ * The bot token for a channel check or test post, or null while Discord is not
+ * configured — a bot token AND a server ID (§2.4, discord.md §2.2), the same
+ * test the summary itself posts under. A Vault read failure is reported and
+ * treated as "couldn't check" rather than as a missing token, so a transient
+ * outage never tells the admin to reconfigure Discord.
  */
 async function readBotToken(
   action: string
 ): Promise<{ ok: true; token: string | null } | { ok: false }> {
   try {
-    return { ok: true, token: await getDiscordBotToken() };
+    const config = await getDiscordConfig();
+    return { ok: true, token: config?.botToken ?? null };
   } catch (error) {
     log.warn({ err: error, action }, "Failed to read the Discord bot token");
     return { ok: false };
@@ -124,7 +128,10 @@ export async function saveActivitySummaryConfigAction(
       statusDetail = null;
     } else {
       const token = await readBotToken("saveActivitySummaryConfigAction");
-      if (token.ok) {
+      if (token.ok && token.token === null) {
+        status = "needs_discord";
+        statusDetail = DISCORD_NOT_CONFIGURED;
+      } else if (token.ok) {
         ({ status, statusDetail } = await checkDiscordChannel(
           token.token,
           channelId
@@ -248,11 +255,11 @@ export async function sendActivitySummaryTestAction(
       };
     }
     if (!token.token) {
-      await recordStatus("needs_discord", "Discord bot token not configured");
+      await recordStatus("needs_discord", DISCORD_NOT_CONFIGURED);
       return {
         ok: false,
         reason: "needs_discord",
-        message: "Discord bot token is not configured.",
+        message: "Set up the Discord bot token and server ID first.",
       };
     }
 
