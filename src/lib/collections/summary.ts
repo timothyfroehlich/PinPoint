@@ -1,4 +1,5 @@
 import type { MachineViewHealth } from "~/lib/types";
+import { isRemoved } from "~/lib/machines/presence";
 import type { CollectionMachine } from "./owner";
 
 export interface CollectionSummary {
@@ -18,7 +19,7 @@ export function summarizeCollection(
   healthByInitials: ReadonlyMap<string, MachineViewHealth>
 ): CollectionSummary {
   const counted = machines.filter(
-    (machine) => machine.presenceStatus !== "removed"
+    (machine) => !isRemoved(machine.presenceStatus)
   );
   const summary: CollectionSummary = {
     total: counted.length,

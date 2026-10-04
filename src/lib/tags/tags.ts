@@ -5,6 +5,7 @@ import { asc } from "drizzle-orm";
 import { db, type DbTransaction } from "~/server/db";
 import { machines } from "~/server/db/schema";
 import type { CollectionMachine } from "~/lib/collections/owner";
+import { isRemoved } from "~/lib/machines/presence";
 import {
   getCurrentManufacturer,
   groupManufacturerTags,
@@ -26,8 +27,7 @@ export interface MachineTag {
 }
 
 function countNotRemoved(tagged: readonly CollectionMachine[]): number {
-  return tagged.filter((machine) => machine.presenceStatus !== "removed")
-    .length;
+  return tagged.filter((machine) => !isRemoved(machine.presenceStatus)).length;
 }
 
 export type TagsByType = Record<TagTypeId, MachineTag[]>;

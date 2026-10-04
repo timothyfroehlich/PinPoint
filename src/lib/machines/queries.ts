@@ -17,16 +17,19 @@ export function machineNotRemoved(): SQL {
   return ne(machines.presenceStatus, "removed");
 }
 
-/** An issue-row condition: the issue's machine is not Removed. */
-export function issueMachineNotRemoved(): SQL {
+/** An issue-row condition: the issue's machine satisfies `condition`. */
+export function issueMachineMatches(condition: SQL): SQL {
   return exists(
     db
       .select({ one: machines.id })
       .from(machines)
-      .where(
-        and(eq(machines.initials, issues.machineInitials), machineNotRemoved())
-      )
+      .where(and(eq(machines.initials, issues.machineInitials), condition))
   );
+}
+
+/** An issue-row condition: the issue's machine is not Removed. */
+export function issueMachineNotRemoved(): SQL {
+  return issueMachineMatches(machineNotRemoved());
 }
 
 export interface MachineChoice {

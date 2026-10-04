@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { McpServer } from "@modelcontextprotocol/server";
-import { and, count, eq, exists, inArray, type SQL } from "drizzle-orm";
+import { and, count, eq, inArray, type SQL } from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -11,7 +11,7 @@ import {
   type IssueStatus,
 } from "~/lib/issues/status";
 import { checkPermission } from "~/lib/permissions/helpers";
-import { machineNotRemoved } from "~/lib/machines/queries";
+import { issueMachineMatches, machineNotRemoved } from "~/lib/machines/queries";
 import { db } from "~/server/db";
 import { issues, machines } from "~/server/db/schema";
 import { ISSUE_SEVERITY_VALUES } from "~/lib/types";
@@ -131,16 +131,7 @@ export async function runListIssues(
         ? null
         : machineNotRemoved();
   if (machinePresence) {
-    conditions.push(
-      exists(
-        db
-          .select({ one: machines.id })
-          .from(machines)
-          .where(
-            and(eq(machines.initials, issues.machineInitials), machinePresence)
-          )
-      )
-    );
+    conditions.push(issueMachineMatches(machinePresence));
   }
   if (args.severity) {
     conditions.push(eq(issues.severity, args.severity));
