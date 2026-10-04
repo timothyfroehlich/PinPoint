@@ -35,7 +35,7 @@ export async function resolveIssueActivityEvents<
   const assigneeIds = new Set<string>();
   for (const { eventData } of entries) {
     // `typeof`, not `!== null`: an event written by the previous release while
-    // migration 0103 deployed has no `assigneeId` key at all.
+    // migration 0104 deployed has no `assigneeId` key at all.
     if (
       eventData?.type === "assigned" &&
       typeof eventData.assigneeId === "string"

@@ -20,7 +20,9 @@ export function CollectionHeader({
   summary,
   action,
 }: Props): React.JSX.Element {
-  const parts: string[] = [plural(summary.total, "machine")];
+  const parts: string[] = [
+    summary.total === 0 ? "No machines" : plural(summary.total, "machine"),
+  ];
   if (summary.total > 0) {
     parts.push(`${String(summary.operational)} operational`);
     if (summary.needsService > 0)

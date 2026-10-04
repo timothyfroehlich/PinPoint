@@ -726,8 +726,15 @@
     {
       "idx": 103,
       "version": "7",
-      "when": 1791085968558,
-      "tag": "0103_assigned-event-assignee-ids",
+      "when": 1791086011508,
+      "tag": "0103_hand-applied-tags",
+      "breakpoints": true
+    },
+    {
+      "idx": 104,
+      "version": "7",
+      "when": 1791087419613,
+      "tag": "0104_assigned-event-assignee-ids",
       "breakpoints": true
     }
   ]

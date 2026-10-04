@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { asDbOrTx, getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { createTestMachine } from "~/test/helpers/factories";
 import { machines, opdbMachines, pinballmapCatalog } from "~/server/db/schema";
+import type { MachineTag } from "~/lib/tags/types";
 
 vi.mock("~/server/db", async () => {
   const { getTestDb } = await import("~/test/setup/pglite");
@@ -107,9 +108,13 @@ describe("OPDB tags", () => {
   });
 
   it("groups machines into ordered, labeled tags of each type", async () => {
-    const tags = await listTags(asDbOrTx(await getTestDb()));
+    const groups = await listTags(asDbOrTx(await getTestDb()));
     const summary = (type: "type" | "display" | "player-count") =>
-      tags[type].map((tag) => ({
+      (
+        groups.find(
+          (group) => group.kind === "automatic" && group.type.id === type
+        )?.tags ?? []
+      ).map((tag) => ({
         slug: tag.slug,
         name: tag.name,
         initials: tag.machines.map((machine) => machine.initials),
@@ -147,7 +152,9 @@ describe("OPDB tags", () => {
       )?.id ?? "";
 
     const gz = await getTagsForMachine(asDbOrTx(db), await idOf("GZ"));
-    expect(gz.map((tag) => `${tag.type}:${tag.name}`)).toEqual([
+    const label = (tag: MachineTag): string =>
+      `${tag.kind === "automatic" ? tag.type : "hand"}:${tag.name}`;
+    expect(gz.map(label)).toEqual([
       "type:Solid State",
       "display:LCD",
       "player-count:4 Players",
@@ -158,14 +165,10 @@ describe("OPDB tags", () => {
       ).toEqual([]);
     }
     expect(
-      (await getTagsForMachine(asDbOrTx(db), await idOf("HB"))).map(
-        (tag) => tag.type
-      )
-    ).toEqual(["manufacturer"]);
+      (await getTagsForMachine(asDbOrTx(db), await idOf("HB"))).map(label)
+    ).toEqual(["manufacturer:Garage"]);
     expect(
-      (await getTagsForMachine(asDbOrTx(db), await idOf("KS"))).map(
-        (tag) => `${tag.type}:${tag.name}`
-      )
+      (await getTagsForMachine(asDbOrTx(db), await idOf("KS"))).map(label)
     ).toEqual([
       "type:Electromechanical",
       "display:Lights",
