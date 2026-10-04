@@ -116,13 +116,9 @@
 
 ## Known divergences (code vs spec)
 
-| Requirement | Divergence | Resolution |
-| :-- | :-- | :-- |
-| §9.2 | Collections' Page Preset is All machines. | PP-s363 |
-| §2.4 | Machine View has its own toolbar, chips, and Saved Views menu rather than the shared List View. | PP-jb9v |
-| §3.13 | Owner offers Unassigned but not Me. | PP-jb9v |
-| §3.14 | Sorting is only by column header; phones in Compact mode cannot sort. | PP-jb9v |
-| §4.2 | Owner "Me" writes the viewer's account ID into the URL. | PP-jb9v |
+| Requirement | Divergence                                | Resolution |
+| :---------- | :---------------------------------------- | :--------- |
+| §9.2        | Collections' Page Preset is All machines. | PP-s363    |
 
 ---
 
