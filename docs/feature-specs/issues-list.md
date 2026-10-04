@@ -42,7 +42,7 @@
 - **4.2** The Primary Filters, in order, are Status, Severity, Priority, Machine, Assignee, and Machine Presence.
 - **4.3** The Secondary Filters, in order, are Created, Updated, Frequency, Machine owner, Reporter, and Watching.
 - **4.4** Status offers every status grouped by status group; selecting a group selects all its statuses. The control reads "Open" when exactly the Open statuses are selected.
-- **4.5** Machine searches machines by name and initials and offers a My machines shortcut (machines the person owns).
+- **4.5** Machine searches machines by name and initials, leaving out Removed machines unless Machine Presence includes Removed, and offers a My machines shortcut (machines the person owns, other than Removed ones). A machine already selected stays listed.
 - **4.6** Assignee searches people by name and offers Me and Unassigned shortcuts.
 - **4.7** Machine Presence offers every presence state.
 - **4.8** Created and Updated are date ranges.
@@ -88,6 +88,7 @@
 
 | Requirement | Divergence | Resolution |
 | :-- | :-- | :-- |
+| 4.5 | Machine and My machines include Removed machines. | PP-s363 |
 | §2.3 | The page title is "All Issues". | PP-jb9v |
 | §4.2, §4.7 | Machine presence has no filter control; a hidden parameter includes other presence states. | PP-jb9v |
 | §6 | No Built-in Views. | PP-jb9v |
@@ -99,5 +100,6 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-03 | Machine and My machines leave out Removed machines unless Machine Presence includes Removed (4.5). |
 | 2026-10-03 | §3.1: on a narrow phone the second line wraps rather than truncating. |
 | 2026-10-02 | Created from the approved list-framework design: two-line rows with inline editing, Primary and Secondary Filters including Machine Presence, sorting and export rules, the Open issues Page Preset and four Built-in Views, and canonical URL state with aliases for older parameters. |
