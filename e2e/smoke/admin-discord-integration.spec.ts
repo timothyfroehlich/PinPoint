@@ -40,17 +40,25 @@ test.describe("Admin integrations page", () => {
       page.getByRole("heading", { level: 2, name: "Discord" })
     ).toBeVisible();
     const discordCard = page.getByTestId("discord-integration-card");
+    // The connection settings save on their own, apart from the activity
+    // summary below them (discord-activity-summary §2.5).
+    const connection = discordCard.getByRole("region", { name: "Connection" });
     // Key form fields from the Pattern B redesign.
-    await expect(discordCard.getByLabel("Bot token")).toBeVisible();
-    await expect(discordCard.getByLabel("Server ID")).toBeVisible();
-    await expect(discordCard.getByLabel("Invite link")).toBeVisible();
-    await expect(page.getByRole("checkbox")).toHaveCount(0);
+    await expect(connection.getByLabel("Bot token")).toBeVisible();
+    await expect(connection.getByLabel("Server ID")).toBeVisible();
+    await expect(connection.getByLabel("Invite link")).toBeVisible();
+    // No distinct integration enable switch.
+    await expect(connection.getByRole("checkbox")).toHaveCount(0);
+    await expect(connection.getByRole("switch")).toHaveCount(0);
     // Save / Reset footer.
     await expect(
-      discordCard.getByRole("button", { name: "Save changes" })
+      connection.getByRole("button", { name: "Save changes" })
     ).toBeVisible();
     await expect(
-      discordCard.getByRole("button", { name: "Reset" })
+      connection.getByRole("button", { name: "Reset" })
+    ).toBeVisible();
+    await expect(
+      discordCard.getByRole("region", { name: "Activity summary" })
     ).toBeVisible();
 
     const pinballMapCard = page.getByTestId("pinballmap-integration-card");
