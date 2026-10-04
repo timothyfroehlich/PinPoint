@@ -1447,7 +1447,9 @@ export async function updateIssueTitle({
  * old number.
  *
  * Throws if the destination machine does not exist or matches the current
- * machine (no-op).
+ * machine (no-op), and `MachineRemovedError` if the destination is Removed:
+ * a move files the issue on the destination, which a Removed machine refuses
+ * (reporting §10.2).
  */
 export async function reassignIssueMachine({
   issueId,
@@ -1486,10 +1488,15 @@ export async function reassignIssueMachine({
         id: machines.id,
         nextIssueNumber: machines.nextIssueNumber,
         name: machines.name,
+        presenceStatus: machines.presenceStatus,
       });
 
     if (!destinationMachine) {
       throw new Error(`Machine not found: ${newMachineInitials}`);
+    }
+    // Throwing rolls the number reservation above back with the transaction.
+    if (destinationMachine.presenceStatus === "removed") {
+      throw new MachineRemovedError(newMachineInitials);
     }
 
     const newIssueNumber = destinationMachine.nextIssueNumber - 1;
