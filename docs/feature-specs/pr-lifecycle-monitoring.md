@@ -135,6 +135,7 @@
 | 6.1–6.3 | Host coordination: concurrent watches coalesce under one polling leader | Removed 2026-09-24 in the watcher simplification: each watch polls GitHub on its own. The XDG lock, state-file, and leader/follower machinery cost more code than the duplicate polling it saved. | Delete §6 (requirement diff needs Tim's approval) |
 | 7.4 | Local execution telemetry (harness, model, wake count, elapsed duration) | Removed 2026-09-24 with the MCP wrapper and watcher agents, the only sources of harness, model, and wake data; nothing read the `tmp/gh-monitor/watcher-run-*.json` records. | Delete 7.4 (requirement diff needs Tim's approval) |
 | 8.3 | Only a review record provides coverage | The gate still accepts a Codex review on the exact head | Remove the Codex checker once its subscription ends |
+| Concepts (Review level), 8.14 | A review runs at low, medium, or high | The review record and the gate also accept `xhigh` and `max`, the levels the owner picks when `claude-review-level.sh` answers `ask` (PP-vusb) | Amend the Review level concept and 8.14 to name xhigh and max as the owner's choices above 3,000 lines (requirement diff needs Tim's approval) |
 
 ---
 
