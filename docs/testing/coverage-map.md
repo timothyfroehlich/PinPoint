@@ -123,6 +123,7 @@ a blank Full-E2E cell is often correct by design) is in the
 | Discord DM / channel delivery |  ✓   |      ✓      |   ✓   |    ✓     | `lib/notifications/channels/discord-channel.test.ts`, `notification-discord-batch.test.ts`, `e2e/smoke/admin-discord-integration.spec.ts`, `e2e/full/discord-dm-preferences.spec.ts`   |
 | Preferences & unsubscribe     |  ✓   |      ✓      |       |    ✓     | `settings/notifications/notification-preferences-form.test.tsx`, `notification-preferences-action.test.ts`, `api/unsubscribe.route.test.ts`, `e2e/full/discord-dm-preferences.spec.ts` |
 | Resource-URL deep links       |  ✓   |             |       |          | `lib/notifications/resource-url.test.ts`                                                                                                                                               |
+| Discord activity summary      |  ✓   |      ✓      |       |          | `lib/discord/activity-summary/message.test.ts`, `schedule.test.ts`, `discord-activity-summary.test.ts`, `supabase/discord-activity-summary.test.ts`                                    |
 
 ## Admin
 

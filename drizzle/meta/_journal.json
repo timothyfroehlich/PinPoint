@@ -701,6 +701,13 @@
       "when": 1791066883805,
       "tag": "0099_drop-machine-apron-columns",
       "breakpoints": true
+    },
+    {
+      "idx": 100,
+      "version": "7",
+      "when": 1791069006186,
+      "tag": "0100_activity-summary-settings",
+      "breakpoints": true
     }
   ]
 }

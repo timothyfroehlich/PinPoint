@@ -200,6 +200,17 @@ describe("PinballMapConfigForm", () => {
     expect(screen.getByText(new RegExp(expected))).toBeInTheDocument();
   });
 
+  it("places the page's Location and Region alerts section anchors", () => {
+    renderForm();
+
+    expect(
+      screen.getByRole("region", { name: "Region alerts" })
+    ).toContainElement(document.getElementById("region-alerts"));
+    expect(
+      screen.getByLabelText("Location ID").closest("section")
+    ).toContainElement(document.getElementById("pinball-map-location"));
+  });
+
   it("links the configured location while its first snapshot is waiting", () => {
     renderForm({
       ...CONFIGURED,
