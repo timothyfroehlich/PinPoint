@@ -1,8 +1,9 @@
-import { asc, eq, inArray } from "drizzle-orm";
+import { asc, eq, inArray, or } from "drizzle-orm";
 import { z } from "zod";
 import { db, type DbTransaction } from "~/server/db";
 import { collections, collectionMachines, machines } from "~/server/db/schema";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
+import { machineNotRemoved } from "~/lib/machines/queries";
 import type { CollectionMachine } from "./owner";
 
 export interface UserCollection {
@@ -123,4 +124,39 @@ export async function getCollectionByViewToken(
   });
   if (!base) return null;
   return hydrateCollection(tx, base);
+}
+
+export interface PickerMachine {
+  id: string;
+  initials: string;
+  name: string;
+}
+
+/**
+ * The machines offered when choosing a Collection's machines, alphabetical.
+ * Removed machines are left out, except ones already in `collectionId`
+ * (collections-and-tags 2.7). Pass null for a Collection not yet created.
+ */
+export async function getCollectionPickerMachines(
+  tx: DbTransaction,
+  collectionId: string | null
+): Promise<PickerMachine[]> {
+  const where =
+    collectionId === null
+      ? machineNotRemoved()
+      : or(
+          machineNotRemoved(),
+          inArray(
+            machines.id,
+            tx
+              .select({ id: collectionMachines.machineId })
+              .from(collectionMachines)
+              .where(eq(collectionMachines.collectionId, collectionId))
+          )
+        );
+  return tx.query.machines.findMany({
+    where,
+    columns: { id: true, initials: true, name: true },
+    orderBy: [asc(machines.name)],
+  });
 }

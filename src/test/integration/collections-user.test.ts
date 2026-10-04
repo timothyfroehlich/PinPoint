@@ -11,6 +11,7 @@ import {
 import {
   getCollection,
   getCollectionByViewToken,
+  getCollectionPickerMachines,
 } from "~/lib/collections/user";
 
 describe("getCollection", () => {
@@ -135,5 +136,52 @@ describe("getCollectionByViewToken", () => {
       .values({ name: "Private", ownerId: owner.id })
       .returning();
     expect(await getCollectionByViewToken(asDbOrTx(db), "")).toBeNull();
+  });
+});
+
+describe("getCollectionPickerMachines", () => {
+  setupTestDb();
+
+  it("leaves out Removed machines except the collection's own, alphabetical", async () => {
+    const db = await getTestDb();
+    const owner = createTestUser();
+    await db.insert(userProfiles).values(owner);
+    const floor = createTestMachine({ initials: "FL", name: "Floor" });
+    const kept = createTestMachine({
+      initials: "KP",
+      name: "Kept",
+      presenceStatus: "removed",
+    });
+    const sold = createTestMachine({
+      initials: "SD",
+      name: "Sold",
+      presenceStatus: "removed",
+    });
+    const away = createTestMachine({
+      initials: "AW",
+      name: "Away",
+      presenceStatus: "off_the_floor",
+    });
+    await db.insert(machines).values([floor, kept, sold, away]);
+    const [collection] = await db
+      .insert(collections)
+      .values({ name: "Picks", ownerId: owner.id })
+      .returning();
+    if (!collection) throw new Error("seed failed");
+    await db
+      .insert(collectionMachines)
+      .values({ collectionId: collection.id, machineId: kept.id });
+
+    const forCollection = await getCollectionPickerMachines(
+      asDbOrTx(db),
+      collection.id
+    );
+    expect(forCollection.map((m) => m.initials)).toEqual(["AW", "FL", "KP"]);
+
+    const forNewCollection = await getCollectionPickerMachines(
+      asDbOrTx(db),
+      null
+    );
+    expect(forNewCollection.map((m) => m.initials)).toEqual(["AW", "FL"]);
   });
 });

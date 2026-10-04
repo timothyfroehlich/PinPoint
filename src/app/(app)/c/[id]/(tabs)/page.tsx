@@ -22,7 +22,7 @@ export default async function CollectionOverviewPage({
 
   if (data.collection.machines.length === 0) {
     if (data.viewerCanManage) {
-      const allMachines = await getPickerMachines();
+      const allMachines = await getPickerMachines(data.collection.id);
       return (
         <AddMachinesInline
           collectionId={data.collection.id}

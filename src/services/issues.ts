@@ -144,6 +144,21 @@ export class PinballMapCommentAlreadyConvertedError extends Error {
   }
 }
 
+/** User-facing message for an attempt to report on a Removed machine. */
+export const REMOVED_MACHINE_REPORT_ERROR =
+  "This machine is Removed and can't take new issues.";
+
+/**
+ * The machine is Removed, PinPoint's archived presence state, so no path may
+ * create an issue on it (reporting §10.2). Nothing is written.
+ */
+export class MachineRemovedError extends Error {
+  constructor(readonly machineInitials: string) {
+    super(REMOVED_MACHINE_REPORT_ERROR);
+    this.name = "MachineRemovedError";
+  }
+}
+
 export interface UpdateIssueStatusParams {
   issueId: string;
   status: IssueStatus;
@@ -294,10 +309,15 @@ export async function createIssue({
         nextIssueNumber: machines.nextIssueNumber,
         name: machines.name,
         ownerId: machines.ownerId,
+        presenceStatus: machines.presenceStatus,
       });
 
     if (!updatedMachine) {
       throw new Error(`Machine not found: ${machineInitials}`);
+    }
+    // Throwing rolls the number reservation above back with the transaction.
+    if (updatedMachine.presenceStatus === "removed") {
+      throw new MachineRemovedError(machineInitials);
     }
 
     // The number we just reserved is (nextIssueNumber - 1) because we incremented it
@@ -1430,7 +1450,9 @@ export async function updateIssueTitle({
  * old number.
  *
  * Throws if the destination machine does not exist or matches the current
- * machine (no-op).
+ * machine (no-op), and `MachineRemovedError` if the destination is Removed:
+ * a move files the issue on the destination, which a Removed machine refuses
+ * (reporting §10.2).
  */
 export async function reassignIssueMachine({
   issueId,
@@ -1469,10 +1491,15 @@ export async function reassignIssueMachine({
         id: machines.id,
         nextIssueNumber: machines.nextIssueNumber,
         name: machines.name,
+        presenceStatus: machines.presenceStatus,
       });
 
     if (!destinationMachine) {
       throw new Error(`Machine not found: ${newMachineInitials}`);
+    }
+    // Throwing rolls the number reservation above back with the transaction.
+    if (destinationMachine.presenceStatus === "removed") {
+      throw new MachineRemovedError(newMachineInitials);
     }
 
     const newIssueNumber = destinationMachine.nextIssueNumber - 1;

@@ -34,7 +34,7 @@ describe("machine view URL state", () => {
 
   it("uses the Collection preset defaults independently", () => {
     const state = parseMachineViewState(new URLSearchParams(), "collection");
-    expect(state.presence).toBe("all");
+    expect(state.presence).toEqual(["on_the_floor"]);
     expect(state.columns).toEqual(
       parseMachineViewState(new URLSearchParams(), "machines").columns
     );

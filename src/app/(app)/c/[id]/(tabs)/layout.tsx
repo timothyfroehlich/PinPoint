@@ -47,7 +47,7 @@ export default async function CollectionLayout({
   // view-token or admin visitor.
   let headerAction: React.ReactNode = null;
   if (data.viewerCanEdit) {
-    const allMachines = await getPickerMachines();
+    const allMachines = await getPickerMachines(data.collection.id);
     let sharePanel: React.ReactNode = null;
     if (data.viewerCanManage) {
       const [editors, grantableMembers] = await Promise.all([

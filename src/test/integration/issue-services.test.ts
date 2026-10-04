@@ -31,6 +31,7 @@ import {
   addIssueComment,
   reassignIssueMachine,
   updateIssueTitle,
+  MachineRemovedError,
 } from "~/services/issues";
 import { planNotification, planNotifications } from "~/lib/notifications";
 import { plainTextToDoc, type ProseMirrorDoc } from "~/lib/tiptap/types";
@@ -1598,6 +1599,29 @@ describe("Issue Service Functions (Integration)", () => {
           userId: testUser.id,
         })
       ).rejects.toThrow("Machine not found");
+    });
+
+    it("refuses a Removed destination and leaves the issue and counter untouched", async () => {
+      const db = await getTestDb();
+      await db
+        .update(machines)
+        .set({ presenceStatus: "removed" })
+        .where(eq(machines.initials, "KP"));
+
+      await expect(
+        reassignIssueMachine({
+          issueId: testIssue.id,
+          newMachineInitials: "KP",
+          userId: testUser.id,
+        })
+      ).rejects.toBeInstanceOf(MachineRemovedError);
+
+      const issue = await db.query.issues.findFirst({
+        where: eq(issues.id, testIssue.id),
+      });
+      // This file's db.transaction is a pass-through mock, so the counter
+      // rollback is not observable here; quick-report-action covers it.
+      expect(issue?.machineInitials).not.toBe("KP");
     });
 
     it("throws when issue does not exist (block 17)", async () => {

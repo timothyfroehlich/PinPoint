@@ -6,7 +6,7 @@ import { after } from "next/server";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { revalidatePath } from "next/cache";
 import { log } from "~/lib/logger";
-import { createIssue } from "~/services/issues";
+import { createIssue, MachineRemovedError } from "~/services/issues";
 import { dispatchNotification } from "~/lib/notifications";
 import {
   reportError,
@@ -425,6 +425,9 @@ export async function submitPublicIssueAction(
   } catch (error) {
     if (isRedirectError(error)) {
       throw error;
+    }
+    if (error instanceof MachineRemovedError) {
+      return { error: error.message };
     }
     reportError(error, {
       action: "submitPublicIssueAction",

@@ -62,6 +62,14 @@ export function isOnTheFloor(status: MachinePresenceStatus): boolean {
 }
 
 /**
+ * Removed is the archived presence state (PP-s363). The SQL counterpart is
+ * `machineNotRemoved()` in `~/lib/machines/queries`.
+ */
+export function isRemoved(status: MachinePresenceStatus): boolean {
+  return status === "removed";
+}
+
+/**
  * Summary Widget colors per presence: `text` for the count, `fill` for the bar
  * segment. Same tokens as {@link getMachinePresenceStyles}. The Presence
  * Widget does not count Removed machines (machine-widgets §3.2).

@@ -75,7 +75,7 @@ export function resolveTimelineEvent(
 ): ResolvedTimelineEvent {
   if (event.type !== "assigned") return event;
   // `typeof`, not `!== null`: an event written by the previous release while
-  // migration 0100 deployed has no `assigneeId` key at all.
+  // migration 0101 deployed has no `assigneeId` key at all.
   const displayName =
     typeof event.assigneeId === "string"
       ? accountNames.get(event.assigneeId)

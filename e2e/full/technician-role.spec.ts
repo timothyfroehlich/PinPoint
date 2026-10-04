@@ -81,6 +81,9 @@ test.describe("Technician Role Permissions", () => {
 
     await page.getByLabel("Machine Name").fill("Technician Test Machine");
     await page.getByLabel("Initials").fill(initials);
+    // Every new machine needs a Pinball Map title or Manual Entry (not on
+    // Pinball Map); this spec is not about Pinball Map, so take Manual Entry.
+    await page.getByRole("radio", { name: "Manual Entry" }).click();
 
     // Should be able to select an owner. Target the owner select specifically —
     // the create form now also has the PinballMap link picker (another

@@ -49,6 +49,24 @@ describe("summarizeCollection", () => {
     });
   });
 
+  it("leaves out Removed machines and their open issues", () => {
+    const machines = [machine("AA"), machine("RM", "removed")];
+    const summary = summarizeCollection(
+      machines,
+      new Map([
+        ["AA", health(1, 0)],
+        ["RM", health(0, 2)],
+      ])
+    );
+    expect(summary).toEqual({
+      total: 1,
+      operational: 0,
+      needsService: 1,
+      unplayable: 0,
+      openIssues: 1,
+    });
+  });
+
   it("handles the empty collection", () => {
     expect(summarizeCollection([], new Map())).toEqual({
       total: 0,
