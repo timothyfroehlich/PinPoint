@@ -84,11 +84,11 @@ function FilterPopoverHeader({
       {filter.label}
       <button
         type="button"
-        onClick={() => filter.onChange([])}
-        disabled={filter.selected.length === 0}
+        onClick={filter.onReset}
+        disabled={filter.atPreset}
         className="min-h-7 rounded-sm px-1 text-xs font-normal text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-50"
       >
-        Clear
+        Reset
       </button>
     </div>
   );
@@ -181,11 +181,11 @@ function MoreFilters({
               <span className="flex-1">{active.label}</span>
               <button
                 type="button"
-                onClick={() => active.onChange([])}
-                disabled={active.selected.length === 0}
+                onClick={active.onReset}
+                disabled={active.atPreset}
                 className="min-h-7 rounded-sm px-2 text-xs font-normal text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-50"
               >
-                Clear
+                Reset
               </button>
             </div>
             <FilterPicker filter={active} variant="popover" />

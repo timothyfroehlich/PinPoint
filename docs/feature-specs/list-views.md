@@ -56,6 +56,7 @@
 - **4.6** Filter values the Page Preset sets by default are shown on their control like any other value.
 - **4.7** Changing search, a filter, sorting, or page size returns to page 1.
 - **4.8** Changing displayed fields keeps the current page when that page remains valid.
+- **4.9** Every filter's options offer Reset, which returns that filter to its Page Preset value, at every width.
 
 ---
 
@@ -174,7 +175,7 @@
 
 | Date | Change |
 | :-- | :-- |
-| 2026-10-04 | Reset all returns filters to the Page Preset (§7.5); Built-in Views stay reachable as tabs or in More views (§10.12); the List Header's crowding order and the single-page result range (§8.3). |
+| 2026-10-04 | Reset all returns filters to the Page Preset (§7.5); Built-in Views stay reachable as tabs or in More views (§10.12); the List Header's crowding order and the single-page result range (§8.3); per-filter Reset (§4.9). |
 | 2026-10-03 | On a Collection or Tag tab the Summary Row toggle sits on its own row between the page's tabs and search (§7.2). |
 | 2026-10-03 | Stacked Summary Widgets sit in a collapsible section (§8.4). |
 | 2026-10-02 | Default View controls appear only on the Machines and Issues pages (§10.8). |

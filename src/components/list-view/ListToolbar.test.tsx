@@ -81,4 +81,44 @@ describe("ListToolbar", () => {
     expect(screen.queryByTestId("list-filter-owner")).not.toBeInTheDocument();
     expect(screen.getByTestId("list-filter-more")).toBeInTheDocument();
   });
+
+  it("resets a filter to its Page Preset value rather than emptying it (list-views §4.9)", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const onReset = vi.fn();
+    const presence: ListFilterModel = {
+      id: "presence",
+      label: "Presence",
+      options: [
+        { value: "on_the_floor", label: "On the Floor" },
+        { value: "removed", label: "Removed" },
+      ],
+      selected: ["removed"],
+      valueLabel: "Removed",
+      atPreset: false,
+      onChange,
+      onReset,
+    };
+    const { rerender } = render(
+      <ListToolbar
+        search={<input aria-label="Search" />}
+        primaryFilters={[presence]}
+      />
+    );
+
+    await user.click(screen.getByTestId("list-filter-presence"));
+    await user.click(screen.getByRole("button", { name: "Reset" }));
+    expect(onReset).toHaveBeenCalledOnce();
+    expect(onChange).not.toHaveBeenCalled();
+
+    rerender(
+      <ListToolbar
+        search={<input aria-label="Search" />}
+        primaryFilters={[
+          { ...presence, selected: ["on_the_floor"], atPreset: true },
+        ]}
+      />
+    );
+    expect(screen.getByRole("button", { name: "Reset" })).toBeDisabled();
+  });
 });
