@@ -2,6 +2,7 @@ import "server-only";
 
 import { and, eq } from "drizzle-orm";
 
+import { resolveIssueActivityEvents } from "~/lib/timeline/events";
 import { loadMentionNames } from "~/lib/tiptap/mention-names";
 import { applyMentionNames } from "~/lib/tiptap/types";
 import type { IssueWithAllRelations } from "~/lib/types";
@@ -15,7 +16,9 @@ import { issues } from "~/server/db/schema";
  * Mentions in the description, the machine's owner requirements, and every
  * comment carry the mentioned person's current name — one name lookup for the
  * whole page, after the issue query. The comment editor opens on these same
- * docs, so a re-edited comment saves the current name too.
+ * docs, so a re-edited comment saves the current name too. Assignment events
+ * in Activity resolve to the assignee's current name the same way, in a
+ * lookup run alongside it (PP-0fg0.1).
  *
  * `reporterEmail` is never selected (CORE-SEC-007).
  */
@@ -96,10 +99,13 @@ export async function getIssueForDetail(
   });
   if (!issue) return undefined;
 
-  const names = await loadMentionNames([
-    issue.description,
-    issue.machine.ownerRequirements,
-    ...issue.comments.map((comment) => comment.content),
+  const [names, comments] = await Promise.all([
+    loadMentionNames([
+      issue.description,
+      issue.machine.ownerRequirements,
+      ...issue.comments.map((comment) => comment.content),
+    ]),
+    resolveIssueActivityEvents(issue.comments),
   ]);
   return {
     ...issue,
@@ -111,7 +117,7 @@ export async function getIssueForDetail(
         names
       ),
     },
-    comments: issue.comments.map((comment) => ({
+    comments: comments.map((comment) => ({
       ...comment,
       content: applyMentionNames(comment.content, names),
     })),
