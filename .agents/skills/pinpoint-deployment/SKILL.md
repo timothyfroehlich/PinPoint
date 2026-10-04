@@ -136,6 +136,8 @@ Pass `--no-sensitive` for anything that must stay readable. Verify by pulling to
 
 Native Supabase auto-branching is **disabled** — no PR gets a preview by default (zero branches, zero cost). Previews are created on demand via PR comment commands and torn down on a TTL.
 
+**Vercel builds only `main` automatically.** `vercel.json` sets `git.deploymentEnabled` to `{"main": true, "**": false}`, so a push to any other branch creates no Vercel deployment (build CPU minutes were most of the bill when every push built a preview, PP-ke8x). Branch patterns are minimatch globs and a branch matching any `true` rule deploys. The catch-all is `"**"`, not `"*"`, because `*` does not cross `/` and our branches are `feature/...`, `chore/...`, `dependabot/...`. A preview exists only after `/preview`, which creates its deployment itself through `POST /v13/deployments` with a `gitSource` (`trigger_vercel_build` in `preview-create.sh`), not through the git push hook. That function only warns on a non-2xx from the API, so a blocked deployment would surface as a `/preview` status comment with no live URL. To get a build for a branch without `/preview`, run it locally or add a branch rule to `git.deploymentEnabled`.
+
 - **Control surface = PR comments** (from authors with write access only):
   - `/preview` — create (or restart after expiry) a branch, migrate + seed it, wire creds into the Vercel preview, and post a sticky status comment with the live URL + 48h expiry.
   - `/preview extend` — push expiry +48h (no DB work). `/preview stop` — tear down now.
