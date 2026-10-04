@@ -128,7 +128,7 @@
 - **10.7** A Saved View name is required and must be unique, ignoring case, among the account's Saved Views for that List Host. A colliding name is rejected, never silently overwritten.
 - **10.8** Manage views lets the account rename or delete its Saved Views. On the Machines and Issues pages it also lets the account set or clear its Default View.
 - **10.9** An account has at most one Default View per List Host.
-- **10.10** The Machines or Issues page, opened with no view configuration other than page, shows the account's Default View if one exists, otherwise the Page Preset. A Collection or Tag tab opened that way always shows its Page Preset. A URL carrying any view configuration opens exactly as written. When an account with a Default View shows the Page Preset's settings, the URL names the Page Preset's Built-in View, so reopening it does not show the Default View.
+- **10.10** The Machines or Issues page, opened with no view configuration other than page, shows the account's Default View if one exists, otherwise the Page Preset. A Collection or Tag tab opened that way always shows its Page Preset. A URL carrying any view configuration opens exactly as written. On the Machines or Issues page, when an account with a Default View shows the Page Preset's settings, the URL names the Page Preset's Built-in View, so reopening it does not show the Default View.
 - **10.11** When the Default View opens, the address bar shows its canonical URL.
 - **10.12** Every Built-in View is always reachable, as a List Header tab or in More views, so an account with a default can still reach the Page Preset.
 - **10.13** Deleting the Default View leaves its host without a default; the main page then opens to the Page Preset.
