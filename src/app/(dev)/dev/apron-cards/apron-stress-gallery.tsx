@@ -5,10 +5,13 @@ import { useLayoutEffect, useRef, useState } from "react";
 
 import { ApronCardFace } from "~/components/machines/apron/ApronCardFace";
 import {
-  APRON_CARD_LAYOUTS,
   APRON_CARD_SIZES,
+  APRON_CARD_TEMPLATES,
+  apronTitleFit,
   isApronCardSize,
+  isApronCardTemplate,
   type ApronCardSize,
+  type ApronCardTemplate,
 } from "~/lib/machines/apron-card";
 import {
   APRON_STRESS_FIXTURES,
@@ -19,8 +22,10 @@ import {
 import { buildMachineHubUrl } from "~/lib/machines/hub-url";
 import { cn } from "~/lib/utils";
 
-// Every size the card supports, so a new size shows up here unprompted.
+// Every size and template the card supports, so a new one shows up here
+// unprompted.
 const SIZES = Object.keys(APRON_CARD_SIZES).filter(isApronCardSize);
+const TEMPLATES = Object.keys(APRON_CARD_TEMPLATES).filter(isApronCardTemplate);
 
 // A realistic scan target, so the QR code has production density.
 const SCAN_URL = buildMachineHubUrl(
@@ -65,19 +70,25 @@ function renderedWords(fixture: ApronStressFixture, fill: FillState): number {
   return fixture.textFill?.at === "over" ? fill.limit + 1 : fill.limit;
 }
 
+// Header band text past its second column overflows sideways (spec §5.7).
 function overflows(root: HTMLElement, selector: string): boolean {
   const el = root.querySelector<HTMLElement>(selector);
-  return el !== null && el.scrollHeight > el.clientHeight + 0.5;
+  return (
+    el !== null &&
+    (el.scrollHeight > el.clientHeight + 0.5 ||
+      el.scrollWidth > el.clientWidth + 0.5)
+  );
 }
 
 function checkCard(
   root: HTMLElement,
   size: ApronCardSize,
+  template: ApronCardTemplate,
   fixture: ApronStressFixture,
   fill: FillState,
   reportedOverflow: boolean
 ): StressResult {
-  const layout = APRON_CARD_LAYOUTS[size];
+  const layout = apronTitleFit(template, size);
   const failures: StressFailure[] = [];
   const fail = (check: ApronStressCheck, message: string): void => {
     const known = fixture.knownIssues?.find((issue) => issue.check === check);
@@ -158,9 +169,11 @@ function checkCard(
 function StressCard({
   fixture,
   size,
+  template,
 }: {
   fixture: ApronStressFixture;
   size: ApronCardSize;
+  template: ApronCardTemplate;
 }): React.JSX.Element {
   const rootRef = useRef<HTMLDivElement>(null);
   const reportedRef = useRef(false);
@@ -190,8 +203,10 @@ function StressCard({
       return;
     }
     setFill({ phase: "done", limit: fill.limit });
-    setResult(checkCard(root, size, fixture, fill, reportedRef.current));
-  }, [ready, result, fill, fixture, size]);
+    setResult(
+      checkCard(root, size, template, fixture, fill, reportedRef.current)
+    );
+  }, [ready, result, fill, fixture, size, template]);
 
   const content = fixture.textFill
     ? withFilledText(fixture, renderedWords(fixture, fill))
@@ -203,12 +218,14 @@ function StressCard({
       data-testid="apron-stress-card"
       data-fixture={fixture.id}
       data-size={size}
+      data-template={template}
       data-stress-status={result?.status}
     >
       <div ref={rootRef} className="w-fit ring-1 ring-border">
         <ApronCardFace
           content={content}
           size={size}
+          template={template}
           scanUrl={SCAN_URL}
           onOverflowChange={(overflowing) => {
             reportedRef.current = overflowing;
@@ -220,7 +237,8 @@ function StressCard({
       </div>
       <figcaption className="flex flex-col gap-0.5 text-sm">
         <span className="text-muted-foreground">
-          {APRON_CARD_SIZES[size].label}
+          {APRON_CARD_SIZES[size].label} ·{" "}
+          {APRON_CARD_TEMPLATES[template].label}
           {result ? ` · title ${result.titlePx}px` : null}
           {result && result.words !== null ? ` · ${result.words} words` : null}
         </span>
@@ -274,10 +292,10 @@ export function ApronStressGallery(): React.JSX.Element {
       <header className="flex flex-col gap-2">
         <h1 className="text-2xl font-semibold">Apron card stress fixtures</h1>
         <p className="max-w-3xl text-muted-foreground">
-          Every fixture at every apron size, at print size. Each card checks
-          title width, title size, identity panel height, card text overflow,
-          and that the card's own fit verdict agrees; text fixtures fill word by
-          word to the overflow limit. Fixtures live in
+          Every fixture at every apron size and template, at print size. Each
+          card checks title width, title size, identity panel height, card text
+          overflow, and that the card's own fit verdict agrees; text fixtures
+          fill word by word to the overflow limit. Fixtures live in
           src/lib/machines/apron-card-fixtures.ts (PP-xeki).
         </p>
       </header>
@@ -298,9 +316,16 @@ export function ApronStressGallery(): React.JSX.Element {
             <p className="text-sm">{fixture.stresses}</p>
           </div>
           <div className="flex flex-wrap gap-6">
-            {SIZES.map((size) => (
-              <StressCard key={size} fixture={fixture} size={size} />
-            ))}
+            {TEMPLATES.flatMap((template) =>
+              SIZES.map((size) => (
+                <StressCard
+                  key={`${template}-${size}`}
+                  fixture={fixture}
+                  size={size}
+                  template={template}
+                />
+              ))
+            )}
           </div>
         </section>
       ))}

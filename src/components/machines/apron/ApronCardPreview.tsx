@@ -7,6 +7,7 @@ import {
   apronCardPixelSize,
   type ApronCardContent,
   type ApronCardSize,
+  type ApronCardTemplate,
 } from "~/lib/machines/apron-card";
 import { cn } from "~/lib/utils";
 import { ApronCardFace } from "./ApronCardFace";
@@ -14,6 +15,7 @@ import { ApronCardFace } from "./ApronCardFace";
 interface ApronCardPreviewProps {
   content: ApronCardContent;
   size: ApronCardSize;
+  template: ApronCardTemplate;
   scanUrl: string;
   /** Upper bound on the scale; 1 shows the card at print size. */
   maxScale?: number;
@@ -35,6 +37,7 @@ interface ApronCardPreviewProps {
 export function ApronCardPreview({
   content,
   size,
+  template,
   scanUrl,
   maxScale = 1,
   onOverflowChange,
@@ -81,6 +84,7 @@ export function ApronCardPreview({
           <ApronCardFace
             content={content}
             size={size}
+            template={template}
             scanUrl={scanUrl}
             {...(onOverflowChange ? { onOverflowChange } : {})}
           />

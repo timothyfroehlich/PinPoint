@@ -76,6 +76,7 @@ describe("apronCardContent", () => {
   };
 
   const card: ApronCardSettings = {
+    template: "standard",
     useCustomDescription: false,
     description: plainTextToDoc("Custom description"),
     tip: plainTextToDoc("Aim for the scoop"),
