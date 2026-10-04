@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { issues, machines, userProfiles } from "~/server/db/schema";
+import { issues, userProfiles } from "~/server/db/schema";
 import { eq, asc, and, ne, notInArray, sql } from "drizzle-orm";
 import { IssueActivity } from "~/components/issues/IssueActivity";
 import { IssueDetails } from "~/components/issues/IssueDetails";
@@ -20,6 +20,7 @@ import {
   IssueSections,
 } from "~/components/issues/IssueSectionTabs";
 import { getMachineOwnerId } from "~/lib/issues/owner";
+import { getMachineChoices } from "~/lib/machines/queries";
 import { CLOSED_STATUSES } from "~/lib/issues/status";
 import { formatIssueId } from "~/lib/issues/utils";
 import type { IssueWithAllRelations } from "~/lib/types";
@@ -225,11 +226,11 @@ export default async function IssueDetailPage({
           .where(notInArray(userProfiles.role, ["guest"]))
           .orderBy(asc(userProfiles.name))
       : Promise.resolve(issue.assignedToUser ? [issue.assignedToUser] : []),
+    // Move lists machines not marked Removed (issue-detail §4.6).
     userCanReassign
-      ? db.query.machines.findMany({
-          columns: { initials: true, name: true },
-          orderBy: asc(machines.name),
-        })
+      ? getMachineChoices(db).then((rows) =>
+          rows.map(({ initials, name }) => ({ initials, name }))
+        )
       : Promise.resolve([]),
   ]);
 

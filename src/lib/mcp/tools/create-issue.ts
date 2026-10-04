@@ -13,7 +13,7 @@ import {
   ISSUE_PRIORITY_VALUES,
   ISSUE_SEVERITY_VALUES,
 } from "~/lib/types";
-import { createIssue } from "~/services/issues";
+import { createIssue, MachineRemovedError } from "~/services/issues";
 
 import {
   contentAddressedUuid,
@@ -121,6 +121,12 @@ export async function runCreateIssue(
       machine.id,
       Date.now()
     ),
+  }).catch((error: unknown) => {
+    // Removed machines take no new issues (reporting §10.2).
+    if (error instanceof MachineRemovedError) {
+      throw new McpToolError("invalid", error.message);
+    }
+    throw error;
   });
 
   after(() => dispatchNotification(deliveryPlan));
