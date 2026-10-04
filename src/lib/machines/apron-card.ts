@@ -15,8 +15,6 @@ import { formatCreditNames, type MachineCredits } from "~/lib/opdb/credits";
  * its height only changes how much room the text gets. The 3in-tall Gottlieb
  * EM card is the exception: WPC's widths with Stern's vertical sizes, since
  * WPC's larger title floor and logo leave a long title no room at that height.
- * The 7×5in Glass corner card keeps WPC's geometry with Stern's narrower
- * identity panel, giving its extra room to the text.
  */
 export const APRON_CARD_SIZES = {
   stern: {
@@ -61,13 +59,6 @@ export const APRON_CARD_SIZES = {
     heightMm: 95.25,
     geometry: "narrow",
   },
-  "glass-corner": {
-    label: "Glass corner",
-    dimensions: "7 × 5 in",
-    widthMm: 177.8,
-    heightMm: 127,
-    geometry: "glass",
-  },
 } as const;
 
 export type ApronCardSize = keyof typeof APRON_CARD_SIZES;
@@ -101,7 +92,6 @@ function layoutsBySize<T>(
     "williams-em": at("williams-em"),
     "gottlieb-em": at("gottlieb-em"),
     "bally-em": at("bally-em"),
-    "glass-corner": at("glass-corner"),
   };
 }
 
@@ -352,19 +342,6 @@ export const APRON_CARD_LAYOUTS = layoutsBySize<ApronGeometryLayout>({
     qrWithTipPx: 84,
     bodyFontPx: 12,
   },
-  glass: {
-    panelWidth: 206,
-    titleMaxWidth: 170,
-    panelPadding: "18px 18px 14px 18px",
-    bodyPadding: "18px 18px 16px 18px",
-    titleMaxPx: 46,
-    titleMinPx: 26,
-    logoWidth: 160,
-    logoWithCreditsWidth: 110,
-    qrPx: 108,
-    qrWithTipPx: 92,
-    bodyFontPx: 12.5,
-  },
 });
 
 /**
@@ -410,19 +387,6 @@ export const APRON_SIDE_RAIL_LAYOUTS = layoutsBySize<ApronGeometryLayout>({
     qrPx: 98,
     qrWithTipPx: 98,
     bodyFontPx: 12,
-  },
-  glass: {
-    panelWidth: 160,
-    titleMaxWidth: 128,
-    panelPadding: "16px 16px 12px 16px",
-    bodyPadding: "18px 18px 14px 18px",
-    titleMaxPx: 34,
-    titleMinPx: 17,
-    logoWidth: 96,
-    logoWithCreditsWidth: 96,
-    qrPx: 108,
-    qrWithTipPx: 108,
-    bodyFontPx: 12.5,
   },
 });
 
@@ -481,17 +445,6 @@ export const APRON_HEADER_BAND_LAYOUTS = layoutsBySize<
     qrPx: 98,
     bodyPadding: "12px 16px 12px 16px",
     bodyFontPx: 12,
-  },
-  glass: {
-    bandHeight: 72,
-    bandPadding: "11px 16px 11px 18px",
-    titleMaxWidth: 558,
-    titleMaxPx: 30,
-    titleMinPx: 16,
-    logoWidth: 68,
-    qrPx: 108,
-    bodyPadding: "14px 18px 14px 18px",
-    bodyFontPx: 12.5,
   },
 });
 

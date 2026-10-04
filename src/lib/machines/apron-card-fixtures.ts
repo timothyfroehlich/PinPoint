@@ -66,7 +66,7 @@ const noText = {
 
 // Generic card copy — no machine-specific rules, so it makes no claims about
 // a real game — long enough to overflow the text region of any plausible
-// apron size. It runs twice so the 7×5in Glass corner card still overflows.
+// apron size. It runs twice so the tallest cards still overflow.
 // The harness fails loudly if a size ever fits all of it.
 const FILL_SENTENCES = [
   "Start a game with the button on the front of the cabinet, then plunge the ball with a firm, full pull.",
