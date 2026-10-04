@@ -2,17 +2,21 @@ import { describe, expect, it } from "vitest";
 import { buildTagGroups } from "./groups";
 import type { AutomaticTag, HandTag, HandTagType, TagTypeId } from "./types";
 
-const machine = (name: string) => ({
+const machine = (
+  name: string,
+  presenceStatus: "on_the_floor" | "removed" = "on_the_floor"
+) => ({
   id: name,
   initials: name.slice(0, 2).toUpperCase(),
   name,
-  presenceStatus: "on_the_floor" as const,
+  presenceStatus,
 });
 
 function handTag(
   name: string,
   typeId: string | null,
-  machines: number
+  machines: number,
+  removed = 0
 ): HandTag {
   return {
     kind: "hand",
@@ -21,9 +25,16 @@ function handTag(
     slug: name.toLowerCase(),
     name,
     href: `/c/tags/x/${name}`,
-    machines: Array.from({ length: machines }, (_, n) =>
-      machine(`${name}${String(n)}`)
-    ),
+    machines: [
+      ...Array.from({ length: machines }, (_, n) =>
+        machine(`${name}${String(n)}`)
+      ),
+      ...Array.from({ length: removed }, (_, n) =>
+        machine(`${name}-removed${String(n)}`, "removed")
+      ),
+    ],
+    // Removed machines stay members but leave the count (spec 7.9).
+    machineCount: machines,
   };
 }
 
@@ -41,6 +52,7 @@ const automatic: Record<TagTypeId, AutomaticTag[]> = {
       name: "Williams",
       href: "/w",
       machines: [machine("a")],
+      machineCount: 1,
     },
     {
       kind: "automatic",
@@ -49,6 +61,7 @@ const automatic: Record<TagTypeId, AutomaticTag[]> = {
       name: "Bally",
       href: "/b",
       machines: [machine("b")],
+      machineCount: 1,
     },
   ],
   type: [],
@@ -70,6 +83,7 @@ describe("buildTagGroups", () => {
       handTag("front room", "l", 2),
       handTag("Back room", "l", 1),
       handTag("Arcade", "l", 0),
+      handTag("Old cabinet", "l", 0, 1),
       handTag("Needs rubbers", null, 0),
       handTag("Kid-friendly", null, 3),
     ]
@@ -97,12 +111,14 @@ describe("buildTagGroups", () => {
     ]);
   });
 
-  it("keeps automatic order and puts empty hand tags last, each part by name", () => {
+  it("keeps automatic order and puts hand tags with no machines to count last, each part by name", () => {
     expect(summary[0]?.tags).toEqual(["Williams", "Bally"]);
     expect(summary.find((entry) => entry.group === "Location")?.tags).toEqual([
       "Back room",
       "front room",
       "Arcade",
+      // Only a Removed machine: nothing to count, so it sorts with the empty tags.
+      "Old cabinet",
       "Storage",
     ]);
     expect(summary.at(-1)?.tags).toEqual(["Kid-friendly", "Needs rubbers"]);

@@ -20,13 +20,12 @@ export function compareTagNames(left: string, right: string): number {
  * Tags with machines first, then tags with none, each part ordered by name
  * (spec 11.13–11.14).
  */
-export function orderHandTags<T extends Pick<HandTag, "name" | "machines">>(
+export function orderHandTags<T extends Pick<HandTag, "name" | "machineCount">>(
   tags: readonly T[]
 ): T[] {
   return [...tags].sort(
     (left, right) =>
-      Number(left.machines.length === 0) -
-        Number(right.machines.length === 0) ||
+      Number(left.machineCount === 0) - Number(right.machineCount === 0) ||
       compareTagNames(left.name, right.name)
   );
 }

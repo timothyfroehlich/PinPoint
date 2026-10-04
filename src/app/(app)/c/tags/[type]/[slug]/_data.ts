@@ -1,8 +1,11 @@
 import { cache } from "react";
-import { getPickerMachines } from "~/app/(app)/c/[id]/_data";
 import { getViewer } from "~/lib/collections/viewer";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
-import { resolveTag, type ResolvedTag } from "~/lib/tags/tags";
+import {
+  getTagPickerMachines,
+  resolveTag,
+  type ResolvedTag,
+} from "~/lib/tags/tags";
 import { db } from "~/server/db";
 
 /**
@@ -105,7 +108,7 @@ export const getTagEditor = cache(
             ? `${group.type.name} · One per machine`
             : group.type.name
           : null,
-      allMachines: await getPickerMachines(),
+      allMachines: await getTagPickerMachines(tag.id),
       currentIds: tag.machines.map((machine) => machine.id),
       otherTagByMachine,
       parentHref: group.kind === "hand" ? group.type.href : "/c/tags",

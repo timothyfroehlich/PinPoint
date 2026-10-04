@@ -28,9 +28,9 @@ The control's states (§4) are comparisons across these: _in sync_ means the lin
 
 ## 2. Catalog matching
 
-- **2.1** A machine may be matched to a Pinball Map catalog title, declared uncataloged, or left unmatched. Matched and uncataloged are mutually exclusive.
+- **2.1** A machine is either matched to a Pinball Map catalog title or declared uncataloged; it cannot be saved as neither. Matched and uncataloged are mutually exclusive.
 - **2.2** Matching is done by a person (or an explicit tool call) — never guessed by the system.
-- **2.3** Changing or clearing a machine's matched title resets its lineup setting to Off (Don't sync is kept), with a confirmation that says the old Pinball Map entry itself is not removed. Matching a machine to an entry from the lineup page sets its lineup setting On instead, unless it is set to Don't sync or its availability forbids On (§6.2) (`pinballmap-lineup.md` §5.4).
+- **2.3** Changing a machine's matched title resets its lineup setting to Off (Don't sync is kept), with a confirmation that says the old Pinball Map entry itself is not removed. Matching a machine to an entry from the lineup page sets its lineup setting On instead, unless it is set to Don't sync or its availability forbids On (§6.2) (`pinballmap-lineup.md` §5.4).
 - **2.4** An uncataloged machine can carry a hand-entered model identity (title, manufacturer, year, type, display, player count, designers, artists) — the manual model. Every field is optional and starts blank. Type, display, and player count take the values their tags use (collections-and-tags §9.3–9.5). Designers and artists are each an ordered list of names, shown wherever OPDB credits are (apron-cards §10). A blank title means the machine's own name: the field suggests the current name rather than pre-filling it, so a title left blank keeps following a later rename instead of freezing the name as it was the day the source was switched. A blank manufacturer or year reads as **Unknown** wherever it is shown under its own label. The machine header omits blanks instead, so it never reads "Unknown · Unknown".
 - **2.5** Cleaning up the old entry after a re-match is deliberately a separate action, never a side effect of changing the match. The orphaned entry may stay on the lineup as long as the operator wants. While any cabinet is still matched to the old title, the entry is that title's ordinary business and surfaces through those cabinets' own states (§4). When none is, PinPoint remembers which machine walked away and surfaces the entry on that machine's page, with the same removal action and matching copy. Listing the machine under its new title is likewise the standard flow — two actions, taken independently.
 - **2.6** An edition near-miss (§1) is flagged as a candidate match for operator confirmation on the lineup page (`docs/feature-specs/pinballmap-lineup.md` §5.4). Resolving an edition near-miss by selecting or changing a match follows standard match reset and entry rules (§2.3, §2.5).
@@ -55,7 +55,7 @@ The control's states (§4) are comparisons across these: _in sync_ means the lin
   - **Status row**: the observed lineup fact as a short sentence, plus a warning-colored "Insider Connected not set." (or the value that differs) when 3.8 is out of sync, with reconciliation actions on the right.
   - **Header**: "Pinball Map — {location name}", the name taken from their location entry and linked to the location's Pinball Map page (this link doubles as the 9.1 attribution link-back); last-refresh time and a Refresh button (3.2); an **Out of sync** alert when the lineup setting and the lineup disagree. Before the first refresh the location name is unknown and the title is bare.
 - **4.2** State names (canonical):
-  - **No model** — disabled box, status says why.
+  - **No model** — a machine that is neither matched nor uncataloged, saved before 2.1 required one; disabled box, status says why.
   - **Uncataloged** — no control. The section collapses to one line naming the section and why it is unavailable: no lineup setting, no status, no Refresh. It keeps its place on the page, so an abandoned entry (§2.5) still surfaces beneath it. The stored snapshot may go stale here — nothing on the page reads it.
   - **Not configured** — no tracked location; disabled box, no Refresh or location link, and no retained snapshot rendered as current.
   - **Waiting** — no valid refresh yet (3.5); disabled box, header error marker.
@@ -193,6 +193,7 @@ Changes to this document. Divergence-table rows are working state and are not lo
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-03 | §2.1: a machine must be matched or uncataloged and can no longer be saved as neither. §2.3 drops clearing a match, which 2.1 rules out. §4.2's No model names the machines it still covers. |
 | 2026-10-03 | §10 preamble drops the sync-report channel; the activity summary (`discord-activity-summary.md`) replaced the weekly sync report. |
 | 2026-10-01 | §4.8: the service is always written "Pinball Map"; the abbreviation "PBM" never appears in user-facing copy. |
 | 2026-10-01 | §4.10 cites the lineup page as its dense-view example; `fleet.md` is retired. |

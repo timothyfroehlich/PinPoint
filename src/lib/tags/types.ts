@@ -93,6 +93,8 @@ interface TagFields {
   href: string;
   /** Alphabetical by machine name, in every presence state. */
   machines: CollectionMachine[];
+  /** Machines other than Removed ones: the count the tag shows (spec 7.9). */
+  machineCount: number;
 }
 
 /** A tag PinPoint derives from machine data (spec §8, §9). */

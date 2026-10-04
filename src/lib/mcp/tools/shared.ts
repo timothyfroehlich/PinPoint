@@ -15,7 +15,10 @@ import {
   type McpAuthContext,
 } from "~/lib/mcp/verify-token";
 import { OPEN_STATUSES, type IssueStatus } from "~/lib/issues/status";
-import type { MachinePresenceStatus } from "~/lib/machines/presence";
+import {
+  VALID_MACHINE_PRESENCE_STATUSES,
+  type MachinePresenceStatus,
+} from "~/lib/machines/presence";
 import { reportError } from "~/lib/observability/report-error";
 import { checkMcpWriteLimit, formatResetTime } from "~/lib/rate-limit";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
@@ -35,6 +38,39 @@ import {
   machines,
   userProfiles,
 } from "~/server/db/schema";
+
+/**
+ * `presence` takes a SET, not a single value (PP-u4ab.13).
+ *
+ * A single value cannot express the question the fleet linking pass (PP-h059)
+ * actually runs on: "unlinked AND still plausibly in the collection". Without
+ * it, `pinballmap: "unlinked"` also returns the cabinets that are `removed` or
+ * `pending_arrival` — rows nobody will ever link, which therefore sit in every
+ * page of that filter forever and hold `total` above zero permanently. The
+ * model was left to notice and skip them by hand on each page.
+ *
+ * The single-value form is kept, not deprecated: it is what every existing
+ * caller sends, and `presence: "off_the_floor"` stays the natural way to ask a
+ * one-state question.
+ *
+ * `.min(1)` on the array is deliberate. An empty set would type-check, produce
+ * `inArray(col, [])` — a predicate matching nothing — and hand back
+ * `total: 0` for the whole collection, which reads as an authoritative "there
+ * are none" rather than as the malformed filter it is (CORE-ARCH-012). Zod
+ * rejects it instead.
+ */
+export const presenceFilterSchema = z.union([
+  z.enum(VALID_MACHINE_PRESENCE_STATUSES),
+  z.array(z.enum(VALID_MACHINE_PRESENCE_STATUSES)).min(1),
+]);
+
+export type PresenceFilter = z.infer<typeof presenceFilterSchema>;
+
+export function resolvePresence(
+  filter: PresenceFilter
+): MachinePresenceStatus[] {
+  return Array.isArray(filter) ? filter : [filter];
+}
 
 /**
  * A tool-level failure that maps to a user-facing MCP error result rather than a

@@ -11,7 +11,7 @@ vi.mock("~/server/db", async () => {
 
 const { loadMachineViewFromDatabase } =
   await import("~/lib/machines/view/queries");
-const { getTagsForMachine, listTags, resolveTag } =
+const { getTagPickerMachines, getTagsForMachine, listTags, resolveTag } =
   await import("~/lib/tags/tags");
 
 const GZ = createTestMachine({
@@ -45,6 +45,7 @@ describe("hand-applied tag reads", () => {
   setupTestDb();
 
   let frontRoom: string;
+  let storage: string;
 
   beforeEach(async () => {
     const db = await getTestDb();
@@ -87,6 +88,7 @@ describe("hand-applied tag reads", () => {
     const id = (slug: string): string =>
       inserted.find((tag) => tag.slug === slug)?.id ?? "";
     frontRoom = id("front-room");
+    storage = id("storage");
     const apply = (machineId: string, slug: string) => {
       const tag = inserted.find((row) => row.slug === slug);
       return {
@@ -113,7 +115,7 @@ describe("hand-applied tag reads", () => {
       groups.map((group) => ({
         group: label(group),
         tags: group.tags.map(
-          (tag) => `${tag.name} ${String(tag.machines.length)}`
+          (tag) => `${tag.name} ${String(tag.machineCount)}`
         ),
       }))
     ).toEqual([
@@ -122,7 +124,8 @@ describe("hand-applied tag reads", () => {
       { group: "Display", tags: [] },
       { group: "Player Count", tags: [] },
       { group: "features", tags: ["Topper 1"] },
-      { group: "Location", tags: ["Back room 1", "Front room 2", "Storage 0"] },
+      // Front room's count leaves out the Removed MM (spec 7.9).
+      { group: "Location", tags: ["Back room 1", "Front room 1", "Storage 0"] },
       { group: "Zed", tags: [] },
       { group: "Other tags", tags: ["Kid-friendly 1", "Needs rubbers 0"] },
     ]);
@@ -136,6 +139,16 @@ describe("hand-applied tag reads", () => {
       "/c/tags/location/front-room",
       "/c/tags/location/storage",
     ]);
+  });
+
+  it("offers Removed machines on the Edit machines dialog only when they carry the tag", async () => {
+    const tx = asDbOrTx(await getTestDb());
+    const initials = async (tagId: string) =>
+      (await getTagPickerMachines(tagId, tx)).map(
+        (machine) => machine.initials
+      );
+    expect(await initials(storage)).toEqual(["AFM", "GZ"]);
+    expect(await initials(frontRoom)).toEqual(["AFM", "GZ", "MM"]);
   });
 
   it("lists a machine's hand-applied tags after its automatic ones (spec 11.14)", async () => {

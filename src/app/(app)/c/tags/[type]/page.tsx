@@ -107,7 +107,7 @@ export default async function TagTypePage({
             tags={group.tags.map((tag) => ({
               href: tag.href,
               name: tag.name,
-              machineCount: tag.machines.length,
+              machineCount: tag.machineCount,
             }))}
           />
         )}

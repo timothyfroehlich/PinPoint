@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getTestDb, setupTestDb } from "~/test/setup/pglite";
+import { asDbOrTx, getTestDb, setupTestDb } from "~/test/setup/pglite";
 import {
   createTestComment,
   createTestIssue,
@@ -13,6 +13,10 @@ import {
   userProfiles,
 } from "~/server/db/schema";
 import { loadIssueListPage } from "~/lib/issues/list-page";
+import {
+  getMachineChoices,
+  getOwnedMachineInitials,
+} from "~/lib/machines/queries";
 import type { IssueSort } from "~/lib/issues/filters";
 import { formatIssueId } from "~/lib/issues/utils";
 
@@ -174,5 +178,71 @@ describe("issue list page: sorting and comment counts", () => {
       "BB-01": 0,
       "BB-02": 0,
     });
+  });
+});
+
+/**
+ * The Machine filter's options and My machines shortcut (issues-list 4.5), the
+ * move picker (issue-detail §4.6), and the report form's machine list
+ * (reporting §10.1) all read these two queries.
+ */
+describe("machine choices: Removed machines", () => {
+  setupTestDb();
+
+  const OWNER = "11111111-1111-4111-8111-111111111111";
+
+  beforeEach(async () => {
+    const db = await getTestDb();
+    await db
+      .insert(userProfiles)
+      .values(
+        createTestUser({ id: OWNER, firstName: "Olive", lastName: "Owner" })
+      );
+    await db.insert(machines).values([
+      createTestMachine({ initials: "LV", name: "Live", ownerId: OWNER }),
+      createTestMachine({
+        initials: "OF",
+        name: "Off Floor",
+        presenceStatus: "off_the_floor",
+      }),
+      createTestMachine({
+        initials: "RA",
+        name: "Removed A",
+        ownerId: OWNER,
+        presenceStatus: "removed",
+      }),
+      createTestMachine({
+        initials: "RB",
+        name: "Removed B",
+        presenceStatus: "removed",
+      }),
+    ]);
+  });
+
+  it("leaves out Removed machines by default", async () => {
+    const db = await getTestDb();
+    const choices = await getMachineChoices(asDbOrTx(db));
+    expect(choices.map((m) => m.initials)).toEqual(["LV", "OF"]);
+  });
+
+  it("keeps a selected Removed machine listed", async () => {
+    const db = await getTestDb();
+    const choices = await getMachineChoices(asDbOrTx(db), {
+      keepInitials: ["RB"],
+    });
+    expect(choices.map((m) => m.initials)).toEqual(["LV", "OF", "RB"]);
+  });
+
+  it("lists every machine when the presence filter includes Removed", async () => {
+    const db = await getTestDb();
+    const choices = await getMachineChoices(asDbOrTx(db), {
+      includeRemoved: true,
+    });
+    expect(choices.map((m) => m.initials)).toEqual(["LV", "OF", "RA", "RB"]);
+  });
+
+  it("leaves Removed machines out of My machines", async () => {
+    const db = await getTestDb();
+    expect(await getOwnedMachineInitials(asDbOrTx(db), OWNER)).toEqual(["LV"]);
   });
 });

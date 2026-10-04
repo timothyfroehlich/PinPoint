@@ -51,7 +51,7 @@ export function TagGroupCard({
               <TagChip
                 href={tag.href}
                 name={tag.name}
-                machineCount={tag.machines.length}
+                machineCount={tag.machineCount}
               />
             </li>
           ))}

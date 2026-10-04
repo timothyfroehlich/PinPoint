@@ -114,7 +114,7 @@ When the user asks for one of these, say so and name the closest option. Do not 
 
 ## 6. Finding the right record
 
-- **Machine**: use its initials (for example `MM`). If the user gives a title, call `list_machines` with `search` set to that title. Use the initials only if exactly one machine matches. If none or several match, show the matches and ask.
+- **Machine**: use its initials (for example `MM`). If the user gives a title, call `list_machines` with `search` set to that title. Use the initials only if exactly one machine matches. If none or several match, show the matches and ask. `list_machines` leaves out Removed machines unless `presence` lists `removed`; search again with it before saying a machine does not exist.
 - **Issue**: a machine plus the issue number (`MM` issue `3`), from `list_issues` or `get_issue`.
 - **Filters**: `list_machines` can filter by name or initials text (`search`), by `presence`, and by Pinball Map state (`pinballmap`). Nothing else. `search` does not match manufacturer, year, owner or type: "every Stern machine" or "all of Bob's games" cannot be found with it. Say so, and ask the user to name the machines.
 - **Person** (owner or assignee): their exact full name, "First Last", or their UUID. No tool lists members, so if the user gives only a first name or a nickname ("Tom"), ask for the full name before anything else. First names, nicknames, partial names and emails do not work. If a tool answers "Multiple members named", show the list it returns and ask the user which one.

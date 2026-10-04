@@ -71,6 +71,7 @@ vi.mock("~/lib/observability/report-error", () => ({
 // Mock Service — createIssue is mocked to throw a sensitive error
 vi.mock("~/services/issues", () => ({
   createIssue: vi.fn(),
+  MachineRemovedError: class MachineRemovedError extends Error {},
 }));
 
 import { createIssue } from "~/services/issues";

@@ -1,10 +1,13 @@
 import "server-only";
 
 import { cache } from "react";
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, inArray, or } from "drizzle-orm";
 import { db, type DbTransaction } from "~/server/db";
 import { machines, machineTags, tags, tagTypes } from "~/server/db/schema";
 import type { CollectionMachine } from "~/lib/collections/owner";
+import type { PickerMachine } from "~/lib/collections/user";
+import { isRemoved } from "~/lib/machines/presence";
+import { machineNotRemoved } from "~/lib/machines/queries";
 import {
   getCurrentManufacturer,
   groupManufacturerTags,
@@ -28,6 +31,11 @@ import {
 } from "./types";
 
 type AutomaticTagsByType = Record<TagTypeId, AutomaticTag[]>;
+
+/** Members other than Removed ones: the count a tag shows (spec 7.9). */
+function countNotRemoved(tagged: readonly CollectionMachine[]): number {
+  return tagged.filter((machine) => !isRemoved(machine.presenceStatus)).length;
+}
 
 /**
  * The model facts the Type, Display and Player Count tags read. A catalog-linked
@@ -68,6 +76,7 @@ function groupByLabel(
       name: label.name,
       href: tagHref(type, label.slug),
       machines: tagged,
+      machineCount: countNotRemoved(tagged),
     }));
 }
 
@@ -139,14 +148,18 @@ async function loadAutomaticTags(
   });
 
   return {
-    manufacturer: groupManufacturerTags(members).map((group): AutomaticTag => ({
-      kind: "automatic",
-      type: "manufacturer",
-      slug: group.slug,
-      name: group.name,
-      href: tagHref("manufacturer", group.slug),
-      machines: group.machines.map((member) => member.machine),
-    })),
+    manufacturer: groupManufacturerTags(members).map((group): AutomaticTag => {
+      const tagged = group.machines.map((member) => member.machine);
+      return {
+        kind: "automatic",
+        type: "manufacturer",
+        slug: group.slug,
+        name: group.name,
+        href: tagHref("manufacturer", group.slug),
+        machines: tagged,
+        machineCount: countNotRemoved(tagged),
+      };
+    }),
     type: groupByLabel("type", members, (model) => typeTag(model.type)),
     display: groupByLabel("display", members, (model) =>
       displayTag(model.display)
@@ -216,6 +229,7 @@ async function loadHandTags(
         row.slug
       ),
       machines: membersByTag.get(row.id) ?? [],
+      machineCount: countNotRemoved(membersByTag.get(row.id) ?? []),
     })),
   };
 }
@@ -307,4 +321,29 @@ export async function getTagsForMachine(
       tag.machines.some((machine) => machine.id === machineId)
     )
   );
+}
+
+/**
+ * The machines offered on a hand-applied tag's Edit machines dialog,
+ * alphabetical. Removed machines are left out, except ones already carrying
+ * the tag, the same rule a Collection's machine choice follows (spec 2.7).
+ */
+export function getTagPickerMachines(
+  tagId: string,
+  tx: DbTransaction = db
+): Promise<PickerMachine[]> {
+  return tx.query.machines.findMany({
+    where: or(
+      machineNotRemoved(),
+      inArray(
+        machines.id,
+        tx
+          .select({ id: machineTags.machineId })
+          .from(machineTags)
+          .where(eq(machineTags.tagId, tagId))
+      )
+    ),
+    columns: { id: true, initials: true, name: true },
+    orderBy: [asc(machines.name)],
+  });
 }
