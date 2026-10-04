@@ -26,8 +26,17 @@ export interface IssueState {
   severity: IssueSeverity;
   /** The machine the issue was on at that instant. */
   machineInitials: string;
-  /** The assignee's name as recorded when assigned; null when unassigned. */
-  assigneeName: string | null;
+  /** Null when unassigned. */
+  assignee: AssigneeState | null;
+}
+
+/**
+ * An issue's assignee at one instant: a comparison key for the person (so a
+ * rename alone is not a reassignment) and their current display name.
+ */
+export interface AssigneeState {
+  key: string;
+  name: string;
 }
 
 export interface IssueActivity {
@@ -236,12 +245,13 @@ function extraRows(
   // the assignment.
   if (
     enabled.has("assignments") &&
-    (atStart?.assigneeName ?? null) !== atEnd.assigneeName
+    // Compare people, not names: a rename alone is not a reassignment.
+    (atStart?.assignee?.key ?? null) !== (atEnd.assignee?.key ?? null)
   ) {
     rows.push({
       kind: "assignment",
       issue: ref,
-      assigneeName: atEnd.assigneeName,
+      assigneeName: atEnd.assignee?.name ?? null,
     });
   }
 

@@ -19,8 +19,15 @@ import {
   VALID_MACHINE_PRESENCE_STATUSES,
   type MachinePresenceStatus,
 } from "~/lib/machines/presence";
-import { personLabel, resolvePerson } from "~/lib/timeline/resolve-person";
-import type { TimelineEventData } from "~/lib/timeline/types";
+import {
+  FORMER_USER_NAME,
+  personLabel,
+  resolvePerson,
+} from "~/lib/timeline/resolve-person";
+import {
+  assigneeDisplayName,
+  type TimelineEventData,
+} from "~/lib/timeline/types";
 import {
   ISSUE_SEVERITY_VALUES,
   type IssueSeverity,
@@ -39,6 +46,7 @@ import {
 import type { ActivitySummaryEventKey } from "./events";
 import type {
   ActivityHistory,
+  AssigneeState,
   IssueActivity,
   IssueState,
   MachineActivity,
@@ -60,8 +68,10 @@ import type {
  * - machine availability — the machine timeline's `presence_changed`;
  * - machine owner — `owner_changed` with its `from_owner` person reference.
  *
- * Assignment events record only the new assignee, by name, so the assignee
- * at an instant is read FORWARD instead: the last assignment event before it.
+ * Assignment events record only the new assignee, so the assignee at an
+ * instant is read FORWARD instead: the last assignment event before it. The
+ * assignee is keyed by account id (a legacy event without one, by its stored
+ * name) and named as issue Activity names them (PP-0fg0.1).
  *
  * Instants are compared with drizzle operators on typed columns, never by
  * interpolating a `Date` into raw SQL — postgres.js cannot bind an untyped
@@ -149,13 +159,27 @@ function recordIssueChange(
   }
 }
 
-/** The assignee an assignment event leaves, or undefined for other events. */
+/**
+ * The assignee an assignment event leaves (null for an unassignment), or
+ * undefined for other events. Keyed by account id; an event without one, by
+ * its stored name, or as its own former person when it has neither (an event
+ * rewritten by account deletion). Named by `assigneeDisplayName`, the rule
+ * issue Activity uses.
+ */
 function assigneeOf(
-  event: TimelineEventData | null
-): string | null | undefined {
+  eventId: string,
+  event: TimelineEventData | null,
+  accountNames: ReadonlyMap<string, string>
+): AssigneeState | null | undefined {
   if (event?.type === "unassigned") return null;
-  if (event?.type === "assigned") return event.assigneeName;
-  return undefined;
+  if (event?.type !== "assigned") return undefined;
+  const name = assigneeDisplayName(event, accountNames);
+  // `typeof`: an event written by the previous release has no id key at all.
+  if (typeof event.assigneeId === "string")
+    return { key: `u:${event.assigneeId}`, name };
+  if (event.assigneeName !== undefined)
+    return { key: `n:${event.assigneeName}`, name };
+  return { key: `former:${eventId}`, name };
 }
 
 function ownerState(
@@ -211,6 +235,7 @@ export async function loadActivityHistory(
         status: issues.status,
         severity: issues.severity,
         createdAt: issues.createdAt,
+        assignedTo: issues.assignedTo,
         assigneeName: userProfiles.name,
       })
       .from(issues)
@@ -268,6 +293,7 @@ export async function loadActivityHistory(
       ? Promise.resolve([])
       : db
           .select({
+            id: issueComments.id,
             issueId: issueComments.issueId,
             eventData: issueComments.eventData,
             createdAt: issueComments.createdAt,
@@ -403,9 +429,31 @@ export async function loadActivityHistory(
     recordIssueChange(logs, row.createdAt, row.eventData);
     changesByIssue.set(row.issueId, logs);
   }
-  const assignmentsByIssue = new Map<string, TimedEvent<string | null>[]>();
+  // Current names for every assignee the log names by id, in one query.
+  const assigneeIds = new Set<string>();
+  for (const { eventData } of assignmentRows) {
+    if (
+      eventData?.type === "assigned" &&
+      typeof eventData.assigneeId === "string"
+    )
+      assigneeIds.add(eventData.assigneeId);
+  }
+  const accountNames = new Map(
+    assigneeIds.size === 0
+      ? []
+      : (
+          await db
+            .select({ id: userProfiles.id, name: userProfiles.name })
+            .from(userProfiles)
+            .where(inArray(userProfiles.id, [...assigneeIds]))
+        ).map((row) => [row.id, row.name] as const)
+  );
+  const assignmentsByIssue = new Map<
+    string,
+    TimedEvent<AssigneeState | null>[]
+  >();
   for (const row of assignmentRows) {
-    const assignee = assigneeOf(row.eventData);
+    const assignee = assigneeOf(row.id, row.eventData, accountNames);
     if (assignee !== undefined)
       pushTo(assignmentsByIssue, row.issueId, {
         createdAt: row.createdAt,
@@ -419,6 +467,13 @@ export async function loadActivityHistory(
   const issueActivity: IssueActivity[] = issueRows.map((row) => {
     const changes = changesByIssue.get(row.id);
     const assignments = assignmentsByIssue.get(row.id);
+    const currentAssignee: AssigneeState | null =
+      row.assignedTo === null
+        ? null
+        : {
+            key: `u:${row.assignedTo}`,
+            name: row.assigneeName ?? FORMER_USER_NAME,
+          };
 
     const stateAt = (at: Date): IssueState => ({
       status: firstAtOrAfter(changes?.status ?? [], at)?.data ?? row.status,
@@ -427,9 +482,9 @@ export async function loadActivityHistory(
       machineInitials:
         firstAtOrAfter(changes?.machine ?? [], at)?.data ?? row.machineInitials,
       // An issue with no assignment log predates it: its assignee is today's.
-      assigneeName:
+      assignee:
         assignments === undefined
-          ? row.assigneeName
+          ? currentAssignee
           : (lastBefore(assignments, at)?.data ?? null),
     });
 

@@ -11,7 +11,8 @@
 # Weighted size = added + deleted lines, leaving out the lockfile, migration
 # snapshots, test fixtures, binary files and feature specs, with test code counted
 # at half weight. Bands: low below 50, medium from 50 up to 1,500, high from 1,500
-# through 3,000. Above 3,000 the answer is `ask`: stop and ask Tim before reviewing.
+# through 3,000. Above 3,000 the answer is `ask`: stop and ask Tim whether to review at
+# xhigh or max, or to split the PR. record-claude-review.sh accepts all five levels.
 set -euo pipefail
 
 if [[ $# -gt 1 ]]; then
@@ -43,5 +44,7 @@ git -c core.quotePath=false diff --numstat --no-renames "$merge_base" HEAD | awk
     else if (weighted <= 3000) level = "high"
     else level = "ask"
     print level
-    printf "weighted %d lines: code %d, tests %d at half weight, %d left out\n", weighted, code, tests, excluded
+    printf "weighted %d lines: code %d, tests %d at half weight, %d left out", weighted, code, tests, excluded
+    if (level == "ask") printf "; ask Tim: xhigh, max, or split the PR"
+    printf "\n"
   }'

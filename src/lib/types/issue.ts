@@ -5,11 +5,14 @@ import type {
   UserProfile,
   IssueImage,
 } from "./database";
+import type { ResolvedTimelineEvent } from "~/lib/timeline/types";
 
 export type IssueCommentWithAuthor = Pick<
   IssueComment,
-  "id" | "content" | "createdAt" | "updatedAt" | "isSystem" | "eventData"
+  "id" | "content" | "createdAt" | "updatedAt" | "isSystem"
 > & {
+  /** The stored event with its person references resolved for display. */
+  eventData: ResolvedTimelineEvent | null;
   author?: Pick<UserProfile, "id" | "name"> | null;
   images: IssueImage[];
 };

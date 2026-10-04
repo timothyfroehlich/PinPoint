@@ -722,6 +722,20 @@
       "when": 1791084746092,
       "tag": "0102_guest-reporter-timeline-conversion",
       "breakpoints": true
+    },
+    {
+      "idx": 103,
+      "version": "7",
+      "when": 1791086011508,
+      "tag": "0103_hand-applied-tags",
+      "breakpoints": true
+    },
+    {
+      "idx": 104,
+      "version": "7",
+      "when": 1791087419613,
+      "tag": "0104_assigned-event-assignee-ids",
+      "breakpoints": true
     }
   ]
 }
