@@ -143,10 +143,16 @@
 - **9.5** The panel has explicit loading, failure, no-machine, and no-open- issues states.
 - **9.6** The recent-open-issues section is always visible and visually prominent whenever it is shown; it is not collapsible.
 
+## 10. Machine choice
+
+- **10.1** Every reporting mode's machine choice leaves out Removed machines.
+- **10.2** PinPoint refuses to create an issue on a Removed machine, whatever path submits it.
+
 ## Known divergences
 
 | Requirement | Code today | Resolution |
 | :-- | :-- | :-- |
+| §10.1–§10.2 | Every reporting mode offers Removed machines and accepts reports on them. | PP-s363 |
 | §2.3, §3.5–§3.11, §4.1, §4.3–§4.4, §5–§6 | Quick report templates, progressive problem selection, template values and confirmation, and deflection guidance do not exist. | `PP-ek0e.3` |
 | §9.1, §9.6 | Detailed report still shows five recent issues on desktop and lets its panel collapse; Quick report shows three and is always visible. | `PP-ek0e` follow-up decision; preserve Detailed behavior in `PP-ek0e.2` |
 
@@ -154,6 +160,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-03 | Added machine choice (§10): Removed machines are not offered, and no path creates an issue on one. |
 | 2026-09-22 | Split the report-mode preference into mobile bottom-bar and tablet/desktop header settings with distinct defaults and fallbacks; clarified that direct `/report` links remain Quick. |
 | 2026-09-12 | Added a per-user default report mode with a capability-safe fallback, and made recent open issues always visible. |
 | 2026-09-06 | Aligned batch-row behavior and divergence coverage with the existing report flow after conformance review. |
