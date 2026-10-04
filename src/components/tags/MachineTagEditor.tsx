@@ -113,7 +113,13 @@ interface Editing {
   count: (tag: TagEditorTag) => number;
   status: Status;
   setTag: (tagId: string, on: boolean, clears: string[]) => void;
-  create: (name: string, typeId: string | null, clears: string[]) => void;
+  /** `onFailed` runs when the tag could not be created, to restore the name. */
+  create: (
+    name: string,
+    typeId: string | null,
+    clears: string[],
+    onFailed: () => void
+  ) => void;
 }
 
 function useMachineTags({
@@ -169,7 +175,12 @@ function useMachineTags({
     });
   }
 
-  function create(name: string, typeId: string | null, clears: string[]): void {
+  function create(
+    name: string,
+    typeId: string | null,
+    clears: string[],
+    onFailed: () => void
+  ): void {
     const pendingId = `${PENDING_PREFIX}${name}`;
     startTransition(async () => {
       addOptimistic({
@@ -181,6 +192,7 @@ function useMachineTags({
       );
       if (!made.ok) {
         setStatus({ kind: "error", message: made.message });
+        onFailed();
         return;
       }
       const tag: CreatedTag = {
@@ -348,6 +360,15 @@ function TagEditorPanel({
     ? newTypeId
     : "";
 
+  // Each group's full tag ids, for clearing an exclusive type's other tag
+  // even when the search hides it.
+  const allTagsByType = new Map(
+    editing.groups.map((group) => [
+      group.typeId ?? "untyped",
+      group.tags.map((tag) => tag.id),
+    ])
+  );
+
   const shown = editing.groups
     .map((group) => ({
       ...group,
@@ -362,7 +383,10 @@ function TagEditorPanel({
     const group = types.find((candidate) => candidate.typeId === typeId);
     const clears =
       group?.exclusive === true ? group.tags.map((tag) => tag.id) : [];
-    editing.create(name, typeId === "" ? null : typeId, clears);
+    const typed = query;
+    editing.create(name, typeId === "" ? null : typeId, clears, () =>
+      setQuery(typed)
+    );
     setQuery("");
   }
 
@@ -499,9 +523,10 @@ function TagEditorPanel({
                         editing.setTag(
                           tag.id,
                           true,
-                          group.tags
-                            .filter((other) => other.id !== tag.id)
-                            .map((other) => other.id)
+                          // Every sibling, not only the ones the search shows.
+                          (allTagsByType.get(key) ?? []).filter(
+                            (otherId) => otherId !== tag.id
+                          )
                         )
                       }
                       className={RADIO}
@@ -530,8 +555,11 @@ function TagEditorPanel({
                     name={radioName}
                     checked={current.length === 0}
                     onChange={() => {
-                      for (const tag of current)
+                      for (const tag of current) {
+                        // A tag still being created has no id to send yet.
+                        if (tag.id.startsWith(PENDING_PREFIX)) continue;
                         editing.setTag(tag.id, false, []);
+                      }
                     }}
                     className={RADIO}
                   />

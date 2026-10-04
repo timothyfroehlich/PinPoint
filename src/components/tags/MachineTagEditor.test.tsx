@@ -153,6 +153,56 @@ describe("MachineTagEditor", () => {
     );
   });
 
+  it("replaces an exclusive type's tag even when the search hides it", async () => {
+    // Held open so the check reads the optimistic state, then released: an
+    // async action left pending holds up later transitions in other tests.
+    let release: (value: typeof saved) => void = () => undefined;
+    setMachineTag.mockReturnValue(
+      new Promise<typeof saved>((resolve) => {
+        release = resolve;
+      })
+    );
+    const panel = await openEditor();
+    const search = within(panel).getByRole("textbox", {
+      name: "Find or create a tag",
+    });
+
+    try {
+      await userEvent.type(search, "back");
+      await userEvent.click(
+        within(panel).getByRole("radio", { name: /^Back room/ })
+      );
+      await userEvent.clear(search);
+
+      const location = within(panel).getByRole("group", { name: /Location/ });
+      expect(
+        within(location).getByRole("radio", { name: "Front room, 4 machines" })
+      ).not.toBeChecked();
+    } finally {
+      release(saved);
+    }
+    expect(await within(panel).findByText("Saved")).toBeInTheDocument();
+  });
+
+  it("keeps the typed name when creating a tag fails", async () => {
+    createTag.mockResolvedValue({ ok: false, message: "Name already used" });
+    const panel = await openEditor();
+    const search = within(panel).getByRole("textbox", {
+      name: "Find or create a tag",
+    });
+
+    await userEvent.type(search, "Bay 3");
+    await userEvent.click(
+      within(panel).getByRole("button", { name: "Create “Bay 3”" })
+    );
+
+    expect(await within(panel).findByRole("alert")).toHaveTextContent(
+      "Name already used"
+    );
+    expect(search).toHaveValue("Bay 3");
+    expect(setMachineTag).not.toHaveBeenCalled();
+  });
+
   it("filters by name and hides None while searching", async () => {
     const panel = await openEditor({ canCreate: false });
     const search = within(panel).getByRole("textbox", { name: "Find a tag" });
