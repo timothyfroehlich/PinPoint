@@ -21,7 +21,8 @@ export const UNASSIGNED_OWNER_ID = "unassigned";
 /**
  * The owner filter value for whoever is viewing (machine-views §4.2). It is
  * resolved per viewer when the filter runs, so one URL or Saved View means
- * each signed-in person's own machines, and nothing for anonymous visitors.
+ * each signed-in person's own machines. For an anonymous visitor the filter
+ * is dropped, so the list shows every machine in the rest of the view.
  */
 export const ME_OWNER_ID = "me";
 
