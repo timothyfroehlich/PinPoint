@@ -8,6 +8,7 @@ import {
   docIsEmpty,
   docsEqualByText,
   isProseMirrorDoc,
+  withoutMentionLabels,
   type ProseMirrorDoc,
 } from "./types";
 
@@ -220,6 +221,43 @@ describe("applyMentionNames", () => {
     expect(applyMentionNames(undefined, names)).toBeUndefined();
     const malformed = { type: "doc" } as never;
     expect(applyMentionNames(malformed, names)).toBe(malformed);
+  });
+});
+
+describe("withoutMentionLabels", () => {
+  const withLabel = (label: string): ProseMirrorDoc => ({
+    type: "doc",
+    content: [
+      {
+        type: "bulletList",
+        content: [
+          {
+            type: "listItem",
+            content: [
+              {
+                type: "paragraph",
+                content: [
+                  { type: "text", text: "Ask " },
+                  { type: "mention", attrs: { id: "user-1", label } },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  });
+
+  it("makes docs that differ only in a mention's label equal, and keeps the id", () => {
+    const stripped = withoutMentionLabels(withLabel("Tim"));
+    expect(stripped).toEqual(withoutMentionLabels(withLabel("Timothy")));
+    expect(extractMentions(stripped)).toEqual(["user-1"]);
+    expect(extractMentionLabels(withLabel("Tim"))).toEqual(["Tim"]);
+  });
+
+  it("passes empty values through", () => {
+    expect(withoutMentionLabels(null)).toBeNull();
+    expect(withoutMentionLabels(undefined)).toBeUndefined();
   });
 });
 

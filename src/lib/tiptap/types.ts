@@ -165,23 +165,51 @@ export function applyMentionNames(
   names: ReadonlyMap<string, string>
 ): ProseMirrorDoc | null | undefined {
   if (!isProseMirrorDoc(doc) || names.size === 0) return doc;
+  return {
+    ...doc,
+    content: mapMentions(doc.content, (mention, id) => {
+      const name = names.get(id);
+      return name === undefined
+        ? mention
+        : { ...mention, attrs: { ...mention.attrs, label: name } };
+    }),
+  };
+}
 
-  function relabel(nodes: ProseMirrorNode[]): ProseMirrorNode[] {
-    return nodes.map((node) => {
-      const id = node.attrs?.["id"];
-      if (node.type === "mention" && typeof id === "string") {
-        const name = names.get(id);
-        return name === undefined
-          ? node
-          : { ...node, attrs: { ...node.attrs, label: name } };
-      }
-      return Array.isArray(node.content)
-        ? { ...node, content: relabel(node.content) }
-        : node;
-    });
-  }
+/**
+ * The doc with every mention's `label` removed, for deciding whether a
+ * submitted doc differs from the stored one. Editors open on docs whose labels
+ * were refreshed to current names (`applyMentionNames`), so an unchanged save
+ * after a rename differs from storage only in labels, which is not an edit.
+ * Pure: the input doc is not mutated.
+ */
+export function withoutMentionLabels(
+  doc: ProseMirrorDoc | null | undefined
+): ProseMirrorDoc | null | undefined {
+  if (!isProseMirrorDoc(doc)) return doc;
+  return {
+    ...doc,
+    content: mapMentions(doc.content, (mention) => {
+      const attrs = Object.fromEntries(
+        Object.entries(mention.attrs ?? {}).filter(([key]) => key !== "label")
+      );
+      return { ...mention, attrs };
+    }),
+  };
+}
 
-  return { ...doc, content: relabel(doc.content) };
+/** `nodes` with each mention node (one with a string `id`) replaced by `fn`. */
+function mapMentions(
+  nodes: ProseMirrorNode[],
+  fn: (mention: ProseMirrorNode, id: string) => ProseMirrorNode
+): ProseMirrorNode[] {
+  return nodes.map((node) => {
+    const id = node.attrs?.["id"];
+    if (node.type === "mention" && typeof id === "string") return fn(node, id);
+    return Array.isArray(node.content)
+      ? { ...node, content: mapMentions(node.content, fn) }
+      : node;
+  });
 }
 
 /**

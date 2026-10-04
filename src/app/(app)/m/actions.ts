@@ -51,6 +51,7 @@ import {
   type ProseMirrorDoc,
   docToPlainText,
   proseMirrorDocSchema,
+  withoutMentionLabels,
 } from "~/lib/tiptap/types";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { getUserAccessLevel } from "~/lib/permissions/access";
@@ -104,6 +105,23 @@ function canonicalJson(value: unknown): string {
     }
     return val;
   });
+}
+
+/**
+ * Whether a submitted prose value differs from the stored one. Mention labels
+ * are ignored: editors open on docs whose labels carry current names
+ * (PP-0fg0.2), so an untouched save after a rename differs from storage only
+ * in labels and is not an edit. A real edit still writes the submitted doc,
+ * current labels included.
+ */
+function proseChanged(
+  stored: ProseMirrorDoc | null,
+  submitted: ProseMirrorDoc | null
+): boolean {
+  return (
+    canonicalJson(withoutMentionLabels(stored)) !==
+    canonicalJson(withoutMentionLabels(submitted))
+  );
 }
 
 /** The `owner_requirements_updated` marker event, inside the caller's tx. */
@@ -894,8 +912,10 @@ export async function updateMachineAction(
         // intent carry-over at the `resolvePbmLinkColumnsForUpdate` call.
         pinballmapMachineId: true,
         pinballmapIntent: true,
-        // Compared against the submitted value so an unchanged save does not
-        // put an "owner's requirements updated" row on the timeline.
+        // Compared against the submitted values so an unchanged save neither
+        // rewrites them nor puts an "owner's requirements updated" row on the
+        // timeline.
+        description: true,
         ownerRequirements: true,
       },
     });
@@ -905,11 +925,20 @@ export async function updateMachineAction(
     }
 
     // The same marker event the inline editor emits, and on the same rule:
-    // only when the normalized value actually changed (PP-0x98).
+    // only when the normalized value actually changed (PP-0x98). A prose
+    // field that did not change is left out of the write, so a stale stored
+    // mention label stays as the fallback rather than counting as an edit.
     const ownerRequirementsChanged =
       ownerRequirementsColumn !== undefined &&
-      canonicalJson(currentMachine.ownerRequirements) !==
-        canonicalJson(ownerRequirementsColumn);
+      proseChanged(currentMachine.ownerRequirements, ownerRequirementsColumn);
+    const descriptionWrite =
+      descriptionColumn !== undefined &&
+      proseChanged(currentMachine.description, descriptionColumn)
+        ? descriptionColumn
+        : undefined;
+    const ownerRequirementsWrite = ownerRequirementsChanged
+      ? ownerRequirementsColumn
+      : undefined;
 
     // Permission check via matrix
     if (
@@ -1031,11 +1060,11 @@ export async function updateMachineAction(
             ...(presenceStatus !== undefined && { presenceStatus }),
             ownerId: machineOwnerId ?? null,
             invitedOwnerId: machineInvitedOwnerId ?? null,
-            ...(descriptionColumn !== undefined && {
-              description: descriptionColumn,
+            ...(descriptionWrite !== undefined && {
+              description: descriptionWrite,
             }),
-            ...(ownerRequirementsColumn !== undefined && {
-              ownerRequirements: ownerRequirementsColumn,
+            ...(ownerRequirementsWrite !== undefined && {
+              ownerRequirements: ownerRequirementsWrite,
             }),
             ...(iscoredGameId !== undefined && { iscoredGameId }),
           })
@@ -1259,11 +1288,11 @@ export async function updateMachineAction(
         ownerId: finalOwnerId,
         invitedOwnerId: finalInvitedOwnerId,
       }),
-      ...(descriptionColumn !== undefined && {
-        description: descriptionColumn,
+      ...(descriptionWrite !== undefined && {
+        description: descriptionWrite,
       }),
-      ...(ownerRequirementsColumn !== undefined && {
-        ownerRequirements: ownerRequirementsColumn,
+      ...(ownerRequirementsWrite !== undefined && {
+        ownerRequirements: ownerRequirementsWrite,
       }),
       ...(iscoredGameId !== undefined && { iscoredGameId }),
     };
@@ -1677,9 +1706,14 @@ async function updateMachineTextField(
     // doesn't preserve source key order — a round-tripped doc returns with
     // PG's normalized key order which won't match the client's submission
     // order under plain `JSON.stringify`.
+    //
+    // Mention labels are ignored (`proseChanged`): the editor opens on the
+    // current names, so an untouched save after a rename is not an edit, and
+    // is not written either.
     const beforeValue: ProseMirrorDoc | null = machine[field];
-    const changed =
-      canonicalJson(beforeValue) !== canonicalJson(normalizedValue);
+    const changed = proseChanged(beforeValue, normalizedValue);
+
+    if (!changed) return ok({ machineId: machine.id });
 
     // Atomic: update + (optional) marker event emit. If the emit fails, the
     // field update rolls back along with it.
@@ -1689,11 +1723,10 @@ async function updateMachineTextField(
         .set({ [field]: normalizedValue })
         .where(eq(machines.id, machine.id));
 
-      // Only emit when (a) the field actually changed and (b) the field
-      // has an event-kind mapping. `description` is intentionally omitted
-      // from the map (see PROSE_FIELD_TO_EVENT_KIND).
+      // Only emit when the field has an event-kind mapping. `description` is
+      // intentionally omitted from the map (see PROSE_FIELD_TO_EVENT_KIND).
       const eventKind = PROSE_FIELD_TO_EVENT_KIND[field];
-      if (changed && eventKind) {
+      if (eventKind) {
         await createMachineTimelineEvent(
           machine.id,
           {
