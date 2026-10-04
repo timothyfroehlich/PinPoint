@@ -75,8 +75,7 @@
 ## Known divergences
 
 | Requirement | Divergence | Resolution |
-| :-- | :-- | :-- |
-| 5.9 | Machine results wait on the same debounced server lookup as issue results. | PP-l9qv |
+| :---------- | :--------- | :--------- |
 
 ## Changelog
 

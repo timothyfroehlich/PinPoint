@@ -6,6 +6,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -30,13 +31,19 @@ import {
 import { Skeleton } from "~/components/ui/skeleton";
 import { getIssueStatusLabel } from "~/lib/issues/status";
 import {
-  quickSearchResultsSchema,
-  type QuickSearchResults,
+  QUICK_SEARCH_MIN_QUERY_LENGTH,
+  matchQuickSearchMachines,
+} from "~/lib/quick-search/match";
+import {
+  quickSearchIssueResultsSchema,
+  quickSearchMachineIndexSchema,
+  type QuickSearchIssueResult,
+  type QuickSearchMachineIndexEntry,
+  type QuickSearchMachineResult,
 } from "~/lib/quick-search/types";
 import { cn } from "~/lib/utils";
 
 const SEARCH_DEBOUNCE_MS = 150;
-const MIN_QUERY_LENGTH = 2;
 
 interface QuickSearchContextValue {
   openQuickSearch: (trigger?: HTMLElement) => void;
@@ -47,7 +54,7 @@ interface QuickSearchContextValue {
   closeDesktopSearch: () => void;
   query: string;
   setQuery: (query: string) => void;
-  searchState: SearchState;
+  results: QuickSearchView;
   navigateTo: (href: string) => void;
   retry: () => void;
 }
@@ -61,12 +68,105 @@ class RateLimitError extends Error {
   }
 }
 
-type SearchState =
-  | { status: "idle" }
-  | { status: "loading" }
-  | { status: "loaded"; query: string; results: QuickSearchResults }
+type SearchFailure =
   | { status: "rate-limited"; retryAfterSeconds: number | null }
   | { status: "error" };
+
+type MachineIndexState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "loaded"; machines: QuickSearchMachineIndexEntry[] }
+  | SearchFailure;
+
+type IssueSearchState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "loaded"; query: string; issues: QuickSearchIssueResult[] }
+  | SearchFailure;
+
+/** One group's current presentation for the typed query. */
+type GroupView<Result> =
+  | { status: "pending" }
+  | { status: "ready"; results: Result[]; stale: boolean }
+  | SearchFailure;
+
+interface QuickSearchView {
+  machines: GroupView<QuickSearchMachineResult>;
+  issues: GroupView<QuickSearchIssueResult>;
+}
+
+/** Fetch quick search JSON, turning a 429 into a RateLimitError. */
+async function fetchQuickSearch<T>(
+  url: string,
+  signal: AbortSignal,
+  parse: (value: unknown) => T
+): Promise<T> {
+  const response = await fetch(url, { signal });
+  if (response.status === 429) {
+    const retryAfterHeader = response.headers.get("Retry-After");
+    const parsedSeconds = retryAfterHeader
+      ? parseInt(retryAfterHeader, 10)
+      : null;
+    throw new RateLimitError(
+      parsedSeconds !== null &&
+        Number.isFinite(parsedSeconds) &&
+        parsedSeconds > 0
+        ? parsedSeconds
+        : null
+    );
+  }
+  if (!response.ok) throw new Error("Search request failed");
+  return parse(await response.json());
+}
+
+function toSearchFailure(error: unknown, logMessage: string): SearchFailure {
+  if (error instanceof RateLimitError) {
+    return {
+      status: "rate-limited",
+      retryAfterSeconds: error.retryAfterSeconds,
+    };
+  }
+  console.error(logMessage, error);
+  return { status: "error" };
+}
+
+function isFailure<Result>(
+  view: GroupView<Result>
+): view is GroupView<Result> & SearchFailure {
+  return view.status === "rate-limited" || view.status === "error";
+}
+
+/** Result count once both groups are current, for the live region (spec 6.2). */
+function settledResultCount(view: QuickSearchView): number | null {
+  if (
+    view.machines.status !== "ready" ||
+    view.issues.status !== "ready" ||
+    view.issues.stale
+  ) {
+    return null;
+  }
+  return view.machines.results.length + view.issues.results.length;
+}
+
+function ResultCountAnnouncement({
+  results,
+}: {
+  results: QuickSearchView;
+}): React.JSX.Element {
+  const count = settledResultCount(results);
+  const rateLimited =
+    results.machines.status === "rate-limited" ||
+    results.issues.status === "rate-limited";
+  return (
+    <p className="sr-only" aria-live="polite" aria-atomic="true">
+      {count !== null
+        ? `${String(count)} ${count === 1 ? "result" : "results"} found`
+        : rateLimited
+          ? "Search rate limit reached."
+          : ""}
+    </p>
+  );
+}
 
 const QuickSearchContext = createContext<QuickSearchContextValue | undefined>(
   undefined
@@ -90,7 +190,10 @@ export function QuickSearchProvider({
   const [desktopOpen, setDesktopOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [retryKey, setRetryKey] = useState(0);
-  const [searchState, setSearchState] = useState<SearchState>({
+  const [machineIndex, setMachineIndex] = useState<MachineIndexState>({
+    status: "idle",
+  });
+  const [issueSearch, setIssueSearch] = useState<IssueSearchState>({
     status: "idle",
   });
   const returnFocusRef = useRef<HTMLElement | null>(null);
@@ -110,7 +213,7 @@ export function QuickSearchProvider({
   const resetSearch = (): void => {
     requestSequenceRef.current += 1;
     setQuery("");
-    setSearchState({ status: "idle" });
+    setIssueSearch({ status: "idle" });
   };
 
   const closeDesktopSearch = (): void => {
@@ -140,47 +243,64 @@ export function QuickSearchProvider({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [openQuickSearch]);
 
+  const searchActive = open || desktopOpen;
+
+  // The machine list loads each time search opens, so machine matches are
+  // instant (spec 5.9) and a machine added since the last open appears. An
+  // already-loaded list stays in use while the new copy loads.
   useEffect(() => {
-    if (!open && !desktopOpen) return;
+    if (!searchActive) return;
+
+    const controller = new AbortController();
+    setMachineIndex((previous) =>
+      previous.status === "loaded" ? previous : { status: "loading" }
+    );
+    fetchQuickSearch("/api/quick-search/machines", controller.signal, (value) =>
+      quickSearchMachineIndexSchema.parse(value)
+    )
+      .then(({ machines }) => {
+        setMachineIndex({ status: "loaded", machines });
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        const failure = toSearchFailure(
+          error,
+          "Quick search machine list request failed"
+        );
+        setMachineIndex((previous) =>
+          previous.status === "loaded" ? previous : failure
+        );
+      });
+
+    return () => controller.abort();
+  }, [searchActive, retryKey]);
+
+  useEffect(() => {
+    if (!searchActive) return;
 
     const normalizedQuery = query.trim();
     const requestSequence = ++requestSequenceRef.current;
-    if (normalizedQuery.length < MIN_QUERY_LENGTH) {
-      setSearchState({ status: "idle" });
+    if (normalizedQuery.length < QUICK_SEARCH_MIN_QUERY_LENGTH) {
+      setIssueSearch({ status: "idle" });
       return;
     }
 
     const controller = new AbortController();
     const timeout = window.setTimeout(() => {
-      setSearchState((previous) =>
+      setIssueSearch((previous) =>
         previous.status === "loaded" ? previous : { status: "loading" }
       );
-      void fetch(`/api/quick-search?q=${encodeURIComponent(normalizedQuery)}`, {
-        signal: controller.signal,
-      })
-        .then(async (response) => {
-          if (response.status === 429) {
-            const retryAfterHeader = response.headers.get("Retry-After");
-            const parsedSeconds = retryAfterHeader
-              ? parseInt(retryAfterHeader, 10)
-              : null;
-            const retryAfterSeconds =
-              parsedSeconds !== null &&
-              Number.isFinite(parsedSeconds) &&
-              parsedSeconds > 0
-                ? parsedSeconds
-                : null;
-            throw new RateLimitError(retryAfterSeconds);
-          }
-          if (!response.ok) throw new Error("Search request failed");
-          return quickSearchResultsSchema.parse(await response.json());
-        })
-        .then((results) => {
+      fetchQuickSearch(
+        `/api/quick-search?q=${encodeURIComponent(normalizedQuery)}`,
+        controller.signal,
+        (value) => quickSearchIssueResultsSchema.parse(value)
+      )
+        .then(({ issues }) => {
           if (requestSequence === requestSequenceRef.current) {
-            setSearchState({
+            setIssueSearch({
               status: "loaded",
               query: normalizedQuery,
-              results,
+              issues,
             });
           }
         })
@@ -189,15 +309,9 @@ export function QuickSearchProvider({
             !controller.signal.aborted &&
             requestSequence === requestSequenceRef.current
           ) {
-            if (error instanceof RateLimitError) {
-              setSearchState({
-                status: "rate-limited",
-                retryAfterSeconds: error.retryAfterSeconds,
-              });
-            } else {
-              console.error("Quick search request failed", error);
-              setSearchState({ status: "error" });
-            }
+            setIssueSearch(
+              toSearchFailure(error, "Quick search request failed")
+            );
           }
         });
     }, SEARCH_DEBOUNCE_MS);
@@ -206,7 +320,35 @@ export function QuickSearchProvider({
       window.clearTimeout(timeout);
       controller.abort();
     };
-  }, [open, desktopOpen, query, retryKey]);
+  }, [searchActive, query, retryKey]);
+
+  const loadedMachines =
+    machineIndex.status === "loaded" ? machineIndex.machines : null;
+  const machineResults = useMemo(
+    () =>
+      loadedMachines ? matchQuickSearchMachines(loadedMachines, query) : [],
+    [loadedMachines, query]
+  );
+
+  const normalizedQuery = query.trim();
+  const results: QuickSearchView = {
+    machines:
+      machineIndex.status === "loaded"
+        ? { status: "ready", results: machineResults, stale: false }
+        : machineIndex.status === "idle" || machineIndex.status === "loading"
+          ? { status: "pending" }
+          : machineIndex,
+    issues:
+      issueSearch.status === "loaded"
+        ? {
+            status: "ready",
+            results: issueSearch.issues,
+            stale: issueSearch.query !== normalizedQuery,
+          }
+        : issueSearch.status === "idle" || issueSearch.status === "loading"
+          ? { status: "pending" }
+          : issueSearch,
+  };
 
   const handleOpenChange = (nextOpen: boolean): void => {
     setOpen(nextOpen);
@@ -230,15 +372,10 @@ export function QuickSearchProvider({
     closeDesktopSearch,
     query,
     setQuery,
-    searchState,
+    results,
     navigateTo,
     retry: () => setRetryKey((key) => key + 1),
   };
-
-  const resultCount =
-    searchState.status === "loaded"
-      ? searchState.results.machines.length + searchState.results.issues.length
-      : 0;
 
   return (
     <QuickSearchContext.Provider value={contextValue}>
@@ -270,24 +407,13 @@ export function QuickSearchProvider({
             <CommandList className="max-h-[min(65dvh,28rem)]">
               <QuickSearchContent
                 query={query}
-                searchState={searchState}
-                isRefreshing={
-                  searchState.status === "loaded" &&
-                  searchState.query !== query.trim()
-                }
+                results={results}
                 onNavigate={navigateTo}
                 onRetry={() => setRetryKey((key) => key + 1)}
               />
             </CommandList>
           </Command>
-          <p className="sr-only" aria-live="polite" aria-atomic="true">
-            {searchState.status === "loaded" &&
-            searchState.query === query.trim()
-              ? `${String(resultCount)} ${resultCount === 1 ? "result" : "results"} found`
-              : searchState.status === "rate-limited"
-                ? "Search rate limit reached."
-                : ""}
-          </p>
+          <ResultCountAnnouncement results={results} />
         </DialogContent>
       </Dialog>
     </QuickSearchContext.Provider>
@@ -296,18 +422,16 @@ export function QuickSearchProvider({
 
 function QuickSearchContent({
   query,
-  searchState,
-  isRefreshing,
+  results,
   onNavigate,
   onRetry,
 }: {
   query: string;
-  searchState: SearchState;
-  isRefreshing: boolean;
+  results: QuickSearchView;
   onNavigate: (href: string) => void;
   onRetry: () => void;
 }): React.JSX.Element {
-  if (query.trim().length < MIN_QUERY_LENGTH || searchState.status === "idle") {
+  if (query.trim().length < QUICK_SEARCH_MIN_QUERY_LENGTH) {
     return (
       <SearchMessage>
         <span className="block font-medium text-foreground">
@@ -320,66 +444,38 @@ function QuickSearchContent({
     );
   }
 
-  if (searchState.status === "loading") {
+  const { machines, issues } = results;
+  if (isFailure(machines) && isFailure(issues)) {
     return (
-      <div className="flex flex-col gap-3 p-3" aria-hidden="true">
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-4/5" />
-      </div>
+      <SearchFailureMessage
+        failure={machines.status === "rate-limited" ? machines : issues}
+        onRetry={onRetry}
+      />
     );
   }
 
-  if (searchState.status === "rate-limited") {
-    const { retryAfterSeconds } = searchState;
-    const retryMessage =
-      retryAfterSeconds !== null
-        ? `Search rate limit reached. Please wait ${String(retryAfterSeconds)}s before trying again.`
-        : "Search rate limit reached. Please wait a moment before trying again.";
-
-    return (
-      <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
-        <p className="text-sm text-destructive-text" role="alert">
-          {retryMessage}
-        </p>
-        <Button type="button" variant="outline" size="sm" onClick={onRetry}>
-          Try again
-        </Button>
-      </div>
-    );
-  }
-
-  if (searchState.status === "error") {
-    return (
-      <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
-        <p className="text-sm text-destructive-text">Search is unavailable.</p>
-        <Button type="button" variant="outline" size="sm" onClick={onRetry}>
-          Try again
-        </Button>
-      </div>
-    );
-  }
-
-  const { machines: machineResults, issues: issueResults } =
-    searchState.results;
-  if (machineResults.length === 0 && issueResults.length === 0) {
+  const showMachines =
+    machines.status !== "ready" || machines.results.length > 0;
+  // Stale issue rows with nothing to show wait like a pending group, so the
+  // empty state never flashes between keystrokes.
+  const showIssues =
+    issues.status !== "ready" || issues.results.length > 0 || issues.stale;
+  if (!showMachines && !showIssues) {
     return <SearchMessage>No machines or issues found.</SearchMessage>;
   }
 
   return (
     <>
-      {isRefreshing && (
-        <p className="px-3 pt-2 text-xs text-muted-foreground" role="status">
-          Searching…
-        </p>
+      {machines.status === "pending" && <PendingGroup heading="Machines" />}
+      {isFailure(machines) && (
+        <SearchFailureMessage failure={machines} onRetry={onRetry} />
       )}
-      {machineResults.length > 0 && (
+      {machines.status === "ready" && machines.results.length > 0 && (
         <CommandGroup heading="Machines">
-          {machineResults.map((machine) => (
+          {machines.results.map((machine) => (
             <CommandItem
               key={machine.id}
               value={`machine-${machine.id}`}
-              disabled={isRefreshing}
               onSelect={() => onNavigate(`/m/${machine.initials}`)}
               className="py-2.5"
             >
@@ -402,13 +498,26 @@ function QuickSearchContent({
         </CommandGroup>
       )}
 
-      {machineResults.length > 0 && issueResults.length > 0 && (
-        <CommandSeparator />
-      )}
+      {showMachines && showIssues && <CommandSeparator />}
 
-      {issueResults.length > 0 && (
+      {(issues.status === "pending" ||
+        (issues.status === "ready" &&
+          issues.stale &&
+          issues.results.length === 0)) && <PendingGroup heading="Issues" />}
+      {isFailure(issues) && (
+        <SearchFailureMessage failure={issues} onRetry={onRetry} />
+      )}
+      {issues.status === "ready" && issues.results.length > 0 && (
         <CommandGroup heading="Issues">
-          {issueResults.map((issue) => {
+          {issues.stale && (
+            <p
+              className="px-2 pb-1 text-xs text-muted-foreground"
+              role="status"
+            >
+              Searching…
+            </p>
+          )}
+          {issues.results.map((issue) => {
             const issueId = `${issue.machineInitials.toUpperCase()}-${String(
               issue.issueNumber
             ).padStart(2, "0")}`;
@@ -416,7 +525,7 @@ function QuickSearchContent({
               <CommandItem
                 key={issue.id}
                 value={`issue-${issue.id}`}
-                disabled={isRefreshing}
+                disabled={issues.stale}
                 onSelect={() =>
                   onNavigate(
                     `/m/${issue.machineInitials}/i/${String(issue.issueNumber)}`
@@ -443,6 +552,57 @@ function QuickSearchContent({
   );
 }
 
+/** A group heading over skeleton rows while that group's results load. */
+function PendingGroup({ heading }: { heading: string }): React.JSX.Element {
+  return (
+    <div className="p-1">
+      <p className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+        {heading}
+      </p>
+      <div className="flex flex-col gap-2 px-2 pb-2" aria-hidden="true">
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-4/5" />
+      </div>
+    </div>
+  );
+}
+
+function SearchFailureMessage({
+  failure,
+  onRetry,
+}: {
+  failure: SearchFailure;
+  onRetry: () => void;
+}): React.JSX.Element {
+  if (failure.status === "rate-limited") {
+    const { retryAfterSeconds } = failure;
+    const retryMessage =
+      retryAfterSeconds !== null
+        ? `Search rate limit reached. Please wait ${String(retryAfterSeconds)}s before trying again.`
+        : "Search rate limit reached. Please wait a moment before trying again.";
+
+    return (
+      <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
+        <p className="text-sm text-destructive-text" role="alert">
+          {retryMessage}
+        </p>
+        <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+          Try again
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
+      <p className="text-sm text-destructive-text">Search is unavailable.</p>
+      <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+        Try again
+      </Button>
+    </div>
+  );
+}
+
 function SearchMessage({
   children,
 }: {
@@ -464,7 +624,7 @@ export function DesktopQuickSearchTrigger(): React.JSX.Element {
     closeDesktopSearch,
     query,
     setQuery,
-    searchState,
+    results,
     navigateTo,
     retry,
   } = useQuickSearch();
@@ -484,13 +644,6 @@ export function DesktopQuickSearchTrigger(): React.JSX.Element {
     return () =>
       document.removeEventListener("pointerdown", closeOnOutsidePointer);
   }, [desktopOpen, closeDesktopSearch]);
-
-  const isRefreshing =
-    searchState.status === "loaded" && searchState.query !== query.trim();
-  const resultCount =
-    searchState.status === "loaded"
-      ? searchState.results.machines.length + searchState.results.issues.length
-      : 0;
 
   if (mobileOpen) {
     return <></>;
@@ -545,21 +698,14 @@ export function DesktopQuickSearchTrigger(): React.JSX.Element {
           {desktopOpen && (
             <QuickSearchContent
               query={query}
-              searchState={searchState}
-              isRefreshing={isRefreshing}
+              results={results}
               onNavigate={navigateTo}
               onRetry={retry}
             />
           )}
         </CommandList>
       </Command>
-      <p className="sr-only" aria-live="polite" aria-atomic="true">
-        {searchState.status === "loaded" && !isRefreshing
-          ? `${String(resultCount)} ${resultCount === 1 ? "result" : "results"} found`
-          : searchState.status === "rate-limited"
-            ? "Search rate limit reached."
-            : ""}
-      </p>
+      <ResultCountAnnouncement results={results} />
     </div>
   );
 }

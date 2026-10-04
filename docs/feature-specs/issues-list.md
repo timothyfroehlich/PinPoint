@@ -38,7 +38,7 @@
 
 ## 4. Search and Filters
 
-- **4.1** Search matches issue titles, issue IDs (such as AFM-12), machine names and initials, people's names, and comment text.
+- **4.1** Search matches issue titles, issue IDs (such as AFM-12), machine names and initials, people's names, description text, and comment text.
 - **4.2** The Primary Filters, in order, are Status, Severity, Priority, Machine, Assignee, and Machine Presence.
 - **4.3** The Secondary Filters, in order, are Created, Updated, Frequency, Machine owner, Reporter, and Watching.
 - **4.4** Status offers every status grouped by status group; selecting a group selects all its statuses. The control reads "Open" when exactly the Open statuses are selected.
@@ -100,6 +100,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-04 | Search also matches description text (4.1). |
 | 2026-10-03 | Machine and My machines leave out Removed machines unless Machine Presence includes Removed (4.5). |
 | 2026-10-03 | §3.1: on a narrow phone the second line wraps rather than truncating. |
 | 2026-10-02 | Created from the approved list-framework design: two-line rows with inline editing, Primary and Secondary Filters including Machine Presence, sorting and export rules, the Open issues Page Preset and four Built-in Views, and canonical URL state with aliases for older parameters. |

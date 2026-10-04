@@ -4,13 +4,15 @@ import type * as RateLimitModule from "~/lib/rate-limit";
 
 const {
   checkQuickSearchLimitMock,
-  searchQuickNavigationMock,
+  searchQuickIssuesMock,
+  listQuickSearchMachinesMock,
   getUserMock,
   getUserContextMock,
   checkPermissionMock,
 } = vi.hoisted(() => ({
   checkQuickSearchLimitMock: vi.fn(),
-  searchQuickNavigationMock: vi.fn(),
+  searchQuickIssuesMock: vi.fn(),
+  listQuickSearchMachinesMock: vi.fn(),
   getUserMock: vi.fn(),
   getUserContextMock: vi.fn(),
   checkPermissionMock: vi.fn(),
@@ -45,7 +47,8 @@ vi.mock("~/app/api/quick-search/queries", async (importOriginal) => {
   const actual = await importOriginal<typeof QuickSearchQueriesModule>();
   return {
     ...actual,
-    searchQuickNavigation: searchQuickNavigationMock,
+    searchQuickIssues: searchQuickIssuesMock,
+    listQuickSearchMachines: listQuickSearchMachinesMock,
   };
 });
 
@@ -58,6 +61,7 @@ vi.mock("~/lib/logger", () => ({
 }));
 
 import { GET } from "./route";
+import { GET as GET_MACHINES } from "./machines/route";
 
 describe("GET /api/quick-search", () => {
   beforeEach(() => {
@@ -71,9 +75,11 @@ describe("GET /api/quick-search", () => {
       remaining: 119,
       reset: 0,
     });
-    searchQuickNavigationMock.mockResolvedValue({
+    searchQuickIssuesMock.mockResolvedValue({
+      issues: [{ machineInitials: "AFM", title: "Weak flipper" }],
+    });
+    listQuickSearchMachinesMock.mockResolvedValue({
       machines: [{ initials: "AFM", name: "Attack from Mars" }],
-      issues: [],
     });
   });
 
@@ -92,10 +98,9 @@ describe("GET /api/quick-search", () => {
       "198.51.100.25",
       undefined
     );
-    expect(searchQuickNavigationMock).toHaveBeenCalledWith("AFM");
+    expect(searchQuickIssuesMock).toHaveBeenCalledWith("AFM");
     expect(await response.json()).toEqual({
-      machines: [{ initials: "AFM", name: "Attack from Mars" }],
-      issues: [],
+      issues: [{ machineInitials: "AFM", title: "Weak flipper" }],
     });
   });
 
@@ -118,7 +123,7 @@ describe("GET /api/quick-search", () => {
       "198.51.100.25",
       "user-apc-member-123"
     );
-    expect(searchQuickNavigationMock).toHaveBeenCalledWith("AFM");
+    expect(searchQuickIssuesMock).toHaveBeenCalledWith("AFM");
   });
 
   it("returns 429 with Retry-After header and skips search query when rate limit is exceeded", async () => {
@@ -146,7 +151,7 @@ describe("GET /api/quick-search", () => {
     expect(await response.json()).toEqual({
       error: "Quick search rate limit reached",
     });
-    expect(searchQuickNavigationMock).not.toHaveBeenCalled();
+    expect(searchQuickIssuesMock).not.toHaveBeenCalled();
   });
 
   it("does not check rate limit when machine or issue view permission is denied", async () => {
@@ -157,7 +162,7 @@ describe("GET /api/quick-search", () => {
 
     expect(response.status).toBe(403);
     expect(checkQuickSearchLimitMock).not.toHaveBeenCalled();
-    expect(searchQuickNavigationMock).not.toHaveBeenCalled();
+    expect(searchQuickIssuesMock).not.toHaveBeenCalled();
   });
 
   it("does not check rate limit when query string validation fails", async () => {
@@ -169,6 +174,54 @@ describe("GET /api/quick-search", () => {
 
     expect(response.status).toBe(400);
     expect(checkQuickSearchLimitMock).not.toHaveBeenCalled();
-    expect(searchQuickNavigationMock).not.toHaveBeenCalled();
+    expect(searchQuickIssuesMock).not.toHaveBeenCalled();
+  });
+
+  describe("GET /api/quick-search/machines", () => {
+    it("returns the machine list within the shared rate limit", async () => {
+      const response = await GET_MACHINES(
+        new Request("https://pinpoint.test/api/quick-search/machines", {
+          headers: { "x-forwarded-for": "198.51.100.25" },
+        })
+      );
+
+      expect(response.status).toBe(200);
+      expect(checkQuickSearchLimitMock).toHaveBeenCalledWith(
+        "198.51.100.25",
+        undefined
+      );
+      expect(await response.json()).toEqual({
+        machines: [{ initials: "AFM", name: "Attack from Mars" }],
+      });
+    });
+
+    it("returns 403 without listing machines when view permission is denied", async () => {
+      checkPermissionMock.mockReturnValue(false);
+
+      const response = await GET_MACHINES(
+        new Request("https://pinpoint.test/api/quick-search/machines")
+      );
+
+      expect(response.status).toBe(403);
+      expect(checkQuickSearchLimitMock).not.toHaveBeenCalled();
+      expect(listQuickSearchMachinesMock).not.toHaveBeenCalled();
+    });
+
+    it("returns 429 without listing machines when rate limited", async () => {
+      checkQuickSearchLimitMock.mockResolvedValue({
+        success: false,
+        limit: 120,
+        remaining: 0,
+        reset: Date.now() + 30_000,
+      });
+
+      const response = await GET_MACHINES(
+        new Request("https://pinpoint.test/api/quick-search/machines")
+      );
+
+      expect(response.status).toBe(429);
+      expect(response.headers.get("Retry-After")).not.toBeNull();
+      expect(listQuickSearchMachinesMock).not.toHaveBeenCalled();
+    });
   });
 });

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { TriangleAlert } from "lucide-react";
 
 import { PersonHoverCard } from "~/components/people/PersonHoverCard";
+import { MachineTagList } from "~/components/tags/MachineTagList";
 import { formatDate } from "~/lib/dates";
 import { formatCreditNames, type MachineCredits } from "~/lib/opdb/credits";
 
@@ -12,9 +13,9 @@ interface InfoRailProps {
   addedAt: Date;
   /** Edit-machine control (dialog trigger or denied tooltip), shown in the owner card footer. */
   editSlot?: React.ReactNode;
-  /** Top scores card slot, rendered below Details and above Tags placeholder. */
+  /** Top scores card slot, rendered below Details. */
   topScoresSlot?: React.ReactNode;
-  /** PinTips tip card slot (spec pintips 4.1), between Top scores and Tags. */
+  /** PinTips tip card slot (spec pintips 4.1), after Top scores. */
   tipSlot?: React.ReactNode;
   /**
    * The game's model identity — normally the Pinball Map catalog title (e.g.
@@ -51,6 +52,11 @@ interface InfoRailProps {
   credits: MachineCredits;
   /** Every tag the machine belongs to, in tag type order (spec 7.4). */
   tags: { name: string; href: string }[];
+  /**
+   * The Edit tags control, for a viewer who may tag this machine (spec 11.10);
+   * omitted for everyone else.
+   */
+  tagsEditSlot?: React.ReactNode;
   /**
    * The machine's standing on Pinball Map, rendered as one unlabelled line
    * under Model.
@@ -126,14 +132,15 @@ const LABEL =
   "text-[10px] font-bold uppercase tracking-wider text-muted-foreground";
 
 /**
- * InfoRail — the Info tab's reference cluster: the Details card (Model,
- * Pinball Map standing, owner, Edit), then Tags. The machine description is
+ * InfoRail — the Info tab's reference cluster: Tags, then the Details card
+ * (Model, Pinball Map standing, owner, Edit). The machine description is
  * not here: it leads the main column, because a long one stretched this
  * 320px rail far past the main column's height. Renders as the desktop
  * right rail and folds inline on mobile (the caller controls placement + gap;
  * this returns the cards as a fragment).
  *
- * Tags links each tag the machine belongs to.
+ * Tags links each tag the machine belongs to, with the tag editor's trigger
+ * for people who may tag the machine.
  *
  * PP-o355.21 removed the standalone Pinball Map card that PP-o355.3 introduced
  * and PP-l81u last extended. A whole card for two facts hid them: a reader
@@ -153,10 +160,25 @@ export function InfoRail({
   year,
   credits,
   tags,
+  tagsEditSlot,
   pinballmap,
 }: InfoRailProps): React.JSX.Element {
   return (
     <>
+      {/* Tags lead the rail (approved design, PP-wqit.3): what kind of game
+          this is, and where it sits, before the reference detail. */}
+      <div className={CARD} data-testid="machine-tags">
+        <div className="mb-2 flex items-center">
+          <p className={`mr-auto ${LABEL}`}>Tags</p>
+          {tagsEditSlot}
+        </div>
+        {tags.length > 0 ? (
+          <MachineTagList tags={tags} />
+        ) : (
+          <p className="text-sm text-muted-foreground">No tags</p>
+        )}
+      </div>
+
       {/* Details — reading order: the machine's identity (Model + its Pinball
           Map standing), then the owner in a distinct panel
           with an explicit role badge (name only, never email per CORE-SEC-007),
@@ -325,26 +347,6 @@ export function InfoRail({
       {topScoresSlot}
 
       {tipSlot}
-
-      <div className={CARD} data-testid="machine-tags">
-        <p className={`mb-2 ${LABEL}`}>Tags</p>
-        {tags.length > 0 ? (
-          <ul className="flex flex-wrap gap-2">
-            {tags.map((tag) => (
-              <li key={tag.href}>
-                <Link
-                  href={tag.href}
-                  className="inline-flex items-center rounded-full bg-secondary-container px-3 py-1 text-sm font-medium text-on-secondary-container hover:bg-secondary-container/80"
-                >
-                  {tag.name}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-muted-foreground">No tags</p>
-        )}
-      </div>
     </>
   );
 }
