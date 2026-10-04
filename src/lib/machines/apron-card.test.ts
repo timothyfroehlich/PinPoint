@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  APRON_CARD_LAYOUTS,
+  APRON_CARD_SIZES,
+  APRON_HEADER_BAND_LAYOUTS,
+  APRON_SIDE_RAIL_LAYOUTS,
   apronCardContent,
   type ApronCardSettings,
   type ApronMachineSource,
@@ -7,6 +11,7 @@ import {
   apronCreditRows,
   fitTitleSize,
   groupedEdition,
+  isApronCardSize,
   shrinkUntilFits,
 } from "~/lib/machines/apron-card";
 import { NO_CREDITS } from "~/lib/opdb/credits";
@@ -289,6 +294,22 @@ describe("card helpers", () => {
     expect(wpc.width).toBeCloseTo(576, 6);
     expect(wpc.height).toBeCloseTo(312, 6);
     expect(apronCardPixelSize("stern").width).toBeCloseTo(529.13, 2);
+  });
+
+  it("lays every template out at the size's own dimensions", () => {
+    for (const size of Object.keys(APRON_CARD_SIZES).filter(isApronCardSize)) {
+      const { widthMm, heightMm } = APRON_CARD_SIZES[size];
+      for (const layout of [
+        APRON_CARD_LAYOUTS[size],
+        APRON_SIDE_RAIL_LAYOUTS[size],
+        APRON_HEADER_BAND_LAYOUTS[size],
+      ]) {
+        expect([layout.width, layout.height]).toEqual([
+          `${widthMm}mm`,
+          `${heightMm}mm`,
+        ]);
+      }
+    }
   });
 
   it("renders a QR code as a single path over a square grid", () => {
