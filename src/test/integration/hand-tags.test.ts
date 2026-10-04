@@ -183,6 +183,7 @@ describe("hand-applied tag reads", () => {
     const all = await loadMachineViewFromDatabase(tx, {
       scope,
       preset: "collection",
+      viewerId: null,
       searchParams: new URLSearchParams({
         columns: "machine",
         presence: "all",
@@ -193,6 +194,7 @@ describe("hand-applied tag reads", () => {
     const searched = await loadMachineViewFromDatabase(tx, {
       scope,
       preset: "collection",
+      viewerId: null,
       searchParams: new URLSearchParams({
         q: "Attack",
         columns: "machine",
