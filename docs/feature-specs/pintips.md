@@ -42,7 +42,9 @@
 
 ## Known divergences
 
-_None — the current implementation matches this spec._
+| Requirement | Divergence | Resolution |
+| :-- | :-- | :-- |
+| 4.1 | The Tags card now leads the Info tab's reference rail (approved tags design), so the tip card follows Top scores with no Tags card after it. | Amend 4.1 with Tim's approval (PP-wqit.3) |
 
 ## Changelog
 
