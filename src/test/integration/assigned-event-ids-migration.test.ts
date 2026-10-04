@@ -20,9 +20,9 @@ const migrationStatements = readFileSync(
   .filter((statement) => statement.length > 0);
 
 /**
- * 0100 points Activity's "assigned" events at the assignee's account instead
- * of a name snapshot (PP-0fg0.1): a name exactly one account holds becomes
- * that id, and anything else keeps its name with a null id.
+ * 0100 points Activity's "assigned" events at the assignee's account
+ * (PP-0fg0.1): an event whose name exactly one account holds gains that id,
+ * anything else gains a null id, and every event keeps its name.
  */
 describe("0100 assigned-event assignee ids backfill", () => {
   setupTestDb();
@@ -87,9 +87,11 @@ describe("0100 assigned-event assignee ids backfill", () => {
 
     await runMigration();
     const afterFirst = await eventData();
+    // The name stays, so the previous release still renders the event.
     expect(afterFirst.get(unique)).toEqual({
       type: "assigned",
       assigneeId: alice,
+      assigneeName: "Alice Able",
     });
     expect(afterFirst.get(ambiguous)).toEqual({
       type: "assigned",

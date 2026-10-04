@@ -6,12 +6,13 @@ import {
   type SQL,
   sql,
 } from "drizzle-orm";
-import { db } from "~/server/db";
+import { db, type DbTransaction } from "~/server/db";
 import {
   issues,
   issueWatchers,
   machines,
   issueComments,
+  userProfiles,
   issueImages,
   pinballmapComments,
 } from "~/server/db/schema";
@@ -50,6 +51,26 @@ import {
   extractMentions,
   docToPlainText,
 } from "~/lib/tiptap/types";
+
+/**
+ * An Activity "assigned" event. Activity shows the account's current name by
+ * `assigneeId` (PP-0fg0.1); `assigneeName` is a rollback/fallback copy so a
+ * release that predates the id still renders the event.
+ */
+async function assignedEvent(
+  tx: DbTransaction,
+  assigneeId: string
+): Promise<TimelineEventData> {
+  const assignee = await tx.query.userProfiles.findFirst({
+    where: eq(userProfiles.id, assigneeId),
+    columns: { name: true },
+  });
+  return {
+    type: "assigned",
+    assigneeId,
+    ...(assignee !== undefined && { assigneeName: assignee.name }),
+  };
+}
 
 // --- Errors ---
 
@@ -375,11 +396,9 @@ export async function createIssue({
 
     // 3. Assignment Logic (if applicable)
     if (assignedTo) {
-      // Create timeline event. It stores the assignee's id; Activity resolves
-      // the current name when it renders (PP-0fg0.1).
       await createTimelineEvent(
         issue.id,
-        { type: "assigned", assigneeId: assignedTo },
+        await assignedEvent(tx, assignedTo),
         tx,
         reportedBy ?? null
       );
@@ -1091,10 +1110,8 @@ export async function assignIssue({
         .onConflictDoNothing();
     }
 
-    // Create timeline event. It stores the assignee's id; Activity resolves
-    // the current name when it renders (PP-0fg0.1).
     const event: TimelineEventData = assignedTo
-      ? { type: "assigned", assigneeId: assignedTo }
+      ? await assignedEvent(tx, assignedTo)
       : { type: "unassigned" };
     const assignmentEventId = await createTimelineEvent(
       issueId,

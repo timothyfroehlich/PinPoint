@@ -501,10 +501,11 @@ describe("Issue Service Functions (Integration)", () => {
         (e) => e.isSystem && e.eventData?.type === "assigned"
       );
       expect(assignEvent).toBeDefined();
-      // The account id, never a name snapshot (PP-0fg0.1).
+      // The account id, plus the name as a rollback copy (PP-0fg0.1).
       expect(assignEvent?.eventData).toEqual({
         type: "assigned",
         assigneeId: testUser2.id,
+        assigneeName: "Second User",
       });
       expect(assignEvent?.authorId).toBe(testUser.id);
     });
@@ -527,13 +528,19 @@ describe("Issue Service Functions (Integration)", () => {
         events
           .filter((e) => e.eventData?.type === "assigned")
           .map((e) => e.eventData)
-      ).toEqual([{ type: "assigned", assigneeId: testUser2.id }]);
+      ).toEqual([
+        {
+          type: "assigned",
+          assigneeId: testUser2.id,
+          assigneeName: "Second User",
+        },
+      ]);
     });
 
     /**
      * Activity resolves an assignment to the account's current name when it
-     * loads (PP-0fg0.1). A legacy event the backfill could not tie to an
-     * account keeps showing its stored name.
+     * loads (PP-0fg0.1), over the stored "Second User" rollback copy. A legacy
+     * event the backfill could not tie to an account shows its stored name.
      */
     it("Activity shows the assignee's current name after a rename", async () => {
       const db = await getTestDb();

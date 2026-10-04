@@ -27,8 +27,11 @@ export type TimelineEventData =
        */
       assigneeId: string | null;
       /**
-       * Legacy name snapshot, left only on events migration 0100 could not
-       * match to an account. New events never write it.
+       * The assignee's name when the event was written. A rollback/fallback
+       * copy only: it lets a release that predates `assigneeId` render the
+       * event, and it is shown only when the id is null or no longer
+       * resolves. Never the display source when the id resolves. Account
+       * deletion removes it.
        */
       assigneeName?: string;
     }

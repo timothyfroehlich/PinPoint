@@ -227,10 +227,11 @@ describe("Account Deletion Anonymization (PGlite)", () => {
     const [byId, legacyName, other, legacyOther] = await db
       .insert(issueComments)
       .values([
-        assigned(leavingId),
+        // The shape new events take: the id plus a rollback copy of the name.
+        assigned(leavingId, "Leaving Member"),
         // A legacy event the backfill could not tie to one account.
         assigned(null, "Leaving Member"),
-        assigned(stayingId),
+        assigned(stayingId, "Staying Member"),
         assigned(null, "Someone Else"),
       ])
       .returning({ id: issueComments.id });

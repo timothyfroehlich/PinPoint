@@ -92,7 +92,7 @@
 - **7.2** Activity lists comments and system events together, oldest first.
 - **7.3** A Comments only toggle beside the heading hides system events while on. It starts off on every visit; the page never remembers it. It is absent while Activity has no entries.
 - **7.4** A comment shows its author's name, an owner badge when the author is the machine's owner, its relative time with the exact time available on hover and on tap, an edited marker when it has been edited, its rich-text body, and its photos.
-- **7.5** A system event is one line: who made the change, what changed (from → to where there is a before and after), and when.
+- **7.5** A system event is one line: who made the change, what changed (from → to where there is a before and after), and when. A person it names appears under their current name, or as Former user once their account is deleted.
 - **7.6** System events are recorded for: assigning and unassigning; status, severity, priority, frequency, and title changes; moving the issue (from which Issue ID and machine to which); and a comment's deletion (by its author or by an admin).
 - **7.7** Activity shows no avatars and no connecting line between entries.
 - **7.8** With no comments, Activity shows an empty state inviting the first comment.
@@ -194,6 +194,7 @@ Changes to this document. Divergence-table rows are working state and are not lo
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-03 | §7.5 names a person in a system event by their current name, or Former user once their account is deleted. |
 | 2026-10-02 | §8.7 keeps an unposted comment draft, with its photos, until it posts. |
 | 2026-10-02 | §1 Summary line and §4.7 add the assignee to the summary line, which may wrap to a second line; §4.1 and §4.5 move the mobile ⋯ menu to the end of the header's first row; §7.3 hides Comments only while Activity is empty. |
 | 2026-10-01 | Design-review decisions: §4.4 gives mobile Save and Cancel buttons and keeps the edit open when the field loses focus; §5.1 and §7.4 make the exact time available on tap; §8.3 shows the Comment button on the Issue tab only; §11.1 shows the Other issues count as a badge; §13.2 adds relative times and exempts links inside a line of text. |
