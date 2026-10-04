@@ -126,6 +126,7 @@ export async function saveApronCardsAction(
         const settings = {
           name: card.name,
           size: card.size,
+          template: card.template,
           useCustomDescription: card.useCustomDescription,
           description: cardTextDoc(card.description),
           tip: cardTextDoc(card.tip),

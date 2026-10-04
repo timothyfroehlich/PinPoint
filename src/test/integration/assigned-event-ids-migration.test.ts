@@ -12,7 +12,7 @@ import {
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 
 const migrationStatements = readFileSync(
-  resolve("drizzle/0101_assigned-event-assignee-ids.sql"),
+  resolve("drizzle/0102_assigned-event-assignee-ids.sql"),
   "utf8"
 )
   .split("--> statement-breakpoint")
@@ -20,11 +20,11 @@ const migrationStatements = readFileSync(
   .filter((statement) => statement.length > 0);
 
 /**
- * 0101 points Activity's "assigned" events at the assignee's account
+ * 0102 points Activity's "assigned" events at the assignee's account
  * (PP-0fg0.1): an event whose name exactly one account holds gains that id,
  * anything else gains a null id, and every event keeps its name.
  */
-describe("0101 assigned-event assignee ids backfill", () => {
+describe("0102 assigned-event assignee ids backfill", () => {
   setupTestDb();
 
   it("ties unique names to accounts, keeps the rest, and is safe to rerun", async () => {
@@ -44,7 +44,7 @@ describe("0101 assigned-event assignee ids backfill", () => {
     const issue = createTestIssue(machine.initials, { issueNumber: 1 });
     await db.insert(issues).values(issue);
 
-    // Pre-0101 rows are written as raw jsonb: the current type has no
+    // Pre-0102 rows are written as raw jsonb: the current type has no
     // name-only shape.
     async function event(eventData: object): Promise<string> {
       const id = randomUUID();

@@ -106,7 +106,7 @@ export async function anonymizeUserReferences(
     // Activity's assignment events name the assignee by id (PP-0fg0.1). Null
     // the id, so the event shows the deleted-account placeholder even where a
     // profile row outlives the account. Also clear a legacy name snapshot
-    // equal to this person's name: an event migration 0101 could not tie to
+    // equal to this person's name: an event migration 0102 could not tie to
     // one account (a shared name, or one written while it deployed). With a
     // shared name that clears the namesake's event too, erring toward privacy.
     const assignedEvent = sql`${issueComments.eventData}->>'type' = 'assigned'`;

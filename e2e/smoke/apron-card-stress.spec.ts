@@ -1,8 +1,8 @@
 /**
- * Smoke: apron card stress fixtures (PP-xeki)
+ * Smoke: apron card stress fixtures (PP-xeki, PP-s3fa)
  *
  * Class D (layout / overflow). /dev/apron-cards renders every stress fixture
- * at every apron size and runs each card's fit checks in the browser: title
+ * at every apron size and template and runs each card's fit checks in the browser: title
  * width and size, identity panel height, card text at the overflow limit, and
  * that the card's own fit verdict (which gates save and export, spec §3.5 and
  * §6.4) agrees with what the page measured. Real text measurement needs a
@@ -16,7 +16,9 @@ import { STORAGE_STATE } from "../support/auth-state.js";
 
 test.use({ storageState: STORAGE_STATE.member });
 
-test("every apron stress fixture fits every apron size", async ({ page }) => {
+test("every apron stress fixture fits every apron size and template", async ({
+  page,
+}) => {
   await page.goto("/dev/apron-cards");
   const cards = page.getByTestId("apron-stress-card");
   await expect(cards.first()).toBeVisible();
@@ -31,7 +33,7 @@ test("every apron stress fixture fits every apron size", async ({ page }) => {
     .evaluateAll((failed) =>
       failed.map(
         (card) =>
-          `${card.getAttribute("data-fixture")} @ ${card.getAttribute("data-size")}: ${card.querySelector("figcaption")?.textContent ?? ""}`
+          `${card.getAttribute("data-fixture")} @ ${card.getAttribute("data-size")} ${card.getAttribute("data-template")}: ${card.querySelector("figcaption")?.textContent ?? ""}`
       )
     );
   expect(failures).toEqual([]);

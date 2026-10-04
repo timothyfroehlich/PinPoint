@@ -102,7 +102,6 @@
 
 | Requirement | Current implementation gap |
 | :-- | :-- |
-| §1, §5.5–§5.7, §6.5 | Templates are not built yet (PP-s3fa): every card renders on the Standard template, and the Apron card tab has no template setting. |
 | §4.2 | Automatic apron-size fill from a Pinball Map match is intentionally deferred. Editors choose Stern/SPIKE or WPC manually for now; unmatched machines still have no default. |
 
 ## Changelog
