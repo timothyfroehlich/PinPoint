@@ -27,10 +27,12 @@ export type TimelineEventData =
        */
       assigneeId: string | null;
       /**
-       * The assignee's name when the event was written. A rollback/fallback
-       * copy only: it lets a release that predates `assigneeId` render the
-       * event, and it is shown only when the id is null or no longer
-       * resolves. Never the display source when the id resolves. Account
+       * The assignee's name when the event was written. A rollback copy: it
+       * lets a release that predates `assigneeId` render the event. Activity
+       * shows it only when `assigneeId` is null or absent (a legacy name that
+       * matched no single account, or an event written by the previous
+       * release during the deploy). With an id, Activity never shows it: the
+       * live name, or "Former user" once the account is gone. Account
        * deletion removes it.
        */
       assigneeName?: string;
@@ -62,21 +64,25 @@ export type ResolvedTimelineEvent =
 
 /**
  * Resolve an event's person references against current account names (id →
- * name). An assignee shows their current name; failing that, the event's
- * legacy name snapshot; failing that, the deleted-account placeholder.
+ * name). An assignee with an id shows that account's current name, or the
+ * deleted-account placeholder once the account is gone: never the stored
+ * name, which would outlive an account deleted outside the app. Only an
+ * event without an id falls back to its stored name.
  */
 export function resolveTimelineEvent(
   event: TimelineEventData,
   accountNames: ReadonlyMap<string, string>
 ): ResolvedTimelineEvent {
   if (event.type !== "assigned") return event;
-  const currentName =
+  // `typeof`, not `!== null`: an event written by the previous release while
+  // migration 0100 deployed has no `assigneeId` key at all.
+  const displayName =
     typeof event.assigneeId === "string"
       ? accountNames.get(event.assigneeId)
-      : undefined;
+      : event.assigneeName;
   return {
     type: "assigned",
-    assigneeDisplayName: currentName ?? event.assigneeName ?? FORMER_USER_NAME,
+    assigneeDisplayName: displayName ?? FORMER_USER_NAME,
   };
 }
 

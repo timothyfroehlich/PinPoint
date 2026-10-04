@@ -539,8 +539,10 @@ describe("Issue Service Functions (Integration)", () => {
 
     /**
      * Activity resolves an assignment to the account's current name when it
-     * loads (PP-0fg0.1), over the stored "Second User" rollback copy. A legacy
-     * event the backfill could not tie to an account shows its stored name.
+     * loads (PP-0fg0.1), over the stored "Second User" rollback copy. An id
+     * whose profile row is gone (an account deleted outside the app) shows
+     * "Former user", never its stored name. Only a legacy event with no id
+     * shows its stored name.
      */
     it("Activity shows the assignee's current name after a rename", async () => {
       const db = await getTestDb();
@@ -550,15 +552,26 @@ describe("Issue Service Functions (Integration)", () => {
         assignedTo: testUser2.id,
         actorId: testUser.id,
       });
-      await db.insert(issueComments).values({
-        issueId: testIssue.id,
-        isSystem: true,
-        eventData: {
-          type: "assigned",
-          assigneeId: null,
-          assigneeName: "Departed Member",
+      await db.insert(issueComments).values([
+        {
+          issueId: testIssue.id,
+          isSystem: true,
+          eventData: {
+            type: "assigned",
+            assigneeId: null,
+            assigneeName: "Departed Member",
+          },
         },
-      });
+        {
+          issueId: testIssue.id,
+          isSystem: true,
+          eventData: {
+            type: "assigned",
+            assigneeId: "00000000-0000-0000-0000-0000000000ff",
+            assigneeName: "Deleted Elsewhere",
+          },
+        },
+      ]);
       await db
         .update(userProfiles)
         .set({ firstName: "Renamed" })
@@ -576,7 +589,7 @@ describe("Issue Service Functions (Integration)", () => {
               : []
           )
           .sort()
-      ).toEqual(["Departed Member", "Renamed User"]);
+      ).toEqual(["Departed Member", "Former user", "Renamed User"]);
     });
 
     /**
