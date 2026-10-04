@@ -126,7 +126,7 @@ function SavedViewsSheet({
           {views.edited ? (
             <div className="mt-3 space-y-2">
               <p className="rounded-lg border border-warning-container bg-warning-container/40 px-3 py-2 text-sm text-on-warning-container">
-                You changed <strong>{views.appliedName}</strong>.
+                <strong>{views.appliedName}</strong> · Edited
               </p>
               <div className="grid grid-cols-2 gap-2">
                 {views.canSave && views.appliedIsSaved ? (

@@ -380,7 +380,7 @@ export function MachineView({
     actions: {
       saveChanges: async () => {
         if (!applied.isSaved) {
-          return { ok: false, message: "Only your own views can be changed" };
+          return { ok: false, message: "Not your view" };
         }
         const outcome = await updateSavedMachineViewAction({
           id: applied.id,
@@ -468,7 +468,7 @@ export function MachineView({
             description={
               edited
                 ? "Try removing a filter or using a broader search."
-                : `${applied.name} has no machines right now.`
+                : `No machines in ${applied.name}`
             }
             action={
               edited ? (
