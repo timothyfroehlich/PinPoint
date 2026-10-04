@@ -41,6 +41,11 @@ import type { IssueFilters, IssueSort } from "./filters";
  *   frozen into the doc never matches once the person has a different name.
  *
  * Names only, never emails (CORE-SEC-007).
+ *
+ * The joined profile is referenced by a literal alias, not `${userProfiles.id}`:
+ * the relational query API (`db.query.issues.findMany`) rewrites every column
+ * in a raw fragment to the root table's alias, which would turn it into
+ * `"issues"."id"`.
  */
 function proseMatches(doc: AnyPgColumn, search: string): SQL {
   return sql`(
@@ -52,10 +57,10 @@ function proseMatches(doc: AnyPgColumn, search: string): SQL {
     or exists (
       select 1
       from jsonb_path_query(${doc}, 'lax $.** ? (@.type == "mention").attrs') as mention(attrs)
-      left join ${userProfiles}
-        on ${userProfiles.id}::text = lower(mention.attrs ->> 'id')
+      left join ${userProfiles} as mentioned
+        on mentioned.id::text = lower(mention.attrs ->> 'id')
       where coalesce(
-        ${userProfiles.name},
+        mentioned.name,
         case
           when mention.attrs ->> 'id' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
             then ${FORMER_USER_NAME}
