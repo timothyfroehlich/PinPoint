@@ -41,6 +41,10 @@ Divergence rows are a one-line todo list, not writeups.
 
 If a PR changes roles, statuses, permissions, or user-facing terminology, check `src/app/(app)/help/` for content that becomes stale. Role names must match `src/lib/permissions/matrix.ts` (Guest, Member, Technician, Admin). Status labels must use the display labels in `STATUS_CONFIG` (`src/lib/issues/status.ts`), not raw database values.
 
+## Smoke E2E remit
+
+Smoke specs (`e2e/smoke/*`) prove a page renders without a 500 and holds its layout — the cheapest end-to-end signal. When a PR adds or materially grows one, flag assertions that reach past that remit into behavior, permissions, or form state: those belong at a cheaper layer, and `pinpoint-testing` owns that call. The nudge is a climbing assertion count, not a fixed line budget to enforce; pre-existing bloat is already catalogued in `docs/testing/e2e-audit-2026-05.md`.
+
 ## Scope of the review
 
 A default `/code-review` pass is aimed at smaller changes — Tim triggers deeper reviews (`/code-review ultra`) manually on bigger ones. In practice: prioritise the highest-priority rule violations above and genuine correctness defects. Don't editorialise about style a formatter or linter already owns (Prettier, oxlint). A clean review — no comments — is a valid outcome; don't manufacture nits to justify the pass.

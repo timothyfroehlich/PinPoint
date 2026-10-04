@@ -35,7 +35,7 @@ There is no numeric target for test counts. Total-test-count is a vanity metric.
 | **I** | DB query correctness (filters, joins, ordering)                | Integration (PGlite)                                                                                                                                                                                                                                                             |
 | **J** | Third-party integration                                        | **Boundary-mocked** unit/integration. NEVER live external services in E2E except our owned local stack (Mailpit, PGlite, local Supabase including local Storage). See CORE-TEST-006, "Test What We Own", in [docs/NON_NEGOTIABLES.md](../../../docs/NON_NEGOTIABLES.md#testing). |
 
-E2E earns its slot when the test is genuinely class F. Most other classes have a cheaper home. The 2026-05 audit ([e2e-audit-2026-05.md](../../../docs/testing/e2e-audit-2026-05.md)) found that 36 of 48 specs were partially or fully misallocated — write the cheapest layer that catches the bug class, not the most thorough one (CORE-TEST-005).
+E2E earns its slot when the test is genuinely class F. Most other classes have a cheaper home. The 2026-05 audit ([e2e-audit-2026-05.md](../../../docs/testing/e2e-audit-2026-05.md)) found that 36 of 48 specs were partially or fully misallocated — write the cheapest layer that catches the bug class, not the most thorough one (CORE-TEST-005). Smoke E2E holds class D plus the bare "renders without 500" check; when a smoke spec starts accreting class B/C/E/H assertions, move them to their cheaper home rather than letting the spec grow.
 
 ## Where Existing Coverage Lives (Look Here First)
 
