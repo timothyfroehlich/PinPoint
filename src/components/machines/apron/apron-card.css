@@ -2,8 +2,8 @@
  * Apron card face (PP-esta). A printed artifact, not app UI: it keeps its own
  * fixed ink palette (light card, dark identity panel) in both the dark app and
  * on paper, so it does not use the app's semantic tokens. Geometry comes from
- * the approved design canvas; sizes that differ per apron size arrive as
- * custom properties from APRON_CARD_LAYOUTS.
+ * the approved design canvases; sizes that differ per apron size and
+ * template arrive as custom properties from the layouts in apron-card.ts.
  */
 .apron-card {
   --apron-ink: #0f0f11;
@@ -276,6 +276,192 @@
   color: var(--apron-label);
 }
 
+/* QR captions (Side rail and Header band, spec §5.6–5.7): the destinations
+ * named in small type under the QR. */
+.apron-card__qr-block {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: 6px;
+  width: var(--apron-qr-size);
+}
+
+.apron-card__captions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.apron-card__captions-heading {
+  font-weight: 800;
+  font-size: 11.5px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+
+.apron-card__caption {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 700;
+  font-size: 10.5px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.apron-card__caption svg {
+  display: block;
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+}
+
+/* Side rail (spec §5.6): a narrower panel, and one text column that wraps
+ * around the QR floated at its top right. */
+.apron-card.is-side-rail .apron-card__panel {
+  gap: 10px;
+}
+
+.apron-card.is-side-rail .apron-card__identity {
+  gap: 5px;
+}
+
+.apron-card.is-side-rail .apron-card__title {
+  line-height: 0.92;
+}
+
+.apron-card.is-side-rail .apron-card__edition {
+  font-size: 11.5px;
+}
+
+.apron-card.is-side-rail .apron-card__meta,
+.apron-card.is-side-rail .apron-card__owner {
+  font-size: 11px;
+}
+
+.apron-card.is-side-rail[data-apron-size="wpc"] .apron-card__edition {
+  font-size: 12.5px;
+}
+
+.apron-card.is-side-rail[data-apron-size="wpc"] .apron-card__meta,
+.apron-card.is-side-rail[data-apron-size="wpc"] .apron-card__owner {
+  font-size: 12px;
+}
+
+.apron-card.is-side-rail .apron-card__body {
+  display: flow-root;
+}
+
+.apron-card.is-side-rail .apron-card__qr-block {
+  float: right;
+  margin: 0 0 8px 14px;
+}
+
+.apron-card.is-side-rail .apron-card__text-block + .apron-card__text-block {
+  margin-top: 8px;
+}
+
+/* Header band (spec §5.7): identity in a dark band across the top; text in
+ * two columns beside a QR column. */
+.apron-card.is-header-band {
+  flex-direction: column;
+  background: var(--apron-paper);
+}
+
+.apron-card__band {
+  display: flex;
+  flex-shrink: 0;
+  align-items: stretch;
+  gap: 12px;
+  height: var(--apron-band-height);
+  padding: var(--apron-band-padding);
+  background: var(--apron-ink);
+}
+
+.apron-card__band .apron-card__identity {
+  flex: 1 1 auto;
+}
+
+/* Auto margins centre the lines while they fit and drop to zero once they
+   do not, so overflow runs downward where the fit can measure it (§6.5). */
+.apron-card__band-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-block: auto;
+}
+
+.apron-card.is-header-band .apron-card__title {
+  line-height: 0.92;
+}
+
+.apron-card__band-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+}
+
+.apron-card__band-meta > * {
+  margin: 0;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.apron-card__band-meta .apron-card__edition {
+  font-size: 11.5px;
+}
+
+.apron-card__band-meta .apron-card__meta,
+.apron-card__band-meta .apron-card__owner {
+  font-size: 11px;
+}
+
+.apron-card.is-header-band[data-apron-size="wpc"]
+  .apron-card__band-meta
+  .apron-card__edition {
+  font-size: 12.5px;
+}
+
+.apron-card.is-header-band[data-apron-size="wpc"]
+  .apron-card__band-meta
+  :is(.apron-card__meta, .apron-card__owner) {
+  font-size: 12px;
+}
+
+.apron-card__band .apron-card__logo {
+  align-self: center;
+}
+
+.apron-card.is-header-band .apron-card__body {
+  flex-direction: row;
+  gap: 14px;
+  min-height: 0;
+}
+
+/* Text past the second column runs into a third, off the card's edge: the
+   overflow check reads it as sideways overflow (§3.5). */
+.apron-card.is-header-band .apron-card__text {
+  display: block;
+  min-width: 0;
+  column-count: 2;
+  column-gap: 16px;
+  column-fill: auto;
+}
+
+.apron-card.is-header-band .apron-card__text-block + .apron-card__text-block {
+  margin-top: 8px;
+}
+
+.apron-card.is-header-band .apron-card__label {
+  break-after: avoid;
+}
+
+.apron-card.is-header-band .apron-card__text li {
+  break-inside: avoid;
+}
+
 /* Print sheet (print route and PDF export): white margin around the card,
  * 2mm of panel bleed past the left, top, and bottom trim edges, and corner
  * crop marks set 3mm out from the trim so they clear the bleed. */
@@ -306,6 +492,14 @@
   left: calc(-1 * var(--apron-bleed));
   width: calc(var(--apron-bleed-panel-width) + var(--apron-bleed));
   background: #0f0f11;
+}
+
+/* A Header band card bleeds its band past the top, left, and right edges. */
+.apron-sheet__bleed.is-band {
+  right: calc(-1 * var(--apron-bleed));
+  bottom: auto;
+  width: auto;
+  height: calc(var(--apron-bleed-band-height) + var(--apron-bleed));
 }
 
 .apron-sheet__mark {

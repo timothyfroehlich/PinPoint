@@ -1,0 +1,1 @@
+ALTER TABLE "machine_apron_cards" ADD COLUMN "template" text DEFAULT 'standard' NOT NULL;
