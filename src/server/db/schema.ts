@@ -28,6 +28,11 @@ import { type TimelineTag } from "~/lib/timeline/machine-tags";
 import { type SettingsSection } from "~/lib/machines/settings-types";
 import type { LocationSnapshot } from "~/lib/pinballmap/types";
 import {
+  DEFAULT_ACTIVITY_SUMMARY_EVENTS,
+  DEFAULT_ACTIVITY_SUMMARY_INTERVAL_HOURS,
+  DEFAULT_ACTIVITY_SUMMARY_START_HOUR,
+} from "~/lib/discord/activity-summary/events";
+import {
   OPDB_DISPLAY_TYPES,
   OPDB_MACHINE_TYPES,
   type OpdbPerson,
@@ -1799,6 +1804,45 @@ export const discordIntegrationConfig = pgTable(
       .notNull()
       .default("unknown"),
     lastBotCheckAt: timestamp("last_bot_check_at", { withTimezone: true }),
+    // Activity summary settings and delivery health (PP-ogup,
+    // discord-activity-summary spec §2). Saved on their own; the credential
+    // save never touches them.
+    summaryChannelId: text("summary_channel_id"),
+    // Hours per period; NULL is Disabled (spec §1).
+    summaryIntervalHours: integer("summary_interval_hours").default(
+      DEFAULT_ACTIVITY_SUMMARY_INTERVAL_HOURS
+    ),
+    // US Central hour of day that anchors the schedule (spec §3.1).
+    summaryStartHour: integer("summary_start_hour")
+      .notNull()
+      .default(DEFAULT_ACTIVITY_SUMMARY_START_HOUR),
+    summaryEvents: text("summary_events")
+      .array()
+      .notNull()
+      .default([...DEFAULT_ACTIVITY_SUMMARY_EVENTS]),
+    // Same status vocabulary as the region-alert channel (spec §2.7).
+    summaryStatus: text("summary_status", {
+      enum: [
+        "not_configured",
+        "posting",
+        "cant_post",
+        "couldnt_check",
+        "needs_discord",
+      ],
+    })
+      .notNull()
+      .default("not_configured"),
+    summaryStatusDetail: text("summary_status_detail"),
+    summaryLastPostAt: timestamp("summary_last_post_at", {
+      withTimezone: true,
+    }),
+    // End of the last covered period (spec §3.2); written by the scheduler.
+    summaryPeriodEnd: timestamp("summary_period_end", { withTimezone: true }),
+    // The Pinball Map rows to review at the last period end, so the next
+    // period can tell whether they changed (spec §5.11).
+    summaryPinballMapReviewKeys: text(
+      "summary_pinball_map_review_keys"
+    ).array(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -1813,6 +1857,18 @@ export const discordIntegrationConfig = pgTable(
     healthStatusCheck: check(
       "discord_integration_config_health_check",
       sql`bot_health_status IN ('unknown', 'healthy', 'degraded')`
+    ),
+    summaryIntervalCheck: check(
+      "discord_integration_config_summary_interval_check",
+      sql`summary_interval_hours IS NULL OR summary_interval_hours IN (1, 2, 4, 6, 12, 24)`
+    ),
+    summaryStartHourCheck: check(
+      "discord_integration_config_summary_start_hour_check",
+      sql`summary_start_hour BETWEEN 0 AND 23`
+    ),
+    summaryStatusCheck: check(
+      "discord_integration_config_summary_status_check",
+      sql`summary_status IN ('not_configured', 'posting', 'cant_post', 'couldnt_check', 'needs_discord')`
     ),
   })
 );

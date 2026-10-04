@@ -45,6 +45,7 @@ import {
   updateIssueComment,
   updateIssueTitle,
   reassignIssueMachine,
+  MachineRemovedError,
 } from "~/services/issues";
 import { dispatchNotification } from "~/lib/notifications";
 import { checkPermission } from "~/lib/permissions/helpers";
@@ -1090,6 +1091,9 @@ export async function reassignIssueMachineAction(
       error.message.startsWith("Machine not found")
     ) {
       return err("NOT_FOUND", "Destination machine not found");
+    }
+    if (error instanceof MachineRemovedError) {
+      return err("VALIDATION", error.message);
     }
     return serverActionError(error, "SERVER", "Failed to reassign issue", {
       action: "reassignIssueMachine",

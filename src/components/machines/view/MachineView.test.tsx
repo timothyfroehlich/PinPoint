@@ -327,19 +327,24 @@ describe("MachineView", () => {
     const state = {
       ...getMachineViewPreset("collection").defaultState,
       q: "mars",
+      presence: "all" as const,
       page: 3,
     };
     // A URL from before the All/Filtered choice was retired
     // (machine-widgets §2.2): the parameter is ignored and rewritten away.
     navigation.searchParams = new URLSearchParams({
       q: "mars",
+      presence: "all",
       page: "3",
       playabilityWidget: "filtered",
     });
     renderView({ result: result({ state }), preset: "collection" });
-    expect(navigation.replace).toHaveBeenLastCalledWith("/m?q=mars&page=3", {
-      scroll: false,
-    });
+    expect(navigation.replace).toHaveBeenLastCalledWith(
+      "/m?q=mars&presence=all&page=3",
+      {
+        scroll: false,
+      }
+    );
     const playability = screen.getByRole("region", { name: "Playability" });
 
     // A Playability Segment also sets Presence to On the Floor (§4.3), keeps
@@ -348,7 +353,8 @@ describe("MachineView", () => {
       within(playability).getByRole("button", { name: "1 Needs Service" })
     );
     expect(navigation.replace).toHaveBeenLastCalledWith(
-      "/m?q=mars&presence=on_the_floor&status=needs_service",
+      // On the Floor is the Collections Page Preset, so it leaves the URL.
+      "/m?q=mars&status=needs_service",
       { scroll: false }
     );
   });

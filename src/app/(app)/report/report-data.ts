@@ -2,7 +2,8 @@ import "server-only";
 import { cache } from "react";
 import { asc, sql } from "drizzle-orm";
 import { db } from "~/server/db";
-import { machines, userProfiles } from "~/server/db/schema";
+import { userProfiles } from "~/server/db/schema";
+import { getMachineChoices } from "~/lib/machines/queries";
 import { checkPermission } from "~/lib/permissions/helpers";
 import type { AccessLevel } from "~/lib/permissions/matrix";
 
@@ -17,13 +18,12 @@ import type { AccessLevel } from "~/lib/permissions/matrix";
  * `/report` no longer fetches machines + assignees twice (PP-2m17 #3).
  */
 
-/** All machines, id/name/initials, ordered by name. */
-export const getReportMachines = cache(async () =>
-  db.query.machines.findMany({
-    orderBy: asc(machines.name),
-    columns: { id: true, name: true, initials: true },
-  })
-);
+/**
+ * Machines a report can be filed on, id/name/initials, ordered by name.
+ * Removed machines are left out, so a `?machine=` link to one preselects
+ * nothing (reporting §10.1).
+ */
+export const getReportMachines = cache(async () => getMachineChoices(db));
 
 /**
  * Assignable users for the report forms, or `[]` when the viewer can't assign.

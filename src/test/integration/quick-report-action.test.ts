@@ -45,6 +45,7 @@ vi.mock("~/server/db", async () => {
 // Import AFTER the db mock so the action and createIssue pick up PGlite.
 const { submitQuickIssuesAction, submitQuickIssueRowAction } =
   await import("~/app/(app)/report/(tabbed)/quick/actions");
+const { REMOVED_MACHINE_REPORT_ERROR } = await import("~/services/issues");
 
 async function seedUser(
   role: "guest" | "member" | "technician" | "admin"
@@ -59,11 +60,14 @@ async function seedUser(
 
 async function seedMachine(
   initials: string,
-  name: string
+  name: string,
+  presenceStatus: "on_the_floor" | "removed" = "on_the_floor"
 ): Promise<{ id: string; initials: string }> {
   const id = randomUUID();
   const db = await getTestDb();
-  await db.insert(machines).values(createTestMachine({ id, initials, name }));
+  await db
+    .insert(machines)
+    .values(createTestMachine({ id, initials, name, presenceStatus }));
   return { id, initials };
 }
 
@@ -153,6 +157,35 @@ describe("quick report actions", () => {
     expect(first.ok && second.ok).toBe(true);
     const created = await db.query.issues.findMany();
     expect(created).toHaveLength(1);
+  });
+
+  it("refuses a row on a Removed machine without writing or using a number", async () => {
+    const db = await getTestDb();
+    const tech = await seedUser("technician");
+    const live = await seedMachine("GP", "Grand Prix");
+    const sold = await seedMachine("SD", "Sold Game", "removed");
+    mockGetUser.mockResolvedValue({ data: { user: { id: tech.id } } });
+
+    const res = await submitQuickIssuesAction([
+      row({ machineId: live.id, title: "Good row" }),
+      row({ machineId: sold.id, title: "On a removed machine" }),
+    ]);
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.results[0]).toMatchObject({ index: 0, ok: true });
+      expect(res.results[1]).toEqual({
+        index: 1,
+        ok: false,
+        error: REMOVED_MACHINE_REPORT_ERROR,
+      });
+    }
+    const created = await db.query.issues.findMany();
+    expect(created.map((issue) => issue.machineInitials)).toEqual(["GP"]);
+    const soldRow = await db.query.machines.findFirst({
+      where: (m, { eq }) => eq(m.id, sold.id),
+      columns: { nextIssueNumber: true },
+    });
+    expect(soldRow?.nextIssueNumber).toBe(1);
   });
 
   it("rejects a batch over the soft cap", async () => {

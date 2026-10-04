@@ -91,7 +91,7 @@ describe("manufacturer tags", () => {
     ]);
   });
 
-  it("lists every tag with its machines in any presence state", async () => {
+  it("lists every tag with its machines in any presence state, counting all but Removed ones", async () => {
     const db = await getTestDb();
     const tags = (await listTags(asDbOrTx(db))).manufacturer;
     expect(
@@ -99,10 +99,22 @@ describe("manufacturer tags", () => {
         slug: tag.slug,
         name: tag.name,
         initials: tag.machines.map((machine) => machine.initials),
+        machineCount: tag.machineCount,
       }))
     ).toEqual([
-      { slug: "stern", name: "Stern", initials: ["EXC", "GON", "LNK"] },
-      { slug: "williams", name: "Williams", initials: ["WMS"] },
+      // GON is Removed: still a member, but not counted (spec 7.9).
+      {
+        slug: "stern",
+        name: "Stern",
+        initials: ["EXC", "GON", "LNK"],
+        machineCount: 2,
+      },
+      {
+        slug: "williams",
+        name: "Williams",
+        initials: ["WMS"],
+        machineCount: 1,
+      },
     ]);
     expect(await getTag(asDbOrTx(db), "manufacturer", "nobody")).toBeNull();
   });
@@ -120,7 +132,10 @@ describe("manufacturer tags", () => {
       scope,
       preset: "collection",
       viewerId: null,
-      searchParams: new URLSearchParams({ columns: "machine" }),
+      searchParams: new URLSearchParams({
+        presence: "all",
+        columns: "machine",
+      }),
     });
     expect(all.scopeCount).toBe(3);
     expect(all.rows.map((row) => row.initials).sort()).toEqual([
