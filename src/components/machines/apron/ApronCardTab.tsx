@@ -38,6 +38,7 @@ import {
   APRON_CARD_SIZES,
   APRON_CARD_TEMPLATES,
   apronCardPixelSize,
+  isApronCardSize,
   isApronCardTemplate,
   cardFaceContent,
   type ApronCardIdentity,
@@ -428,9 +429,7 @@ export function ApronCardTab({
                   <Select
                     value={selected.size ?? ""}
                     onValueChange={(value) => {
-                      if (value === "stern" || value === "wpc") {
-                        update({ size: value });
-                      }
+                      if (isApronCardSize(value)) update({ size: value });
                     }}
                   >
                     <SelectTrigger

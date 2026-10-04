@@ -389,7 +389,9 @@ export const machineApronCards = pgTable(
       .references(() => machines.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     // Every saved card has a size (§4.3).
-    size: text("size", { enum: ["stern", "wpc"] }).notNull(),
+    size: text("size", {
+      enum: ["stern", "wpc", "bally", "williams-em", "gottlieb-em", "bally-em"],
+    }).notNull(),
     // Which layout the card face uses (§1, §5.5); new cards start on Standard.
     template: text("template", {
       enum: ["standard", "side-rail", "header-band"],
