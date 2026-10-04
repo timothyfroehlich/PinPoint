@@ -23,7 +23,6 @@ import { getMachineOwnerId } from "~/lib/issues/owner";
 import { getMachineChoices } from "~/lib/machines/queries";
 import { CLOSED_STATUSES } from "~/lib/issues/status";
 import { formatIssueId } from "~/lib/issues/utils";
-import { resolveIssueActivityEvents } from "~/lib/timeline/events";
 import type { IssueWithAllRelations } from "~/lib/types";
 import { EditableIssueTitle } from "./editable-issue-title";
 import { getIssueForDetail } from "./_data";
@@ -125,11 +124,12 @@ export default async function IssueDetailPage({
     notFound();
   }
 
+  const issueWithRelations: IssueWithAllRelations = issue;
   const accessLevel = getAccessLevel(currentUserProfile?.role);
   const ownershipContext: OwnershipContext = {
     userId: user?.id,
-    reporterId: issue.reportedBy,
-    machineOwnerId: getMachineOwnerId(issue),
+    reporterId: issueWithRelations.reportedBy,
+    machineOwnerId: getMachineOwnerId(issueWithRelations),
   };
 
   // Don't serialize the member roster to viewers who can't open the picker —
@@ -148,10 +148,8 @@ export default async function IssueDetailPage({
   );
 
   // Both gated queries run in parallel; viewers without the relevant
-  // permission skip the round-trip entirely. Activity's assignees resolve to
-  // their current names alongside them (PP-0fg0.1).
-  const [comments, allUsers, allMachines] = await Promise.all([
-    resolveIssueActivityEvents(issue.comments),
+  // permission skip the round-trip entirely.
+  const [allUsers, allMachines] = await Promise.all([
     canTriage
       ? db
           .select({ id: userProfiles.id, name: userProfiles.name })
@@ -166,7 +164,6 @@ export default async function IssueDetailPage({
         )
       : Promise.resolve([]),
   ]);
-  const issueWithRelations: IssueWithAllRelations = { ...issue, comments };
 
   const ownerRequirements = user
     ? (issue.machine.ownerRequirements ?? undefined)

@@ -48,8 +48,6 @@ export function getMachineOwnerName(
  * @param issue - The issue with machine owner information
  * @returns The owner's ID or null if no owner. May be from user_profiles or invited_users table.
  */
-export function getMachineOwnerId(
-  issue: Pick<IssueWithAllRelations, "machine">
-): string | null {
+export function getMachineOwnerId(issue: IssueWithAllRelations): string | null {
   return issue.machine.owner?.id ?? issue.machine.invitedOwner?.id ?? null;
 }
