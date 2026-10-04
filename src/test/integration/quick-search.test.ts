@@ -3,12 +3,16 @@ import { createTestIssue, createTestMachine } from "~/test/helpers/factories";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { issues, machines, pinballmapCatalog } from "~/server/db/schema";
 import {
-  QUICK_SEARCH_RESULT_LIMIT,
+  listQuickSearchMachines,
   quickSearchQuerySchema,
-  searchQuickNavigation,
+  searchQuickIssues,
 } from "~/app/api/quick-search/queries";
+import { QUICK_SEARCH_RESULT_LIMIT } from "~/lib/quick-search/match";
 import { plainTextToDoc } from "~/lib/tiptap/types";
-import { quickSearchResultsSchema } from "~/lib/quick-search/types";
+import {
+  quickSearchIssueResultsSchema,
+  quickSearchMachineIndexSchema,
+} from "~/lib/quick-search/types";
 
 vi.mock("~/server/db", async () => {
   const { getTestDb } = await import("~/test/setup/pglite");
@@ -27,7 +31,7 @@ describe("quick search queries", () => {
     );
   });
 
-  it("matches and ranks public machine and issue identity fields", async () => {
+  it("matches and ranks public issue identity fields", async () => {
     const db = await getTestDb();
     await db.insert(pinballmapCatalog).values({
       pinballmapMachineId: 101,
@@ -61,40 +65,27 @@ describe("quick search queries", () => {
       }),
     ]);
 
-    const initialsResults = await searchQuickNavigation("AFM");
-    expect(quickSearchResultsSchema.safeParse(initialsResults).success).toBe(
+    const issueResults = await searchQuickIssues("flipper");
+    expect(quickSearchIssueResultsSchema.safeParse(issueResults).success).toBe(
       true
     );
-    expect(initialsResults.machines.map((machine) => machine.initials)).toEqual(
-      ["AFM", "AF2"]
-    );
-
-    const modelResults = await searchQuickNavigation("Godzilla Premium");
-    expect(modelResults.machines).toEqual([
-      expect.objectContaining({
-        initials: "GODZ",
-        modelName: "Godzilla Premium",
-      }),
-    ]);
-
-    const issueResults = await searchQuickNavigation("flipper");
     expect(issueResults.issues.map((issue) => issue.issueNumber)).toEqual([
       4, 3,
     ]);
 
-    const exactIssueResults = await searchQuickNavigation("AFM-03");
+    const exactIssueResults = await searchQuickIssues("AFM-03");
     expect(exactIssueResults.issues[0]).toEqual(
       expect.objectContaining({ machineInitials: "AFM", issueNumber: 3 })
     );
 
-    const machineNameResults = await searchQuickNavigation("Attack");
+    const machineNameResults = await searchQuickIssues("Attack");
     expect(machineNameResults.issues).toHaveLength(2);
 
-    const excludedFieldResults = await searchQuickNavigation("search decoy");
+    const excludedFieldResults = await searchQuickIssues("search decoy");
     expect(excludedFieldResults.issues).toHaveLength(0);
   });
 
-  it("searches catalog and manual manufacturer and year with prefix ranking", async () => {
+  it("lists each machine with its current model identity, manufacturer, and year", async () => {
     const db = await getTestDb();
     await db.insert(pinballmapCatalog).values({
       pinballmapMachineId: 991,
@@ -124,39 +115,44 @@ describe("quick search queries", () => {
       }),
     ]);
 
-    expect(
-      (await searchQuickNavigation("Bally")).machines.map(
-        (machine) => machine.initials
-      )
-    ).toEqual(["PBM", "MAN"]);
-    expect(
-      (await searchQuickNavigation("1995")).machines.map(
-        (machine) => machine.initials
-      )
-    ).toEqual(["PBM"]);
-    expect(
-      (await searchQuickNavigation("1987")).machines.map(
-        (machine) => machine.initials
-      )
-    ).toEqual(["MAN"]);
+    const index = await listQuickSearchMachines();
+    expect(quickSearchMachineIndexSchema.safeParse(index).success).toBe(true);
+    expect(index.machines).toEqual([
+      expect.objectContaining({
+        initials: "MAN",
+        modelName: "Prototype",
+        manufacturer: "The Bally Company",
+        year: "1987",
+      }),
+      expect.objectContaining({
+        initials: "UND",
+        manufacturer: null,
+      }),
+      expect.objectContaining({
+        initials: "PBM",
+        modelName: "Meteor",
+        manufacturer: "Bally",
+        year: "1995",
+      }),
+    ]);
   });
 
-  it("enforces the minimum query length and per-group result limit", async () => {
+  it("enforces the minimum query length and result limit for issues", async () => {
     const db = await getTestDb();
-    await db.insert(machines).values(
+    await db
+      .insert(machines)
+      .values(createTestMachine({ initials: "MM", name: "Medieval Madness" }));
+    await db.insert(issues).values(
       Array.from({ length: QUICK_SEARCH_RESULT_LIMIT + 2 }, (_unused, index) =>
-        createTestMachine({
-          initials: `M${String(index + 10)}`,
-          name: `Machine ${String(index + 1)}`,
+        createTestIssue("MM", {
+          issueNumber: index + 1,
+          title: `Magnet ${String(index + 1)}`,
         })
       )
     );
 
-    expect(await searchQuickNavigation("M")).toEqual({
-      machines: [],
-      issues: [],
-    });
-    expect((await searchQuickNavigation("Machine")).machines).toHaveLength(
+    expect(await searchQuickIssues("M")).toEqual({ issues: [] });
+    expect((await searchQuickIssues("Magnet")).issues).toHaveLength(
       QUICK_SEARCH_RESULT_LIMIT
     );
   });
@@ -178,11 +174,16 @@ describe("quick search queries", () => {
         createTestIssue("TZ2", { issueNumber: 1, title: "Twilight magnet" }),
       ]);
 
-    const results = await searchQuickNavigation("Twilight");
-    expect(results.machines.map((machine) => machine.initials)).toEqual(["TZ"]);
-    expect(results.issues.map((issue) => issue.machineInitials)).toEqual([
-      "TZ",
-    ]);
+    expect(
+      (await listQuickSearchMachines()).machines.map(
+        (machine) => machine.initials
+      )
+    ).toEqual(["TZ"]);
+    expect(
+      (await searchQuickIssues("Twilight")).issues.map(
+        (issue) => issue.machineInitials
+      )
+    ).toEqual(["TZ"]);
   });
 
   it("preserves three-digit issue numbers in identifier matches", async () => {
@@ -198,12 +199,12 @@ describe("quick search queries", () => {
       ]);
 
     expect(
-      (await searchQuickNavigation("AFM-123")).issues.map(
+      (await searchQuickIssues("AFM-123")).issues.map(
         (issue) => issue.issueNumber
       )
     ).toEqual([123]);
     expect(
-      (await searchQuickNavigation("AFM-12")).issues.map(
+      (await searchQuickIssues("AFM-12")).issues.map(
         (issue) => issue.issueNumber
       )
     ).toEqual([12, 123]);
