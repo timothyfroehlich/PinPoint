@@ -88,6 +88,7 @@ export default async function ApronCardPrintPage({
           null
       )}
       size={card.size}
+      template={card.template}
       scanUrl={buildMachineHubUrl(
         resolveRequestUrl(await headers()),
         machine.initials

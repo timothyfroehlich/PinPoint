@@ -103,7 +103,7 @@ export async function emitIssueOpened(
  * `emitIssueOpened` writes for an account-backed open, the account becomes the
  * event's author where none is set, and the typed name is dropped so the live
  * account name is the only one shown. Run it in the same
- * transaction as the issue transfer. Mirrors `handle_new_user` (drizzle/0101).
+ * transaction as the issue transfer. Mirrors `handle_new_user` (drizzle/0102).
  */
 export async function attachSignedUpGuestReporter(
   tx: DbTransaction,

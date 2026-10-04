@@ -253,6 +253,7 @@ export async function getMachineApronCards(
       id: true,
       name: true,
       size: true,
+      template: true,
       useCustomDescription: true,
       description: true,
       tip: true,
