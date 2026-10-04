@@ -86,7 +86,7 @@ export function assigneeDisplayName(
   accountNames: ReadonlyMap<string, string>
 ): string {
   // `typeof`, not `!== null`: an event written by the previous release while
-  // migration 0102 deployed has no `assigneeId` key at all.
+  // migration 0103 deployed has no `assigneeId` key at all.
   const displayName =
     typeof event.assigneeId === "string"
       ? accountNames.get(event.assigneeId)
