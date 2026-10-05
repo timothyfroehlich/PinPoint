@@ -16,6 +16,8 @@ import {
 } from "~/lib/opdb/credits";
 import { getOpdbRecords } from "~/lib/opdb/records";
 import { opdbGroupId } from "~/lib/pintips/parse";
+import { loadMentionNames } from "~/lib/tiptap/mention-names";
+import { applyMentionNames } from "~/lib/tiptap/types";
 
 /** One saved card as the Print apron cards page lists and prints it. */
 export interface PrintableApronCard {
@@ -85,7 +87,7 @@ export async function getPrintableApronCards(): Promise<PrintableApronCard[]> {
       })
     ),
   ];
-  const [records, tipGroups] = await Promise.all([
+  const [records, tipGroups, mentionNames] = await Promise.all([
     getOpdbRecords(db, creditIds),
     groupIds.length === 0
       ? Promise.resolve([])
@@ -93,6 +95,14 @@ export async function getPrintableApronCards(): Promise<PrintableApronCard[]> {
           .selectDistinct({ groupId: pinTips.opdbGroupId })
           .from(pinTips)
           .where(inArray(pinTips.opdbGroupId, groupIds)),
+    // Cards print each @mention under the person's current name, as the
+    // Apron card tab's preview does.
+    loadMentionNames(
+      withCards.flatMap((machine) => [
+        machine.description,
+        ...machine.apronCards.flatMap((card) => [card.description, card.tip]),
+      ])
+    ),
   ]);
   const groupsWithTips = new Set(tipGroups.map((row) => row.groupId));
 
@@ -113,7 +123,19 @@ export async function getPrintableApronCards(): Promise<PrintableApronCard[]> {
       cardName: card.name,
       size: card.size,
       template: card.template,
-      content: apronCardContent(machine, card, credits, hasPinTips),
+      content: apronCardContent(
+        {
+          ...machine,
+          description: applyMentionNames(machine.description, mentionNames),
+        },
+        {
+          ...card,
+          description: applyMentionNames(card.description, mentionNames),
+          tip: applyMentionNames(card.tip, mentionNames),
+        },
+        credits,
+        hasPinTips
+      ),
     }));
   });
 }

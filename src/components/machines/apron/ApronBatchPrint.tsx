@@ -12,6 +12,7 @@ import { Input } from "~/components/ui/input";
 import {
   APRON_CARD_SIZES,
   APRON_CARD_TEMPLATES,
+  isApronCardSize,
   type ApronCardContent,
   type ApronCardSize,
   type ApronCardTemplate,
@@ -32,6 +33,7 @@ import { ApronCardFace } from "./ApronCardFace";
 import {
   apronBatchFilename,
   buildApronOrderSheetPdf,
+  countOf as count,
   buildApronSheetsPdf,
 } from "./export-batch";
 import { downloadBlob, rasterize } from "./export-card";
@@ -47,11 +49,9 @@ export interface BatchPrintCard {
   scanUrl: string;
 }
 
-const SIZE_ORDER = Object.keys(APRON_CARD_SIZES) as ApronCardSize[];
-
-function count(n: number, one: string, many: string): string {
-  return `${n} ${n === 1 ? one : many}`;
-}
+const SIZE_ORDER = Object.keys(APRON_CARD_SIZES).filter(isApronCardSize);
+const PAPERS: readonly ApronPrintPaper[] = ["tabloid", "letter"];
+const MARGINS: readonly ApronPrintMargin[] = ["narrow", "standard"];
 
 /**
  * Print apron cards (spec apron-cards §12): every saved card grouped by apron
@@ -128,20 +128,20 @@ export function ApronBatchPrint({
     });
   };
 
+  // One size at a time, so only that file's card images are held in memory.
   const downloadFiles = async (): Promise<void> => {
-    const ids = [
-      ...new Set(files.flatMap((file) => file.cards.map((card) => card.id))),
-    ];
+    const total = chosen.length;
+    let done = 0;
     try {
-      const images = new Map<string, string>();
-      for (const [index, cardId] of ids.entries()) {
-        setProgress(`Preparing card ${index + 1} of ${ids.length}…`);
-        const node = faceNodes.current.get(cardId);
-        if (!node) throw new Error(`No rendered face for card ${cardId}`);
-        images.set(cardId, await rasterize(node));
-      }
       for (const file of files) {
-        setProgress(`Building ${APRON_CARD_SIZES[file.size].label}…`);
+        const images = new Map<string, string>();
+        for (const card of file.cards) {
+          done += 1;
+          setProgress(`Preparing card ${done} of ${total}…`);
+          const node = faceNodes.current.get(card.id);
+          if (!node) throw new Error(`No rendered face for card ${card.id}`);
+          images.set(card.id, await rasterize(node));
+        }
         const blob = await buildApronSheetsPdf({
           size: file.size,
           grid: file.grid,
@@ -357,44 +357,40 @@ export function ApronBatchPrint({
 
           <fieldset className="flex flex-col gap-2" disabled={busy}>
             <legend className="mb-2 font-medium">Paper</legend>
-            {(Object.keys(APRON_PRINT_PAPERS) as ApronPrintPaper[]).map(
-              (key) => (
-                <label key={key} className="flex min-h-8 items-center gap-2.5">
-                  <input
-                    type="radio"
-                    name={`${id}-paper`}
-                    className="size-4 accent-primary"
-                    checked={paper === key}
-                    onChange={() => {
-                      setPaper(key);
-                    }}
-                  />
-                  {key === "tabloid"
-                    ? `${APRON_PRINT_PAPERS[key].label} cover stock`
-                    : `${APRON_PRINT_PAPERS[key].label} (test print)`}
-                </label>
-              )
-            )}
+            {PAPERS.map((key) => (
+              <label key={key} className="flex min-h-8 items-center gap-2.5">
+                <input
+                  type="radio"
+                  name={`${id}-paper`}
+                  className="size-4 accent-primary"
+                  checked={paper === key}
+                  onChange={() => {
+                    setPaper(key);
+                  }}
+                />
+                {key === "tabloid"
+                  ? `${APRON_PRINT_PAPERS[key].label} cover stock`
+                  : `${APRON_PRINT_PAPERS[key].label} (test print)`}
+              </label>
+            ))}
           </fieldset>
 
           <fieldset className="flex flex-col gap-2" disabled={busy}>
             <legend className="mb-2 font-medium">Printer edge margin</legend>
-            {(Object.keys(APRON_PRINT_MARGINS) as ApronPrintMargin[]).map(
-              (key) => (
-                <label key={key} className="flex min-h-8 items-center gap-2.5">
-                  <input
-                    type="radio"
-                    name={`${id}-margin`}
-                    className="size-4 accent-primary"
-                    checked={margin === key}
-                    onChange={() => {
-                      setMargin(key);
-                    }}
-                  />
-                  {APRON_PRINT_MARGINS[key].label}
-                </label>
-              )
-            )}
+            {MARGINS.map((key) => (
+              <label key={key} className="flex min-h-8 items-center gap-2.5">
+                <input
+                  type="radio"
+                  name={`${id}-margin`}
+                  className="size-4 accent-primary"
+                  checked={margin === key}
+                  onChange={() => {
+                    setMargin(key);
+                  }}
+                />
+                {APRON_PRINT_MARGINS[key].label}
+              </label>
+            ))}
           </fieldset>
 
           <div className="flex flex-col gap-2">
@@ -418,7 +414,19 @@ export function ApronBatchPrint({
                   checked={override}
                   disabled={busy}
                   onChange={() => {
-                    setOverride((value) => !value);
+                    // Cards that do not fit leave the run with the override,
+                    // so ticking it again never brings them back (§12.3).
+                    if (override) {
+                      setSelected(
+                        (current) =>
+                          new Set(
+                            [...current].filter(
+                              (cardId) => !overflowing[cardId]
+                            )
+                          )
+                      );
+                    }
+                    setOverride(!override);
                   }}
                 />
                 <span className="flex flex-col">

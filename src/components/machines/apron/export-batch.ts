@@ -7,6 +7,7 @@ import {
 } from "~/lib/machines/apron-card";
 import {
   APRON_PANEL_COLOR,
+  APRON_PRINT_INK,
   APRON_PRINT_PAPERS,
   apronCutMarks,
   apronSheetLabelPosition,
@@ -20,6 +21,11 @@ import {
 /** The file name of one apron size's print file (spec apron-cards §12.5). */
 export function apronBatchFilename(size: ApronCardSize): string {
   return `apron-cards-${size}.pdf`;
+}
+
+/** "1 card", "2 cards". */
+export function countOf(n: number, one: string, many: string): string {
+  return `${n} ${n === 1 ? one : many}`;
 }
 
 const MARK_WIDTH_MM = 0.25;
@@ -93,12 +99,16 @@ export async function buildApronSheetsPdf({
     }
     pdf.setLineWidth(MARK_WIDTH_MM);
     for (const mark of apronCutMarks(grid, bleeds)) {
-      pdf.setDrawColor(mark.color === "white" ? "#ffffff" : "#000000");
+      pdf.setDrawColor(
+        mark.color === "white"
+          ? APRON_PRINT_INK.markOnBleed
+          : APRON_PRINT_INK.mark
+      );
       pdf.line(mark.x1Mm, mark.y1Mm, mark.x2Mm, mark.y2Mm);
     }
     const at = apronSheetLabelPosition(grid);
     pdf.setFontSize(LABEL_FONT_PT);
-    pdf.setTextColor("#52525b");
+    pdf.setTextColor(APRON_PRINT_INK.label);
     pdf.text(
       `${label} · ${dimensions} · Sheet ${index + 1} of ${sheets.length} · Print at 100%`,
       at.xMm,
@@ -160,15 +170,15 @@ export async function buildApronOrderSheetPdf({
     return wrapped.length * size * 0.3528 * 1.25 + gap;
   };
 
-  pdf.setTextColor("#18181b");
+  pdf.setTextColor(APRON_PRINT_INK.text);
   y += write("Apron card print order", { size: 18, bold: true, gap: 2 });
-  pdf.setTextColor("#52525b");
+  pdf.setTextColor(APRON_PRINT_INK.label);
   y += write(
-    `${date} · ${lines.length} ${lines.length === 1 ? "file" : "files"} · ${sheets} ${sheets === 1 ? "sheet" : "sheets"}`,
+    `${date} · ${countOf(lines.length, "file", "files")} · ${countOf(sheets, "sheet", "sheets")}`,
     { gap: 6 }
   );
 
-  pdf.setTextColor("#18181b");
+  pdf.setTextColor(APRON_PRINT_INK.text);
   const facts: [string, string][] = [
     ["Paper", `${APRON_PRINT_PAPERS[paper].label}, 100 lb matte cover, white`],
     ["Printing", "Full color, single-sided"],
@@ -186,20 +196,17 @@ export async function buildApronOrderSheetPdf({
 
   for (const line of lines) {
     const { label, dimensions } = APRON_CARD_SIZES[line.size];
-    pdf.setDrawColor("#d4d4d8");
+    pdf.setDrawColor(APRON_PRINT_INK.rule);
     pdf.setLineWidth(0.3);
     pdf.line(left, y - 4.5, left + width, y - 4.5);
     y += write(`${apronBatchFilename(line.size)} — ${label}, ${dimensions}`, {
       bold: true,
       gap: 1,
     });
-    const cards = `${line.cards} ${line.cards === 1 ? "card" : "cards"}${line.spares === 0 ? "" : ` + ${line.spares} spare`}`;
-    y += write(
-      `${line.sheets} ${line.sheets === 1 ? "sheet" : "sheets"} · ${cards}`,
-      {
-        gap: 1,
-      }
-    );
+    const cards = `${countOf(line.cards, "card", "cards")}${line.spares === 0 ? "" : ` + ${line.spares} spare`}`;
+    y += write(`${countOf(line.sheets, "sheet", "sheets")} · ${cards}`, {
+      gap: 1,
+    });
     y += write(
       `Cut from left (in): ${formatCuts(line.cutsFromLeftIn)}    Cut from top (in): ${formatCuts(line.cutsFromTopIn)}`,
       { gap: 7 }

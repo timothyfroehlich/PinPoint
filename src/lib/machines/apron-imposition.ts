@@ -34,6 +34,15 @@ export const APRON_BLEED_MM = 2;
 /** The panel and band color (`.apron-card__panel` in apron-card.css). */
 export const APRON_PANEL_COLOR = "#0f0f11";
 
+/** Inks the print files and order sheet use beyond the cards themselves. */
+export const APRON_PRINT_INK = {
+  mark: "#000000",
+  markOnBleed: "#ffffff",
+  label: "#52525b",
+  text: "#18181b",
+  rule: "#d4d4d8",
+} as const;
+
 const PX_TO_MM = 25.4 / 96;
 
 /** Floating-point slack so cards that fit exactly are not rejected. */

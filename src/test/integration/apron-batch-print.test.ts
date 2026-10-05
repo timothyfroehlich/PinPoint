@@ -4,7 +4,8 @@
  * Worker-scoped PGlite (CORE-TEST-001). Covers which saved cards the batch
  * page offers and in what order (apron-cards spec §12.2), and that each card
  * prints the same credits and PinTips line as a one-card export (§10.1) when
- * those are read for every machine at once.
+ * those are read for every machine at once, and that an @mention prints the
+ * person's current name, as the Apron card tab's preview does.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
@@ -14,8 +15,10 @@ import {
   opdbMachines,
   pinTips,
   pinballmapCatalog,
+  userProfiles,
 } from "~/server/db/schema";
-import { createTestMachine } from "~/test/helpers/factories";
+import { createTestMachine, createTestUser } from "~/test/helpers/factories";
+import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 
 vi.mock("~/server/db", async () => {
   const { getTestDb } = await import("~/test/setup/pglite");
@@ -123,5 +126,40 @@ describe("getPrintableApronCards", () => {
       credits: { design: ["Pat Builder"], art: [] },
       hasPinTips: false,
     });
+  });
+  it("prints each @mention under the person's current name", async () => {
+    const db = await getTestDb();
+    const person = createTestUser({ firstName: "Alexis", lastName: "Rivera" });
+    await db.insert(userProfiles).values(person);
+    const mention = (text: string): ProseMirrorDoc => ({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: `${text} ` },
+            { type: "mention", attrs: { id: person.id, label: "Alex Old" } },
+          ],
+        },
+      ],
+    });
+    const machineId = await addMachine({
+      initials: "AF",
+      name: "Attack From Mars",
+      description: mention("Ask"),
+    });
+    await db.insert(machineApronCards).values({
+      machineId,
+      name: "Main card",
+      size: "wpc",
+      tip: mention("Tip from"),
+      tipEnabled: true,
+    });
+
+    const [card] = await getPrintableApronCards();
+    const printed = JSON.stringify(card?.content);
+
+    expect(printed).toContain("@Alexis Rivera");
+    expect(printed).not.toContain("Alex Old");
   });
 });
