@@ -110,8 +110,10 @@ describe("MachineTagEditor", () => {
     expect(await within(panel).findByRole("alert")).toHaveTextContent(
       "Not allowed"
     );
+    // The alert can commit before the transition that undoes the optimistic
+    // change, so wait for the rollback itself.
     expect(
-      within(panel).getByRole("checkbox", { name: "Topper, 3 machines" })
+      await within(panel).findByRole("checkbox", { name: "Topper, 3 machines" })
     ).toBeChecked();
   });
 
