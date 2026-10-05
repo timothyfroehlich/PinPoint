@@ -1,11 +1,14 @@
 import { cache } from "react";
 import { getViewer } from "~/lib/collections/viewer";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
+import { moveConflicts, typesWithTagName } from "~/lib/tags/conflicts";
 import {
   getTagPickerMachines,
+  listTags,
   resolveTag,
   type ResolvedTag,
 } from "~/lib/tags/tags";
+import type { TagConflictMachine } from "~/lib/tags/types";
 import { db } from "~/server/db";
 
 /**
@@ -112,6 +115,84 @@ export const getTagEditor = cache(
       currentIds: tag.machines.map((machine) => machine.id),
       otherTagByMachine,
       parentHref: group.kind === "hand" ? group.type.href : "/c/tags",
+    };
+  }
+);
+
+/** One place a hand-applied tag can move to (spec 11.16). */
+export interface TagMoveDestination {
+  /** A hand-applied tag type's id, or null for no tag type. */
+  id: string | null;
+  /** The tag type's name; unused for no tag type. */
+  name: string;
+  exclusive: boolean;
+  /** Another tag there already has this tag's name. */
+  nameTaken: boolean;
+  /** In an exclusive type: machines that would hold two of its tags. */
+  conflicts: TagConflictMachine[];
+}
+
+/** What the tag's Move dialog needs, so it can validate as a type is picked. */
+export interface TagMove {
+  tagId: string;
+  tagName: string;
+  /** The tag's tag type, or null when it has none. */
+  typeId: string | null;
+  typeName: string | null;
+  machineCount: number;
+  /** No tag type first, then each hand-applied tag type by name (11.14). */
+  destinations: TagMoveDestination[];
+}
+
+/**
+ * The Move dialog's props for a hand-applied tag's page when the viewer may
+ * manage tags, else null. The action checks all of this again (11.16).
+ */
+export const getTagMove = cache(
+  async (type: string, slug: string): Promise<TagMove | null> => {
+    const resolved = await getTagForLayout(type, slug);
+    if (resolved?.tag.kind !== "hand") return null;
+    const viewer = await getViewer();
+    if (!checkPermission("tags.manage", getAccessLevel(viewer.role))) {
+      return null;
+    }
+    const { tag, group } = resolved;
+    const [groups, taken, conflicts] = await Promise.all([
+      listTags(),
+      typesWithTagName(db, tag.id),
+      moveConflicts(db, tag.id),
+    ]);
+    const destinations: TagMoveDestination[] = [
+      {
+        id: null,
+        name: "",
+        exclusive: false,
+        nameTaken: taken.has(null),
+        conflicts: [],
+      },
+      ...groups.flatMap((candidate): TagMoveDestination[] =>
+        candidate.kind === "hand"
+          ? [
+              {
+                id: candidate.type.id,
+                name: candidate.type.name,
+                exclusive: candidate.type.exclusive,
+                nameTaken: taken.has(candidate.type.id),
+                conflicts: candidate.type.exclusive
+                  ? (conflicts.get(candidate.type.id) ?? [])
+                  : [],
+              },
+            ]
+          : []
+      ),
+    ];
+    return {
+      tagId: tag.id,
+      tagName: tag.name,
+      typeId: tag.typeId,
+      typeName: group.kind === "hand" ? group.type.name : null,
+      machineCount: tag.machineCount,
+      destinations,
     };
   }
 );

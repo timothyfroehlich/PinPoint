@@ -9,6 +9,7 @@ import type { ResolvedTag } from "~/lib/tags/tags";
 import {
   getTagEditor,
   getTagForLayout,
+  getTagMove,
 } from "~/app/(app)/c/tags/[type]/[slug]/_data";
 
 interface TagParams {
@@ -42,9 +43,10 @@ export default async function TagLayout({
   params,
 }: TagParams & { children: React.ReactNode }): Promise<React.JSX.Element> {
   const { type, slug } = await params;
-  const [resolved, editor] = await Promise.all([
+  const [resolved, editor, move] = await Promise.all([
     getTagForLayout(type, slug),
     getTagEditor(type, slug),
+    getTagMove(type, slug),
   ]);
   if (!resolved) notFound();
   const { tag } = resolved;
@@ -56,7 +58,7 @@ export default async function TagLayout({
       machines={tag.machines}
       basePath={tag.href}
       action={
-        editor ? (
+        editor && move ? (
           <div className="flex items-center gap-2">
             <EditTagMachinesDialog {...editor} />
             <TagActionsMenu
@@ -64,6 +66,7 @@ export default async function TagLayout({
               name={editor.tagName}
               machineCount={editor.currentIds.length}
               parentHref={editor.parentHref}
+              move={move}
             />
           </div>
         ) : null

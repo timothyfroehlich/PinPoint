@@ -318,7 +318,7 @@ export async function deleteTestMachine(machineId: string) {
 }
 
 /** A tag name's slug, in the format the tags tables' CHECK constraints require. */
-function testTagSlug(name: string): string {
+export function testTagSlug(name: string): string {
   return name
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
@@ -333,7 +333,14 @@ function testTagSlug(name: string): string {
  */
 export async function createTestTagType(
   name: string,
-  options: { exclusive: boolean; tags: string[] }
+  options: {
+    exclusive: boolean;
+    /**
+     * Tag names, or a name with its own slug: slugs are unique across every
+     * tag, so a second tag sharing a name with one in another type needs one.
+     */
+    tags: (string | { name: string; slug: string })[];
+  }
 ): Promise<void> {
   const { data: type, error: typeError } = await supabaseAdmin
     .from("tag_types")
@@ -341,16 +348,54 @@ export async function createTestTagType(
     .select("id")
     .single<{ id: string }>();
   if (typeError) throw typeError;
+  if (options.tags.length === 0) return;
 
   const { error: tagsError } = await supabaseAdmin.from("tags").insert(
-    options.tags.map((tagName) => ({
-      tag_type_id: type.id,
-      type_exclusive: options.exclusive,
-      slug: testTagSlug(tagName),
-      name: tagName,
-    }))
+    options.tags.map((tag) => {
+      const { name: tagName, slug } =
+        typeof tag === "string" ? { name: tag, slug: testTagSlug(tag) } : tag;
+      return {
+        tag_type_id: type.id,
+        type_exclusive: options.exclusive,
+        slug,
+        name: tagName,
+      };
+    })
   );
   if (tagsError) throw tagsError;
+}
+
+/**
+ * Apply hand-applied tags to a machine directly in the database. Each tag is
+ * found by the slug its name derives (see {@link createTestTagType}).
+ */
+export async function addTestMachineTags(
+  machineId: string,
+  tagNames: string[]
+): Promise<void> {
+  const { data: rows, error: tagsError } = await supabaseAdmin
+    .from("tags")
+    .select("id, tag_type_id, type_exclusive")
+    .in("slug", tagNames.map(testTagSlug))
+    .returns<
+      { id: string; tag_type_id: string | null; type_exclusive: boolean }[]
+    >();
+  if (tagsError) throw tagsError;
+  if (rows.length !== tagNames.length) {
+    throw new Error(
+      `Expected ${String(tagNames.length)} tags, found ${String(rows.length)}`
+    );
+  }
+
+  const { error } = await supabaseAdmin.from("machine_tags").insert(
+    rows.map((tag) => ({
+      machine_id: machineId,
+      tag_id: tag.id,
+      tag_type_id: tag.tag_type_id,
+      type_exclusive: tag.type_exclusive,
+    }))
+  );
+  if (error) throw error;
 }
 
 /**
