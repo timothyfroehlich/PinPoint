@@ -562,3 +562,34 @@
 .apron-sheet__mark.is-bottom-right-v {
   right: 0;
 }
+
+/* Batch print list (spec §12.2): a schematic of the card's template, the
+ * panel or band dark on white paper, the way the printed card reads. */
+.apron-thumb {
+  position: relative;
+  flex-shrink: 0;
+  width: 64px;
+  height: 36px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: #ffffff;
+  /* The panel is as dark as the page; the outline keeps the card's edge. */
+  box-shadow: 0 0 0 1px #52525b;
+}
+
+.apron-thumb__panel {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  background: #0f0f11;
+}
+
+.apron-thumb.is-side-rail .apron-thumb__panel {
+  width: 28%;
+}
+
+.apron-thumb.is-header-band .apron-thumb__panel {
+  inset: 0 0 auto 0;
+  width: auto;
+  height: 30%;
+}

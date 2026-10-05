@@ -9,7 +9,10 @@
  * - a member who cannot edit the machine gets Preview and Export only, and
  *   Export prints the chosen card;
  * - Export marks a saved card that does not fit and needs the override;
- * - a signed-out visitor gets no tab and cannot print.
+ * - a signed-out visitor gets no tab and cannot print;
+ * - a member opens Print apron cards from the Machines list, picks a card,
+ *   and downloads its size's print file; a card that does not fit needs the
+ *   page's override (§12).
  *
  * The edit-permission split and the save action's rules are covered at the
  * integration layer (src/test/integration/apron-card-actions.test.ts,
@@ -232,5 +235,57 @@ test.describe("Apron card export", () => {
       `/m/${machine.initials}/apron/print?card=${cardId}`
     );
     expect(response?.status()).toBe(404);
+  });
+});
+
+test.describe("Print apron cards", () => {
+  test.use({ storageState: STORAGE_STATE.member });
+
+  let fits: { id: string; initials: string; name: string };
+  let overflows: { id: string; initials: string; name: string };
+
+  test.beforeEach(async () => {
+    const ownerId = await getProfileIdByEmail(TEST_USERS.admin.email);
+    fits = await createTestMachine(ownerId);
+    overflows = await createTestMachine(ownerId);
+    await seedSavedApronCard(fits.id, {
+      description: "Shoot the ramps to light the lock.",
+    });
+    await seedSavedApronCard(overflows.id, { description: LONG_TEXT });
+  });
+
+  test.afterEach(async () => {
+    await deleteTestMachine(fits.id).catch(() => undefined);
+    await deleteTestMachine(overflows.id).catch(() => undefined);
+  });
+
+  test("downloads a size's print file and needs the override for a card that does not fit", async ({
+    page,
+  }) => {
+    await page.goto("/m");
+    await page.getByRole("link", { name: "Print apron cards" }).click();
+    await expect(page).toHaveURL("/m/apron-cards");
+
+    const search = page.getByRole("searchbox", { name: "Search machines" });
+    await search.fill(fits.name);
+    const card = page.getByRole("checkbox", { name: fits.name });
+    await expect(card).toBeEnabled();
+    await card.check();
+
+    const run = page.getByRole("complementary", { name: "Print run" });
+    await expect(run.getByText("1 card · 6 per sheet")).toBeVisible();
+    await expect(run.getByText("5 spare copies")).toBeVisible();
+
+    const download = page.waitForEvent("download");
+    await run.getByRole("button", { name: "Download 1 PDF" }).click();
+    expect((await download).suggestedFilename()).toBe("apron-cards-stern.pdf");
+
+    // A card that does not fit is offered only with the override (§12.3).
+    await search.fill(overflows.name);
+    const tooLong = page.getByRole("checkbox", { name: overflows.name });
+    await expect(page.getByText("Doesn't fit")).toBeVisible();
+    await expect(tooLong).toBeDisabled();
+    await run.getByLabel("Include cards that don't fit").check();
+    await expect(tooLong).toBeEnabled();
   });
 });
