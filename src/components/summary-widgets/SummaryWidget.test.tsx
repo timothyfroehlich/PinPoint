@@ -43,7 +43,6 @@ function widget({
     <SummaryWidget
       id="test-widget"
       label="Status"
-      headline={{ figure: 4, text: "up", accentClassName: "text-success" }}
       segments={widgetSegments}
       selectedValue={selectedValue}
       onSegmentSelect={onSegmentSelect}

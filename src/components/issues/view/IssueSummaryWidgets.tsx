@@ -50,17 +50,9 @@ interface IssueSummaryWidgetsProps {
   controller?: SummaryWidgetsController | undefined;
 }
 
-function plural(count: number, singular: string, pluralForm: string): string {
-  return count === 1 ? singular : pluralForm;
-}
-
 /** The value a filter holds when it holds exactly one value, else null. */
 function soleValue<T>(values: readonly T[]): T | null {
   return values.length === 1 ? (values[0] ?? null) : null;
-}
-
-function machinesText(count: number): string {
-  return `open across ${count} ${plural(count, "machine", "machines")}`;
 }
 
 /** The Summary Row: the open total and the Unplayable count (issue-widgets §2.4). */
@@ -135,11 +127,6 @@ export function IssueSummaryWidgets({
       <SummaryWidget
         id="issue-widget-status"
         label="Status"
-        headline={{
-          figure: summary.open,
-          text: `open of ${summary.total} ${plural(summary.total, "issue", "issues")}`,
-          accentClassName: STATUS_CONFIG.new.iconColor,
-        }}
         segments={statusSegments}
         selectedValue={soleValue(state.status)}
         onSegmentSelect={(value) =>
@@ -149,11 +136,6 @@ export function IssueSummaryWidgets({
       <SummaryWidget
         id="issue-widget-severity"
         label="Severity"
-        headline={{
-          figure: summary.open,
-          text: machinesText(summary.machinesWithOpenIssues),
-          accentClassName: "text-warning",
-        }}
         segments={severitySegments}
         selectedValue={soleValue(state.severity)}
         onSegmentSelect={(value) =>
@@ -163,11 +145,6 @@ export function IssueSummaryWidgets({
       <SummaryWidget
         id="issue-widget-priority"
         label="Priority"
-        headline={{
-          figure: summary.open,
-          text: machinesText(summary.machinesWithOpenIssues),
-          accentClassName: PRIORITY_CONFIG.high.iconColor,
-        }}
         segments={prioritySegments}
         selectedValue={soleValue(state.priority)}
         onSegmentSelect={(value) =>

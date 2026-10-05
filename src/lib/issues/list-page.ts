@@ -1,13 +1,4 @@
-import {
-  and,
-  count,
-  countDistinct,
-  eq,
-  exists,
-  inArray,
-  sql,
-  type SQL,
-} from "drizzle-orm";
+import { and, count, eq, exists, inArray, sql, type SQL } from "drizzle-orm";
 import { db } from "~/server/db";
 import { issues, machines } from "~/server/db/schema";
 import { getUnifiedUsers } from "~/lib/users/queries";
@@ -62,7 +53,7 @@ const OPEN_STATUS_SET: ReadonlySet<string> = new Set(OPEN_STATUSES);
  * Summary Widget counts for an issue list (issue-widgets §2–§5): every issue,
  * open or closed, on the host's On the Floor machines (§2.2), whatever search
  * and filters the list carries (widgets §3.1). On a group Issues tab those are
- * the group's On the Floor machines. Two grouped queries, so no issue rows
+ * the group's On the Floor machines. One grouped query, so no issue rows
  * leave the database (widgets §4.2).
  */
 async function loadIssueListSummary(
@@ -89,27 +80,19 @@ async function loadIssueListSummary(
         : sql`false`
     );
   }
-  const [groups, machineRows] = await Promise.all([
-    db
-      .select({
-        status: issues.status,
-        severity: issues.severity,
-        priority: issues.priority,
-        value: count(),
-      })
-      .from(issues)
-      .where(and(...where))
-      .groupBy(issues.status, issues.severity, issues.priority),
-    db
-      .select({ value: countDistinct(issues.machineInitials) })
-      .from(issues)
-      .where(and(...where, inArray(issues.status, [...OPEN_STATUSES]))),
-  ]);
+  const groups = await db
+    .select({
+      status: issues.status,
+      severity: issues.severity,
+      priority: issues.priority,
+      value: count(),
+    })
+    .from(issues)
+    .where(and(...where))
+    .groupBy(issues.status, issues.severity, issues.priority);
 
   const counts: IssueListSummary = {
-    total: 0,
     open: 0,
-    machinesWithOpenIssues: machineRows[0]?.value ?? 0,
     byStatus: {
       new: 0,
       confirmed: 0,
@@ -127,7 +110,6 @@ async function loadIssueListSummary(
     byPriority: { low: 0, medium: 0, high: 0 },
   };
   for (const group of groups) {
-    counts.total += group.value;
     counts.byStatus[group.status] += group.value;
     if (!OPEN_STATUS_SET.has(group.status)) continue;
     counts.open += group.value;

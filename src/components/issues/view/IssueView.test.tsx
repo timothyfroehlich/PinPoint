@@ -104,9 +104,7 @@ function result(overrides: Partial<IssueViewResult> = {}): IssueViewResult {
     rows: [row()],
     totalCount: 1,
     summary: {
-      total: 1,
       open: 1,
-      machinesWithOpenIssues: 1,
       byStatus: {
         new: 1,
         confirmed: 0,

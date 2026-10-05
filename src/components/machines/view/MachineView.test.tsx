@@ -121,7 +121,6 @@ function result(overrides: Partial<MachineViewResult> = {}): MachineViewResult {
     totalCount: 1,
     summary: {
       presence: {
-        total: 3,
         byPresence: {
           on_the_floor: 2,
           off_the_floor: 0,
@@ -379,7 +378,7 @@ describe("MachineView", () => {
     );
   });
 
-  it("lists Segments in spec order and shows the Playability headline as the Summary Row", () => {
+  it("lists Segments in spec order and shows the playable figure as the Summary Row (machine-widgets §2.4)", () => {
     renderView();
     const names = (widget: string): (string | null)[] =>
       within(screen.getByRole("region", { name: widget }))

@@ -91,9 +91,7 @@ describe("issue list Summary Widget counts", () => {
     // skipping CC (off the floor) and DD (removed).
     expect(totalCount).toBe(0);
     expect(summary).toEqual({
-      total: 3,
       open: 2,
-      machinesWithOpenIssues: 2,
       byStatus: {
         new: 1,
         confirmed: 0,
@@ -121,9 +119,7 @@ describe("issue list Summary Widget counts", () => {
 
     // The group holds AA, CC, and DD; only AA is on the floor. The tab's
     // machine filter (BB) never narrows or widens the widgets.
-    expect(summary.total).toBe(2);
     expect(summary.open).toBe(1);
-    expect(summary.machinesWithOpenIssues).toBe(1);
     expect(summary.bySeverity).toEqual({
       cosmetic: 0,
       minor: 0,

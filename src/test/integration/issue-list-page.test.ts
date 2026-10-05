@@ -156,7 +156,11 @@ describe("issue list page: sorting and comment counts", () => {
         { isAdmin: false, scopeMachineInitials: scope }
       );
       expect(totalCount).toBe(issuesList.length);
-      if (scope.length === 0) expect(summary.total).toBe(0);
+      if (scope.length === 0) {
+        expect(Object.values(summary.byStatus).every((n) => n === 0)).toBe(
+          true
+        );
+      }
       return issuesList.map((i) =>
         formatIssueId(i.machineInitials, i.issueNumber)
       );

@@ -93,8 +93,7 @@ export type MachinePresenceWidgetStatus = Exclude<
  */
 export interface MachineViewSummary {
   presence: {
-    /** Machines in the scope other than Removed ones (§3.1). */
-    total: number;
+    /** Removed machines are not counted (§3.2). */
     byPresence: Record<MachinePresenceWidgetStatus, number>;
   };
   playability: {

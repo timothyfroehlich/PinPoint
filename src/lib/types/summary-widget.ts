@@ -6,12 +6,8 @@ import type { IssuePriority, IssueSeverity, IssueStatus } from "./database";
  * On the Floor machines (§2.2).
  */
 export interface IssueListSummary {
-  /** Every issue in the population, open or closed. */
-  total: number;
   /** Open issues in the population. */
   open: number;
-  /** Distinct machines with at least one open issue. */
-  machinesWithOpenIssues: number;
   /** Issues of each status; closed statuses included. */
   byStatus: Record<IssueStatus, number>;
   /** Open issues of each severity. */

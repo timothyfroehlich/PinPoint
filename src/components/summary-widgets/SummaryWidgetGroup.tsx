@@ -3,11 +3,7 @@
 import * as React from "react";
 import { ChevronDown } from "lucide-react";
 import { cn } from "~/lib/utils";
-import {
-  SIDE_BY_SIDE_LAYOUT,
-  type SummaryWidgetCount,
-  SummaryWidgetLayoutContext,
-} from "./layout";
+import { SIDE_BY_SIDE_LAYOUT, type SummaryWidgetCount } from "./layout";
 
 /**
  * Until the person chooses, CSS opens the stacked section on screens at least
@@ -164,9 +160,8 @@ interface SummaryWidgetGroupProps {
  * control. Everywhere else, phones included, they stack full-width in one
  * collapsible section headed by the Summary Row; the person's choice is
  * remembered per host in this browser, never in the URL or a Saved View
- * (§2.6), and never hides side-by-side widgets. The widgets read the same
- * side-by-side condition from context, so the headline and breakdown follow
- * it (§5.1, §5.7).
+ * (§2.6), and never hides side-by-side widgets. Each widget lays out the
+ * same way in either arrangement (§5.7).
  */
 export function SummaryWidgetGroup({
   storageKey,
@@ -240,9 +235,7 @@ export function SummaryWidgetGroup({
             layout.grid
           )}
         >
-          <SummaryWidgetLayoutContext.Provider value={layout}>
-            {children}
-          </SummaryWidgetLayoutContext.Provider>
+          {children}
         </div>
       </div>
     </div>

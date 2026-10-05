@@ -33,6 +33,11 @@ function ids(result: IssueViewResult): string[] {
   );
 }
 
+/** Every issue the widgets count, open or closed (issue-widgets §2.2). */
+function counted(result: IssueViewResult): number {
+  return Object.values(result.summary.byStatus).reduce((a, b) => a + b, 0);
+}
+
 function load(query: string, scope?: string[]): Promise<IssueViewResult> {
   return loadIssueView({ searchParams: new URLSearchParams(query), scope });
 }
@@ -129,14 +134,14 @@ describe("loadIssueView", () => {
       name: "Bravo",
     });
     // The widgets still count the tab's scope (issue-widgets §2.1).
-    expect(result.summary.total).toBe(2);
+    expect(counted(result)).toBe(2);
   });
 
   it("counts nothing for a group with no machines, yet loads (issue-widgets §2.1)", async () => {
     const result = await load("", []);
     expect(result.rows).toEqual([]);
     expect(result.totalCount).toBe(0);
-    expect(result.summary.total).toBe(0);
+    expect(counted(result)).toBe(0);
     expect(result.machineOptions).toEqual([]);
   });
 

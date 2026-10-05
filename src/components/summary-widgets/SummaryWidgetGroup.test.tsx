@@ -31,11 +31,6 @@ function widget(index: number): React.JSX.Element {
       key={index}
       id={`widget-${index}`}
       label={`Widget ${index}`}
-      headline={{
-        figure: 2,
-        text: `up in widget ${index}`,
-        accentClassName: "text-success",
-      }}
       segments={SEGMENTS}
       selectedValue={null}
       onSegmentSelect={vi.fn()}
@@ -159,7 +154,7 @@ describe("SummaryWidgetGroup", () => {
 });
 
 /**
- * Stacked versus side by side (widgets §2.3, §2.4, §5.1, §5.7). jsdom has no
+ * Stacked versus side by side (widgets §2.3, §2.4, §5.7). jsdom has no
  * layout, so the CSS classes that switch at the side-by-side container query
  * are the observable contract; the base classes are the stacked layout, at
  * every width.
@@ -197,30 +192,24 @@ describe.each(SIDE_BY_SIDE)(
       expect(content()).toHaveClass("hidden", `${sideBySide}:grid`);
     });
 
-    it("shows each headline only side by side, and moves the breakdown under the bar there", () => {
+    it("keeps the breakdown on the label line and the bar beneath it, stacked or side by side", () => {
       renderGroup(widgetCount);
 
       for (let i = 1; i <= widgetCount; i += 1) {
         const region = screen.getByRole("region", { name: `Widget ${i}` });
-        const headline = within(region).getByText(`up in widget ${i}`);
         const breakdown = within(region).getByRole("button", {
           name: "1 Down",
         }).parentElement;
-        const [label, ...rest] = Array.from(region.children);
-        const bar = rest.find((child) => child.hasAttribute("aria-hidden"));
+        const [label, bar] = Array.from(region.children);
 
-        // DOM order stays label, headline, bar, breakdown for screen readers.
-        expect(Array.from(region.children)).toEqual([
-          label,
-          headline,
-          bar,
-          breakdown,
-        ]);
-        // display:none while stacked, so it is not announced either.
-        expect(headline).toHaveClass("hidden", `${sideBySide}:block`);
-        // Stacked: breakdown on the label line, bar beneath it.
-        expect(breakdown).toHaveClass("order-2", `${sideBySide}:order-4`);
-        expect(bar).toHaveClass("order-4", `${sideBySide}:order-3`);
+        // DOM order stays label, bar, breakdown for screen readers.
+        expect(Array.from(region.children)).toEqual([label, bar, breakdown]);
+        expect(bar).toHaveAttribute("aria-hidden", "true");
+        // Flex order puts the breakdown on the label line, the bar beneath.
+        expect(breakdown).toHaveClass("order-2");
+        expect(bar).toHaveClass("order-4");
+        // Nothing in a widget switches at the side-by-side query (§5.1, §5.7).
+        expect(region.outerHTML).not.toContain(sideBySide);
       }
     });
   }
