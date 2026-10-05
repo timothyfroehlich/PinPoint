@@ -98,6 +98,19 @@
 - **11.6** The Apron card tab shows one saved card at a time, with a control to switch between them. Switching keeps unsaved edits to every card; saving the tab saves all of them.
 - **11.7** Adding, renaming, or deleting a saved card requires the machine-management capability (§3.6).
 
+## 12. Batch printing
+
+- **12.1** A member can open a Print apron cards page from the Machines list. It requires the same signed-in membership as exporting one card (§9.3).
+- **12.2** The page lists every saved card of every machine that is not Removed, grouped by apron size. A person selects cards one at a time or a whole size group at once, and can narrow the list by machine name.
+- **12.3** A card that does not fit is listed and marked. It can be selected only while an explicit override on the page is ticked; the override is not saved (§9.5).
+- **12.4** The page shows, for each apron size with a selected card, the number of selected cards, cards per sheet, sheets, and empty positions, and the total number of files and sheets.
+- **12.5** Downloading produces one print file per apron size with a selected card. Every sheet in a file holds only that size's cards in the same grid, so the file's printed stack can be cut together. Cards print at their exact dimensions (§9.2).
+- **12.6** A person chooses the paper, 11 × 17 in (the default) or 8.5 × 11 in, and the printer's edge margin, 4 mm (the default) or ¼ in. Cards per sheet follow from the paper, the margin, and the apron size.
+- **12.7** Neighbouring cards on a sheet sit edge to edge and share one cut wherever their touching edges print the same; a card may print upside down to make that happen. Cards are separated by a gap only where one card's bleed would otherwise print onto its neighbour.
+- **12.8** Empty positions on a file's last sheet are filled with spare copies of that file's cards, unless the person turns spares off.
+- **12.9** Each sheet prints a short mark at the sheet edge on every cut line, and a line outside the cards naming the apron size and the sheet's number in its file.
+- **12.10** Downloading also offers an order sheet for the print shop: the paper, full color, single-sided, actual-size printing with no fit-to-page, and for each file its sheet count, card count, and cut positions measured from the sheet's left and top edges, in cutting order.
+
 ## Known divergences
 
 | Requirement | Current implementation gap |
@@ -108,6 +121,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-04 | Added §12 Batch printing: a Print apron cards page selects saved cards across machines and downloads one N-up print file per apron size, plus an order sheet for the print shop. |
 | 2026-10-04 | Apron sizes: Stern/SPIKE becomes Stern / Data East / Sega and WPC becomes Williams / WPC; adds Bally solid state, Bally EM, Gottlieb EM, and Williams EM (§1, §4.1). |
 | 2026-10-03 | Card templates: each saved card chooses Standard, Side rail, or Header band; the two new templates give description and tip more room and show no credits (§1, §2.3, §3.1, §3.6, §5.1–§5.7, §6.5, §10.2, §10.5). |
 | 2026-10-02 | Card editing moves from the machine form to its own Apron card tab with its own Save; the New Machine page has no card; the Service tab thumbnail is replaced by the tab (§3.1–3.5, §3.8, §11.6). |
