@@ -21,7 +21,7 @@ The server admits an OAuth token only when its `client_id` is an enabled row in 
 
 6. In claude.ai, disconnect and reconnect the connector so the next token carries the MCP audience. Call `whoami`: `authMode` is `oauth` and `clientId` is the id from step 4.
 7. If you turned DCR on in step 1, turn it off.
-8. In the connector's settings, set the read tools (`whoami`, `list_machines`, `get_machine`, `list_issues`, `get_issue`, `search_pinballmap_catalog`) to always allow and every other tool to ask before running. This is the client-side gate under the skill's confirmation rule.
+8. In the connector's settings, set the read tools (`whoami`, `list_machines`, `get_machine`, `list_issues`, `get_issue`, `search_pinballmap_catalog`, `list_settings_sets`) to always allow and every other tool to ask before running. This is the client-side gate under the skill's confirmation rule.
 
 ## Claude Code
 
