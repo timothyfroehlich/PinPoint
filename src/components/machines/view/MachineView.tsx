@@ -258,6 +258,9 @@ export function MachineView({
   });
 
   function resetFilters(): void {
+    // Like each filter's Reset (list-views §4.9), nothing happens at the
+    // Page Preset: no page change and no navigation.
+    if (filters.every((filter) => filter.atPreset)) return;
     update({
       presence: defaults.presence,
       status: defaults.status,

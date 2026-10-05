@@ -124,16 +124,16 @@ export function ListView({
   // discarded); the search field is keyed on it.
   const [searchEpoch, setSearchEpoch] = React.useState(0);
   // A Save changes failure belongs to the view and configuration it was made
-  // from. Any change after it clears it for good, so returning to that
-  // configuration never shows it again without a new attempt.
+  // from. Any change clears it for good, and a failure that arrives after the
+  // person has moved on is dropped, so it never shows again without a new
+  // attempt.
   const viewKey = `${views.appliedId}:${views.configurationKey}`;
-  const [saveFailure, setSaveFailure] = React.useState<{
-    message: string;
-    viewKey: string;
-  } | null>(null);
-  React.useEffect(() => setSaveFailure(null), [viewKey]);
-  const saveError =
-    saveFailure?.viewKey === viewKey ? saveFailure.message : null;
+  const currentViewKey = React.useRef(viewKey);
+  const [saveError, setSaveError] = React.useState<string | null>(null);
+  React.useLayoutEffect(() => {
+    currentViewKey.current = viewKey;
+    setSaveError(null);
+  }, [viewKey]);
   const [isSaving, startSaving] = React.useTransition();
   const range = getPageRange(
     pagination.page,
@@ -143,16 +143,18 @@ export function ListView({
   const empty = pagination.totalCount === 0;
 
   function saveChanges(): void {
-    setSaveFailure(null);
+    setSaveError(null);
+    const savedFrom = viewKey;
     startSaving(async () => {
       const result = await views.actions.saveChanges();
-      if (!result.ok) setSaveFailure({ message: result.message, viewKey });
+      if (!result.ok && currentViewKey.current === savedFrom) {
+        setSaveError(result.message);
+      }
     });
   }
 
   function moveWhole(): void {
     setSearchEpoch((epoch) => epoch + 1);
-    setSaveFailure(null);
   }
   const listViews: ListViewsModel = {
     ...views,
