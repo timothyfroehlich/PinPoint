@@ -223,7 +223,10 @@ export function QuickSearchProvider({
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
-      if (event.key.toLowerCase() === "k" && (event.metaKey || event.ctrlKey)) {
+      // Compare without calling a method: Chrome autofill dispatches keydown
+      // events whose `key` is undefined despite the KeyboardEvent type.
+      const isK = event.key === "k" || event.key === "K";
+      if (isK && (event.metaKey || event.ctrlKey)) {
         event.preventDefault();
         const desktopInput = desktopInputRef.current;
         const desktopInputVisible =
