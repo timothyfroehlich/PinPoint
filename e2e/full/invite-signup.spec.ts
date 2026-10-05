@@ -14,6 +14,7 @@ import {
   ensureLoggedIn,
   logout,
   openMachineManageTab,
+  selectOwnerBySearch,
 } from "../support/actions.js";
 import { cleanupTestEntities } from "../support/cleanup.js";
 import { seededMachines, TEST_USERS } from "../support/constants.js";
@@ -141,7 +142,10 @@ test.describe("User Invitation & Signup Flow", () => {
     await page.goto("/m/new");
     await page.getByRole("button", { name: /Invite New/i }).click();
     await page.getByLabel(/First Name/i).fill("Owner");
-    await page.getByLabel(/Last Name/i).fill("Transfer");
+    // Unique last name: chromium, Mobile Chrome and firefox run this test
+    // against one database, and the owner search below must match one user.
+    const lastName = `Transfer${testId}`;
+    await page.getByLabel(/Last Name/i).fill(lastName);
     await page.getByRole("textbox", { name: "Email" }).fill(userEmail);
 
     const inviteCheckbox = page.getByRole("checkbox", {
@@ -165,17 +169,20 @@ test.describe("User Invitation & Signup Flow", () => {
     await expect(page).toHaveURL(/\/edit$/);
 
     // Ownership lives in the Danger zone behind a disclosure (PP-o355.19).
-    await page.getByTestId("open-owner-transfer").click();
-
-    // Click the owner dropdown and select the invited user (shown with
-    // "(INVITED)" suffix). Invited users are hidden by default — toggle the
-    // checkbox to reveal them.
+    // The click can land before React attaches the handler after the tab
+    // navigation, so re-issue it until the owner dropdown mounts (PP-2b3r).
     const ownerSelect = page.getByTestId("owner-select");
+    await expect(async () => {
+      if (!(await ownerSelect.isVisible())) {
+        await page.getByTestId("open-owner-transfer").click();
+      }
+      await expect(ownerSelect).toBeVisible({ timeout: 3000 });
+    }).toPass({ timeout: 30_000 });
+
+    // Open the owner dropdown and pick the invited user by search, which also
+    // reaches invited users without the "Show guests and invited users" toggle.
     await ownerSelect.click();
-    await page.getByLabel(/Show guests and invited users/i).click();
-    await page
-      .getByRole("option", { name: /Owner Transfer.*\(Invited\)/i })
-      .click();
+    await selectOwnerBySearch(page, `Owner ${lastName}`);
 
     await page.getByRole("button", { name: /^Transfer ownership$/ }).click();
     await expect(page.getByTestId("open-owner-transfer")).toBeVisible({
