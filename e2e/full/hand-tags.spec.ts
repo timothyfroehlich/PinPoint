@@ -9,6 +9,11 @@
  * and exclusivity rules are covered in src/test/integration/tag-actions.test.ts
  * and hand-tags.test.ts.
  *
+ * Changing a tag type's one-per-machine setting and moving a tag between tag
+ * types (PP-wqit.4, §11.7 and §11.16) are covered as journeys too: each
+ * dialog reads what blocks it when the page renders, so the tests clear or
+ * create the blocker on one page and check the dialog on the next.
+ *
  * Isolation: tag types, tags, and machines that a test changes are created per
  * run and removed in afterAll; the read-only checks use seeded tags and
  * machines and never mutate them.
@@ -22,13 +27,20 @@ import {
 import { STORAGE_STATE } from "../support/auth-state.js";
 import { seededMachines, TEST_USERS } from "../support/constants.js";
 import {
+  addTestMachineTags,
   createTestMachine,
   createTestTagType,
   deleteTestMachine,
   deleteTestTagType,
   getProfileIdByEmail,
+  testTagSlug,
 } from "../support/supabase-admin.js";
 import { getTestPrefix } from "../support/test-isolation.js";
+
+/** A machine-editor tag row's accessible name reads "<name>, <count> machines". */
+function tagRow(name: string): RegExp {
+  return new RegExp(`^${name},`);
+}
 
 test.describe("Hand-applied tags", () => {
   test.describe("technician", () => {
@@ -202,11 +214,6 @@ test.describe("Machine tag editor", () => {
   const desktop = { width: 1280, height: 800 };
   /** Admin-owned and carries seeded hand-applied tags (seed-tags.mjs). */
   const seededInitials = seededMachines.medievalMadness.initials;
-
-  /** A tag row's accessible name reads "<name>, <count> machines". */
-  function tagRow(name: string): RegExp {
-    return new RegExp(`^${name},`);
-  }
 
   test.describe("technician", () => {
     test.use({ storageState: STORAGE_STATE.technician, viewport: desktop });
@@ -405,6 +412,269 @@ test.describe("Machine tag editor", () => {
       await assertNoA11yViolations(page);
       await sheet.getByRole("button", { name: "Done" }).click();
       await expect(sheet).toBeHidden();
+    });
+  });
+});
+
+test.describe("Tag type changes", () => {
+  test.use({
+    storageState: STORAGE_STATE.technician,
+    viewport: { width: 1280, height: 800 },
+  });
+
+  test.describe("one per machine", () => {
+    const prefix = getTestPrefix();
+    const typeName = `Rack ${prefix}`;
+    const top = `Top ${prefix}`;
+    const low = `Low ${prefix}`;
+    let machine: { id: string; initials: string; name: string } | null = null;
+
+    test.beforeAll(async () => {
+      const ownerId = await getProfileIdByEmail(TEST_USERS.admin.email);
+      const created = await createTestMachine(ownerId);
+      machine = created;
+      await createTestTagType(typeName, { exclusive: false, tags: [top, low] });
+      await addTestMachineTags(created.id, [top, low]);
+    });
+
+    test.afterAll(async () => {
+      await deleteTestTagType(typeName).catch(() => undefined);
+      if (machine) await deleteTestMachine(machine.id).catch(() => undefined);
+    });
+
+    test("is blocked by a machine holding two tags until one is removed, then toggles back", async ({
+      page,
+    }) => {
+      if (!machine) throw new Error("Test machine was not created");
+      const typePath = `/c/tags/${testTagSlug(typeName)}`;
+      const badge = page.getByText("One per machine", { exact: true });
+      const openMenuItem = async (name: string): Promise<void> => {
+        await page.getByRole("button", { name: "Tag type actions" }).click();
+        await page.getByRole("menuitem", { name }).click();
+      };
+      const makeDialog = page.getByRole("alertdialog", {
+        name: `Make ${typeName} one per machine?`,
+      });
+
+      // --- Blocked: the machine holding both tags is named and linked ------
+      await page.goto(typePath);
+      await expect(
+        page.getByRole("heading", { level: 1, name: typeName })
+      ).toBeVisible();
+      await expect(badge).toHaveCount(0);
+      await openMenuItem("Make one per machine");
+      await expect(makeDialog).toBeVisible();
+      await expect(makeDialog.getByRole("alert")).toHaveText(
+        `1 machine has more than one ${typeName} tag`
+      );
+      await expect(
+        makeDialog.getByRole("link", { name: machine.name })
+      ).toHaveAttribute("href", `/m/${machine.initials}`);
+      await expect(
+        makeDialog.getByRole("button", { name: "Make one per machine" })
+      ).toHaveCount(0);
+      await makeDialog.getByRole("button", { name: "Close" }).click();
+      await expect(makeDialog).toBeHidden();
+
+      // --- Clear the blocker from the machine page --------------------------
+      await page.goto(`/m/${machine.initials}`);
+      const tagsCard = page.getByTestId("machine-tags");
+      await tagsCard.getByRole("button", { name: "Edit tags" }).click();
+      const editor = page.getByRole("dialog", { name: "Edit tags" });
+      await editor.getByRole("checkbox", { name: tagRow(low) }).uncheck();
+      await expect(editor.getByRole("status")).toHaveText("Saved");
+      await editor.getByRole("button", { name: "Done" }).click();
+      await expect(editor).toBeHidden();
+      await expect(
+        tagsCard.getByRole("link", { name: low, exact: true })
+      ).toHaveCount(0);
+
+      // --- Now it can be made one per machine -------------------------------
+      await page.goto(typePath);
+      await openMenuItem("Make one per machine");
+      await expect(makeDialog.getByRole("alert")).toHaveCount(0);
+      await makeDialog
+        .getByRole("button", { name: "Make one per machine" })
+        .click();
+      await expect(makeDialog).toBeHidden();
+      await expect(badge).toBeVisible();
+
+      // --- And back to more than one ---------------------------------------
+      await openMenuItem("Allow more than one per machine");
+      const allowDialog = page.getByRole("alertdialog", {
+        name: `Allow more than one ${typeName} tag per machine?`,
+      });
+      await allowDialog
+        .getByRole("button", { name: "Allow more than one" })
+        .click();
+      await expect(allowDialog).toBeHidden();
+      await expect(badge).toHaveCount(0);
+      await page.reload();
+      await expect(
+        page.getByRole("heading", { level: 1, name: typeName })
+      ).toBeVisible();
+      await expect(badge).toHaveCount(0);
+    });
+  });
+
+  test.describe("move a tag", () => {
+    const prefix = getTestPrefix();
+    const fromType = `From ${prefix}`;
+    const toType = `To ${prefix}`;
+    const tagName = `Mv ${prefix}`;
+    let machine: { id: string; initials: string } | null = null;
+
+    test.beforeAll(async () => {
+      const ownerId = await getProfileIdByEmail(TEST_USERS.admin.email);
+      const created = await createTestMachine(ownerId);
+      machine = created;
+      await createTestTagType(fromType, { exclusive: false, tags: [tagName] });
+      await createTestTagType(toType, { exclusive: false, tags: [] });
+      await addTestMachineTags(created.id, [tagName]);
+    });
+
+    test.afterAll(async () => {
+      await deleteTestTagType(fromType).catch(() => undefined);
+      await deleteTestTagType(toType).catch(() => undefined);
+      if (machine) await deleteTestMachine(machine.id).catch(() => undefined);
+    });
+
+    test("moves a tag to another tag type; the old address redirects", async ({
+      page,
+    }) => {
+      if (!machine) throw new Error("Test machine was not created");
+      const oldPath = `/c/tags/${testTagSlug(fromType)}/${testTagSlug(tagName)}`;
+      const newPath = `/c/tags/${testTagSlug(toType)}/${testTagSlug(tagName)}`;
+      const breadcrumb = page.getByRole("navigation", { name: "Breadcrumb" });
+
+      await page.goto(oldPath);
+      await expect(
+        page.getByRole("heading", { level: 1, name: tagName })
+      ).toBeVisible();
+      await expect(
+        breadcrumb.getByRole("link", { name: fromType })
+      ).toBeVisible();
+
+      await page.getByRole("button", { name: "Tag actions" }).click();
+      await page
+        .getByRole("menuitem", { name: "Move to another tag type…" })
+        .click();
+      const dialog = page.getByRole("dialog", { name: `Move ${tagName}` });
+      await expect(dialog).toBeVisible();
+      await expect(
+        dialog.getByText(`Now in ${fromType} · 1 machine`)
+      ).toBeVisible();
+      const move = dialog.getByRole("button", { name: "Move tag" });
+      await expect(move).toBeDisabled();
+      await dialog.getByLabel("Tag type").selectOption({ label: toType });
+      await expect(dialog.getByRole("alert")).toHaveCount(0);
+      await move.click();
+
+      // --- The tag's page now lives under the destination type -------------
+      await expect(page).toHaveURL(new RegExp(`${newPath}$`));
+      await expect(
+        page.getByRole("heading", { level: 1, name: tagName })
+      ).toBeVisible();
+      await expect(
+        breadcrumb.getByRole("link", { name: toType })
+      ).toHaveAttribute("href", `/c/tags/${testTagSlug(toType)}`);
+
+      // --- The old address redirects to the new one ------------------------
+      await page.goto(oldPath);
+      await expect(page).toHaveURL(new RegExp(`${newPath}$`));
+
+      // --- The machine keeps the tag, linked to its new page ---------------
+      await page.goto(`/m/${machine.initials}`);
+      await expect(
+        page
+          .getByTestId("machine-tags")
+          .getByRole("link", { name: tagName, exact: true })
+      ).toHaveAttribute("href", newPath);
+    });
+  });
+
+  test.describe("move blocked", () => {
+    const prefix = getTestPrefix();
+    const sourceType = `Src ${prefix}`;
+    const tagName = `Dup ${prefix}`;
+    const takenType = `Has ${prefix}`;
+    const exclusiveType = `One ${prefix}`;
+    const held = `Own ${prefix}`;
+    let machine: { id: string; initials: string; name: string } | null = null;
+
+    test.beforeAll(async () => {
+      const ownerId = await getProfileIdByEmail(TEST_USERS.admin.email);
+      const created = await createTestMachine(ownerId);
+      machine = created;
+      await createTestTagType(sourceType, {
+        exclusive: false,
+        tags: [tagName],
+      });
+      // Same name in another type; slugs are unique across every tag.
+      await createTestTagType(takenType, {
+        exclusive: false,
+        tags: [{ name: tagName, slug: `${testTagSlug(tagName)}-2` }],
+      });
+      await createTestTagType(exclusiveType, {
+        exclusive: true,
+        tags: [held],
+      });
+      await addTestMachineTags(created.id, [tagName, held]);
+    });
+
+    test.afterAll(async () => {
+      for (const name of [sourceType, takenType, exclusiveType]) {
+        await deleteTestTagType(name).catch(() => undefined);
+      }
+      if (machine) await deleteTestMachine(machine.id).catch(() => undefined);
+    });
+
+    test("refuses a taken name and a machine that would hold two exclusive tags", async ({
+      page,
+    }) => {
+      if (!machine) throw new Error("Test machine was not created");
+      await page.goto(
+        `/c/tags/${testTagSlug(sourceType)}/${testTagSlug(tagName)}`
+      );
+      await page.getByRole("button", { name: "Tag actions" }).click();
+      await page
+        .getByRole("menuitem", { name: "Move to another tag type…" })
+        .click();
+      const dialog = page.getByRole("dialog", { name: `Move ${tagName}` });
+      const select = dialog.getByLabel("Tag type");
+      const move = dialog.getByRole("button", { name: "Move tag" });
+
+      // --- A tag type that already has the name -----------------------------
+      await select.selectOption({ label: takenType });
+      await expect(dialog.getByRole("alert")).toHaveText(
+        `${takenType} already has a tag named ${tagName}`
+      );
+      await expect(move).toBeDisabled();
+
+      // --- An exclusive type the machine already holds a tag of -------------
+      await select.selectOption({
+        label: `${exclusiveType} · one per machine`,
+      });
+      await expect(dialog.getByRole("alert")).toHaveText(
+        `1 machine would hold two ${exclusiveType} tags`
+      );
+      await expect(
+        dialog.getByRole("link", { name: machine.name })
+      ).toHaveAttribute("href", `/m/${machine.initials}`);
+      await expect(dialog.getByText(held, { exact: true })).toBeVisible();
+      await expect(move).toBeDisabled();
+      await assertNoA11yViolations(page);
+
+      // --- The blocked dialog fits the narrowest review viewport ------------
+      await page.setViewportSize({ width: 320, height: 568 });
+      await expect(dialog.getByRole("alert")).toBeVisible();
+      const fit = await dialog.evaluate((element) => ({
+        right: element.getBoundingClientRect().right,
+        overflow: element.scrollWidth - element.clientWidth,
+        viewport: document.documentElement.clientWidth,
+      }));
+      expect(fit.right).toBeLessThanOrEqual(fit.viewport);
+      expect(fit.overflow).toBeLessThanOrEqual(0);
     });
   });
 });
