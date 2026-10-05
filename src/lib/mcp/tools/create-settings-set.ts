@@ -46,7 +46,7 @@ export const createSettingsSetSchema = z.object({
     .boolean()
     .optional()
     .describe(
-      "Publish the set so everyone can see it. Default false: a private draft only you (and admins) can see, to review in the Settings tab first."
+      "Publish the set so everyone can see it. Default false: a private draft only you (and admins) can see, to review in the Settings tab first. Ignored when the set becomes the Owner's default, which is always public."
     ),
   isTournament: z
     .boolean()
@@ -80,7 +80,13 @@ export async function runCreateSettingsSet(
       eq(machineSettingsSets.createdBy, ctx.userId),
       eq(machineSettingsSets.name, payload.name)
     ),
-    columns: { id: true, description: true, sections: true },
+    columns: {
+      id: true,
+      description: true,
+      sections: true,
+      isPublic: true,
+      isTournament: true,
+    },
   });
   const wanted = contentOf(payload.sections);
   const existing = yours.find(
@@ -92,8 +98,11 @@ export async function runCreateSettingsSet(
     return {
       result: {
         created: false,
-        reason: "You already created an identical set on this machine.",
+        reason:
+          "You already created an identical set on this machine. isPublic and isTournament were not applied; change them with update_settings_set.",
         id: existing.id,
+        isPublic: existing.isPublic,
+        isTournament: existing.isTournament,
         machine: machine.initials,
         url: `${machineUrl(machine.initials)}/settings`,
       },
@@ -141,7 +150,7 @@ export function registerCreateSettingsSet(server: McpServer): void {
     {
       title: "Create a settings set",
       description:
-        "Add a settings set to a machine: named, with software adjustment rows (menu code, name, value, plus the baseline install they change from), tables, DIP switch banks, and plain-text notes (e.g. rubbers and post positions). Created as a private draft unless isPublic is true. Call list_settings_sets first so you don't duplicate an existing set. Adds a timeline entry on the machine.",
+        "Add a settings set to a machine: named, with software adjustment rows (menu code, name, value, plus the baseline install they change from), tables, DIP switch banks, and plain-text notes (e.g. rubbers and post positions). Created as a private community draft unless isPublic is true. Exception: when you own the machine, the set is an owner set, and if the machine has no Owner's default yet it becomes the Owner's default and is published. Call list_settings_sets first so you don't duplicate an existing set. Adds a timeline entry on the machine.",
       inputSchema: createSettingsSetSchema,
       annotations: WRITE_TOOL_ANNOTATIONS,
     },

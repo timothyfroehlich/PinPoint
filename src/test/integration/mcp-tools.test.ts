@@ -29,7 +29,11 @@ import {
   timelineEvents,
   userProfiles,
 } from "~/server/db/schema";
-import { docToPlainText, type ProseMirrorDoc } from "~/lib/tiptap/types";
+import {
+  docToPlainText,
+  plainTextToDoc,
+  type ProseMirrorDoc,
+} from "~/lib/tiptap/types";
 import {
   VALID_MACHINE_PRESENCE_STATUSES,
   type MachinePresenceStatus,
@@ -83,6 +87,7 @@ import type { McpMachinePinballmap } from "~/lib/mcp/tools/pinballmap-block";
 import { updateMachineSchema as updateMachineFormSchema } from "~/app/(app)/m/schemas";
 import { updateMachinePbmLink } from "~/services/machines";
 import { REMOVED_MACHINE_REPORT_ERROR } from "~/services/issues";
+import { updateSettingsSet } from "~/services/machine-settings";
 import { runUpdateIssue } from "~/lib/mcp/tools/update-issue";
 import {
   runUpdateSettingsSet,
@@ -4217,6 +4222,8 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       expect(retry.result).toMatchObject({
         created: false,
         id: (first.result as { id: string }).id,
+        isPublic: false,
+        isTournament: false,
       });
       const db = await getTestDb();
       const rows = await db.query.machineSettingsSets.findMany({
@@ -4436,6 +4443,120 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
         )
       ).rejects.toMatchObject({ reason: "invalid" });
       expect((await storedSet(setId)).isPublic).toBe(true);
+    });
+
+    it("lists paragraphs separated by blank lines and writes them back as paragraphs", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine();
+      const setId = await seedSet(machine.id, {
+        createdBy: admin,
+        sections: [
+          {
+            kind: "note",
+            id: "n1",
+            title: "Other",
+            body: plainTextToDoc("Gate left on\n\nEar plug installed"),
+            customTitle: true,
+          },
+        ],
+      });
+
+      const listed = await runListSettingsSets(
+        { machine: machine.initials },
+        ctx("admin", admin)
+      );
+      const { sets } = listed.result as {
+        sets: { sections: { text: string }[] }[];
+      };
+      const text = sets[0]?.sections[0]?.text;
+      expect(text).toBe("Gate left on\n\nEar plug installed");
+
+      await runUpdateSettingsSet(
+        updateSettingsSetSchema.parse({
+          machine: machine.initials,
+          set: setId,
+          sections: [
+            {
+              kind: "note",
+              id: "n1",
+              title: "Other",
+              text: `${text ?? ""}\n\nOutlane posts removed`,
+            },
+          ],
+        }),
+        ctx("admin", admin)
+      );
+
+      const [note] = (await storedSet(setId)).sections;
+      expect(note?.kind === "note" ? note.body?.content : null).toHaveLength(3);
+    });
+
+    it("keeps a custom note titled like a preset custom on round trip", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine();
+      const sections = [
+        {
+          kind: "note" as const,
+          id: "preset",
+          title: "Rubbers",
+          body: plainTextToDoc("Inlane off"),
+          customTitle: false,
+        },
+        {
+          kind: "note" as const,
+          id: "custom",
+          title: "Rubbers",
+          body: plainTextToDoc("Bring spares"),
+          customTitle: true,
+        },
+      ];
+      const setId = await seedSet(machine.id, { createdBy: admin, sections });
+      const listed = await runListSettingsSets(
+        { machine: machine.initials },
+        ctx("admin", admin)
+      );
+      const { sets } = listed.result as { sets: { sections: unknown[] }[] };
+
+      const outcome = await runUpdateSettingsSet(
+        updateSettingsSetSchema.parse({
+          machine: machine.initials,
+          set: setId,
+          sections: sets[0]?.sections,
+          isPublic: true,
+        }),
+        ctx("admin", admin)
+      );
+
+      expect(outcome.result).toMatchObject({
+        contentChanged: false,
+        isPublic: true,
+      });
+      expect((await storedSet(setId)).sections).toEqual(sections);
+    });
+
+    it("refuses an update built from a read the set has since moved past", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine();
+      const setId = await seedSet(machine.id, { createdBy: admin });
+      const readAt = (await storedSet(setId)).updatedAt;
+      const db = await getTestDb();
+      await db
+        .update(machineSettingsSets)
+        .set({
+          name: "Edited in the web app",
+          updatedAt: new Date(readAt.getTime() + 1000),
+        })
+        .where(eq(machineSettingsSets.id, setId));
+
+      const result = await updateSettingsSet({
+        setId,
+        actor: { userId: admin, access: "admin" },
+        expectedUpdatedAt: readAt,
+        payload: { name: "Renamed", description: null, sections: [] },
+      });
+
+      expect(result).toMatchObject({ ok: false, code: "conflict" });
+      expect((await storedSet(setId)).name).toBe("Edited in the web app");
     });
 
     it("treats a set on a different machine as not found", async () => {

@@ -30,7 +30,8 @@ export interface SettingsActor {
   access: AccessLevel;
 }
 
-export type SettingsWriteError = "not_found" | "denied" | "invalid";
+export type SettingsWriteError =
+  "not_found" | "denied" | "invalid" | "conflict";
 
 // Aggregate byte ceiling on the persisted JSON content of one set — a backstop
 // against payload bloat beyond the per-field/array caps in the Zod schema.
@@ -209,6 +210,12 @@ export interface UpdateSettingsSetParams {
    * not-found, so a set can't be re-parented or probed across machines.
    */
   expectedMachineId?: string;
+  /**
+   * The set's `updatedAt` when the caller read it. A caller that builds the
+   * payload from its own earlier read passes this so an edit landing in
+   * between is refused (`conflict`) instead of overwritten.
+   */
+  expectedUpdatedAt?: Date;
   /** Full replacement of the set's name, description, and sections. */
   payload?: SettingsSetPayload;
   isPublic?: boolean;
@@ -237,6 +244,7 @@ export async function updateSettingsSet({
   setId,
   actor,
   expectedMachineId,
+  expectedUpdatedAt,
   payload,
   isPublic,
   isTournament,
@@ -261,6 +269,7 @@ export async function updateSettingsSet({
       isPreferred: true,
       isTournament: true,
       createdBy: true,
+      updatedAt: true,
     },
   });
   if (
@@ -288,6 +297,16 @@ export async function updateSettingsSet({
     )
   ) {
     return err("denied", "Forbidden");
+  }
+
+  if (
+    expectedUpdatedAt !== undefined &&
+    existing.updatedAt.getTime() !== expectedUpdatedAt.getTime()
+  ) {
+    return err(
+      "conflict",
+      "The set changed since it was read. Read it again and reapply the change."
+    );
   }
 
   // The Owner's default is always public — unset it before hiding.

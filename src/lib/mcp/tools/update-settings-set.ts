@@ -86,6 +86,7 @@ export async function runUpdateSettingsSet(
       name: true,
       description: true,
       sections: true,
+      updatedAt: true,
     },
   });
   if (current?.machineId !== machine.id) throw notFound;
@@ -117,7 +118,9 @@ export async function runUpdateSettingsSet(
     setId: args.set,
     actor: { userId: ctx.userId, access: ctx.accessLevel },
     expectedMachineId: machine.id,
-    ...(payload ? { payload } : {}),
+    // The payload carries this read's unchanged fields, so refuse it if the
+    // set moved since.
+    ...(payload ? { payload, expectedUpdatedAt: current.updatedAt } : {}),
     ...(args.isPublic !== undefined ? { isPublic: args.isPublic } : {}),
     ...(args.isTournament !== undefined
       ? { isTournament: args.isTournament }
@@ -128,7 +131,7 @@ export async function runUpdateSettingsSet(
     throw new McpToolError(
       updated.code,
       updated.code === "denied"
-        ? "You can't edit this set. Owner sets are editable only by the machine owner and admins."
+        ? "You can't edit this set. Owner sets are editable only by the machine owner and admins; a private draft only by its creator."
         : updated.message
     );
   }

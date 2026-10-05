@@ -141,9 +141,9 @@ PERMANENT: no tool can delete the set. It adds a "settings set created" line to 
 - `isPublic` (default `false`): a private draft is visible only to Tim (and admins) until published.
 - `isTournament` (default `false`).
 
-Sets you create are **community** sets: technicians and the machine owner can edit them too. Only a set the owner creates is an owner set.
+Sets you create are **community** sets: technicians and the machine owner can edit them too. The exception is a machine Tim owns: there the set is an **owner set**, and if the machine has no Owner's default yet, it becomes the Owner's default and is published regardless of `isPublic`. Check `isOwnersDefault` and `isPublic` in the result and tell the user.
 
-Duplicates: if you already created a set on this machine with the same name, description and sections, the call returns it with `created: false` and writes nothing.
+Duplicates: if you already created a set on this machine with the same name, description and sections, the call returns it with `created: false` and writes nothing, not even `isPublic` or `isTournament`. The result shows the existing set's flags; change them with `update_settings_set`.
 
 ### `update_settings_set`
 
@@ -154,6 +154,6 @@ CHANGE. `machine` and `set` (the id from `list_settings_sets`) are required, plu
 - **`isPublic`**: publish (`true`) or return to a private draft (`false`). The Owner's default cannot be made private.
 - **`isTournament`**: add or remove the Tournament tag.
 
-A content change (name, description or sections) adds a "settings set updated" line to the timeline. Publishing and tagging add nothing. `changed: false` means every value you sent was already set.
+A content change is refused with "The set changed since it was read" when someone edited the set after your `list_settings_sets`; read it again and reapply your edit. A content change (name, description or sections) adds a "settings set updated" line to the timeline. Publishing and tagging add nothing. `changed: false` means every value you sent was already set.
 
 Trap: owner sets can be edited only by the machine owner and admins; `canEdit` in `list_settings_sets` tells you before you try.

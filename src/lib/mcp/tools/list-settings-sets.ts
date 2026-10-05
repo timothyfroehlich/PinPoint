@@ -6,11 +6,11 @@ import { z } from "zod";
 
 import { getMachineSettingsSets } from "~/lib/machines/settings-queries";
 import { checkPermission } from "~/lib/permissions/helpers";
-import { docToPlainText } from "~/lib/tiptap/types";
+import { type ProseMirrorDoc } from "~/lib/tiptap/types";
 import { db } from "~/server/db";
 import { machines } from "~/server/db/schema";
 
-import { toMcpSection } from "./settings-set-shape";
+import { docToMcpText, toMcpSection } from "./settings-set-shape";
 import {
   machineUrl,
   McpToolError,
@@ -32,8 +32,8 @@ const listSettingsSetsSchema = z.object({
 type ListSettingsSetsArgs = z.infer<typeof listSettingsSetsSchema>;
 
 /** Plain text of a machine-level note, or null when it is empty. */
-function noteText(doc: Parameters<typeof docToPlainText>[0]): string | null {
-  const text = docToPlainText(doc).trim();
+function noteText(doc: ProseMirrorDoc | null | undefined): string | null {
+  const text = docToMcpText(doc);
   return text === "" ? null : text;
 }
 
@@ -46,18 +46,20 @@ export async function runListSettingsSets(
   }
 
   const machine = await resolveMachine(args.machine);
-  const notes = await db.query.machines.findFirst({
-    where: eq(machines.id, machine.id),
-    columns: { settingsRequests: true, settingsInstructions: true },
-  });
-
-  // The Settings tab's own query: it applies the visibility rules (another
-  // user's private draft is left out) and computes per-set edit rights.
-  const sets = await getMachineSettingsSets(db, machine.id, {
-    viewerId: ctx.userId,
-    access: ctx.accessLevel,
-    machineOwnerId: machine.ownerId,
-  });
+  // getMachineSettingsSets is the Settings tab's own query: it applies the
+  // visibility rules (another user's private draft is left out) and computes
+  // per-set edit rights.
+  const [notes, sets] = await Promise.all([
+    db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+      columns: { settingsRequests: true, settingsInstructions: true },
+    }),
+    getMachineSettingsSets(db, machine.id, {
+      viewerId: ctx.userId,
+      access: ctx.accessLevel,
+      machineOwnerId: machine.ownerId,
+    }),
+  ]);
 
   return {
     result: {

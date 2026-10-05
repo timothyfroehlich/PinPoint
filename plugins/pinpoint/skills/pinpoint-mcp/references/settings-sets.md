@@ -31,7 +31,7 @@ Never invent a value, a menu code or a switch number the source does not state. 
 
 1. Find the machine (`SKILL.md` §6), then call `list_settings_sets` on it. When a set already covers the same purpose, propose `update_settings_set` on it instead of a new set.
 2. Show the change preview with every section and every row written out, in order, exactly as you will send them, followed by the skipped content and the possible issues. One set is one numbered change; a batch of machines is one change per machine, at most 10 per preview.
-3. Create sets as private drafts (omit `isPublic`) unless the user asked to publish. The user reviews drafts in the Settings tab; publish afterwards with `update_settings_set`.
+3. Create sets as private drafts (omit `isPublic`) unless the user asked to publish. On a machine Tim owns with no Owner's default, the first set becomes the published Owner's default instead; say so in the preview. The user reviews drafts in the Settings tab; publish afterwards with `update_settings_set`.
 
 ## Editing a set
 

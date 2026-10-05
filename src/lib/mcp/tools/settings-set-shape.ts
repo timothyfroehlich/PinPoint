@@ -109,6 +109,20 @@ export const mcpSettingsSectionSchema = z.discriminatedUnion("kind", [
 
 export type McpSettingsSection = z.infer<typeof mcpSettingsSectionSchema>;
 
+/**
+ * Stored document → MCP plain text: one top-level block (paragraph, list,
+ * heading) per paragraph, separated by a blank line — the convention
+ * `plainTextToDoc` reads back. `docToPlainText` alone joins paragraphs with a
+ * single newline, which `plainTextToDoc` would turn into a line break.
+ */
+export function docToMcpText(doc: ProseMirrorDoc | null | undefined): string {
+  if (!doc) return "";
+  return doc.content
+    .map((block) => docToPlainText({ type: "doc", content: [block] }))
+    .filter((text) => text !== "")
+    .join("\n\n");
+}
+
 /** Stored section → MCP shape (plain-text notes, no render keys). */
 export function toMcpSection(section: SettingsSection): McpSettingsSection {
   switch (section.kind) {
@@ -142,7 +156,7 @@ export function toMcpSection(section: SettingsSection): McpSettingsSection {
         kind: "note",
         id: section.id,
         title: section.title,
-        text: docToPlainText(section.body),
+        text: docToMcpText(section.body),
       };
   }
 }
@@ -157,7 +171,7 @@ function textToDoc(
   text: string,
   previous: ProseMirrorDoc | null | undefined
 ): ProseMirrorDoc | null {
-  if (previous && docToPlainText(previous) === text) return previous;
+  if (previous && docToMcpText(previous) === text) return previous;
   return text.trim() === "" ? null : plainTextToDoc(text);
 }
 
@@ -171,7 +185,9 @@ interface PayloadInput {
 /**
  * Convert MCP sections to the stored shape. A section whose id matches one in
  * `previous` keeps that id; a note whose text is unchanged keeps its stored
- * document. New sections get fresh ids.
+ * document, and an existing note keeps its preset-or-custom heading kind (a
+ * custom note may carry a preset's title). New sections get fresh ids, and a
+ * new note is a preset when its title is a preset title.
  */
 export function toStoredSections(
   sections: McpSettingsSection[],
@@ -209,9 +225,11 @@ export function toStoredSections(
         };
       case "note": {
         const title = section.title.trim();
-        const isPreset = (PRESET_NOTE_TITLES as readonly string[]).includes(
-          title
-        );
+        const prior = previousById.get(id);
+        const isPreset =
+          prior?.kind === "note"
+            ? !prior.customTitle && prior.title === title
+            : (PRESET_NOTE_TITLES as readonly string[]).includes(title);
         if (isPreset) {
           const count = (presetCounts.get(title) ?? 0) + 1;
           presetCounts.set(title, count);
@@ -222,7 +240,6 @@ export function toStoredSections(
             );
           }
         }
-        const prior = previousById.get(id);
         return {
           kind: "note",
           id,
