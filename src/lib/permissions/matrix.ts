@@ -615,7 +615,7 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         id: "views.save",
         label: "Save views",
         description:
-          "Save personal named views of the Machines list, and choose the view it opens with",
+          "Save personal named views of the Machines and Issues lists, and choose the view each opens with",
         access: {
           unauthenticated: false,
           guest: true,

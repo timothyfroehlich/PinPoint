@@ -1,14 +1,12 @@
 "use client";
 
-import * as React from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import type React from "react";
 import {
   SummaryWidget,
   SummaryWidgetGroup,
   type SummaryWidgetSegment,
+  type SummaryWidgetsController,
 } from "~/components/summary-widgets";
-import { useSearchFilters } from "~/hooks/use-search-filters";
-import { parseIssueFilters } from "~/lib/issues/filters";
 import { cn } from "~/lib/utils";
 import {
   PRIORITY_CONFIG,
@@ -20,9 +18,11 @@ import type {
   IssueListSummary,
   IssuePriority,
   IssueSeverity,
+  IssueViewState,
 } from "~/lib/types";
 
-const STORAGE_KEY = "pinpoint:summary-widgets:issues";
+/** Browser storage key for the Issues widgets' expanded choice (widgets §2.6). */
+export const ISSUE_SUMMARY_STORAGE_KEY = "pinpoint:summary-widgets:issues";
 
 /** Segment order, worst first (issue-widgets §3.2, §4.2, §5.2). */
 const STATUS_SEGMENTS: readonly IssueStatus[] = [
@@ -41,14 +41,13 @@ const SEVERITY_SEGMENTS: readonly IssueSeverity[] = [
 ];
 const PRIORITY_SEGMENTS: readonly IssuePriority[] = ["high", "medium", "low"];
 
-/**
- * The retired Widget Population parameters (issue-widgets §2.3). They are
- * ignored, and dropped from the address bar when a URL still carries them.
- */
-const RETIRED_PARAMS = ["status_widget", "severity_widget", "priority_widget"];
-
 interface IssueSummaryWidgetsProps {
   summary: IssueListSummary;
+  state: IssueViewState;
+  /** Shows a new configuration; a Segment keeps every other filter (widgets §6.2). */
+  onStateChange: (next: IssueViewState) => void;
+  /** Shares the expanded state with a Summary Row toggle in the title row. */
+  controller?: SummaryWidgetsController | undefined;
 }
 
 function plural(count: number, singular: string, pluralForm: string): string {
@@ -56,39 +55,51 @@ function plural(count: number, singular: string, pluralForm: string): string {
 }
 
 /** The value a filter holds when it holds exactly one value, else null. */
-function soleValue<T>(values: T[] | undefined): T | null {
-  return values?.length === 1 ? (values[0] ?? null) : null;
+function soleValue<T>(values: readonly T[]): T | null {
+  return values.length === 1 ? (values[0] ?? null) : null;
 }
 
 function machinesText(count: number): string {
   return `open across ${count} ${plural(count, "machine", "machines")}`;
 }
 
+/** The Summary Row: the open total and the Unplayable count (issue-widgets §2.4). */
+export function IssueSummaryRow({
+  summary,
+}: {
+  summary: IssueListSummary;
+}): React.JSX.Element {
+  return (
+    <>
+      <span className="font-semibold text-foreground tabular-nums">
+        {summary.open}
+      </span>{" "}
+      open ·{" "}
+      <span
+        className={cn(
+          "font-semibold tabular-nums",
+          SEVERITY_CONFIG.unplayable.iconColor
+        )}
+      >
+        {summary.bySeverity.unplayable}
+      </span>{" "}
+      unplayable
+    </>
+  );
+}
+
 /**
- * The Status, Severity, and Priority widgets on issue lists (issue-widgets
+ * The Status, Severity, and Priority widgets on Issue View (issue-widgets
  * spec). Every widget counts the host's whole scope (§2.2), whatever the
- * list's filters. Reads the list's filters from the URL, as IssueList does,
- * so a group Issues tab's forced machine scope never leaks into the URL.
+ * list's filters; a Segment sets its own filter to that value alone and
+ * returns to page 1 (widgets §6.1, §6.2).
  */
 export function IssueSummaryWidgets({
   summary,
+  state,
+  onStateChange,
+  controller,
 }: IssueSummaryWidgetsProps): React.JSX.Element {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const filters = parseIssueFilters(searchParams);
-  const { pushFilters } = useSearchFilters(filters);
-
-  React.useEffect(() => {
-    if (!RETIRED_PARAMS.some((param) => searchParams.has(param))) return;
-    const canonical = new URLSearchParams(searchParams.toString());
-    for (const param of RETIRED_PARAMS) canonical.delete(param);
-    const query = canonical.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, {
-      scroll: false,
-    });
-  }, [pathname, router, searchParams]);
-
   const statusSegments: SummaryWidgetSegment<IssueStatus>[] =
     STATUS_SEGMENTS.map((value) => ({
       value,
@@ -114,30 +125,12 @@ export function IssueSummaryWidgets({
       fillClassName: PRIORITY_CONFIG[value].barColor,
     }));
 
-  // The open-issue total and the Unplayable open-issue count (§2.4).
-  const summaryRow = (
-    <>
-      <span className="font-semibold text-foreground tabular-nums">
-        {summary.open}
-      </span>{" "}
-      open ·{" "}
-      <span
-        className={cn(
-          "font-semibold tabular-nums",
-          SEVERITY_CONFIG.unplayable.iconColor
-        )}
-      >
-        {summary.bySeverity.unplayable}
-      </span>{" "}
-      unplayable
-    </>
-  );
-
   return (
     <SummaryWidgetGroup
-      storageKey={STORAGE_KEY}
-      summaryRow={summaryRow}
+      storageKey={ISSUE_SUMMARY_STORAGE_KEY}
+      summaryRow={<IssueSummaryRow summary={summary} />}
       widgetCount={3}
+      controller={controller}
     >
       <SummaryWidget
         id="issue-widget-status"
@@ -148,8 +141,10 @@ export function IssueSummaryWidgets({
           accentClassName: STATUS_CONFIG.new.iconColor,
         }}
         segments={statusSegments}
-        selectedValue={soleValue(filters.status)}
-        onSegmentSelect={(value) => pushFilters({ status: [value], page: 1 })}
+        selectedValue={soleValue(state.status)}
+        onSegmentSelect={(value) =>
+          onStateChange({ ...state, status: [value], page: 1 })
+        }
       />
       <SummaryWidget
         id="issue-widget-severity"
@@ -160,8 +155,10 @@ export function IssueSummaryWidgets({
           accentClassName: "text-warning",
         }}
         segments={severitySegments}
-        selectedValue={soleValue(filters.severity)}
-        onSegmentSelect={(value) => pushFilters({ severity: [value], page: 1 })}
+        selectedValue={soleValue(state.severity)}
+        onSegmentSelect={(value) =>
+          onStateChange({ ...state, severity: [value], page: 1 })
+        }
       />
       <SummaryWidget
         id="issue-widget-priority"
@@ -172,8 +169,10 @@ export function IssueSummaryWidgets({
           accentClassName: PRIORITY_CONFIG.high.iconColor,
         }}
         segments={prioritySegments}
-        selectedValue={soleValue(filters.priority)}
-        onSegmentSelect={(value) => pushFilters({ priority: [value], page: 1 })}
+        selectedValue={soleValue(state.priority)}
+        onSegmentSelect={(value) =>
+          onStateChange({ ...state, priority: [value], page: 1 })
+        }
       />
     </SummaryWidgetGroup>
   );

@@ -82,7 +82,7 @@ describe("issue list Summary Widget counts", () => {
       {
         q: "nothing matches this",
         severity: ["major"],
-        includeInactiveMachines: true,
+        presence: [],
       },
       { isAdmin: false }
     );
@@ -115,7 +115,7 @@ describe("issue list Summary Widget counts", () => {
   it("counts only a group Issues tab's On the Floor machines", async () => {
     await seed();
     const { summary } = await loadIssueListPage(
-      { machine: ["BB"], includeInactiveMachines: true },
+      { machine: ["BB"], presence: [] },
       { isAdmin: false, scopeMachineInitials: ["AA", "CC", "DD"] }
     );
 
@@ -184,7 +184,7 @@ describe("issue list loader email privacy (CORE-SEC-007)", () => {
 
     // Every seeded issue and user loaded, so the absence below is meaningful.
     expect(page.issuesList).toHaveLength(4);
-    expect(page.filterUsers.map((user) => user.id)).toEqual(
+    expect(page.people.map((user) => user.id)).toEqual(
       expect.arrayContaining([member.id, assignee.id, invited.id])
     );
     expect(JSON.stringify(page)).not.toMatch(/@example\.com/);

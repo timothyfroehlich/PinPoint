@@ -1,18 +1,9 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { IssueListSummary } from "~/lib/types";
+import { describe, expect, it, vi } from "vitest";
+import { ISSUE_VIEW_PRESET } from "~/lib/issues/view/config";
+import type { IssueListSummary, IssueViewState } from "~/lib/types";
 import { IssueSummaryWidgets } from "./IssueSummaryWidgets";
-
-const PATHNAME = "/c/tags/manufacturer/williams/issues";
-const mockPush = vi.fn();
-const mockReplace = vi.fn();
-let mockSearch = "";
-vi.mock("next/navigation", () => ({
-  useSearchParams: () => new URLSearchParams(mockSearch),
-  useRouter: () => ({ push: mockPush, replace: mockReplace }),
-  usePathname: () => PATHNAME,
-}));
 
 const summary: IssueListSummary = {
   total: 9,
@@ -35,9 +26,18 @@ const summary: IssueListSummary = {
   byPriority: { low: 1, medium: 4, high: 2 },
 };
 
-function pushedParams(): URLSearchParams {
-  const [path] = mockPush.mock.lastCall ?? [""];
-  return new URL(String(path), "http://localhost").searchParams;
+function renderWidgets(
+  state: IssueViewState = ISSUE_VIEW_PRESET,
+  onStateChange = vi.fn()
+): ReturnType<typeof vi.fn> {
+  render(
+    <IssueSummaryWidgets
+      summary={summary}
+      state={state}
+      onStateChange={onStateChange}
+    />
+  );
+  return onStateChange;
 }
 
 function segmentNames(widget: string): (string | null)[] {
@@ -47,14 +47,8 @@ function segmentNames(widget: string): (string | null)[] {
 }
 
 describe("IssueSummaryWidgets", () => {
-  beforeEach(() => {
-    mockPush.mockClear();
-    mockReplace.mockClear();
-    mockSearch = "";
-  });
-
   it("lists Segments worst first (issue-widgets §3.2, §4.2, §5.2)", () => {
-    render(<IssueSummaryWidgets summary={summary} />);
+    renderWidgets();
 
     expect(segmentNames("Status")).toEqual([
       "2 Need Help",
@@ -73,7 +67,7 @@ describe("IssueSummaryWidgets", () => {
   });
 
   it("shows the open total and the Unplayable count in the Summary Row (§2.4)", () => {
-    render(<IssueSummaryWidgets summary={summary} />);
+    renderWidgets();
 
     expect(
       screen.getByRole("button", { name: "Summary: 7 open · 3 unplayable" })
@@ -81,7 +75,7 @@ describe("IssueSummaryWidgets", () => {
   });
 
   it("collapses and hides headlines unless all three widgets fit side by side (widgets §2.3, §5.1)", () => {
-    render(<IssueSummaryWidgets summary={summary} />);
+    renderWidgets();
     const status = screen.getByRole("region", { name: "Status" });
     const severity = screen.getByRole("region", { name: "Severity" });
     const priority = screen.getByRole("region", { name: "Priority" });
@@ -98,43 +92,22 @@ describe("IssueSummaryWidgets", () => {
     }
   });
 
-  it("sets only that widget's filter from a Segment and returns to page 1", async () => {
-    mockSearch = "page=3&q=flipper&priority=high";
-    render(<IssueSummaryWidgets summary={summary} />);
+  it("sets only that widget's filter from a Segment and returns to page 1 (widgets §6.1, §6.2)", async () => {
+    const state: IssueViewState = {
+      ...ISSUE_VIEW_PRESET,
+      q: "flipper",
+      priority: ["high"],
+      severity: ["minor", "major"],
+      page: 3,
+    };
+    const onStateChange = renderWidgets(state);
 
     await userEvent.click(screen.getByRole("button", { name: "3 Unplayable" }));
 
-    const params = pushedParams();
-    expect(params.get("severity")).toBe("unplayable");
-    expect(params.get("q")).toBe("flipper");
-    expect(params.get("priority")).toBe("high");
-    expect(params.get("page")).toBeNull();
-    // The group's machine scope never leaks into the URL.
-    expect(params.get("machine")).toBeNull();
-  });
-
-  it("ignores the retired population parameters and drops them from the URL (§2.3)", async () => {
-    mockSearch = "q=flipper&status_widget=filtered&severity_widget=filtered";
-    render(<IssueSummaryWidgets summary={summary} />);
-
-    expect(mockReplace).toHaveBeenCalledWith(`${PATHNAME}?q=flipper`, {
-      scroll: false,
+    expect(onStateChange).toHaveBeenCalledWith({
+      ...state,
+      severity: ["unplayable"],
+      page: 1,
     });
-    expect(
-      screen.queryByRole("group", { name: /population/i })
-    ).not.toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole("button", { name: "2 New" }));
-    const params = pushedParams();
-    expect(params.get("status")).toBe("new");
-    expect(params.has("status_widget")).toBe(false);
-    expect(params.has("severity_widget")).toBe(false);
-  });
-
-  it("leaves a URL without retired parameters alone", () => {
-    mockSearch = "q=flipper";
-    render(<IssueSummaryWidgets summary={summary} />);
-
-    expect(mockReplace).not.toHaveBeenCalled();
   });
 });

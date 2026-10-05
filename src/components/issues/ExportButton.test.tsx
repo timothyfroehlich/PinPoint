@@ -21,23 +21,6 @@ vi.mock("sonner", () => ({
   },
 }));
 
-// Mock Tooltip components (Radix UI) to render children directly
-vi.mock("~/components/ui/tooltip", () => ({
-  Tooltip: ({ children }: { children: React.ReactNode }) => (
-    <div>{children}</div>
-  ),
-  TooltipTrigger: ({
-    children,
-    asChild,
-  }: {
-    children: React.ReactNode;
-    asChild?: boolean;
-  }) => (asChild ? <>{children}</> : <div>{children}</div>),
-  TooltipContent: ({ children }: { children: React.ReactNode }) => (
-    <div>{children}</div>
-  ),
-}));
-
 const mockExportAction = vi.fn();
 
 vi.mock("~/app/(app)/issues/export-action", () => ({
@@ -54,7 +37,7 @@ describe("ExportButton", () => {
     mockExportAction.mockReturnValue(new Promise(() => {}));
 
     const user = userEvent.setup();
-    render(<ExportButton machineInitials="TM" />);
+    render(<ExportButton query="machine=TM" />);
 
     const btn = screen.getByRole("button", { name: "Export to CSV" });
     await user.click(btn);
@@ -88,7 +71,7 @@ describe("ExportButton", () => {
     });
 
     const user = userEvent.setup();
-    render(<ExportButton machineInitials="TM" />);
+    render(<ExportButton query="machine=TM" />);
 
     const btn = screen.getByRole("button", { name: "Export to CSV" });
     await user.click(btn);
@@ -108,7 +91,7 @@ describe("ExportButton", () => {
     });
 
     const user = userEvent.setup();
-    render(<ExportButton machineInitials="TM" />);
+    render(<ExportButton query="machine=TM" />);
 
     const btn = screen.getByRole("button", { name: "Export to CSV" });
     await user.click(btn);

@@ -71,3 +71,19 @@ export {
 } from "./list-view";
 
 export { type IssueListSummary } from "./summary-widget";
+
+export {
+  ISSUE_VIEW_SORT_FIELDS,
+  type IssueViewBuiltInView,
+  type IssueViewDateRange,
+  type IssueViewMachineOption,
+  type IssueViewPersonOption,
+  type IssueViewResult,
+  type IssueViewSavedState,
+  type IssueViewSavedViews,
+  type IssueViewSavedViewSummary,
+  type IssueViewSortDirection,
+  type IssueViewSortField,
+  type IssueViewState,
+  type IssueViewSurface,
+} from "./issue-view";

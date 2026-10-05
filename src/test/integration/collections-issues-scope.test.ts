@@ -35,16 +35,33 @@ describe("collection issues scoping (PP-slrd.1)", () => {
     expect(rows.map((r) => r.title)).toEqual(["mine issue"]);
   });
 
-  it("documents the hazard: an empty machine[] does NOT scope", async () => {
+  it("bounds the issues to a scope, and an empty scope to nothing (issues-list §2.2)", async () => {
     const db = await getTestDb();
-    const mine = createTestMachine({ initials: "CC", name: "Mine2" });
-    await db.insert(machines).values(mine);
-    await db.insert(issues).values(createTestIssue("CC", { title: "visible" }));
+    await db
+      .insert(machines)
+      .values([
+        createTestMachine({ initials: "CC", name: "Mine2" }),
+        createTestMachine({ initials: "DD", name: "Other" }),
+      ]);
+    await db
+      .insert(issues)
+      .values([
+        createTestIssue("CC", { title: "in scope" }),
+        createTestIssue("DD", { title: "outside" }),
+      ]);
+    const titles = async (
+      machine: string[] | undefined,
+      scope: string[]
+    ): Promise<string[]> => {
+      const where = buildWhereConditions({ machine }, asDbOrTx(db), { scope });
+      const rows = await db.query.issues.findMany({ where: and(...where) });
+      return rows.map((r) => r.title);
+    };
 
-    const where = buildWhereConditions({ machine: [] }, asDbOrTx(db));
-    const rows = await db.query.issues.findMany({ where: and(...where) });
-    // Unscoped! The collection issues page must short-circuit to its empty
-    // state instead of ever passing machine: [] to buildWhereConditions.
-    expect(rows.length).toBeGreaterThan(0);
+    expect(await titles(undefined, ["CC"])).toEqual(["in scope"]);
+    // A Machine filter outside the scope never widens it.
+    expect(await titles(["DD"], ["CC"])).toEqual([]);
+    // A group with no machines shows no issues, not every issue.
+    expect(await titles(undefined, [])).toEqual([]);
   });
 });
