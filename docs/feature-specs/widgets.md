@@ -71,8 +71,7 @@
 ## Known divergences (code vs spec)
 
 | Requirement | Divergence | Resolution |
-| :-- | :-- | :-- |
-| §2.2, §4.5 | A Collection or Tag Issues tab whose group has no machines, or whose stale `?machine=` filter selects none of its machines, shows only a message and no Summary Widgets. | PP-jb9v |
+| :---------- | :--------- | :--------- |
 
 ---
 

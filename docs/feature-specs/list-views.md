@@ -161,13 +161,7 @@
 ## Known divergences (code vs spec)
 
 | Requirement | Divergence | Resolution |
-| :-- | :-- | :-- |
-| §2.1 | Issues and Collection Issues tabs use their own toolbar, pager, and URL handling. | PP-jb9v |
-| §3–§8, §12 | Issues and Collection Issues tabs don't use the shared layout, List Header, phone sheets, or overflow rules. | PP-jb9v |
-| §5.7 | Issues offers 15, 25, and 50 per page, defaulting to 15. | PP-jb9v |
-| §9.2, §9.4 | Issues uses snake_case parameters and a composite sort value. | PP-jb9v |
-| §10 | Issues has no Saved Views. | PP-jb9v |
-| §11 | Issues restores the last URL from a cookie across sessions. | PP-jb9v |
+| :---------- | :--------- | :--------- |
 
 ---
 
