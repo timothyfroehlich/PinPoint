@@ -3,6 +3,7 @@
 import type React from "react";
 import { useState } from "react";
 import Link from "next/link";
+import { useListReturnHref } from "~/components/list-view/use-list-return-href";
 import { usePathname } from "next/navigation";
 import {
   Plus,
@@ -62,6 +63,8 @@ export function BottomTabBar({
   const [moreOpen, setMoreOpen] = useState(false);
   const pathname = usePathname();
   const resolvedIssuesPath = issuesPath ?? "/issues";
+  // Returning to Machines reopens its last view this tab session (list-views §11.1).
+  const machinesPath = useListReturnHref("/m");
 
   return (
     <>
@@ -80,7 +83,9 @@ export function BottomTabBar({
               ? resolvedIssuesPath
               : tab.href === "/report"
                 ? reportHref
-                : tab.href;
+                : tab.href === "/m"
+                  ? machinesPath
+                  : tab.href;
           const active = isNavItemActive(
             tab.href,
             pathname,

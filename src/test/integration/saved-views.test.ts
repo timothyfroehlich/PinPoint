@@ -398,7 +398,7 @@ describe("machine Saved Views on each Surface (list-views §10.5, §10.10)", () 
     });
 
     const [view] = await listSavedMachineViews(asDbOrTx(db), userId);
-    expect(view?.state.owner).toEqual([ownerId, "unassigned"]);
+    expect(view?.state.owner).toEqual(["unassigned", ownerId]);
   });
 
   it("keeps an out-of-scope owner through apply and Save changes on a Collection tab (§10.18)", async () => {
@@ -452,6 +452,7 @@ describe("machine Saved Views on each Surface (list-views §10.5, §10.10)", () 
     const applied = await loadMachineViewFromDatabase(asDbOrTx(db), {
       scope: { kind: "collection", collectionId },
       preset: "collection",
+      viewerId: null,
       searchParams: savedMachineViewSearchParams(
         offeredView.state,
         "collection",

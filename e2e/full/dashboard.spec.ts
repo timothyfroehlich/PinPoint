@@ -134,7 +134,7 @@ test.describe("Member Dashboard", () => {
       .filter({ hasText: "Machines Needing Service" });
     await expect(machinesCard).toHaveAttribute(
       "href",
-      /\/m\?status=unplayable,needs_service/
+      /\/m\?status=needs_service,unplayable/
     );
 
     // Assigned to Me — actually click to verify end-to-end navigation

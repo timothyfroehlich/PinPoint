@@ -500,6 +500,14 @@ describe("Specific permission rules from design", () => {
       expect(getPermission("machines.pinballmap.sync", "admin")).toBe(true);
     });
 
+    it("should let every signed-in account save views (list-views §10.1)", () => {
+      expect(getPermission("views.save", "unauthenticated")).toBe(false);
+      expect(getPermission("views.save", "guest")).toBe(true);
+      expect(getPermission("views.save", "member")).toBe(true);
+      expect(getPermission("views.save", "technician")).toBe(true);
+      expect(getPermission("views.save", "admin")).toBe(true);
+    });
+
     it("should require authentication to watch machines", () => {
       expect(getPermission("machines.watch", "unauthenticated")).toBe(false);
       expect(getPermission("machines.watch", "guest")).toBe(true);

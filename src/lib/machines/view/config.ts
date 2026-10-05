@@ -16,10 +16,33 @@ import { VALID_MACHINE_PRESENCE_STATUSES } from "~/lib/machines/presence";
  */
 export type MachineViewDependency = "service" | "activity";
 
+/** The owner filter value for machines with no owner (machine-views §4.2). */
+export const UNASSIGNED_OWNER_ID = "unassigned";
+/** How the Unassigned shortcut and an ownerless machine are named (§3.13). */
+export const UNASSIGNED_OWNER_NAME = "Unassigned";
+/**
+ * The owner filter value for whoever is viewing (machine-views §4.2). It is
+ * resolved per viewer when the filter runs, so one URL or Saved View means
+ * each signed-in person's own machines. For an anonymous visitor the filter
+ * is dropped, so the list shows every machine in the rest of the view.
+ */
+export const ME_OWNER_ID = "me";
+/** How the Me shortcut is named (machine-views §3.13). */
+export const ME_OWNER_NAME = "Me";
+
+type DirectionLabels = Record<MachineViewSortDirection, string>;
+
+const ALPHABETICAL: DirectionLabels = { asc: "A–Z", desc: "Z–A" };
+const DATES: DirectionLabels = { asc: "oldest", desc: "newest" };
+
 export interface MachineViewFieldDefinition {
   id: MachineViewFieldId;
   label: string;
+  /** How the sort control names the field, when not its label (§3.14). */
+  sortLabel?: string;
   preferredDirection: MachineViewSortDirection;
+  /** Each sort direction in words that fit the field's values (§3.14). */
+  directionLabels: DirectionLabels;
   dependencies: MachineViewDependency[];
 }
 
@@ -30,67 +53,79 @@ export const MACHINE_VIEW_FIELDS: Record<
   machine: {
     id: "machine",
     label: "Machine",
+    sortLabel: "Name",
     preferredDirection: "asc",
+    directionLabels: ALPHABETICAL,
     dependencies: [],
   },
   playability: {
     id: "playability",
     label: "Playability",
     preferredDirection: "desc",
+    directionLabels: { asc: "best first", desc: "worst first" },
     dependencies: [],
   },
   openIssues: {
     id: "openIssues",
     label: "Open Issues",
     preferredDirection: "desc",
+    directionLabels: { asc: "fewest", desc: "most" },
     dependencies: [],
   },
   lastServiced: {
     id: "lastServiced",
     label: "Last Serviced",
     preferredDirection: "desc",
+    directionLabels: DATES,
     dependencies: ["service"],
   },
   presence: {
     id: "presence",
     label: "Presence",
     preferredDirection: "asc",
+    directionLabels: { asc: "on the floor first", desc: "removed first" },
     dependencies: [],
   },
   owner: {
     id: "owner",
     label: "Owner",
     preferredDirection: "asc",
+    directionLabels: ALPHABETICAL,
     dependencies: [],
   },
   manufacturer: {
     id: "manufacturer",
     label: "Manufacturer",
     preferredDirection: "asc",
+    directionLabels: ALPHABETICAL,
     dependencies: [],
   },
   year: {
     id: "year",
     label: "Year",
     preferredDirection: "desc",
+    directionLabels: DATES,
     dependencies: [],
   },
   oldestOpenIssue: {
     id: "oldestOpenIssue",
     label: "Oldest Open Issue",
     preferredDirection: "asc",
+    directionLabels: DATES,
     dependencies: [],
   },
   lastActivity: {
     id: "lastActivity",
     label: "Last Activity",
     preferredDirection: "desc",
+    directionLabels: DATES,
     dependencies: ["activity"],
   },
   dateAdded: {
     id: "dateAdded",
     label: "Date Added",
     preferredDirection: "desc",
+    directionLabels: DATES,
     dependencies: [],
   },
 };

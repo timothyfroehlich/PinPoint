@@ -4,11 +4,12 @@ import { and, asc, eq, ne, sql } from "drizzle-orm";
 import type { DbTransaction } from "~/server/db";
 import { savedViewDefaults, savedViews } from "~/server/db/schema";
 import { err, ok, type Result } from "~/lib/result";
-import type {
-  DefaultViewTarget,
-  ListHost,
-  SavedViewError,
-  StoredSavedView,
+import {
+  SAVED_VIEW_NAME_MAX,
+  type DefaultViewTarget,
+  type ListHost,
+  type SavedViewError,
+  type StoredSavedView,
 } from "~/lib/types";
 
 /**
@@ -18,9 +19,6 @@ import type {
  * changed, or made a default through another host. Each host validates the
  * View Configuration it stores and re-validates what it reads (§10.14).
  */
-
-/** Longest Saved View name accepted. */
-export const SAVED_VIEW_NAME_MAX = 60;
 
 /** The account's Saved Views for one host, ordered by name. */
 export async function listSavedViews(

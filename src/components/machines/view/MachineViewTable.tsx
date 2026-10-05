@@ -89,7 +89,8 @@ export function MachineViewTable({
       field !== "machine"
   );
   const table = (
-    <div className="relative overflow-hidden rounded-lg border border-outline-variant bg-card shadow-sm">
+    // The List View list box draws the card (list-views §3.1, §7.7).
+    <div className="relative">
       {mobileMode === "table" && fields.length > 1 ? (
         <div className="flex items-center justify-end border-b border-outline-variant px-3 py-1.5 text-xs text-muted-foreground md:hidden">
           Scroll for more&nbsp;→

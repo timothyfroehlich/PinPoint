@@ -16,7 +16,11 @@ import {
 import { isPgErrorCode } from "~/lib/db/postgres-errors";
 import { VALID_MACHINE_PRESENCE_STATUSES } from "~/lib/machines/presence";
 import { machineViewDefaultBuiltInIds } from "~/lib/machines/view/saved-views";
-import { normalizeMachineViewSavedState } from "~/lib/machines/view/state";
+import {
+  MACHINE_STATUS_VALUES,
+  MACHINE_VIEW_PAGE_SIZES,
+  normalizeMachineViewSavedState,
+} from "~/lib/machines/view/state";
 import {
   ISSUE_SEVERITY_VALUES,
   MACHINE_VIEW_FIELD_IDS,
@@ -43,12 +47,12 @@ const savedStateSchema = z.object({
     z.literal("all"),
     z.array(z.enum(VALID_MACHINE_PRESENCE_STATUSES)),
   ]),
-  status: z.array(z.enum(["operational", "needs_service", "unplayable"])),
+  status: z.array(z.enum(MACHINE_STATUS_VALUES)),
   severity: z.array(z.enum(ISSUE_SEVERITY_VALUES)),
   owner: z.array(z.string().max(64)).max(500),
   sort: z.enum(MACHINE_VIEW_FIELD_IDS),
   dir: z.enum(["asc", "desc"]),
-  pageSize: z.union([z.literal(25), z.literal(50), z.literal(100)]),
+  pageSize: z.literal(MACHINE_VIEW_PAGE_SIZES),
   columns: z.array(z.enum(MACHINE_VIEW_FIELD_IDS)),
 });
 
@@ -78,7 +82,7 @@ const createSchema = z.object({
 const createProtected = createProtectedAction({
   actionName: "createSavedMachineViewAction",
   schema: createSchema,
-  permission: "machines.views.save",
+  permission: "views.save",
   handler: async (input, { user }): Promise<SavedViewActionResult> =>
     withNameConflict(() =>
       db.transaction((tx) =>
@@ -105,7 +109,7 @@ const updateSchema = z.object({ id: z.uuid(), state: savedStateSchema });
 const updateProtected = createProtectedAction({
   actionName: "updateSavedMachineViewAction",
   schema: updateSchema,
-  permission: "machines.views.save",
+  permission: "views.save",
   handler: async (input, { user }): Promise<SavedViewActionResult> =>
     updateSavedViewState(db, {
       userId: user.id,
@@ -127,7 +131,7 @@ const renameSchema = z.object({ id: z.uuid(), name: z.string() });
 const renameProtected = createProtectedAction({
   actionName: "renameSavedMachineViewAction",
   schema: renameSchema,
-  permission: "machines.views.save",
+  permission: "views.save",
   handler: async (input, { user }): Promise<SavedViewActionResult> =>
     withNameConflict(() =>
       db.transaction((tx) =>
@@ -145,7 +149,7 @@ export async function renameSavedMachineViewAction(
 const deleteProtected = createProtectedAction({
   actionName: "deleteSavedMachineViewAction",
   schema: z.uuid(),
-  permission: "machines.views.save",
+  permission: "views.save",
   handler: async (id, { user }): Promise<SavedViewActionResult> =>
     deleteSavedView(db, { userId: user.id, host: "machines", id }),
 });
@@ -168,7 +172,7 @@ const defaultSchema = z.object({
 const defaultProtected = createProtectedAction({
   actionName: "setMachineViewDefaultAction",
   schema: defaultSchema,
-  permission: "machines.views.save",
+  permission: "views.save",
   handler: async (
     input,
     { user }

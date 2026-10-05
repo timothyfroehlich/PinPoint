@@ -44,23 +44,31 @@ describe("machine view URL state", () => {
     });
   });
 
-  it("accepts explicit all presence and canonical comma-separated values", () => {
+  it("puts filter values in canonical order and keeps displayed fields in URL order", () => {
     const params = new URLSearchParams({
       presence: "all",
       status: "unplayable,operational,invalid",
       severity: "major,bogus,cosmetic,major",
-      owner: "owner-2,unassigned,owner-2",
+      owner: "owner-2,unassigned,owner-1,me,owner-2",
       columns: "machine,year,invalid,owner",
       pageSize: "50",
     });
     const state = parseMachineViewState(params, "machines");
 
     expect(state.presence).toBe("all");
-    expect(state.status).toEqual(["unplayable", "operational"]);
-    expect(state.severity).toEqual(["major", "cosmetic"]);
-    expect(state.owner).toEqual(["owner-2", "unassigned"]);
+    expect(state.status).toEqual(["operational", "unplayable"]);
+    expect(state.severity).toEqual(["cosmetic", "major"]);
+    // Me, then Unassigned, then people by id.
+    expect(state.owner).toEqual(["me", "unassigned", "owner-1", "owner-2"]);
+    // Displayed fields show in the order the URL lists them.
     expect(state.columns).toEqual(["machine", "year", "owner"]);
     expect(state.pageSize).toBe(50);
+    expect(
+      parseMachineViewState(
+        new URLSearchParams({ presence: "on_loan,on_the_floor" }),
+        "machines"
+      ).presence
+    ).toEqual(["on_the_floor", "on_loan"]);
   });
 
   it("ignores retired widget parameters and drops them from the canonical URL", () => {

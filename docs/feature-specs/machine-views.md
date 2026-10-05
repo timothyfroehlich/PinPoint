@@ -56,7 +56,7 @@
 - **4.5** _Moved 2026-10-02_ to list-views §9.8.
 - **4.6** Both initial Page Presets display Machine, Playability, Presence, Open Issues, Last Serviced, and Last Activity by default.
 - **4.7** `/m` defaults to Presence “On the Floor” and machine-title ascending. An omitted `presence` parameter means On the Floor; `presence=all` is the explicit unfiltered state.
-- **4.8** Collections include every member presence state by default and sort worst playability first.
+- **4.8** Collections open to On the Floor members by default, sorted worst playability first; All machines shows every presence state (§9.2).
 - **4.9** _Moved 2026-10-02_ to list-views §9.1.
 - **4.10** _Moved 2026-10-02_ to list-views §9.5.
 - **4.11** _Moved 2026-10-02_ to list-views §9.6.
@@ -117,12 +117,7 @@
 ## Known divergences (code vs spec)
 
 | Requirement | Divergence | Resolution |
-| :-- | :-- | :-- |
-| §9.2 | Collections' Page Preset is All machines. | PP-s363 |
-| §2.4 | Machine View has its own toolbar, chips, and Saved Views menu rather than the shared List View. | PP-jb9v |
-| §3.13 | Owner offers Unassigned but not Me. | PP-jb9v |
-| §3.14 | Sorting is only by column header; phones in Compact mode cannot sort. | PP-jb9v |
-| §4.2 | Owner "Me" writes the viewer's account ID into the URL. | PP-jb9v |
+| :---------- | :--------- | :--------- |
 
 ---
 
@@ -130,6 +125,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-04 | Collections open to On the Floor members by default (§4.8), matching §9.2. |
 | 2026-10-03 | Collections' Page Preset becomes On the floor (§9.2). |
 | 2026-10-03 | Presence and Last Activity join the default fields, Presence after Playability (§4.6); All machines and Recently added no longer add Presence (§9.1). Desktop and tablet rows are two lines, with manufacturer, year, and owner under the name (§3.2, §5.2); Owner, Manufacturer, and Year leave the default fields (§4.6). |
 | 2026-10-02 | Machine View became a List Host on the shared List View (§2.4): moved the generic concepts, URL rules, shared controls, and Saved Views to list-views (§1, §4.3–§4.5, §4.9–§4.11, §5.1, §7.6, §8, §9.4, §9.5); one-line machine identity and rows (§3.2, §5.2, §5.3); dropped Widget Population parameters (§4.1); Recently added leaves out Removed machines (§9.1); Primary Filters, Owner shortcuts, and the sort control (§3.12–§3.14); more default fields (§4.6); right-aligned Open Issues that link to the machine's issues in every presence state (§5.6); an Owner `me` sentinel (§4.2). |
