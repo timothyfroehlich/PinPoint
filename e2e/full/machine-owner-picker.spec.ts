@@ -18,6 +18,7 @@
  */
 
 import { test, expect, type Page } from "../support/fixtures.js";
+import { selectOwnerBySearch } from "../support/actions.js";
 import { cleanupTestEntities } from "../support/cleanup.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
 import { createTestUser, deleteTestUser } from "../support/supabase-admin.js";
@@ -46,37 +47,6 @@ async function openOwnerPicker(page: Page) {
   await expect(page.getByPlaceholder("Search users...")).toBeVisible({
     timeout: 5000,
   });
-}
-
-/**
- * Select a guest user by name using the search input.
- *
- * Searching bypasses the "Show guests and invited users" checkbox filter
- * (per OwnerSelect: when query is non-empty, all matching users are shown).
- * This is more robust on mobile viewports where the checkbox+list scroll
- * interaction can miss clicks on CommandItem elements.
- *
- * Uses keyboard Enter rather than pointer click to confirm the selection.
- * cmdk's keyboard handler fires the "cmdk-item-select" event on the currently
- * aria-selected item, which is more reliable on mobile touch emulation where
- * Playwright's synthesized pointer events can fail to trigger cmdk's onClick
- * even when the element is correctly targeted (PP-pvbq regression).
- */
-async function selectGuestUserBySearch(page: Page, name: string) {
-  const searchInput = page.getByPlaceholder("Search users...");
-  await searchInput.fill(name);
-  const list = page.locator("[data-slot=command-list]");
-  const item = list
-    .locator("[data-slot=command-item]")
-    .filter({ hasText: name });
-  await expect(item).toBeVisible({ timeout: 5000 });
-  // Wait for cmdk to mark the item as keyboard-selected (aria-selected="true").
-  // cmdk auto-selects the first visible item when the search query changes;
-  // pressing Enter on the focused search input then fires onSelect on that item.
-  await expect(item).toHaveAttribute("aria-selected", "true", {
-    timeout: 3000,
-  });
-  await searchInput.press("Enter");
 }
 
 test.describe("Machine Owner Picker — promote-dialog journeys (PP-6oi)", () => {
@@ -170,7 +140,7 @@ test.describe("Machine Owner Picker — promote-dialog journeys (PP-6oi)", () =>
     // Open picker and select guest via search (search bypasses the
     // "Show guests" checkbox filter — more robust on mobile viewports).
     await openOwnerPicker(page);
-    await selectGuestUserBySearch(page, guestName);
+    await selectOwnerBySearch(page, guestName);
 
     // Owner trigger should show the throwaway guest as selected
     await expect(page.getByTestId("owner-select")).toContainText(guestName);
@@ -226,7 +196,7 @@ test.describe("Machine Owner Picker — promote-dialog journeys (PP-6oi)", () =>
     // Open picker and select guest via search (search bypasses the
     // "Show guests" checkbox filter — more robust on mobile viewports).
     await openOwnerPicker(page);
-    await selectGuestUserBySearch(page, guestName);
+    await selectOwnerBySearch(page, guestName);
 
     // Verify selection
     await expect(page.getByTestId("owner-select")).toContainText(guestName);
