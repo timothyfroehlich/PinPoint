@@ -6,7 +6,7 @@ code and migration land. The MCP endpoint is
 also its RFC 9728 protected-resource identifier and JWT audience.
 
 The committed Codex project configuration defaults every MCP tool to a prompt
-and opts only the six read-only tools into automatic approval. The existing
+and opts only the read-only tools into automatic approval. The existing
 static bearer remains solely for the already-configured Claude client.
 
 ## Safety boundary
