@@ -184,7 +184,6 @@ None.
 | :-- | :-- | :-- |
 | §4.6 | Move lists Removed machines. | PP-s363 |
 | §5.4 | The report's photos include every photo on the issue, so a comment's photos also appear in the initial report. | PP-buwx |
-| §2.2 | A number with trailing characters (`/i/1abc`, `/i/1.5`) is read as its leading digits and shows issue 1 instead of Issue not found. | PP-xlod |
 | §2.5–§2.6 | Email and in-app notification links are the bare issue URL; only Discord links add the comment's anchor, and field-change notifications carry no system event id to anchor to. | PP-4g43 |
 
 ---
