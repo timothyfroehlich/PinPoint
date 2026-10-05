@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { PhoneListHeader } from "./PhoneListHeader";
 import type {
   ListDisplayModel,
-  ListFilterModel,
+  ListOptionsFilterModel,
   ListSortModel,
   ListViewsModel,
 } from "./types";
@@ -21,7 +21,9 @@ window.matchMedia = vi.fn().mockImplementation(() => ({
   dispatchEvent: vi.fn(),
 }));
 
-function filter(overrides: Partial<ListFilterModel> = {}): ListFilterModel {
+function filter(
+  overrides: Partial<ListOptionsFilterModel> = {}
+): ListOptionsFilterModel {
   return {
     id: "status",
     label: "Status",
@@ -90,8 +92,8 @@ const display: ListDisplayModel = {
 function renderHeader(
   options: {
     views?: ListViewsModel;
-    primary?: ListFilterModel[];
-    secondary?: ListFilterModel[];
+    primary?: ListOptionsFilterModel[];
+    secondary?: ListOptionsFilterModel[];
   } = {}
 ): {
   onSaveChanges: ReturnType<typeof vi.fn>;

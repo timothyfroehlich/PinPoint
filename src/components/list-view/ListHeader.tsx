@@ -16,6 +16,7 @@ import {
 } from "~/components/ui/dropdown-menu";
 import { planListHeader } from "~/lib/list-view/overflow";
 import { cn } from "~/lib/utils";
+import { listHeaderIconButtonClass } from "./classes";
 import { isPlainClick } from "./links";
 import { CompactPager, RangeTextFace } from "./ListPager";
 import {
@@ -37,8 +38,7 @@ const currentTabClass =
   "font-semibold text-foreground shadow-[inset_0_-2px_0_var(--color-primary)]";
 const ghostButtonClass =
   "inline-flex h-8 shrink-0 items-center gap-1 rounded-md px-1.5 text-sm whitespace-nowrap text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none data-[state=open]:bg-muted data-[state=open]:text-foreground motion-reduce:transition-none";
-const iconButtonClass =
-  "inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none data-[state=open]:bg-muted data-[state=open]:text-foreground motion-reduce:transition-none";
+const iconButtonClass = listHeaderIconButtonClass;
 
 function TabFace({
   name,
