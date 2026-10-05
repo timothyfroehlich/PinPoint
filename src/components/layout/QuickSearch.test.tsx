@@ -175,6 +175,24 @@ describe("QuickSearch", () => {
     expect(input).not.toHaveFocus();
   });
 
+  it("ignores a keydown event without a key, as browser autofill sends", () => {
+    renderQuickSearch();
+    const errors: unknown[] = [];
+    const recordError = (event: ErrorEvent): void => {
+      errors.push(event.error);
+      event.preventDefault();
+    };
+    window.addEventListener("error", recordError);
+
+    document.dispatchEvent(new Event("keydown"));
+
+    window.removeEventListener("error", recordError);
+    expect(errors).toEqual([]);
+    expect(
+      screen.queryByRole("dialog", { name: "Quick search" })
+    ).not.toBeInTheDocument();
+  });
+
   it("shows machine matches before the issue lookup answers (spec 5.9)", async () => {
     const user = userEvent.setup();
     const issueLookup = deferred();
