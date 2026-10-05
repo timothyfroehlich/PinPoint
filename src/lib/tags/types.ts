@@ -124,3 +124,14 @@ export type TagGroup =
   | { kind: "untyped"; tags: HandTag[] };
 
 export type HandTagGroup = Extract<TagGroup, { kind: "hand" | "untyped" }>;
+
+/**
+ * A machine that blocks making a tag type exclusive (spec 11.7) or moving a
+ * tag (11.16), with its tags of the tag type in question.
+ */
+export interface TagConflictMachine {
+  initials: string;
+  name: string;
+  /** By name, alphabetical. */
+  tags: string[];
+}

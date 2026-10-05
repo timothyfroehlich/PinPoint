@@ -15,7 +15,9 @@ import {
   TagDeleteDialog,
   TagRenameDialog,
 } from "~/components/tags/TagManageDialogs";
+import { MoveTagDialog } from "~/components/tags/MoveTagDialog";
 import { deleteTagAction, renameTagAction } from "~/app/(app)/c/tags/actions";
+import type { TagMove } from "~/app/(app)/c/tags/[type]/[slug]/_data";
 
 interface TagActionsMenuProps {
   tagId: string;
@@ -23,16 +25,23 @@ interface TagActionsMenuProps {
   machineCount: number;
   /** The tag type's page, or the tag browse for a tag with no tag type. */
   parentHref: string;
+  /** What the Move dialog offers and what blocks each choice. */
+  move: TagMove;
 }
 
-/** A hand-applied tag's ⋯ menu: Rename and Delete (spec 11.8–11.9). */
+/**
+ * A hand-applied tag's ⋯ menu: Rename, Move to another tag type, and Delete
+ * (spec 11.8–11.9, 11.16).
+ */
 export function TagActionsMenu({
   tagId,
   name,
   machineCount,
   parentHref,
+  move,
 }: TagActionsMenuProps): React.JSX.Element {
   const [renameOpen, setRenameOpen] = useState(false);
+  const [moveOpen, setMoveOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const machinesPhrase =
     machineCount === 0
@@ -51,6 +60,9 @@ export function TagActionsMenu({
           <DropdownMenuItem onSelect={() => setRenameOpen(true)}>
             Rename…
           </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setMoveOpen(true)}>
+            Move to another tag type…
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             variant="destructive"
@@ -67,6 +79,7 @@ export function TagActionsMenu({
         currentName={name}
         onRename={(next) => renameTagAction({ tagId, name: next })}
       />
+      <MoveTagDialog open={moveOpen} onOpenChange={setMoveOpen} move={move} />
       <TagDeleteDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}

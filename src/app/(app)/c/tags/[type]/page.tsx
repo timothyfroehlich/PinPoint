@@ -10,8 +10,10 @@ import { TagTrail } from "~/components/tags/TagTrail";
 import { TagTypeActionsMenu } from "~/components/tags/TagTypeActionsMenu";
 import { getViewer } from "~/lib/collections/viewer";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
+import { exclusiveConflicts } from "~/lib/tags/conflicts";
 import { listTags } from "~/lib/tags/tags";
 import type { TagGroup } from "~/lib/tags/types";
+import { db } from "~/server/db";
 
 interface PageProps {
   params: Promise<{ type: string }>;
@@ -63,6 +65,11 @@ export default async function TagTypePage({
     checkPermission("tags.manage", getAccessLevel(viewer.role))
       ? group
       : null;
+  // Opens the one-per-machine dialog already knowing what blocks it (11.7).
+  const conflicts =
+    managed && !managed.type.exclusive
+      ? await exclusiveConflicts(db, managed.type.id)
+      : [];
 
   return (
     <PageContainer size="standard">
@@ -88,6 +95,8 @@ export default async function TagTypePage({
                   tagTypeId={managed.type.id}
                   name={managed.type.name}
                   tagCount={managed.tags.length}
+                  exclusive={managed.type.exclusive}
+                  exclusiveConflicts={conflicts}
                 />
               </div>
             ) : null}
