@@ -12,7 +12,7 @@ import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { loadMachineView } from "~/lib/machines/view/queries";
 import { lineupToReviewCount } from "~/lib/pinballmap/lineup-comparison";
 import { loadLineupData } from "~/lib/pinballmap/lineup-data";
-import { toMachineViewSearchParams } from "~/lib/machines/view/state";
+import { toListSearchParams } from "~/lib/list-view/url-state";
 import { loadMachineViewSavedViews } from "~/lib/machines/view/saved-views";
 
 interface MachinesPageProps {
@@ -38,7 +38,7 @@ export default async function MachinesPage({
     "machines.pinballmap.sync",
     accessLevel
   );
-  const viewSearchParams = toMachineViewSearchParams(rawSearchParams);
+  const viewSearchParams = toListSearchParams(rawSearchParams);
   const { savedViews, redirectTo } = await loadMachineViewSavedViews(
     "machines",
     viewSearchParams

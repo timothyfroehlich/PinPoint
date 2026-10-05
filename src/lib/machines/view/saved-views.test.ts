@@ -5,12 +5,8 @@ vi.mock("server-only", () => ({}));
 vi.mock("~/server/db", () => ({ db: {} }));
 
 const { resolveSavedMachineViewRequest } = await import("./saved-views");
-const {
-  hasMachineViewConfiguration,
-  machineViewSavedStatesEqual,
-  serializeMachineViewState,
-  toMachineViewSavedState,
-} = await import("./state");
+const { hasMachineViewConfiguration, serializeMachineViewState } =
+  await import("./state");
 
 const savedView: MachineViewSavedViewSummary = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -129,19 +125,5 @@ describe("saved view URL helpers", () => {
     expect(
       serializeMachineViewState(state, "machines", "needs-attention").toString()
     ).toBe(`${plain}&view=needs-attention`);
-  });
-
-  it("compares configurations without the page", () => {
-    const saved = savedView.state;
-    expect(
-      machineViewSavedStatesEqual(
-        toMachineViewSavedState({ ...saved, page: 4 }),
-        saved,
-        "machines"
-      )
-    ).toBe(true);
-    expect(
-      machineViewSavedStatesEqual({ ...saved, q: "stern" }, saved, "machines")
-    ).toBe(false);
   });
 });

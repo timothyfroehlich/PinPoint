@@ -2,42 +2,25 @@
 
 import { z } from "zod";
 import {
-  createProtectedAction,
-  type ProtectedActionResult,
-} from "~/lib/actions";
-import { err } from "~/lib/result";
-import {
-  createSavedView,
-  deleteSavedView,
-  renameSavedView,
-  setDefaultView,
-  updateSavedViewState,
-} from "~/lib/list-view/saved-views";
-import { isPgErrorCode } from "~/lib/db/postgres-errors";
+  createSavedViewActionHandlers,
+  type DefaultViewActionResult,
+  type DefaultViewInput,
+  type SavedViewActionResult,
+} from "~/lib/list-view/saved-view-actions";
+import { LIST_PAGE_SIZES } from "~/lib/types";
 import { VALID_MACHINE_PRESENCE_STATUSES } from "~/lib/machines/presence";
 import { machineViewDefaultBuiltInIds } from "~/lib/machines/view/saved-views";
 import {
   MACHINE_STATUS_VALUES,
-  MACHINE_VIEW_PAGE_SIZES,
   normalizeMachineViewSavedState,
 } from "~/lib/machines/view/state";
-import {
-  ISSUE_SEVERITY_VALUES,
-  MACHINE_VIEW_FIELD_IDS,
-  type SavedViewError,
-} from "~/lib/types";
-import { db } from "~/server/db";
+import { ISSUE_SEVERITY_VALUES, MACHINE_VIEW_FIELD_IDS } from "~/lib/types";
 
 /**
  * Machine Saved View actions (spec list-views §10). Every action works on the
  * account's machine Saved Views, whichever Surface it is called from: a Saved
  * View belongs to the Machine View host, not a Surface (§10.5).
  */
-
-type SavedViewActionResult = ProtectedActionResult<
-  { id: string },
-  SavedViewError
->;
 
 // Values the Machine View parser accepts; the stored configuration is then
 // re-validated exactly as URL parameters are (list-views §9.3, §10.14).
@@ -52,144 +35,59 @@ const savedStateSchema = z.object({
   owner: z.array(z.string().max(64)).max(500),
   sort: z.enum(MACHINE_VIEW_FIELD_IDS),
   dir: z.enum(["asc", "desc"]),
-  pageSize: z.literal(MACHINE_VIEW_PAGE_SIZES),
+  pageSize: z.literal(LIST_PAGE_SIZES),
   columns: z.array(z.enum(MACHINE_VIEW_FIELD_IDS)),
 });
 
-/**
- * The name check runs before the write, so two concurrent saves of one name
- * can both pass it; the unique index then rejects the second (§10.7).
- */
-async function withNameConflict(
-  write: () => Promise<SavedViewActionResult>
-): Promise<SavedViewActionResult> {
-  try {
-    return await write();
-  } catch (error) {
-    if (isPgErrorCode(error, "23505")) {
-      return err("NAME_TAKEN", "A view with this name already exists");
-    }
-    throw error;
-  }
-}
+type MachineSavedStateInput = z.infer<typeof savedStateSchema>;
 
-const createSchema = z.object({
-  name: z.string(),
-  state: savedStateSchema,
-  makeDefault: z.boolean(),
-});
-
-const createProtected = createProtectedAction({
-  actionName: "createSavedMachineViewAction",
-  schema: createSchema,
-  permission: "views.save",
-  handler: async (input, { user }): Promise<SavedViewActionResult> =>
-    withNameConflict(() =>
-      db.transaction((tx) =>
-        createSavedView(tx, {
-          userId: user.id,
-          host: "machines",
-          name: input.name,
-          state: normalizeMachineViewSavedState(input.state),
-          makeDefault: input.makeDefault,
-        })
-      )
-    ),
+const handlers = createSavedViewActionHandlers({
+  host: "machines",
+  names: {
+    create: "createSavedMachineViewAction",
+    update: "updateSavedMachineViewAction",
+    rename: "renameSavedMachineViewAction",
+    remove: "deleteSavedMachineViewAction",
+    setDefault: "setMachineViewDefaultAction",
+  },
+  stateSchema: savedStateSchema,
+  normalize: normalizeMachineViewSavedState,
+  builtInViewIds: machineViewDefaultBuiltInIds,
 });
 
 /** Save as new (list-views §5.3, §10.1). */
-export async function createSavedMachineViewAction(
-  input: z.infer<typeof createSchema>
-): Promise<SavedViewActionResult> {
-  return createProtected(input);
+export async function createSavedMachineViewAction(input: {
+  name: string;
+  state: MachineSavedStateInput;
+  makeDefault: boolean;
+}): Promise<SavedViewActionResult> {
+  return handlers.create(input);
 }
-
-const updateSchema = z.object({ id: z.uuid(), state: savedStateSchema });
-
-const updateProtected = createProtectedAction({
-  actionName: "updateSavedMachineViewAction",
-  schema: updateSchema,
-  permission: "views.save",
-  handler: async (input, { user }): Promise<SavedViewActionResult> =>
-    updateSavedViewState(db, {
-      userId: user.id,
-      host: "machines",
-      id: input.id,
-      state: normalizeMachineViewSavedState(input.state),
-    }),
-});
 
 /** Save changes (list-views §5.3). */
-export async function updateSavedMachineViewAction(
-  input: z.infer<typeof updateSchema>
-): Promise<SavedViewActionResult> {
-  return updateProtected(input);
+export async function updateSavedMachineViewAction(input: {
+  id: string;
+  state: MachineSavedStateInput;
+}): Promise<SavedViewActionResult> {
+  return handlers.update(input);
 }
 
-const renameSchema = z.object({ id: z.uuid(), name: z.string() });
-
-const renameProtected = createProtectedAction({
-  actionName: "renameSavedMachineViewAction",
-  schema: renameSchema,
-  permission: "views.save",
-  handler: async (input, { user }): Promise<SavedViewActionResult> =>
-    withNameConflict(() =>
-      db.transaction((tx) =>
-        renameSavedView(tx, { userId: user.id, host: "machines", ...input })
-      )
-    ),
-});
-
-export async function renameSavedMachineViewAction(
-  input: z.infer<typeof renameSchema>
-): Promise<SavedViewActionResult> {
-  return renameProtected(input);
+export async function renameSavedMachineViewAction(input: {
+  id: string;
+  name: string;
+}): Promise<SavedViewActionResult> {
+  return handlers.rename(input);
 }
-
-const deleteProtected = createProtectedAction({
-  actionName: "deleteSavedMachineViewAction",
-  schema: z.uuid(),
-  permission: "views.save",
-  handler: async (id, { user }): Promise<SavedViewActionResult> =>
-    deleteSavedView(db, { userId: user.id, host: "machines", id }),
-});
 
 export async function deleteSavedMachineViewAction(
   id: string
 ): Promise<SavedViewActionResult> {
-  return deleteProtected(id);
+  return handlers.remove(id);
 }
-
-const defaultSchema = z.object({
-  target: z
-    .discriminatedUnion("kind", [
-      z.object({ kind: z.literal("saved"), id: z.uuid() }),
-      z.object({ kind: z.literal("builtIn"), id: z.string().max(64) }),
-    ])
-    .nullable(),
-});
-
-const defaultProtected = createProtectedAction({
-  actionName: "setMachineViewDefaultAction",
-  schema: defaultSchema,
-  permission: "views.save",
-  handler: async (
-    input,
-    { user }
-  ): Promise<ProtectedActionResult<{ id: string | null }, SavedViewError>> =>
-    db.transaction((tx) =>
-      setDefaultView(tx, {
-        userId: user.id,
-        host: "machines",
-        target: input.target,
-        builtInViewIds: machineViewDefaultBuiltInIds(),
-      })
-    ),
-});
 
 /** Set or clear the account's machine Default View (list-views §10.8, §10.9). */
 export async function setMachineViewDefaultAction(
-  input: z.infer<typeof defaultSchema>
-): Promise<ProtectedActionResult<{ id: string | null }, SavedViewError>> {
-  return defaultProtected(input);
+  input: DefaultViewInput
+): Promise<DefaultViewActionResult> {
+  return handlers.setDefault(input);
 }

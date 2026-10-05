@@ -2,6 +2,12 @@ import type { IssueSeverity } from "./database";
 import type { MachinePresenceStatus } from "~/lib/machines/presence";
 import type { MachineStatus } from "~/lib/machines/status";
 import type { TagTypeId } from "~/lib/tags/types";
+import type {
+  ListBuiltInView,
+  ListPageSize,
+  ListSavedViews,
+  ListSavedViewSummary,
+} from "./list-view";
 
 export const MACHINE_VIEW_FIELD_IDS = [
   "machine",
@@ -30,7 +36,7 @@ export type MachineViewScope =
   | { kind: "handTag"; tagId: string };
 
 export type MachineViewSortDirection = "asc" | "desc";
-export type MachineViewPageSize = 25 | 50 | 100;
+export type MachineViewPageSize = ListPageSize;
 
 export interface MachineViewState {
   q: string;
@@ -115,38 +121,14 @@ export interface MachineViewResult {
  */
 export type MachineViewSavedState = Omit<MachineViewState, "page">;
 
-export interface MachineViewSavedViewSummary {
-  id: string;
-  name: string;
-  state: MachineViewSavedState;
-}
+export type MachineViewSavedViewSummary =
+  ListSavedViewSummary<MachineViewSavedState>;
 
 /** A Built-in View as the menu shows it (machine-views §9). */
-export interface MachineViewBuiltInView {
-  id: string;
-  name: string;
-  state: MachineViewSavedState;
-}
+export type MachineViewBuiltInView = ListBuiltInView<MachineViewSavedState>;
 
 /**
  * The views one machine Surface offers a viewer (list-views §10,
- * machine-views §9): the Surface's Built-in Views and, for an account that can
- * save, every machine Saved View. `activeViewId` is the validated `view` URL
- * reference (list-views §9.6) — an owned Saved View id or a Built-in View id
- * — or null, which means the Page Preset's baseline. `defaultViewId` is the
- * account's machine Default View, which only the Machines page opens
- * (§10.10).
+ * machine-views §9); only the Machines page offers the Default View.
  */
-export interface MachineViewSavedViews {
-  /** Whether the viewer can save, change, and delete Saved Views (§10.1). */
-  canSave: boolean;
-  /**
-   * Whether this Surface is the Machines page, where the Default View is
-   * chosen and opens (§10.10); other Surfaces do not offer defaults.
-   */
-  offersDefault: boolean;
-  builtInViews: MachineViewBuiltInView[];
-  views: MachineViewSavedViewSummary[];
-  defaultViewId: string | null;
-  activeViewId: string | null;
-}
+export type MachineViewSavedViews = ListSavedViews<MachineViewSavedState>;

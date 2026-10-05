@@ -18,7 +18,6 @@ export {
   nextMachineViewSort,
   parseMachineViewState,
   serializeMachineViewState,
-  toMachineViewSearchParams,
   type MachineViewSearchParams,
 } from "./state";
 export { loadMachineView, MACHINE_VIEW_SERVICE_TAGS } from "./queries";

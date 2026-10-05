@@ -7,6 +7,12 @@ import type {
 } from "~/lib/types";
 import { MACHINE_VIEW_FIELD_IDS } from "~/lib/types";
 import { VALID_MACHINE_PRESENCE_STATUSES } from "~/lib/machines/presence";
+import {
+  ME_PERSON_ID,
+  ME_PERSON_NAME,
+  UNASSIGNED_PERSON_ID,
+  UNASSIGNED_PERSON_NAME,
+} from "~/lib/list-view/url-state";
 
 /**
  * Optional per-row enrichment a field needs before it can display or sort.
@@ -17,18 +23,18 @@ import { VALID_MACHINE_PRESENCE_STATUSES } from "~/lib/machines/presence";
 export type MachineViewDependency = "service" | "activity";
 
 /** The owner filter value for machines with no owner (machine-views §4.2). */
-export const UNASSIGNED_OWNER_ID = "unassigned";
+export const UNASSIGNED_OWNER_ID = UNASSIGNED_PERSON_ID;
 /** How the Unassigned shortcut and an ownerless machine are named (§3.13). */
-export const UNASSIGNED_OWNER_NAME = "Unassigned";
+export const UNASSIGNED_OWNER_NAME = UNASSIGNED_PERSON_NAME;
 /**
  * The owner filter value for whoever is viewing (machine-views §4.2). It is
  * resolved per viewer when the filter runs, so one URL or Saved View means
  * each signed-in person's own machines. For an anonymous visitor the filter
  * is dropped, so the list shows every machine in the rest of the view.
  */
-export const ME_OWNER_ID = "me";
+export const ME_OWNER_ID = ME_PERSON_ID;
 /** How the Me shortcut is named (machine-views §3.13). */
-export const ME_OWNER_NAME = "Me";
+export const ME_OWNER_NAME = ME_PERSON_NAME;
 
 type DirectionLabels = Record<MachineViewSortDirection, string>;
 
