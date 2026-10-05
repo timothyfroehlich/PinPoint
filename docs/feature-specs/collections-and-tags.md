@@ -149,9 +149,7 @@
 
 ## Known divergences (code vs spec)
 
-| Requirement | Divergence                         | Resolution |
-| :---------- | :--------------------------------- | :--------- |
-| 6.2         | Owner Collections require sign-in. | PP-wqit.9  |
+_None — the current implementation matches this spec._
 
 ---
 

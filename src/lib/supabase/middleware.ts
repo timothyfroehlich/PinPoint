@@ -103,14 +103,13 @@ export async function updateSession(
   // Shared collection views (Wave 0b) live at /c/<handle> — a uuid or view
   // token — and must open for anonymous visitors (a valid view token grants
   // read access; the in-page resolver 404s a missing/invalid handle, so opening
-  // the route publicly reveals nothing). Exclude the owner-only siblings, which
-  // stay auth-gated: /c/collections (the "My Collections" list) and /c/owner/*.
+  // the route publicly reveals nothing). Owner Collections at /c/owner/* are
+  // public too (spec collections-and-tags 6.2). Only the "My Collections" list
+  // at /c/collections stays auth-gated.
   const isPublicCollectionView =
     path.startsWith("/c/") &&
     path !== "/c/collections" &&
-    !path.startsWith("/c/collections/") &&
-    path !== "/c/owner" &&
-    !path.startsWith("/c/owner/");
+    !path.startsWith("/c/collections/");
 
   const isPublic =
     path === "/" ||

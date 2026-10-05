@@ -220,6 +220,9 @@ describe("updateSession public route access", () => {
     "/c/tags/manufacturer/stern/issues",
     "/c/tags/location",
     "/c/tags/other/needs-rubbers",
+    "/c/owner/00000000-0000-4000-8000-000000000000",
+    "/c/owner/00000000-0000-4000-8000-000000000000/issues",
+    "/c/owner/00000000-0000-4000-8000-000000000000/timeline",
   ];
 
   it.each(publicRoutes)("allows unauthenticated access to %s", async (path) => {
@@ -240,6 +243,7 @@ describe("updateSession public route access", () => {
     "/admin/users",
     "/notifications",
     "/dev/badges",
+    "/c/collections",
   ];
 
   it.each(protectedRoutes)(

@@ -2,8 +2,9 @@
  * E2E Tests: Collection view (PP-slrd.1)
  *
  * Smoke coverage for the /c/owner/[userId] tabbed page: user-menu entry
- * point, all three tabs render without 500, and the owner-name link on a
- * machine Info tab lands on that owner's collection.
+ * point, all three tabs render without 500, the owner-name link on a
+ * machine Info tab lands on that owner's collection, and an anonymous visitor
+ * can open an Owner Collection (spec collections-and-tags 6.2).
  *
  * Fixtures: the seeded member user owns SC, HB, EBD, AFM, SM, GDZ2 (see
  * supabase/seed-users.mjs ownerMap), so "My Machines" is non-empty.
@@ -16,7 +17,8 @@ import {
   assertNoHorizontalOverflow,
   retryNavClick,
 } from "../support/actions.js";
-import { seededMachines } from "../support/constants.js";
+import { seededMachines, seededMember } from "../support/constants.js";
+import { getProfileIdByEmail } from "../support/supabase-admin.js";
 
 test.describe("Collection view (PP-slrd.1)", () => {
   test.use({ storageState: STORAGE_STATE.member });
@@ -111,5 +113,31 @@ test.describe("Collection view (PP-slrd.1)", () => {
       { timeout: 30_000 }
     );
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  });
+});
+
+test.describe("Owner Collection for an anonymous visitor", () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  test("opens all three tabs read-only without signing in", async ({
+    page,
+  }) => {
+    const memberId = await getProfileIdByEmail(seededMember.email);
+    const base = `/c/owner/${memberId}`;
+
+    await page.goto(base);
+    await expect(page).toHaveURL(base);
+    await expect(
+      page.getByRole("link", { name: "Attack from Mars", exact: true })
+    ).toBeVisible();
+    // No share, edit, or add-machine controls (spec 6.3).
+    await expect(page.getByTestId("collection-share-trigger")).toHaveCount(0);
+    await expect(page.getByTestId("collection-edit-trigger")).toHaveCount(0);
+
+    for (const suffix of ["/issues", "/timeline"]) {
+      await page.goto(`${base}${suffix}`);
+      await expect(page).toHaveURL(`${base}${suffix}`);
+      await expect(page.getByTestId("collection-summary")).toBeVisible();
+    }
   });
 });
