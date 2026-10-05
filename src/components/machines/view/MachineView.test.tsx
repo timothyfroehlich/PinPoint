@@ -225,6 +225,13 @@ describe("MachineView", () => {
     });
   });
 
+  it("searches without a placeholder, named for the list it searches (list-views §4.2)", () => {
+    renderView();
+    expect(
+      screen.getByRole("searchbox", { name: "Search machines" })
+    ).not.toHaveAttribute("placeholder");
+  });
+
   it("debounces search and resets to page one", () => {
     vi.useFakeTimers();
     navigation.searchParams = new URLSearchParams({ page: "3" });

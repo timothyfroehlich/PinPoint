@@ -211,7 +211,6 @@ export function IssueView({
             value={state.q}
             onSearch={(q) => update({ q })}
             label="Search issues"
-            placeholder="Search titles, IDs (AFM-12), machines, people, comments"
           />
         }
         primaryFilters={filters.primary}

@@ -49,7 +49,7 @@
 ## 4. Search and Filters
 
 - **4.1** Search runs 250 ms after typing stops, or immediately on Enter.
-- **4.2** The search field names what it searches in its placeholder or a hint.
+- **4.2** The search field shows no placeholder. Its accessible name says which list it searches.
 - **4.3** Each Primary Filter is a dropdown button labeled with the filter's name; when set, it shows its value (one value) or a count of values (several).
 - **4.4** A filter whose options are long lists of records (machines, people) has a search box that narrows its options as the person types, plus the shortcuts its host names.
 - **4.5** More holds every Secondary Filter, and any Primary Filter that does not fit (§8.1).
@@ -169,7 +169,7 @@
 
 | Date | Change |
 | :-- | :-- |
-| 2026-10-04 | Reset all returns filters to the Page Preset (§7.5); Built-in Views stay reachable as tabs or in More views (§10.12); the List Header's crowding order and the single-page result range (§8.3); per-filter Reset (§4.9); a Page Preset URL names its Built-in View when the account's Default View is another view (§10.10); empty-state action only when Edited (§3.6). |
+| 2026-10-04 | Reset all returns filters to the Page Preset (§7.5); Built-in Views stay reachable as tabs or in More views (§10.12); the List Header's crowding order and the single-page result range (§8.3); per-filter Reset (§4.9); a Page Preset URL names its Built-in View when the account's Default View is another view (§10.10); empty-state action only when Edited (§3.6). The search field shows no placeholder (§4.2). |
 | 2026-10-03 | On a Collection or Tag tab the Summary Row toggle sits on its own row between the page's tabs and search (§7.2). |
 | 2026-10-03 | Stacked Summary Widgets sit in a collapsible section (§8.4). |
 | 2026-10-02 | Default View controls appear only on the Machines and Issues pages (§10.8). |

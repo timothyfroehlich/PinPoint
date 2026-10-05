@@ -185,12 +185,18 @@ export function buildIssueFilters({
       ? [{ value: "my-machines", label: "My machines", values: myMachines }]
       : [];
   const person = peopleOptions(people);
-  const assigneeShortcuts: ListOption[] = [
-    ...(signedIn ? [{ value: ME_PERSON_ID, label: ME_PERSON_NAME }] : []),
-    { value: UNASSIGNED_PERSON_ID, label: UNASSIGNED_PERSON_NAME },
-  ];
+  // Me appears only to signed-in people (§4.9). Assignee and Machine owner
+  // offer Me and Unassigned; Reporter offers Me (§4.6, §4.10).
+  const meShortcut: ListOption[] = signedIn
+    ? [{ value: ME_PERSON_ID, label: ME_PERSON_NAME }]
+    : [];
+  const unassignedShortcut: ListOption = {
+    value: UNASSIGNED_PERSON_ID,
+    label: UNASSIGNED_PERSON_NAME,
+  };
+  const meAndUnassigned: ListOption[] = [...meShortcut, unassignedShortcut];
   // People values the shortcuts stand for, so a selected one reads by name.
-  const personLabels: ListOption[] = [...assigneeShortcuts, ...person];
+  const personLabels: ListOption[] = [...meAndUnassigned, ...person];
 
   // The control reads "Open" when exactly the Open statuses are selected
   // (issues-list §4.4).
@@ -254,7 +260,7 @@ export function buildIssueFilters({
       id: "assignee",
       label: "Assignee",
       options: person,
-      shortcuts: assigneeShortcuts,
+      shortcuts: meAndUnassigned,
       searchPlaceholder: "Search people",
       selected: state.assignee,
       valueLabel: describeSelection(state.assignee, personLabels),
@@ -314,6 +320,7 @@ export function buildIssueFilters({
       id: "owner",
       label: "Machine owner",
       options: person,
+      shortcuts: meAndUnassigned,
       searchPlaceholder: "Search people",
       selected: state.owner,
       valueLabel: describeSelection(state.owner, personLabels),
@@ -325,6 +332,7 @@ export function buildIssueFilters({
       id: "reporter",
       label: "Reporter",
       options: person,
+      shortcuts: meShortcut,
       searchPlaceholder: "Search people",
       selected: state.reporter,
       valueLabel: describeSelection(state.reporter, personLabels),

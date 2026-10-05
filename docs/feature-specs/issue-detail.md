@@ -130,7 +130,7 @@
 
 - **10.1** Other issues lists the machine's open issues other than this one — an open issue is one whose status is outside the Closed group — each as the same issue card the machine page's Open Issues card uses, in the same compact presentation, and each opening its issue. Closed issues never appear.
 - **10.2** On desktop the list's heading is **Other issues**. On mobile the Other issues tab has no heading of its own. Neither ever includes the machine's name.
-- **10.3** The list carries a **See all** link that opens the issue list at `/issues` with only the machine filter set to this machine and no other filtering: every status (closed included) and the machine shown even when it is not On the Floor (`/issues?machine=<initials>&status=all&include_inactive_machines=true`).
+- **10.3** The list carries a **See all** link that opens the issue list at `/issues` with only the machine filter set to this machine and no other filtering: every status (closed included) and the machine shown even when it is not On the Floor (`/issues?machine=<initials>&status=all&presence=all`).
 - **10.4** The list carries no link to the machine page and no explanatory copy; the header's machine link serves as the way to the machine.
 - **10.5** The list shows the five newest open issues, newest first; See all covers the rest.
 - **10.6** With no other open issues, the list shows a No other open issues message, on the mobile tab and in the desktop section alike.
@@ -195,6 +195,7 @@ Changes to this document. Divergence-table rows are working state and are not lo
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-04 | The link to a machine's other issues uses the canonical Machine Presence parameter (§10.3). |
 | 2026-10-03 | §7.5 names a person in a system event by their current name, or Former user once their account is deleted. |
 | 2026-10-03 | §4.6 Move leaves out Removed machines. |
 | 2026-10-02 | §8.7 keeps an unposted comment draft, with its photos, until it posts. |

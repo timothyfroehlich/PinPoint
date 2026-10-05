@@ -303,6 +303,57 @@ describe("IssueView", () => {
     });
   });
 
+  it("offers Me and Unassigned for Machine owner and Me for Reporter (issues-list §4.10)", async () => {
+    const user = userEvent.setup();
+    renderView();
+
+    const shortcutLabels = (name: string): (string | undefined)[] =>
+      within(screen.getByRole("group", { name: `${name} options` }))
+        .getAllByRole("checkbox")
+        .map((box) => box.closest("label")?.textContent);
+
+    await user.click(screen.getByTestId("list-filter-more"));
+    await user.click(screen.getByRole("button", { name: /^Machine owner/ }));
+    expect(shortcutLabels("Machine owner")).toEqual([
+      "Me",
+      "Unassigned",
+      "Alex",
+    ]);
+    await user.click(screen.getByRole("checkbox", { name: "Unassigned" }));
+    expect(navigation.replace).toHaveBeenLastCalledWith(
+      "/issues?owner=unassigned",
+      { scroll: false }
+    );
+    await user.keyboard("{Escape}");
+
+    await user.click(screen.getByTestId("list-filter-more"));
+    await user.click(screen.getByRole("button", { name: /^Reporter/ }));
+    expect(shortcutLabels("Reporter")).toEqual(["Me", "Alex"]);
+    await user.click(screen.getByRole("checkbox", { name: "Me" }));
+    expect(navigation.replace).toHaveBeenLastCalledWith(
+      "/issues?owner=unassigned&reporter=me",
+      { scroll: false }
+    );
+  });
+
+  it("checks a selected owner or reporter shortcut and names it on the control (issues-list §4.10)", async () => {
+    const user = userEvent.setup();
+    renderView({
+      result: withState({ owner: ["unassigned"], reporter: ["me"] }),
+    });
+
+    await user.click(screen.getByTestId("list-filter-more"));
+    expect(
+      screen.getByRole("button", { name: /^Machine owner/ })
+    ).toHaveTextContent(/Unassigned$/);
+    expect(screen.getByRole("button", { name: /^Reporter/ })).toHaveTextContent(
+      /Me$/
+    );
+    await user.click(screen.getByRole("button", { name: /^Machine owner/ }));
+    expect(screen.getByRole("checkbox", { name: "Unassigned" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Me" })).not.toBeChecked();
+  });
+
   it("offers My machines for Machine, selecting the viewer's machines (issues-list §4.5)", async () => {
     const user = userEvent.setup();
     renderView();
@@ -338,6 +389,27 @@ describe("IssueView", () => {
     expect(
       screen.queryByRole("button", { name: /^Watching/ })
     ).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^Machine owner/ }));
+    expect(
+      within(screen.getByRole("group", { name: "Machine owner options" }))
+        .getAllByRole("checkbox")
+        .map((box) => box.closest("label")?.textContent)
+    ).toEqual(["Unassigned", "Alex"]);
+    await user.keyboard("{Escape}");
+    await user.click(screen.getByTestId("list-filter-more"));
+    await user.click(screen.getByRole("button", { name: /^Reporter/ }));
+    expect(
+      within(screen.getByRole("group", { name: "Reporter options" }))
+        .getAllByRole("checkbox")
+        .map((box) => box.closest("label")?.textContent)
+    ).toEqual(["Alex"]);
+  });
+
+  it("searches without a placeholder, named for the list it searches (list-views §4.2)", () => {
+    renderView();
+    expect(
+      screen.getByRole("searchbox", { name: "Search issues" })
+    ).not.toHaveAttribute("placeholder");
   });
 
   it("lists the Secondary Filters under More, in order (issues-list §4.3)", async () => {

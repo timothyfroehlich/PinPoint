@@ -275,7 +275,6 @@ export function MachineView({
             value={state.q}
             onSearch={(q) => update({ q })}
             label="Search machines"
-            placeholder="Search names, initials, manufacturers"
           />
         }
         primaryFilters={filters}
