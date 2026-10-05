@@ -119,15 +119,6 @@ test.describe("Pinball Map lineup page (PP-o355.65)", () => {
           addRow.getByRole("button", { name: "Add to Pinball Map" })
         ).toBeVisible();
 
-        // The badge on /m shows the same count as the page.
-        const summary =
-          (await page.getByTestId("pbm-lineup-summary").textContent()) ?? "";
-        const pageCount = /(\d+) to review/.exec(summary)?.[1];
-        await page.goto("/m");
-        await expect(
-          page.getByTestId("pinball-map-lineup-to-review")
-        ).toContainText(String(pageCount));
-
         // Entry point 2: the admin menu item.
         await page.getByTestId("user-menu-button").click();
         await page

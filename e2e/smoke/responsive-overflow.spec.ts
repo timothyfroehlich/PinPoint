@@ -18,6 +18,7 @@ import {
   seededMember,
 } from "../support/constants.js";
 import { getProfileIdByEmail } from "../support/supabase-admin.js";
+import { STORAGE_STATE } from "../support/auth-state.js";
 
 // Build routes from seeded data so they don't break if seed data changes
 const machineInitials = seededMachines.addamsFamily.initials;
@@ -311,6 +312,27 @@ test.describe("Responsive: no horizontal overflow", () => {
         });
       });
     });
+  });
+
+  // The member-role `/m` entry above renders no header actions. An admin sees
+  // Pinball Map and Add Machine, which overran the header at phone widths.
+  test.describe("machines list header as admin", () => {
+    test.use({ storageState: STORAGE_STATE.admin });
+
+    for (const width of [320, 430]) {
+      test(`/m header actions fit at ${String(width)}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 800 });
+        await page.goto("/m");
+
+        await expect(page.getByTestId("add-machine-button")).toBeInViewport({
+          ratio: 1,
+        });
+        await expect(
+          page.getByTestId("pinball-map-lineup-button")
+        ).toBeInViewport({ ratio: 1 });
+        await assertNoHorizontalOverflow(page);
+      });
+    }
   });
 
   test.describe("public pages", () => {

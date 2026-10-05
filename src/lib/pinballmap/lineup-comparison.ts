@@ -218,11 +218,6 @@ function inAvailabilityConflict(machine: LineupMachineInput): boolean {
   );
 }
 
-/** The "to review" count the page and the `/m` badge share (§4.1). */
-export function lineupToReviewCount(comparison: LineupComparison): number {
-  return comparison.status === "ready" ? comparison.toReview : 0;
-}
-
 /** "Premium" from "Jurassic Park (Premium)"; null when the name has none. */
 function editionOf(name: string): string | null {
   const match = /\(([^()]+)\)\s*$/.exec(name);
