@@ -4329,6 +4329,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
         updateSettingsSetSchema.parse({
           machine: machine.initials,
           set: setId,
+          version: (await storedSet(setId)).updatedAt.toISOString(),
           sections: [
             {
               kind: "note",
@@ -4475,6 +4476,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
         updateSettingsSetSchema.parse({
           machine: machine.initials,
           set: setId,
+          version: (await storedSet(setId)).updatedAt.toISOString(),
           sections: [
             {
               kind: "note",
@@ -4515,12 +4517,15 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
         { machine: machine.initials },
         ctx("admin", admin)
       );
-      const { sets } = listed.result as { sets: { sections: unknown[] }[] };
+      const { sets } = listed.result as {
+        sets: { version: string; sections: unknown[] }[];
+      };
 
       const outcome = await runUpdateSettingsSet(
         updateSettingsSetSchema.parse({
           machine: machine.initials,
           set: setId,
+          version: sets[0]?.version,
           sections: sets[0]?.sections,
           isPublic: true,
         }),
@@ -4557,6 +4562,48 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
 
       expect(result).toMatchObject({ ok: false, code: "conflict" });
       expect((await storedSet(setId)).name).toBe("Edited in the web app");
+    });
+
+    it("refuses replacing sections when the set was edited after the list read", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine();
+      const setId = await seedSet(machine.id, { createdBy: admin });
+      const listed = await runListSettingsSets(
+        { machine: machine.initials },
+        ctx("admin", admin)
+      );
+      const { sets } = listed.result as { sets: { version: string }[] };
+      const db = await getTestDb();
+      await db
+        .update(machineSettingsSets)
+        .set({
+          name: "Edited in the web app",
+          updatedAt: new Date(Date.parse(sets[0]?.version ?? "") + 1000),
+        })
+        .where(eq(machineSettingsSets.id, setId));
+
+      await expect(
+        runUpdateSettingsSet(
+          updateSettingsSetSchema.parse({
+            machine: machine.initials,
+            set: setId,
+            version: sets[0]?.version,
+            sections: [],
+          }),
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({ reason: "conflict" });
+      expect((await storedSet(setId)).name).toBe("Edited in the web app");
+    });
+
+    it("requires a version when replacing sections", () => {
+      expect(
+        updateSettingsSetSchema.safeParse({
+          machine: "MM",
+          set: randomUUID(),
+          sections: [],
+        }).success
+      ).toBe(false);
     });
 
     it("treats a set on a different machine as not found", async () => {

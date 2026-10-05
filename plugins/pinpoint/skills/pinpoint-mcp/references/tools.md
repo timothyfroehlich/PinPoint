@@ -61,7 +61,7 @@ Pass exactly one of `query` (a title) or `machineGroupId` (a family id). Procedu
 
 - `machine` (required): initials or UUID.
 
-Returns the machine's owner requests and how-to-change-settings notes as plain text, then every set you can see: the Owner's default, public sets, and your own private drafts. Each set has its `id`, `name`, `kind` (`owner` or `community`), `isOwnersDefault`, `isPublic`, `isTournament`, `canEdit`, description, and `sections` in display order. The section shapes are in [`settings-sets.md`](settings-sets.md). Notes come back as plain text; formatting added in the web app is not shown.
+Returns the machine's owner requests and how-to-change-settings notes as plain text, then every set you can see: the Owner's default, public sets, and your own private drafts. Each set has its `id`, `version` (pass it back to `update_settings_set`), `name`, `kind` (`owner` or `community`), `isOwnersDefault`, `isPublic`, `isTournament`, `canEdit`, description, and `sections` in display order. The section shapes are in [`settings-sets.md`](settings-sets.md). Notes come back as plain text; formatting added in the web app is not shown.
 
 ## Write tools
 
@@ -150,10 +150,11 @@ Duplicates: if you already created a set on this machine with the same name, des
 CHANGE. `machine` and `set` (the id from `list_settings_sets`) are required, plus at least one of:
 
 - **`name`**, **`description`** (plain text, or `null` to clear).
-- **`sections`**: replaces **every** section. Send the whole list from `list_settings_sets` with your edits applied, keeping each section's `id`. A section you leave out is deleted.
+- **`sections`**: replaces **every** section. Send the whole list from `list_settings_sets` with your edits applied, keeping each section's `id`, and pass that read's `version`. A section you leave out is deleted.
+- **`version`**: the set's `version` from your `list_settings_sets` read. Required with `sections`; recommended with `name` or `description`.
 - **`isPublic`**: publish (`true`) or return to a private draft (`false`). The Owner's default cannot be made private.
 - **`isTournament`**: add or remove the Tournament tag.
 
-A content change is refused with "The set changed since it was read" when someone edited the set after your `list_settings_sets`; read it again and reapply your edit. A content change (name, description or sections) adds a "settings set updated" line to the timeline. Publishing and tagging add nothing. `changed: false` means every value you sent was already set.
+A content change is refused with "The set changed since it was read" when the set was edited after the read `version` came from (or, without `version`, during the call). Read it again, show the user the new contents, and reapply the edit. A content change (name, description or sections) adds a "settings set updated" line to the timeline. Publishing and tagging add nothing. `changed: false` means every value you sent was already set.
 
 Trap: owner sets can be edited only by the machine owner and admins; `canEdit` in `list_settings_sets` tells you before you try.

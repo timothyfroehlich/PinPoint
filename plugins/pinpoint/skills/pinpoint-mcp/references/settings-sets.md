@@ -35,4 +35,4 @@ Never invent a value, a menu code or a switch number the source does not state. 
 
 ## Editing a set
 
-`sections` in `update_settings_set` replaces the whole list. Start from the sections `list_settings_sets` just returned, change only what the user asked for, and send the full list back with every section's `id`. A note whose text you send back unchanged keeps the formatting it had in the web app; a note you rewrite becomes plain text.
+`sections` in `update_settings_set` replaces the whole list. Start from the sections `list_settings_sets` just returned, change only what the user asked for, and send the full list back with every section's `id` and the set's `version` from that read. A note whose text you send back unchanged keeps the formatting it had in the web app; a note you rewrite becomes plain text.

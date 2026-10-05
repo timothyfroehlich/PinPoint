@@ -8,7 +8,7 @@ import { getMachineSettingsSets } from "~/lib/machines/settings-queries";
 import { checkPermission } from "~/lib/permissions/helpers";
 import { type ProseMirrorDoc } from "~/lib/tiptap/types";
 import { db } from "~/server/db";
-import { machines } from "~/server/db/schema";
+import { machineSettingsSets, machines } from "~/server/db/schema";
 
 import { docToMcpText, toMcpSection } from "./settings-set-shape";
 import {
@@ -49,7 +49,7 @@ export async function runListSettingsSets(
   // getMachineSettingsSets is the Settings tab's own query: it applies the
   // visibility rules (another user's private draft is left out) and computes
   // per-set edit rights.
-  const [notes, sets] = await Promise.all([
+  const [notes, sets, versions] = await Promise.all([
     db.query.machines.findFirst({
       where: eq(machines.id, machine.id),
       columns: { settingsRequests: true, settingsInstructions: true },
@@ -59,7 +59,16 @@ export async function runListSettingsSets(
       access: ctx.accessLevel,
       machineOwnerId: machine.ownerId,
     }),
+    // The view model carries updatedAt as a date only; update_settings_set
+    // needs the exact timestamp to detect an edit made after this read.
+    db.query.machineSettingsSets.findMany({
+      where: eq(machineSettingsSets.machineId, machine.id),
+      columns: { id: true, updatedAt: true },
+    }),
   ]);
+  const versionById = new Map(
+    versions.map((v) => [v.id, v.updatedAt.toISOString()])
+  );
 
   return {
     result: {
@@ -72,6 +81,7 @@ export async function runListSettingsSets(
       },
       sets: sets.map((set) => ({
         id: set.id,
+        version: versionById.get(set.id) ?? null,
         name: set.name,
         kind: set.isOwnerSet ? "owner" : "community",
         isOwnersDefault: set.isPreferred,
@@ -94,7 +104,7 @@ export function registerListSettingsSets(server: McpServer): void {
     {
       title: "List a machine's settings sets",
       description:
-        "Read every settings set on a machine you can see — the Owner's default, public sets, and your own private drafts — with full contents: software adjustment rows, tables, DIP switch banks, and notes. Also returns the machine's owner requests and how-to-change-settings notes. Use before create_settings_set to avoid duplicating an existing set, and before update_settings_set to get the set id and current sections.",
+        "Read every settings set on a machine you can see — the Owner's default, public sets, and your own private drafts — with full contents: software adjustment rows, tables, DIP switch banks, and notes. Also returns the machine's owner requests and how-to-change-settings notes. Use before create_settings_set to avoid duplicating an existing set, and before update_settings_set to get the set id, version and current sections.",
       inputSchema: listSettingsSetsSchema,
       annotations: READ_ONLY_TOOL_ANNOTATIONS,
     },

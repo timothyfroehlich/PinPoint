@@ -33,6 +33,12 @@ export const updateSettingsSetSchema = z
       .min(1)
       .describe("Machine initials (case-insensitive) or UUID."),
     set: z.uuid().describe("The set's id, from list_settings_sets."),
+    version: z.iso
+      .datetime()
+      .optional()
+      .describe(
+        "The set's version from the list_settings_sets read your changes are based on. Required with sections. If the set was edited after that read, the update is refused so the edit is not overwritten."
+      ),
     name: settingsSetNameSchema.optional(),
     description: z
       .string()
@@ -65,7 +71,11 @@ export const updateSettingsSetSchema = z
       message:
         "Supply at least one field to change: name, description, sections, isPublic, or isTournament.",
     }
-  );
+  )
+  .refine((args) => args.sections === undefined || args.version !== undefined, {
+    message:
+      "sections replaces every section, so pass the set's version from the list_settings_sets read the sections came from.",
+  });
 
 type UpdateSettingsSetArgs = z.infer<typeof updateSettingsSetSchema>;
 
@@ -118,9 +128,17 @@ export async function runUpdateSettingsSet(
     setId: args.set,
     actor: { userId: ctx.userId, access: ctx.accessLevel },
     expectedMachineId: machine.id,
-    // The payload carries this read's unchanged fields, so refuse it if the
-    // set moved since.
-    ...(payload ? { payload, expectedUpdatedAt: current.updatedAt } : {}),
+    // The payload is built from the caller's read (version) and this one's
+    // unchanged fields; refuse it if the set moved since the earlier of them.
+    ...(payload
+      ? {
+          payload,
+          expectedUpdatedAt:
+            args.version === undefined
+              ? current.updatedAt
+              : new Date(args.version),
+        }
+      : {}),
     ...(args.isPublic !== undefined ? { isPublic: args.isPublic } : {}),
     ...(args.isTournament !== undefined
       ? { isTournament: args.isTournament }
