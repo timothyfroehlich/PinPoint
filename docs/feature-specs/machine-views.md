@@ -41,7 +41,7 @@
 - **3.9** Filtering, deterministic sorting, and pagination occur in the server-only pipeline. The browser receives only the current page, filtered total count, Summary Widget counts, validated view state, permitted fields, and required filter options.
 - **3.10** Initial delivery adds no database index. Query plans are benchmarked with realistic 100- and 500-machine fixtures and `EXPLAIN` evidence before proposing a partial open-issue or latest-service index.
 - **3.11** The Open Issue Severity filter matches a machine that has at least one open issue of any selected severity.
-- **3.12** The Primary Filters, in order, are Presence, Playability, Issue severity, and Owner. Machine View has no Secondary Filters.
+- **3.12** The Primary Filters, in order, are Presence, Playability, Issue severity, Owner, Tag, and Collection. Machine View has no Secondary Filters. Tag and Collection follow collections-and-tags §12.
 - **3.13** Owner searches people by name and offers Me (signed-in people only) and Unassigned shortcuts.
 - **3.14** Every sortable field is offered in the List Header's sort control as well as by its column header.
 
@@ -49,7 +49,7 @@
 
 ## 4. URL State and Presets
 
-- **4.1** Canonical Machine View URL state uses `q`, `presence`, `status`, `severity`, `owner`, `sort`, `dir`, `page`, `pageSize`, `columns`, and `view`.
+- **4.1** Canonical Machine View URL state uses `q`, `presence`, `status`, `severity`, `owner`, `tag`, `collection`, `sort`, `dir`, `page`, `pageSize`, `columns`, and `view`.
 - **4.2** Multi-values serialize as comma-separated canonical values. Owner filters use stable IDs plus the `me` and `unassigned` sentinels; `me` means whoever is viewing. Page sizes are limited to 25, 50, and 100. Severity filters use `cosmetic`, `minor`, `major`, and `unplayable`.
 - **4.3** _Moved 2026-10-02_ to list-views §9.3.
 - **4.4** _Moved 2026-10-02_ to list-views §4.7 and §4.8.
@@ -125,6 +125,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-05 | Tag and Collection Primary Filters (§3.12) and their `tag` and `collection` parameters (§4.1). |
 | 2026-10-04 | Collections open to On the Floor members by default (§4.8), matching §9.2. |
 | 2026-10-03 | Collections' Page Preset becomes On the floor (§9.2). |
 | 2026-10-03 | Presence and Last Activity join the default fields, Presence after Playability (§4.6); All machines and Recently added no longer add Presence (§9.1). Desktop and tablet rows are two lines, with manufacturer, year, and owner under the name (§3.2, §5.2); Owner, Manufacturer, and Year leave the default fields (§4.6). |

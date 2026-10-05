@@ -147,6 +147,17 @@
 
 ---
 
+## 12. Filtering Lists by Tag and Collection
+
+- **12.1** The Machines and Issues lists can be filtered by Tag and by Collection (machine-views §3.12, issues-list §4.3). An issue matches when its machine does.
+- **12.2** The Tag filter offers every tag, automatic and hand-applied, grouped by tag type in the tag browse's order (7.3, 11.14), with a search box that narrows the tags by name. Tag type headings label their group and cannot be selected. Hand-applied tags with no machines are offered too.
+- **12.3** A machine matches the Tag filter when, for every tag type with a selected tag, it holds at least one of that type's selected tags. Tags with no tag type count as one group. Selecting Front room, Back room, and Solid State matches machines in Front room or Back room that are also Solid State.
+- **12.4** The Collection filter offers the Collections listed in the viewer's My Collections (§5), with a search box that narrows them by name, and appears only to signed-in people. A machine matches when it belongs to any selected Collection.
+- **12.5** A filtered tag or Collection stays selected in links and Saved Views when it is renamed or, for a tag, moved to another tag type. A deleted tag or Collection, or a Collection the viewer can no longer open, drops out of the filter (list-views §9.3, §10.14).
+- **12.6** Tag and Collection are filters only; neither list gains a Tag or Collection field.
+
+---
+
 ## Known divergences (code vs spec)
 
 | Requirement | Divergence                         | Resolution |
@@ -159,6 +170,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-05 | Added Tag and Collection filters on the Machines and Issues lists (§12). |
 | 2026-10-03 | Removed machines are archived: left out of the add-machine choice (2.7), header counts (4.2), Collection counts (5.2), and tag counts (7.9); 7.2 drops its every-presence default, which machine-views §9.2 now sets. |
 | 2026-10-02 | Added hand-applied tags, with or without a hand-applied tag type, curated by technicians and admins and applied by machine owners to their own machines. Tag types can be exclusive. Names are capped at 20 characters. The tag browse lists hand-applied tags with no machines. Retired deferred items 10.1–10.2 and deferred tag merging. |
 | 2026-09-26 | Uncataloged machines join Type, Display, and Player Count tags through hand-entered values. |
