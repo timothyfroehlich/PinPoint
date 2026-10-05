@@ -36,12 +36,18 @@
 ## 4. Preferred sets
 
 - **4.1** A machine has at most one preferred House set and one preferred Tournament set. Either may be absent, and one set may be both.
-- **4.2** Only a set tagged House can be the preferred House set, and only a set tagged Tournament can be the preferred Tournament set. A preferred set keeps that tag until it stops being preferred.
+- **4.2** Only a set tagged House can be the preferred House set, and only a set tagged Tournament can be the preferred Tournament set. A preferred set keeps that tag until it stops being preferred. A preferred set is always a community set: making a personal set preferred makes it a community set.
 - **4.3** Technicians and admins can make any eligible set preferred, or clear it, and a machine's owner can on the machines they own. Choosing a new preferred set replaces the previous one.
-- **4.4** The first set created on a machine becomes its preferred House set.
+- **4.4** A set created on a machine that has no preferred House set becomes its preferred House set.
 - **4.5** Deleting a preferred set leaves that slot empty. Duplicating a set never copies preferred status; the copy is a personal set of the person who duplicated it, with the same tags.
-- **4.6** Setting, replacing, or clearing a preferred set, including 4.4, records a timeline event on the machine and notifies the machine owner and the machine's watchers, except the person who made the change.
+- **4.6** Setting, replacing, or clearing a preferred set, including by 4.4 or by deleting it, notifies the machine owner and the machine's watchers, except the person who made the change.
 - **4.7** The Settings tab marks both preferred sets so they can be found at a glance.
+
+## 5. Timeline
+
+- **5.1** Every change to a settings set records a timeline event on the machine: creating, editing, deleting, tagging, making it a community set, and setting, replacing, or clearing it as a preferred set.
+- **5.2** The machine's timeline shows creating, deleting, and preferred-set events by default. The other settings events are hidden by default and can be shown with the timeline's filters.
+- **5.3** Editing or tagging a set notifies no one.
 
 ---
 
@@ -52,6 +58,7 @@
 | 1, 2.1–2.5 | Sets are owner sets or community sets, with private drafts visible only to their creator; there are no personal sets. | PP-k3km.1 |
 | 3.2, 3.5, 4.1–4.7 | Sets carry a Tournament flag and one Owner's default (owner sets only, chosen by the owner or an admin, no timeline event or notification); there is no House tag or preferred Tournament set. | PP-k3km.1 |
 | 3.1, 3.3, 3.4, 3.6 | No custom settings tags or tag pages exist. | PP-k3km.2 |
+| 5.1, 5.2 | All settings events are hidden by default, and tagging, community changes, and preferred changes record no event. | PP-k3km.1 |
 
 ## Changelog
 
