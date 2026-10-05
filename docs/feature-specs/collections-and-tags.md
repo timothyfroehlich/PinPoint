@@ -149,10 +149,9 @@
 
 ## Known divergences (code vs spec)
 
-| Requirement | Divergence | Resolution |
-| :-- | :-- | :-- |
-| 6.2 | Owner Collections require sign-in. | PP-wqit.9 |
-| 11.7, 11.16 | A tag type's exclusivity is fixed when it is created, and a tag cannot move into, between, or out of tag types. | PP-wqit.3, PP-wqit.4 |
+| Requirement | Divergence                         | Resolution |
+| :---------- | :--------------------------------- | :--------- |
+| 6.2         | Owner Collections require sign-in. | PP-wqit.9  |
 
 ---
 
