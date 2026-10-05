@@ -11,7 +11,7 @@ import {
   type MachineLabel,
 } from "./MachineAttributionLine";
 import { TagPill } from "./TagSelect";
-import { RelativeTime } from "~/components/issues/RelativeTime";
+import { TimelineRowTime } from "./TimelineRowTime";
 import { Button } from "~/components/ui/button";
 import { formatIssueId } from "~/lib/issues/utils";
 import { pinballmapCommenterName } from "~/lib/pinballmap/comment-conversion";
@@ -64,7 +64,7 @@ export function MachineTimelinePinballMapCommentRow({
   const [isConvertOpen, setIsConvertOpen] = useState(false);
   const { comment } = row;
   const rightMeta: React.ReactNode = showRelativeTime ? (
-    <RelativeTime value={row.createdAt} />
+    <TimelineRowTime value={row.createdAt} />
   ) : (
     rowDateLabel
   );
@@ -80,7 +80,7 @@ export function MachineTimelinePinballMapCommentRow({
       >
         <MapPin className="size-5 text-muted-foreground" />
       </div>
-      <div className="min-w-0 flex-1">
+      <div className="@container min-w-0 flex-1">
         {machineLabel ? (
           <MachineAttributionLine machine={machineLabel} />
         ) : null}

@@ -53,7 +53,7 @@ export async function MachineRecentActivity({
 
   return (
     <section aria-labelledby="recent-activity-heading">
-      <div className="mb-2 flex items-center justify-between gap-3">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <div className="flex items-baseline gap-3">
           <h2
             id="recent-activity-heading"

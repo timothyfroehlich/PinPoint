@@ -173,6 +173,18 @@ test.describe("Responsive: no horizontal overflow", () => {
       });
     }
 
+    // 320px is the layout floor (design bible §4). Medieval Madness's seeded
+    // issues put severity badges in its Recent activity rows, the row shape
+    // that overran this width (PP-xw8s).
+    test("machine Info tab fits a 320px viewport", async ({ page }) => {
+      await page.setViewportSize({ width: 320, height: 640 });
+      await page.goto(`/m/${seededMachines.medievalMadness.initials}`);
+      await expect(
+        page.getByTestId("issue-severity-badge").first()
+      ).toBeVisible();
+      await assertNoHorizontalOverflow(page);
+    });
+
     test("machine tabs remain reachable at 320px with 200% root text", async ({
       page,
     }) => {
