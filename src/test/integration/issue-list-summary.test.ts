@@ -45,7 +45,7 @@ describe("issue list Summary Widget counts", () => {
     await db.insert(issues).values([
       createTestIssue("AA", {
         issueNumber: 1,
-        status: "new",
+        status: "confirmed",
         severity: "unplayable",
         priority: "high",
       }),
@@ -76,7 +76,7 @@ describe("issue list Summary Widget counts", () => {
     ]);
   }
 
-  it("counts open and closed issues on On the Floor machines, ignoring the list's search and filters", async () => {
+  it("counts open issues on On the Floor machines by status group, ignoring the list's search and filters", async () => {
     await seed();
     const { summary, totalCount } = await loadIssueListPage(
       {
@@ -88,23 +88,12 @@ describe("issue list Summary Widget counts", () => {
     );
 
     // The list itself matches nothing; the widgets still count the scope,
-    // skipping CC (off the floor) and DD (removed).
+    // skipping CC (off the floor) and DD (removed). Confirmed counts in the
+    // New group (issue-widgets §3.2); the Fixed issue counts nowhere.
     expect(totalCount).toBe(0);
     expect(summary).toEqual({
       open: 2,
-      byStatus: {
-        new: 1,
-        confirmed: 0,
-        in_progress: 1,
-        need_parts: 0,
-        need_help: 0,
-        wait_owner: 0,
-        fixed: 1,
-        wont_fix: 0,
-        wai: 0,
-        no_repro: 0,
-        duplicate: 0,
-      },
+      byStatusGroup: { new: 1, in_progress: 1 },
       bySeverity: { cosmetic: 0, minor: 0, major: 1, unplayable: 1 },
       byPriority: { low: 0, medium: 1, high: 1 },
     });

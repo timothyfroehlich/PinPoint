@@ -9,11 +9,15 @@ import {
 } from "~/components/summary-widgets";
 import { cn } from "~/lib/utils";
 import {
+  OPEN_STATUS_GROUPS,
   PRIORITY_CONFIG,
   SEVERITY_CONFIG,
   STATUS_CONFIG,
-  type IssueStatus,
+  STATUS_GROUPS,
+  type OpenStatusGroup,
 } from "~/lib/issues/status";
+import { arraysEqual } from "~/lib/list-view/url-state";
+import { STATUS_FILTER_GROUP_NAMES } from "./issue-filters";
 import type {
   IssueListSummary,
   IssuePriority,
@@ -24,15 +28,10 @@ import type {
 /** Browser storage key for the Issues widgets' expanded choice (widgets §2.6). */
 export const ISSUE_SUMMARY_STORAGE_KEY = "pinpoint:summary-widgets:issues";
 
-/** Segment order, worst first (issue-widgets §3.2, §4.2, §5.2). */
-const STATUS_SEGMENTS: readonly IssueStatus[] = [
-  "need_help",
-  "need_parts",
-  "wait_owner",
-  "new",
-  "confirmed",
-  "in_progress",
-];
+/**
+ * Segment order: Status runs New then In Progress (issue-widgets §3.2);
+ * Severity and Priority run worst first (§4.2, §5.2).
+ */
 const SEVERITY_SEGMENTS: readonly IssueSeverity[] = [
   "unplayable",
   "major",
@@ -53,6 +52,17 @@ interface IssueSummaryWidgetsProps {
 /** The value a filter holds when it holds exactly one value, else null. */
 function soleValue<T>(values: readonly T[]): T | null {
   return values.length === 1 ? (values[0] ?? null) : null;
+}
+
+/** The open status group the Status filter holds exactly, else null. */
+function selectedStatusGroup(
+  status: IssueViewState["status"]
+): OpenStatusGroup | null {
+  return (
+    OPEN_STATUS_GROUPS.find((group) =>
+      arraysEqual(status, STATUS_GROUPS[group])
+    ) ?? null
+  );
 }
 
 /** The Summary Row: the open total and the Unplayable count (issue-widgets §2.4). */
@@ -83,8 +93,9 @@ export function IssueSummaryRow({
 /**
  * The Status, Severity, and Priority widgets on Issue View (issue-widgets
  * spec). Every widget counts the host's whole scope (§2.2), whatever the
- * list's filters; a Segment sets its own filter to that value alone and
- * returns to page 1 (widgets §6.1, §6.2).
+ * list's filters; a Segment sets its own filter and returns to page 1
+ * (widgets §6.1, §6.2). A Status Segment is a status group, so it sets the
+ * Status filter to every status in the group, in canonical order (§3.3).
  */
 export function IssueSummaryWidgets({
   summary,
@@ -92,11 +103,12 @@ export function IssueSummaryWidgets({
   onStateChange,
   controller,
 }: IssueSummaryWidgetsProps): React.JSX.Element {
-  const statusSegments: SummaryWidgetSegment<IssueStatus>[] =
-    STATUS_SEGMENTS.map((value) => ({
+  // No status group has a colour of its own; each takes its namesake status's.
+  const statusSegments: SummaryWidgetSegment<OpenStatusGroup>[] =
+    OPEN_STATUS_GROUPS.map((value) => ({
       value,
-      label: STATUS_CONFIG[value].label,
-      count: summary.byStatus[value],
+      label: STATUS_FILTER_GROUP_NAMES[value],
+      count: summary.byStatusGroup[value],
       textClassName: STATUS_CONFIG[value].iconColor,
       fillClassName: STATUS_CONFIG[value].barColor,
     }));
@@ -128,9 +140,13 @@ export function IssueSummaryWidgets({
         id="issue-widget-status"
         label="Status"
         segments={statusSegments}
-        selectedValue={soleValue(state.status)}
-        onSegmentSelect={(value) =>
-          onStateChange({ ...state, status: [value], page: 1 })
+        selectedValue={selectedStatusGroup(state.status)}
+        onSegmentSelect={(group) =>
+          onStateChange({
+            ...state,
+            status: [...STATUS_GROUPS[group]],
+            page: 1,
+          })
         }
       />
       <SummaryWidget

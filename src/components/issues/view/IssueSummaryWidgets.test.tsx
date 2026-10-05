@@ -7,19 +7,7 @@ import { IssueSummaryWidgets } from "./IssueSummaryWidgets";
 
 const summary: IssueListSummary = {
   open: 7,
-  byStatus: {
-    new: 2,
-    confirmed: 0,
-    in_progress: 1,
-    need_parts: 1,
-    need_help: 2,
-    wait_owner: 1,
-    fixed: 2,
-    wont_fix: 0,
-    wai: 0,
-    no_repro: 0,
-    duplicate: 0,
-  },
+  byStatusGroup: { new: 2, in_progress: 5 },
   bySeverity: { cosmetic: 2, minor: 1, major: 1, unplayable: 3 },
   byPriority: { low: 1, medium: 4, high: 2 },
 };
@@ -45,16 +33,10 @@ function segmentNames(widget: string): (string | null)[] {
 }
 
 describe("IssueSummaryWidgets", () => {
-  it("lists Segments worst first (issue-widgets §3.2, §4.2, §5.2)", () => {
+  it("lists the Status groups, then Severity and Priority worst first (issue-widgets §3.2, §4.2, §5.2)", () => {
     renderWidgets();
 
-    expect(segmentNames("Status")).toEqual([
-      "2 Need Help",
-      "1 Need Parts",
-      "1 Pending Owner",
-      "2 New",
-      "1 In Progress",
-    ]);
+    expect(segmentNames("Status")).toEqual(["2 New", "5 In Progress"]);
     expect(segmentNames("Severity")).toEqual([
       "3 Unplayable",
       "1 Major",
@@ -97,5 +79,32 @@ describe("IssueSummaryWidgets", () => {
       severity: ["unplayable"],
       page: 1,
     });
+  });
+
+  it("sets the Status filter to every status in a group (§3.3)", async () => {
+    const state: IssueViewState = {
+      ...ISSUE_VIEW_PRESET,
+      q: "flipper",
+      page: 2,
+    };
+    const onStateChange = renderWidgets(state);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "5 In Progress" })
+    );
+
+    expect(onStateChange).toHaveBeenCalledWith({
+      ...state,
+      status: ["in_progress", "need_parts", "need_help", "wait_owner"],
+      page: 1,
+    });
+  });
+
+  it("marks a Status Segment selected only when the filter is exactly its group (§3.3)", () => {
+    renderWidgets({ ...ISSUE_VIEW_PRESET, status: ["new", "confirmed"] });
+    expect(screen.getByRole("button", { name: "2 New" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
   });
 });

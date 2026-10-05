@@ -49,15 +49,21 @@ export type IssueFilterPatch = Partial<
 const WATCHING_VALUE = "watching";
 
 /**
- * Status groups as the Status filter names them (issues-list §1, §4.4):
- * the New and In Progress groups together are the Open statuses, so the
- * New group is not called Open here.
+ * Status groups as the Status filter and the Status Widget name them
+ * (issues-list §1, §4.4; issue-widgets §3.2): the New and In Progress groups
+ * together are the Open statuses, so the New group is not called Open here.
  */
-const STATUS_GROUP_NAMES = [
-  ["new", "New"],
-  ["in_progress", STATUS_GROUP_LABELS.in_progress],
-  ["closed", STATUS_GROUP_LABELS.closed],
-] as const;
+export const STATUS_FILTER_GROUP_NAMES: Record<
+  keyof typeof STATUS_GROUPS,
+  string
+> = {
+  new: "New",
+  in_progress: STATUS_GROUP_LABELS.in_progress,
+  closed: STATUS_GROUP_LABELS.closed,
+};
+
+/** The status groups in the Status filter's order. */
+const STATUS_FILTER_GROUPS = ["new", "in_progress", "closed"] as const;
 
 const dayFormat = new Intl.DateTimeFormat("en-US", {
   month: "short",
@@ -152,14 +158,13 @@ export function buildIssueFilters({
   primary: ListFilterModel[];
   secondary: ListFilterModel[];
 } {
-  const statusOptions: ListOption[] = STATUS_GROUP_NAMES.flatMap(
-    ([group, name]) =>
-      STATUS_GROUPS[group].map((value) => ({
-        value,
-        label: STATUS_CONFIG[value].label,
-        textClassName: STATUS_CONFIG[value].iconColor,
-        group: name,
-      }))
+  const statusOptions: ListOption[] = STATUS_FILTER_GROUPS.flatMap((group) =>
+    STATUS_GROUPS[group].map((value) => ({
+      value,
+      label: STATUS_CONFIG[value].label,
+      textClassName: STATUS_CONFIG[value].iconColor,
+      group: STATUS_FILTER_GROUP_NAMES[group],
+    }))
   );
   const severityOptions: ListOption[] = ISSUE_SEVERITY_VALUES.map((value) => ({
     value,

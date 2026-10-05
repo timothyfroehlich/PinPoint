@@ -33,9 +33,9 @@ function ids(result: IssueViewResult): string[] {
   );
 }
 
-/** Every issue the widgets count, open or closed (issue-widgets §2.2). */
+/** The open issues the widgets count (issue-widgets §2.2, §2.4). */
 function counted(result: IssueViewResult): number {
-  return Object.values(result.summary.byStatus).reduce((a, b) => a + b, 0);
+  return result.summary.open;
 }
 
 function load(query: string, scope?: string[]): Promise<IssueViewResult> {

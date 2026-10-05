@@ -10,7 +10,7 @@
 
 ## 1. Concepts
 
-- **Status Widget** — summarizes the population's open issues by status.
+- **Status Widget** — summarizes the population's open issues by status group.
 - **Severity Widget** — summarizes the population's open issues by severity.
 - **Priority Widget** — summarizes the population's open issues by priority.
 
@@ -28,8 +28,8 @@
 ## 3. Status Widget
 
 - **3.1** _Retired 2026-10-04._ Summary Widgets no longer show a headline (widgets §5.1). Number kept so older citations don't dangle.
-- **3.2** The Segments are, in order, Need Help, Need Parts, Pending Owner, New, Confirmed, and In Progress, dividing the population's open issues by status. Closed issues are excluded.
-- **3.3** Selecting a Segment sets the Status filter to that status.
+- **3.2** The Segments are, in order, New and In Progress, dividing the population's open issues by status group. Closed issues are excluded.
+- **3.3** Selecting a Segment sets the Status filter to every status in that group.
 
 ---
 
@@ -60,6 +60,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-05 | The Status Widget's Segments are the New and In Progress status groups (§1, §3.2, §3.3). |
 | 2026-10-04 | Retired the widget headlines (§3.1, §4.1, §5.1). |
 | 2026-10-02 | Reworded the population (§2.2); retired the Widget Population parameters (§2.3); the Summary Row drops the High priority count (§2.4); Segments run worst first (§3.2, §4.2, §5.2). |
 | 2026-09-26 | §2.2: All counts only issues on On the Floor machines, matching the issue list's default view. |

@@ -1,4 +1,5 @@
-import type { IssuePriority, IssueSeverity, IssueStatus } from "./database";
+import type { OpenStatusGroup } from "~/lib/issues/status";
+import type { IssuePriority, IssueSeverity } from "./database";
 
 /**
  * Counts for the issue-list Summary Widgets (issue-widgets §2–§5). Every widget
@@ -8,8 +9,8 @@ import type { IssuePriority, IssueSeverity, IssueStatus } from "./database";
 export interface IssueListSummary {
   /** Open issues in the population. */
   open: number;
-  /** Issues of each status; closed statuses included. */
-  byStatus: Record<IssueStatus, number>;
+  /** Open issues in each open status group. */
+  byStatusGroup: Record<OpenStatusGroup, number>;
   /** Open issues of each severity. */
   bySeverity: Record<IssueSeverity, number>;
   /** Open issues of each priority. */

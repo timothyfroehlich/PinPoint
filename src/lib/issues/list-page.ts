@@ -7,7 +7,12 @@ import {
   buildWhereConditions,
 } from "~/lib/issues/filters-queries";
 import type { IssueFilters } from "~/lib/issues/filters";
-import { OPEN_STATUSES } from "~/lib/issues/status";
+import {
+  OPEN_STATUS_GROUPS,
+  STATUS_GROUPS,
+  type IssueStatus,
+  type OpenStatusGroup,
+} from "~/lib/issues/status";
 import type {
   IssueListRow,
   IssueListSummary,
@@ -47,7 +52,12 @@ const ISSUE_LIST_COLUMNS = {
   assignedTo: true,
 } as const;
 
-const OPEN_STATUS_SET: ReadonlySet<string> = new Set(OPEN_STATUSES);
+/** The open status group each open status belongs to; closed ones are absent. */
+const OPEN_STATUS_GROUP: ReadonlyMap<IssueStatus, OpenStatusGroup> = new Map(
+  OPEN_STATUS_GROUPS.flatMap((group) =>
+    STATUS_GROUPS[group].map((status) => [status, group] as const)
+  )
+);
 
 /**
  * Summary Widget counts for an issue list (issue-widgets §2–§5): every issue,
@@ -93,26 +103,15 @@ async function loadIssueListSummary(
 
   const counts: IssueListSummary = {
     open: 0,
-    byStatus: {
-      new: 0,
-      confirmed: 0,
-      in_progress: 0,
-      need_parts: 0,
-      need_help: 0,
-      wait_owner: 0,
-      fixed: 0,
-      wont_fix: 0,
-      wai: 0,
-      no_repro: 0,
-      duplicate: 0,
-    },
+    byStatusGroup: { new: 0, in_progress: 0 },
     bySeverity: { cosmetic: 0, minor: 0, major: 0, unplayable: 0 },
     byPriority: { low: 0, medium: 0, high: 0 },
   };
   for (const group of groups) {
-    counts.byStatus[group.status] += group.value;
-    if (!OPEN_STATUS_SET.has(group.status)) continue;
+    const statusGroup = OPEN_STATUS_GROUP.get(group.status);
+    if (statusGroup === undefined) continue;
     counts.open += group.value;
+    counts.byStatusGroup[statusGroup] += group.value;
     counts.bySeverity[group.severity] += group.value;
     counts.byPriority[group.priority] += group.value;
   }
