@@ -5,6 +5,10 @@ import { and, eq } from "drizzle-orm";
 import { isDeepStrictEqual } from "node:util";
 import { z } from "zod";
 
+import {
+  BUILTIN_SETTINGS_TAG_NAMES,
+  BUILTIN_SETTINGS_TAGS,
+} from "~/lib/machines/settings-types";
 import { db } from "~/server/db";
 import { machineSettingsSets } from "~/server/db/schema";
 import { createSettingsSet } from "~/services/machine-settings";
@@ -42,16 +46,12 @@ export const createSettingsSetSchema = z.object({
   sections: z
     .array(mcpSettingsSectionSchema)
     .describe("The set's sections, in display order."),
-  isPublic: z
-    .boolean()
+  tags: z
+    .array(z.enum(BUILTIN_SETTINGS_TAGS))
     .optional()
     .describe(
-      "Publish the set so everyone can see it. Default false: a private draft only you (and admins) can see, to review in the Settings tab first. Ignored when the set becomes the Owner's default, which is always public."
+      'Built-in settings tags to start with: "house" (day-to-day setup) and/or "tournament". Default ["house"].'
     ),
-  isTournament: z
-    .boolean()
-    .optional()
-    .describe("Tag the set Tournament. Default false."),
 });
 
 type CreateSettingsSetArgs = z.infer<typeof createSettingsSetSchema>;
@@ -84,8 +84,7 @@ export async function runCreateSettingsSet(
       id: true,
       description: true,
       sections: true,
-      isPublic: true,
-      isTournament: true,
+      isCommunity: true,
     },
   });
   const wanted = contentOf(payload.sections);
@@ -99,10 +98,9 @@ export async function runCreateSettingsSet(
       result: {
         created: false,
         reason:
-          "You already created an identical set on this machine. isPublic and isTournament were not applied; change them with update_settings_set.",
+          "You already created an identical set on this machine. tags were not applied; change them with update_settings_set.",
         id: existing.id,
-        isPublic: existing.isPublic,
-        isTournament: existing.isTournament,
+        kind: existing.isCommunity ? "community" : "personal",
         machine: machine.initials,
         url: `${machineUrl(machine.initials)}/settings`,
       },
@@ -114,10 +112,7 @@ export async function runCreateSettingsSet(
     machineId: machine.id,
     actor: { userId: ctx.userId, access: ctx.accessLevel },
     payload,
-    ...(args.isPublic !== undefined ? { isPublic: args.isPublic } : {}),
-    ...(args.isTournament !== undefined
-      ? { isTournament: args.isTournament }
-      : {}),
+    ...(args.tags !== undefined ? { builtinTags: args.tags } : {}),
   });
   if (!created.ok) {
     throw new McpToolError(
@@ -134,10 +129,9 @@ export async function runCreateSettingsSet(
       id: created.value.id,
       machine: machine.initials,
       name: payload.name,
-      kind: created.value.isOwnerSet ? "owner" : "community",
-      isOwnersDefault: created.value.isPreferred,
-      isPublic: created.value.isPublic,
-      isTournament: created.value.isTournament,
+      kind: created.value.isCommunity ? "community" : "personal",
+      isPreferredHouse: created.value.isPreferredHouse,
+      tags: created.value.builtinTags.map((t) => BUILTIN_SETTINGS_TAG_NAMES[t]),
       url: `${machineUrl(machine.initials)}/settings`,
     },
     machineId: machine.id,
@@ -150,7 +144,7 @@ export function registerCreateSettingsSet(server: McpServer): void {
     {
       title: "Create a settings set",
       description:
-        "Add a settings set to a machine: named, with software adjustment rows (menu code, name, value, plus the baseline install they change from), tables, DIP switch banks, and plain-text notes (e.g. rubbers and post positions). Created as a private community draft unless isPublic is true. Exception: when you own the machine, the set is an owner set, and if the machine has no Owner's default yet it becomes the Owner's default and is published. Call list_settings_sets first so you don't duplicate an existing set. Adds a timeline entry on the machine.",
+        "Add a settings set to a machine: named, with software adjustment rows (menu code, name, value, plus the baseline install they change from), tables, DIP switch banks, and plain-text notes (e.g. rubbers and post positions). The set is your personal set — only you can edit it — tagged House unless tags says otherwise. To let technicians and the owner edit it, follow with update_settings_set makeCommunity. Exception: on a machine with no preferred House set, a House-tagged set becomes the preferred House set and so a community set. Call list_settings_sets first so you don't duplicate an existing set. Adds a timeline entry on the machine.",
       inputSchema: createSettingsSetSchema,
       annotations: WRITE_TOOL_ANNOTATIONS,
     },

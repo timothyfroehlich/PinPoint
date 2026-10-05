@@ -4,7 +4,8 @@ import { z } from "zod";
  * Tag enum for `timeline_events.tag`.
  *
  * Ordered by family so the dropdown reads coherently:
- *   - Reserved (system-emitted): lifecycle, issue, settings, pinballmap
+ *   - Reserved (system-emitted): lifecycle, issue, settings, settings_edit,
+ *     pinballmap
  *   - Hands-on work:             maintenance, adjustment, parts, upgrade
  *   - Care:                      cleaning
  *   - Observation:               inspection, note
@@ -18,6 +19,7 @@ export const TIMELINE_TAGS = [
   "lifecycle",
   "issue",
   "settings",
+  "settings_edit",
   "pinballmap",
   "maintenance",
   "adjustment",
@@ -38,17 +40,19 @@ export type TimelineTag = (typeof TIMELINE_TAGS)[number];
  * constant so PP-43q3 can later default an individual tag (e.g. `settings`) OFF
  * by editing this one line without touching the query/filter wiring.
  *
- * PP-43q3: `settings` defaults OFF — settings-change events are noise on the
- * default timeline view, surfaced only when the user opts into the tag.
+ * Machine-settings spec §5.2: `settings` (a set created or deleted, a preferred
+ * set changed) shows by default; `settings_edit` (edits, tagging, a set made
+ * community) defaults OFF, surfaced only when the user opts into the tag.
  */
 export const DEFAULT_TIMELINE_TAGS = TIMELINE_TAGS.filter(
-  (t): t is TimelineTag => t !== "settings"
+  (t): t is TimelineTag => t !== "settings_edit"
 );
 
 export const RESERVED_TAGS = [
   "lifecycle",
   "issue",
   "settings",
+  "settings_edit",
   "pinballmap",
 ] as const satisfies readonly TimelineTag[];
 
@@ -68,6 +72,7 @@ const TAG_LABELS: Record<TimelineTag, string> = {
   lifecycle: "Lifecycle",
   issue: "Issue",
   settings: "Settings",
+  settings_edit: "Settings edits",
   pinballmap: "Pinball Map",
   maintenance: "Maintenance",
   adjustment: "Adjustment",

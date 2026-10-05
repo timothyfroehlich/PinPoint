@@ -736,6 +736,20 @@
       "when": 1791087419613,
       "tag": "0104_assigned-event-assignee-ids",
       "breakpoints": true
+    },
+    {
+      "idx": 105,
+      "version": "7",
+      "when": 1791169082901,
+      "tag": "0105_settings-sets-model",
+      "breakpoints": true
+    },
+    {
+      "idx": 106,
+      "version": "7",
+      "when": 1791169106307,
+      "tag": "0106_settings-sets-drop-old-flags",
+      "breakpoints": true
     }
   ]
 }

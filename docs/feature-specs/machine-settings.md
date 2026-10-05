@@ -55,10 +55,8 @@
 
 | Requirement | Divergence | Resolution |
 | :-- | :-- | :-- |
-| 1, 2.1–2.5 | Sets are owner sets or community sets, with private drafts visible only to their creator; there are no personal sets. | PP-k3km.1 |
-| 3.2, 3.5, 4.1–4.7 | Sets carry a Tournament flag and one Owner's default (owner sets only, chosen by the owner or an admin, no timeline event or notification); there is no House tag or preferred Tournament set. | PP-k3km.1 |
-| 3.1, 3.3, 3.4, 3.6 | No custom settings tags or tag pages exist. | PP-k3km.2 |
-| 5.1, 5.2 | All settings events are hidden by default, and tagging, community changes, and preferred changes record no event. | PP-k3km.1 |
+| 3.1, 3.3, 3.4, 3.6 | Only the built-in House and Tournament tags exist; there are no custom settings tags or tag pages. | PP-k3km.2 |
+| 4.6 | Changing a preferred set notifies no one. | PP-k3km.3 |
 
 ## Changelog
 

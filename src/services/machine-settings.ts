@@ -1,27 +1,46 @@
 import { Buffer } from "node:buffer";
 import { isDeepStrictEqual } from "node:util";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 import { isPgErrorCode } from "~/lib/db/postgres-errors";
-import { canEditSet, type SettingsSetAuth } from "~/lib/permissions";
-import { checkPermission } from "~/lib/permissions/helpers";
+import {
+  canDeleteSet,
+  canEditSet,
+  canMakeCommunity,
+  canManageMachineSettings,
+  type SettingsSetAuth,
+} from "~/lib/permissions";
 import { type AccessLevel } from "~/lib/permissions/matrix";
 import {
+  BUILTIN_SETTINGS_TAG_NAMES,
+  BUILTIN_SETTINGS_TAGS,
+  NAME_MAX,
+  type SettingsPreferredSlot,
   type SettingsSection,
   type SettingsSetPayload,
 } from "~/lib/machines/settings-types";
 import { type Result, err, ok } from "~/lib/result";
 import { type ProseMirrorDoc } from "~/lib/tiptap/types";
 import { emitSettingsSetEvent } from "~/lib/timeline/machine-events";
-import { db } from "~/server/db";
-import { machineSettingsSets, machines } from "~/server/db/schema";
+import { db, type DbTransaction } from "~/server/db";
+import {
+  machineSettingsSetTags,
+  machineSettingsSets,
+  machines,
+  settingsTags,
+} from "~/server/db/schema";
 
 /**
  * Settings-set writes shared by the Settings tab's Server Actions and the MCP
- * tools (PP-u4ab.25). Callers authenticate and validate the payload shape
- * (`settingsSetPayloadSchema`); this layer owns authorization against the
- * per-set rules in `~/lib/permissions/settings`, the writes, and the timeline
- * events. Path revalidation stays with the Server Actions.
+ * tools. Callers authenticate and validate the payload shape
+ * (`settingsSetPayloadSchema`); this layer owns authorization against
+ * `~/lib/permissions/settings`, the writes, and the timeline events
+ * (docs/feature-specs/machine-settings.md). Path revalidation stays with the
+ * Server Actions.
+ *
+ * Only content writes bump a set's `updatedAt` — it is the version MCP callers
+ * pass back — so tagging, preferring, and making a set community never make an
+ * agent's held version stale.
  */
 
 /** Who is acting, resolved by the caller from its own auth. */
@@ -66,53 +85,142 @@ function exceedsByteCeiling(stored: ReturnType<typeof toStored>): boolean {
 
 /** Project a settings-set row's auth-relevant columns to `SettingsSetAuth`. */
 export function toSettingsSetAuth(row: {
-  isOwnerSet: boolean;
-  isPublic: boolean;
-  isPreferred: boolean;
+  isCommunity: boolean;
   createdBy: string | null;
 }): SettingsSetAuth {
-  return {
-    isOwnerSet: row.isOwnerSet,
-    isPublic: row.isPublic,
-    isPreferred: row.isPreferred,
-    createdById: row.createdBy,
-  };
+  return { isCommunity: row.isCommunity, createdById: row.createdBy };
 }
+
+function preferredPatch(
+  slot: SettingsPreferredSlot,
+  value: boolean
+): { isPreferredHouse: boolean } | { isPreferredTournament: boolean } {
+  return slot === "house"
+    ? { isPreferredHouse: value }
+    : { isPreferredTournament: value };
+}
+
+/**
+ * The built-in House and Tournament tags' ids (spec §3.2). Migration 0105
+ * inserts them; this also creates them where a database was built from the
+ * schema alone (the PGlite test schema), so callers never see them missing.
+ */
+export async function ensureBuiltinSettingsTags(
+  tx: DbTransaction = db
+): Promise<Record<SettingsPreferredSlot, string>> {
+  await tx
+    .insert(settingsTags)
+    .values(
+      BUILTIN_SETTINGS_TAGS.map((slug) => ({
+        slug,
+        name: BUILTIN_SETTINGS_TAG_NAMES[slug],
+        isBuiltin: true,
+      }))
+    )
+    .onConflictDoNothing({ target: settingsTags.slug });
+  const rows = await tx
+    .select({ id: settingsTags.id, slug: settingsTags.slug })
+    .from(settingsTags)
+    .where(inArray(settingsTags.slug, [...BUILTIN_SETTINGS_TAGS]));
+  const house = rows.find((r) => r.slug === "house");
+  const tournament = rows.find((r) => r.slug === "tournament");
+  if (!house || !tournament) throw new Error("Built-in settings tags missing");
+  return { house: house.id, tournament: tournament.id };
+}
+
+/** Which built-in tags a set carries. */
+async function builtinSlotsOf(
+  setId: string,
+  builtin: Record<SettingsPreferredSlot, string>,
+  tx: DbTransaction = db
+): Promise<Set<SettingsPreferredSlot>> {
+  const rows = await tx
+    .select({ tagId: machineSettingsSetTags.tagId })
+    .from(machineSettingsSetTags)
+    .where(eq(machineSettingsSetTags.setId, setId));
+  const ids = new Set(rows.map((r) => r.tagId));
+  return new Set(
+    BUILTIN_SETTINGS_TAGS.filter((slot) => ids.has(builtin[slot]))
+  );
+}
+
+interface LoadedSet {
+  set: {
+    id: string;
+    machineId: string;
+    name: string;
+    description: ProseMirrorDoc | null;
+    sections: SettingsSection[];
+    isCommunity: boolean;
+    isPreferredHouse: boolean;
+    isPreferredTournament: boolean;
+    createdBy: string | null;
+    updatedAt: Date;
+  };
+  machine: { id: string; initials: string; ownerId: string | null };
+}
+
+async function loadSet(
+  setId: string,
+  expectedMachineId?: string
+): Promise<LoadedSet | null> {
+  const set = await db.query.machineSettingsSets.findFirst({
+    where: eq(machineSettingsSets.id, setId),
+    columns: {
+      id: true,
+      machineId: true,
+      name: true,
+      description: true,
+      sections: true,
+      isCommunity: true,
+      isPreferredHouse: true,
+      isPreferredTournament: true,
+      createdBy: true,
+      updatedAt: true,
+    },
+  });
+  if (!set) return null;
+  if (expectedMachineId !== undefined && set.machineId !== expectedMachineId) {
+    return null;
+  }
+  const machine = await db.query.machines.findFirst({
+    where: eq(machines.id, set.machineId),
+    columns: { id: true, initials: true, ownerId: true },
+  });
+  if (!machine) return null;
+  return { set: { ...set, description: set.description ?? null }, machine };
+}
+
+// ---------------------------------------------------------------------------
+// Create
+// ---------------------------------------------------------------------------
 
 export interface CreateSettingsSetParams {
   machineId: string;
   actor: SettingsActor;
   payload: SettingsSetPayload;
-  /** Publish on creation. Omitted → a private draft (the default). */
-  isPublic?: boolean;
-  isTournament?: boolean;
+  /** Built-in tags to start with. Omitted → House only (spec §2.1). */
+  builtinTags?: readonly SettingsPreferredSlot[];
 }
 
 export interface CreatedSettingsSet {
   id: string;
   machineInitials: string;
-  isOwnerSet: boolean;
-  isPublic: boolean;
-  isPreferred: boolean;
-  isTournament: boolean;
+  isCommunity: boolean;
+  isPreferredHouse: boolean;
+  builtinTags: SettingsPreferredSlot[];
 }
 
 /**
- * Create a settings set. Gated by `machines.settings.manage`; whoever may
- * create a set may also edit, publish, and tag it, so the optional flags need
- * no further check.
- *
- * Kind is captured at creation: a set the machine owner makes is an owner set
- * (protected); anyone else's is a community set. New sets are private drafts —
- * EXCEPT the owner's very first set with no existing default, which
- * auto-becomes the Owner's default (and so is published).
+ * Create a settings set: a personal set of its creator (spec §2.1). When the
+ * machine has no preferred House set and the new set carries House, it becomes
+ * the preferred House set and so a community set (§4.4, §4.2).
  */
 export async function createSettingsSet({
   machineId,
   actor,
   payload,
-  isPublic = false,
-  isTournament = false,
+  builtinTags = ["house"],
 }: CreateSettingsSetParams): Promise<
   Result<CreatedSettingsSet, SettingsWriteError>
 > {
@@ -127,80 +235,92 @@ export async function createSettingsSet({
   });
   if (!machine) return err("not_found", "Machine not found");
 
-  if (
-    !checkPermission("machines.settings.manage", actor.access, {
-      userId: actor.userId,
-      machineOwnerId: machine.ownerId,
-    })
-  ) {
+  if (!canManageMachineSettings(machine.ownerId, actor.userId, actor.access)) {
     return err("denied", "Forbidden");
   }
 
-  const isOwnerSet =
-    machine.ownerId !== null && actor.userId === machine.ownerId;
-  const existingPreferred = isOwnerSet
-    ? await db.query.machineSettingsSets.findFirst({
-        where: and(
-          eq(machineSettingsSets.machineId, machineId),
-          eq(machineSettingsSets.isPreferred, true)
-        ),
-        columns: { id: true },
-      })
-    : undefined;
-  const autoDefault = isOwnerSet && !existingPreferred;
-
-  const insertSet = (asDefault: boolean): Promise<string | undefined> =>
+  const tags = [...new Set(builtinTags)];
+  const insertSet = (
+    tryPreferred: boolean
+  ): Promise<{ id: string; preferred: boolean }> =>
     db.transaction(async (tx) => {
+      const builtin = await ensureBuiltinSettingsTags(tx);
+      const preferred =
+        tryPreferred &&
+        tags.includes("house") &&
+        !(await tx.query.machineSettingsSets.findFirst({
+          where: and(
+            eq(machineSettingsSets.machineId, machineId),
+            eq(machineSettingsSets.isPreferredHouse, true)
+          ),
+          columns: { id: true },
+        }));
       const [inserted] = await tx
         .insert(machineSettingsSets)
         .values({
           machineId,
           ...stored,
-          isOwnerSet,
-          isPublic: asDefault || isPublic,
-          isPreferred: asDefault,
-          isTournament,
+          isCommunity: preferred,
+          isPreferredHouse: preferred,
           createdBy: actor.userId,
           updatedBy: actor.userId,
         })
         .returning({ id: machineSettingsSets.id });
-      if (!inserted) return undefined;
+      if (!inserted) throw new Error("Could not create settings set");
+      if (tags.length > 0) {
+        await tx.insert(machineSettingsSetTags).values(
+          tags.map((slot) => ({
+            setId: inserted.id,
+            tagId: builtin[slot],
+            addedBy: actor.userId,
+          }))
+        );
+      }
       await emitSettingsSetEvent(
         machineId,
-        "settings_set_created",
-        stored.name,
+        { kind: "settings_set_created", setName: stored.name },
         actor.userId,
         tx
       );
-      return inserted.id;
+      if (preferred) {
+        await emitSettingsSetEvent(
+          machineId,
+          {
+            kind: "settings_preferred_changed",
+            setName: stored.name,
+            slot: "house",
+            action: "set",
+          },
+          actor.userId,
+          tx
+        );
+      }
+      return { id: inserted.id, preferred };
     });
 
-  // The `existingPreferred` probe above runs OUTSIDE the transaction, so two
-  // concurrent first-set creates by the same owner (two tabs) both compute
-  // autoDefault=true and the second collides on the partial unique index
-  // `uniq_machine_settings_preferred`. Losing that race is not an error —
-  // a default now exists, so retry as an ordinary set rather than 500-ing and
-  // discarding the user's set.
-  let asDefault = autoDefault;
-  let newId: string | undefined;
+  // Two concurrent first creates can both see no preferred House set; the loser
+  // collides on uniq_machine_settings_preferred. A preferred set now exists, so
+  // retry as an ordinary set rather than discarding the user's set.
+  let created: { id: string; preferred: boolean };
   try {
-    newId = await insertSet(asDefault);
+    created = await insertSet(true);
   } catch (error) {
-    if (!autoDefault || !isPgErrorCode(error, "23505")) throw error;
-    asDefault = false;
-    newId = await insertSet(false);
+    if (!isPgErrorCode(error, "23505")) throw error;
+    created = await insertSet(false);
   }
-  if (!newId) throw new Error("Could not create settings set");
 
   return ok({
-    id: newId,
+    id: created.id,
     machineInitials: machine.initials,
-    isOwnerSet,
-    isPublic: asDefault || isPublic,
-    isPreferred: asDefault,
-    isTournament,
+    isCommunity: created.preferred,
+    isPreferredHouse: created.preferred,
+    builtinTags: tags,
   });
 }
+
+// ---------------------------------------------------------------------------
+// Update content / make community
+// ---------------------------------------------------------------------------
 
 export interface UpdateSettingsSetParams {
   setId: string;
@@ -218,8 +338,8 @@ export interface UpdateSettingsSetParams {
   expectedUpdatedAt?: Date;
   /** Full replacement of the set's name, description, and sections. */
   payload?: SettingsSetPayload;
-  isPublic?: boolean;
-  isTournament?: boolean;
+  /** Turn a personal set into a community set (spec §2.4, one-way). */
+  makeCommunity?: boolean;
 }
 
 export interface UpdatedSettingsSet {
@@ -229,16 +349,14 @@ export interface UpdatedSettingsSet {
   /** False when every supplied value already matched — nothing was written. */
   changed: boolean;
   contentChanged: boolean;
-  isPublic: boolean;
-  isTournament: boolean;
+  isCommunity: boolean;
 }
 
 /**
- * Update an existing set's content and/or its Public and Tournament flags in
- * one transaction. All three need edit rights on the set (owner sets: owner +
- * admin; community sets: technicians+, the owner, admin). A content change
- * emits `settings_set_updated`; flag changes emit nothing (PP-tn6t). Values
- * that already match are skipped, and an all-no-op call writes nothing.
+ * Update a set's content and/or make it a community set, in one transaction.
+ * Content needs edit rights (§2.2–§2.3); making it community needs its author
+ * (§2.4). Values that already match are skipped; an all-no-op call writes
+ * nothing.
  */
 export async function updateSettingsSet({
   setId,
@@ -246,8 +364,7 @@ export async function updateSettingsSet({
   expectedMachineId,
   expectedUpdatedAt,
   payload,
-  isPublic,
-  isTournament,
+  makeCommunity,
 }: UpdateSettingsSetParams): Promise<
   Result<UpdatedSettingsSet, SettingsWriteError>
 > {
@@ -256,64 +373,32 @@ export async function updateSettingsSet({
     return err("invalid", "Settings are too large to save.");
   }
 
-  const existing = await db.query.machineSettingsSets.findFirst({
-    where: eq(machineSettingsSets.id, setId),
-    columns: {
-      id: true,
-      machineId: true,
-      name: true,
-      description: true,
-      sections: true,
-      isOwnerSet: true,
-      isPublic: true,
-      isPreferred: true,
-      isTournament: true,
-      createdBy: true,
-      updatedAt: true,
-    },
-  });
+  const loaded = await loadSet(setId, expectedMachineId);
+  if (!loaded) return err("not_found", "Settings set not found");
+  const { set, machine } = loaded;
+  const auth = toSettingsSetAuth(set);
+
   if (
-    !existing ||
-    (expectedMachineId !== undefined &&
-      existing.machineId !== expectedMachineId)
+    stored !== undefined &&
+    !canEditSet(auth, machine.ownerId, actor.userId, actor.access)
   ) {
-    return err("not_found", "Settings set not found");
+    return err(
+      "denied",
+      set.isCommunity ? "Forbidden" : "Only its author can edit a personal set."
+    );
   }
-
-  const machine = await db.query.machines.findFirst({
-    where: eq(machines.id, existing.machineId),
-    columns: { id: true, initials: true, ownerId: true },
-  });
-  if (!machine) return err("not_found", "Machine not found");
-
-  // canEditSet includes view rights, so another user's private draft is
-  // refused here too.
-  if (
-    !canEditSet(
-      toSettingsSetAuth(existing),
-      machine.ownerId,
-      actor.userId,
-      actor.access
-    )
-  ) {
-    return err("denied", "Forbidden");
+  const communityChanged = makeCommunity === true && !set.isCommunity;
+  if (communityChanged && !canMakeCommunity(auth, actor.userId, actor.access)) {
+    return err("denied", "Only its author can make a personal set community.");
   }
 
   if (
     expectedUpdatedAt !== undefined &&
-    existing.updatedAt.getTime() !== expectedUpdatedAt.getTime()
+    set.updatedAt.getTime() !== expectedUpdatedAt.getTime()
   ) {
     return err(
       "conflict",
       "The set changed since it was read. Read it again and reapply the change."
-    );
-  }
-
-  // The Owner's default is always public — unset it before hiding.
-  if (isPublic === false && existing.isPreferred) {
-    return err(
-      "invalid",
-      "Unset the Owner's default before making it private."
     );
   }
 
@@ -323,9 +408,9 @@ export async function updateSettingsSet({
     stored !== undefined &&
     !isDeepStrictEqual(
       {
-        name: existing.name,
-        description: existing.description ?? null,
-        sections: existing.sections,
+        name: set.name,
+        description: set.description,
+        sections: set.sections,
       },
       {
         name: stored.name,
@@ -333,29 +418,32 @@ export async function updateSettingsSet({
         sections: stored.sections,
       }
     );
-  const publicChanged =
-    isPublic !== undefined && isPublic !== existing.isPublic;
-  const tournamentChanged =
-    isTournament !== undefined && isTournament !== existing.isTournament;
-  const changed = contentChanged || publicChanged || tournamentChanged;
+  const changed = contentChanged || communityChanged;
 
   if (changed) {
     await db.transaction(async (tx) => {
       await tx
         .update(machineSettingsSets)
         .set({
-          ...(contentChanged ? stored : {}),
-          ...(publicChanged ? { isPublic } : {}),
-          ...(tournamentChanged ? { isTournament } : {}),
-          updatedBy: actor.userId,
-          updatedAt: new Date(),
+          ...(contentChanged
+            ? { ...stored, updatedBy: actor.userId, updatedAt: new Date() }
+            : {}),
+          ...(communityChanged ? { isCommunity: true } : {}),
         })
         .where(eq(machineSettingsSets.id, setId));
+      const setName = contentChanged ? stored.name : set.name;
       if (contentChanged) {
         await emitSettingsSetEvent(
           machine.id,
-          "settings_set_updated",
-          stored.name,
+          { kind: "settings_set_updated", setName },
+          actor.userId,
+          tx
+        );
+      }
+      if (communityChanged) {
+        await emitSettingsSetEvent(
+          machine.id,
+          { kind: "settings_set_made_community", setName },
           actor.userId,
           tx
         );
@@ -364,12 +452,329 @@ export async function updateSettingsSet({
   }
 
   return ok({
-    id: existing.id,
+    id: set.id,
     machineId: machine.id,
     machineInitials: machine.initials,
     changed,
     contentChanged,
-    isPublic: isPublic ?? existing.isPublic,
-    isTournament: isTournament ?? existing.isTournament,
+    isCommunity: set.isCommunity || communityChanged,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Tags
+// ---------------------------------------------------------------------------
+
+export interface SetSettingsSetTagParams {
+  setId: string;
+  actor: SettingsActor;
+  /** A built-in tag's slot (custom tags arrive with PP-k3km.2). */
+  tag: SettingsPreferredSlot;
+  applied: boolean;
+}
+
+export interface SettingsSetRef {
+  id: string;
+  machineId: string;
+  machineInitials: string;
+  changed: boolean;
+}
+
+/**
+ * Apply or remove a settings tag (spec §3.4). A preferred set keeps its slot's
+ * tag until it stops being preferred (§4.2).
+ */
+export async function setSettingsSetTag({
+  setId,
+  actor,
+  tag,
+  applied,
+}: SetSettingsSetTagParams): Promise<
+  Result<SettingsSetRef, SettingsWriteError>
+> {
+  const loaded = await loadSet(setId);
+  if (!loaded) return err("not_found", "Settings set not found");
+  const { set, machine } = loaded;
+  if (!canManageMachineSettings(machine.ownerId, actor.userId, actor.access)) {
+    return err("denied", "Forbidden");
+  }
+  const isPreferredInSlot =
+    tag === "house" ? set.isPreferredHouse : set.isPreferredTournament;
+  if (!applied && isPreferredInSlot) {
+    return err(
+      "invalid",
+      `Unset the preferred ${BUILTIN_SETTINGS_TAG_NAMES[tag]} set before removing its tag.`
+    );
+  }
+
+  const changed = await db.transaction(async (tx) => {
+    const builtin = await ensureBuiltinSettingsTags(tx);
+    const tagId = builtin[tag];
+    const rows = applied
+      ? await tx
+          .insert(machineSettingsSetTags)
+          .values({ setId, tagId, addedBy: actor.userId })
+          .onConflictDoNothing()
+          .returning({ setId: machineSettingsSetTags.setId })
+      : await tx
+          .delete(machineSettingsSetTags)
+          .where(
+            and(
+              eq(machineSettingsSetTags.setId, setId),
+              eq(machineSettingsSetTags.tagId, tagId)
+            )
+          )
+          .returning({ setId: machineSettingsSetTags.setId });
+    if (rows.length === 0) return false;
+    await emitSettingsSetEvent(
+      machine.id,
+      {
+        kind: "settings_set_tagged",
+        setName: set.name,
+        tagName: BUILTIN_SETTINGS_TAG_NAMES[tag],
+        added: applied,
+      },
+      actor.userId,
+      tx
+    );
+    return true;
+  });
+
+  return ok({
+    id: set.id,
+    machineId: machine.id,
+    machineInitials: machine.initials,
+    changed,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Preferred sets
+// ---------------------------------------------------------------------------
+
+export interface SetPreferredSettingsSetParams {
+  setId: string;
+  actor: SettingsActor;
+  slot: SettingsPreferredSlot;
+  preferred: boolean;
+}
+
+/**
+ * Make a set the machine's preferred House or Tournament set, or clear it
+ * (spec §4.2–§4.3). Only a set carrying the slot's tag is eligible; a personal
+ * set becomes a community set as it is made preferred. The previous holder is
+ * cleared in the same transaction (the partial unique index is the backstop).
+ */
+export async function setPreferredSettingsSet({
+  setId,
+  actor,
+  slot,
+  preferred,
+}: SetPreferredSettingsSetParams): Promise<
+  Result<SettingsSetRef, SettingsWriteError>
+> {
+  const loaded = await loadSet(setId);
+  if (!loaded) return err("not_found", "Settings set not found");
+  const { set, machine } = loaded;
+  if (!canManageMachineSettings(machine.ownerId, actor.userId, actor.access)) {
+    return err("denied", "Forbidden");
+  }
+  const slotName = BUILTIN_SETTINGS_TAG_NAMES[slot];
+  const current =
+    slot === "house" ? set.isPreferredHouse : set.isPreferredTournament;
+  if (current === preferred) {
+    return ok({
+      id: set.id,
+      machineId: machine.id,
+      machineInitials: machine.initials,
+      changed: false,
+    });
+  }
+
+  try {
+    await db.transaction(async (tx) => {
+      if (preferred) {
+        const builtin = await ensureBuiltinSettingsTags(tx);
+        const slots = await builtinSlotsOf(setId, builtin, tx);
+        if (!slots.has(slot)) {
+          throw new IneligibleError(
+            `Only a set tagged ${slotName} can be the preferred ${slotName} set.`
+          );
+        }
+        await tx
+          .update(machineSettingsSets)
+          .set(preferredPatch(slot, false))
+          .where(
+            and(
+              eq(machineSettingsSets.machineId, machine.id),
+              eq(
+                slot === "house"
+                  ? machineSettingsSets.isPreferredHouse
+                  : machineSettingsSets.isPreferredTournament,
+                true
+              )
+            )
+          );
+      }
+      await tx
+        .update(machineSettingsSets)
+        .set({
+          ...preferredPatch(slot, preferred),
+          ...(preferred ? { isCommunity: true } : {}),
+        })
+        .where(eq(machineSettingsSets.id, setId));
+      if (preferred && !set.isCommunity) {
+        await emitSettingsSetEvent(
+          machine.id,
+          { kind: "settings_set_made_community", setName: set.name },
+          actor.userId,
+          tx
+        );
+      }
+      await emitSettingsSetEvent(
+        machine.id,
+        {
+          kind: "settings_preferred_changed",
+          setName: set.name,
+          slot,
+          action: preferred ? "set" : "cleared",
+        },
+        actor.userId,
+        tx
+      );
+    });
+  } catch (error) {
+    if (error instanceof IneligibleError) return err("invalid", error.message);
+    // Two callers promoting different sets concurrently can collide on the
+    // slot's partial unique index.
+    if (isPgErrorCode(error, "23505")) {
+      return err(
+        "conflict",
+        `Another set was just made the preferred ${slotName} set. Please try again.`
+      );
+    }
+    throw error;
+  }
+
+  return ok({
+    id: set.id,
+    machineId: machine.id,
+    machineInitials: machine.initials,
+    changed: true,
+  });
+}
+
+class IneligibleError extends Error {}
+
+// ---------------------------------------------------------------------------
+// Delete / duplicate
+// ---------------------------------------------------------------------------
+
+/** Delete a set (spec §2.2–§2.3). A preferred slot it held is left empty (§4.5). */
+export async function deleteSettingsSet({
+  setId,
+  actor,
+}: {
+  setId: string;
+  actor: SettingsActor;
+}): Promise<Result<SettingsSetRef, SettingsWriteError>> {
+  const loaded = await loadSet(setId);
+  if (!loaded) return err("not_found", "Settings set not found");
+  const { set, machine } = loaded;
+  if (
+    !canDeleteSet(
+      toSettingsSetAuth(set),
+      machine.ownerId,
+      actor.userId,
+      actor.access
+    )
+  ) {
+    return err("denied", "Forbidden");
+  }
+
+  await db.transaction(async (tx) => {
+    await tx
+      .delete(machineSettingsSets)
+      .where(eq(machineSettingsSets.id, setId));
+    await emitSettingsSetEvent(
+      machine.id,
+      { kind: "settings_set_deleted", setName: set.name },
+      actor.userId,
+      tx
+    );
+  });
+
+  return ok({
+    id: set.id,
+    machineId: machine.id,
+    machineInitials: machine.initials,
+    changed: true,
+  });
+}
+
+/**
+ * Duplicate a set: the copy is a personal set of the duplicator with the same
+ * tags, never preferred (spec §4.5). Needs create rights on the machine.
+ */
+export async function duplicateSettingsSet({
+  setId,
+  actor,
+}: {
+  setId: string;
+  actor: SettingsActor;
+}): Promise<Result<SettingsSetRef, SettingsWriteError>> {
+  const loaded = await loadSet(setId);
+  if (!loaded) return err("not_found", "Settings set not found");
+  const { set, machine } = loaded;
+  if (!canManageMachineSettings(machine.ownerId, actor.userId, actor.access)) {
+    return err("denied", "Forbidden");
+  }
+
+  // Cap the copy name so a long original (up to NAME_MAX) plus the " (copy)"
+  // suffix can't exceed NAME_MAX — otherwise the duplicate would persist but
+  // fail the save schema on any later edit.
+  const COPY_SUFFIX = " (copy)";
+  const copyName = `${set.name.slice(0, NAME_MAX - COPY_SUFFIX.length)}${COPY_SUFFIX}`;
+
+  const newId = await db.transaction(async (tx) => {
+    const [inserted] = await tx
+      .insert(machineSettingsSets)
+      .values({
+        machineId: machine.id,
+        name: copyName,
+        description: set.description,
+        sections: set.sections,
+        createdBy: actor.userId,
+        updatedBy: actor.userId,
+      })
+      .returning({ id: machineSettingsSets.id });
+    if (!inserted) throw new Error("Could not duplicate set");
+    const tagRows = await tx
+      .select({ tagId: machineSettingsSetTags.tagId })
+      .from(machineSettingsSetTags)
+      .where(eq(machineSettingsSetTags.setId, setId));
+    if (tagRows.length > 0) {
+      await tx.insert(machineSettingsSetTags).values(
+        tagRows.map((r) => ({
+          setId: inserted.id,
+          tagId: r.tagId,
+          addedBy: actor.userId,
+        }))
+      );
+    }
+    await emitSettingsSetEvent(
+      machine.id,
+      { kind: "settings_set_created", setName: copyName },
+      actor.userId,
+      tx
+    );
+    return inserted.id;
+  });
+
+  return ok({
+    id: newId,
+    machineId: machine.id,
+    machineInitials: machine.initials,
+    changed: true,
   });
 }

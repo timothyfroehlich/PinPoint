@@ -1,4 +1,5 @@
 import type { MachineLifecycleEventData } from "~/lib/timeline/machine-event-types";
+import { BUILTIN_SETTINGS_TAG_NAMES } from "~/lib/machines/settings-types";
 import type { MachinePresenceStatus } from "~/lib/machines/presence";
 import {
   personLabel,
@@ -59,6 +60,18 @@ export function formatMachineEvent(
       return `Settings set "${event.setName}" removed`;
     case "settings_set_preferred":
       return `Marked "${event.setName}" as the preferred settings set`;
+    case "settings_set_tagged":
+      return event.added
+        ? `Tagged settings set "${event.setName}" ${event.tagName}`
+        : `Removed the ${event.tagName} tag from settings set "${event.setName}"`;
+    case "settings_set_made_community":
+      return `Settings set "${event.setName}" made a community set`;
+    case "settings_preferred_changed": {
+      const slot = BUILTIN_SETTINGS_TAG_NAMES[event.slot];
+      return event.action === "set"
+        ? `"${event.setName}" made the preferred ${slot} set`
+        : `"${event.setName}" is no longer the preferred ${slot} set`;
+    }
     // "Lineup" is Pinball Map's own word for the set of machines at a location,
     // and "listing" never appears in user-facing copy (spec 4.8).
     case "pinballmap_intent":

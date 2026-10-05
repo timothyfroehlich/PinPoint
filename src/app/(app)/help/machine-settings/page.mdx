@@ -8,63 +8,76 @@ export const metadata = {
 
 ## Choosing a set
 
-The set badged **★ Owner's default** is the configuration the machine's owner
-considers canonical. Each machine has at most one, and it always sorts first.
-**🏆 Tournament** marks a set as competition-ready. A set can carry both badges.
+Each machine can have one **★ Preferred House** set — how it runs day to day —
+and one **Preferred Tournament** set for competition. Both sort first. One set
+can be both.
+
+Sets also carry **tags**. **House** and **Tournament** are built in: only a set
+tagged House can be the preferred House set, and only a set tagged Tournament
+can be the preferred Tournament set. A set can carry both tags.
 
 ## Who can edit a set
-
-Two independent properties decide this: a set's **kind** — Owner or Community,
-fixed when it is created — and whether it is still a **private draft**. A draft
-is limited to its creator and admins regardless of kind.
 
 <div className="overflow-x-auto mt-3">
   <table className="w-full text-sm border-collapse">
     <thead>
       <tr className="border-b">
         <th className="text-left p-2 font-medium text-foreground">Badge</th>
-        <th className="text-left p-2 font-medium text-foreground">Means</th>
-        <th className="text-left p-2 font-medium text-foreground">Who can edit it</th>
+        <th className="text-left p-2 font-medium text-foreground">
+          Who can edit it
+        </th>
+        <th className="text-left p-2 font-medium text-foreground">
+          Who can delete it
+        </th>
       </tr>
     </thead>
     <tbody>
       <tr className="border-b">
-        <td className="p-2 font-medium text-foreground whitespace-nowrap">Owner</td>
-        <td className="p-2 text-muted-foreground">Made by the machine owner</td>
-        <td className="p-2 text-muted-foreground">The owner and admins only — not technicians</td>
+        <td className="p-2 font-medium text-foreground whitespace-nowrap">
+          Personal
+        </td>
+        <td className="p-2 text-muted-foreground">
+          Only the person who made it
+        </td>
+        <td className="p-2 text-muted-foreground">Its author and admins</td>
       </tr>
       <tr className="border-b">
-        <td className="p-2 font-medium text-foreground whitespace-nowrap">Community</td>
-        <td className="p-2 text-muted-foreground">Made by a technician or admin</td>
-        <td className="p-2 text-muted-foreground">Any technician, plus the owner and admins</td>
-      </tr>
-      <tr className="border-b">
-        <td className="p-2 font-medium text-foreground whitespace-nowrap">Private draft</td>
-        <td className="p-2 text-muted-foreground">Not yet published</td>
-        <td className="p-2 text-muted-foreground">Its creator and admins</td>
+        <td className="p-2 font-medium text-foreground whitespace-nowrap">
+          Community
+        </td>
+        <td className="p-2 text-muted-foreground">
+          Technicians, the machine owner, and admins
+        </td>
+        <td className="p-2 text-muted-foreground">The same people</td>
       </tr>
     </tbody>
   </table>
 </div>
 
-Drafts are hidden from everyone but their creator and admins, so a set can be
-built out before it is published. Creating a set at all requires the **owner**,
-**technician**, or **admin** role — see
+Every new set starts as a personal set tagged House. Its author can make it a
+community set from the ⋮ menu; that can't be undone. Creating a set requires
+the **owner**, **technician**, or **admin** role — see
 [Roles & Permissions](/help/permissions).
 
-Two exceptions are worth knowing:
+Everyone can see every set. Other people's personal sets are hidden until you
+turn on **Others' personal** above the list, unless one is a preferred set.
 
-- The Owner's default must stay public. Remove the default designation before
-  making the set private.
-- If you own the machine and it has no default yet, your **first** set skips
-  the draft stage: it is published and made the default immediately.
+## Tags and preferred sets
+
+Technicians, admins, and the machine's owner can tag any set on the machine and
+choose its preferred sets, even sets they can't edit. Choosing a new preferred
+set replaces the old one.
+
+- A preferred set is always a community set: making someone's personal set
+  preferred turns it into a community set.
+- A preferred set keeps its tag. Unset it before removing the tag.
+- If a machine has no preferred House set, the next set created on it becomes
+  the preferred House set.
 
 ## Duplicating a set
 
-A duplicate starts as a private draft owned by you, and its kind is re-derived
-from who copied it — so a copy of someone else's **Owner** set becomes a
-**Community** set you can edit. The duplicate carries the Tournament tag over.
-It never inherits the Owner's default designation.
+A duplicate is a personal set of yours with the same tags. It is never
+preferred.
 
 ## Saving
 
@@ -78,8 +91,8 @@ stop typing, so there is no Save button.
 - Software settings, Post positions, and Rubbers are limited to one per set,
   and leave the **Add section** menu once used. DIP banks, tables, and notes
   can repeat.
-- Creating, editing, and deleting a set record a **settings** entry on the
-  machine's Timeline; publishing, tagging, and changing the default do not.
-  That Timeline filter is off by default.
+- The machine's Timeline shows sets being created and deleted and preferred
+  sets changing. Edits, tags, and sets made community are recorded under
+  **Settings edits**, a Timeline filter that is off by default.
 
 </HelpPage>

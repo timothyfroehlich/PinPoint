@@ -6,7 +6,11 @@ import { z } from "zod";
 
 import { db } from "~/server/db";
 import { machineSettingsSets } from "~/server/db/schema";
-import { updateSettingsSet } from "~/services/machine-settings";
+import { BUILTIN_SETTINGS_TAGS } from "~/lib/machines/settings-types";
+import {
+  setSettingsSetTag,
+  updateSettingsSet,
+} from "~/services/machine-settings";
 
 import {
   mcpSettingsSectionSchema,
@@ -51,25 +55,32 @@ export const updateSettingsSetSchema = z
       .describe(
         "Replaces ALL of the set's sections, in display order. To change one row, send every section back with that row edited; a section left out is deleted."
       ),
-    isPublic: z
+    makeCommunity: z
+      .literal(true)
+      .optional()
+      .describe(
+        "Turn your personal set into a community set that technicians, the machine owner and admins can edit. Only the set's author can, and it cannot be undone."
+      ),
+    house: z
       .boolean()
       .optional()
-      .describe("Publish (true) or return to a private draft (false)."),
-    isTournament: z
+      .describe("Apply (true) or remove (false) the House tag."),
+    tournament: z
       .boolean()
       .optional()
-      .describe("Add (true) or remove (false) the Tournament tag."),
+      .describe("Apply (true) or remove (false) the Tournament tag."),
   })
   .refine(
     (args) =>
       args.name !== undefined ||
       args.description !== undefined ||
       args.sections !== undefined ||
-      args.isPublic !== undefined ||
-      args.isTournament !== undefined,
+      args.makeCommunity !== undefined ||
+      args.house !== undefined ||
+      args.tournament !== undefined,
     {
       message:
-        "Supply at least one field to change: name, description, sections, isPublic, or isTournament.",
+        "Supply at least one field to change: name, description, sections, makeCommunity, house, or tournament.",
     }
   )
   .refine((args) => args.sections === undefined || args.version !== undefined, {
@@ -139,29 +150,47 @@ export async function runUpdateSettingsSet(
               : new Date(args.version),
         }
       : {}),
-    ...(args.isPublic !== undefined ? { isPublic: args.isPublic } : {}),
-    ...(args.isTournament !== undefined
-      ? { isTournament: args.isTournament }
-      : {}),
+    ...(args.makeCommunity ? { makeCommunity: true } : {}),
   });
   if (!updated.ok) {
     if (updated.code === "not_found") throw notFound;
     throw new McpToolError(
       updated.code,
       updated.code === "denied"
-        ? "You can't edit this set. Owner sets are editable only by the machine owner and admins; a private draft only by its creator."
+        ? `You can't change this set. ${updated.message}`
         : updated.message
     );
   }
 
+  const actor = { userId: ctx.userId, access: ctx.accessLevel };
+  let tagsChanged = false;
+  for (const tag of BUILTIN_SETTINGS_TAGS) {
+    const applied = tag === "house" ? args.house : args.tournament;
+    if (applied === undefined) continue;
+    const tagged = await setSettingsSetTag({
+      setId: args.set,
+      actor,
+      tag,
+      applied,
+    });
+    if (!tagged.ok) {
+      throw new McpToolError(
+        tagged.code,
+        tagged.code === "denied"
+          ? "Only technicians, admins, and the machine owner can tag its settings sets."
+          : tagged.message
+      );
+    }
+    tagsChanged ||= tagged.value.changed;
+  }
+
   return {
     result: {
-      changed: updated.value.changed,
+      changed: updated.value.changed || tagsChanged,
       contentChanged: updated.value.contentChanged,
       id: updated.value.id,
       machine: machine.initials,
-      isPublic: updated.value.isPublic,
-      isTournament: updated.value.isTournament,
+      kind: updated.value.isCommunity ? "community" : "personal",
       url: `${machineUrl(machine.initials)}/settings`,
     },
     machineId: machine.id,
@@ -174,7 +203,7 @@ export function registerUpdateSettingsSet(server: McpServer): void {
     {
       title: "Update a settings set",
       description:
-        "Change a settings set's name, description, or sections, publish or unpublish it, or toggle its Tournament tag. Supply machine and set id (from list_settings_sets) plus at least one field. sections replaces every section, so send the full list read from list_settings_sets with your edits applied. A content change adds a timeline entry on the machine.",
+        "Change a settings set's name, description, or sections, make your personal set a community set, or apply or remove its House and Tournament tags. Supply machine and set id (from list_settings_sets) plus at least one field. sections replaces every section, so send the full list read from list_settings_sets with your edits applied. Content edits need edit rights: a personal set's author, or for a community set technicians, the owner and admins. Each change adds a timeline entry on the machine.",
       inputSchema: updateSettingsSetSchema,
       annotations: WRITE_TOOL_ANNOTATIONS,
     },

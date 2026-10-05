@@ -527,10 +527,10 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         id: "machines.settings.manage",
         label: "Manage machine settings",
         description:
-          "Create, edit, duplicate, and delete settings sets (owners manage " +
-          "sets on their own machines; technicians manage community sets and " +
-          "unowned machine sets; admins manage any). Setting the preferred " +
-          "owner default is governed separately by machines.settings.setDefault. " +
+          "Create settings sets, edit and delete community sets, apply " +
+          "settings tags, and choose a machine's preferred House and " +
+          "Tournament sets (owners on their own machines; technicians and " +
+          "admins on any). A personal set is edited only by its author. " +
           "(Viewing settings is public, via machines.view.)",
         access: {
           unauthenticated: false,
@@ -541,23 +541,10 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         },
       },
       {
-        id: "machines.settings.setDefault",
-        label: "Set preferred machine settings set",
+        id: "machines.settings.delete.any",
+        label: "Delete any settings set",
         description:
-          "Set an owner settings set as the machine's preferred default. Restricted to machine owners and admins; technicians cannot set the default on machines they do not own.",
-        access: {
-          unauthenticated: false,
-          guest: false,
-          member: "owner",
-          technician: "owner",
-          admin: true,
-        },
-      },
-      {
-        id: "machines.settings.view.private",
-        label: "View private settings drafts",
-        description:
-          "View another user's unshared private settings draft. Creators always see their own drafts; public and preferred sets are visible to everyone.",
+          "Delete another person's personal settings set, which only its author can edit.",
         access: {
           unauthenticated: false,
           guest: false,
