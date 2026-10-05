@@ -58,6 +58,8 @@ const authenticatedRoutes = [
   // Desktop-only page that scrolls inside its own container; the document
   // itself must not overflow (CORE-RESP-004, lineup spec 2.6).
   "/m/pinball-map",
+  // Print apron cards (apron-cards spec §12).
+  "/m/apron-cards",
   `/m/${machineInitials}`,
   `/m/${machineInitials}/settings`,
   `/m/${machineInitials}/maintenance`,

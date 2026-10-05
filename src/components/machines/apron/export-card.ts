@@ -7,7 +7,8 @@ import {
 /** Print resolution for PNG and PDF exports. */
 const EXPORT_DPI = 600;
 
-async function rasterize(node: HTMLElement): Promise<string> {
+/** The node as a PNG data URL at the print resolution. */
+export async function rasterize(node: HTMLElement): Promise<string> {
   const { domToPng } = await import("modern-screenshot");
   return await domToPng(node, {
     scale: EXPORT_DPI / 96,
@@ -15,7 +16,7 @@ async function rasterize(node: HTMLElement): Promise<string> {
   });
 }
 
-function download(href: string, filename: string): void {
+export function download(href: string, filename: string): void {
   const link = document.createElement("a");
   link.href = href;
   link.download = filename;
@@ -55,7 +56,12 @@ export async function exportApronCardPdf(
     compress: true,
   });
   pdf.addImage(png, "PNG", 0, 0, pageW, pageH, undefined, "FAST");
-  const url = URL.createObjectURL(pdf.output("blob"));
+  downloadBlob(pdf.output("blob"), filename);
+}
+
+/** Saves a generated file; the object URL is released once the save starts. */
+export function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
   download(url, filename);
   setTimeout(() => {
     URL.revokeObjectURL(url);
