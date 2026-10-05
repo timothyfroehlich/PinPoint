@@ -21,8 +21,8 @@ registry.
   `CLOSED_STATUSES` are derived from the same source.
 - **Default issue view = `OPEN_STATUSES`.** When no status filter is set,
   `IssueFilters` renders two default chips, "Open" and "In Progress".
-- **Machine statuses are a separate system.** The machine list toolbar
-  (`src/components/machines/view/MachineViewToolbar.tsx`) filters on computed
+- **Machine statuses are a separate system.** The machine list's filters
+  (`src/components/machines/view/machine-filters.ts`) filter on computed
   machine status (`src/lib/machines/status.ts` — machines have no
   status column) plus presence (`src/lib/machines/presence.ts`), with labels
   from `getMachineStatusLabel` / `getMachinePresenceLabel`. Don't reach for
@@ -53,8 +53,9 @@ Two current-user quick-selects exist. Their exact label strings ("Me",
   prop. It filters **issues** by the machines the current user owns, so it lives
   on the **issues** side: `IssueFilters` builds it from an `ownedMachineInitials`
   prop that `src/app/(app)/issues/page.tsx` resolves server-side (initials only,
-  not user IDs — CORE-SEC-006). It is **not** in the machine list toolbar,
-  which has no owner-of-mine logic — a plausible wrong turn.
+  not user IDs — CORE-SEC-006). It is **not** in the machine list's filters,
+  whose Owner filter offers "Me" (the `me` sentinel, resolved per viewer on the
+  server) — a plausible wrong turn.
 
 ## Mobile vs desktop
 
@@ -62,27 +63,26 @@ Two current-user quick-selects exist. Their exact label strings ("Me",
   `MobileFilterBar` was deliberately abandoned; don't reintroduce a parallel
   mobile filter tree.
 - **CSS-only responsiveness.** Both bars adapt with Tailwind utilities —
-  viewport breakpoints (`md:`, 768px, is the mobile/desktop pivot), plus
-  container queries for the machine toolbar's filter grid. The filter bars use
+  viewport breakpoints (`md:`, 768px, is the mobile/desktop pivot). The List
+  View measures its own controls with `ResizeObserver` only to decide which
+  filters move into More (the CORE-RESP-002 boundary). The filter bars use
   no JavaScript
   viewport detection (`useMediaQuery` / `matchMedia`) — the design-bible §4
   responsive rule (which sanctions only a couple of narrow exceptions elsewhere
   in the app), and exactly why a re-styling-only `MobileFilterBar` was rejected.
 - **Removal ✕ is always visible on every chip.** Touch has no hover, so
   removal affordances are never hover-revealed.
-- **Chips wrap on their own row below the search input** at every viewport,
-  on both surfaces (chips overlaid on the input spilled off-screen on narrow
-  viewports). The machine toolbar labels that row as an "Active filters"
-  region and adds a search chip and a Clear all action.
+- **Issues: chips wrap on their own row below the search input** at every
+  viewport (chips overlaid on the input spilled off-screen on narrow
+  viewports). The List View has no chip row: each filter control shows its
+  own value (list-views §3.3).
 
 ## Current state (unification)
 
-`IssueFilters` and `MachineViewToolbar` are **separate components today**. They
-share only `MultiSelect` (`src/components/ui/multi-select.tsx`). Each side keeps
-its own URL state: issues use the `useSearchFilters` hook and the
-`filter-utils.ts` helpers; machines use `src/lib/machines/view/state.ts`.
-
-**PP-jb9v** puts both lists on one shared List View (spec:
-`docs/feature-specs/list-views.md`), absorbing PP-zpje's shared filter bar.
-Until that lands, keep new filter work consistent with the surface it's on and
-build on the primitives above rather than forking new ones.
+Machines is on the shared List View (`src/components/list-view/`,
+`src/lib/list-view/`; spec `docs/feature-specs/list-views.md`): the host builds
+filter, sort, view, and pager models and List View renders the toolbar, List
+Header, phone sheets, and pagers. Issues still uses `IssueFilters` with
+`MultiSelect`, the `useSearchFilters` hook, and the `filter-utils.ts` helpers
+until **PP-jb9v** moves it onto List View too (absorbing PP-zpje's shared
+filter bar). New list filter work belongs in List View's models, not a fork.

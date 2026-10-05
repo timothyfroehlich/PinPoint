@@ -25,9 +25,13 @@ export function MachineViewCompactList({
   onMachineSelect,
 }: MachineViewCompactListProps): React.JSX.Element {
   return (
-    <ul className="divide-y divide-outline-variant overflow-hidden rounded-lg border border-outline-variant bg-card md:hidden">
+    // Rows align with the page's horizontal padding (list-views §7.7).
+    <ul className="divide-y divide-outline-variant md:hidden">
       {rows.map((row) => (
-        <li key={row.id} className="flex min-h-11 items-center gap-2 px-4 py-1">
+        <li
+          key={row.id}
+          className="flex min-h-11 items-center gap-2 px-4 py-1 sm:px-8"
+        >
           {row.health ? (
             <PlayabilityDot status={row.health.playability} />
           ) : null}

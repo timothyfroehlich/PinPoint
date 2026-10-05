@@ -42,7 +42,7 @@
 - **3.3** Active filters are never repeated as a separate chip row; each filter control shows its own current value.
 - **3.4** At 1440×900 the first rows of the list are visible without scrolling, with the Summary Widgets open.
 - **3.5** While a new result is loading the rows dim and the list is marked busy; the controls stay usable.
-- **3.6** A View Configuration that matches nothing shows an empty state whose action returns to the Applied View.
+- **3.6** A View Configuration that matches nothing shows an empty state; when the List View is Edited, its action returns to the Applied View.
 
 ---
 
@@ -56,6 +56,7 @@
 - **4.6** Filter values the Page Preset sets by default are shown on their control like any other value.
 - **4.7** Changing search, a filter, sorting, or page size returns to page 1.
 - **4.8** Changing displayed fields keeps the current page when that page remains valid.
+- **4.9** Every filter's options offer Reset, which returns that filter to its Page Preset value, at every width.
 
 ---
 
@@ -82,10 +83,10 @@
 ## 7. Phones
 
 - **7.1** Below the md breakpoint a List View uses the phone layout: title row, Summary Widgets, search on its own row, then the list box.
-- **7.2** The title row holds the title, the Summary Row toggle (widgets §2.5), and the host's page actions; actions that do not fit become icon buttons with accessible names.
+- **7.2** The title row holds the title, the Summary Row toggle (widgets §2.5), and the host's page actions; actions that do not fit become icon buttons with accessible names. On a Collection or Tag tab, whose title row belongs to the Collection or Tag page, the Summary Row toggle sits on its own row between the page's tabs and the search field.
 - **7.3** The phone List Header holds the Applied View's name as a button that opens the Saved Views sheet, and a Filters icon button showing a count of filters not at their Page Preset value.
 - **7.4** When the List View is Edited, the Applied View's name carries a marker that is announced as "edited".
-- **7.5** The Filters button opens one sheet holding Sort, the Primary Filters, the Secondary Filters under More filters, and Display (page size). Selecting a filter opens its options inside the sheet; the sheet's footer offers Reset all and a button that shows the result count and closes the sheet.
+- **7.5** The Filters button opens one sheet holding Sort, the Primary Filters, the Secondary Filters under More filters, and Display (page size). Selecting a filter opens its options inside the sheet; the sheet's footer offers Reset all, which returns every filter to the Page Preset's values and keeps search, sort, and page size, and a button that shows the result count and closes the sheet.
 - **7.6** The Saved Views sheet offers, when Edited, Save changes (own Saved View only), Save as new, and Discard changes; then the Built-in Views, then the account's Saved Views, then Manage views.
 - **7.7** The list box runs edge to edge with no card border; rows align with the page's horizontal padding.
 - **7.8** The pager is a 44px bar pinned above the tab bar, with Previous, the range ("1–25 of 84"), and Next. The list leaves room so its last row can scroll clear of the pager.
@@ -97,7 +98,7 @@
 
 - **8.1** When the Primary Filters do not fit beside search, they move into More from the right, one at a time, in the host's order.
 - **8.2** When the List Header's tabs do not fit, Saved View tabs move into More views from the right; the Applied View's tab always stays visible.
-- **8.3** When the List Header is still crowded, the compact pager drops its range text, then disappears; the pager below the list remains.
+- **8.3** When the List Header is still crowded, the compact pager drops its range text, then disappears; then Discard changes shortens to Discard, and then the Applied View's tab name truncates. The pager below the list remains, and shows the result range even when there is only one page.
 - **8.4** When the Summary Widgets do not fit side by side, they stack full-width in a collapsible section (widgets §2.4).
 - **8.5** No List View width between 320px and 1440px scrolls the page horizontally.
 
@@ -127,9 +128,9 @@
 - **10.7** A Saved View name is required and must be unique, ignoring case, among the account's Saved Views for that List Host. A colliding name is rejected, never silently overwritten.
 - **10.8** Manage views lets the account rename or delete its Saved Views. On the Machines and Issues pages it also lets the account set or clear its Default View.
 - **10.9** An account has at most one Default View per List Host.
-- **10.10** The Machines or Issues page, opened with no view configuration other than page, shows the account's Default View if one exists, otherwise the Page Preset. A Collection or Tag tab opened that way always shows its Page Preset. A URL carrying any view configuration opens exactly as written.
+- **10.10** The Machines or Issues page, opened with no view configuration other than page, shows the account's Default View if one exists, otherwise the Page Preset. A Collection or Tag tab opened that way always shows its Page Preset. A URL carrying any view configuration opens exactly as written. On the Machines or Issues page, when an account whose Default View is not the Page Preset's Built-in View shows the Page Preset's settings, the URL names that Built-in View, so reopening it does not show the Default View.
 - **10.11** When the Default View opens, the address bar shows its canonical URL.
-- **10.12** More views always offers every Built-in View, so an account with a default can still reach the Page Preset.
+- **10.12** Every Built-in View is always reachable, as a List Header tab or in More views, so an account with a default can still reach the Page Preset.
 - **10.13** Deleting the Default View leaves its host without a default; the main page then opens to the Page Preset.
 - **10.14** A stored field, filter value, or person that no longer exists or is not permitted on the Surface is dropped when the view is applied, exactly as an invalid URL value is (§9.3).
 - **10.15** _Retired 2026-10-02._ Saved Views belong to a List Host, not a Surface, so deleting a Collection or Tag deletes none. Number kept so older citations don't dangle.
@@ -162,11 +163,11 @@
 | Requirement | Divergence | Resolution |
 | :-- | :-- | :-- |
 | §2.1 | Issues and Collection Issues tabs use their own toolbar, pager, and URL handling. | PP-jb9v |
-| §3–§8, §12 | Neither list uses the shared layout, List Header, phone sheets, or overflow rules. | PP-jb9v |
+| §3–§8, §12 | Issues and Collection Issues tabs don't use the shared layout, List Header, phone sheets, or overflow rules. | PP-jb9v |
 | §5.7 | Issues offers 15, 25, and 50 per page, defaulting to 15. | PP-jb9v |
 | §9.2, §9.4 | Issues uses snake_case parameters and a composite sort value. | PP-jb9v |
-| §10 | Issues has no Saved Views; machine Saved Views appear in a menu rather than List Header tabs. | PP-jb9v |
-| §11 | Issues restores the last URL from a cookie across sessions; Machines does not restore. | PP-jb9v |
+| §10 | Issues has no Saved Views. | PP-jb9v |
+| §11 | Issues restores the last URL from a cookie across sessions. | PP-jb9v |
 
 ---
 
@@ -174,6 +175,8 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-04 | Reset all returns filters to the Page Preset (§7.5); Built-in Views stay reachable as tabs or in More views (§10.12); the List Header's crowding order and the single-page result range (§8.3); per-filter Reset (§4.9); a Page Preset URL names its Built-in View when the account's Default View is another view (§10.10); empty-state action only when Edited (§3.6). |
+| 2026-10-03 | On a Collection or Tag tab the Summary Row toggle sits on its own row between the page's tabs and search (§7.2). |
 | 2026-10-03 | Stacked Summary Widgets sit in a collapsible section (§8.4). |
 | 2026-10-02 | Default View controls appear only on the Machines and Issues pages (§10.8). |
 | 2026-10-02 | Created from the approved list-framework design: shared layout, filters, List Header with Saved View tabs, compact and bottom pagers, phone sheets and pinned pager, overflow rules, URL state, Saved Views shared across each host's Surfaces with a Default View on the main page only (moved from machine-views §8), returning to a list, and accessibility. |

@@ -3,6 +3,7 @@
 import type React from "react";
 import { useMemo } from "react";
 import Link from "next/link";
+import { useListReturnHref } from "~/components/list-view/use-list-return-href";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { AlertCircle } from "lucide-react";
@@ -50,15 +51,22 @@ export function AppHeader({
   reportHref = "/report/detailed",
 }: AppHeaderProps): React.JSX.Element {
   const pathname = usePathname();
+  // Returning to Machines reopens its last view this tab session (list-views §11.1).
+  const machinesPath = useListReturnHref("/m");
 
   const navLinks = useMemo(
     () =>
       NAV_ITEMS.map((item) => {
-        const href = item.href === "/issues" ? issuesPath : item.href;
+        const href =
+          item.href === "/issues"
+            ? issuesPath
+            : item.href === "/m"
+              ? machinesPath
+              : item.href;
         const active = isNavItemActive(item.href, pathname, issuesPath);
         return { ...item, href, active };
       }),
-    [pathname, issuesPath]
+    [pathname, issuesPath, machinesPath]
   );
 
   return (

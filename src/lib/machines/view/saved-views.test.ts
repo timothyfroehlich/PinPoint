@@ -71,8 +71,11 @@ describe("saved view request resolution", () => {
     });
   });
 
-  it("keeps the page when a URL carries only a page", () => {
-    expect(resolve("page=3", savedView.id).redirectTo).toMatch(/&page=3$/);
+  it("keeps the page when a URL carries only a page, in canonical order", () => {
+    // The order the list writes, so the client does not rewrite it again.
+    expect(resolve("page=3", savedView.id).redirectTo).toBe(
+      `/m?status=needs_service%2Cunplayable&sort=playability&dir=desc&page=3&pageSize=50&view=${savedView.id}`
+    );
   });
 
   it("opens the Page Preset for a bare URL without a default", () => {

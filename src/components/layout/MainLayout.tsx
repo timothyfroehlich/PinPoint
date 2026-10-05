@@ -20,6 +20,7 @@ import {
   resolveDefaultReportMode,
 } from "~/lib/report/default-mode";
 import type { ReportMode } from "~/lib/types/user";
+import { LIST_PAGER_SLOT_ID } from "~/components/list-view/pager-slot";
 import { QuickSearchProvider } from "./QuickSearch";
 
 export async function MainLayout({
@@ -199,6 +200,9 @@ export async function MainLayout({
           <div className="@container px-4 sm:px-8 lg:px-10 pb-[calc(88px+env(safe-area-inset-bottom))] [&:has([data-machine-scan-hub])]:pb-0 md:pb-0">
             {children}
           </div>
+          {/* A List View's phone pager renders here, outside the size
+              container above (list-views §7.8; see LIST_PAGER_SLOT_ID). */}
+          <div id={LIST_PAGER_SLOT_ID} />
         </main>
 
         {/* Fixed bottom tab bar — mobile only (md:hidden is applied inside the component) */}

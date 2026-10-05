@@ -18,7 +18,8 @@ import { getExistingMachineViewOwners } from "./owners";
 import {
   hasMachineViewConfiguration,
   normalizeMachineViewSavedState,
-  savedMachineViewSearchParams,
+  parseMachineViewState,
+  serializeMachineViewState,
   type MachineViewSearchParams,
 } from "./state";
 
@@ -54,9 +55,11 @@ export async function listSavedMachineViews(
     name,
     state: normalizeMachineViewSavedState(state),
   }));
+  // The owning account is signed in, so its Me filters stay (§4.2).
   const existingOwners = await getExistingMachineViewOwners(
     tx,
-    views.flatMap((view) => view.state.owner)
+    views.flatMap((view) => view.state.owner),
+    userId
   );
   return views.map((view) => ({
     ...view,
@@ -111,13 +114,14 @@ export function resolveSavedMachineViewRequest({
     if (defaultView.id === MACHINE_VIEW_PAGE_PRESET_VIEW_ID[preset]) {
       return { activeViewId: null, redirectTo: null };
     }
-    const params = savedMachineViewSearchParams(
-      defaultView.state,
+    // The canonical URL the list itself writes, so the client never
+    // rewrites it again: the default's configuration at the URL's page.
+    const { page } = parseMachineViewState(searchParams, preset);
+    const params = serializeMachineViewState(
+      { ...defaultView.state, page },
       preset,
       defaultView.id
     );
-    const page = searchParams.get("page");
-    if (page !== null) params.set("page", page);
     return {
       activeViewId: defaultView.id,
       redirectTo: `${pathname}?${params.toString()}`,
@@ -152,7 +156,7 @@ export async function loadMachineViewSavedViews(
   const isMachinesPage = preset === MACHINES_PAGE.preset;
   const userId =
     viewer.userId !== undefined &&
-    checkPermission("machines.views.save", getAccessLevel(viewer.role))
+    checkPermission("views.save", getAccessLevel(viewer.role))
       ? viewer.userId
       : null;
   let views: MachineViewSavedViewSummary[] = [];

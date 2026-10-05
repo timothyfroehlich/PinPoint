@@ -380,18 +380,6 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         },
       },
       {
-        id: "machines.views.save",
-        label: "Save machine views",
-        description: "Save personal named views of machine lists",
-        access: {
-          unauthenticated: false,
-          guest: true,
-          member: true,
-          technician: true,
-          admin: true,
-        },
-      },
-      {
         id: "machines.create",
         label: "Create machines",
         description: "Add new machines to the system",
@@ -614,6 +602,25 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
           guest: false,
           member: "own_or_owner",
           technician: "own_or_owner",
+          admin: true,
+        },
+      },
+    ],
+  },
+  {
+    id: "lists",
+    label: "Lists",
+    permissions: [
+      {
+        id: "views.save",
+        label: "Save views",
+        description:
+          "Save personal named views of the Machines list, and choose the view it opens with",
+        access: {
+          unauthenticated: false,
+          guest: true,
+          member: true,
+          technician: true,
           admin: true,
         },
       },

@@ -62,61 +62,77 @@ export default async function MachinesPage({
   // to (§4.1). It is zero until there is a lineup to compare (§2.4–§2.5).
   const lineupToReview =
     lineupData === null ? 0 : lineupToReviewCount(lineupData.comparison);
+  // On phones the actions shrink to icon buttons that keep their accessible
+  // names (list-views §7.2).
   const lineupButton = canViewLineup ? (
-    <Button asChild variant="outline" data-testid="pinball-map-lineup-button">
-      <Link href="/m/pinball-map">
-        <MapPin className="mr-2 size-4" aria-hidden="true" />
-        Pinball Map
+    <Button
+      asChild
+      variant="outline"
+      className="relative max-md:size-11 max-md:px-0"
+      data-testid="pinball-map-lineup-button"
+    >
+      <Link
+        href="/m/pinball-map"
+        aria-label={
+          lineupToReview > 0
+            ? `Pinball Map, ${lineupToReview} to review`
+            : "Pinball Map"
+        }
+      >
+        <MapPin className="size-4 md:mr-2" aria-hidden="true" />
+        <span className="max-md:hidden">Pinball Map</span>
         {lineupToReview > 0 ? (
           <span
-            className="ml-2 inline-flex min-w-5 items-center justify-center rounded-full border border-error-container bg-error-container/50 px-1.5 text-xs font-semibold tabular-nums text-on-error-container"
+            aria-hidden="true"
+            className="inline-flex min-w-5 items-center justify-center rounded-full border border-error-container bg-error-container px-1.5 text-xs font-semibold tabular-nums text-on-error-container max-md:absolute max-md:-top-1.5 max-md:-right-1.5 md:ml-2 md:bg-error-container/50"
             data-testid="pinball-map-lineup-to-review"
           >
             {lineupToReview}
-            <span className="sr-only"> to review</span>
           </span>
         ) : null}
       </Link>
     </Button>
   ) : null;
   const printApronCardsButton = canPrintApronCards ? (
-    <Button asChild variant="outline">
+    <Button asChild variant="outline" className="max-md:size-11 max-md:px-0">
       <Link href="/m/apron-cards" aria-label="Print apron cards">
-        <Printer className="size-4 lg:mr-2" aria-hidden="true" />
-        <span className="hidden lg:inline">Print apron cards</span>
+        <Printer className="size-4 md:mr-2" aria-hidden="true" />
+        <span className="max-md:hidden">Print apron cards</span>
       </Link>
     </Button>
   ) : null;
   const addMachineButton = canCreateMachine ? (
     <Button
       asChild
-      className="bg-primary text-on-primary hover:bg-primary/90"
+      className="bg-primary text-on-primary hover:bg-primary/90 max-md:h-11 max-[389px]:w-11 max-[389px]:px-0"
       data-testid="add-machine-button"
     >
-      <Link href="/m/new">
-        <Plus className="mr-2 size-4" />
-        Add Machine
+      <Link href="/m/new" aria-label="Add Machine">
+        <Plus
+          className="size-4 min-[390px]:mr-1.5 md:mr-2"
+          aria-hidden="true"
+        />
+        <span className="max-[389px]:hidden">
+          Add<span className="max-md:hidden"> Machine</span>
+        </span>
       </Link>
     </Button>
-  ) : undefined;
+  ) : null;
+  const pageActions =
+    lineupButton === null &&
+    printApronCardsButton === null &&
+    addMachineButton === null ? undefined : (
+      <>
+        {lineupButton}
+        {printApronCardsButton}
+        {addMachineButton}
+      </>
+    );
 
-  return (
-    <PageContainer size="wide">
-      <PageHeader
-        title="Machines"
-        actions={
-          lineupButton === null &&
-          printApronCardsButton === null &&
-          addMachineButton === undefined ? undefined : (
-            <>
-              {lineupButton}
-              {printApronCardsButton}
-              {addMachineButton}
-            </>
-          )
-        }
-      />
-      {result.scopeCount === 0 ? (
+  if (result.scopeCount === 0) {
+    return (
+      <PageContainer size="wide">
+        <PageHeader title="Machines" actions={pageActions} />
         <EmptyState
           icon={Plus}
           title="No machines yet"
@@ -139,13 +155,21 @@ export default async function MachinesPage({
             ) : undefined
           }
         />
-      ) : (
-        <MachineView
-          result={result}
-          preset="machines"
-          savedViews={savedViews}
-        />
-      )}
+      </PageContainer>
+    );
+  }
+
+  // Machine View draws the title row so the phone Summary Row toggle can sit
+  // in it (list-views §3.1, §7.2).
+  return (
+    <PageContainer size="wide" className="max-md:pt-3">
+      <MachineView
+        result={result}
+        preset="machines"
+        savedViews={savedViews}
+        title="Machines"
+        actions={pageActions}
+      />
     </PageContainer>
   );
 }

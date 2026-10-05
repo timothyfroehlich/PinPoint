@@ -3,4 +3,9 @@ export {
   type SummaryWidgetHeadline,
   type SummaryWidgetSegment,
 } from "./SummaryWidget";
-export { SummaryWidgetGroup } from "./SummaryWidgetGroup";
+export {
+  SummaryRowToggle,
+  SummaryWidgetGroup,
+  type SummaryWidgetsController,
+  useSummaryWidgetsController,
+} from "./SummaryWidgetGroup";

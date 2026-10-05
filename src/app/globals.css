@@ -163,6 +163,13 @@
   );
 }
 
+/* A List View's phone pager (list-views §7.8) is a 44px bar pinned directly
+   above the tab bar. It renders into the scroller's pager slot, so the
+   scroller reserves its height the same way (§12.5). */
+#main-content:has([data-list-pager]) {
+  --floating-action-clearance: 2.75rem;
+}
+
 @utility glow-primary {
   box-shadow:
     0 0 10px color-mix(in srgb, var(--color-primary) 50%, transparent),

@@ -58,6 +58,7 @@ export {
 
 export {
   LIST_HOSTS,
+  SAVED_VIEW_NAME_MAX,
   type DefaultViewTarget,
   type ListHost,
   type SavedViewError,
