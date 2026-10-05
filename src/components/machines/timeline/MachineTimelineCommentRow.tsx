@@ -37,7 +37,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
-import { RelativeTime } from "~/components/issues/RelativeTime";
+import { TimelineRowTime } from "./TimelineRowTime";
 import { formatRelative } from "~/lib/dates";
 import { type TimelineTag } from "~/lib/timeline/machine-tags";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
@@ -106,7 +106,7 @@ export function MachineTimelineCommentRow({
   // render. `(edited)` keeps the static `formatRelative` for the hover-title
   // — only paints when hovered and doesn't need to tick.
   const rightMeta: React.ReactNode = showRelativeTime ? (
-    <RelativeTime value={row.createdAt} />
+    <TimelineRowTime value={row.createdAt} />
   ) : (
     rowDateLabel
   );
@@ -124,7 +124,7 @@ export function MachineTimelineCommentRow({
           {(row.authorName ?? "??").slice(0, 2).toUpperCase()}
         </AvatarFallback>
       </Avatar>
-      <div className="min-w-0 flex-1">
+      <div className="@container min-w-0 flex-1">
         {machineLabel ? (
           <MachineAttributionLine machine={machineLabel} />
         ) : null}
