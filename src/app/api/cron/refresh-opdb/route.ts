@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
+import type { NextResponse } from "next/server";
 import { refreshOpdbRecords } from "~/lib/opdb/records";
-import { assertCronAuthorized } from "~/lib/cron/auth";
+import { runCron } from "~/lib/cron/run-cron";
 import { log } from "~/lib/logger";
 import { db } from "~/server/db";
 
@@ -15,15 +15,9 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 export async function GET(request: Request): Promise<NextResponse> {
-  const denied = assertCronAuthorized(request);
-  if (denied) return denied;
-
-  try {
+  return runCron(request, "opdb.refresh", async () => {
     const count = await refreshOpdbRecords(db);
     log.info({ count, action: "opdb.refresh" }, "OPDB copy refreshed");
-    return NextResponse.json({ ok: true, count });
-  } catch (err) {
-    log.error({ err }, "OPDB refresh cron failed");
-    return NextResponse.json({ error: "Refresh failed" }, { status: 500 });
-  }
+    return { ok: true, count };
+  });
 }

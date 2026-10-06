@@ -1,7 +1,7 @@
 # PinPoint Non‑Negotiables
 
-**Last Updated**: 2026-09-26
-**Version**: 2.6 (CORE-TEST-007..010 added: failure-first regressions, no test-only seams, one owner per contract, failing tests are evidence — PP-wptk)
+**Last Updated**: 2026-10-05
+**Version**: 2.7 (CORE-ARCH-015 added: a caught error not returned to the user goes to `reportError`; cron routes use `runCron` — PP-az4d.3). Prior: 2.6 (CORE-TEST-007..010 added: failure-first regressions, no test-only seams, one owner per contract, failing tests are evidence — PP-wptk)
 
 > **Canonical catalog**: this document defines the canonical `CORE-*` rules for PinPoint. Portable skills (`.agents/skills/`) and agent context (`AGENTS.md`) cite rules by ID and provide domain/task-specific procedures.
 
@@ -39,6 +39,7 @@
 22. Image priority and preconnect discipline: `priority` is for the LCP candidate only; preconnect to known image origins (CORE-PERF-003)
 23. External side effects (HTTP, email, Discord, blob, Vault RPC) never run inside a DB transaction; deliver them post-commit (CORE-ARCH-011)
 24. A bug-fix regression test fails on the pre-fix code; tests reach production through real callers' seams (CORE-TEST-007/008)
+25. A caught error that is not returned to the user goes to `reportError`, never to a bare `log.error`; cron routes use `runCron` (CORE-ARCH-015)
 
 ---
 
@@ -418,6 +419,13 @@
 - **Do:** When a control cannot perform its action — a dependency is unavailable, JavaScript is not running, a precondition is unmet — let it visibly do nothing, or surface a real error. Rely on server-side validation to reject submissions that could not have carried valid input.
 - **Don't:** Render a success message, toast, or confirmation for a submission whose input could not have been collected. Don't wire a save control that submits unchanged state and confirms it as a change.
 
+**CORE-ARCH-015:** A caught error that is not returned to the user goes to `reportError`
+
+- **Severity:** Required
+- **Why:** Sentry's auto-capture sees only _uncaught_ exceptions. A `catch` that logs and returns a clean response hides the failure from monitoring; a Vercel log line that ages out is the only evidence the job ran badly (PP-a5y). Five of seven cron routes (`cleanup-blobs`, `pinballmap-sync`, `refresh-catalog`, `refresh-opdb`, `refresh-pintips`) did exactly this, while the other two already called `reportError` (PP-az4d.3).
+- **Do:** Send every caught error that is not returned to the user through `reportError(err, { action: "<area.operation>" })` from `~/lib/observability/report-error`: one call captures to Sentry and writes the structured log. A Server Action that also returns an `err` Result uses `serverActionError(...)`. Write each cron route as `return runCron(request, "<action>", async () => ({ ok: true, ... }))` from `~/lib/cron/run-cron`: it applies the `CRON_SECRET` gate, reports any thrown failure, and answers with the single failure status (500). A cron job that fails by returning a result value throws that failure inside the callback. An error tolerated by design is still reported, with `bestEffort: true` in the context.
+- **Don't:** Pair `catch` with a bare `log.error`. Don't add `try`/`catch` to a cron route; `runCron` owns it.
+
 ---
 
 ## Integrations
@@ -684,7 +692,7 @@ If all Yes → ship it. Perfect is the enemy of done.
 - CORE‑SEC‑001..010: Security
 - CORE‑PERF‑001..003: Performance (incl. image priority + preconnect)
 - CORE‑TEST‑001..006: Testing
-- CORE‑ARCH‑001, 004..012: Architecture (002, 003 retired)
+- CORE‑ARCH‑001, 004..012, 015: Architecture (013, 014 reserved) (002, 003 retired)
 - CORE‑RESP‑001..004: Responsive framework
 - CORE‑UI‑001..006: UI & styling + Browser support / MWG catalog (005, 006)
 - CORE‑A11Y‑001..006: Accessibility floor
