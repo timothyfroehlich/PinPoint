@@ -140,10 +140,48 @@ function sourceFiles(dir: string): string[] {
   });
 }
 
-/** The export's source, from its declaration to the next top-level `}`. */
-function declarationAt(source: string, start: number): string {
-  const end = source.indexOf("\n}", start);
-  return end === -1 ? source.slice(start) : source.slice(start, end);
+/** Index just past the bracket that closes the one at `open`. */
+function pastClosing(
+  source: string,
+  open: number,
+  opener: string,
+  closer: string
+): number {
+  let depth = 0;
+  for (let index = open; index < source.length; index++) {
+    if (source[index] === opener) depth++;
+    else if (source[index] === closer && --depth === 0) return index + 1;
+  }
+  return source.length;
+}
+
+/**
+ * The body of the function whose parameter list opens at `paramsOpen`. An
+ * async function's return type is `Promise<…>`, so the body opens at the first
+ * `{` outside angle brackets (an arrow's `=>` is not a closing bracket).
+ */
+function functionBody(source: string, paramsOpen: number): string {
+  let angle = 0;
+  for (
+    let index = pastClosing(source, paramsOpen, "(", ")");
+    index < source.length;
+    index++
+  ) {
+    const char = source[index];
+    if (char === "<") angle++;
+    else if (char === ">" && source[index - 1] !== "=") angle--;
+    else if (char === "{" && angle === 0) {
+      return source.slice(index + 1, pastClosing(source, index, "{", "}") - 1);
+    }
+  }
+  return "";
+}
+
+/** A pipeline-built action's body is one statement: return the pipeline const's call. */
+function delegatesTo(body: string, pipelineConsts: string[]): boolean {
+  const statement = body.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, "").trim();
+  const delegated = /^return\s+(?:await\s+)?(\w+)\([^;]*\);?$/.exec(statement);
+  return delegated?.[1] !== undefined && pipelineConsts.includes(delegated[1]);
 }
 
 interface ServerAction {
@@ -162,13 +200,18 @@ function serverActions(): ServerAction[] {
     );
 
     return [...source.matchAll(EXPORTED_ACTION)].map((match) => {
-      const name = match[1] ?? match[2] ?? "";
-      const declaration = declarationAt(source, match.index);
+      const [, functionName, constName] = match;
+      if (constName !== undefined) {
+        // `export const x = createProtectedAction(...)` is itself a pipeline const.
+        return {
+          key: `${file}#${constName}`,
+          builtWithPipeline: pipelineConsts.includes(constName),
+        };
+      }
+      const body = functionBody(source, source.indexOf("(", match.index));
       return {
-        key: `${file}#${name}`,
-        builtWithPipeline: pipelineConsts.some((identifier) =>
-          new RegExp(`\\b${identifier}\\b`).test(declaration)
-        ),
+        key: `${file}#${functionName ?? ""}`,
+        builtWithPipeline: delegatesTo(body, pipelineConsts),
       };
     });
   });
@@ -179,6 +222,22 @@ describe("Server Actions go through the pipeline (CORE-ARCH-013)", () => {
 
   it("finds the Server Actions it ratchets", () => {
     expect(actions.length).toBeGreaterThan(50);
+  });
+
+  it("counts an action as pipeline-built only when its body returns the pipeline call", () => {
+    const consts = ["saveProtected"];
+    expect(
+      delegatesTo("\n  return await saveProtected(formData);\n", consts)
+    ).toBe(true);
+    expect(
+      delegatesTo(
+        "\n  if (draft) return saveProtected(formData);\n  await db.delete(rows);\n  return ok(true);\n",
+        consts
+      )
+    ).toBe(false);
+    expect(
+      delegatesTo("\n  // saveProtected\n  return ok(true);\n", consts)
+    ).toBe(false);
   });
 
   it("builds every new Server Action with createProtectedAction or createPublicAction", () => {
