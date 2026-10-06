@@ -12,8 +12,9 @@
  * Every flow follows the same ordering rule (CORE-ARCH-011): the credential
  * decrypt and the PBM HTTP call run before the transaction, and only their
  * results enter it. Every flow that writes to PBM holds the mutation lease
- * (`claimPinballMapMutationLease`) across the call and the local commit, and
- * commits only while the lease still owns the tracked location.
+ * (`withPinballMapMutationLease`) across the call and the local commit, and
+ * commits only while the lease still owns the tracked location
+ * (`mutationLeaseOwnsLocation`).
  *
  * The removals live in `./outbound-remove`, which shares the plumbing exported
  * here.
@@ -40,9 +41,12 @@ import {
 import { findLmxForMachine } from "~/lib/pinballmap/resolve-lmx";
 import { withLmxAdded, withLmxIcEnabled } from "~/lib/pinballmap/snapshot-edit";
 import {
-  claimPinballMapMutationLease,
+  mutationLeaseOwnsLocation,
+  withPinballMapMutationLease,
+} from "~/lib/pinballmap/mutation-lease";
+import {
+  PINBALLMAP_STATE_ID,
   getPinballMapState,
-  releasePinballMapMutationLease,
   syncLocationSnapshot,
   type PinballMapMutationLease,
 } from "~/lib/pinballmap/state";
@@ -129,7 +133,7 @@ export async function editStoredSnapshot(
       snapshotJson: pinballmapState.snapshotJson,
     })
     .from(pinballmapState)
-    .where(eq(pinballmapState.id, "singleton"))
+    .where(eq(pinballmapState.id, PINBALLMAP_STATE_ID))
     .for("update");
   if (row?.locationId !== expectedLocationId || !row.snapshotJson) return;
   await tx
@@ -139,28 +143,7 @@ export async function editStoredSnapshot(
       snapshotRevision: sql`${pinballmapState.snapshotRevision} + 1`,
       updatedAt: new Date(),
     })
-    .where(eq(pinballmapState.id, "singleton"));
-}
-
-export async function mutationLeaseOwnsLocation(
-  tx: Tx,
-  lease: PinballMapMutationLease
-): Promise<boolean> {
-  const [row] = await tx
-    .select({
-      locationId: pinballmapState.locationId,
-      configurationGeneration: pinballmapState.configurationGeneration,
-      mutationLeaseId: pinballmapState.mutationLeaseId,
-    })
-    .from(pinballmapState)
-    .where(eq(pinballmapState.id, "singleton"))
-    .for("update");
-  return (
-    row !== undefined &&
-    row.locationId === lease.trackedLocationId &&
-    row.configurationGeneration === lease.configurationGeneration &&
-    row.mutationLeaseId === lease.id
-  );
+    .where(eq(pinballmapState.id, PINBALLMAP_STATE_ID));
 }
 
 async function locationGenerationIsCurrent(
@@ -174,7 +157,7 @@ async function locationGenerationIsCurrent(
       configurationGeneration: pinballmapState.configurationGeneration,
     })
     .from(pinballmapState)
-    .where(eq(pinballmapState.id, "singleton"))
+    .where(eq(pinballmapState.id, PINBALLMAP_STATE_ID))
     .for("update");
   return (
     row?.locationId === locationId &&
@@ -353,103 +336,95 @@ export async function addLineupEntry(args: {
   const linked = await getLinkedPinballMapCredentials(userId);
   if (!linked) return err("NOT_LINKED", NOT_LINKED_MESSAGE);
 
-  const lease = await claimPinballMapMutationLease(
+  const leased = await withPinballMapMutationLease(
     locationId,
-    configurationGeneration
-  );
-  if (!lease)
-    return err(
-      "SERVER",
-      "The tracked Pinball Map location is being changed. Reload the page and try again."
-    );
-
-  let icUnclear = false;
-  let addedLmxId: number;
-  try {
-    const client = await getPinballMapClient();
-    const written = await client.addMachine({
-      credentials: linked.credentials,
-      locationId,
-      machineId: titleId,
-    });
-    if (!written.ok) {
-      log.error(
-        { reason: written.reason, action: "pinballmap.addMachine" },
-        "PinballMap add rejected"
-      );
-      return await rejectPush(userId, linked, written);
-    }
-    const lmxId = written.lmxId;
-    // --- transaction: local state only ---
-
-    const committed = await db.transaction(async (tx) => {
-      if (!(await mutationLeaseOwnsLocation(tx, lease))) return false;
-      // PBM returns the EXISTING lmx when the entry is already on the lineup, so
-      // an add can reclaim one a machine walked away from.
-      await retireAbandonmentForLmx(tx, lmxId);
-      // The stored lineup is what every control renders from, so it has to carry
-      // the entry we just created — otherwise the page repaints as still Missing
-      // and offers Add again, for up to an hour (CORE-ARCH-012).
-      await editStoredSnapshot(tx, locationId, (snapshot) =>
-        withLmxAdded(snapshot, lmxId, titleId)
-      );
-      await createMachineTimelineEvent(
-        machineId,
-        {
-          sourceType: "lifecycle",
-          tag: "lifecycle",
-          eventData: { kind: "pinballmap_listing", action: "listed", lmxId },
-          actorId: userId,
-        },
-        tx
-      );
-      return true;
-    });
-
-    if (!committed) {
-      // The only normal way to lose the lease is an invocation outliving its
-      // recovery window. Do not report a listing we could not attach locally;
-      // retain its exact old-location handle as an actionable cleanup record.
-      await db.transaction(async (tx) => {
-        await recordAbandonedListing(
-          tx,
-          machineId,
-          { lmxId, pinballmapMachineId: titleId, locationId },
-          userId
-        );
-      });
-      return err(
-        "SERVER",
-        "The tracked Pinball Map location changed while this addition was running. The old-location entry was saved for cleanup; reload the page."
-      );
-    }
-
-    // Adding also applies the entry's Insider Connected target (4.3), so one
-    // push leaves Pinball Map matching both intents. A failure here does not
-    // undo the add: the page then shows Insider Connected differs, with its
-    // own Update push.
-    const icTarget = (await getCatalogEntry(titleId))?.icEligible
-      ? await entryIcTarget(titleId)
-      : null;
-    if (icTarget !== null) {
-      const icOutcome = await pushInsiderConnected({
+    configurationGeneration,
+    async (lease) => {
+      const client = await getPinballMapClient();
+      const written = await client.addMachine({
         credentials: linked.credentials,
-        lease,
         locationId,
-        lmxId,
-        target: icTarget,
+        machineId: titleId,
       });
-      icUnclear = icOutcome.kind === "unclear";
-    }
+      if (!written.ok) {
+        log.error(
+          { reason: written.reason, action: "pinballmap.addMachine" },
+          "PinballMap add rejected"
+        );
+        return await rejectPush(userId, linked, written);
+      }
+      const lmxId = written.lmxId;
+      // --- transaction: local state only ---
 
-    addedLmxId = lmxId;
-  } finally {
-    await releasePinballMapMutationLease(lease.id);
-  }
+      const committed = await db.transaction(async (tx) => {
+        if (!(await mutationLeaseOwnsLocation(tx, lease))) return false;
+        // PBM returns the EXISTING lmx when the entry is already on the lineup, so
+        // an add can reclaim one a machine walked away from.
+        await retireAbandonmentForLmx(tx, lmxId);
+        // The stored lineup is what every control renders from, so it has to carry
+        // the entry we just created — otherwise the page repaints as still Missing
+        // and offers Add again, for up to an hour (CORE-ARCH-012).
+        await editStoredSnapshot(tx, locationId, (snapshot) =>
+          withLmxAdded(snapshot, lmxId, titleId)
+        );
+        await createMachineTimelineEvent(
+          machineId,
+          {
+            sourceType: "lifecycle",
+            tag: "lifecycle",
+            eventData: { kind: "pinballmap_listing", action: "listed", lmxId },
+            actorId: userId,
+          },
+          tx
+        );
+        return true;
+      });
+
+      if (!committed) {
+        // The only normal way to lose the lease is an invocation outliving its
+        // recovery window. Do not report a listing we could not attach locally;
+        // retain its exact old-location handle as an actionable cleanup record.
+        await db.transaction(async (tx) => {
+          await recordAbandonedListing(
+            tx,
+            machineId,
+            { lmxId, pinballmapMachineId: titleId, locationId },
+            userId
+          );
+        });
+        return err(
+          "SERVER",
+          "The tracked Pinball Map location changed while this addition was running. The old-location entry was saved for cleanup; reload the page."
+        );
+      }
+
+      // Adding also applies the entry's Insider Connected target (4.3), so one
+      // push leaves Pinball Map matching both intents. A failure here does not
+      // undo the add: the page then shows Insider Connected differs, with its
+      // own Update push.
+      const icTarget = (await getCatalogEntry(titleId))?.icEligible
+        ? await entryIcTarget(titleId)
+        : null;
+      let icUnclear = false;
+      if (icTarget !== null) {
+        const icOutcome = await pushInsiderConnected({
+          credentials: linked.credentials,
+          lease,
+          locationId,
+          lmxId,
+          target: icTarget,
+        });
+        icUnclear = icOutcome.kind === "unclear";
+      }
+
+      return ok({ lmxId, icUnclear });
+    }
+  );
+  if (!leased.ok) return leased;
 
   // Outside the lease: the re-read claims its own place at the sync chokepoint.
-  if (icUnclear) await reReadAfterUnclearIc(userId);
-  return ok({ lmxId: addedLmxId, alreadyListed: false });
+  if (leased.value.icUnclear) await reReadAfterUnclearIc(userId);
+  return ok({ lmxId: leased.value.lmxId, alreadyListed: false });
 }
 
 export type PushEntryInsiderConnectedResult = Result<
@@ -511,28 +486,22 @@ export async function pushEntryInsiderConnected(args: {
   const linked = await getLinkedPinballMapCredentials(userId);
   if (!linked) return err("NOT_LINKED", NOT_LINKED_MESSAGE);
 
-  const lease = await claimPinballMapMutationLease(
+  const leased = await withPinballMapMutationLease(
     locationId,
-    state.configurationGeneration
+    state.configurationGeneration,
+    async (lease) =>
+      ok(
+        await pushInsiderConnected({
+          credentials: linked.credentials,
+          lease,
+          locationId,
+          lmxId: lmx.id,
+          target,
+        })
+      )
   );
-  if (!lease)
-    return err(
-      "SERVER",
-      "The tracked Pinball Map location is being changed. Reload the page and try again."
-    );
-
-  let outcome: IcPushOutcome;
-  try {
-    outcome = await pushInsiderConnected({
-      credentials: linked.credentials,
-      lease,
-      locationId,
-      lmxId: lmx.id,
-      target,
-    });
-  } finally {
-    await releasePinballMapMutationLease(lease.id);
-  }
+  if (!leased.ok) return leased;
+  const outcome = leased.value;
 
   switch (outcome.kind) {
     case "applied":
@@ -584,50 +553,42 @@ export async function confirmLocationLineup(args: {
   const linked = await getLinkedPinballMapCredentials(userId);
   if (!linked) return err("NOT_LINKED", NOT_LINKED_MESSAGE);
 
-  const lease = await claimPinballMapMutationLease(
+  return withPinballMapMutationLease(
     locationId,
-    state.configurationGeneration
-  );
-  if (!lease)
-    return err(
-      "SERVER",
-      "The tracked Pinball Map location is being changed. Reload the page and try again."
-    );
-
-  try {
-    const client = await getPinballMapClient();
-    const written = await client.confirmLineup({
-      credentials: linked.credentials,
-      locationId,
-    });
-    if (!written.ok) {
-      log.error(
-        { reason: written.reason, action: "pinballmap.confirmLineup" },
-        "PinballMap lineup confirmation rejected"
-      );
-      // The shared message names an entry; this call is about the location.
-      if (written.reason === "not_found")
-        return err(
-          "PBM_REJECTED",
-          "Pinball Map couldn't find the tracked location."
+    state.configurationGeneration,
+    async (lease) => {
+      const client = await getPinballMapClient();
+      const written = await client.confirmLineup({
+        credentials: linked.credentials,
+        locationId,
+      });
+      if (!written.ok) {
+        log.error(
+          { reason: written.reason, action: "pinballmap.confirmLineup" },
+          "PinballMap lineup confirmation rejected"
         );
-      return await rejectPush(userId, linked, written);
+        // The shared message names an entry; this call is about the location.
+        if (written.reason === "not_found")
+          return err(
+            "PBM_REJECTED",
+            "Pinball Map couldn't find the tracked location."
+          );
+        return await rejectPush(userId, linked, written);
+      }
+      log.info(
+        { userId, locationId, action: "pinballmap.confirmLineup" },
+        "Confirmed the Pinball Map lineup"
+      );
+
+      await db.transaction(async (tx) => {
+        if (!(await mutationLeaseOwnsLocation(tx, lease))) return;
+        await editStoredSnapshot(tx, locationId, (snapshot) => ({
+          ...snapshot,
+          dateLastUpdated: today,
+        }));
+      });
+
+      return ok({});
     }
-    log.info(
-      { userId, locationId, action: "pinballmap.confirmLineup" },
-      "Confirmed the Pinball Map lineup"
-    );
-
-    await db.transaction(async (tx) => {
-      if (!(await mutationLeaseOwnsLocation(tx, lease))) return;
-      await editStoredSnapshot(tx, locationId, (snapshot) => ({
-        ...snapshot,
-        dateLastUpdated: today,
-      }));
-    });
-
-    return ok({});
-  } finally {
-    await releasePinballMapMutationLease(lease.id);
-  }
+  );
 }

@@ -18,7 +18,7 @@ import {
   LineupSections,
   type LineupViewContext,
 } from "~/components/pinballmap/LineupSections";
-import { getViewer } from "~/lib/collections/viewer";
+import { getViewer } from "~/lib/auth/viewer";
 import { formatDate, formatDateTime } from "~/lib/dates";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { loadLineupData } from "~/lib/pinballmap/lineup-data";

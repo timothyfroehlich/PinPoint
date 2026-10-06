@@ -31,37 +31,24 @@
  *   re-running scripts/sql/readonly-role.sql — see docs/ENV_VARS.md)
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 import { isPinPointProductionTarget } from "./lib/db-target.mjs";
+import { loadEnvFile } from "./lib/env-file.mjs";
 
 const VERIFY_SQL = new URL("./sql/verify-readonly-role.sql", import.meta.url)
   .pathname;
 
 const CLI_TIMEOUT_MS = 30_000;
 
-/**
- * `.env.local` fallback, matching query-readonly.mjs's own default: an
- * already-exported var wins, so an operator's `export POSTGRES_URL_READONLY=`
- * is never silently swapped out for a worktree's local value.
- */
-function loadEnvLocal() {
-  if (process.env.POSTGRES_URL_READONLY) return;
-  if (!existsSync(".env.local")) return;
-  for (const line of readFileSync(".env.local", "utf8").split("\n")) {
-    const match = /^\s*POSTGRES_URL_READONLY\s*=\s*(.*)$/.exec(line);
-    if (match) {
-      process.env.POSTGRES_URL_READONLY = match[1]
-        .trim()
-        .replace(/^["']|["']$/g, "");
-      return;
-    }
-  }
-}
-
 function main() {
-  loadEnvLocal();
+  // `.env.local` fallback, matching query-readonly.mjs's own default: an
+  // already-exported var wins, so an operator's `export POSTGRES_URL_READONLY=`
+  // is never silently swapped out for a worktree's local value.
+  loadEnvFile(".env.local", {
+    keys: ["POSTGRES_URL_READONLY"],
+    required: false,
+  });
 
   const url = process.env.POSTGRES_URL_READONLY;
   if (!url) {
