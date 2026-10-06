@@ -4585,6 +4585,174 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       expect(await storedTagSlugs(setId)).toEqual(["tournament"]);
     });
 
+    it("makes a tagged set preferred, clearing the previous preferred set and writing settings_preferred_changed", async () => {
+      const owner = await makeUser("member");
+      const tech = await makeUser("technician");
+      const machine = await seedMachine({ ownerId: owner });
+      const firstSet = await seedSet(
+        machine.id,
+        {
+          name: "Original House",
+          createdBy: tech,
+          isCommunity: true,
+          isPreferredHouse: true,
+        },
+        ["house"]
+      );
+      const personalSet = await seedSet(
+        machine.id,
+        {
+          name: "New House",
+          createdBy: owner,
+          isCommunity: false,
+          isPreferredHouse: false,
+        },
+        ["house"]
+      );
+
+      const outcome = await runUpdateSettingsSet(
+        updateSettingsSetSchema.parse({
+          machine: machine.initials,
+          set: personalSet,
+          preferredHouse: true,
+        }),
+        ctx("technician", tech)
+      );
+
+      expect(outcome.result).toMatchObject({
+        changed: true,
+        contentChanged: false,
+        kind: "community",
+      });
+      expect((await storedSet(personalSet)).isPreferredHouse).toBe(true);
+      expect((await storedSet(personalSet)).isCommunity).toBe(true);
+      expect((await storedSet(firstSet)).isPreferredHouse).toBe(false);
+
+      expect(await settingsEvents(machine.id)).toEqual([
+        "settings_preferred_changed:settings",
+        "settings_set_made_community:settings_edit",
+      ]);
+    });
+
+    it("allows the machine owner or admin to set preferred, but refuses a regular member with denied", async () => {
+      const owner = await makeUser("member");
+      const nonOwner = await makeUser("member");
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ ownerId: owner });
+      const setId = await seedSet(
+        machine.id,
+        {
+          name: "Tourney Set",
+          createdBy: owner,
+          isCommunity: true,
+          isPreferredTournament: false,
+        },
+        ["tournament"]
+      );
+
+      await expect(
+        runUpdateSettingsSet(
+          updateSettingsSetSchema.parse({
+            machine: machine.initials,
+            set: setId,
+            preferredTournament: true,
+          }),
+          ctx("member", nonOwner)
+        )
+      ).rejects.toMatchObject({ reason: "denied" });
+      expect((await storedSet(setId)).isPreferredTournament).toBe(false);
+
+      // Machine owner can make it preferred
+      await runUpdateSettingsSet(
+        updateSettingsSetSchema.parse({
+          machine: machine.initials,
+          set: setId,
+          preferredTournament: true,
+        }),
+        ctx("member", owner)
+      );
+      expect((await storedSet(setId)).isPreferredTournament).toBe(true);
+
+      // Admin can clear it
+      await runUpdateSettingsSet(
+        updateSettingsSetSchema.parse({
+          machine: machine.initials,
+          set: setId,
+          preferredTournament: false,
+        }),
+        ctx("admin", admin)
+      );
+      expect((await storedSet(setId)).isPreferredTournament).toBe(false);
+    });
+
+    it("refuses making a set preferred if it lacks the slot tag and writes nothing even with content edits", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine();
+      const setId = await seedSet(
+        machine.id,
+        {
+          name: "Untagged Set",
+          createdBy: admin,
+          isCommunity: true,
+          isPreferredTournament: false,
+        },
+        ["house"] // only tagged house, not tournament
+      );
+
+      await expect(
+        runUpdateSettingsSet(
+          updateSettingsSetSchema.parse({
+            machine: machine.initials,
+            set: setId,
+            name: "Attempted Rename",
+            preferredTournament: true,
+          }),
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({
+        reason: "invalid",
+        message: expect.stringMatching(
+          /Only a set tagged Tournament can be the preferred Tournament set/i
+        ),
+      });
+
+      const stored = await storedSet(setId);
+      expect(stored.name).toBe("Untagged Set");
+      expect(stored.isPreferredTournament).toBe(false);
+      expect(await settingsEvents(machine.id)).toEqual([]);
+    });
+
+    it("allows applying the slot tag and making it preferred in the same call", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine();
+      const setId = await seedSet(
+        machine.id,
+        {
+          name: "Fresh Set",
+          createdBy: admin,
+          isCommunity: true,
+        },
+        []
+      );
+
+      const outcome = await runUpdateSettingsSet(
+        updateSettingsSetSchema.parse({
+          machine: machine.initials,
+          set: setId,
+          tournament: true,
+          preferredTournament: true,
+        }),
+        ctx("admin", admin)
+      );
+
+      expect(outcome.result).toMatchObject({
+        changed: true,
+      });
+      const stored = await storedSet(setId);
+      expect(stored.isPreferredTournament).toBe(true);
+      expect(await storedTagSlugs(setId)).toEqual(["tournament"]);
+    });
+
     it("refuses a technician editing another user's personal set", async () => {
       const owner = await makeUser("member");
       const tech = await makeUser("technician");
