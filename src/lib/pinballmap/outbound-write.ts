@@ -41,14 +41,14 @@ import {
 import { findLmxForMachine } from "~/lib/pinballmap/resolve-lmx";
 import { withLmxAdded, withLmxIcEnabled } from "~/lib/pinballmap/snapshot-edit";
 import {
-  PINBALLMAP_STATE_ID,
   mutationLeaseOwnsLocation,
   withPinballMapMutationLease,
-  type PinballMapMutationLease,
 } from "~/lib/pinballmap/mutation-lease";
 import {
+  PINBALLMAP_STATE_ID,
   getPinballMapState,
   syncLocationSnapshot,
+  type PinballMapMutationLease,
 } from "~/lib/pinballmap/state";
 import { reconcileAfterSync } from "~/lib/pinballmap/sync";
 import type {

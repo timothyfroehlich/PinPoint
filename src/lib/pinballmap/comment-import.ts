@@ -16,7 +16,7 @@ import {
   timelineEvents,
 } from "~/server/db/schema";
 import { pinballmapCommenterName } from "./comment-conversion";
-import { PINBALLMAP_STATE_ID } from "./mutation-lease";
+import { PINBALLMAP_STATE_ID } from "./state";
 import { markEndedEntries } from "./previous-listing";
 import type { PbmCondition, PbmLmx } from "./types";
 
