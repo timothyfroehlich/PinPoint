@@ -491,6 +491,10 @@ jobs:
       - name: Run Smoke Tests (Chromium)
         env:
           MOCK_BLOB_STORAGE: "true"
+          # Production server: the webServer runs `next build && next start`
+          # inside this step, after Setup Supabase exported the NEXT_PUBLIC_*
+          # values the build inlines. See playwright.config.ts (PP-izj5).
+          PLAYWRIGHT_WEB_SERVER: "start"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
           UNSUBSCRIBE_SIGNING_SECRET: "ci-test-only-not-a-real-secret-0000000000000000000000000000000000"
@@ -562,6 +566,10 @@ jobs:
       - name: Run Smoke Tests (Mobile Chrome)
         env:
           MOCK_BLOB_STORAGE: "true"
+          # Production server: the webServer runs `next build && next start`
+          # inside this step, after Setup Supabase exported the NEXT_PUBLIC_*
+          # values the build inlines. See playwright.config.ts (PP-izj5).
+          PLAYWRIGHT_WEB_SERVER: "start"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
           UNSUBSCRIBE_SIGNING_SECRET: "ci-test-only-not-a-real-secret-0000000000000000000000000000000000"
@@ -633,6 +641,10 @@ jobs:
       - name: Run Full Tests (Chromium)
         env:
           MOCK_BLOB_STORAGE: "true"
+          # Production server: the webServer runs `next build && next start`
+          # inside this step, after Setup Supabase exported the NEXT_PUBLIC_*
+          # values the build inlines. See playwright.config.ts (PP-izj5).
+          PLAYWRIGHT_WEB_SERVER: "start"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
           UNSUBSCRIBE_SIGNING_SECRET: "ci-test-only-not-a-real-secret-0000000000000000000000000000000000"
@@ -736,6 +748,10 @@ jobs:
         timeout-minutes: 25
         env:
           MOCK_BLOB_STORAGE: "true"
+          # Production server: the webServer runs `next build && next start`
+          # inside this step, after Setup Supabase exported the NEXT_PUBLIC_*
+          # values the build inlines. See playwright.config.ts (PP-izj5).
+          PLAYWRIGHT_WEB_SERVER: "start"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
           # Per-run filename, NOT a shared results.json. The reporter writes
@@ -812,6 +828,10 @@ jobs:
         timeout-minutes: 40
         env:
           MOCK_BLOB_STORAGE: "true"
+          # Production server: the webServer runs `next build && next start`
+          # inside this step, after Setup Supabase exported the NEXT_PUBLIC_*
+          # values the build inlines. See playwright.config.ts (PP-izj5).
+          PLAYWRIGHT_WEB_SERVER: "start"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
           PLAYWRIGHT_JSON_OUTPUT_NAME: playwright-report/results-full.json

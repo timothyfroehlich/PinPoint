@@ -34,6 +34,15 @@ If all five say "E2E is the right layer", write it. Otherwise, the cheapest laye
 - **Run Full Suite**: `pnpm run e2e:full` / `e2e:all` (Comprehensive — CI's job by default; three parallel Chromium workers plus a Supabase stack and a Next server, peaking at several GB)
 - **Debug Mode**: `pnpm exec playwright test e2e/path/to/test.spec.ts --debug`
 
+## Web Server: `next dev` or a Production Build
+
+`playwright.config.ts` starts the app itself, and `PLAYWRIGHT_WEB_SERVER` picks which server:
+
+- **Unset or `dev`** (default): `pnpm run dev`. Local runs, `preflight`, and crabbox jobs use this. Playwright reuses a server already on the port outside CI.
+- **`start`**: `next build && next start` with `VERCEL_ENV=development` and `MOCK_BLOB_STORAGE=true`, so `isProductionRuntime()` stays false and test-only behavior keeps working under `NODE_ENV=production`. All CI E2E jobs set it, because `next dev` compiles each route on first visit and that compile can exceed the 20s navigation timeout (PP-rj2x, PP-po96). It never reuses a running server, and it refuses a checkout that holds `.env.production` or `.env.production.local`, which `next build` would load.
+
+The switch is deliberately not keyed on `CI`: crabbox jobs set `CI=1` and stay on dev. To reproduce a CI-only failure, set `PLAYWRIGHT_WEB_SERVER=start` on the run. The build runs inside the Playwright step, so it inlines the `NEXT_PUBLIC_*` values that step sees.
+
 ## Which Tests to Run (Decision Tree)
 
 See AGENTS.md §5 "Which tests to run" — canonical, don't duplicate here.
