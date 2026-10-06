@@ -215,22 +215,30 @@ function delegatesTo(
  * `createProtectedAction` or `createPublicAction`: every name in the
  * factory's returned object must be a pipeline const declared in its body.
  */
-function factoryHandlersOffPipeline(name: string, file: string): string[] {
-  const source = readFileSync(join(ROOT, file), "utf8");
+function handlersOffPipeline(source: string, name: string): string[] {
   const declared = new RegExp(`export\\s+function\\s+${name}\\b`).exec(source);
-  if (!declared) return [`${file}#${name} (factory not found)`];
+  if (!declared) return [`${name} (factory not found)`];
   const body = functionBody(source, source.indexOf("(", declared.index));
   const built = [
     ...body.matchAll(/const\s+(\w+)\s*=\s*create(?:Protected|Public)Action\b/g),
   ].map((match) => match[1]);
+  // The returned object must list its handlers by shorthand name; anything
+  // else (a renamed key, a spread, an inline function) counts as off it.
   const returned = /return\s*\{([^}]*)\}\s*;?\s*$/.exec(body.trim());
-  if (!returned?.[1]) return [`${file}#${name} (no returned handlers)`];
+  if (!returned?.[1]) return [`${name} (no returned handlers)`];
   return returned[1]
     .split(",")
     .map((entry) => entry.trim())
     .filter(Boolean)
     .filter((handler) => !built.includes(handler))
-    .map((handler) => `${file}#${name}.${handler}`);
+    .map((handler) => `${name}.${handler}`);
+}
+
+/** {@link handlersOffPipeline} for a listed factory's defining file. */
+function factoryHandlersOffPipeline(name: string, file: string): string[] {
+  return handlersOffPipeline(readFileSync(join(ROOT, file), "utf8"), name).map(
+    (entry) => `${file}#${entry}`
+  );
 }
 
 interface ServerAction {
@@ -302,6 +310,40 @@ describe("Server Actions go through the pipeline (CORE-ARCH-013)", () => {
     expect(delegatesTo(body, [], [])).toBe(false);
     // A pipeline const's member is not a factory handler.
     expect(delegatesTo(body, ["handlers"], [])).toBe(false);
+    // Only a single return statement counts, as for a pipeline const.
+    expect(
+      delegatesTo(
+        "\n  await db.delete(rows);\n  return handlers.remove(id);\n",
+        [],
+        ["handlers"]
+      )
+    ).toBe(false);
+  });
+
+  it("flags a factory handler built outside the pipeline", () => {
+    const factory = `
+export function buildHandlers(): Handlers {
+  const save = createProtectedAction({ permission: "views.save" });
+  const remove = async (id: string) => db.delete(rows).where(eq(rows.id, id));
+  const rename = createPublicAction({});
+  return { save, remove, rename };
+}
+`;
+    expect(handlersOffPipeline(factory, "buildHandlers")).toEqual([
+      "buildHandlers.remove",
+    ]);
+    // A handler under a renamed key or a spread is not provably built
+    // through the pipeline either.
+    const renamed = `
+export function buildHandlers(): Handlers {
+  const save = createProtectedAction({});
+  return { save, update: save, ...extra };
+}
+`;
+    expect(handlersOffPipeline(renamed, "buildHandlers")).toEqual([
+      "buildHandlers.update: save",
+      "buildHandlers....extra",
+    ]);
   });
 
   it("lists only factories that build every handler they return through the pipeline", () => {

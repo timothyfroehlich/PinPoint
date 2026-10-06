@@ -224,6 +224,8 @@ A `"use server"` file exports only async functions, so keep the pipeline in a mo
 
 Two helpers sit beside the pipeline in `~/lib/actions`: `revalidateMachine(initials, tabs)` revalidates `/m/<initials>` and each named tab beneath it, and `rethrowIfRedirect(error)` is the redirect passthrough for a `catch` outside the pipeline.
 
+When several hosts need the same set of actions, a pipeline factory can build them once: `createSavedViewActionHandlers` in `src/lib/list-view/saved-view-actions.ts` builds the Saved View handlers that `src/app/(app)/issues/saved-view-actions.ts` and `src/app/(app)/m/saved-view-actions.ts` export. A factory must build every handler it returns with `createProtectedAction` or `createPublicAction`, and each `"use server"` export is one statement, `return handlers.create(input)`, on a module-level const holding the factory's result. List a new factory in `PIPELINE_FACTORIES` in the ratchet test; the test checks every handler the factory returns, so a factory with one hand-rolled handler fails.
+
 The exceptions (signed-out auth flows, redirect-only OAuth and consent actions) and the backlog of hand-rolled actions are the allowlists in `src/test/lint/protected-action-ratchet.test.ts`. Migrating an action means deleting its line there; the test fails until you do.
 
 Exported actions are **suffixed `Action`** — `createMachineAction`, `markAsReadAction`. Older actions predate the convention: name new ones with the suffix, leave existing names alone (a rename risks missing a call site), and treat an unsuffixed export as a possible Server Action, since several are wired straight into `useActionState`.
