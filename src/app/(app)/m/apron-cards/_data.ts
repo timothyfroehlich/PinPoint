@@ -1,7 +1,12 @@
-import { inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 import { db } from "~/server/db";
-import { pinTips } from "~/server/db/schema";
+import {
+  apronCardPrintQueue,
+  machineApronCards,
+  machines,
+  pinTips,
+} from "~/server/db/schema";
 import {
   apronCardContent,
   type ApronCardContent,
@@ -138,4 +143,34 @@ export async function getPrintableApronCards(): Promise<PrintableApronCard[]> {
       ),
     }));
   });
+}
+
+/**
+ * The ids of the cards in a member's print queue (spec apron-cards §13),
+ * limited to `cardIds` when given. Like the Print apron cards page, it leaves
+ * out cards of Removed machines (§13.3).
+ */
+export async function getQueuedApronCardIds(
+  userId: string,
+  cardIds?: readonly string[]
+): Promise<string[]> {
+  if (cardIds?.length === 0) return [];
+  const rows = await db
+    .select({ cardId: apronCardPrintQueue.cardId })
+    .from(apronCardPrintQueue)
+    .innerJoin(
+      machineApronCards,
+      eq(machineApronCards.id, apronCardPrintQueue.cardId)
+    )
+    .innerJoin(machines, eq(machines.id, machineApronCards.machineId))
+    .where(
+      and(
+        eq(apronCardPrintQueue.userId, userId),
+        machineNotRemoved(),
+        cardIds === undefined
+          ? undefined
+          : inArray(apronCardPrintQueue.cardId, [...cardIds])
+      )
+    );
+  return rows.map((row) => row.cardId);
 }
