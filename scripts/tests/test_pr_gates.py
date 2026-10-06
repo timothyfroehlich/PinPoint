@@ -984,8 +984,12 @@ def git_repo_with_merge(
         elif conflict_in_merge:
             git_cmd("checkout", "-q", "feat", cwd=repo)
             subprocess.run(
-                ["git", "merge", "-q", "--no-ff", "main"], cwd=repo, check=False
+                ["git", "merge", "-q", "--no-ff", "main"],
+                cwd=repo,
+                check=False,
+                env={**os.environ, **GIT_ENV},
             )
+            assert (repo / ".git" / "MERGE_HEAD").exists(), "merge did not start"
             (repo / "feat.txt").write_text("manual conflict resolution\n")
             git_cmd("add", "-A", cwd=repo)
             git_cmd("commit", "-qm", "Merge main with conflict resolution", cwd=repo)
@@ -1228,7 +1232,9 @@ def git_repo_with_migration_merge(
             cwd=repo,
             check=False,
             capture_output=True,
+            env={**os.environ, **GIT_ENV},
         )
+        assert (repo / ".git" / "MERGE_HEAD").exists(), "merge did not start"
         # The renumber resolution: main's drizzle/, ours re-appended as 0002.
         git_cmd("checkout", "main", "--", "drizzle", cwd=repo)
         git_cmd("rm", "-q", "drizzle/0001_mine.sql", cwd=repo)
