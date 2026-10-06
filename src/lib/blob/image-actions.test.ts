@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { uploadIssueImage } from "./images";
+import { uploadIssueImage } from "./image-actions";
 import * as blobClient from "~/lib/blob/client";
 import * as rateLimit from "~/lib/rate-limit";
 import { db } from "~/server/db";

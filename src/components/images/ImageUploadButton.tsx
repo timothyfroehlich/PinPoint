@@ -8,9 +8,9 @@ import { Label } from "~/components/ui/label";
 import { Camera, Image as ImageIcon, Loader2 } from "lucide-react";
 import { compressImage } from "~/lib/blob/compression";
 import { validateImageFile } from "~/lib/blob/validation";
-import { uploadIssueImage } from "~/server/actions/images";
+import { uploadIssueImage } from "~/lib/blob/image-actions";
 import { toast } from "sonner";
-import { type ImageMetadata } from "~/types/images";
+import { type ImageMetadata } from "~/lib/types/images";
 import { getUploadErrorMessage } from "~/components/images/upload-error-message";
 import { cn } from "~/lib/utils";
 

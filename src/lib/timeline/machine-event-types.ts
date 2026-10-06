@@ -3,6 +3,15 @@ import type { MachinePresenceStatus } from "~/lib/machines/presence";
 import type { IssueFrequency, IssueSeverity, IssueStatus } from "~/lib/types";
 
 /**
+ * All valid values for `timeline_events.source_type`. Used as the column's
+ * `$type` annotation in the schema so reads/writes are statically checked.
+ * Lives here, not in `machine-events.ts`, so the schema can import it without
+ * pulling in the database module.
+ */
+export type TimelineEventSourceType =
+  "lifecycle" | "issue" | "comment" | "pinballmap";
+
+/**
  * Discriminated union of every structured event variant that can be stored
  * in `timeline_events.event_data`. The `kind` field is the discriminator.
  *
