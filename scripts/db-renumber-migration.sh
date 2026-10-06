@@ -67,12 +67,28 @@ old_number=${old_tag%%_*}
 name=${old_tag#*_}
 
 work_dir=$(mktemp -d)
-trap 'rm -rf "$work_dir"' EXIT
+drizzle_touched=0
+renumbered=0
+
+# On any failure after drizzle/ is touched, drop drizzle-kit's working-tree
+# edits and generated files so the index and tree agree again; otherwise
+# `git merge --abort` refuses ("not uptodate").
+cleanup() {
+  if [[ $drizzle_touched -eq 1 && $renumbered -eq 0 ]]; then
+    git checkout -- drizzle/ 2>/dev/null || true
+    git clean -fq -- drizzle/ 2>/dev/null || true
+    printf '\ndrizzle/ now holds the base branch version with this branch'"'"'s migration removed.\n' >&2
+    printf 'Run git merge --abort to start over, or finish by hand (pinpoint-deployment skill, "Migration Conflicts").\n' >&2
+  fi
+  rm -rf "$work_dir"
+}
+trap cleanup EXIT
 git show "HEAD:drizzle/${old_tag}.sql" > "$work_dir/reviewed.sql"
 mkdir -p "$work_dir/base"
 git archive "$base_side" drizzle | tar -x -C "$work_dir/base"
 
 # Take the base branch's drizzle/ and drop this branch's files from the index.
+drizzle_touched=1
 git checkout "$base_side" -- drizzle/
 git rm -q -f --ignore-unmatch "drizzle/${old_tag}.sql"
 if ! git cat-file -e "${base_side}:drizzle/meta/${old_number}_snapshot.json" 2>/dev/null; then
@@ -99,9 +115,7 @@ if ! python3 scripts/migration_statements.py "drizzle/${new_tag}.sql" "$work_dir
 db-renumber-migration: the regenerated migration does more than the reviewed one.
 Either the schema.ts merge resolution changed this branch's schema, or the base
 branch carries schema drift that a later migration is meant to apply. Shipping
-those statements would change what this migration does. Review them, then
-finish by hand (pinpoint-deployment skill, "Migration Conflicts"), or run
-\`git merge --abort\` and start over.
+those statements would change what this migration does.
 EOF
   exit 1
 fi
@@ -109,6 +123,7 @@ fi
 cp "$work_dir/reviewed.sql" "drizzle/${new_tag}.sql"
 python3 scripts/check_migration_order.py --base-dir "$work_dir/base"
 git add drizzle/
+renumbered=1
 
 printf '\nRenumbered %s -> %s (SQL unchanged).\n' "$old_tag" "$new_tag"
 printf 'Next: pnpm run db:reset, then git commit to conclude the merge.\n'
