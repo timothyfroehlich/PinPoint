@@ -405,6 +405,32 @@ describe("request timeouts", () => {
     expect(budgets).toEqual([15_000]);
   });
 
+  it("sendDm reports transient when the DM-channel body stalls past the deadline", async () => {
+    // Headers arrive, then the body never finishes; the deadline errors the
+    // stream the way a real aborted fetch does.
+    globalThis.fetch = vi.fn(
+      (_input: RequestInfo | URL, init?: RequestInit) => {
+        const signal = init?.signal;
+        const body = new ReadableStream<Uint8Array>({
+          start(controller) {
+            signal?.addEventListener(
+              "abort",
+              () => {
+                controller.error(signal.reason);
+              },
+              { once: true }
+            );
+          },
+        });
+        return Promise.resolve(new Response(body, { status: 200 }));
+      }
+    );
+    shrinkDeadlines();
+    expect(
+      await sendDm({ botToken: "t", discordUserId: "u", content: "hi" })
+    ).toEqual({ ok: false, reason: "transient" });
+  });
+
   it("postChannelMessage aborts a hung post after 15s and reports transient", async () => {
     const budgets = shrinkDeadlines();
     expect(

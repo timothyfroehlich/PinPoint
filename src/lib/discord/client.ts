@@ -119,10 +119,21 @@ async function openDmChannel(
   });
   if (!res.ok) return { ok: false, result: await classify(res) };
 
-  const json = (await res.json()) as { id?: string };
-  if (!json.id)
+  // The request deadline also covers this body read, so a body that stalls
+  // rejects here; like a body without an id, that is a transient failure,
+  // never a throw out of sendDm.
+  let body: unknown;
+  try {
+    body = await res.json();
+  } catch {
     return { ok: false, result: { ok: false, reason: "transient" } };
-  return { ok: true, channelId: json.id };
+  }
+  const id =
+    typeof body === "object" && body !== null && "id" in body ? body.id : null;
+  if (typeof id !== "string" || id.length === 0) {
+    return { ok: false, result: { ok: false, reason: "transient" } };
+  }
+  return { ok: true, channelId: id };
 }
 
 async function postMessage(

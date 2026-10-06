@@ -7,9 +7,9 @@ import { log } from "~/lib/logger";
  * It owns the behaviors every integration client needs alike: each request
  * carries a timeout, a network failure or timeout becomes a synthetic 599
  * response instead of a throw, and a 429 gets one bounded retry that honors
- * `Retry-After`. Integration-specific concerns
- * (headers, the PinballMap production guard, mapping statuses to results) stay
- * in the client that calls it.
+ * `Retry-After`. Integration-specific concerns (headers, the PinballMap
+ * production guard, mapping statuses to results) stay in the client that
+ * calls it.
  */
 
 /** Status of the synthetic response `safeFetch` returns when `fetch` throws. */
