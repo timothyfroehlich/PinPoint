@@ -32,11 +32,13 @@ export function CollectionHeader({
     parts.push(plural(summary.openIssues, "open issue"));
   }
   return (
-    // The action wraps below the title and summary before squeezing them.
+    // The title block keeps at least 16rem; when the actions can't fit beside
+    // it (phones), they wrap onto their own row instead of squeezing the
+    // title and summary to a word per line.
     <header className="flex flex-wrap items-center justify-between gap-3">
-      <div className="min-w-0 flex-[1_1_14rem]">
+      <div className="min-w-0 flex-[1_1_16rem]">
         {eyebrow ? <div className="mb-1">{eyebrow}</div> : null}
-        <h1 className="min-w-0 truncate text-2xl font-bold text-foreground sm:text-3xl">
+        <h1 className="min-w-0 break-words text-2xl font-bold text-foreground sm:text-3xl">
           {title}
         </h1>
         <p

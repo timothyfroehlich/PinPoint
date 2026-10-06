@@ -1,7 +1,7 @@
 # PinPoint Non‑Negotiables
 
-**Last Updated**: 2026-10-05
-**Version**: 2.7 (CORE-ARCH-014 added: one write path per mutation; CORE-ARCH-010 amended: share load-bearing code at two copies, reuse existing helpers — PP-az4d.1)
+**Last Updated**: 2026-10-06
+**Version**: 2.8 (CORE-ARCH-015 added: a caught error not returned to the user goes to `reportError`; cron routes use `runCron` — PP-az4d.3). Prior: 2.7 (CORE-ARCH-014 added: one write path per mutation; CORE-ARCH-010 amended: share load-bearing code at two copies, reuse existing helpers — PP-az4d.1)
 
 > **Canonical catalog**: this document defines the canonical `CORE-*` rules for PinPoint. Portable skills (`.agents/skills/`) and agent context (`AGENTS.md`) cite rules by ID and provide domain/task-specific procedures.
 
@@ -40,6 +40,7 @@
 23. External side effects (HTTP, email, Discord, blob, Vault RPC) never run inside a DB transaction; deliver them post-commit (CORE-ARCH-011)
 24. A bug-fix regression test fails on the pre-fix code; tests reach production through real callers' seams (CORE-TEST-007/008)
 25. A mutation with more than one entry point lives in `src/services`; entry points parse, authorize, and call it (CORE-ARCH-014)
+26. A caught error that is not returned to the user goes to `reportError`, never to a bare `log.error`; cron routes use `runCron` (CORE-ARCH-015)
 
 ---
 
@@ -426,6 +427,13 @@
 - **Do:** Put a mutation reachable from more than one entry point — a web Server Action, an MCP tool, a cron route — in `src/services`. Each entry point parses its input, authorizes the caller, and calls the service. Adding a second entry point to a mutation that lives in one entry point moves the mutation into `src/services` first.
 - **Don't:** Copy a service's transaction, event, or notification logic into an entry point.
 
+**CORE-ARCH-015:** A caught error that is not returned to the user goes to `reportError`
+
+- **Severity:** Required
+- **Why:** Sentry's auto-capture sees only _uncaught_ exceptions. A `catch` that logs and returns a clean response hides the failure from monitoring; a Vercel log line that ages out is the only evidence the job ran badly (PP-a5y). Five of seven cron routes (`cleanup-blobs`, `pinballmap-sync`, `refresh-catalog`, `refresh-opdb`, `refresh-pintips`) did exactly this, while the other two already called `reportError` (PP-az4d.3).
+- **Do:** Send every caught error that is not returned to the user through `reportError(err, { action: "<area.operation>" })` from `~/lib/observability/report-error`: one call captures to Sentry and writes the structured log. A Server Action that also returns an `err` Result uses `serverActionError(...)`. Write each cron route as `return runCron(request, "<action>", async () => ({ ok: true, ... }))` from `~/lib/cron/run-cron`: it applies the `CRON_SECRET` gate, reports any thrown failure, and answers with the single failure status (500). A cron job that fails by returning a result value throws that failure inside the callback. An error tolerated by design is still reported, with `bestEffort: true` in the context.
+- **Don't:** Pair `catch` with a bare `log.error`. Don't add `try`/`catch` to a cron route; `runCron` owns it.
+
 ---
 
 ## Integrations
@@ -692,7 +700,7 @@ If all Yes → ship it. Perfect is the enemy of done.
 - CORE‑SEC‑001..010: Security
 - CORE‑PERF‑001..003: Performance (incl. image priority + preconnect)
 - CORE‑TEST‑001..006: Testing
-- CORE‑ARCH‑001, 004..012, 014: Architecture (002, 003 retired)
+- CORE‑ARCH‑001, 004..012, 014, 015: Architecture (013 reserved) (002, 003 retired)
 - CORE‑RESP‑001..004: Responsive framework
 - CORE‑UI‑001..006: UI & styling + Browser support / MWG catalog (005, 006)
 - CORE‑A11Y‑001..006: Accessibility floor

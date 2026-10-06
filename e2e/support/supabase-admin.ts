@@ -413,7 +413,7 @@ export async function deleteTestTagType(name: string) {
 /**
  * Generate an unsubscribe token for E2E tests.
  * Uses the same HMAC-SHA256 algorithm and signing secret as
- * src/lib/notifications/channels/email-channel.ts. The test client must
+ * src/lib/notifications/unsubscribe-token.ts. The test client must
  * derive tokens using the same UNSUBSCRIBE_SIGNING_SECRET that the dev
  * server uses to verify them, otherwise verification fails.
  */

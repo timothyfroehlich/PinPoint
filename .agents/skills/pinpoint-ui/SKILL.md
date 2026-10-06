@@ -234,6 +234,10 @@ Data access lives in **colocated** `_data.ts` / `queries.ts` files next to the r
 
 Revalidate with `revalidatePath` — that's the convention throughout. `revalidateTag` has **zero** usages in `src/`; if you think you need it, you're introducing a second caching convention.
 
+### Stored rich text
+
+A prose column a person writes in the rich text editor (machine description, owner's requirements, Collection description) is validated with `validateProseMirrorDoc` (`~/lib/tiptap/validate`) before it is saved. It checks the doc's shape, applies the 10k plain-text / 100k JSON size caps, and reports a whitespace-only doc as `"empty"` so the column stores NULL. Map its result to your action's own error copy; don't write another size check.
+
 ### Machine status is derived, never stored
 
 There is no `status` column on the `machines` table — a machine's operational status is computed at read time from its open issues. `src/lib/machines/status.ts` is the source of truth for the algorithm and the label/style helpers. Read it rather than reimplementing or restating the rules; an earlier prose copy of this algorithm drifted until it was behaviorally wrong. Query only the columns the derivation needs (`status`, `severity`) when loading issues for it.
