@@ -5,7 +5,7 @@ import { IssueFilters } from "~/components/issues/IssueFilters";
 import { IssueList } from "~/components/issues/IssueList";
 import { IssueSummaryWidgets } from "~/components/issues/IssueSummaryWidgets";
 import type { CollectionMachine } from "~/lib/collections/owner";
-import type { Viewer } from "~/lib/collections/viewer";
+import type { Viewer } from "~/lib/auth/viewer";
 import { getAccessLevel } from "~/lib/permissions/helpers";
 import type { IssueExportScope } from "~/app/(app)/issues/export-schema";
 

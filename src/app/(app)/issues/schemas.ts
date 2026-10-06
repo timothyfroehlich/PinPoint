@@ -7,7 +7,11 @@
 
 import { z } from "zod";
 import { ISSUE_TITLE_MAX_MESSAGE, issueTitleSchema } from "~/lib/issues/title";
-import { ISSUE_FREQUENCY_VALUES } from "~/lib/types";
+import {
+  ISSUE_FREQUENCY_VALUES,
+  ISSUE_PRIORITY_VALUES,
+  ISSUE_SEVERITY_VALUES,
+} from "~/lib/types";
 import { ISSUE_STATUS_VALUES } from "~/lib/issues/status";
 
 const uuidish = z
@@ -34,7 +38,7 @@ export const updateIssueStatusSchema = z.object({
  */
 export const updateIssueSeveritySchema = z.object({
   issueId: uuidish,
-  severity: z.enum(["cosmetic", "minor", "major", "unplayable"], {
+  severity: z.enum(ISSUE_SEVERITY_VALUES, {
     message: "Invalid severity level",
   }),
 });
@@ -44,7 +48,7 @@ export const updateIssueSeveritySchema = z.object({
  */
 export const updateIssuePrioritySchema = z.object({
   issueId: uuidish,
-  priority: z.enum(["low", "medium", "high"], {
+  priority: z.enum(ISSUE_PRIORITY_VALUES, {
     message: "Invalid priority level",
   }),
 });

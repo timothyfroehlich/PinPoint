@@ -1,7 +1,7 @@
 # PinPoint Non‑Negotiables
 
 **Last Updated**: 2026-10-06
-**Version**: 2.10 (CORE-ARCH-016 added: third-party HTTP goes through `~/lib/http/external` with a per-request timeout — PP-az4d.11). Prior: 2.9 (CORE-ARCH-013 added: Server Actions go through `createProtectedAction` — PP-az4d.4). Prior: 2.8 (CORE-ARCH-015 added: a caught error not returned to the user goes to `reportError`; cron routes use `runCron` — PP-az4d.3). Prior: 2.7 (CORE-ARCH-014 added: one write path per mutation; CORE-ARCH-010 amended: share load-bearing code at two copies, reuse existing helpers — PP-az4d.1)
+**Version**: 2.11 (CORE-TS-002 amended: a `*_VALUES` array is the single source for zod, Drizzle and TS unions — PP-az4d.13). Prior: 2.10 (CORE-ARCH-016 added: third-party HTTP goes through `~/lib/http/external` with a per-request timeout — PP-az4d.11). Prior: 2.9 (CORE-ARCH-013 added: Server Actions go through `createProtectedAction` — PP-az4d.4). Prior: 2.8 (CORE-ARCH-015 added: a caught error not returned to the user goes to `reportError`; cron routes use `runCron` — PP-az4d.3). Prior: 2.7 (CORE-ARCH-014 added: one write path per mutation; CORE-ARCH-010 amended: share load-bearing code at two copies, reuse existing helpers — PP-az4d.1)
 
 > **Canonical catalog**: this document defines the canonical `CORE-*` rules for PinPoint. Portable skills (`.agents/skills/`) and agent context (`AGENTS.md`) cite rules by ID and provide domain/task-specific procedures.
 
@@ -59,8 +59,8 @@
 
 - **Severity:** High
 - **Why:** Divergent shapes cause bugs
-- **Do:** Reuse domain types from `~/lib/types`
-- **Don't:** Declare look‑alike types in multiple places
+- **Do:** Reuse domain types from `~/lib/types`. A value set with a `*_VALUES` array (`ISSUE_SEVERITY_VALUES`, `USER_ROLES`, `NOTIFICATION_TYPE_VALUES`, `ISSUE_STATUS_VALUES`) has that array as its single source: `z.enum(X_VALUES)`, Drizzle `text(..., { enum: X_VALUES })`, and `type X = (typeof X_VALUES)[number]` all derive from it. Give a new value set its array before a second site needs the list.
+- **Don't:** Declare look‑alike types in multiple places. Restate a value set's literals by hand in a union, `z.enum([...])`, or Drizzle `enum: [...]`, and cast an array (`as unknown as [T, ...T[]]`) to fit a Drizzle enum: pass the `as const` array as is.
 
 **CORE-TS-003:** DB vs App boundary
 

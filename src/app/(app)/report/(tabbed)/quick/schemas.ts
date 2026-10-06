@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { ISSUE_STATUS_VALUES } from "~/lib/issues/status";
-import { ISSUE_FREQUENCY_VALUES } from "~/lib/types";
+import {
+  ISSUE_FREQUENCY_VALUES,
+  ISSUE_PRIORITY_VALUES,
+  ISSUE_SEVERITY_VALUES,
+} from "~/lib/types";
 import { ISSUE_TITLE_MAX, issueTitleSchema } from "~/lib/issues/title";
 import { proseMirrorDocValueSchema } from "~/lib/tiptap/types";
 
@@ -17,10 +21,12 @@ export const quickRowSchema = z.object({
   // routes an empty editor to `null` via `docIsEmpty` before submit, so a junk
   // "empty paragraph" doc is never persisted.
   description: proseMirrorDocValueSchema.nullable(),
-  severity: z.enum(["cosmetic", "minor", "major", "unplayable"], {
+  severity: z.enum(ISSUE_SEVERITY_VALUES, {
     message: "Select a severity",
   }),
-  priority: z.enum(["low", "medium", "high"], { message: "Select a priority" }),
+  priority: z.enum(ISSUE_PRIORITY_VALUES, {
+    message: "Select a priority",
+  }),
   frequency: z.enum(ISSUE_FREQUENCY_VALUES, {
     message: "Select a frequency",
   }),
