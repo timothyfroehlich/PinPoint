@@ -17,10 +17,14 @@ import {
   foreignKey,
 } from "drizzle-orm/pg-core";
 import { citext } from "~/server/db/citext";
+import { ISSUE_STATUS_VALUES } from "~/lib/issues/status-values";
+import { VALID_MACHINE_PRESENCE_STATUSES } from "~/lib/machines/presence";
+import { NOTIFICATION_TYPE_VALUES } from "~/lib/notifications/events";
 import {
-  ISSUE_STATUS_VALUES,
-  type IssueStatus,
-} from "~/lib/issues/status-values";
+  ISSUE_FREQUENCY_VALUES,
+  ISSUE_PRIORITY_VALUES,
+  ISSUE_SEVERITY_VALUES,
+} from "~/lib/types/issue-values";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 import { type TimelineEventData } from "~/lib/timeline/types";
 import { type MachineTimelineEventData } from "~/lib/timeline/machine-event-types";
@@ -39,7 +43,7 @@ import {
   type OpdbPerson,
 } from "~/lib/opdb/types";
 import { PINTIP_CATEGORIES } from "~/lib/pintips/types";
-import { REPORT_MODE_VALUES } from "~/lib/types/user";
+import { REPORT_MODE_VALUES, USER_ROLES } from "~/lib/types/user";
 import { LIST_HOSTS } from "~/lib/types/list-view";
 
 /**
@@ -113,9 +117,7 @@ export const userProfiles = pgTable(
     bio: text("bio"),
     pronouns: text("pronouns"),
     discordUserId: text("discord_user_id").unique(),
-    role: text("role", { enum: ["guest", "member", "technician", "admin"] })
-      .notNull()
-      .default("guest"), // Default for new signups (no invitation)
+    role: text("role", { enum: USER_ROLES }).notNull().default("guest"), // Default for new signups (no invitation)
     mobileReportMode: text("mobile_report_mode", {
       enum: REPORT_MODE_VALUES,
     })
@@ -175,9 +177,7 @@ export const invitedUsers = pgTable(
       .generatedAlwaysAs(sql`btrim(first_name || ' ' || last_name)`)
       .notNull(),
     email: citext("email").notNull().unique(),
-    role: text("role", { enum: ["guest", "member", "technician", "admin"] })
-      .notNull()
-      .default("member"), // Default for invited users (trusted)
+    role: text("role", { enum: USER_ROLES }).notNull().default("member"), // Default for invited users (trusted)
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -234,13 +234,7 @@ export const machines = pgTable(
       "settings_instructions"
     ).$type<ProseMirrorDoc>(),
     presenceStatus: text("presence_status", {
-      enum: [
-        "on_the_floor",
-        "off_the_floor",
-        "on_loan",
-        "pending_arrival",
-        "removed",
-      ],
+      enum: VALID_MACHINE_PRESENCE_STATUSES,
     })
       .notNull()
       .default("on_the_floor"),
@@ -785,21 +779,17 @@ export const issues = pgTable(
     // Status values imported from single source of truth
     // Based on _issue-status-redesign/README.md - Final design with 11 statuses
     status: text("status", {
-      enum: ISSUE_STATUS_VALUES as unknown as [IssueStatus, ...IssueStatus[]],
+      enum: ISSUE_STATUS_VALUES,
     })
       .notNull()
       .default("new"),
-    severity: text("severity", {
-      enum: ["cosmetic", "minor", "major", "unplayable"],
-    })
+    severity: text("severity", { enum: ISSUE_SEVERITY_VALUES })
       .notNull()
       .default("minor"),
-    priority: text("priority", { enum: ["low", "medium", "high"] })
+    priority: text("priority", { enum: ISSUE_PRIORITY_VALUES })
       .notNull()
       .default("medium"),
-    frequency: text("frequency", {
-      enum: ["not_specified", "intermittent", "frequent", "constant"],
-    })
+    frequency: text("frequency", { enum: ISSUE_FREQUENCY_VALUES })
       .notNull()
       .default("intermittent"),
     reportedBy: uuid("reported_by").references(() => userProfiles.id),
@@ -1612,17 +1602,7 @@ export const notifications = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => userProfiles.id, { onDelete: "cascade" }),
-    type: text("type", {
-      enum: [
-        "issue_assigned",
-        "issue_status_changed",
-        "new_comment",
-        "new_issue",
-        "machine_ownership_changed",
-        "mentioned",
-        "pinballmap_comment",
-      ],
-    }).notNull(),
+    type: text("type", { enum: NOTIFICATION_TYPE_VALUES }).notNull(),
     resourceId: uuid("resource_id").notNull(), // Generic reference to issue or machine
     resourceType: text("resource_type", {
       enum: ["issue", "machine"],

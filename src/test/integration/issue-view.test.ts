@@ -6,7 +6,7 @@ import {
   createTestUser,
 } from "~/test/helpers/factories";
 import { issues, machines, userProfiles } from "~/server/db/schema";
-import { getViewer } from "~/lib/collections/viewer";
+import { getViewer } from "~/lib/auth/viewer";
 import { formatIssueId } from "~/lib/issues/utils";
 import type { IssueViewResult, IssueViewSavedState } from "~/lib/types";
 
@@ -14,7 +14,7 @@ vi.mock("~/server/db", async () => {
   const { getTestDb } = await import("~/test/setup/pglite");
   return { db: await getTestDb() };
 });
-vi.mock("~/lib/collections/viewer", () => ({ getViewer: vi.fn() }));
+vi.mock("~/lib/auth/viewer", () => ({ getViewer: vi.fn() }));
 
 const { loadIssueView } = await import("~/lib/issues/view/queries");
 const { loadIssueViewSavedViews, listSavedIssueViews } =
@@ -76,7 +76,11 @@ describe("loadIssueView", () => {
         createTestIssue("BB", { issueNumber: 1 }),
         createTestIssue("RR", { issueNumber: 1, assignedTo: VIEWER }),
       ]);
-    vi.mocked(getViewer).mockResolvedValue({ userId: VIEWER, role: "member" });
+    vi.mocked(getViewer).mockResolvedValue({
+      userId: VIEWER,
+      role: "member",
+      profile: null,
+    });
   });
 
   it("resolves `me` to whoever is viewing (issues-list §7.3)", async () => {
@@ -86,7 +90,11 @@ describe("loadIssueView", () => {
   });
 
   it("drops `me` and Watching for an anonymous visitor (issues-list §4.9)", async () => {
-    vi.mocked(getViewer).mockResolvedValue({ userId: undefined, role: null });
+    vi.mocked(getViewer).mockResolvedValue({
+      userId: undefined,
+      role: null,
+      profile: null,
+    });
     const result = await load("assignee=me&watching=true&sort=id&dir=asc");
     expect(result.state.assignee).toEqual([]);
     expect(result.state.watching).toBe(false);
@@ -193,7 +201,11 @@ describe("issue Saved Views", () => {
     await db
       .insert(machines)
       .values(createTestMachine({ initials: "AA", name: "Alpha" }));
-    vi.mocked(getViewer).mockResolvedValue({ userId: VIEWER, role: "member" });
+    vi.mocked(getViewer).mockResolvedValue({
+      userId: VIEWER,
+      role: "member",
+      profile: null,
+    });
   });
 
   it("re-validates stored views as they are read (list-views §10.14)", async () => {
@@ -256,7 +268,11 @@ describe("issue Saved Views", () => {
   });
 
   it("offers anonymous visitors the Built-in Views without My issues (issues-list §6.3)", async () => {
-    vi.mocked(getViewer).mockResolvedValue({ userId: undefined, role: null });
+    vi.mocked(getViewer).mockResolvedValue({
+      userId: undefined,
+      role: null,
+      profile: null,
+    });
     const page = await loadIssueViewSavedViews("issues", new URLSearchParams());
     expect(page.savedViews.canSave).toBe(false);
     expect(page.savedViews.builtInViews.map((view) => view.id)).toEqual([

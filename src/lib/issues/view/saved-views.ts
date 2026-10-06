@@ -7,7 +7,7 @@ import {
 } from "~/lib/list-view/saved-views-page";
 import type { ListSearchParams } from "~/lib/list-view/url-state";
 import type { ListUrlCodec } from "~/lib/list-view/view-request";
-import { getViewer } from "~/lib/collections/viewer";
+import { getViewer } from "~/lib/auth/viewer";
 import type {
   IssueViewSavedState,
   IssueViewSavedViewSummary,

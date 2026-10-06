@@ -251,6 +251,8 @@ Three guardrails enforce this, so a violation fails loudly instead of silently s
 
 Data access lives in **colocated** `_data.ts` / `queries.ts` files next to the route that uses it, wrapped in `cache()` from React so a layout and its page don't double-hit the DB in one render pass. There is **no** `src/server/data-access/` directory — don't create one.
 
+The current viewer is the one shared exception: pages, layouts and server components read it from `getViewer()` (`~/lib/auth/viewer`), a request-scoped `cache()` that runs `auth.getUser()` and the profile read (id, role, name, report modes) once per render. It returns nulls for a signed-out viewer or a missing profile row; the caller keeps its own redirect, 404 or Forbidden. Server Actions keep their own auth check (`createProtectedAction`).
+
 Revalidate with `revalidatePath` — that's the convention throughout. `revalidateTag` has **zero** usages in `src/`; if you think you need it, you're introducing a second caching convention.
 
 ### Stored rich text

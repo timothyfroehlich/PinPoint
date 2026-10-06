@@ -3,7 +3,7 @@ import { type Metadata } from "next";
 import { redirect } from "next/navigation";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { IssueView } from "~/components/issues/view/IssueView";
-import { getViewer } from "~/lib/collections/viewer";
+import { getViewer } from "~/lib/auth/viewer";
 import { loadIssueView } from "~/lib/issues/view/queries";
 import { loadIssueViewSavedViews } from "~/lib/issues/view/saved-views";
 import { toListSearchParams } from "~/lib/list-view/url-state";

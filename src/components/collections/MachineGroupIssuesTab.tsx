@@ -1,7 +1,7 @@
 import type React from "react";
 import { IssueView } from "~/components/issues/view/IssueView";
 import type { CollectionMachine } from "~/lib/collections/owner";
-import type { Viewer } from "~/lib/collections/viewer";
+import type { Viewer } from "~/lib/auth/viewer";
 import { loadIssueView } from "~/lib/issues/view/queries";
 import { loadIssueViewSavedViews } from "~/lib/issues/view/saved-views";
 import { toListSearchParams } from "~/lib/list-view/url-state";

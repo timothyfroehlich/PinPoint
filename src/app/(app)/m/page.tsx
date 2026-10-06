@@ -7,7 +7,7 @@ import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
 import { Button } from "~/components/ui/button";
 import { EmptyState } from "~/components/ui/empty-state";
-import { getViewer } from "~/lib/collections/viewer";
+import { getViewer } from "~/lib/auth/viewer";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { loadMachineView } from "~/lib/machines/view/queries";
 import { lineupToReviewCount } from "~/lib/pinballmap/lineup-comparison";

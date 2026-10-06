@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getViewer } from "~/lib/collections/viewer";
+import { getViewer } from "~/lib/auth/viewer";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import type {
   ListBuiltInView,

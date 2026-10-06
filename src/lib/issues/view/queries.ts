@@ -1,7 +1,7 @@
 import "server-only";
 
 import { inArray } from "drizzle-orm";
-import { getViewer } from "~/lib/collections/viewer";
+import { getViewer } from "~/lib/auth/viewer";
 import { issueFiltersFromState, type IssueFilters } from "~/lib/issues/filters";
 import { loadIssueListPage } from "~/lib/issues/list-page";
 import { getExistingPeople } from "~/lib/list-view/people";

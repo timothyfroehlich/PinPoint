@@ -1,7 +1,7 @@
 import type React from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "~/lib/supabase/server";
+import { getViewer } from "~/lib/auth/viewer";
 import { db } from "~/server/db";
 import { issues, userProfiles } from "~/server/db/schema";
 import { eq, asc, and, ne, notInArray, sql } from "drizzle-orm";
@@ -33,7 +33,6 @@ import {
   checkPermission,
   getAccessLevel,
 } from "~/lib/permissions/helpers";
-import { reportAuthError } from "~/lib/observability/report-error";
 
 /**
  * Issue Detail Page
@@ -49,23 +48,6 @@ export default async function IssueDetailPage({
 }): Promise<React.JSX.Element> {
   // Get params (Next.js 16: params is a Promise)
   const { initials, issueNumber } = await params;
-
-  // Load auth context for permission-aware rendering
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-  if (authError) {
-    // Backend glitch: keep rendering (as unauthenticated) rather than crash,
-    // but capture the error so the silent guest-downgrade is observable.
-    // AuthSessionMissingError is the normal no-session response for logged-out
-    // visitors and is suppressed; only real token-validation failures reach Sentry.
-    reportAuthError(authError, {
-      action: "issue-detail-page.auth.getUser",
-      bestEffort: true,
-    });
-  }
 
   // Require a clean positive integer: parseInt would accept "1abc"/"1.5" and
   // silently render issue 1 instead of 404 (PP-xlod).
@@ -83,53 +65,48 @@ export default async function IssueDetailPage({
     notInArray(issues.status, [...CLOSED_STATUSES])
   );
 
-  const [issue, currentUserProfile, otherIssues, otherIssuesCount] =
-    await Promise.all([
-      // Query issue with all relations; mentions carry current names
-      getIssueForDetail(initials, issueNum),
-      // Fetch current user's profile for permission-aware rendering and to
-      // gate the (potentially expensive + privacy-sensitive) assignee roster
-      // fetch below.
-      user?.id
-        ? db.query.userProfiles.findFirst({
-            where: eq(userProfiles.id, user.id),
-            columns: { role: true },
-          })
-        : Promise.resolve(null),
-      // The machine's other open issues: the newest few, and how many in all
-      // (spec §10.5, §11.1).
-      db.query.issues.findMany({
-        where: otherOpenIssues,
-        columns: {
-          id: true,
-          issueNumber: true,
-          title: true,
-          status: true,
-          severity: true,
-          priority: true,
-          frequency: true,
-          machineInitials: true,
-          createdAt: true,
-          reporterName: true,
-        },
-        orderBy: (otherIssue, { desc }) => [desc(otherIssue.createdAt)],
-        limit: OTHER_ISSUES_LIMIT,
-      }),
-      db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(issues)
-        .where(otherOpenIssues)
-        .then((rows) => rows[0]?.count ?? 0),
-    ]);
+  const [issue, viewer, otherIssues, otherIssuesCount] = await Promise.all([
+    // Query issue with all relations; mentions carry current names
+    getIssueForDetail(initials, issueNum),
+    // The viewer's id and role, for permission-aware rendering and to gate
+    // the (potentially expensive + privacy-sensitive) assignee roster fetch
+    // below. A failed auth check renders as unauthenticated and is reported.
+    getViewer(),
+    // The machine's other open issues: the newest few, and how many in all
+    // (spec §10.5, §11.1).
+    db.query.issues.findMany({
+      where: otherOpenIssues,
+      columns: {
+        id: true,
+        issueNumber: true,
+        title: true,
+        status: true,
+        severity: true,
+        priority: true,
+        frequency: true,
+        machineInitials: true,
+        createdAt: true,
+        reporterName: true,
+      },
+      orderBy: (otherIssue, { desc }) => [desc(otherIssue.createdAt)],
+      limit: OTHER_ISSUES_LIMIT,
+    }),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(issues)
+      .where(otherOpenIssues)
+      .then((rows) => rows[0]?.count ?? 0),
+  ]);
 
   if (!issue) {
     notFound();
   }
 
   const issueWithRelations: IssueWithAllRelations = issue;
-  const accessLevel = getAccessLevel(currentUserProfile?.role);
+  const { userId } = viewer;
+  const accessLevel = getAccessLevel(viewer.role);
   const ownershipContext: OwnershipContext = {
-    userId: user?.id,
+    userId,
     reporterId: issueWithRelations.reportedBy,
     machineOwnerId: getMachineOwnerId(issueWithRelations),
   };
@@ -167,7 +144,7 @@ export default async function IssueDetailPage({
       : Promise.resolve([]),
   ]);
 
-  const ownerRequirements = user
+  const ownerRequirements = userId
     ? (issue.machine.ownerRequirements ?? undefined)
     : undefined;
   const userCanEditTitle = checkPermission(
@@ -230,7 +207,7 @@ export default async function IssueDetailPage({
               )}
               <IssueActivity
                 issue={issueWithRelations}
-                currentUserId={user?.id ?? null}
+                currentUserId={userId ?? null}
                 currentUserRole={accessLevel}
               />
             </IssueSectionPanel>
@@ -244,7 +221,7 @@ export default async function IssueDetailPage({
               <IssueDetails
                 issue={issueWithRelations}
                 allUsers={allUsers}
-                currentUserId={user?.id ?? null}
+                currentUserId={userId ?? null}
                 accessLevel={accessLevel}
                 ownershipContext={ownershipContext}
               />
@@ -258,8 +235,8 @@ export default async function IssueDetailPage({
             </IssueSectionPanel>
           </div>
         </div>
-        {accessLevel !== "unauthenticated" && user ? (
-          <FloatingCommentButton issueId={issue.id} userId={user.id} />
+        {accessLevel !== "unauthenticated" && userId ? (
+          <FloatingCommentButton issueId={issue.id} userId={userId} />
         ) : null}
       </IssueSections>
     </PageContainer>
