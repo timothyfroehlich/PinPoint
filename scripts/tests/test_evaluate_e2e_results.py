@@ -464,8 +464,8 @@ def test_a_dedicated_step_gates_on_both_verdicts() -> None:
 def test_job_timeout_exceeds_the_sum_of_step_budgets() -> None:
     """The backstop must clear both step budgets plus a COLD-cache setup.
 
-    Both caches key on the lockfile hash, so every dependency bump that lands
-    on main misses them and pays install + browser download.
+    The node_modules cache keys on the lockfile hash, so every dependency bump
+    that lands on main misses it and pays a full install.
     """
     ci = _ci_yml()
     job = ci.split("test-e2e-comprehensive:", 1)[1].split("\n  gitleaks:", 1)[0]

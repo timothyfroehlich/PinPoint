@@ -446,7 +446,9 @@ jobs:
     # Runs smoke tests with chromium browser only for fast feedback.
     #
     # This and its two PR siblings each split into 2 Playwright shards
-    # (`--shard`). The smoke jobs use playwright.config.ts, which sets
+    # (`--shard`); GitHub appends the shard number to the job name. The name
+    # itself stays a plain string, because a skipped matrix job never expands
+    # its matrix and would show the raw expression. The smoke jobs use playwright.config.ts, which sets
     # fullyParallel, so smoke splits by test and comes out even (51/51 tests;
     # ~200s per shard against ~420s unsplit). playwright.config.full.ts does
     # not, so Full splits by file and runs uneven (62/57 tests, 396s/267s on
@@ -455,7 +457,7 @@ jobs:
     # server's first-compile cost again, and takes another slot under the
     # account's concurrent-job cap. (PP-yva7.2.)
     # ==============================================================================
-    name: E2E Smoke Tests (Chromium) (shard ${{ matrix.shard }}/${{ strategy.job-total }})
+    name: E2E Smoke Tests (Chromium)
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
     needs: changes
@@ -523,7 +525,7 @@ jobs:
     #
     # Runs smoke tests with Mobile Chrome browser to catch mobile-specific issues.
     # ==============================================================================
-    name: E2E Smoke Tests (Mobile Chrome) (shard ${{ matrix.shard }}/${{ strategy.job-total }})
+    name: E2E Smoke Tests (Mobile Chrome)
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
     needs: changes
@@ -591,7 +593,7 @@ jobs:
     #
     # Runs full test suite with chromium browser.
     # ==============================================================================
-    name: E2E Full Tests (Chromium) (shard ${{ matrix.shard }}/${{ strategy.job-total }})
+    name: E2E Full Tests (Chromium)
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
     needs: changes
