@@ -85,7 +85,7 @@ gh run list --branch main --status completed --limit 5 \
   --json status,conclusion,name,createdAt,url
 ```
 
-Flag any `conclusion == "failure"`.
+Flag any `conclusion == "failure"`. A `cancelled` main run was superseded by a newer merge (main runs one at a time; `pinpoint-pr-workflow` 5.1), not broken; a red run covers every commit since the last green one.
 
 ### Group D: New GitHub Issues (last 5 days)
 

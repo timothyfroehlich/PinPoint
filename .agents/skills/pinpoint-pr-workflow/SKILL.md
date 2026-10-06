@@ -284,9 +284,18 @@ If `behind_by > 0`, comment `@dependabot rebase` on the PR and wait for the reba
 
 Work isn't done at "git push" — it's done when the change is **merged, deployed clean, and cleaned up**.
 
-### 5.1 Watch the deployment — only if the PR could break it
+### 5.1 Main's CI verdict, and the deployment if the PR could break it
 
-After Tim merges, consider watching the deployment — only if the PR could break it. A merge that breaks prod isn't done, so when the change actually reaches the deployed app, it's worth watching the production deploy land and confirming no build, migration, or runtime errors. That means: anything under `src/`, a migration, a dependency or `next.config.ts` change, an env-registry change, or anything on the `vercel-build` path. **Skip it otherwise** — docs, skills, beads, GitHub workflows, and dev-only scripts can't affect the deploy, and watching a run that was never at risk just burns time. This is a judgement call, not a mandate; if you're not present when Tim merges, it's his to do or to ask you to pick back up.
+**Main's CI verdict.** Main runs one CI run at a time (`ci.yml` concurrency, PP-yva7.7): a merge that lands during a main run waits, and a newer merge cancels the waiting run. Your commit's own run can therefore read `cancelled`, which means superseded, not broken. Your verdict is the first completed, non-cancelled main run whose head contains your commit:
+
+```bash
+gh run list --branch main --workflow CI --limit 10 --json headSha,status,conclusion,url
+git merge-base --is-ancestor <your-merge-sha> <run-headSha> && echo covered
+```
+
+A red run covers every commit since the last green main run. List them (`git log --oneline <last-green-sha>..<red-sha>`) and read the failing jobs before deciding the failure is yours or someone else's.
+
+**The deployment.** After Tim merges, consider watching the deployment — only if the PR could break it. A merge that breaks prod isn't done, so when the change actually reaches the deployed app, it's worth watching the production deploy land and confirming no build, migration, or runtime errors. That means: anything under `src/`, a migration, a dependency or `next.config.ts` change, an env-registry change, or anything on the `vercel-build` path. **Skip it otherwise** — docs, skills, beads, GitHub workflows, and dev-only scripts can't affect the deploy, and watching a run that was never at risk just burns time. This is a judgement call, not a mandate; if you're not present when Tim merges, it's his to do or to ask you to pick back up.
 
 ### 5.2 Cleanup — non-destructive now, destructive on confirmation
 
