@@ -94,7 +94,9 @@ vi.mock("~/server/db", () => ({
         ),
       },
     },
-    transaction: vi.fn((cb: any) => cb((globalThis as any).testDb)),
+    // A real PGlite transaction, so a failure mid-transaction rolls back and
+    // the tests can observe atomicity (PP-az4d.2).
+    transaction: vi.fn((cb: any) => (globalThis as any).testDb.transaction(cb)),
   },
 }));
 
@@ -1561,6 +1563,66 @@ describe("Issue Service Functions (Integration)", () => {
   });
 
   // -----------------------------------------------------------------------
+  // Severity / priority / frequency atomicity (PP-az4d.2). The field write and
+  // its Activity event commit together: if the event insert fails, the field
+  // keeps its old value. An actor id with no user_profiles row makes the
+  // event insert fail on the issue_comments.author_id foreign key.
+  // -----------------------------------------------------------------------
+  describe("reporting-field updates are atomic with their Activity event", () => {
+    const missingActorId = "00000000-0000-0000-0000-0000000000ff";
+
+    it.each([
+      {
+        field: "severity" as const,
+        before: "minor",
+        run: (issueId: string) =>
+          updateIssueSeverity({
+            issueId,
+            severity: "unplayable",
+            userId: missingActorId,
+          }),
+      },
+      {
+        field: "priority" as const,
+        before: "low",
+        run: (issueId: string) =>
+          updateIssuePriority({
+            issueId,
+            priority: "high",
+            userId: missingActorId,
+          }),
+      },
+      {
+        field: "frequency" as const,
+        before: "intermittent",
+        run: (issueId: string) =>
+          updateIssueFrequency({
+            issueId,
+            frequency: "constant",
+            userId: missingActorId,
+          }),
+      },
+    ])(
+      "leaves $field unchanged when the Activity event insert fails",
+      async ({ field, before, run }) => {
+        const db = await getTestDb();
+
+        await expect(run(testIssue.id)).rejects.toThrow();
+
+        const issue = await db.query.issues.findFirst({
+          where: eq(issues.id, testIssue.id),
+        });
+        expect(issue?.[field]).toBe(before);
+
+        const events = await db.query.issueComments.findMany({
+          where: eq(issueComments.issueId, testIssue.id),
+        });
+        expect(events.filter((e) => e.isSystem)).toHaveLength(0);
+      }
+    );
+  });
+
+  // -----------------------------------------------------------------------
   // assignIssue no-op (block 13 from source)
   //
   // The target already has "should no-op when assignment unchanged" in the
@@ -1694,8 +1756,7 @@ describe("Issue Service Functions (Integration)", () => {
       const issue = await db.query.issues.findFirst({
         where: eq(issues.id, testIssue.id),
       });
-      // This file's db.transaction is a pass-through mock, so the counter
-      // rollback is not observable here; quick-report-action covers it.
+      // quick-report-action covers the destination counter rollback.
       expect(issue?.machineInitials).not.toBe("KP");
     });
 

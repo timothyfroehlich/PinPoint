@@ -1,18 +1,13 @@
 /**
- * Per-set authorization for machine settings sets (PP-tn6t).
+ * Per-set authorization for machine settings sets
+ * (docs/feature-specs/machine-settings.md §2–§4).
  *
- * The matrix entry `machines.settings.manage` gates *creating* a set
- * (owner / technician / admin). Once a set exists, view and edit rights depend
- * on the set's KIND (owner vs community) and VISIBILITY (private vs public) —
- * that per-set logic lives here as pure functions so it can be unit-tested and
- * reused by the query, the server actions, and the UI.
- *
- * Model (see docs/superpowers/specs/2026-07-22-shareable-settings-sets-design.md):
- * - Owner set (`isOwnerSet`): editable by the machine owner + admin only.
- * - Community set: co-edited by technicians+, the machine owner, and admin.
- * - Visibility: private drafts are visible only to their creator (+ admin);
- *   public sets and the owner's default are visible to everyone.
- * - Editing always requires BOTH view and edit rights.
+ * The matrix entry `machines.settings.manage` (technicians and admins on any
+ * machine, a member on the machines they own) gates creating sets, editing
+ * community sets, applying settings tags, and choosing preferred sets. A
+ * personal set adds one rule on top: only its author edits it (§2.2). Every set
+ * is visible to everyone who can open the machine (§2.5), so there is no view
+ * predicate.
  */
 
 import { checkPermission } from "./helpers";
@@ -20,29 +15,40 @@ import { type AccessLevel } from "./matrix";
 
 /** The minimal per-set facts the authorization rules need. */
 export interface SettingsSetAuth {
-  isOwnerSet: boolean;
-  isPublic: boolean;
-  isPreferred: boolean;
+  isCommunity: boolean;
   createdById: string | null;
 }
 
 /**
- * Who may SEE a set: public sets and the owner's default are visible to
- * everyone; a private draft only to its creator (and admin).
+ * Who may create sets on a machine, edit its community sets, tag its sets, and
+ * choose its preferred sets (§2.1, §2.3, §3.4, §4.3).
  */
-export function canViewSet(
+export function canManageMachineSettings(
+  machineOwnerId: string | null,
+  viewerId: string | null,
+  access: AccessLevel
+): boolean {
+  return checkPermission("machines.settings.manage", access, {
+    userId: viewerId ?? undefined,
+    machineOwnerId,
+  });
+}
+
+/** Whether the viewer wrote this set. Guests and anonymous visitors never did. */
+function isAuthor(
   set: SettingsSetAuth,
   viewerId: string | null,
   access: AccessLevel
 ): boolean {
-  if (set.isPublic || set.isPreferred) return true;
-  if (set.createdById !== null && set.createdById === viewerId) return true;
-  return checkPermission("machines.settings.view.private", access);
+  // A demoted or signed-out account no longer acts as the author.
+  // permissions-audit-allow: authorship check, not a permission gate
+  if (access === "unauthenticated" || access === "guest") return false;
+  return set.createdById !== null && set.createdById === viewerId;
 }
 
 /**
- * Who may EDIT a set. Requires view rights, then applies the kind rule:
- * owner sets are owner+admin only; community sets add technicians+.
+ * Who may EDIT a set's contents: a personal set's author only (§2.2); a
+ * community set's technicians, machine owner, and admins (§2.3).
  */
 export function canEditSet(
   set: SettingsSetAuth,
@@ -50,42 +56,29 @@ export function canEditSet(
   viewerId: string | null,
   access: AccessLevel
 ): boolean {
-  if (!canViewSet(set, viewerId, access)) return false;
-
-  // An owner set on a machine with NO owner has nobody to protect it for — the
-  // 0060 backfill turns every pre-existing preferred set into an owner set,
-  // including those on unowned machines, which would otherwise leave them
-  // admin-only. Fall back to community rules there so technicians keep them.
-  if (!set.isOwnerSet || machineOwnerId === null) {
-    return checkPermission("machines.settings.manage", access, {
-      userId: viewerId ?? undefined,
-      machineOwnerId,
-    });
-  }
-
-  // Owner sets on owned machines: owner + admin only (technicians excluded).
-  return canSetOwnerDefault(set, machineOwnerId, viewerId, access);
+  if (!set.isCommunity) return isAuthor(set, viewerId, access);
+  return canManageMachineSettings(machineOwnerId, viewerId, access);
 }
 
 /**
- * Who may set a set as the Owner's default: owner/admin only, and only an
- * owner set is eligible (a community set can't become the default).
+ * Who may DELETE a set: whoever can edit it, plus an admin for a personal set
+ * (§2.2).
  */
-export function canSetOwnerDefault(
+export function canDeleteSet(
   set: SettingsSetAuth,
   machineOwnerId: string | null,
   viewerId: string | null,
   access: AccessLevel
 ): boolean {
-  if (!set.isOwnerSet) return false;
-  return checkPermission("machines.settings.setDefault", access, {
-    userId: viewerId ?? undefined,
-    machineOwnerId,
-  });
+  if (checkPermission("machines.settings.delete.any", access)) return true;
+  return canEditSet(set, machineOwnerId, viewerId, access);
 }
 
-/** Publishing (public toggle) needs the same rights as editing. */
-export const canPublishSet = canEditSet;
-
-/** Tagging Tournament needs the same rights as editing. */
-export const canTagTournamentSet = canEditSet;
+/** Only a personal set's author turns it into a community set (§2.4). */
+export function canMakeCommunity(
+  set: SettingsSetAuth,
+  viewerId: string | null,
+  access: AccessLevel
+): boolean {
+  return !set.isCommunity && isAuthor(set, viewerId, access);
+}

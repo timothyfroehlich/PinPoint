@@ -1,16 +1,18 @@
 import "server-only";
-import { Buffer } from "node:buffer";
-import { createHmac, timingSafeEqual } from "node:crypto";
 import sanitizeHtml from "sanitize-html";
-import { log } from "~/lib/logger";
 import { NON_TEXT_TAGS } from "~/lib/sanitize-html-config";
 import { isInternalAccount } from "~/lib/auth/internal-accounts";
 import { getSiteUrl } from "~/lib/url";
+import { generateUnsubscribeToken } from "~/lib/notifications/unsubscribe-token";
 import { getThreadingHeaders } from "~/lib/notifications/email-threading";
 import { buildResourceUrl } from "~/lib/notifications/resource-url";
 import { reportError } from "~/lib/observability/report-error";
 import { escapeHtml } from "~/lib/markdown";
 import { pinballmapLocationUrl } from "~/lib/pinballmap/public-url";
+import {
+  EMAIL_PREFERENCE_COLUMNS,
+  shouldDeliverForChannel,
+} from "./should-deliver";
 import type {
   DeliveryChannel,
   NotificationPreferencesRow,
@@ -51,59 +53,6 @@ const EMAIL_SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
     span: ["style"],
   },
 };
-
-let warnedMissingSecret = false;
-
-/**
- * Returns the HMAC signing secret for unsubscribe tokens.
- * Uses UNSUBSCRIBE_SIGNING_SECRET, which must be set independently of the
- * Supabase service role key so that Supabase key rotation does not invalidate
- * outstanding unsubscribe URLs.
- *
- * Logs once in production if the secret is missing — without it, unsubscribe
- * links are omitted from outgoing emails and any incoming /api/unsubscribe
- * request will reject, which is a CAN-SPAM compliance risk worth surfacing.
- */
-function getUnsubscribeSigningSecret(): string {
-  const secret = process.env["UNSUBSCRIBE_SIGNING_SECRET"] ?? "";
-  if (!secret && !warnedMissingSecret) {
-    warnedMissingSecret = true;
-    if (process.env["VERCEL_ENV"] === "production") {
-      log.error(
-        { action: "unsubscribe.signingSecretMissing" },
-        "UNSUBSCRIBE_SIGNING_SECRET not set in production — unsubscribe links " +
-          "will be omitted from outgoing emails and incoming requests will reject."
-      );
-    }
-  }
-  return secret;
-}
-
-/**
- * Generate an HMAC-signed unsubscribe token for a user.
- * Uses UNSUBSCRIBE_SIGNING_SECRET as the signing secret.
- */
-export function generateUnsubscribeToken(userId: string): string {
-  const secret = getUnsubscribeSigningSecret();
-  if (!secret) {
-    return "";
-  }
-  return createHmac("sha256", secret)
-    .update(userId + ":unsubscribe")
-    .digest("hex");
-}
-
-/**
- * Verify an unsubscribe token against a userId.
- */
-export function verifyUnsubscribeToken(userId: string, token: string): boolean {
-  const expected = generateUnsubscribeToken(userId);
-  if (!expected || token.length === 0) return false;
-  const expectedBuf = Buffer.from(expected, "utf-8");
-  const tokenBuf = Buffer.from(token, "utf-8");
-  if (expectedBuf.length !== tokenBuf.length) return false;
-  return timingSafeEqual(expectedBuf, tokenBuf);
-}
 
 function getEmailFooter(userId?: string): string {
   const siteUrl = getSiteUrl();
@@ -339,28 +288,12 @@ export const emailChannel: DeliveryChannel = {
     type: NotificationType,
     recipientReason?: RecipientReason
   ): boolean {
-    if (!prefs.emailEnabled) return false;
-    switch (type) {
-      case "issue_assigned":
-        return prefs.emailNotifyOnAssigned;
-      case "issue_status_changed":
-        return prefs.emailNotifyOnStatusChange;
-      case "new_comment":
-        return prefs.emailNotifyOnNewComment;
-      case "new_issue":
-        if (recipientReason === "global_watcher") {
-          return prefs.emailWatchNewIssuesGlobal;
-        }
-        if (recipientReason) return prefs.emailNotifyOnNewIssue;
-        return prefs.emailNotifyOnNewIssue || prefs.emailWatchNewIssuesGlobal;
-      case "machine_ownership_changed":
-        // Critical event — preferences cannot opt out (only main switch can).
-        return true;
-      case "mentioned":
-        return prefs.emailNotifyOnMentioned;
-      case "pinballmap_comment":
-        return prefs.emailNotifyOnPinballMapComment;
-    }
+    return shouldDeliverForChannel(
+      EMAIL_PREFERENCE_COLUMNS,
+      prefs,
+      type,
+      recipientReason
+    );
   },
   async deliver(ctx: ChannelContext): Promise<DeliveryResult> {
     if (!ctx.email || isInternalAccount(ctx.email)) {

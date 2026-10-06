@@ -197,8 +197,8 @@ export async function updateMachineWatchMode({
   }
 }
 
-// --- Machine mutation services (createMachine / updateMachineOwner /
-//     updateMachinePresence / updateMachineName) ------------------------------
+// --- Machine mutation services (createMachine / updateMachine, and its
+//     updateMachineOwner / updateMachinePresence / updateMachineName slices) ---
 //
 // These mirror `~/services/issues.ts`: a typed params object (with an explicit
 // `actorUserId`), the whole `db.transaction` — row writes, watcher
@@ -404,49 +404,120 @@ export async function createMachine({
   });
 }
 
-export interface UpdateMachineOwnerParams {
+/**
+ * Thrown from inside {@link updateMachine}'s transaction when the machine row
+ * is gone (deleted between the caller's load and the write). Callers map it to
+ * their own not-found response.
+ */
+export class MachineNotFoundError extends Error {
+  constructor() {
+    super("Machine not found");
+    this.name = "MachineNotFoundError";
+  }
+}
+
+/** A new owner: at most one id set (active XOR invited); both null clears it. */
+export interface MachineOwnerAssignment {
+  ownerId: string | null;
+  invitedOwnerId: string | null;
+}
+
+export interface UpdateMachineParams {
   machineId: string;
   actorUserId: string;
   /** Current machine state, pre-loaded by the caller for the permission check. */
   current: MachineMutationSnapshot;
+  /** New display name; undefined leaves it alone. */
+  name?: string | undefined;
+  /** New availability; undefined leaves it alone. */
+  presenceStatus?: MachinePresenceStatus | undefined;
   /**
-   * The new owner. At most one id is set (active XOR invited); both null clears
-   * ownership. The caller resolves the raw name/UUID to the right column.
+   * The new owner, or undefined to leave ownership alone. The caller resolves
+   * the submitted id to the right column.
    */
-  newOwner: { ownerId: string | null; invitedOwnerId: string | null };
+  newOwner?: MachineOwnerAssignment | undefined;
   /** Optional guest→member promotion for the incoming owner (see {@link PromoteGuest}). */
   promoteGuest?: PromoteGuest | null | undefined;
+  /** New description; undefined leaves it alone, null clears it. */
+  description?: ProseMirrorDoc | null | undefined;
+  /**
+   * New Owner's Requirements; undefined leaves it alone, null clears it. Any
+   * value passed is written AND marked on the timeline
+   * (`owner_requirements_updated`), so callers pass it only when it changed.
+   */
+  ownerRequirements?: ProseMirrorDoc | null | undefined;
+  /** Linked iScored game id; undefined leaves it alone, null clears it. */
+  iscoredGameId?: string | null | undefined;
+  /**
+   * A PinballMap link change decided by {@link planMachinePbmLink} before this
+   * call, and the selection it was planned from. Applied in this transaction,
+   * with the stored exclusion reason carried from the row this transaction
+   * wrote, not from the caller's earlier read.
+   */
+  pbmLink?:
+    { plan: MachinePbmLinkPlan; selection: PbmLinkSelection } | undefined;
 }
 
 /**
- * Change (or clear) a machine's owner and nothing else — the focused slice of
- * `updateMachineAction`'s owner logic, for the MCP `update_machine` tool.
- * Atomically: (optional) guest→member promotion, the owner-column update,
- * watcher reconciliation (drop the old owner, subscribe the new), and the
- * `owner_changed` lifecycle event. Name and presence are untouched. Removed and
- * added owners are notified (`machine_ownership_changed`); the plan is returned
- * for post-commit delivery.
+ * The one write path for editing an existing machine (CORE-ARCH-014). The
+ * machine edit form (`updateMachineAction`) saves through it whole, and the
+ * focused slices the MCP `update_machine` tool calls
+ * ({@link updateMachineOwner}, {@link updateMachineName},
+ * {@link updateMachinePresence}) are this function with one field set.
+ *
+ * Atomically, in one transaction: (optional) guest→member promotion, the
+ * column update, the `owner_requirements_updated` marker, the PinballMap link
+ * apply, watcher reconciliation for an owner change (drop the old active owner,
+ * subscribe the new one), the lifecycle events, and the planning of the
+ * `machine_ownership_changed` notifications to the removed and added active
+ * owners. Their external delivery comes back as a plan for the caller to
+ * dispatch after commit: `after(() => dispatchNotification(deliveryPlan))`
+ * (CORE-ARCH-011).
+ *
+ * Throws {@link MachineNotFoundError} when the row is gone.
  */
-export async function updateMachineOwner({
+export async function updateMachine({
   machineId,
   actorUserId,
   current,
+  name,
+  presenceStatus,
   newOwner,
   promoteGuest,
-}: UpdateMachineOwnerParams): Promise<{
+  description,
+  ownerRequirements,
+  iscoredGameId,
+  pbmLink,
+}: UpdateMachineParams): Promise<{
   machine: Machine;
   deliveryPlan: DeliveryPlan;
 }> {
   const oldOwnerId = current.ownerId;
-  const { ownerId: newOwnerId, invitedOwnerId: newInvitedOwnerId } = newOwner;
+  const newOwnerId = newOwner?.ownerId ?? null;
 
   // A notification fires only when the active owner actually changes (old owner
   // removed and/or new owner added). `getChannels()` is a live Vault round-trip,
   // so resolve it only then, and before the transaction (CORE-ARCH-011).
-  const willNotify =
-    (oldOwnerId !== null && oldOwnerId !== newOwnerId) ||
-    (newOwnerId !== null && newOwnerId !== oldOwnerId);
-  const channels = willNotify ? await getChannels() : [];
+  const activeOwnerChanges =
+    newOwner !== undefined && oldOwnerId !== newOwnerId;
+  const channels = activeOwnerChanges ? await getChannels() : [];
+
+  // Every non-PinballMap column this call touches. An edit surface posts only
+  // the fields it renders, so this is routinely a subset — and on the PBM
+  // picker's own save it is EMPTY, which is why it cannot go straight into a
+  // `.set()`: Drizzle rejects an update with no values, and the link columns
+  // travel separately (`applyMachinePbmLink`).
+  const detailValues = {
+    ...(name !== undefined && { name }),
+    ...(presenceStatus !== undefined && { presenceStatus }),
+    ...(newOwner !== undefined && {
+      ownerId: newOwner.ownerId,
+      invitedOwnerId: newOwner.invitedOwnerId,
+    }),
+    ...(description !== undefined && { description }),
+    ...(ownerRequirements !== undefined && { ownerRequirements }),
+    ...(iscoredGameId !== undefined && { iscoredGameId }),
+  };
 
   return db.transaction(async (tx) => {
     if (promoteGuest) {
@@ -463,19 +534,64 @@ export async function updateMachineOwner({
       }
     }
 
-    const [machine] = await tx
-      .update(machines)
-      .set({ ownerId: newOwnerId, invitedOwnerId: newInvitedOwnerId })
-      .where(eq(machines.id, machineId))
-      .returning();
+    const [machine] =
+      Object.keys(detailValues).length > 0
+        ? await tx
+            .update(machines)
+            .set(detailValues)
+            .where(eq(machines.id, machineId))
+            .returning()
+        : // Nothing outside the PBM block changed. Read the row instead of
+          // writing it, so the not-found check below still runs and the
+          // caller still gets a machine back.
+          await tx
+            .select()
+            .from(machines)
+            .where(eq(machines.id, machineId))
+            .for("update")
+            .limit(1);
 
     if (!machine) {
-      throw new Error("Machine not found");
+      throw new MachineNotFoundError();
     }
 
-    // Reconcile watcher rows (roll back with the owner change if anything below
-    // throws). Old-owner removal + new-owner subscription mirror the action.
-    if (oldOwnerId && oldOwnerId !== newOwnerId) {
+    if (ownerRequirements !== undefined) {
+      await createMachineTimelineEvent(
+        machineId,
+        {
+          sourceType: "lifecycle",
+          tag: "lifecycle",
+          eventData: { kind: "owner_requirements_updated" },
+          actorId: actorUserId,
+        },
+        tx
+      );
+    }
+
+    if (pbmLink) {
+      const selectionWithFreshReason = carryExcludedReason(pbmLink.selection, {
+        pinballmapExcluded: machine.pinballmapExcluded,
+        pinballmapExcludedReason: machine.pinballmapExcludedReason,
+      });
+      await applyMachinePbmLink(
+        tx,
+        machineId,
+        {
+          ...pbmLink.plan,
+          columns: {
+            ...pbmLink.plan.columns,
+            pinballmapExcludedReason:
+              selectionWithFreshReason.pinballmapExcludedReason ?? null,
+          },
+        },
+        actorUserId,
+        machine.pinballmapIntent
+      );
+    }
+
+    // Reconcile watcher rows inside the transaction, so they roll back with the
+    // owner change if anything below throws.
+    if (oldOwnerId && activeOwnerChanges) {
       await tx
         .delete(machineWatchers)
         .where(
@@ -485,7 +601,7 @@ export async function updateMachineOwner({
           )
         );
     }
-    if (newOwnerId && newOwnerId !== oldOwnerId) {
+    if (newOwnerId && activeOwnerChanges) {
       await tx
         .insert(machineWatchers)
         .values({ machineId, userId: newOwnerId, watchMode: "subscribe" })
@@ -495,8 +611,9 @@ export async function updateMachineOwner({
         });
     }
 
-    // Lifecycle: emit only `owner_changed`. Name is passed unchanged and
-    // presence is left `undefined` so no spurious name/presence events fire.
+    // Lifecycle: one event per tracked field that changed (name, owner,
+    // presence). Atomic with the update — if an emit fails, the update rolls
+    // back.
     const ownerEventId = await emitMachineUpdated(
       tx,
       {
@@ -506,15 +623,18 @@ export async function updateMachineOwner({
         presenceStatus: current.presenceStatus,
       },
       {
-        name: current.name,
-        ownerChanged: true,
-        owner: toMachineOwnerRef(newOwnerId, newInvitedOwnerId),
-        presenceStatus: undefined,
+        name: name ?? current.name,
+        ownerChanged: newOwner !== undefined,
+        // Consulted only when `ownerChanged`, i.e. when a new owner was given.
+        owner: newOwner
+          ? toMachineOwnerRef(newOwner.ownerId, newOwner.invitedOwnerId)
+          : null,
+        presenceStatus,
       },
       actorUserId
     );
 
-    if (willNotify && ownerEventId === null) {
+    if (activeOwnerChanges && ownerEventId === null) {
       throw new Error("Owner changed without a timeline event");
     }
 
@@ -522,52 +642,90 @@ export async function updateMachineOwner({
     // caller post-commit. Best-effort: a planning failure never rolls back the
     // committed owner change.
     const deliveries: DeliveryPlan["deliveries"] = [];
-    try {
-      if (ownerEventId && oldOwnerId && oldOwnerId !== newOwnerId) {
-        const removed = await planNotification(
-          {
-            type: "machine_ownership_changed",
-            resourceId: machine.id,
-            resourceType: "machine",
-            eventId: ownerEventId,
-            actorId: actorUserId,
-            includeActor: false,
-            machineName: machine.name,
-            ownershipChange: "removed",
-            additionalRecipientIds: [oldOwnerId],
-          },
-          tx,
-          channels
-        );
-        deliveries.push(...removed.deliveries);
+    if (ownerEventId && activeOwnerChanges) {
+      try {
+        if (oldOwnerId) {
+          const removed = await planNotification(
+            {
+              type: "machine_ownership_changed",
+              resourceId: machine.id,
+              resourceType: "machine",
+              eventId: ownerEventId,
+              actorId: actorUserId,
+              includeActor: false,
+              machineName: machine.name,
+              ownershipChange: "removed",
+              additionalRecipientIds: [oldOwnerId],
+            },
+            tx,
+            channels
+          );
+          deliveries.push(...removed.deliveries);
+        }
+        if (newOwnerId) {
+          const added = await planNotification(
+            {
+              type: "machine_ownership_changed",
+              resourceId: machine.id,
+              resourceType: "machine",
+              eventId: ownerEventId,
+              actorId: actorUserId,
+              includeActor: false,
+              machineName: machine.name,
+              ownershipChange: "added",
+              additionalRecipientIds: [newOwnerId],
+            },
+            tx,
+            channels
+          );
+          deliveries.push(...added.deliveries);
+        }
+      } catch (error) {
+        reportError(error, {
+          action: "updateMachineOwnerNotify",
+          bestEffort: true,
+          machineId: machine.id,
+        });
       }
-      if (ownerEventId && newOwnerId && newOwnerId !== oldOwnerId) {
-        const added = await planNotification(
-          {
-            type: "machine_ownership_changed",
-            resourceId: machine.id,
-            resourceType: "machine",
-            eventId: ownerEventId,
-            actorId: actorUserId,
-            includeActor: false,
-            machineName: machine.name,
-            ownershipChange: "added",
-            additionalRecipientIds: [newOwnerId],
-          },
-          tx,
-          channels
-        );
-        deliveries.push(...added.deliveries);
-      }
-    } catch (error) {
-      reportError(error, {
-        action: "updateMachineOwnerNotify",
-        bestEffort: true,
-        machineId: machine.id,
-      });
     }
 
     return { machine, deliveryPlan: { deliveries } };
+  });
+}
+
+export interface UpdateMachineOwnerParams {
+  machineId: string;
+  actorUserId: string;
+  /** Current machine state, pre-loaded by the caller for the permission check. */
+  current: MachineMutationSnapshot;
+  /** The new owner. The caller resolves the raw name/UUID to the right column. */
+  newOwner: MachineOwnerAssignment;
+  /** Optional guest→member promotion for the incoming owner (see {@link PromoteGuest}). */
+  promoteGuest?: PromoteGuest | null | undefined;
+}
+
+/**
+ * Change (or clear) a machine's owner and nothing else: {@link updateMachine}
+ * with only the owner set. Name and presence are untouched. Removed and added
+ * active owners are notified (`machine_ownership_changed`); the plan is
+ * returned for post-commit delivery.
+ */
+export async function updateMachineOwner({
+  machineId,
+  actorUserId,
+  current,
+  newOwner,
+  promoteGuest,
+}: UpdateMachineOwnerParams): Promise<{
+  machine: Machine;
+  deliveryPlan: DeliveryPlan;
+}> {
+  return updateMachine({
+    machineId,
+    actorUserId,
+    current,
+    newOwner,
+    promoteGuest,
   });
 }
 
@@ -595,29 +753,8 @@ export async function updateMachinePresence({
     return { changed: false };
   }
 
-  await db.transaction(async (tx) => {
-    await tx
-      .update(machines)
-      .set({ presenceStatus })
-      .where(eq(machines.id, machineId));
-
-    await emitMachineUpdated(
-      tx,
-      {
-        id: machineId,
-        name: current.name,
-        owner: toMachineOwnerRef(current.ownerId, current.invitedOwnerId),
-        presenceStatus: current.presenceStatus,
-      },
-      {
-        name: current.name,
-        ownerChanged: false,
-        owner: toMachineOwnerRef(current.ownerId, current.invitedOwnerId),
-        presenceStatus,
-      },
-      actorUserId
-    );
-  });
+  // No owner change, so the returned plan carries no deliveries.
+  await updateMachine({ machineId, actorUserId, current, presenceStatus });
 
   return { changed: true };
 }
@@ -1204,26 +1341,8 @@ export async function updateMachineName({
     return { changed: false };
   }
 
-  await db.transaction(async (tx) => {
-    await tx.update(machines).set({ name }).where(eq(machines.id, machineId));
-
-    await emitMachineUpdated(
-      tx,
-      {
-        id: machineId,
-        name: current.name,
-        owner: toMachineOwnerRef(current.ownerId, current.invitedOwnerId),
-        presenceStatus: current.presenceStatus,
-      },
-      {
-        name,
-        ownerChanged: false,
-        owner: toMachineOwnerRef(current.ownerId, current.invitedOwnerId),
-        presenceStatus: undefined,
-      },
-      actorUserId
-    );
-  });
+  // No owner change, so the returned plan carries no deliveries.
+  await updateMachine({ machineId, actorUserId, current, name });
 
   return { changed: true };
 }

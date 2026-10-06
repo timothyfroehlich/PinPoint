@@ -1080,8 +1080,9 @@ export const timelineEventPeople = pgTable(
  * adjustments, DIP banks, rubbers, post positions, notes). The whole ordered
  * body lives in one `sections` JSONB array (a discriminated union — see
  * `~/lib/machines/settings-types`) so sections of any kind reorder freely;
- * `description` is a ProseMirror doc. At most one set per machine may be
- * `is_preferred`, enforced by a partial unique index.
+ * `description` is a ProseMirror doc. Kind, tags, and the two preferred sets
+ * follow docs/feature-specs/machine-settings.md; partial unique indexes keep
+ * one preferred House and one preferred Tournament set per machine.
  */
 export const machineSettingsSets = pgTable(
   "machine_settings_sets",
@@ -1096,20 +1097,22 @@ export const machineSettingsSets = pgTable(
       .$type<SettingsSection[]>()
       .notNull()
       .default([]),
-    // The machine owner's canonical set. Exactly one per machine (partial
-    // unique index below). Always an owner set + public.
-    isPreferred: boolean("is_preferred").notNull().default(false),
-    // Kind (drives who may EDIT — see ~/lib/permissions/settings):
-    // true = owner set (created by the machine owner; only owner + admin edit,
-    // protected from techs). false = community set (co-edited by technicians+
-    // and the machine owner). Captured at creation; stored not derived, so it
-    // survives machine-ownership transfer.
-    isOwnerSet: boolean("is_owner_set").notNull().default(false),
-    // Visibility (drives who may SEE): false = private draft (creator only),
-    // true = public. New sets are born private drafts.
-    isPublic: boolean("is_public").notNull().default(false),
-    // The orthogonal "Tournament" tag. Tagging requires edit rights on the set.
-    isTournament: boolean("is_tournament").notNull().default(false),
+    // The machine's preferred House set (spec machine-settings.md §4). At most
+    // one per machine (partial unique index below); always a community set
+    // carrying the House settings tag. The column keeps its original name.
+    isPreferredHouse: boolean("is_preferred").notNull().default(false),
+    // The machine's preferred Tournament set — same rules, Tournament tag.
+    isPreferredTournament: boolean("is_preferred_tournament")
+      .notNull()
+      .default(false),
+    // Kind (spec §2): false = personal set (only its author edits), true =
+    // community set (technicians, the machine owner, and admins edit). New sets
+    // start personal; the change to community is one-way.
+    isCommunity: boolean("is_community").notNull().default(false),
+    // The retired is_owner_set, is_public and is_tournament columns stay in the
+    // database until a follow-up migration drops them, so the deployment
+    // serving while this one builds can still query sets (migrations run
+    // before the build). Nothing reads or writes them.
     createdBy: uuid("created_by").references(() => userProfiles.id, {
       onDelete: "set null",
     }),
@@ -1130,7 +1133,17 @@ export const machineSettingsSets = pgTable(
     // exclusive-Preferred guarantee (the action also clears-then-sets).
     onePreferredPerMachine: uniqueIndex("uniq_machine_settings_preferred")
       .on(t.machineId)
-      .where(sql`${t.isPreferred}`),
+      .where(sql`${t.isPreferredHouse}`),
+    onePreferredTournamentPerMachine: uniqueIndex(
+      "uniq_machine_settings_preferred_tournament"
+    )
+      .on(t.machineId)
+      .where(sql`${t.isPreferredTournament}`),
+    // A preferred set is always a community set (spec §4.2).
+    preferredIsCommunity: check(
+      "machine_settings_sets_preferred_is_community",
+      sql`${t.isCommunity} OR NOT (${t.isPreferredHouse} OR ${t.isPreferredTournament})`
+    ),
     // Indexes on the created_by and updated_by FK columns (PP-o60s.5): prod
     // advisor flagged them as unindexed_foreign_keys. Both FK to user_profiles
     // with ON DELETE SET NULL, so a profile delete scans this table on each FK.
@@ -1350,6 +1363,64 @@ export const machineTags = pgTable(
       .on(t.machineId, t.tagTypeId)
       .where(sql`${t.typeExclusive}`),
     tagIdx: index("idx_machine_tags_tag").on(t.tagId),
+  })
+).enableRLS();
+
+/**
+ * Settings tags (spec machine-settings.md §3): system-wide, public labels on
+ * settings sets, separate from machine tags. House and Tournament are built-in
+ * (`is_builtin`, fixed slugs `house` / `tournament`) and always exist; every
+ * reader resolves them by slug through `ensureBuiltinSettingsTags`. Names follow
+ * the machine-tag rules: normalized, at most 20 characters, unique ignoring case.
+ */
+export const settingsTags = pgTable(
+  "settings_tags",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    slug: text("slug").notNull(),
+    name: text("name").notNull(),
+    isBuiltin: boolean("is_builtin").notNull().default(false),
+    createdBy: uuid("created_by").references(() => userProfiles.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    nameNormalized: check(
+      "settings_tags_name_normalized",
+      TAG_NAME_IS_NORMALIZED(t.name)
+    ),
+    slugFormat: check("settings_tags_slug_format", TAG_SLUG_FORMAT(t.slug)),
+    slugUnique: unique("uq_settings_tags_slug").on(t.slug),
+    nameUnique: uniqueIndex("uq_settings_tags_name").on(sql`lower(${t.name})`),
+    createdByIdx: index("idx_settings_tags_created_by").on(t.createdBy),
+  })
+).enableRLS();
+
+/** Which settings tags each settings set carries (spec §3.5: any number). */
+export const machineSettingsSetTags = pgTable(
+  "machine_settings_set_tags",
+  {
+    setId: uuid("set_id")
+      .notNull()
+      .references(() => machineSettingsSets.id, { onDelete: "cascade" }),
+    tagId: uuid("tag_id")
+      .notNull()
+      .references(() => settingsTags.id, { onDelete: "cascade" }),
+    addedAt: timestamp("added_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    addedBy: uuid("added_by").references(() => userProfiles.id, {
+      onDelete: "set null",
+    }),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.setId, t.tagId] }),
+    // "Sets carrying tag X" (tag pages, sheets by tag) is one indexed lookup.
+    tagIdx: index("idx_machine_settings_set_tags_tag").on(t.tagId),
+    addedByIdx: index("idx_machine_settings_set_tags_added_by").on(t.addedBy),
   })
 ).enableRLS();
 
@@ -1797,7 +1868,7 @@ export const apronCardPrintQueueRelations = relations(
 
 export const machineSettingsSetsRelations = relations(
   machineSettingsSets,
-  ({ one }) => ({
+  ({ one, many }) => ({
     machine: one(machines, {
       fields: [machineSettingsSets.machineId],
       references: [machines.id],
@@ -1805,6 +1876,25 @@ export const machineSettingsSetsRelations = relations(
     updatedByUser: one(userProfiles, {
       fields: [machineSettingsSets.updatedBy],
       references: [userProfiles.id],
+    }),
+    tags: many(machineSettingsSetTags),
+  })
+);
+
+export const settingsTagsRelations = relations(settingsTags, ({ many }) => ({
+  sets: many(machineSettingsSetTags),
+}));
+
+export const machineSettingsSetTagsRelations = relations(
+  machineSettingsSetTags,
+  ({ one }) => ({
+    set: one(machineSettingsSets, {
+      fields: [machineSettingsSetTags.setId],
+      references: [machineSettingsSets.id],
+    }),
+    tag: one(settingsTags, {
+      fields: [machineSettingsSetTags.tagId],
+      references: [settingsTags.id],
     }),
   })
 );

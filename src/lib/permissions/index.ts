@@ -40,9 +40,8 @@ export {
 export { canAccessMachineManage } from "./machines";
 export {
   type SettingsSetAuth,
-  canViewSet,
+  canManageMachineSettings,
   canEditSet,
-  canSetOwnerDefault,
-  canPublishSet,
-  canTagTournamentSet,
+  canDeleteSet,
+  canMakeCommunity,
 } from "./settings";
