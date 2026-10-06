@@ -432,6 +432,30 @@ export const machineApronCards = pgTable(
 ).enableRLS();
 
 /**
+ * Apron card print queue (spec apron-cards §13): each member's own list of
+ * saved cards waiting to be printed. A row is one queued card; deleting the
+ * card or the member removes it (§13.3).
+ */
+export const apronCardPrintQueue = pgTable(
+  "apron_card_print_queue",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => userProfiles.id, { onDelete: "cascade" }),
+    cardId: uuid("card_id")
+      .notNull()
+      .references(() => machineApronCards.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.userId, t.cardId] }),
+    cardIdIdx: index("idx_apron_card_print_queue_card_id").on(t.cardId),
+  })
+).enableRLS();
+
+/**
  * Local mirror of PinballMap's canonical machine catalog (machine *titles*, not
  * per-location instances). Powers the create/edit linking picker, which searches
  * this table locally rather than hitting PBM per keystroke — PBM's recommended
@@ -1085,10 +1109,6 @@ export const machineSettingsSets = pgTable(
     // community set (technicians, the machine owner, and admins edit). New sets
     // start personal; the change to community is one-way.
     isCommunity: boolean("is_community").notNull().default(false),
-    // The retired is_owner_set, is_public and is_tournament columns stay in the
-    // database until a follow-up migration drops them, so the deployment
-    // serving while this one builds can still query sets (migrations run
-    // before the build). Nothing reads or writes them.
     createdBy: uuid("created_by").references(() => userProfiles.id, {
       onDelete: "set null",
     }),
@@ -1824,6 +1844,20 @@ export const machineApronCardsRelations = relations(
     machine: one(machines, {
       fields: [machineApronCards.machineId],
       references: [machines.id],
+    }),
+  })
+);
+
+export const apronCardPrintQueueRelations = relations(
+  apronCardPrintQueue,
+  ({ one }) => ({
+    user: one(userProfiles, {
+      fields: [apronCardPrintQueue.userId],
+      references: [userProfiles.id],
+    }),
+    card: one(machineApronCards, {
+      fields: [apronCardPrintQueue.cardId],
+      references: [machineApronCards.id],
     }),
   })
 );

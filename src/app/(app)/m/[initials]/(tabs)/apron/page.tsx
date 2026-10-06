@@ -17,6 +17,7 @@ import {
   getMachineForLayout,
   getMachinePinTips,
 } from "~/app/(app)/m/[initials]/_data";
+import { getQueuedApronCardIds } from "~/app/(app)/m/apron-cards/_data";
 
 /**
  * Machine Apron card tab (/m/[initials]/apron) — the machine's saved apron
@@ -53,11 +54,14 @@ export default async function MachineApronCardPage({
     machineOwnerId: machine.ownerId ?? undefined,
   });
 
-  const [savedCards, credits, pinTips] = await Promise.all([
+  const [savedCards, credits, pinTips, queuedIds] = await Promise.all([
     getMachineApronCards(machine.id),
     getMachineCredits(machine),
     getMachinePinTips(machine.pinballmapTitle?.opdbId ?? null),
+    // The export permission above implies a signed-in member (§13.1).
+    user ? getQueuedApronCardIds(user.id) : Promise.resolve([]),
   ]);
+  const machineCardIds = new Set(savedCards.map((card) => card.id));
 
   return (
     <ApronCardTab
@@ -71,6 +75,8 @@ export default async function MachineApronCardPage({
         machine.initials
       )}
       canEdit={canEdit}
+      queuedCardIds={queuedIds.filter((id) => machineCardIds.has(id))}
+      queueCount={queuedIds.length}
     />
   );
 }
