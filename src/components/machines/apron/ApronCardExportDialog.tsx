@@ -60,9 +60,11 @@ interface ApronCardExportDialogProps {
   /** The card chosen when the dialog opens. */
   initialCardId: string | null;
   /** Which of `cards` are in the viewer's print queue (§13.2). */
-  queuedCardIds: readonly string[];
+  queued: ReadonlySet<string>;
   /** How many cards the viewer's print queue holds across all machines. */
   queueCount: number;
+  /** A card joined or left the queue, which now holds `queueCount` cards. */
+  onQueuedChange: (cardId: string, queued: boolean, queueCount: number) => void;
   className?: string;
 }
 
@@ -89,8 +91,9 @@ export function ApronCardExportDialog({
   scanUrl,
   cards,
   initialCardId,
-  queuedCardIds,
-  queueCount: initialQueueCount,
+  queued,
+  queueCount,
+  onQueuedChange,
   className,
 }: ApronCardExportDialogProps): React.JSX.Element {
   const id = useId();
@@ -103,8 +106,6 @@ export function ApronCardExportDialog({
   // earlier overflow report may come from the fallback font.
   const [ready, setReady] = useState<Record<string, true>>({});
   const [pending, setPending] = useState<Format | null>(null);
-  const [queued, setQueued] = useState(() => new Set(queuedCardIds));
-  const [queueCount, setQueueCount] = useState(initialQueueCount);
   const [isQueueing, startQueueing] = useTransition();
   const nodeRef = useRef<HTMLDivElement>(null);
   const startedRef = useRef(false);
@@ -173,13 +174,7 @@ export function ApronCardExportDialog({
         toast.error(result.message);
         return;
       }
-      setQueued((current) => {
-        const updated = new Set(current);
-        if (next) updated.add(card.id);
-        else updated.delete(card.id);
-        return updated;
-      });
-      setQueueCount(result.value.queuedCount);
+      onQueuedChange(card.id, next, result.value.queuedCount);
     });
   };
 

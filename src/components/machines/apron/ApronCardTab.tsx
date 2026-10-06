@@ -103,7 +103,7 @@ export function ApronCardTab({
   scanUrl,
   canEdit,
   queuedCardIds,
-  queueCount,
+  queueCount: initialQueueCount,
 }: ApronCardTabProps): React.JSX.Element {
   const id = useId();
   const [saved, setSaved] = useState(savedCards);
@@ -123,6 +123,11 @@ export function ApronCardTab({
   // card is deleted, while the dialog is still closing.
   const [deleteName, setDeleteName] = useState("");
   const [isSaving, startSaving] = useTransition();
+  // One queue state for both Export dialogs (phone and desktop layouts).
+  const [queued, setQueued] = useState<ReadonlySet<string>>(
+    () => new Set(queuedCardIds)
+  );
+  const [queueCount, setQueueCount] = useState(initialQueueCount);
 
   const dirty = deletedIds.length > 0 || draftsDirty(drafts, saved);
   const selected = drafts.find((card) => card.key === selectedKey) ?? null;
@@ -216,6 +221,15 @@ export function ApronCardTab({
         return;
       }
       const stored = result.value.cards;
+      // Deleting a saved card removes it from the print queue (§13.3).
+      const unqueued = deletedIds.filter((cardId) => queued.has(cardId));
+      if (unqueued.length > 0) {
+        setQueued(
+          (current) =>
+            new Set([...current].filter((cardId) => !unqueued.includes(cardId)))
+        );
+        setQueueCount((n) => n - unqueued.length);
+      }
       // A card added in this save is found again by its name (§11.2).
       const keepKey =
         selected?.id ??
@@ -245,8 +259,17 @@ export function ApronCardTab({
       scanUrl={scanUrl}
       cards={exportable}
       initialCardId={selected?.id ?? null}
-      queuedCardIds={queuedCardIds}
+      queued={queued}
       queueCount={queueCount}
+      onQueuedChange={(cardId, isQueued, count) => {
+        setQueued((current) => {
+          const next = new Set(current);
+          if (isQueued) next.add(cardId);
+          else next.delete(cardId);
+          return next;
+        });
+        setQueueCount(count);
+      }}
       {...(className ? { className } : {})}
     />
   );
