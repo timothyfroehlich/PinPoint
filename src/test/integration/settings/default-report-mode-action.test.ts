@@ -108,7 +108,11 @@ describe("updateDefaultReportModeAction — PGlite integration (CORE-TEST-004)",
       reportModes("unknown", "detailed")
     );
 
-    expect(result).toMatchObject({ ok: false, code: "VALIDATION" });
+    expect(result).toEqual({
+      ok: false,
+      code: "VALIDATION",
+      message: "Choose valid report screens.",
+    });
 
     const db = await getTestDb();
     const [profile] = await db

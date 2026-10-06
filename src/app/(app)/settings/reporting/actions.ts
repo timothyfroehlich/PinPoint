@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import {
   createProtectedAction,
+  formFields,
   type ProtectedActionResult,
 } from "~/lib/actions";
 import { checkPermission } from "~/lib/permissions/helpers";
@@ -13,7 +14,14 @@ import { REPORT_MODE_VALUES, type ReportMode } from "~/lib/types";
 import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
 
-const reportModeSchema = z.enum(REPORT_MODE_VALUES);
+const reportModeSchema = z.enum(REPORT_MODE_VALUES, {
+  error: "Choose valid report screens.",
+});
+
+const reportModesSchema = z.object({
+  mobileReportMode: reportModeSchema,
+  desktopReportMode: reportModeSchema,
+});
 
 export type UpdateDefaultReportModeResult = ProtectedActionResult<{
   mobileMode: ReportMode;
@@ -22,24 +30,16 @@ export type UpdateDefaultReportModeResult = ProtectedActionResult<{
 
 const updateDefaultReportModeProtected = createProtectedAction({
   actionName: "updateDefaultReportModeAction",
+  schema: reportModesSchema,
+  mapInput: (formData: FormData) =>
+    formFields(formData, ["mobileReportMode", "desktopReportMode"]),
   permission: "issues.report.default_mode",
-  handler: async (formData: FormData, { user, accessLevel }) => {
-    const parsed = z
-      .object({
-        mobileMode: reportModeSchema,
-        desktopMode: reportModeSchema,
-      })
-      .safeParse({
-        mobileMode: formData.get("mobileReportMode"),
-        desktopMode: formData.get("desktopReportMode"),
-      });
-    if (!parsed.success) {
-      return err("VALIDATION", "Choose valid report screens.");
-    }
-
+  handler: async (
+    { mobileReportMode, desktopReportMode },
+    { user, accessLevel }
+  ) => {
     if (
-      (parsed.data.mobileMode === "multiple" ||
-        parsed.data.desktopMode === "multiple") &&
+      (mobileReportMode === "multiple" || desktopReportMode === "multiple") &&
       !checkPermission("issues.report.quick", accessLevel)
     ) {
       return err("FORBIDDEN", "Multiple issues is not available to you.");
@@ -47,11 +47,7 @@ const updateDefaultReportModeProtected = createProtectedAction({
 
     const [updated] = await db
       .update(userProfiles)
-      .set({
-        mobileReportMode: parsed.data.mobileMode,
-        desktopReportMode: parsed.data.desktopMode,
-        updatedAt: new Date(),
-      })
+      .set({ mobileReportMode, desktopReportMode, updatedAt: new Date() })
       .where(eq(userProfiles.id, user.id))
       .returning({
         mobileMode: userProfiles.mobileReportMode,

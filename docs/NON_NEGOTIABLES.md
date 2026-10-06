@@ -1,7 +1,7 @@
 # PinPoint Non‑Negotiables
 
-**Last Updated**: 2026-10-05
-**Version**: 2.7 (CORE-ARCH-014 added: one write path per mutation; CORE-ARCH-010 amended: share load-bearing code at two copies, reuse existing helpers — PP-az4d.1)
+**Last Updated**: 2026-10-06
+**Version**: 2.8 (CORE-ARCH-013 added: Server Actions go through `createProtectedAction` — PP-az4d.4). Prior: 2.7 (CORE-ARCH-014 added: one write path per mutation; CORE-ARCH-010 amended: share load-bearing code at two copies, reuse existing helpers — PP-az4d.1)
 
 > **Canonical catalog**: this document defines the canonical `CORE-*` rules for PinPoint. Portable skills (`.agents/skills/`) and agent context (`AGENTS.md`) cite rules by ID and provide domain/task-specific procedures.
 
@@ -40,6 +40,7 @@
 23. External side effects (HTTP, email, Discord, blob, Vault RPC) never run inside a DB transaction; deliver them post-commit (CORE-ARCH-011)
 24. A bug-fix regression test fails on the pre-fix code; tests reach production through real callers' seams (CORE-TEST-007/008)
 25. A mutation with more than one entry point lives in `src/services`; entry points parse, authorize, and call it (CORE-ARCH-014)
+26. Server Actions are built with `createProtectedAction` / `createPublicAction` from `~/lib/actions` (CORE-ARCH-013)
 
 ---
 
@@ -419,6 +420,14 @@
 - **Do:** When a control cannot perform its action — a dependency is unavailable, JavaScript is not running, a precondition is unmet — let it visibly do nothing, or surface a real error. Rely on server-side validation to reject submissions that could not have carried valid input.
 - **Don't:** Render a success message, toast, or confirmation for a submission whose input could not have been collected. Don't wire a save control that submits unchanged state and confirms it as a change.
 
+**CORE-ARCH-013:** Server Actions go through `createProtectedAction`
+
+- **Severity:** Required
+- **Why:** A hand-rolled Server Action repeats the authentication, validation, permission, redirect, and error-reporting sequence, and each copy drifts: the 2026-10-05 audit (PP-az4d) found three different redirect checks, two validation error codes, and permission checks that ran before or after the resource load depending on the file. `createProtectedAction` (`~/lib/actions`) runs the sequence once.
+- **Do:** Build every exported Server Action with `createProtectedAction`, or `createPublicAction` when signed-out visitors may call it. The worked example and the option list live in `pinpoint-ui` § Server Actions.
+- **Don't:** Call `auth.getUser()`, `safeParse`, or `checkPermission()` by hand in a new Server Action. Exceptions: the signed-out auth flows (login, signup, forgot and reset password) and the redirect-only OAuth and consent actions.
+- **Enforced by:** `src/test/lint/protected-action-ratchet.test.ts` fails when an exported Server Action outside its allowlist is built without the pipeline, and when an allowlisted action is migrated or deleted. The allowlist only shrinks (PP-az4d.4).
+
 **CORE-ARCH-014:** One write path per mutation
 
 - **Severity:** Required
@@ -692,7 +701,7 @@ If all Yes → ship it. Perfect is the enemy of done.
 - CORE‑SEC‑001..010: Security
 - CORE‑PERF‑001..003: Performance (incl. image priority + preconnect)
 - CORE‑TEST‑001..006: Testing
-- CORE‑ARCH‑001, 004..012, 014: Architecture (002, 003 retired)
+- CORE‑ARCH‑001, 004..014: Architecture (002, 003 retired)
 - CORE‑RESP‑001..004: Responsive framework
 - CORE‑UI‑001..006: UI & styling + Browser support / MWG catalog (005, 006)
 - CORE‑A11Y‑001..006: Accessibility floor
