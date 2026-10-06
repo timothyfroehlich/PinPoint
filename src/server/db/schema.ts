@@ -1109,10 +1109,6 @@ export const machineSettingsSets = pgTable(
     // community set (technicians, the machine owner, and admins edit). New sets
     // start personal; the change to community is one-way.
     isCommunity: boolean("is_community").notNull().default(false),
-    // The retired is_owner_set, is_public and is_tournament columns stay in the
-    // database until a follow-up migration drops them, so the deployment
-    // serving while this one builds can still query sets (migrations run
-    // before the build). Nothing reads or writes them.
     createdBy: uuid("created_by").references(() => userProfiles.id, {
       onDelete: "set null",
     }),

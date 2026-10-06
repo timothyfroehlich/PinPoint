@@ -24,7 +24,7 @@ import {
 } from "./catalog";
 import { getPinballMapClient } from "./client";
 import { PBM_AUSTIN_REGION, normalizeRegion } from "./config";
-import { getPinballMapState } from "./state";
+import { PINBALLMAP_STATE_ID, getPinballMapState } from "./state";
 import { formatRegionAlertMessage } from "./region-alert-message";
 import type { RegionAlertEntry } from "./region-alert-message";
 import { MAX_REGION_ENTRIES, RegionPayloadTooLargeError } from "./types";
@@ -824,7 +824,7 @@ export async function runRegionMachineAlerts(opts?: {
       await db
         .insert(pinballmapState)
         .values({
-          id: "singleton",
+          id: PINBALLMAP_STATE_ID,
           regionAlertStatus: "not_configured",
           regionAlertLastStatusDetail: null,
         })
@@ -844,7 +844,7 @@ export async function runRegionMachineAlerts(opts?: {
     await db
       .insert(pinballmapState)
       .values({
-        id: "singleton",
+        id: PINBALLMAP_STATE_ID,
         regionAlertStatus: "needs_discord",
         regionAlertLastStatusDetail: "Discord bot token not configured",
       })
@@ -1100,7 +1100,7 @@ export async function runRegionMachineAlerts(opts?: {
         })
         .where(
           and(
-            eq(pinballmapState.id, "singleton"),
+            eq(pinballmapState.id, PINBALLMAP_STATE_ID),
             eq(pinballmapState.regionAlertRegion, region),
             eq(pinballmapState.regionAlertChannelId, channelId)
           )
@@ -1138,7 +1138,7 @@ export async function runRegionMachineAlerts(opts?: {
       })
       .where(
         and(
-          eq(pinballmapState.id, "singleton"),
+          eq(pinballmapState.id, PINBALLMAP_STATE_ID),
           eq(pinballmapState.regionAlertRegion, region),
           eq(pinballmapState.regionAlertChannelId, channelId)
         )
