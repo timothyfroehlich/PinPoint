@@ -36,8 +36,6 @@ import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 
 interface BottomTabBarProps {
   role?: UserRole | undefined;
-  /** The issues link path, read from cookie on the server */
-  issuesPath?: string | undefined;
   reportHref?: string | undefined;
 }
 
@@ -57,14 +55,14 @@ const sheetItemClass =
 
 export function BottomTabBar({
   role,
-  issuesPath,
   reportHref = "/report",
 }: BottomTabBarProps): React.JSX.Element {
   const [moreOpen, setMoreOpen] = useState(false);
   const pathname = usePathname();
-  const resolvedIssuesPath = issuesPath ?? "/issues";
-  // Returning to Machines reopens its last view this tab session (list-views §11.1).
+  // Returning to Machines or Issues reopens its last view this tab session
+  // (list-views §11.1).
   const machinesPath = useListReturnHref("/m");
+  const issuesPath = useListReturnHref("/issues");
 
   return (
     <>
@@ -80,17 +78,13 @@ export function BottomTabBar({
         {bottomTabs.map((tab) => {
           const href =
             tab.href === "/issues"
-              ? resolvedIssuesPath
+              ? issuesPath
               : tab.href === "/report"
                 ? reportHref
                 : tab.href === "/m"
                   ? machinesPath
                   : tab.href;
-          const active = isNavItemActive(
-            tab.href,
-            pathname,
-            resolvedIssuesPath
-          );
+          const active = isNavItemActive(tab.href, pathname);
           return (
             <Link
               key={tab.href}

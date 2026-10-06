@@ -12,16 +12,19 @@ import { getTestEmail } from "../support/test-isolation.js";
  * and src/lib/machines/view/saved-views.test.ts. A fresh account keeps each
  * browser project's default from colliding with another's.
  *
- * Desktop shows the views as tabs in a "Saved views" navigation landmark with
- * Save and Discard changes beside an edited one (§5); phones show the Applied
- * View as a button that opens the Saved Views sheet (§7.3, §7.6).
+ * Desktop shows the views as tabs in a "Saved views" navigation landmark,
+ * with Save view once the configuration has left every view (§5.2); phones
+ * show the Applied View, or "Views" when there is none, as a button that
+ * opens the Saved Views sheet (§7.3, §7.6).
  */
 
 interface ViewsUi {
   /** Assert the Applied View, and whether it is edited. */
   expectApplied: (name: string, edited?: boolean) => Promise<void>;
-  /** Open the Save view dialog for the edited Applied View, `from`. */
-  openSaveAsNew: (from: string) => Promise<void>;
+  /** Assert that no view is applied, so Save view is offered. */
+  expectNoneApplied: () => Promise<void>;
+  /** Open the Save view dialog while no view is applied. */
+  openSaveView: () => Promise<void>;
   /** Apply a Built-in View while `from` is the Applied View. */
   applyBuiltIn: (name: string, from: string) => Promise<void>;
 }
@@ -43,9 +46,17 @@ function desktopViews(page: Page): ViewsUi {
         await expect(discard).toBeHidden();
       }
     },
-    async openSaveAsNew() {
-      await nav.getByRole("button", { name: "Save", exact: true }).click();
-      await page.getByRole("menuitem", { name: "Save as new…" }).click();
+    async expectNoneApplied() {
+      await expect(
+        nav.getByRole("button", { name: "Save view" })
+      ).toBeVisible();
+      // No tab is current.
+      for (const link of await nav.getByRole("link").all()) {
+        await expect(link).not.toHaveAttribute("aria-current", "page");
+      }
+    },
+    async openSaveView() {
+      await nav.getByRole("button", { name: "Save view" }).click();
     },
     async applyBuiltIn(name) {
       await tab(name).click();
@@ -65,10 +76,13 @@ function phoneViews(page: Page): ViewsUi {
     async expectApplied(name, edited = false) {
       await expect(appliedButton(name, edited)).toBeVisible();
     },
-    async openSaveAsNew(from) {
-      await appliedButton(from, true).click();
+    async expectNoneApplied() {
+      await expect(appliedButton("Views", false)).toBeVisible();
+    },
+    async openSaveView() {
+      await appliedButton("Views", false).click();
       await expect(sheet).toBeVisible();
-      await sheet.getByRole("button", { name: "Save as new…" }).click();
+      await sheet.getByRole("button", { name: "Save view" }).click();
     },
     async applyBuiltIn(name, from) {
       await appliedButton(from, false).click();
@@ -102,10 +116,11 @@ test.describe("Machine View saved views", () => {
       ? phoneViews(page)
       : desktopViews(page);
 
+    // Filters that match no Built-in View leave no Applied View (§1, §5.2).
     await page.goto("/m?status=unplayable");
-    await views.expectApplied("On the floor", true);
+    await views.expectNoneApplied();
 
-    await views.openSaveAsNew("On the floor");
+    await views.openSaveView();
     const dialog = page.getByRole("dialog", { name: "Save view" });
     await dialog.getByRole("textbox", { name: /Name/ }).fill("Unplayable only");
     await dialog.getByLabel("Open this view by default").check();

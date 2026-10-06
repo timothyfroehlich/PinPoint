@@ -324,7 +324,7 @@ function AssigneeControl({
 }: {
   name: string | null;
   value: string;
-  users: UserOption[];
+  users: readonly UserOption[];
   editable: boolean;
   isUpdating: boolean;
   onChange: (value: string) => void;
@@ -391,7 +391,7 @@ interface IssueListEntryProps {
   canEditReporting: boolean;
   /** May change priority and assignee (`issues.update.triage`). */
   canTriage: boolean;
-  users: UserOption[];
+  users: readonly UserOption[];
   onUpdate: (field: IssueRowField, value: string | null) => void;
   updatingField: IssueRowField | null;
   errorField: IssueRowField | null;
@@ -438,7 +438,7 @@ export function IssueListEntry({
     <li
       data-testid="issue-row"
       data-issue-id={issue.id}
-      className="isolate flex items-start gap-2.5 px-4 py-2.5 transition-colors duration-150 hover:bg-muted/40"
+      className="isolate flex items-start gap-2.5 px-4 py-2.5 transition-colors sm:max-md:px-8 duration-150 hover:bg-muted/40"
     >
       {errorField !== null && (
         <span role="alert" className="sr-only">

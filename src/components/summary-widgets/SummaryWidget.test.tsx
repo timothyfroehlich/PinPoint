@@ -43,7 +43,6 @@ function widget({
     <SummaryWidget
       id="test-widget"
       label="Status"
-      headline={{ figure: 4, text: "up", accentClassName: "text-success" }}
       segments={widgetSegments}
       selectedValue={selectedValue}
       onSegmentSelect={onSegmentSelect}
@@ -165,6 +164,36 @@ describe("SummaryWidget", () => {
         .map((button) => button.getAttribute("aria-label"))
     ).toEqual(["4 Up"]);
   });
+
+  it.each([
+    { lineSwatches: "shown", hideRule: "", expected: true },
+    {
+      lineSwatches: "hidden",
+      hideRule: "[data-swatch]{display:none}",
+      expected: false,
+    },
+  ])(
+    "shows swatches in N other only when the line shows them (widgets §5.7; line swatches $lineSwatches)",
+    async ({ hideRule, expected }) => {
+      stubBreakdownWidths();
+      // The list renders in a portal, outside the group's container query,
+      // so it copies what the line's swatches show when it opens. jsdom
+      // applies no Tailwind CSS; this rule stands in for the stacked layout.
+      const style = document.createElement("style");
+      style.textContent = hideRule;
+      document.head.append(style);
+      const user = userEvent.setup();
+      renderWidget({ widgetSegments: withCounts([1, 2, 4]) });
+
+      await user.click(screen.getByRole("button", { name: "6 other" }));
+      const swatch = within(screen.getByRole("list", { name: "Other Status" }))
+        .getByRole("button", { name: "4 Up" })
+        .querySelector("[data-swatch]");
+      style.remove();
+      if (expected) expect(swatch).toHaveClass("inline-block");
+      else expect(swatch).not.toHaveClass("inline-block");
+    }
+  );
 
   it("server-renders whole pairs only, wrapping the ones that do not fit out of view until measured", () => {
     const container = document.createElement("div");

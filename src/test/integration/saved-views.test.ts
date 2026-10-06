@@ -34,7 +34,7 @@ const { loadMachineViewFromDatabase } =
   await import("~/lib/machines/view/queries");
 const {
   normalizeMachineViewSavedState,
-  savedMachineViewSearchParams,
+  serializeMachineViewState,
   toMachineViewSavedState,
 } = await import("~/lib/machines/view/state");
 
@@ -462,8 +462,8 @@ describe("machine Saved Views on each Surface (list-views §10.5, §10.10)", () 
       scope: { kind: "collection", collectionId },
       preset: "collection",
       viewerId: null,
-      searchParams: savedMachineViewSearchParams(
-        offeredView.state,
+      searchParams: serializeMachineViewState(
+        { ...offeredView.state, page: 1 },
         "collection",
         id
       ),

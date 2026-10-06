@@ -1,4 +1,5 @@
-import { test, expect, type Locator } from "../support/fixtures.js";
+import { test, expect, type Locator, type Page } from "../support/fixtures.js";
+import { setListFilterOptions } from "../support/actions.js";
 import { cleanupTestEntities } from "../support/cleanup.js";
 import {
   TEST_USERS,
@@ -8,6 +9,15 @@ import {
 import { fillReportForm } from "../support/page-helpers.js";
 import { getTestIssueTitle } from "../support/test-isolation.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
+
+function searchField(page: Page): Locator {
+  return page.getByRole("searchbox", { name: "Search issues" });
+}
+
+/** The List View's announced result count (list-views §12.4). */
+function resultCount(page: Page): Locator {
+  return page.getByRole("status").filter({ hasText: /^(Showing|No) / });
+}
 
 test.describe("Issue List Features - Extended", () => {
   // Use Admin to ensure permissions for all inline edits
@@ -45,12 +55,12 @@ test.describe("Issue List Features - Extended", () => {
 
     // Navigate to issues list and search for our unique issue
     await page.goto("/issues");
-    await page.getByPlaceholder("Search issues...").fill(issueTitle);
-    await page.keyboard.press("Enter");
+    await searchField(page).fill(issueTitle);
+    await searchField(page).press("Enter");
     await expect
       .poll(() => new URL(page.url()).searchParams.get("q"), { timeout: 15000 })
       .toBe(issueTitle);
-    await expect(page.getByText("Showing 1 of 1 issues")).toBeVisible();
+    await expect(resultCount(page)).toHaveText("Showing 1 to 1 of 1 issue");
 
     const issueRow = (): Locator =>
       page
@@ -69,13 +79,9 @@ test.describe("Issue List Features - Extended", () => {
       row.getByRole("button", { name: "Priority: High, change" })
     ).toBeVisible();
 
-    // Verify persistence after reload
+    // Verify persistence after reload; the search stays in the URL.
     await page.reload();
-    await page.getByPlaceholder("Search issues...").fill(issueTitle);
-    await page.keyboard.press("Enter");
-    await expect
-      .poll(() => new URL(page.url()).searchParams.get("q"), { timeout: 15000 })
-      .toBe(issueTitle);
+    await expect(searchField(page)).toHaveValue(issueTitle);
 
     const rowAfterReload = issueRow();
     await expect(
@@ -146,10 +152,9 @@ test.describe("Issue List Features - Extended", () => {
             (await segment.getAttribute("aria-label")) ?? "",
             10
           );
-          const showing = await page
-            .getByText(/^Showing \d+ of \d+ issues$/)
-            .textContent();
-          return showing?.endsWith(` of ${count} issues`) ?? false;
+          const showing = await resultCount(page).textContent();
+          const noun = count === 1 ? "issue" : "issues";
+          return showing?.endsWith(` of ${count} ${noun}`) ?? false;
         },
         { message: "the selected Segment's count equals the filtered total" }
       )
@@ -161,12 +166,10 @@ test.describe("Issue List Features - Extended", () => {
   }) => {
     // 1. Go to issues and apply a severity filter
     await page.goto("/issues");
-    await page.getByTestId("filter-severity").click();
-    await page.getByRole("option", { name: "Major" }).click();
-    await page.keyboard.press("Escape");
+    await setListFilterOptions(page, "Severity", ["Major"]);
 
     // Wait for URL to update with filter
-    await page.waitForURL(/severity=major/);
+    await page.waitForURL(/[?&]severity=major(?:&|$)/);
 
     // 2. Click on an issue title link to navigate to detail page
     const issueLink = page.getByRole("link", {
@@ -181,44 +184,42 @@ test.describe("Issue List Features - Extended", () => {
     // link of its own; AppHeader path persistence is covered by the Issues
     // link test below.
     await page.goBack();
-    await expect(page).toHaveURL(/severity=major/);
+    await expect(page).toHaveURL(/[?&]severity=major(?:&|$)/);
 
-    // Verify filter badge is still visible
+    // The list is still filtered: every row is Major.
+    const issues = page.getByRole("list", { name: "Issues" });
     await expect(
-      page
-        .getByTestId("filter-bar")
-        .locator('[data-slot="badge"]')
-        .filter({ hasText: "Major" })
+      issues.getByRole("link", { name: seededIssue("TAF").title })
     ).toBeVisible();
+    await expect(
+      issues.getByRole("button", { name: /^Severity: (?!Major,)/ })
+    ).toHaveCount(0);
   });
 
-  test("should persist filters when using AppHeader Issues link", async ({
+  test("should return to the filtered list from the app's Issues link", async ({
     page,
-  }, testInfo) => {
+  }) => {
     // 1. Go to issues and apply a search filter
     await page.goto("/issues");
-    await page.getByPlaceholder("Search issues...").fill("Thing");
-    await page.keyboard.press("Enter");
-    await page.waitForURL(/q=Thing/);
+    await searchField(page).fill("Thing");
+    await searchField(page).press("Enter");
+    await page.waitForURL(/[?&]q=Thing(?:&|$)/);
 
-    // 2. Navigate to a different page (dashboard)
+    // 2. Navigate to a different page in the same tab (dashboard)
     await page.goto("/dashboard");
     await expect(page).toHaveURL("/dashboard");
 
-    // 3. Navigate to Issues - should preserve filters via cookie
-    // Desktop: click AppHeader Issues link (which reads issuesPath cookie)
-    // Mobile: navigate directly since AppHeader hides nav links on mobile
-    const isMobile = testInfo.project.name.includes("Mobile");
-    if (isMobile) {
-      await page.goto("/issues?q=Thing");
-    } else {
-      await page.getByRole("link", { name: "Issues", exact: true }).click();
-    }
-    await expect(page).toHaveURL(/q=Thing/);
+    // 3. The Issues link returns to the list this tab last showed
+    // (list-views §11.1): the header link on desktop, the tab bar on phones.
+    const issuesLink = page
+      .getByRole("link", { name: "Issues", exact: true })
+      .filter({ visible: true })
+      .first();
+    await expect(issuesLink).toHaveAttribute("href", /[?&]q=Thing(?:&|$)/);
+    await issuesLink.click();
+    await expect(page).toHaveURL(/[?&]q=Thing(?:&|$)/);
 
     // Verify search term is still in the input
-    await expect(page.getByPlaceholder("Search issues...")).toHaveValue(
-      "Thing"
-    );
+    await expect(searchField(page)).toHaveValue("Thing");
   });
 });

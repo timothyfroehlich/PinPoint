@@ -47,6 +47,7 @@
 - **4.7** Machine Presence offers every presence state.
 - **4.8** Created and Updated are date ranges.
 - **4.9** Me, My machines, Watching, and Machine collection appear only to signed-in people.
+- **4.10** Machine owner searches people by name and offers Me and Unassigned shortcuts; Unassigned matches machines with no owner. Reporter searches people by name and offers a Me shortcut.
 
 ---
 
@@ -87,12 +88,7 @@
 ## Known divergences (code vs spec)
 
 | Requirement | Divergence | Resolution |
-| :-- | :-- | :-- |
-| 4.5 | Machine and My machines include Removed machines. | PP-s363 |
-| §2.3 | The page title is "All Issues". | PP-jb9v |
-| §4.2, §4.7 | Machine presence has no filter control; a hidden parameter includes other presence states. | PP-jb9v |
-| §6 | No Built-in Views. | PP-jb9v |
-| §7 | Snake_case parameters, composite sort, and unvalidated page size and ID values. | PP-jb9v |
+| :---------- | :--------- | :--------- |
 
 ---
 
@@ -101,7 +97,7 @@
 | Date | Change |
 | :-- | :-- |
 | 2026-10-05 | Machine tag and Machine collection Secondary Filters (4.3, 4.9) and their `tag` and `collection` parameters (7.1). |
-| 2026-10-04 | Search also matches description text (4.1). |
+| 2026-10-04 | Search also matches description text (4.1). Machine owner offers Me and Unassigned shortcuts and Reporter offers Me (4.10). |
 | 2026-10-03 | Machine and My machines leave out Removed machines unless Machine Presence includes Removed (4.5). |
 | 2026-10-03 | §3.1: on a narrow phone the second line wraps rather than truncating. |
 | 2026-10-02 | Created from the approved list-framework design: two-line rows with inline editing, Primary and Secondary Filters including Machine Presence, sorting and export rules, the Open issues Page Preset and four Built-in Views, and canonical URL state with aliases for older parameters. |

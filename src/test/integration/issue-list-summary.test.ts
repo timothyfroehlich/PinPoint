@@ -45,7 +45,7 @@ describe("issue list Summary Widget counts", () => {
     await db.insert(issues).values([
       createTestIssue("AA", {
         issueNumber: 1,
-        status: "new",
+        status: "confirmed",
         severity: "unplayable",
         priority: "high",
       }),
@@ -76,37 +76,24 @@ describe("issue list Summary Widget counts", () => {
     ]);
   }
 
-  it("counts open and closed issues on On the Floor machines, ignoring the list's search and filters", async () => {
+  it("counts open issues on On the Floor machines by status group, ignoring the list's search and filters", async () => {
     await seed();
     const { summary, totalCount } = await loadIssueListPage(
       {
         q: "nothing matches this",
         severity: ["major"],
-        includeInactiveMachines: true,
+        presence: [],
       },
       { isAdmin: false }
     );
 
     // The list itself matches nothing; the widgets still count the scope,
-    // skipping CC (off the floor) and DD (removed).
+    // skipping CC (off the floor) and DD (removed). Confirmed counts in the
+    // New group (issue-widgets §3.2); the Fixed issue counts nowhere.
     expect(totalCount).toBe(0);
     expect(summary).toEqual({
-      total: 3,
       open: 2,
-      machinesWithOpenIssues: 2,
-      byStatus: {
-        new: 1,
-        confirmed: 0,
-        in_progress: 1,
-        need_parts: 0,
-        need_help: 0,
-        wait_owner: 0,
-        fixed: 1,
-        wont_fix: 0,
-        wai: 0,
-        no_repro: 0,
-        duplicate: 0,
-      },
+      byStatusGroup: { new: 1, in_progress: 1 },
       bySeverity: { cosmetic: 0, minor: 0, major: 1, unplayable: 1 },
       byPriority: { low: 0, medium: 1, high: 1 },
     });
@@ -115,15 +102,13 @@ describe("issue list Summary Widget counts", () => {
   it("counts only a group Issues tab's On the Floor machines", async () => {
     await seed();
     const { summary } = await loadIssueListPage(
-      { machine: ["BB"], includeInactiveMachines: true },
+      { machine: ["BB"], presence: [] },
       { isAdmin: false, scopeMachineInitials: ["AA", "CC", "DD"] }
     );
 
     // The group holds AA, CC, and DD; only AA is on the floor. The tab's
     // machine filter (BB) never narrows or widens the widgets.
-    expect(summary.total).toBe(2);
     expect(summary.open).toBe(1);
-    expect(summary.machinesWithOpenIssues).toBe(1);
     expect(summary.bySeverity).toEqual({
       cosmetic: 0,
       minor: 0,
@@ -184,7 +169,7 @@ describe("issue list loader email privacy (CORE-SEC-007)", () => {
 
     // Every seeded issue and user loaded, so the absence below is meaningful.
     expect(page.issuesList).toHaveLength(4);
-    expect(page.filterUsers.map((user) => user.id)).toEqual(
+    expect(page.people.map((user) => user.id)).toEqual(
       expect.arrayContaining([member.id, assignee.id, invited.id])
     );
     expect(JSON.stringify(page)).not.toMatch(/@example\.com/);
