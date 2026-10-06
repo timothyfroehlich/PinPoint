@@ -28,6 +28,9 @@ import type {
 /** Browser storage key for the Issues widgets' expanded choice (widgets §2.6). */
 export const ISSUE_SUMMARY_STORAGE_KEY = "pinpoint:summary-widgets:issues";
 
+/** Status, Severity, and Priority (issue-widgets §2.1). */
+export const ISSUE_SUMMARY_WIDGET_COUNT = 3;
+
 /**
  * Segment order: Status runs New then In Progress (issue-widgets §3.2);
  * Severity and Priority run worst first (§4.2, §5.2).
@@ -133,7 +136,7 @@ export function IssueSummaryWidgets({
     <SummaryWidgetGroup
       storageKey={ISSUE_SUMMARY_STORAGE_KEY}
       summaryRow={<IssueSummaryRow summary={summary} />}
-      widgetCount={3}
+      widgetCount={ISSUE_SUMMARY_WIDGET_COUNT}
       controller={controller}
     >
       <SummaryWidget

@@ -49,6 +49,7 @@ import {
 } from "~/lib/types";
 import {
   MACHINE_SUMMARY_STORAGE_KEY,
+  MACHINE_SUMMARY_WIDGET_COUNT,
   MachineSummaryRow,
   MachineSummaryWidgets,
 } from "./MachineSummaryWidgets";
@@ -115,7 +116,8 @@ export function MachineView({
   const rootRef = React.useRef<HTMLDivElement>(null);
   const [mobileMode, setMobileMode] = React.useState<MobileMode>("compact");
   const summaryController = useSummaryWidgetsController(
-    MACHINE_SUMMARY_STORAGE_KEY
+    MACHINE_SUMMARY_STORAGE_KEY,
+    MACHINE_SUMMARY_WIDGET_COUNT
   );
   const defaults = getMachineViewPreset(preset).defaultState;
   const serialize = React.useCallback(

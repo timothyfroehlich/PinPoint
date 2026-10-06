@@ -26,6 +26,9 @@ import { cn } from "~/lib/utils";
 /** Browser storage key for the Machines widgets' expanded choice (widgets §2.6). */
 export const MACHINE_SUMMARY_STORAGE_KEY = "pinpoint:summary-widgets:machines";
 
+/** Presence and Playability (machine-widgets §2.1). */
+export const MACHINE_SUMMARY_WIDGET_COUNT = 2;
+
 /**
  * Segment order: Presence leads with On the Floor and leaves out Removed
  * (machine-widgets §3.2); Playability runs worst first (§4.2).
@@ -145,7 +148,7 @@ export function MachineSummaryWidgets({
     <SummaryWidgetGroup
       storageKey={MACHINE_SUMMARY_STORAGE_KEY}
       summaryRow={<MachineSummaryRow summary={summary} />}
-      widgetCount={2}
+      widgetCount={MACHINE_SUMMARY_WIDGET_COUNT}
       controller={controller}
     >
       <SummaryWidget

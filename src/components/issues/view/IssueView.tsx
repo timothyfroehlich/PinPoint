@@ -50,6 +50,7 @@ import {
 import { buildIssueFilters, presetFilters } from "./issue-filters";
 import {
   ISSUE_SUMMARY_STORAGE_KEY,
+  ISSUE_SUMMARY_WIDGET_COUNT,
   IssueSummaryRow,
   IssueSummaryWidgets,
 } from "./IssueSummaryWidgets";
@@ -102,7 +103,8 @@ export function IssueView({
 }: IssueViewProps): React.JSX.Element {
   const rootRef = React.useRef<HTMLDivElement>(null);
   const summaryController = useSummaryWidgetsController(
-    ISSUE_SUMMARY_STORAGE_KEY
+    ISSUE_SUMMARY_STORAGE_KEY,
+    ISSUE_SUMMARY_WIDGET_COUNT
   );
   const defaults = ISSUE_VIEW_PRESET;
   const { state, applied, edited, pagePresetName, isPending, update, views } =

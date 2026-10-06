@@ -3,7 +3,11 @@
 import * as React from "react";
 import { ChevronDown } from "lucide-react";
 import { cn } from "~/lib/utils";
-import { SIDE_BY_SIDE_LAYOUT, type SummaryWidgetCount } from "./layout";
+import {
+  SIDE_BY_SIDE_LAYOUT,
+  SummaryWidgetCountContext,
+  type SummaryWidgetCount,
+} from "./layout";
 
 /**
  * Until the person chooses, CSS opens the stacked section on screens at least
@@ -42,10 +46,12 @@ function writeChoice(storageKey: string, expanded: boolean): void {
 
 /**
  * The expanded/collapsed state of one host's stacked Summary Widgets, shared
- * by the group and any Summary Row toggle placed outside it (list-views §7.2
- * puts the phone toggle in the page title row).
+ * by the group and any Summary Row toggle placed outside it (list-views §8.4
+ * puts the toggle in the page title row whenever the widgets stack).
  */
 export interface SummaryWidgetsController {
+  /** How many widgets the host shows: the group and toggle switch together. */
+  widgetCount: SummaryWidgetCount;
   contentId: string;
   contentRef: React.RefObject<HTMLDivElement | null>;
   /** null until the person chooses: CSS then decides. */
@@ -57,7 +63,8 @@ export interface SummaryWidgetsController {
 }
 
 export function useSummaryWidgetsController(
-  storageKey: string
+  storageKey: string,
+  widgetCount: SummaryWidgetCount
 ): SummaryWidgetsController {
   const contentId = React.useId();
   const contentRef = React.useRef<HTMLDivElement>(null);
@@ -82,6 +89,7 @@ export function useSummaryWidgetsController(
   }, [choice, defaultOpen, storageKey]);
 
   return {
+    widgetCount,
     contentId,
     contentRef,
     choice,
@@ -97,9 +105,11 @@ function visibilityOf(controller: SummaryWidgetsController): Visibility {
 }
 
 /**
- * A Summary Row toggle placed outside its group, such as in a phone title
- * row (list-views §7.2). It expands and collapses the stacked section and
- * names the state for assistive technology.
+ * A Summary Row toggle placed outside its group, in the page title row
+ * (list-views §7.2, §8.4). It shows exactly while the widgets stack, so it
+ * must sit in a query container as wide as the group's; it expands and
+ * collapses the stacked section and names the state for assistive
+ * technology.
  */
 export function SummaryRowToggle({
   controller,
@@ -120,6 +130,7 @@ export function SummaryRowToggle({
       onClick={controller.toggle}
       className={cn(
         "inline-flex min-h-11 min-w-0 items-center gap-1 rounded-md px-1.5 text-sm whitespace-nowrap text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+        SIDE_BY_SIDE_LAYOUT[controller.widgetCount].toggleHidden,
         className
       )}
     >
@@ -142,12 +153,14 @@ interface SummaryWidgetGroupProps {
   storageKey: string;
   /** The Summary Row: the host's short figures (widgets §2.5). */
   summaryRow: React.ReactNode;
-  /** How many widgets the host shows (its widgets spec §2.1). */
+  /**
+   * How many widgets the host shows (its widgets spec §2.1). A given
+   * controller's count takes its place, so group and toggle always agree.
+   */
   widgetCount: SummaryWidgetCount;
   /**
    * Shares state with a {@link SummaryRowToggle} rendered elsewhere. When
-   * given, that toggle stands in for the group's own on phones, which then
-   * shows its Summary Row only on stacked wider layouts.
+   * given, that toggle replaces the group's own at every stacked width.
    */
   controller?: SummaryWidgetsController | undefined;
   children: React.ReactNode;
@@ -156,12 +169,13 @@ interface SummaryWidgetGroupProps {
 /**
  * Lays out a host's Summary Widgets (widgets spec §2). At md+, when the
  * group's container fits them (a container query, not a viewport
- * breakpoint), they sit side by side, always expanded, with no collapse
- * control. Everywhere else, phones included, they stack full-width in one
- * collapsible section headed by the Summary Row; the person's choice is
- * remembered per host in this browser, never in the URL or a Saved View
- * (§2.6), and never hides side-by-side widgets. Each widget lays out the
- * same way in either arrangement (§5.7).
+ * breakpoint), they sit side by side in one card, always expanded, with no
+ * collapse control. Everywhere else, phones included, they stack full-width
+ * in one collapsible section with no card and no rules between widgets,
+ * headed by the Summary Row unless a {@link SummaryRowToggle} in the title
+ * row stands in for it (list-views §8.4). The person's choice is remembered
+ * per host in this browser, never in the URL or a Saved View (§2.6), and
+ * never hides side-by-side widgets.
  */
 export function SummaryWidgetGroup({
   storageKey,
@@ -170,7 +184,7 @@ export function SummaryWidgetGroup({
   controller: external,
   children,
 }: SummaryWidgetGroupProps): React.JSX.Element {
-  const own = useSummaryWidgetsController(storageKey);
+  const own = useSummaryWidgetsController(storageKey, widgetCount);
   const controller = external ?? own;
   const rootRef = React.useRef<HTMLDivElement>(null);
   const { choice, contentRef, setDefaultOpen } = controller;
@@ -190,52 +204,56 @@ export function SummaryWidgetGroup({
 
   const expanded = choice ?? controller.defaultOpen;
   const visibility = visibilityOf(controller);
-  const layout = SIDE_BY_SIDE_LAYOUT[widgetCount];
+  const layout = SIDE_BY_SIDE_LAYOUT[controller.widgetCount];
 
   return (
     // The container the side-by-side queries measure; a container cannot
-    // query itself, so the card and rules live on the wrapper inside.
+    // query itself, so the card lives on the wrapper inside.
     <div ref={rootRef} className="@container">
       <div
         className={cn(
-          "md:rounded-lg md:border md:bg-card",
-          external ? "max-md:border-0" : "border-b border-border"
+          // A tab's stacked section is ruled off from the search beneath it.
+          !external && "border-b border-border",
+          layout.card
         )}
       >
-        <button
-          type="button"
-          aria-expanded={expanded ?? undefined}
-          aria-controls={controller.contentId}
-          onClick={controller.toggle}
-          className={cn(
-            "flex min-h-11 w-full items-center gap-2 py-2 text-left text-sm text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none md:px-4 md:focus-visible:ring-inset",
-            external && "max-md:hidden",
-            layout.toggleHidden
-          )}
-        >
-          <span className="sr-only">Summary:</span>{" "}
-          <span className="min-w-0 flex-1">{summaryRow}</span>
-          <ChevronDown
-            aria-hidden="true"
+        {external ? null : (
+          <button
+            type="button"
+            aria-expanded={expanded ?? undefined}
+            aria-controls={controller.contentId}
+            onClick={controller.toggle}
             className={cn(
-              "size-4 shrink-0 transition-transform",
-              visibility === "default" && "min-[390px]:rotate-180",
-              visibility === "open" && "rotate-180"
+              "flex min-h-11 w-full items-center gap-2 py-2 text-left text-sm text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+              layout.toggleHidden
             )}
-          />
-        </button>
+          >
+            <span className="sr-only">Summary:</span>{" "}
+            <span className="min-w-0 flex-1">{summaryRow}</span>
+            <ChevronDown
+              aria-hidden="true"
+              className={cn(
+                "size-4 shrink-0 transition-transform",
+                visibility === "default" && "min-[390px]:rotate-180",
+                visibility === "open" && "rotate-180"
+              )}
+            />
+          </button>
+        )}
         <div
           id={controller.contentId}
           ref={contentRef}
           className={cn(
-            "grid-cols-1 pb-2 md:divide-y md:divide-border md:border-t md:border-border md:pb-0",
-            layout.noTopRule,
+            "grid-cols-1 divide-border pb-2",
+            layout.content,
             CONTENT_VISIBILITY[visibility],
             layout.shown,
             layout.grid
           )}
         >
-          {children}
+          <SummaryWidgetCountContext value={controller.widgetCount}>
+            {children}
+          </SummaryWidgetCountContext>
         </div>
       </div>
     </div>

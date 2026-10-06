@@ -429,28 +429,34 @@ describe("MachineView", () => {
     ).toHaveAttribute("aria-controls");
   });
 
-  it("puts the phone Summary Row toggle in the title row on the Machines page (list-views §7.2)", async () => {
+  it("puts the Summary Row toggle in the title row whenever the widgets stack on the Machines page (list-views §7.2, §8.4)", async () => {
     const user = userEvent.setup();
     renderView({ title: "Machines" });
 
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Machines" })
-    ).toBeInTheDocument();
-    // The title row's toggle shows "2/2 playable" and reads "2 of 2"
-    // (machine-widgets §2.4).
-    const [toggle, groupToggle] = screen.getAllByRole("button", {
+    const heading = screen.getByRole("heading", {
+      level: 1,
+      name: "Machines",
+    });
+    // One toggle, in the title row: it shows "2/2 playable" and reads
+    // "2 of 2" (machine-widgets §2.4).
+    const toggles = screen.getAllByRole("button", {
       name: "Summary: 2 of 2 playable",
     });
-    if (!toggle || !groupToggle) throw new Error("Summary Row toggles missing");
+    expect(toggles).toHaveLength(1);
+    const [toggle] = toggles;
+    if (!toggle) throw new Error("Summary Row toggle missing");
+    expect(heading.parentElement).toContainElement(toggle);
     expect(within(toggle).getByText("2/2")).toHaveAttribute(
       "aria-hidden",
       "true"
     );
-    // Both control the same section; the group's own hides on phones.
-    expect(toggle.getAttribute("aria-controls")).toBe(
-      groupToggle.getAttribute("aria-controls")
-    );
-    expect(groupToggle).toHaveClass("max-md:hidden");
+    // It hides only when both widgets fit side by side, querying the title
+    // row, which is as wide as the widgets' group.
+    expect(toggle).toHaveClass("md:@min-[40rem]:hidden");
+    expect(heading.parentElement).toHaveClass("@container");
+    expect(
+      document.getElementById(toggle.getAttribute("aria-controls") ?? "")
+    ).toContainElement(screen.getByRole("region", { name: "Presence" }));
     await user.click(toggle);
     expect(toggle).toHaveAttribute("aria-expanded");
   });

@@ -54,7 +54,7 @@
 - **5.4** Every count appears as text, so color is never the only signal.
 - **5.5** The breakdown lists only Segments with a nonzero count; a Segment with a zero count is left out of the breakdown and of "N other".
 - **5.6** The breakdown lists Segments in the order the host's widgets spec defines, worst first. When the line cannot fit every Segment, it shows whole count-and-label pairs from the start while they fit and rolls the rest into one "N other" entry; the bar still shows every Segment.
-- **5.7** The breakdown sits on the widget's label line, with nothing beneath the bar; on phones it also drops the color swatches.
+- **5.7** The breakdown sits on the widget's label line, with nothing beneath the bar; when the widgets stack, it also drops the color swatches.
 
 ---
 
@@ -79,6 +79,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-05 | Stacked breakdowns drop the color swatches at every width (§5.7). |
 | 2026-10-04 | Summary Widgets no longer show a headline (§1, §5.1); the breakdown sits on the label line at every width (§5.7). |
 | 2026-10-03 | Zero-count Segments are left out of the breakdown and of "N other" (§5.5). Stacked widgets collapse at every width (§2.3, §2.4); headlines show only when widgets sit side by side (§5.1); stacked breakdowns sit on the label line above the bar (§5.7). The Summary Row stands in for any collapsed stacked section, not only on phones (§1). |
 | 2026-10-02 | The Summary Row shows the figures its host defines (§2.5); Summary Widget filters show on their filter control (§6.3). Retired the Filtered population and the All/Filtered choice (§1, §3, §5.1). Widgets stack when a wide layout cannot fit them side by side (§2.3); the phone section starts open at 390px and wider (§2.4); breakdowns run worst first and roll overflow into "N other" (§5.5, §5.6); phone breakdowns sit on the label line (§5.7). |

@@ -99,7 +99,7 @@
 - **8.1** When the Primary Filters do not fit beside search, they move into More from the right, one at a time, in the host's order.
 - **8.2** When the List Header's tabs do not fit, Saved View tabs move into More views from the right; the Applied View's tab always stays visible.
 - **8.3** When the List Header is still crowded, the compact pager drops its range text, then disappears; then Discard changes shortens to Discard, and then the Applied View's tab name truncates. The pager below the list remains, and shows the result range even when there is only one page.
-- **8.4** When the Summary Widgets do not fit side by side, they stack full-width in a collapsible section (widgets §2.4).
+- **8.4** When the Summary Widgets do not fit side by side, they stack full-width in a collapsible section (widgets §2.4), and the Summary Row toggle moves to the title row, or to its own row on a Collection or Tag tab (§7.2).
 - **8.5** No List View width between 320px and 1440px scrolls the page horizontally.
 
 ---
@@ -169,7 +169,7 @@
 
 | Date | Change |
 | :-- | :-- |
-| 2026-10-05 | Built-in Views are starting points: they set filters and sorting only, leaving one leaves no Applied View and offers Save view, and only a changed Saved View is Edited (§1, §3.6, §5.2, §5.3, §7.3, §7.6). |
+| 2026-10-05 | Built-in Views are starting points: they set filters and sorting only, leaving one leaves no Applied View and offers Save view, and only a changed Saved View is Edited (§1, §3.6, §5.2, §5.3, §7.3, §7.6). The Summary Row toggle moves to the title row whenever the Summary Widgets stack (§8.4). |
 | 2026-10-04 | Reset all returns filters to the Page Preset (§7.5); Built-in Views stay reachable as tabs or in More views (§10.12); the List Header's crowding order and the single-page result range (§8.3); per-filter Reset (§4.9); a Page Preset URL names its Built-in View when the account's Default View is another view (§10.10); empty-state action only when Edited (§3.6). The search field shows no placeholder (§4.2). |
 | 2026-10-03 | On a Collection or Tag tab the Summary Row toggle sits on its own row between the page's tabs and search (§7.2). |
 | 2026-10-03 | Stacked Summary Widgets sit in a collapsible section (§8.4). |
