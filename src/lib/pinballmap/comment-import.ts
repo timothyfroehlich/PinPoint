@@ -16,6 +16,7 @@ import {
   timelineEvents,
 } from "~/server/db/schema";
 import { pinballmapCommenterName } from "./comment-conversion";
+import { PINBALLMAP_STATE_ID } from "./mutation-lease";
 import { markEndedEntries } from "./previous-listing";
 import type { PbmCondition, PbmLmx } from "./types";
 
@@ -129,7 +130,7 @@ export async function importPinballMapComments(): Promise<CommentImportResult> {
         baselineLocationId: pinballmapState.commentsBaselineLocationId,
       })
       .from(pinballmapState)
-      .where(eq(pinballmapState.id, "singleton"))
+      .where(eq(pinballmapState.id, PINBALLMAP_STATE_ID))
       .for("update");
     if (!state || state.locationId === null || !state.snapshot) {
       return EMPTY_RESULT;
@@ -263,7 +264,7 @@ export async function importPinballMapComments(): Promise<CommentImportResult> {
       await tx
         .update(pinballmapState)
         .set({ commentsBaselineLocationId: locationId })
-        .where(eq(pinballmapState.id, "singleton"));
+        .where(eq(pinballmapState.id, PINBALLMAP_STATE_ID));
     }
 
     return { commentsObserved: newlyObserved.size, copies, backfill };

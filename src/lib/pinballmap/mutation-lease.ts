@@ -31,7 +31,8 @@ export function availableMutationLease(now: Date): ReturnType<typeof or> {
 }
 
 /**
- * Reserve the configured location for one outbound addition.
+ * Reserve the configured location for one outbound lineup write (add,
+ * remove, Insider Connected or confirm).
  *
  * Configuration commits and clears require this singleton lease to be
  * available in their atomic update, so exactly one of configuration or the

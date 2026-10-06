@@ -6,17 +6,9 @@ import type { PinballmapRuntimeState } from "~/lib/types";
 import { PINBALLMAP_STATE_ID } from "./mutation-lease";
 
 /**
- * PinballMap location-snapshot read path (foundation — PP-o355.16).
- *
- * The integration keeps one `pinballmap_state` singleton row. A sync fetches our
- * location's full JSON through the client seam and stores the WHOLE snapshot, so
- * every downstream surface (status card, desync view, link/verify) reads the
- * stored snapshot rather than hitting PBM per request — PBM's "one call per hour"
- * conduct (CORE-PBM-001). The fetch is a side effect performed OUTSIDE any
- * transaction (CORE-ARCH-011); we persist the result after it returns.
- *
- * PP-o355.11 schedules `syncLocationSnapshot` on a cron; PP-o355.12 reuses the
- * persisted snapshot to resolve/verify lmx handles.
+ * Reads of the `pinballmap_state` singleton row, shared by every module that
+ * owns part of it (`./mutation-lease`, `./refresh-allowance`,
+ * `./location-sync`, `./tracked-location`).
  */
 
 /** Read the integration-state singleton (null when never initialized). */

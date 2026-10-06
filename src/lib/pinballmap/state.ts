@@ -10,7 +10,10 @@
  *   location.
  */
 export { getPinballMapState } from "./runtime-state";
-export { type PinballMapMutationLease } from "./mutation-lease";
+export {
+  PINBALLMAP_STATE_ID,
+  type PinballMapMutationLease,
+} from "./mutation-lease";
 export {
   getRefreshAllowance,
   type RefreshAllowance,
