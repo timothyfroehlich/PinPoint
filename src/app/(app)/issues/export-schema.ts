@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { ISSUE_STATUS_VALUES } from "~/lib/issues/status";
-import { ISSUE_FREQUENCY_VALUES } from "~/lib/types";
+import {
+  ISSUE_FREQUENCY_VALUES,
+  ISSUE_PRIORITY_VALUES,
+  ISSUE_SEVERITY_VALUES,
+} from "~/lib/types";
 import { isIssueSort, type IssueSort } from "~/lib/issues/filters";
 
 /**
@@ -51,10 +55,8 @@ export const exportFiltersSchema = z.object({
   q: z.string().optional(),
   status: z.array(z.enum(ISSUE_STATUS_VALUES)).optional(),
   machine: z.array(z.string()).optional(),
-  severity: z
-    .array(z.enum(["cosmetic", "minor", "major", "unplayable"]))
-    .optional(),
-  priority: z.array(z.enum(["low", "medium", "high"])).optional(),
+  severity: z.array(z.enum(ISSUE_SEVERITY_VALUES)).optional(),
+  priority: z.array(z.enum(ISSUE_PRIORITY_VALUES)).optional(),
   frequency: z.array(z.enum(ISSUE_FREQUENCY_VALUES)).optional(),
   assignee: z.array(z.string()).optional(),
   owner: z.array(z.string()).optional(),

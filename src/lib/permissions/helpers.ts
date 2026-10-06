@@ -11,6 +11,7 @@ import {
   getPermission,
   PERMISSIONS_BY_ID,
 } from "./matrix";
+import type { UserRole } from "~/lib/types";
 
 /**
  * Context for ownership-based permission checks.
@@ -28,9 +29,7 @@ export interface OwnershipContext {
  * Determine the access level for a user based on their role.
  * Returns 'unauthenticated' if no user/role provided.
  */
-export function getAccessLevel(
-  role: "guest" | "member" | "technician" | "admin" | undefined | null
-): AccessLevel {
+export function getAccessLevel(role: UserRole | undefined | null): AccessLevel {
   if (!role) return "unauthenticated";
   return role;
 }
