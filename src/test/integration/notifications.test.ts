@@ -406,6 +406,71 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
     );
   });
 
+  it("a recipient with no preferences row gets the schema column defaults", async () => {
+    const db = await getTestDb();
+
+    const [actor] = await db
+      .insert(userProfiles)
+      .values(createTestUser())
+      .returning();
+    const [recipient] = await db
+      .insert(userProfiles)
+      .values(createTestUser({ email: "no-row@test.com" }))
+      .returning();
+    const [machine] = await db
+      .insert(machines)
+      .values(createTestMachine({ initials: "DEF" }))
+      .returning();
+    const [issue] = await db
+      .insert(issues)
+      .values(createTestIssue(machine.initials, { issueNumber: 1 }))
+      .returning();
+    await db.insert(issueWatchers).values({
+      issueId: issue.id,
+      userId: recipient.id,
+    });
+
+    // Schema default: new-comment notifications are off for every channel.
+    await dispatchNotification(
+      await planNotification(
+        {
+          type: "new_comment",
+          resourceId: issue.id,
+          eventId: issue.id,
+          resourceType: "issue",
+          actorId: actor.id,
+          includeActor: false,
+          commentContent: "Test comment",
+        },
+        asDbOrTx(db)
+      )
+    );
+    expect(await db.query.notifications.findMany()).toHaveLength(0);
+    expect(sendEmail).not.toHaveBeenCalled();
+
+    // Schema default: assignment notifications are on for every channel.
+    await dispatchNotification(
+      await planNotification(
+        {
+          type: "issue_assigned",
+          resourceId: issue.id,
+          eventId: issue.id,
+          resourceType: "issue",
+          actorId: actor.id,
+          includeActor: false,
+          additionalRecipientIds: [recipient.id],
+          issueTitle: "Test Issue",
+          machineName: machine.name,
+        },
+        asDbOrTx(db)
+      )
+    );
+    const rows = await db.query.notifications.findMany();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].userId).toBe(recipient.id);
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+  });
+
   it("self-assignment should not send any email (actor excluded)", async () => {
     const db = await getTestDb();
 

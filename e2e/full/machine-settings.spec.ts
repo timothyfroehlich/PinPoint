@@ -66,7 +66,8 @@ test.describe("Machine Settings (PP-43q3)", () => {
   // below does. This block CREATES a settings set and never deleted it, so on a
   // shared machine every run left one behind. The set-name assertion below
   // reads `.first()`, and the settings route orders sets
-  // `[desc(isPreferred), asc(createdAt)]` (src/lib/machines/settings-queries.ts)
+  // preferred House, then preferred Tournament, then `asc(createdAt)`
+  // (src/lib/machines/settings-queries.ts)
   // — so after the reload `.first()` is the OLDEST set, i.e. the leftover from a
   // previous run, not the one this test just made. That is invisible on a clean
   // machine and fails on the second run against a dirty one, which is exactly

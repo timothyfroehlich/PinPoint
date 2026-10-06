@@ -9,6 +9,7 @@ import {
   machines,
   userProfiles,
 } from "~/server/db/schema";
+import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 
 // --- boundary mocks -------------------------------------------------------
 // Vary the signed-in user per test by resolving mockGetUser.
@@ -657,5 +658,206 @@ describe("collection actions", () => {
       machineIds: [],
     });
     expect(denied.success).toBe(false);
+  });
+
+  // --- descriptions (spec collections-and-tags 2.4, 2.8, 3.8) ---------------
+
+  function textDoc(...paragraphs: string[]): ProseMirrorDoc {
+    return {
+      type: "doc",
+      content: paragraphs.map((text) => ({
+        type: "paragraph",
+        content: [{ type: "text", text }],
+      })),
+    };
+  }
+
+  async function descriptionOf(
+    collectionId: string
+  ): Promise<ProseMirrorDoc | null> {
+    const db = await getTestDb();
+    const row = await db.query.collections.findFirst({
+      where: eq(collections.id, collectionId),
+      columns: { description: true },
+    });
+    return row?.description ?? null;
+  }
+
+  it("createCollectionAction: stores the description; a blank one is stored as null", async () => {
+    const db = await getTestDb();
+    const member = createTestUser({ role: "member" });
+    await db.insert(userProfiles).values(member);
+    const { createCollectionAction } =
+      await import("~/app/(app)/c/collections/actions");
+    signIn(member.id);
+
+    const doc = textDoc("Games for the Thursday league.");
+    const withDesc = await createCollectionAction({
+      name: "League",
+      description: doc,
+    });
+    if (!withDesc.success) throw new Error(withDesc.error);
+    expect(await descriptionOf(withDesc.data?.id ?? "")).toEqual(doc);
+
+    const blank = await createCollectionAction({
+      name: "Blank",
+      description: textDoc("   "),
+    });
+    if (!blank.success) throw new Error(blank.error);
+    expect(await descriptionOf(blank.data?.id ?? "")).toBeNull();
+  });
+
+  it("updateCollectionAction: saves the description with name + machines; null clears, omitted keeps", async () => {
+    const db = await getTestDb();
+    const owner = createTestUser({ role: "member" });
+    await db.insert(userProfiles).values(owner);
+    const a = createTestMachine({ initials: "AA", name: "A" });
+    const b = createTestMachine({ initials: "BB", name: "B" });
+    await db.insert(machines).values([a, b]);
+    const [collection] = await db
+      .insert(collections)
+      .values({ name: "Set", ownerId: owner.id })
+      .returning();
+    const { updateCollectionAction } =
+      await import("~/app/(app)/c/collections/actions");
+    signIn(owner.id);
+
+    const doc = textDoc("First paragraph.", "Second paragraph.");
+    const saved = await updateCollectionAction({
+      collectionId: collection.id,
+      name: "Renamed",
+      description: doc,
+      machineIds: [a.id, b.id],
+    });
+    expect(saved.success).toBe(true);
+    expect(await nameOf(collection.id)).toBe("Renamed");
+    expect(await descriptionOf(collection.id)).toEqual(doc);
+    expect(await membershipOf(collection.id)).toEqual(new Set([a.id, b.id]));
+
+    // A machines-only caller (no description field) leaves it alone.
+    const kept = await updateCollectionAction({
+      collectionId: collection.id,
+      name: "Renamed",
+      machineIds: [a.id],
+    });
+    expect(kept.success).toBe(true);
+    expect(await descriptionOf(collection.id)).toEqual(doc);
+
+    const cleared = await updateCollectionAction({
+      collectionId: collection.id,
+      name: "Renamed",
+      description: null,
+      machineIds: [a.id],
+    });
+    expect(cleared.success).toBe(true);
+    expect(await descriptionOf(collection.id)).toBeNull();
+  });
+
+  it("updateCollectionAction: a failed save changes neither the description nor the rest", async () => {
+    const db = await getTestDb();
+    const owner = createTestUser({ role: "member" });
+    await db.insert(userProfiles).values(owner);
+    const a = createTestMachine({ initials: "AA", name: "A" });
+    await db.insert(machines).values(a);
+    const original = textDoc("Original.");
+    const [collection] = await db
+      .insert(collections)
+      .values({ name: "Set", ownerId: owner.id, description: original })
+      .returning();
+    await db
+      .insert(collectionMachines)
+      .values({ collectionId: collection.id, machineId: a.id });
+    const { updateCollectionAction } =
+      await import("~/app/(app)/c/collections/actions");
+    signIn(owner.id);
+
+    // Unknown machine: the new description must not land on its own.
+    const badMachine = await updateCollectionAction({
+      collectionId: collection.id,
+      name: "Set",
+      description: textDoc("Changed."),
+      machineIds: [crypto.randomUUID()],
+    });
+    expect(badMachine.success).toBe(false);
+    expect(await descriptionOf(collection.id)).toEqual(original);
+
+    // A description with a mention is refused, and the name + machines with it.
+    const mention = await updateCollectionAction({
+      collectionId: collection.id,
+      name: "Renamed",
+      description: {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              { type: "mention", attrs: { id: owner.id, label: "Owner" } },
+            ],
+          },
+        ],
+      },
+      machineIds: [],
+    });
+    expect(mention).toEqual({
+      success: false,
+      error: "Descriptions can't mention people",
+    });
+
+    // An oversized description is refused.
+    const tooLong = await updateCollectionAction({
+      collectionId: collection.id,
+      name: "Renamed",
+      description: textDoc("x".repeat(10_001)),
+      machineIds: [],
+    });
+    expect(tooLong).toEqual({
+      success: false,
+      error: "Description is too long",
+    });
+
+    expect(await nameOf(collection.id)).toBe("Set");
+    expect(await descriptionOf(collection.id)).toEqual(original);
+    expect(await membershipOf(collection.id)).toEqual(new Set([a.id]));
+  });
+
+  it("updateCollectionAction: an editor can change the description; an admin who isn't the owner cannot", async () => {
+    const db = await getTestDb();
+    const owner = createTestUser({ role: "member" });
+    const editor = createTestUser({ role: "member" });
+    const admin = createTestUser({ role: "admin" });
+    await db.insert(userProfiles).values([owner, editor, admin]);
+    const [collection] = await db
+      .insert(collections)
+      .values({ name: "Set", ownerId: owner.id })
+      .returning();
+    await db.insert(collectionCollaborators).values({
+      collectionId: collection.id,
+      userId: editor.id,
+      role: "editor",
+      addedBy: owner.id,
+    });
+    const { updateCollectionAction } =
+      await import("~/app/(app)/c/collections/actions");
+
+    const editorDoc = textDoc("Written by the editor.");
+    signIn(editor.id);
+    const ok = await updateCollectionAction({
+      collectionId: collection.id,
+      name: "Set",
+      description: editorDoc,
+      machineIds: [],
+    });
+    expect(ok.success).toBe(true);
+    expect(await descriptionOf(collection.id)).toEqual(editorDoc);
+
+    signIn(admin.id);
+    const denied = await updateCollectionAction({
+      collectionId: collection.id,
+      name: "Set",
+      description: textDoc("Admin override."),
+      machineIds: [],
+    });
+    expect(denied).toEqual({ success: false, error: "Forbidden" });
+    expect(await descriptionOf(collection.id)).toEqual(editorDoc);
   });
 });

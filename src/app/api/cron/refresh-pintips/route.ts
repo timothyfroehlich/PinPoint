@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
+import type { NextResponse } from "next/server";
 import { refreshPinTips } from "~/lib/pintips/records";
-import { assertCronAuthorized } from "~/lib/cron/auth";
+import { runCron } from "~/lib/cron/run-cron";
 import { log } from "~/lib/logger";
 import { db } from "~/server/db";
 
@@ -13,15 +13,9 @@ import { db } from "~/server/db";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request): Promise<NextResponse> {
-  const denied = assertCronAuthorized(request);
-  if (denied) return denied;
-
-  try {
+  return runCron(request, "pintips.refresh", async () => {
     const count = await refreshPinTips(db);
     log.info({ count, action: "pintips.refresh" }, "PinTips copy refreshed");
-    return NextResponse.json({ ok: true, count });
-  } catch (err) {
-    log.error({ err }, "PinTips refresh cron failed");
-    return NextResponse.json({ error: "Refresh failed" }, { status: 500 });
-  }
+    return { ok: true, count };
+  });
 }

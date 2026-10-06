@@ -14,6 +14,7 @@ describe("machine-tags", () => {
       "lifecycle",
       "issue",
       "settings",
+      "settings_edit",
       "pinballmap",
       "maintenance",
       "adjustment",
@@ -26,18 +27,19 @@ describe("machine-tags", () => {
     ]);
   });
 
-  it("DEFAULT_TIMELINE_TAGS is the full list minus default-off `settings` (PP-43q3)", () => {
+  it("DEFAULT_TIMELINE_TAGS is the full list minus default-off `settings_edit` (machine-settings §5.2)", () => {
     expect([...DEFAULT_TIMELINE_TAGS]).toEqual(
-      TIMELINE_TAGS.filter((t) => t !== "settings")
+      TIMELINE_TAGS.filter((t) => t !== "settings_edit")
     );
-    expect([...DEFAULT_TIMELINE_TAGS]).not.toContain("settings");
+    expect([...DEFAULT_TIMELINE_TAGS]).toContain("settings");
   });
 
-  it("marks lifecycle, issue, settings, and pinballmap as reserved", () => {
+  it("marks lifecycle, issue, settings, settings_edit, and pinballmap as reserved", () => {
     expect([...RESERVED_TAGS]).toEqual([
       "lifecycle",
       "issue",
       "settings",
+      "settings_edit",
       "pinballmap",
     ]);
   });
@@ -58,6 +60,7 @@ describe("machine-tags", () => {
     expect(() => userTagSchema.parse("lifecycle")).toThrow();
     expect(() => userTagSchema.parse("issue")).toThrow();
     expect(() => userTagSchema.parse("settings")).toThrow();
+    expect(() => userTagSchema.parse("settings_edit")).toThrow();
     expect(() => userTagSchema.parse("pinballmap")).toThrow();
     expect(userTagSchema.parse("maintenance")).toBe("maintenance");
     expect(userTagSchema.parse("adjustment")).toBe("adjustment");

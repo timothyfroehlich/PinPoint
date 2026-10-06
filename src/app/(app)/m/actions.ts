@@ -47,12 +47,8 @@ import {
   reportError,
   serverActionError,
 } from "~/lib/observability/report-error";
-import {
-  type ProseMirrorDoc,
-  docToPlainText,
-  proseMirrorDocSchema,
-  withoutMentionLabels,
-} from "~/lib/tiptap/types";
+import { type ProseMirrorDoc, withoutMentionLabels } from "~/lib/tiptap/types";
+import { validateProseMirrorDoc } from "~/lib/tiptap/validate";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { getUserAccessLevel } from "~/lib/permissions/access";
 import { getPermission } from "~/lib/permissions/matrix";
@@ -691,41 +687,6 @@ export async function createMachineAction(
       { action: "createMachineAction" }
     );
   }
-}
-
-/**
- * Shared ProseMirror payload validation for the machine text columns. Both the
- * form's `parseProseFormField` and the inline `updateMachineTextField`
- * call this so the two edit surfaces can't drift on what counts as a
- * valid/oversized/empty doc. Returns a discriminant the caller maps to its own
- * error shape and copy. Size caps: 10k plaintext / 100k serialized JSON.
- * `"empty"` = whitespace-only (caller normalizes to null so the DB stores NULL,
- * not a semantically-empty JSON blob).
- */
-type ProseMirrorValidation =
-  | { status: "invalid" }
-  | { status: "too-long" }
-  | { status: "empty" }
-  | { status: "ok"; doc: ProseMirrorDoc };
-
-function validateProseMirrorDoc(value: unknown): ProseMirrorValidation {
-  // Validate the untrusted value at runtime BEFORE treating it as a doc — the
-  // raw parse result is `unknown`, and only a successful safeParse licenses the
-  // narrow below (CORE-TS-007: no unsafe cast of unvalidated input).
-  if (!proseMirrorDocSchema.safeParse(value).success) {
-    return { status: "invalid" };
-  }
-  // Shape confirmed (`type: "doc"`); narrow the validated `unknown` to the app's
-  // doc type.
-  const doc = value as ProseMirrorDoc;
-  const plainText = docToPlainText(doc);
-  if (plainText.length > 10_000 || JSON.stringify(doc).length > 100_000) {
-    return { status: "too-long" };
-  }
-  if (plainText.trim().length === 0) {
-    return { status: "empty" };
-  }
-  return { status: "ok", doc };
 }
 
 /** What a prose form field is called in its error messages. */

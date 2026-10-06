@@ -49,15 +49,15 @@ from pathlib import Path
 # (Python auto-adds this script's directory to sys.path when invoked as
 # `python3 worktree_cleanup.py`.)
 from worktree_setup import (  # noqa: E402
+    MANIFEST_PATH,
     DockerNotInstalledError,
     DockerUnavailableError,
     list_worktrees,
+    load_slots,
     read_stored_backend,
     resolve_project_id,
     run_docker,
 )
-
-MANIFEST_PATH = Path.home() / ".config" / "pinpoint" / "worktree-slots.json"
 
 SUPABASE_PROJECT_LABEL = "com.supabase.cli.project"
 
@@ -101,19 +101,8 @@ def slot_manifest_paths() -> set[str] | None:
     still hold an entry for the target, and treating that as "no entry" is the
     false-zero shape this script exists to avoid.
     """
-    if not MANIFEST_PATH.exists():
-        return set()
-    try:
-        with open(MANIFEST_PATH) as f:
-            fcntl.flock(f.fileno(), fcntl.LOCK_SH)
-            try:
-                raw = f.read()
-            finally:
-                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
-        slots = json.loads(raw).get("slots", {})
-    except (OSError, json.JSONDecodeError, AttributeError):
-        return None
-    if not isinstance(slots, dict):
+    slots = load_slots(MANIFEST_PATH)
+    if slots is None:
         return None
     return {str(Path(path).resolve()) for path in slots}
 
