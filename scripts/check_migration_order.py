@@ -156,7 +156,10 @@ def check_against_base(drizzle_dir: Path, base_drizzle_dir: Path) -> list[str]:
                 f"drizzle/{base_tag}.sql differs from the base branch. Production "
                 "never re-runs an applied migration; put the change in a new one"
             )
-        number = str(base_tag)[:4]
+        tag_match = TAG_PATTERN.match(str(base_tag))
+        if tag_match is None:
+            continue
+        number = tag_match.group(1)
         snapshot = drizzle_dir / "meta" / f"{number}_snapshot.json"
         base_snapshot = base_drizzle_dir / "meta" / f"{number}_snapshot.json"
         if (

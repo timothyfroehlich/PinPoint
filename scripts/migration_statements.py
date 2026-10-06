@@ -30,16 +30,16 @@ BLOCK_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
 def statements(sql: str) -> list[str]:
     """Split migration SQL into statements, dropping comments and whitespace.
 
-    Block comments go first, so a statement commented out in the reviewed SQL
-    does not count as present.
+    Comments go first, so a statement commented out in the reviewed SQL does
+    not count as present.
     """
     result: list[str] = []
     for chunk in BLOCK_COMMENT.sub(" ", sql).split(BREAKPOINT):
-        lines = [
-            line.strip()
-            for line in chunk.splitlines()
-            if line.strip() and not line.strip().startswith("--")
-        ]
+        # Drop `--` comments, whole-line or trailing, so text in a comment never
+        # counts as a statement. Only matching uses this; the SQL that ships is
+        # the reviewed file, unchanged.
+        lines = [line.split("--", 1)[0].strip() for line in chunk.splitlines()]
+        lines = [line for line in lines if line]
         if lines:
             result.append(" ".join(lines))
     return result

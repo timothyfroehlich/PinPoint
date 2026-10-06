@@ -58,6 +58,13 @@ def test_commented_out_statement_does_not_count_as_present():
     ) == ['ALTER TABLE "tags" ADD COLUMN "slug" text;']
 
 
+def test_statement_in_a_trailing_comment_does_not_count_as_present():
+    reviewed = 'UPDATE "t" SET "x" = 1; -- replaces ALTER TABLE "t" DROP COLUMN "c";'
+    assert missing_from_reviewed('ALTER TABLE "t" DROP COLUMN "c";', reviewed) == [
+        'ALTER TABLE "t" DROP COLUMN "c";'
+    ]
+
+
 def test_shared_chunk_lists_only_the_hand_written_part():
     generated = 'ALTER TABLE "tags" ADD COLUMN "slug" text;'
     reviewed = generated + '\nUPDATE "tags" SET "slug" = "name";\n'

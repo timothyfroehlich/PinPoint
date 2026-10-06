@@ -87,7 +87,8 @@ const db = drizzle(sql);
 // not a guarantee. The wait is bounded, so a stranded lock fails this build with
 // the holder's pid instead of waiting until Vercel's build timeout.
 const MIGRATION_LOCK_KEY = "pinpoint.migrate-production";
-const LOCK_WAIT_MS = 10 * 60 * 1000;
+// Long enough to sit behind a slow backfill, well inside Vercel's 45-minute build limit.
+const LOCK_WAIT_MS = 30 * 60 * 1000;
 const LOCK_POLL_MS = 5000;
 
 async function tryMigrationLock(): Promise<boolean> {
@@ -128,7 +129,7 @@ async function acquireMigrationLock(): Promise<void> {
   }
   throw new Error(
     `Timed out waiting for the migration lock (${await describeLockHolder()}). ` +
-      "If no deploy is running, the lock is stranded: end that backend with pg_terminate_backend(<pid>) and redeploy."
+      "If no deploy is still migrating, the lock is stranded: end that backend with pg_terminate_backend(<pid>) and redeploy."
   );
 }
 
@@ -137,8 +138,12 @@ async function releaseMigrationLock(): Promise<void> {
     // unlock_all, not a single unlock: advisory locks count per session, so a
     // reused backend that already held this lock would otherwise keep one hold.
     await sql`SELECT pg_advisory_unlock_all()`;
-  } catch {
-    // The connection is going away; closing it below is the fallback.
+  } catch (error) {
+    // Closing the connection below is the fallback; log so a later "Timed out
+    // waiting for the migration lock" has a lead.
+    console.error(
+      `⚠️  Could not release the migration lock: ${error instanceof Error ? error.message : String(error)}`
+    );
   }
 }
 
