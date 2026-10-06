@@ -18,6 +18,12 @@ import {
   machines,
   userProfiles,
 } from "~/server/db/schema";
+import {
+  docToPlainText,
+  extractMentions,
+  proseMirrorDocValueSchema,
+  type ProseMirrorDoc,
+} from "~/lib/tiptap/types";
 
 type ActionResult<T = undefined> =
   { success: true; data?: T } | { success: false; error: string };
@@ -44,8 +50,35 @@ async function resolveActor(): Promise<{
 
 const nameSchema = z.string().trim().min(1, "Name is required").max(120);
 
+/**
+ * Validate and normalize an optional Collection description (spec 2.8). A
+ * blank doc (no text once trimmed) is stored as null, so "no description"
+ * has one representation and the header shows nothing (spec 4.7). Size caps
+ * match the machine description: 10k plain text / 100k serialized JSON.
+ * Mentions are rejected: descriptions never notify anyone, so a mention node
+ * can only come from a hand-crafted payload (the editor has them disabled).
+ */
+function parseDescription(
+  value: unknown
+): { ok: true; value: ProseMirrorDoc | null } | { ok: false; error: string } {
+  if (value === null) return { ok: true, value: null };
+  const parsed = proseMirrorDocValueSchema.safeParse(value);
+  if (!parsed.success) return { ok: false, error: "Invalid description" };
+  const doc = parsed.data;
+  const plainText = docToPlainText(doc);
+  if (plainText.length > 10_000 || JSON.stringify(doc).length > 100_000) {
+    return { ok: false, error: "Description is too long" };
+  }
+  if (extractMentions(doc).length > 0) {
+    return { ok: false, error: "Descriptions can't mention people" };
+  }
+  if (plainText.trim().length === 0) return { ok: true, value: null };
+  return { ok: true, value: doc };
+}
+
 export async function createCollectionAction(input: {
   name: string;
+  description?: ProseMirrorDoc | null;
   machineIds?: string[];
 }): Promise<ActionResult<{ id: string }>> {
   const actor = await resolveActor();
@@ -61,6 +94,9 @@ export async function createCollectionAction(input: {
       error: parsed.error.issues[0]?.message ?? "Invalid name",
     };
   }
+
+  const description = parseDescription(input.description ?? null);
+  if (!description.ok) return { success: false, error: description.error };
 
   const idsParsed = z.array(z.uuid()).safeParse(input.machineIds ?? []);
   if (!idsParsed.success) {
@@ -85,7 +121,11 @@ export async function createCollectionAction(input: {
   const id = await db.transaction(async (tx) => {
     const [row] = await tx
       .insert(collections)
-      .values({ name: parsed.data, ownerId: actor.userId })
+      .values({
+        name: parsed.data,
+        description: description.value,
+        ownerId: actor.userId,
+      })
       .returning({ id: collections.id });
     if (!row) return null;
     if (desired.length > 0) {
@@ -120,6 +160,11 @@ async function loadOwner(
 export async function updateCollectionAction(input: {
   collectionId: string;
   name: string;
+  /**
+   * The new description; null clears it. Omitted leaves it unchanged, for
+   * callers that only change machines (the empty Overview's inline picker).
+   */
+  description?: ProseMirrorDoc | null;
   machineIds: string[];
 }): Promise<ActionResult> {
   const actor = await resolveActor();
@@ -145,6 +190,14 @@ export async function updateCollectionAction(input: {
     };
   }
 
+  const description =
+    input.description === undefined
+      ? undefined
+      : parseDescription(input.description);
+  if (description && !description.ok) {
+    return { success: false, error: description.error };
+  }
+
   const idsParsed = z.array(z.uuid()).safeParse(input.machineIds);
   if (!idsParsed.success) {
     return { success: false, error: "Invalid machine ids" };
@@ -162,9 +215,10 @@ export async function updateCollectionAction(input: {
     }
   }
 
-  // Name change + machine-set diff-replace commit together, so a partial edit
-  // (name saved but membership not, or vice versa) can never persist. No
-  // external side effects run in this transaction (CORE-ARCH-011).
+  // Name, description, and the machine-set diff-replace commit together, so a
+  // partial edit (name saved but membership not, or vice versa) can never
+  // persist (spec 2.4). No external side effects run in this transaction
+  // (CORE-ARCH-011).
   await db.transaction(async (tx) => {
     const current = await tx
       .select({ machineId: collectionMachines.machineId })
@@ -197,7 +251,11 @@ export async function updateCollectionAction(input: {
     }
     await tx
       .update(collections)
-      .set({ name: parsedName.data, updatedAt: new Date() })
+      .set({
+        name: parsedName.data,
+        ...(description ? { description: description.value } : {}),
+        updatedAt: new Date(),
+      })
       .where(eq(collections.id, input.collectionId));
   });
 
