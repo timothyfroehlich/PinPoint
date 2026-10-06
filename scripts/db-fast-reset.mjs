@@ -1,9 +1,9 @@
-import { execSync } from "child_process";
 import {
   createScriptClient,
   resolveScriptDatabaseUrl,
 } from "./lib/pg-client.mjs";
 import { assertLocalDatabase } from "./assert-local-db.mjs";
+import { runSeedSteps } from "./lib/seed-steps.mjs";
 
 const databaseUrl = resolveScriptDatabaseUrl();
 assertLocalDatabase(databaseUrl);
@@ -42,50 +42,12 @@ async function fastReset() {
 
     // Reseed
     console.log("🌱 Reseeding data...");
-    // Keep this list in the same ORDER as `db:reset` in package.json, and keep
-    // it COMPLETE for every table the TRUNCATE above reaches. `machines` is
-    // truncated CASCADE, which takes `collections` and `machine_settings_sets`
-    // with it — omitting their seeds left both permanently empty after any
-    // fast-reset, so `preflight`, local E2E runs, and `pr-screenshots` all
-    // silently rendered those pages in their empty state. (PP-tn6t.)
-    //
-    // `pinballmap_catalog` is here for the OTHER reason, and it is why "keep it
-    // complete" is not the same rule as "match the TRUNCATE". The catalog is
-    // NOT truncated above — it survives a fast-reset just fine. But E2E global
-    // setup is `db:migrate` + `db:fast-reset`, with a full `db:reset` only as a
-    // failure fallback, so a worktree whose database only ever went through E2E
-    // never runs the one step that CREATES those rows. The mirror then stays
-    // empty forever and the model picker on the machine edit page searches
-    // nothing — with no error, because an empty catalog and a no-match query
-    // look identical. The seed is an idempotent upsert keyed on
-    // pinballmap_machine_id, so running it when the rows already exist costs a
-    // refresh and nothing else. (PP-o355.21.)
-    const seedCommands = [
-      "pnpm run db:_seed",
-      "pnpm run db:_seed-users",
-      "pnpm run db:_seed-collections",
-      // Hand-applied tags: `machines` CASCADE clears machine_tags, so the
-      // memberships need reseeding; the seed replaces its own types and tags.
-      "pnpm run db:_seed-tags",
-      "pnpm run db:_seed-machine-settings",
-      "pnpm run db:_seed-discord",
-      "pnpm run db:_seed-timeline-backfill",
-      "pnpm run db:_seed-timeline-demo",
-      "pnpm run db:_seed-pinballmap-catalog",
-      // Same never-seeded reason as the catalog: the OPDB copy is not truncated
-      // above, but E2E-only databases would otherwise never get rows (PP-wqit.12).
-      "pnpm run db:_seed-opdb",
-      // Placeholder tips, same never-seeded reason (PP-a0be).
-      "pnpm run db:_seed-pintips",
-      // Unlike the catalog, `pinballmap_state` IS reached by the TRUNCATE
-      // above — `machines` is truncated CASCADE and the state seed writes
-      // machine link columns — so this one is here for the original PP-tn6t
-      // reason as well as the never-seeded one.
-      "pnpm run db:_seed-pinballmap-state",
-    ];
-    for (const cmd of seedCommands) {
-      execSync(cmd, { stdio: "inherit" });
-    }
+    // The list lives in supabase/seed-steps.json, shared with `db:reset` and
+    // the e2e fallback, each step annotated with why it is there. Two reasons
+    // recur: the TRUNCATE above reaches the table through `machines` CASCADE,
+    // or the table is never truncated but an E2E-only database never runs
+    // `db:reset`, so only this step ever fills it.
+    runSeedSteps();
     console.log("✅ Database reseeded.");
   } catch (error) {
     console.error("❌ Fast reset failed:", error);

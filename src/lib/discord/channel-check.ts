@@ -1,8 +1,8 @@
 import "server-only";
+import { DISCORD_API, DISCORD_TIMEOUT_MS } from "~/lib/discord/api";
+import { safeFetch } from "~/lib/http/external";
 import { log } from "~/lib/logger";
 import { assertNotInTransaction } from "~/server/db/transaction-context";
-
-const DISCORD_API = "https://discord.com/api/v10";
 
 /**
  * Stored status of an admin-configured Discord channel (region alerts §3.2,
@@ -43,9 +43,19 @@ export async function checkDiscordChannel(
   assertNotInTransaction("checkDiscordChannel");
 
   try {
-    const res = await fetch(`${DISCORD_API}/channels/${channelId}`, {
-      headers: { Authorization: `Bot ${botToken}` },
-    });
+    // A network failure or timeout comes back as a 599, which lands in the
+    // 5xx branch below with the same verdict the catch gives.
+    const res = await safeFetch(
+      `${DISCORD_API}/channels/${channelId}`,
+      { headers: { Authorization: `Bot ${botToken}` } },
+      {
+        timeoutMs: DISCORD_TIMEOUT_MS,
+        networkErrorLog: {
+          fields: { action: "checkDiscordChannel" },
+          message: "Discord channel check failed",
+        },
+      }
+    );
     if (res.status === 401) {
       return {
         status: "needs_discord",
@@ -103,9 +113,13 @@ export async function fetchDiscordChannelName(
 ): Promise<string | undefined> {
   assertNotInTransaction("fetchDiscordChannelName");
   try {
-    const res = await fetch(`${DISCORD_API}/channels/${channelId}`, {
-      headers: { Authorization: `Bot ${botToken}` },
-    });
+    // No network-error log: this name is optional decoration, and a failure
+    // here has never been logged.
+    const res = await safeFetch(
+      `${DISCORD_API}/channels/${channelId}`,
+      { headers: { Authorization: `Bot ${botToken}` } },
+      { timeoutMs: DISCORD_TIMEOUT_MS }
+    );
     if (!res.ok) return undefined;
     const body = (await res.json()) as { name?: string };
     // An empty name is no better than none for the confirmation line.
