@@ -11,6 +11,8 @@ import {
 } from "@playwright/test";
 import postgres from "postgres";
 
+import seedSteps from "../supabase/seed-steps.json" with { type: "json" };
+
 function redactUrl(url: string): string {
   try {
     const parsed = new URL(url);
@@ -438,8 +440,15 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
       stdio: "inherit",
       env: process.env,
     });
-    execSync("pnpm run db:_seed", { stdio: "inherit", env: process.env });
-    execSync("pnpm run db:_seed-users", { stdio: "inherit", env: process.env });
+    // The `minimal` subset of supabase/seed-steps.json, not the whole list:
+    // this fallback has always seeded just the base rows and the users.
+    for (const step of seedSteps.steps) {
+      if (!step.minimal) continue;
+      execSync(`pnpm run ${step.script}`, {
+        stdio: "inherit",
+        env: process.env,
+      });
+    }
     console.log("✅ Database ready (full reset)");
   } catch (error) {
     console.error("❌ Failed to setup database:", error);
