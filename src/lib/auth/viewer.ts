@@ -4,6 +4,7 @@ import { cache } from "react";
 import { eq, type InferSelectModel } from "drizzle-orm";
 import type { UserRole } from "~/lib/types";
 import { createClient } from "~/lib/supabase/server";
+import { reportAuthError } from "~/lib/observability/report-error";
 import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
 
@@ -28,14 +29,20 @@ export interface Viewer {
  * one render share a single `auth.getUser()` validation (CORE-SSR-002) and a
  * single profile read, instead of each repeating them.
  *
- * It does not heal a missing profile row: `profile` and `role` come back null,
- * and each caller keeps its own signed-out and missing-profile handling.
+ * A failed validation renders as signed out; the error goes to Sentry unless it
+ * is the normal no-session response. It does not heal a missing profile row:
+ * `profile` and `role` come back null, and each caller keeps its own
+ * signed-out and missing-profile handling.
  */
 export const getViewer = cache(async (): Promise<Viewer> => {
   const supabase = await createClient();
   const {
     data: { user },
+    error,
   } = await supabase.auth.getUser();
+  if (error) {
+    reportAuthError(error, { action: "viewer.auth.getUser", bestEffort: true });
+  }
   if (!user) return { userId: undefined, role: null, profile: null };
 
   const profile = await db.query.userProfiles.findFirst({
