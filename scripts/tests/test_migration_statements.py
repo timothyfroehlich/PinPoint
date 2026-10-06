@@ -76,7 +76,9 @@ def test_main_exit_codes(tmp_path: Path, capsys):
     generated.write_text(GENERATED)
     reviewed.write_text(REVIEWED)
     assert main([str(generated), str(reviewed)]) == 0
-    assert "1 hand-written" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "Keeping 1 reviewed statement(s)" in out
+    assert 'UPDATE "tags" SET "slug" = lower("name");' in out
 
     reviewed.write_text('ALTER TABLE "tags" ADD COLUMN "slug" text;')
     assert main([str(generated), str(reviewed)]) == 1

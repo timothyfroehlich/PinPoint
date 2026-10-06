@@ -362,6 +362,15 @@ jobs:
           # or main's previous commit) for the migration order check below.
           fetch-depth: 2
 
+      - name: Verify migration order against the base branch
+        # Production applies only migrations newer than the newest one already
+        # applied, and never re-runs an applied one (scripts/check_migration_order.py).
+        # Static, so it runs before the Supabase setup.
+        run: |
+          mkdir -p "$RUNNER_TEMP/base"
+          git archive HEAD^1 drizzle | tar -x -C "$RUNNER_TEMP/base"
+          python3 scripts/check_migration_order.py --base-dir "$RUNNER_TEMP/base"
+
       - name: Setup locked mise toolchain
         id: toolchain
         uses: $/.github/actions/setup-mise
@@ -389,14 +398,6 @@ jobs:
 
       - name: Verify migration metadata integrity
         run: pnpm run check:migrations
-
-      - name: Verify migration order against the base branch
-        # Production applies only migrations newer than the newest one already
-        # applied, and never re-runs an applied one (scripts/check_migration_order.py).
-        run: |
-          mkdir -p "$RUNNER_TEMP/base"
-          git archive HEAD^1 drizzle | tar -x -C "$RUNNER_TEMP/base"
-          python3 scripts/check_migration_order.py --base-dir "$RUNNER_TEMP/base"
 
       - name: Ensure test schema is current
         run: |

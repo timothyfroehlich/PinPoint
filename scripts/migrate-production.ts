@@ -80,23 +80,71 @@ const db = drizzle(sql);
 // both would run the pending migrations. A session-level advisory lock on the
 // one connection serializes them; the second build waits, then finds nothing
 // pending. The session pooler (:5432) gives this client its own backend for the
-// whole session, so a session lock holds. Closing the connection releases it.
+// whole session, so a session lock holds.
+//
+// The lock is released explicitly in main()'s `finally`: a pooler can hand the
+// backend to another client without resetting it, so closing the connection is
+// not a guarantee. The wait is bounded, so a stranded lock fails this build with
+// the holder's pid instead of waiting until Vercel's build timeout.
 const MIGRATION_LOCK_KEY = "pinpoint.migrate-production";
+const LOCK_WAIT_MS = 10 * 60 * 1000;
+const LOCK_POLL_MS = 5000;
 
-async function acquireMigrationLock(): Promise<void> {
+async function tryMigrationLock(): Promise<boolean> {
   const [row] = await sql<{ locked: boolean }[]>`
     SELECT pg_try_advisory_lock(hashtext(${MIGRATION_LOCK_KEY})) AS locked
   `;
-  if (row?.locked) return;
-  console.log("⏳ Another deploy is migrating; waiting for it to finish...");
-  await sql`SELECT pg_advisory_lock(hashtext(${MIGRATION_LOCK_KEY}))`;
+  return row?.locked === true;
+}
+
+async function describeLockHolder(): Promise<string> {
+  // A one-key advisory lock stores the key's low 32 bits in objid.
+  const rows = await sql<{ pid: number; backend_start: string | null }[]>`
+    SELECT l.pid, a.backend_start::text AS backend_start
+    FROM pg_locks l
+    LEFT JOIN pg_stat_activity a USING (pid)
+    WHERE l.locktype = 'advisory' AND l.granted AND l.objsubid = 1
+      AND l.objid::bigint = (hashtext(${MIGRATION_LOCK_KEY})::bigint & 4294967295)
+  `;
+  const [holder] = rows;
+  if (!holder) return "holder not visible";
+  const since = holder.backend_start
+    ? `, connected since ${holder.backend_start}`
+    : "";
+  return `held by backend pid ${holder.pid}${since}`;
+}
+
+async function acquireMigrationLock(): Promise<void> {
+  if (await tryMigrationLock()) return;
+  console.log(
+    `⏳ Another deploy is migrating (${await describeLockHolder()}); waiting up to ${LOCK_WAIT_MS / 60000} minutes...`
+  );
+  const deadline = Date.now() + LOCK_WAIT_MS;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, LOCK_POLL_MS));
+    if (await tryMigrationLock()) return;
+  }
+  throw new Error(
+    `Timed out waiting for the migration lock (${await describeLockHolder()}). ` +
+      "If no deploy is running, the lock is stranded: end that backend with pg_terminate_backend(<pid>) and redeploy."
+  );
+}
+
+async function releaseMigrationLock(): Promise<void> {
+  try {
+    await sql`SELECT pg_advisory_unlock(hashtext(${MIGRATION_LOCK_KEY}))`;
+  } catch {
+    // The connection is going away; closing it below is the fallback.
+  }
 }
 
 async function main() {
   console.log("🔄 Running production migrations...");
 
+  let locked = false;
   try {
     await acquireMigrationLock();
+    locked = true;
 
     // Read migration journal to show what migrations exist
     const journalPath = join(process.cwd(), "drizzle", "meta", "_journal.json");
@@ -180,8 +228,10 @@ async function main() {
       console.error(error);
     }
 
-    process.exit(1);
+    // Not process.exit(): the `finally` below must run to release the lock.
+    process.exitCode = 1;
   } finally {
+    if (locked) await releaseMigrationLock();
     await sql.end();
   }
 }

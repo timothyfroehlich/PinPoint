@@ -25,6 +25,8 @@ With `--base-dir <dir>` (a directory holding the base branch's `drizzle/`):
   re-timestamping of migrations that may already be applied)
 - the base migrations' SQL is byte-identical; production never re-runs an
   applied migration, so an edit to one has no effect there
+- the base migrations' snapshots are byte-identical; the next generate diffs
+  against them
 """
 
 from __future__ import annotations
@@ -160,6 +162,18 @@ def check_against_base(drizzle_dir: Path, base_drizzle_dir: Path) -> list[str]:
             errors.append(
                 f"drizzle/{base_tag}.sql differs from the base branch. Production "
                 "never re-runs an applied migration; put the change in a new one"
+            )
+        number = str(base_tag)[:4]
+        snapshot = drizzle_dir / "meta" / f"{number}_snapshot.json"
+        base_snapshot = base_drizzle_dir / "meta" / f"{number}_snapshot.json"
+        if (
+            snapshot.is_file()
+            and base_snapshot.is_file()
+            and snapshot.read_bytes() != base_snapshot.read_bytes()
+        ):
+            errors.append(
+                f"drizzle/meta/{number}_snapshot.json differs from the base branch. "
+                "Take the base branch's drizzle/meta and regenerate your migration"
             )
 
     return errors

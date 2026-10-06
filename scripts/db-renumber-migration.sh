@@ -126,5 +126,6 @@ git add drizzle/
 renumbered=1
 
 printf '\nRenumbered %s -> %s (SQL unchanged).\n' "$old_tag" "$new_tag"
-printf 'Next: pnpm run db:reset, then git commit to conclude the merge.\n'
+printf 'Next: pnpm run db:reset (it fails if a kept statement repeats schema main\n'
+printf 'already applies), then git commit to conclude the merge.\n'
 printf 'Tell the merge orchestrator the new number: %s\n' "${new_tag%%_*}"

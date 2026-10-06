@@ -146,6 +146,16 @@ def test_editing_an_applied_migration_fails(tmp_path: Path):
     ]
 
 
+def test_editing_a_base_snapshot_fails(tmp_path: Path):
+    base = write_tree(tmp_path / "base", BASE)
+    head = write_tree(tmp_path / "head", BASE)
+    (head / "meta" / "0001_snapshot.json").write_text(
+        json.dumps({"id": "id-0001_users", "prevId": "id-0000_init", "tables": {}})
+    )
+    errors = check_against_base(head, base)
+    assert any("0001_snapshot.json differs" in e for e in errors)
+
+
 def test_branch_behind_base_fails(tmp_path: Path):
     base = write_tree(tmp_path / "base", [*BASE, ("0002_tags", 3000)])
     head = write_tree(tmp_path / "head", BASE)

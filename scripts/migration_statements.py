@@ -66,7 +66,14 @@ def main(argv: list[str] | None = None) -> int:
 
     kept = hand_written(generated, reviewed)
     if kept:
-        print(f"Keeping {len(kept)} hand-written statement(s) from the reviewed SQL.")
+        # A statement main already applies (the same column or index added on
+        # both sides) also lands here; listing them lets the author spot it.
+        print(
+            f"Keeping {len(kept)} reviewed statement(s) Drizzle did not generate. "
+            "Check each is hand-written, not schema the base branch already has:"
+        )
+        for statement in kept:
+            print(f"  {statement}")
     return 0
 
 
