@@ -219,19 +219,21 @@ _codex_check() {
 # only resolution renumbers the branch's Drizzle migrations after the base side's,
 # which is what scripts/db-renumber-migration.sh produces. Returns 0 when:
 # - the clean merge conflicts only under drizzle/, and every path outside drizzle/
-#   matches it
+#   matches it (a schema.ts conflict is a resolution someone has to review)
+# - the branch changed nothing under drizzle/ but its own migrations and the
+#   journal, so taking the base side's drizzle/ drops no reviewed change
 # - the base side's drizzle/ files are unchanged apart from the journal growing
-# - the journal is the base side's entries followed, in order, by one entry per
-#   branch migration with the same name, the next idx, a later `when`, and
-#   byte-identical SQL
+# - the journal is the base side's, followed in order by one entry per branch
+#   migration that matches the reviewed entry except for a later `when` and the
+#   next idx and number, and whose SQL is byte-identical
 # - the only files added under drizzle/ are those entries' SQL and snapshots
 # The regenerated snapshots are not compared; they hold no SQL that runs.
+# Arguments: branch parent, base parent, merge commit, and the output of
+# `git merge-tree --write-tree --name-only` for the two parents.
 # ---------------------------------------------------------------------------------
 _is_migration_renumber_merge() {
-  local branch_parent=$1 main_parent=$2 merge=$3
-  local out status=0 clean_tree conflicted
-  out=$(git merge-tree --write-tree --name-only "$branch_parent" "$main_parent" 2>/dev/null) || status=$?
-  [[ $status -le 1 ]] || return 1
+  local branch_parent=$1 main_parent=$2 merge=$3 out=$4
+  local clean_tree conflicted
   clean_tree=$(head -n1 <<< "$out")
   conflicted=$(sed -n '2,/^$/p' <<< "$out" | sed '/^$/d')
   if [[ -n "$conflicted" ]] && grep -qv '^drizzle/' <<< "$conflicted"; then
@@ -255,6 +257,7 @@ _is_migration_renumber_merge() {
     | ($main.entries | map(.when) | max // 0) as $newest
     | $merged.entries[$n:] as $added
     | if ($mine | length) == 0
+         or ($merged | del(.entries)) != ($main | del(.entries))
          or $merged.entries[:$n] != $main.entries
          or ($added | length) != ($mine | length)
       then "FAIL"
@@ -265,23 +268,29 @@ _is_migration_renumber_merge() {
                or ($a.tag[0:4] | tonumber) != $a.idx
                or $a.idx != $n + $i
                or ($a.tag | sub("^[0-9]+_"; "")) != ($o.tag | sub("^[0-9]+_"; ""))
+               or ($a | del(.idx, .tag, .when)) != ($o | del(.idx, .tag, .when))
                or $a.when <= (if $i == 0 then $newest else $added[$i - 1].when end)
             then "FAIL" else "\($o.tag) \($a.tag)" end ]
         | if any(.[]; . == "FAIL") then "FAIL" else .[] end
       end' 2>/dev/null) || return 1
   [[ -n "$pairs" && "$pairs" != *FAIL* ]] || return 1
 
-  local expected="M"$'\t'"drizzle/meta/_journal.json" old_tag new_tag old_blob new_blob changes
+  local journal="M"$'\t'"drizzle/meta/_journal.json"
+  local expected=$journal branch_expected=$journal old_tag new_tag old_blob new_blob changes
   while read -r old_tag new_tag; do
     old_blob=$(git rev-parse -q --verify "${branch_parent}:drizzle/${old_tag}.sql") || return 1
     new_blob=$(git rev-parse -q --verify "${merge}:drizzle/${new_tag}.sql") || return 1
     [[ "$old_blob" == "$new_blob" ]] || return 1
     expected+=$'\n'"A"$'\t'"drizzle/${new_tag}.sql"
     expected+=$'\n'"A"$'\t'"drizzle/meta/${new_tag:0:4}_snapshot.json"
+    branch_expected+=$'\n'"A"$'\t'"drizzle/${old_tag}.sql"
+    branch_expected+=$'\n'"A"$'\t'"drizzle/meta/${old_tag:0:4}_snapshot.json"
   done <<< "$pairs"
 
   changes=$(git diff --no-renames --name-status "$main_parent" "$merge" -- ':(top)drizzle' 2>/dev/null) || return 1
   [[ "$(sort <<< "$changes")" == "$(sort <<< "$expected")" ]] || return 1
+  changes=$(git diff --no-renames --name-status "$merge_base" "$branch_parent" -- ':(top)drizzle' 2>/dev/null) || return 1
+  [[ "$(sort <<< "$changes")" == "$(sort <<< "$branch_expected")" ]] || return 1
 }
 
 # ---------------------------------------------------------------------------------
@@ -332,8 +341,9 @@ _is_pure_merge_from_main() {
   # - It must be a 2-parent merge
   # - One parent must be a descendant of reviewed_sha (the feature branch side)
   # - One parent must be on main_ref (the main side)
-  # - The merge must be a clean merge: its tree matches git merge-tree --write-tree
-  local m parents p1 p2 clean_tree actual_tree parent_array branch_parent main_parent
+  # - The merge must be a clean merge (its tree matches git merge-tree --write-tree)
+  #   or a migration renumber merge
+  local m parents p1 p2 out status clean_tree actual_tree parent_array branch_parent main_parent
   for m in $merge_commits; do
     parents=$(git rev-list --parents -n 1 "$m" 2>/dev/null | cut -d' ' -f2-)
     read -r -a parent_array <<< "$parents"
@@ -353,11 +363,15 @@ _is_pure_merge_from_main() {
     fi
 
     actual_tree=$(git rev-parse "${m}^{tree}" 2>/dev/null) || return 1
-    if clean_tree=$(git merge-tree --write-tree "$p1" "$p2" 2>/dev/null) && \
-       [[ "$clean_tree" == "$actual_tree" ]]; then
+    # Exit 1 means the clean merge has conflicts; above 1 is an error.
+    status=0
+    out=$(git merge-tree --write-tree --name-only "$p1" "$p2" 2>/dev/null) || status=$?
+    [[ $status -le 1 ]] || return 1
+    clean_tree=$(head -n1 <<< "$out")
+    if [[ $status -eq 0 && "$clean_tree" == "$actual_tree" ]]; then
       continue
     fi
-    _is_migration_renumber_merge "$branch_parent" "$main_parent" "$m" || return 1
+    _is_migration_renumber_merge "$branch_parent" "$main_parent" "$m" "$out" || return 1
     _MERGE_INHERIT_KIND="migration renumber merge from main"
   done
 

@@ -1217,12 +1217,20 @@ def git_repo_with_migration_merge(
 
         git_cmd("checkout", "-qb", "feat", cwd=repo)
         write_migrations(repo, [INIT, ("0001_mine", 2000, MINE_SQL)])
+        if variant == "branch_drizzle_edit_dropped":
+            (repo / "drizzle" / "0000_init.sql").write_text(
+                "CREATE TABLE a2 (id int);\n"
+            )
+        if variant == "schema_conflict":
+            (repo / "app.txt").write_text("branch app\n")
         git_cmd("add", "-A", cwd=repo)
         git_cmd("commit", "-qm", "feature migration (reviewed)", cwd=repo)
         reviewed_sha = git_cmd("rev-parse", "HEAD", cwd=repo)
 
         git_cmd("checkout", "-q", "main", cwd=repo)
         write_migrations(repo, [INIT, THEIRS])
+        if variant == "schema_conflict":
+            (repo / "app.txt").write_text("main app\n")
         git_cmd("add", "-A", cwd=repo)
         git_cmd("commit", "-qm", "main migration", cwd=repo)
 
@@ -1249,6 +1257,18 @@ def git_repo_with_migration_merge(
             )
         if variant == "old_file_kept":
             (repo / "drizzle" / "0001_mine.sql").write_text(MINE_SQL)
+        if variant == "extra_snapshot":
+            (repo / "drizzle" / "meta" / "0009_snapshot.json").write_text("{}")
+        if variant == "schema_conflict":
+            (repo / "app.txt").write_text("branch app\nmain app\n")
+        if variant in ("journal_field_changed", "base_entry_changed"):
+            journal_path = repo / "drizzle" / "meta" / "_journal.json"
+            journal = json.loads(journal_path.read_text())
+            if variant == "journal_field_changed":
+                journal["dialect"] = "mysql"
+            else:
+                journal["entries"][1]["when"] = 3500
+            journal_path.write_text(json.dumps(journal))
         git_cmd("add", "-A", cwd=repo)
         git_cmd("commit", "-qm", "Merge main, renumber migration", cwd=repo)
         head_sha = git_cmd("rev-parse", "HEAD", cwd=repo)
@@ -1282,6 +1302,11 @@ def test_migration_renumber_merge_inherits_review_record() -> None:
         "outside_change",
         "base_migration_edited",
         "old_file_kept",
+        "extra_snapshot",
+        "journal_field_changed",
+        "base_entry_changed",
+        "branch_drizzle_edit_dropped",
+        "schema_conflict",
     ],
 )
 def test_migration_merge_that_breaks_a_condition_stays_stale(variant: str) -> None:
