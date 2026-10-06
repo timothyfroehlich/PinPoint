@@ -146,7 +146,7 @@ Duplicates: if you already created a set on this machine with the same name, des
 
 ### `update_settings_set`
 
-CHANGE (or PERMANENT when `preferredHouse` or `preferredTournament` is passed: visible on the machine timeline and notifies watchers). `machine` and `set` (the id from `list_settings_sets`) are required, plus at least one of:
+CHANGE (or PERMANENT when `preferredHouse` or `preferredTournament` is passed: turning a personal set into a community set cannot be undone; visible on the machine timeline). `machine` and `set` (the id from `list_settings_sets`) are required, plus at least one of:
 
 - **`name`**, **`description`** (plain text, or `null` to clear).
 - **`sections`**: replaces **every** section. Send the whole list from `list_settings_sets` with your edits applied, keeping each section's `id`, and pass that read's `version`. A section you leave out is deleted.

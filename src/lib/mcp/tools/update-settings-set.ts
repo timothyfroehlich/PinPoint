@@ -260,7 +260,8 @@ export async function runUpdateSettingsSet(
 
   const actor = { userId: ctx.userId, access: ctx.accessLevel };
   let tagsChanged = false;
-  for (const { tag, applied } of tagChanges) {
+  // Apply tag additions first so preferred changes that rely on them succeed.
+  for (const { tag, applied } of tagChanges.filter((t) => t.applied)) {
     const tagged = await setSettingsSetTag({
       setId: args.set,
       actor,
@@ -299,6 +300,25 @@ export async function runUpdateSettingsSet(
     if (preferred && res.value.changed) {
       isCommunity = true;
     }
+  }
+
+  // Apply tag removals after preferred changes so unsetting preferred allows removing the tag.
+  for (const { tag, applied } of tagChanges.filter((t) => !t.applied)) {
+    const tagged = await setSettingsSetTag({
+      setId: args.set,
+      actor,
+      tag,
+      applied,
+    });
+    if (!tagged.ok) {
+      throw new McpToolError(
+        tagged.code,
+        tagged.code === "denied"
+          ? "Only technicians, admins, and the machine owner can tag its settings sets."
+          : tagged.message
+      );
+    }
+    tagsChanged ||= tagged.value.changed;
   }
 
   return {
