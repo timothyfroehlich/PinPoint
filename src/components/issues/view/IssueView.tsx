@@ -32,6 +32,7 @@ import {
   ISSUE_VIEW_SORTS,
 } from "~/lib/issues/view/config";
 import {
+  applyIssueBuiltInView,
   hasIssueViewConfiguration,
   isIssueViewSortField,
   issueViewStateAt,
@@ -104,18 +105,20 @@ export function IssueView({
     ISSUE_SUMMARY_STORAGE_KEY
   );
   const defaults = ISSUE_VIEW_PRESET;
-  const { state, applied, edited, isPending, update, views } = useListViewHost({
-    resultState: result.state,
-    savedViews,
-    pagePresetViewId: ISSUE_VIEW_PAGE_PRESET_VIEW_ID,
-    pagePresetState: toIssueViewSavedState(defaults),
-    serialize,
-    hasConfiguration: hasIssueViewConfiguration,
-    toSaved: toIssueViewSavedState,
-    withPage: issueViewStateAt,
-    defaultPageName: "Issues",
-    actions: ISSUE_VIEW_ACTIONS,
-  });
+  const { state, applied, edited, pagePresetName, isPending, update, views } =
+    useListViewHost({
+      resultState: result.state,
+      savedViews,
+      pagePresetViewId: ISSUE_VIEW_PAGE_PRESET_VIEW_ID,
+      pagePresetState: toIssueViewSavedState(defaults),
+      serialize,
+      hasConfiguration: hasIssueViewConfiguration,
+      toSaved: toIssueViewSavedState,
+      withPage: issueViewStateAt,
+      applyBuiltIn: applyIssueBuiltInView,
+      defaultPageName: "Issues",
+      actions: ISSUE_VIEW_ACTIONS,
+    });
 
   const filters = buildIssueFilters({
     state,
@@ -227,20 +230,24 @@ export function IssueView({
         }
         busy={isPending}
         onResetAll={resetFilters}
-        emptyState={(discard) =>
-          edited ? (
+        emptyState={({ discard, openPagePreset }) =>
+          applied && !edited ? (
+            <EmptyState icon={SearchX} title={`No issues in ${applied.name}`} />
+          ) : (
             <EmptyState
               icon={SearchX}
               title="No issues match"
               description="Try removing a filter or using a broader search."
               action={
-                <Button type="button" variant="outline" onClick={discard}>
-                  Back to {applied.name}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={applied ? discard : openPagePreset}
+                >
+                  Back to {applied?.name ?? pagePresetName}
                 </Button>
               }
             />
-          ) : (
-            <EmptyState icon={SearchX} title={`No issues in ${applied.name}`} />
           )
         }
       >

@@ -85,9 +85,13 @@ interface ListViewProps {
   onResetAll: () => void;
   /**
    * Shown in place of the rows when nothing matches (§3.6). `discard`
-   * returns to the Applied View, as Discard changes does.
+   * returns to the Applied View, as Discard changes does; `openPagePreset`
+   * applies the Page Preset's Built-in View.
    */
-  emptyState: (discard: () => void) => React.ReactNode;
+  emptyState: (moves: {
+    discard: () => void;
+    openPagePreset: () => void;
+  }) => React.ReactNode;
   /** The rows. */
   children: React.ReactNode;
 }
@@ -166,6 +170,10 @@ export function ListView({
       moveWhole();
       views.onDiscard();
     },
+    onOpenPagePreset: () => {
+      moveWhole();
+      views.onOpenPagePreset();
+    },
   };
 
   const openSaveAsNew = (): void => setSaveOpen(true);
@@ -222,7 +230,12 @@ export function ListView({
             busy && "opacity-60"
           )}
         >
-          {empty ? emptyState(listViews.onDiscard) : children}
+          {empty
+            ? emptyState({
+                discard: listViews.onDiscard,
+                openPagePreset: listViews.onOpenPagePreset,
+              })
+            : children}
         </div>
       </section>
       {empty ? null : (

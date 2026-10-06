@@ -31,6 +31,7 @@ import {
   MACHINE_VIEW_PAGE_PRESET_VIEW_ID,
 } from "~/lib/machines/view/config";
 import {
+  applyMachineBuiltInView,
   hasMachineViewConfiguration,
   isMachineViewField,
   nextMachineViewSort,
@@ -122,18 +123,27 @@ export function MachineView({
       serializeMachineViewState(next, preset, view),
     [preset]
   );
-  const { state, applied, edited, isPending, update, views } = useListViewHost({
-    resultState: result.state,
-    savedViews,
-    pagePresetViewId: MACHINE_VIEW_PAGE_PRESET_VIEW_ID[preset],
-    pagePresetState: toMachineViewSavedState(defaults),
-    serialize,
-    hasConfiguration: hasMachineViewConfiguration,
-    toSaved: toMachineViewSavedState,
-    withPage,
-    defaultPageName: "Machines",
-    actions: MACHINE_VIEW_ACTIONS,
-  });
+  const applyBuiltIn = React.useCallback(
+    (
+      view: { id: string; state: MachineViewSavedState },
+      current: MachineViewSavedState
+    ): MachineViewSavedState => applyMachineBuiltInView(preset, view, current),
+    [preset]
+  );
+  const { state, applied, edited, pagePresetName, isPending, update, views } =
+    useListViewHost({
+      resultState: result.state,
+      savedViews,
+      pagePresetViewId: MACHINE_VIEW_PAGE_PRESET_VIEW_ID[preset],
+      pagePresetState: toMachineViewSavedState(defaults),
+      serialize,
+      hasConfiguration: hasMachineViewConfiguration,
+      toSaved: toMachineViewSavedState,
+      withPage,
+      applyBuiltIn,
+      defaultPageName: "Machines",
+      actions: MACHINE_VIEW_ACTIONS,
+    });
 
   React.useEffect(() => {
     try {
@@ -284,22 +294,26 @@ export function MachineView({
         pagination={pagination}
         busy={isPending}
         onResetAll={resetFilters}
-        emptyState={(discard) =>
-          edited ? (
+        emptyState={({ discard, openPagePreset }) =>
+          applied && !edited ? (
+            <EmptyState
+              icon={SearchX}
+              title={`No machines in ${applied.name}`}
+            />
+          ) : (
             <EmptyState
               icon={SearchX}
               title="No machines match"
               description="Try removing a filter or using a broader search."
               action={
-                <Button type="button" variant="outline" onClick={discard}>
-                  Back to {applied.name}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={applied ? discard : openPagePreset}
+                >
+                  Back to {applied?.name ?? pagePresetName}
                 </Button>
               }
-            />
-          ) : (
-            <EmptyState
-              icon={SearchX}
-              title={`No machines in ${applied.name}`}
             />
           )
         }

@@ -102,10 +102,15 @@ export interface ListViewEntry {
 export interface ListViewsModel {
   builtInViews: readonly ListViewEntry[];
   savedViews: readonly ListViewEntry[];
-  appliedId: string;
-  appliedName: string;
+  /**
+   * The Applied View (§1), or null once the configuration has left every
+   * view: no tab is current, and Save view is offered (§5.2, §7.3, §7.6).
+   */
+  appliedId: string | null;
+  appliedName: string | null;
   /** The Applied View is one of the account's own Saved Views (§5.3). */
   appliedIsSaved: boolean;
+  /** The Applied View is a Saved View the configuration differs from (§1). */
   edited: boolean;
   /**
    * The current View Configuration in a stable serialized form. A Save
@@ -125,6 +130,11 @@ export interface ListViewsModel {
   onApply: (id: string) => void;
   /** Returns to the Applied View's configuration at page 1 (§5.4). */
   onDiscard: () => void;
+  /**
+   * Applies the Page Preset's Built-in View, keeping the displayed fields
+   * and page size (§1, §3.6).
+   */
+  onOpenPagePreset: () => void;
   actions: SavedViewActions;
 }
 

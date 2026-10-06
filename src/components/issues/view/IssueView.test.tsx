@@ -512,8 +512,7 @@ describe("IssueView", () => {
     });
     renderView({ result: withState({ priority: ["high"] }) });
 
-    await user.click(screen.getByTestId("list-save-view"));
-    await user.click(screen.getByRole("menuitem", { name: "Save as new…" }));
+    await user.click(screen.getByRole("button", { name: "Save view" }));
     await user.type(screen.getByRole("textbox", { name: /name/i }), "Hot");
     await user.click(screen.getByRole("button", { name: "Save" }));
 
@@ -554,7 +553,7 @@ describe("IssueView", () => {
     });
   });
 
-  it("names an empty edited list's way back to its Applied View (list-views §3.6)", async () => {
+  it("opens the Page Preset from an empty list with no Applied View (list-views §3.6)", async () => {
     const user = userEvent.setup();
     navigation.searchParams = new URLSearchParams({ q: "missing" });
     renderView({
@@ -569,8 +568,68 @@ describe("IssueView", () => {
     await user.click(
       screen.getByRole("button", { name: "Back to Open issues" })
     );
+    expect(navigation.replace).toHaveBeenLastCalledWith("/issues", {
+      scroll: false,
+    });
+  });
+
+  it("keeps a Built-in View current when the page size changes (list-views §1)", async () => {
+    const user = userEvent.setup();
+    renderView();
+
+    await user.click(screen.getByRole("button", { name: "View options" }));
+    await user.click(screen.getByRole("menuitemradio", { name: "50" }));
+
+    expect(navigation.replace).toHaveBeenLastCalledWith("/issues?pageSize=50", {
+      scroll: false,
+    });
+    const tabs = screen.getByRole("navigation", { name: "Saved views" });
+    expect(
+      within(tabs).getByRole("link", { current: "page" })
+    ).toHaveTextContent(/^Open issues$/);
+    expect(
+      screen.queryByRole("button", { name: "Save view" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("leaves every view on a search, offering Save view and reading Views on phones (list-views §5.2, §7.3)", async () => {
+    const user = userEvent.setup();
+    renderView();
+
+    await user.type(
+      screen.getByRole("searchbox", { name: "Search issues" }),
+      "flipper{Enter}"
+    );
+
+    expect(navigation.replace).toHaveBeenLastCalledWith("/issues?q=flipper", {
+      scroll: false,
+    });
+    const tabs = screen.getByRole("navigation", { name: "Saved views" });
+    expect(
+      within(tabs).queryByRole("link", { current: "page" })
+    ).not.toBeInTheDocument();
+    expect(
+      within(tabs).getByRole("button", { name: "Save view" })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^Discard/ })
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("list-phone-views-trigger")).toHaveAccessibleName(
+      "Views"
+    );
+  });
+
+  it("applies a Built-in View keeping the page size showing and clearing the search (list-views §1)", async () => {
+    const user = userEvent.setup();
+    navigation.searchParams = new URLSearchParams({
+      q: "gate",
+      pageSize: "50",
+    });
+    renderView({ result: withState({ q: "gate", pageSize: 50 }) });
+
+    await user.click(screen.getByRole("link", { name: "Unassigned" }));
     expect(navigation.replace).toHaveBeenLastCalledWith(
-      "/issues?view=open-issues",
+      "/issues?assignee=unassigned&pageSize=50&view=unassigned",
       { scroll: false }
     );
   });

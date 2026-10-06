@@ -315,6 +315,17 @@ export function issueViewStateAt(
   return { ...saved, page };
 }
 
+/**
+ * A Built-in View applied to the current configuration (list-views §1): its
+ * search, filters, and sorting at the page size already showing.
+ */
+export function applyIssueBuiltInView(
+  view: { state: IssueViewSavedState },
+  current: IssueViewSavedState
+): IssueViewSavedState {
+  return { ...view.state, pageSize: current.pageSize };
+}
+
 /** The keys of a stored configuration that are also URL parameters. */
 const SAVED_LIST_KEYS = [
   "q",

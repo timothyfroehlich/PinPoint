@@ -4,6 +4,7 @@ import { OPEN_STATUSES } from "~/lib/issues/status";
 import type { IssueViewState } from "~/lib/types";
 import { getIssueViewBuiltInViews, ISSUE_VIEW_PRESET } from "./config";
 import {
+  applyIssueBuiltInView,
   hasIssueViewConfiguration,
   normalizeIssueViewSavedState,
   parseIssueViewState,
@@ -253,5 +254,25 @@ describe("stored Saved View configurations (list-views §10.14)", () => {
     expect(normalizeIssueViewSavedState(null)).toEqual(
       toIssueViewSavedState(ISSUE_VIEW_PRESET)
     );
+  });
+});
+
+describe("applying a Built-in View (list-views §1)", () => {
+  it("takes the view's search, filters, and sorting at the page size showing", () => {
+    const myIssues = getIssueViewBuiltInViews(true).find(
+      (view) => view.id === "my-issues"
+    );
+    if (!myIssues) throw new Error("My issues is missing");
+    const current = toIssueViewSavedState({
+      ...ISSUE_VIEW_PRESET,
+      q: "gate",
+      severity: ["major"],
+      pageSize: 100,
+    });
+
+    expect(applyIssueBuiltInView(myIssues, current)).toEqual({
+      ...myIssues.state,
+      pageSize: 100,
+    });
   });
 });

@@ -4,10 +4,18 @@ import * as React from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { rememberListUrl } from "~/lib/list-view/return-to-list";
 import type { ListSearchParams } from "~/lib/list-view/url-state";
-import type { DefaultViewTarget, ListSavedViews } from "~/lib/types";
+import type {
+  DefaultViewTarget,
+  ListBuiltInView,
+  ListSavedViews,
+} from "~/lib/types";
 import type { ActionOutcome, ActionOutcomeWith, ListViewsModel } from "./types";
 
-/** A Saved View or Built-in View the current configuration came from. */
+/**
+ * The Applied View (list-views §1): the account's Saved View the current
+ * configuration came from, or the Built-in View whose search, filters, and
+ * sorting it has.
+ */
 export interface AppliedView<Saved> {
   id: string;
   name: string;
@@ -45,6 +53,12 @@ export interface ListViewHostConfig<State extends { page: number }, Saved> {
   toSaved: (state: State) => Saved;
   /** A stored configuration at `page`. */
   withPage: (saved: Saved, page: number) => State;
+  /**
+   * A Built-in View applied to `current` (list-views §1): the view's search,
+   * filters, and sorting with `current`'s displayed fields and page size,
+   * plus any field the host names for that view.
+   */
+  applyBuiltIn: (view: { id: string; state: Saved }, current: Saved) => Saved;
   /** The host's main page, where the Default View opens, such as "Machines". */
   defaultPageName: string;
   actions: ListViewHostActions<Saved>;
@@ -52,12 +66,19 @@ export interface ListViewHostConfig<State extends { page: number }, Saved> {
 
 export interface ListViewHost<State, Saved> {
   state: State;
-  applied: AppliedView<Saved>;
+  /** Null once the configuration has left every view (list-views §1). */
+  applied: AppliedView<Saved> | null;
+  /** The Applied View is a Saved View the configuration differs from. */
   edited: boolean;
+  /** The name of the Page Preset's Built-in View, such as "Open issues". */
+  pagePresetName: string;
   /** A new result is loading (§3.5). */
   isPending: boolean;
-  /** Shows `next` under the `view` reference `view`, in place (§9.7). */
-  navigate: (next: State, view: string | null) => void;
+  /**
+   * Shows `next` in place (§9.7). `from` is the view it came from; the URL
+   * names it only while it is still the Applied View (§9.6).
+   */
+  navigate: (next: State, from: string | null) => void;
   /**
    * Changes part of the configuration under the current view. Search,
    * filters, sorting, and page size return to page 1 (§4.7); pass
@@ -76,11 +97,11 @@ interface UrlSurface {
 
 /**
  * The List View plumbing every host shares: the `view` reference (list-views
- * §9.6), the Applied View and whether it is Edited (§5.1, §5.2), URL updates
- * in place (§9.7), the canonical rewrite of older or invalid URLs (§9.3,
- * §9.4), the Default View's URL rules on the main page (§10.10, §10.11),
- * return-to-list memory (§11.1), and the Saved View controls (§10). A host
- * supplies how its state reads and writes and its own Server Actions.
+ * §9.6), the Applied View and whether it is Edited (§1, §5.1, §5.2), URL
+ * updates in place (§9.7), the canonical rewrite of older or invalid URLs
+ * (§9.3, §9.4), the Default View's URL rules on the main page (§10.10,
+ * §10.11), return-to-list memory (§11.1), and the Saved View controls (§10).
+ * A host supplies how its state reads and writes and its own Server Actions.
  */
 export function useListViewHost<State extends { page: number }, Saved>(
   config: ListViewHostConfig<State, Saved>
@@ -94,6 +115,7 @@ export function useListViewHost<State extends { page: number }, Saved>(
     hasConfiguration,
     toSaved,
     withPage,
+    applyBuiltIn,
     defaultPageName,
     actions,
   } = config;
@@ -118,25 +140,57 @@ export function useListViewHost<State extends { page: number }, Saved>(
     hasConfigurationRef.current = hasConfiguration;
   }, [hasConfiguration, serialize]);
 
-  const findView = (id: string | null): AppliedView<Saved> | null => {
-    if (id === null) return null;
-    const saved = savedViews.views.find((view) => view.id === id);
-    if (saved) return { ...saved, isSaved: true };
-    const builtIn = savedViews.builtInViews.find((view) => view.id === id);
-    return builtIn ? { ...builtIn, isSaved: false } : null;
-  };
-  // No `view` reference means the Page Preset's configuration (§9.6).
-  const pagePresetView: AppliedView<Saved> = findView(pagePresetViewId) ?? {
-    id: pagePresetViewId,
-    name: "Standard view",
-    state: pagePresetState,
-    isSaved: false,
-  };
-  const applied = findView(viewId) ?? pagePresetView;
+  const pagePresetView: ListBuiltInView<Saved> = savedViews.builtInViews.find(
+    (view) => view.id === pagePresetViewId
+  ) ?? { id: pagePresetViewId, name: "Standard view", state: pagePresetState };
+  const builtInViews = savedViews.builtInViews.some(
+    (view) => view.id === pagePresetViewId
+  )
+    ? savedViews.builtInViews
+    : [pagePresetView, ...savedViews.builtInViews];
   const sameConfiguration = (left: Saved, right: Saved): boolean =>
     serialize(withPage(left, 1), null).toString() ===
     serialize(withPage(right, 1), null).toString();
-  const edited = !sameConfiguration(toSaved(state), applied.state);
+  // A Built-in View sets search, filters, and sorting only, so displayed
+  // fields and page size never decide whether it is applied (§1): both sides
+  // take the current ones before they are compared.
+  const hasBuiltIn = (view: ListBuiltInView<Saved>, current: Saved): boolean =>
+    sameConfiguration(
+      applyBuiltIn(view, current),
+      applyBuiltIn({ id: view.id, state: current }, current)
+    );
+  /**
+   * The Applied View of `current` (§1): the owned Saved View `reference`
+   * names, else the Built-in View whose search, filters, and sorting it has
+   * (`reference` first when it is one), else none.
+   */
+  const appliedFor = (
+    current: Saved,
+    reference: string | null
+  ): AppliedView<Saved> | null => {
+    const saved = savedViews.views.find((view) => view.id === reference);
+    if (saved) return { ...saved, isSaved: true };
+    const matching = builtInViews.filter((view) => hasBuiltIn(view, current));
+    const builtIn =
+      matching.find((view) => view.id === reference) ?? matching[0];
+    return builtIn ? { ...builtIn, isSaved: false } : null;
+  };
+  /**
+   * The `view` reference naming an Applied View (§9.6), or null for none.
+   * The Page Preset's own view needs none: a URL without one shows it.
+   */
+  const referenceFor = (view: AppliedView<Saved> | null): string | null =>
+    view === null || (!view.isSaved && view.id === pagePresetViewId)
+      ? null
+      : view.id;
+  const referenceOf = (next: State, from: string | null): string | null =>
+    referenceFor(appliedFor(toSaved(next), from));
+
+  const applied = appliedFor(toSaved(state), viewId);
+  // Only a Saved View can be Edited (§1, §5.2).
+  const edited =
+    applied?.isSaved === true &&
+    !sameConfiguration(toSaved(state), applied.state);
 
   const { offersDefault, defaultViewId } = savedViews;
   const surface = React.useMemo<UrlSurface>(
@@ -184,15 +238,15 @@ export function useListViewHost<State extends { page: number }, Saved>(
     },
     [pathname, router]
   );
-  const navigate = React.useCallback(
-    (next: State, view: string | null): void => {
-      const url = listUrl(next, view, surface);
-      setViewId(url.view);
-      setState(next);
-      startTransition(() => replaceQuery(url.query));
-    },
-    [listUrl, replaceQuery, surface]
-  );
+  /** Shows `next` under the `view` reference `reference`. */
+  const show = (next: State, reference: string | null): void => {
+    const url = listUrl(next, reference, surface);
+    setViewId(url.view);
+    setState(next);
+    startTransition(() => replaceQuery(url.query));
+  };
+  const navigate = (next: State, from: string | null): void =>
+    show(next, referenceOf(next, from));
 
   const update = (partial: Partial<State>, resetPage = true): void =>
     navigate(
@@ -205,12 +259,21 @@ export function useListViewHost<State extends { page: number }, Saved>(
     );
 
   // Rewrites older or invalid parameters and out-of-range pages to the
-  // canonical URL (§9.3, §9.4), naming the view as navigation does.
+  // canonical URL (§9.3, §9.4), naming the view as navigation does: a `view`
+  // whose view the configuration has left is dropped (§9.6).
+  const serverReference = referenceOf(resultState, serverViewId);
   React.useEffect(() => {
-    const { query } = listUrl(resultState, serverViewId, surface);
+    const { query } = listUrl(resultState, serverReference, surface);
     if (query === searchParams.toString()) return;
     replaceQuery(query);
-  }, [listUrl, replaceQuery, resultState, searchParams, serverViewId, surface]);
+  }, [
+    listUrl,
+    replaceQuery,
+    resultState,
+    searchParams,
+    serverReference,
+    surface,
+  ]);
 
   // Returning to this list within the tab session reopens this URL (§11.1).
   React.useEffect(() => {
@@ -218,19 +281,37 @@ export function useListViewHost<State extends { page: number }, Saved>(
     rememberListUrl(pathname, query ? `${pathname}?${query}` : pathname);
   }, [pathname, searchParams]);
 
+  /**
+   * What applying a view shows, at page 1 (§10.6): a Saved View's whole
+   * configuration, or a Built-in View's search, filters, and sorting with
+   * the displayed fields and page size already showing (§1).
+   */
+  const opening = (id: string): State | null => {
+    const saved = savedViews.views.find((view) => view.id === id);
+    if (saved) return withPage(saved.state, 1);
+    const builtIn = builtInViews.find((view) => view.id === id);
+    return builtIn ? withPage(applyBuiltIn(builtIn, toSaved(state)), 1) : null;
+  };
+
   const hrefFor = (id: string): string => {
-    const view = findView(id);
-    if (!view) return pathname;
-    // A view opens at page 1 (§10.6), relative to the Page Preset (§9.5).
-    return `${pathname}?${serialize(withPage(view.state, 1), view.id).toString()}`;
+    const next = opening(id);
+    if (!next) return pathname;
+    // Relative to the Page Preset (§9.5), named as navigation names it.
+    const { query } = listUrl(next, referenceOf(next, id), surface);
+    return query ? `${pathname}?${query}` : pathname;
+  };
+
+  const apply = (id: string): void => {
+    const next = opening(id);
+    if (next) navigate(next, id);
   };
 
   const views: ListViewsModel = {
     builtInViews: savedViews.builtInViews.map(({ id, name }) => ({ id, name })),
     savedViews: savedViews.views.map(({ id, name }) => ({ id, name })),
-    appliedId: applied.id,
-    appliedName: applied.name,
-    appliedIsSaved: applied.isSaved,
+    appliedId: applied?.id ?? null,
+    appliedName: applied?.name ?? null,
+    appliedIsSaved: applied?.isSaved ?? false,
     edited,
     configurationKey: serialize({ ...state, page: 1 }, null).toString(),
     canSave: savedViews.canSave,
@@ -238,15 +319,14 @@ export function useListViewHost<State extends { page: number }, Saved>(
     defaultPageName,
     defaultViewId,
     hrefFor,
-    // Applying a view opens it at page 1 (§10.6).
-    onApply: (id) => {
-      const view = findView(id);
-      if (view) navigate(withPage(view.state, 1), view.id);
+    onApply: apply,
+    onDiscard: () => {
+      if (applied) navigate(withPage(applied.state, 1), applied.id);
     },
-    onDiscard: () => navigate(withPage(applied.state, 1), applied.id),
+    onOpenPagePreset: () => apply(pagePresetView.id),
     actions: {
       saveChanges: async () => {
-        if (!applied.isSaved) {
+        if (!applied?.isSaved) {
           return { ok: false, message: "Not your view" };
         }
         const outcome = await actions.update({
@@ -262,7 +342,8 @@ export function useListViewHost<State extends { page: number }, Saved>(
           state: toSaved(state),
           makeDefault,
         });
-        if (outcome.ok) navigate(state, outcome.value.id);
+        // The new view is applied before the refreshed list names it.
+        if (outcome.ok) show(state, outcome.value.id);
         return outcome;
       },
       rename: async (id, name) => {
@@ -281,7 +362,7 @@ export function useListViewHost<State extends { page: number }, Saved>(
         // The list stays as it is (§10.10): once the account has a default,
         // a bare URL opens it, so a list at its Page Preset names that view
         // before the refresh reaches the server.
-        const url = listUrl(state, viewId, {
+        const url = listUrl(state, referenceFor(applied), {
           ...surface,
           defaultViewId: target?.id ?? null,
         });
@@ -295,5 +376,14 @@ export function useListViewHost<State extends { page: number }, Saved>(
     },
   };
 
-  return { state, applied, edited, isPending, navigate, update, views };
+  return {
+    state,
+    applied,
+    edited,
+    pagePresetName: pagePresetView.name,
+    isPending,
+    navigate,
+    update,
+    views,
+  };
 }

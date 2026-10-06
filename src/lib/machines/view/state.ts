@@ -14,6 +14,7 @@ import {
 } from "~/lib/machines/presence";
 import type { MachineStatus } from "~/lib/machines/status";
 import {
+  getMachineViewBuiltInViews,
   getMachineViewPreset,
   MACHINE_VIEW_FIELDS,
 } from "~/lib/machines/view/config";
@@ -194,6 +195,28 @@ export function toMachineViewSavedState(
 ): MachineViewSavedState {
   const { page: _page, ...saved } = state;
   return saved;
+}
+
+/**
+ * A Built-in View applied to the current configuration (list-views §1): its
+ * search, filters, and sorting with the displayed fields and page size
+ * already showing, plus the fields the view adds, such as Recently added's
+ * Date Added (machine-views §9.1).
+ */
+export function applyMachineBuiltInView(
+  presetId: MachineViewPresetId,
+  view: { id: string; state: MachineViewSavedState },
+  current: MachineViewSavedState
+): MachineViewSavedState {
+  const addsFields =
+    getMachineViewBuiltInViews(presetId).find(
+      (definition) => definition.id === view.id
+    )?.addsFields ?? [];
+  return {
+    ...view.state,
+    pageSize: current.pageSize,
+    columns: [...new Set([...current.columns, ...addsFields])],
+  };
 }
 
 /** The keys of a stored configuration, which are also its URL parameters. */

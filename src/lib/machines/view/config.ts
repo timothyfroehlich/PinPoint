@@ -193,26 +193,41 @@ export const MACHINE_VIEW_PRESETS: Record<
 };
 
 /**
- * Built-in Views (spec machine-views.md §9): named configurations PinPoint
- * defines for each Page Preset, the same for every viewer. Ids are stable URL
- * `view` values; views that share a name share an id and appear in the same
- * order on every Surface (§9.6). Exactly one per preset is the Page Preset.
+ * Built-in Views (spec machine-views.md §9): named filters and sorting
+ * PinPoint defines for each Page Preset, the same for every viewer. Applying
+ * one keeps the displayed fields and page size already showing and adds the
+ * fields it names (list-views §1); `state` is the view applied to the Page
+ * Preset, which is what a Default View opens. Ids are stable URL `view`
+ * values; views that share a name share an id and appear in the same order
+ * on every Surface (§9.6). Exactly one per preset is the Page Preset.
  */
 export interface MachineViewBuiltInViewDefinition {
   id: string;
   name: string;
   state: MachineViewSavedState;
+  /** Fields applying the view adds to those showing (§9.1). */
+  addsFields: readonly MachineViewFieldId[];
 }
 
 function builtIn(
   presetId: MachineViewPresetId,
   id: string,
   name: string,
-  overrides: Partial<MachineViewSavedState>
+  overrides: Partial<Omit<MachineViewSavedState, "columns" | "pageSize">>,
+  addsFields: readonly MachineViewFieldId[] = []
 ): MachineViewBuiltInViewDefinition {
   const { page: _page, ...defaults } =
     MACHINE_VIEW_PRESETS[presetId].defaultState;
-  return { id, name, state: { ...defaults, ...overrides } };
+  return {
+    id,
+    name,
+    state: {
+      ...defaults,
+      ...overrides,
+      columns: [...defaults.columns, ...addsFields],
+    },
+    addsFields,
+  };
 }
 
 const NEEDS_ATTENTION: Partial<MachineViewSavedState> = {
@@ -237,15 +252,20 @@ export const MACHINE_VIEW_BUILT_IN_VIEWS: Record<
     builtIn("machines", "all-machines", "All machines", {
       presence: "all",
     }),
-    builtIn("machines", "recently-added", "Recently added", {
-      // Every presence state except Removed (machine-views §9.1).
-      presence: VALID_MACHINE_PRESENCE_STATUSES.filter(
-        (presence) => presence !== "removed"
-      ),
-      sort: "dateAdded",
-      dir: "desc",
-      columns: [...DEFAULT_COLUMNS, "dateAdded"],
-    }),
+    builtIn(
+      "machines",
+      "recently-added",
+      "Recently added",
+      {
+        // Every presence state except Removed (machine-views §9.1).
+        presence: VALID_MACHINE_PRESENCE_STATUSES.filter(
+          (presence) => presence !== "removed"
+        ),
+        sort: "dateAdded",
+        dir: "desc",
+      },
+      ["dateAdded"]
+    ),
   ],
   collection: [
     builtIn("collection", "on-the-floor", "On the floor", {}),
