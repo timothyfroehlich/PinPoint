@@ -65,6 +65,25 @@ def write(repo: Path, path: str, body: str) -> None:
     target.write_text(body)
 
 
+def drizzle_files(migrations: list[tuple[str, int, str]]) -> dict[str, str]:
+    """drizzle/ contents for (tag, when, sql) migrations: SQL, snapshots, journal."""
+    files: dict[str, str] = {}
+    entries = []
+    for idx, (tag, when, sql) in enumerate(migrations):
+        entries.append(
+            {"idx": idx, "version": "7", "when": when, "tag": tag, "breakpoints": True}
+        )
+        files[f"drizzle/{tag}.sql"] = sql
+        files[f"drizzle/meta/{tag[:4]}_snapshot.json"] = json.dumps({"id": tag})
+    files["drizzle/meta/_journal.json"] = json.dumps(
+        {"version": "7", "dialect": "postgresql", "entries": entries}
+    )
+    return files
+
+
+INIT_MIGRATION = ("0000_init", 1000, "CREATE TABLE a (id int);\n")
+
+
 @dataclass
 class Scenario:
     """What the stubbed GitHub says about the PR. Defaults describe a mergeable PR.
@@ -136,6 +155,7 @@ def repo_with_pr(
     branch_changes: dict[str, str],
     scenario: Scenario | None = None,
     merge_main_in: bool = False,
+    renumber_main_in: bool = False,
     extra_branch_commit: dict[str, str] | None = None,
 ) -> Iterator[tuple[str, subprocess.CompletedProcess]]:
     """Build origin + a PR branch, run merge-handoff.sh against it, yield (head_sha, run).
@@ -155,6 +175,9 @@ def repo_with_pr(
         write(work, "src/app/page.tsx", "export default function Page() {}\n")
         write(work, "docs/thing.md", "# thing\n")
         write(work, "next.config.ts", 'const REQUIRED = [["POSTGRES_URL"]];\n')
+        if renumber_main_in:
+            for path, body in drizzle_files([INIT_MIGRATION]).items():
+                write(work, path, body)
         git("add", "-A", cwd=work)
         git("commit", "-qm", "base", cwd=work)
         git("remote", "add", "origin", str(origin), cwd=work)
@@ -175,6 +198,34 @@ def repo_with_pr(
             git("push", "-q", "origin", "main", cwd=work)
             git("checkout", "-q", scenario.branch, cwd=work)
             git("merge", "-q", "--no-ff", "-m", "Merge origin/main", "main", cwd=work)
+
+        if renumber_main_in:
+            # Main lands its own 0001; the merge renumbers the branch's 0001_mine
+            # to 0002 with the same SQL, as db-renumber-migration.sh does.
+            theirs = ("0001_theirs", 3000, "CREATE TABLE b (id int);\n")
+            git("checkout", "-q", "main", cwd=work)
+            for path, body in drizzle_files([INIT_MIGRATION, theirs]).items():
+                write(work, path, body)
+            git("add", "-A", cwd=work)
+            git("commit", "-qm", "main migration", cwd=work)
+            git("push", "-q", "origin", "main", cwd=work)
+            git("checkout", "-q", scenario.branch, cwd=work)
+            subprocess.run(
+                ["git", "merge", "-q", "--no-ff", "main"],
+                cwd=work,
+                capture_output=True,
+                env={**os.environ, **GIT_ENV},
+                check=False,
+            )
+            assert (work / ".git" / "MERGE_HEAD").exists(), "merge did not start"
+            mine_sql = (work / "drizzle" / "0001_mine.sql").read_text()
+            git("checkout", "main", "--", "drizzle", cwd=work)
+            git("rm", "-q", "drizzle/0001_mine.sql", cwd=work)
+            renumbered = [INIT_MIGRATION, theirs, ("0002_mine", 4000, mine_sql)]
+            for path, body in drizzle_files(renumbered).items():
+                write(work, path, body)
+            git("add", "-A", cwd=work)
+            git("commit", "-qm", "Merge origin/main, renumber migration", cwd=work)
 
         if extra_branch_commit is not None:
             for path, body in extra_branch_commit.items():
@@ -583,6 +634,19 @@ def test_a_clean_codex_reaction_gets_the_merge_command() -> None:
         assert "Codex clean reaction witness" in run.stdout
         assert "since review  none — the review covers head" in run.stdout
         assert MERGE_CMD in run.stdout, run.stdout
+
+
+def test_migration_renumber_merge_over_approved_commit_names_the_rule() -> None:
+    mine = ("0001_mine", 2000, "ALTER TABLE a ADD COLUMN note text;\n")
+    with repo_with_pr(
+        branch_changes=drizzle_files([INIT_MIGRATION, mine]),
+        scenario=Scenario(review="previous"),
+        renumber_main_in=True,
+    ) as (_head, run):
+        assert run.returncode == 0, run.stderr
+        assert MERGE_CMD in run.stdout, run.stdout
+        assert "migration renumber merge from main" in run.stdout
+        assert "pure merge from main" not in run.stdout
 
 
 def test_pure_merge_from_main_over_approved_commit_gets_merge_command() -> None:
