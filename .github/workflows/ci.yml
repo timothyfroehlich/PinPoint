@@ -674,7 +674,10 @@ jobs:
     # #2421 took 7-13 minutes of tests per leg, and Smoke 1/2 is the long pole
     # because responsive-overflow.spec.ts is one file of 117 tests. (PP-yva7.3.)
     # ==============================================================================
-    name: E2E Comprehensive ${{ matrix.suite }} ${{ matrix.shard }}/${{ matrix.total }} (Post-Merge)
+    # A plain name: GitHub appends the matrix values ("(smoke, 1, 2)"), and this
+    # job is skipped on every PR, where a matrix expression in the name would
+    # show unexpanded.
+    name: E2E Comprehensive Tests (Post-Merge)
     runs-on: ubuntu-latest
     # Explicit code/deps guard mirrors the three PR E2E siblings. It is the
     # only thing keeping this job off docs-only main pushes: like them it
@@ -698,28 +701,22 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - suite: Smoke
-            config: playwright.config.smoke.ts
+          - suite: smoke
             shard: 1
             total: 2
-          - suite: Smoke
-            config: playwright.config.smoke.ts
+          - suite: smoke
             shard: 2
             total: 2
-          - suite: Full
-            config: playwright.config.full.ts
+          - suite: full
             shard: 1
             total: 4
-          - suite: Full
-            config: playwright.config.full.ts
+          - suite: full
             shard: 2
             total: 4
-          - suite: Full
-            config: playwright.config.full.ts
+          - suite: full
             shard: 3
             total: 4
-          - suite: Full
-            config: playwright.config.full.ts
+          - suite: full
             shard: 4
             total: 4
     steps:
@@ -773,7 +770,7 @@ jobs:
       # must fail.
       - name: Select this shard's spec files
         env:
-          CONFIG: ${{ matrix.config }}
+          CONFIG: playwright.config.${{ matrix.suite }}.ts
           SHARD: ${{ matrix.shard }}/${{ matrix.total }}
           PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ runner.temp }}/e2e-list.json
         run: |
@@ -799,7 +796,7 @@ jobs:
         continue-on-error: true
         timeout-minutes: 20
         env:
-          CONFIG: ${{ matrix.config }}
+          CONFIG: playwright.config.${{ matrix.suite }}.ts
           MOCK_BLOB_STORAGE: "true"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
