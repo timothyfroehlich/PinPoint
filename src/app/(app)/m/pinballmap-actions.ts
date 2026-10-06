@@ -176,6 +176,9 @@ export async function resolvePinballMapLinkAction(
 export async function getPinballMapTitleIcEligibleAction(
   pinballmapMachineId: number
 ): Promise<boolean> {
+  // A Server Action's argument is untrusted: a NaN or fractional id reached
+  // Postgres as an integer bind and threw (Sentry PINPOINT-34).
+  if (!Number.isSafeInteger(pinballmapMachineId)) return false;
   if (!(await canReadCatalog())) return false;
   const entry = await getCatalogEntry(pinballmapMachineId);
   return entry?.icEligible ?? false;

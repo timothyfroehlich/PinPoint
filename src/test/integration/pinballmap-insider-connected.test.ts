@@ -523,6 +523,22 @@ describe("Insider Connected intent (PGlite)", () => {
     });
   });
 
+  describe("getPinballMapTitleIcEligibleAction", () => {
+    it("answers false for a non-integer id rather than querying with it (PINPOINT-34)", async () => {
+      const { getPinballMapTitleIcEligibleAction } =
+        await import("~/app/(app)/m/pinballmap-actions");
+      await seed({ icEligible: true });
+      const member = await createUser("member");
+      await mockAuthAs(member.id);
+
+      expect(await getPinballMapTitleIcEligibleAction(TITLE_ID)).toBe(true);
+      expect(await getPinballMapTitleIcEligibleAction(Number.NaN)).toBe(false);
+      expect(await getPinballMapTitleIcEligibleAction(TITLE_ID + 0.5)).toBe(
+        false
+      );
+    });
+  });
+
   describe("addMachineToPinballMapAction", () => {
     it("applies the Insider Connected target with the new entry in one push", async () => {
       const { addMachineToPinballMapAction } =
