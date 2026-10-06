@@ -3,9 +3,11 @@ import {
   getEmailHtml,
   getEmailSubject,
   getEventTypeLabel,
+} from "~/lib/notifications/channels/email-channel";
+import {
   generateUnsubscribeToken,
   verifyUnsubscribeToken,
-} from "~/lib/notifications/channels/email-channel";
+} from "~/lib/notifications/unsubscribe-token";
 
 vi.mock("~/lib/url", () => ({
   getSiteUrl: () => "http://test.com",

@@ -1,3 +1,7 @@
+import {
+  IN_APP_PREFERENCE_COLUMNS,
+  shouldDeliverForChannel,
+} from "./should-deliver";
 import type { NotificationChannel, NotificationPreferencesRow } from "./types";
 import type {
   NotificationType,
@@ -17,26 +21,11 @@ export const inAppChannel: NotificationChannel = {
     type: NotificationType,
     recipientReason?: RecipientReason
   ): boolean {
-    if (!prefs.inAppEnabled) return false;
-    switch (type) {
-      case "issue_assigned":
-        return prefs.inAppNotifyOnAssigned;
-      case "issue_status_changed":
-        return prefs.inAppNotifyOnStatusChange;
-      case "new_comment":
-        return prefs.inAppNotifyOnNewComment;
-      case "new_issue":
-        if (recipientReason === "global_watcher") {
-          return prefs.inAppWatchNewIssuesGlobal;
-        }
-        if (recipientReason) return prefs.inAppNotifyOnNewIssue;
-        return prefs.inAppNotifyOnNewIssue || prefs.inAppWatchNewIssuesGlobal;
-      case "machine_ownership_changed":
-        return true;
-      case "mentioned":
-        return prefs.inAppNotifyOnMentioned;
-      case "pinballmap_comment":
-        return prefs.inAppNotifyOnPinballMapComment;
-    }
+    return shouldDeliverForChannel(
+      IN_APP_PREFERENCE_COLUMNS,
+      prefs,
+      type,
+      recipientReason
+    );
   },
 };
