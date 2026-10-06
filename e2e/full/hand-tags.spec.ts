@@ -603,14 +603,16 @@ test.describe("Tag type changes", () => {
 
     test.beforeAll(async () => {
       const ownerId = await getProfileIdByEmail(TEST_USERS.admin.email);
-      both = await createTestMachine(ownerId);
-      onlySource = await createTestMachine(ownerId);
+      const holdsBoth = await createTestMachine(ownerId);
+      const holdsSource = await createTestMachine(ownerId);
+      both = holdsBoth;
+      onlySource = holdsSource;
       await createTestTagType(typeName, {
         exclusive: false,
         tags: [source, target],
       });
-      await addTestMachineTags(both.id, [source, target]);
-      await addTestMachineTags(onlySource.id, [source]);
+      await addTestMachineTags(holdsBoth.id, [source, target]);
+      await addTestMachineTags(holdsSource.id, [source]);
     });
 
     test.afterAll(async () => {
@@ -692,13 +694,14 @@ test.describe("Tag type changes", () => {
 
     test.beforeAll(async () => {
       const ownerId = await getProfileIdByEmail(TEST_USERS.admin.email);
-      machine = await createTestMachine(ownerId);
+      const created = await createTestMachine(ownerId);
+      machine = created;
       await createTestTagType(looseType, { exclusive: false, tags: [source] });
       await createTestTagType(exclusiveType, {
         exclusive: true,
         tags: [into, held],
       });
-      await addTestMachineTags(machine.id, [source, held]);
+      await addTestMachineTags(created.id, [source, held]);
     });
 
     test.afterAll(async () => {
