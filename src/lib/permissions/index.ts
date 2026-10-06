@@ -9,6 +9,8 @@ export {
   // Types
   type PermissionValue,
   type AccessLevel,
+  type PermissionDefinition,
+  type PermissionId,
   // Constants
   ACCESS_LEVELS,
   ACCESS_LEVEL_LABELS,
@@ -40,9 +42,8 @@ export {
 export { canAccessMachineManage } from "./machines";
 export {
   type SettingsSetAuth,
-  canViewSet,
+  canManageMachineSettings,
   canEditSet,
-  canSetOwnerDefault,
-  canPublishSet,
-  canTagTournamentSet,
+  canDeleteSet,
+  canMakeCommunity,
 } from "./settings";

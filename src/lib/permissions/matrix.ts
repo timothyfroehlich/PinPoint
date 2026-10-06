@@ -24,6 +24,8 @@
  *   member or above — guests cannot triage even their own issues.
  */
 
+import type { UserRole } from "~/lib/types";
+
 /**
  * Permission value types:
  * - true: Always allowed
@@ -56,21 +58,21 @@ export type PermissionValue = boolean | "own" | "owner" | "own_or_owner";
 /**
  * Access levels represent authentication + authorization state.
  *
- * This differs from UserRole ("guest" | "member" | "admin") because AccessLevel
+ * This differs from UserRole because AccessLevel
  * includes "unauthenticated" — a state, not a persisted role. UserRole is the
  * role stored in the database for authenticated users. Use getAccessLevel() from
  * helpers.ts to convert a UserRole (or null) into an AccessLevel.
  */
-export type AccessLevel =
-  "unauthenticated" | "guest" | "member" | "technician" | "admin";
+export type AccessLevel = "unauthenticated" | UserRole;
 
+/** Every access level in order of increasing privilege (display order). */
 export const ACCESS_LEVELS = [
   "unauthenticated",
   "guest",
   "member",
   "technician",
   "admin",
-] as const;
+] as const satisfies readonly AccessLevel[];
 
 /**
  * Human-readable labels for each access level
@@ -96,7 +98,7 @@ export const ACCESS_LEVEL_DESCRIPTIONS: Record<AccessLevel, string> = {
 
 type RolePermissions = Record<AccessLevel, PermissionValue>;
 
-interface PermissionDefinition {
+export interface PermissionDefinition {
   /** Permission identifier */
   id: string;
   /** Human-readable label for the help page */
@@ -107,20 +109,24 @@ interface PermissionDefinition {
   access: RolePermissions;
 }
 
-interface PermissionCategory {
+export interface PermissionCategory {
   /** Category identifier */
   id: string;
   /** Human-readable label */
   label: string;
   /** Permissions in this category */
-  permissions: PermissionDefinition[];
+  permissions: readonly PermissionDefinition[];
 }
 
 /**
  * The complete permissions matrix.
  * This is the single source of truth for all permissions in the system.
+ *
+ * Declared `as const satisfies` so every permission id is a string literal type:
+ * `PermissionId` is derived from it, and a misspelled id at a call site fails
+ * `tsc` instead of silently denying (getPermission fails closed at runtime).
  */
-export const PERMISSIONS_MATRIX: PermissionCategory[] = [
+const PERMISSIONS_MATRIX_DEFINITION = [
   {
     id: "issues",
     label: "Issues",
@@ -527,10 +533,10 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         id: "machines.settings.manage",
         label: "Manage machine settings",
         description:
-          "Create, edit, duplicate, and delete settings sets (owners manage " +
-          "sets on their own machines; technicians manage community sets and " +
-          "unowned machine sets; admins manage any). Setting the preferred " +
-          "owner default is governed separately by machines.settings.setDefault. " +
+          "Create settings sets, edit and delete community sets, apply " +
+          "settings tags, and choose a machine's preferred House and " +
+          "Tournament sets (owners on their own machines; technicians and " +
+          "admins on any). A personal set is edited only by its author. " +
           "(Viewing settings is public, via machines.view.)",
         access: {
           unauthenticated: false,
@@ -541,23 +547,10 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         },
       },
       {
-        id: "machines.settings.setDefault",
-        label: "Set preferred machine settings set",
+        id: "machines.settings.delete.any",
+        label: "Delete any settings set",
         description:
-          "Set an owner settings set as the machine's preferred default. Restricted to machine owners and admins; technicians cannot set the default on machines they do not own.",
-        access: {
-          unauthenticated: false,
-          guest: false,
-          member: "owner",
-          technician: "owner",
-          admin: true,
-        },
-      },
-      {
-        id: "machines.settings.view.private",
-        label: "View private settings drafts",
-        description:
-          "View another user's unshared private settings draft. Creators always see their own drafts; public and preferred sets are visible to everyone.",
+          "Delete another person's personal settings set, which only its author can edit.",
         access: {
           unauthenticated: false,
           guest: false,
@@ -793,7 +786,28 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
       },
     ],
   },
-];
+] as const satisfies readonly PermissionCategory[];
+
+/**
+ * Every permission id declared in the matrix, as a literal union.
+ */
+export type PermissionId =
+  (typeof PERMISSIONS_MATRIX_DEFINITION)[number]["permissions"][number]["id"];
+
+/**
+ * The matrix as consumers iterate it (widened ids and values; the literal
+ * ids live in `PermissionId`).
+ */
+export const PERMISSIONS_MATRIX: readonly PermissionCategory[] =
+  PERMISSIONS_MATRIX_DEFINITION;
+
+/**
+ * Every permission id, in matrix order.
+ */
+export const PERMISSION_IDS: readonly PermissionId[] =
+  PERMISSIONS_MATRIX_DEFINITION.flatMap((category) =>
+    category.permissions.map((permission) => permission.id)
+  );
 
 /**
  * Flattened permission lookup for quick access.
@@ -814,7 +828,7 @@ export const PERMISSIONS_BY_ID: Record<string, PermissionDefinition> =
  * Get the permission value for a specific permission and access level.
  */
 export function getPermission(
-  permissionId: string,
+  permissionId: PermissionId,
   accessLevel: AccessLevel
 ): PermissionValue {
   const permission = PERMISSIONS_BY_ID[permissionId];
@@ -837,7 +851,7 @@ export function getPermission(
  * @throws Error if the permission value is "own", "owner", or "own_or_owner"
  */
 export function hasPermission(
-  permissionId: string,
+  permissionId: PermissionId,
   accessLevel: AccessLevel
 ): boolean {
   const value = getPermission(permissionId, accessLevel);
@@ -861,7 +875,7 @@ export function hasPermission(
  * to checkPermission() in helpers.ts for an accurate result.
  */
 export function requiresOwnershipCheck(
-  permissionId: string,
+  permissionId: PermissionId,
   accessLevel: AccessLevel
 ): boolean {
   const value = getPermission(permissionId, accessLevel);

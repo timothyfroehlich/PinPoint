@@ -743,6 +743,20 @@
       "when": 1791256237164,
       "tag": "0105_single-line-issue-titles",
       "breakpoints": true
+    },
+    {
+      "idx": 106,
+      "version": "7",
+      "when": 1791272295747,
+      "tag": "0106_settings-sets-model",
+      "breakpoints": true
+    },
+    {
+      "idx": 107,
+      "version": "7",
+      "when": 1791289125468,
+      "tag": "0107_apron-card-print-queue",
+      "breakpoints": true
     }
   ]
 }

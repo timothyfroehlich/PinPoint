@@ -11,6 +11,8 @@ import {
 } from "@playwright/test";
 import postgres from "postgres";
 
+import seedSteps from "../supabase/seed-steps.json" with { type: "json" };
+
 function redactUrl(url: string): string {
   try {
     const parsed = new URL(url);
@@ -384,7 +386,7 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
   console.log("✅ Pre-flight checks passed");
 
   // Sweep throwaway invite-signup users (…@example.com) that accumulate in
-  // auth.users across runs. Neither db:fast-reset nor /api/test-data/cleanup
+  // auth.users across runs. Neither db:fast-reset nor cleanupTestEntities
   // can delete auth.users rows (the Postgres role lacks the privilege), so
   // without this they grow unbounded. Once auth.users exceeds one Admin-API
   // page (GoTrue defaults to 50/page), any *unpaginated* listUsers() email
@@ -438,8 +440,15 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
       stdio: "inherit",
       env: process.env,
     });
-    execSync("pnpm run db:_seed", { stdio: "inherit", env: process.env });
-    execSync("pnpm run db:_seed-users", { stdio: "inherit", env: process.env });
+    // The `minimal` subset of supabase/seed-steps.json, not the whole list:
+    // this fallback has always seeded just the base rows and the users.
+    for (const step of seedSteps.steps) {
+      if (!step.minimal) continue;
+      execSync(`pnpm run ${step.script}`, {
+        stdio: "inherit",
+        env: process.env,
+      });
+    }
     console.log("✅ Database ready (full reset)");
   } catch (error) {
     console.error("❌ Failed to setup database:", error);

@@ -114,6 +114,9 @@ describe("getPermission", () => {
   });
 
   it("should return false for unknown permissions", () => {
+    // Typed ids reject this at compile time; the runtime still fails closed
+    // for any untyped caller.
+    // @ts-expect-error -- deliberately not a PermissionId
     expect(getPermission("nonexistent.permission", "admin")).toBe(false);
   });
 
@@ -523,40 +526,6 @@ describe("Specific permission rules from design", () => {
         true
       );
       expect(getPermission("machines.settings.manage", "admin")).toBe(true);
-    });
-
-    it("should restrict setting owner default to machine owners and admins (PP-leli.8)", () => {
-      expect(
-        getPermission("machines.settings.setDefault", "unauthenticated")
-      ).toBe(false);
-      expect(getPermission("machines.settings.setDefault", "guest")).toBe(
-        false
-      );
-      expect(getPermission("machines.settings.setDefault", "member")).toBe(
-        "owner"
-      );
-      expect(getPermission("machines.settings.setDefault", "technician")).toBe(
-        "owner"
-      );
-      expect(getPermission("machines.settings.setDefault", "admin")).toBe(true);
-    });
-
-    it("should restrict viewing private settings drafts to admins (PP-leli.8)", () => {
-      expect(
-        getPermission("machines.settings.view.private", "unauthenticated")
-      ).toBe(false);
-      expect(getPermission("machines.settings.view.private", "guest")).toBe(
-        false
-      );
-      expect(getPermission("machines.settings.view.private", "member")).toBe(
-        false
-      );
-      expect(
-        getPermission("machines.settings.view.private", "technician")
-      ).toBe(false);
-      expect(getPermission("machines.settings.view.private", "admin")).toBe(
-        true
-      );
     });
 
     it("should define machines.timeline.comment.add: members+ can post (PP-0x98)", () => {

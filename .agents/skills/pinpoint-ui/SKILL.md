@@ -5,7 +5,8 @@ description: >-
   Tailwind CSS v4, and accessibility. Covers semantic color tokens (dark-only,
   no dark: variants), Radix Select form resets, native select stale-option
   fallbacks, config-driven enums with rich metadata, discriminated-union props,
-  Server Action conventions (Action suffix, checkPermission, Result), colocated
+  Server Actions built with createProtectedAction (validation, load,
+  permission, Result, Action suffix), colocated
   data access via cache() and revalidatePath, transactional-service patterns,
   and why console.* is expected in Client Components (logger imports fs and
   cannot run on client; PII logging rules). Use when building UI, forms,
@@ -205,11 +206,27 @@ Or call `useUnsavedChangesGuard({ isDirty, onDiscard, description, ... })` when 
 
 ### Server Actions
 
-- Exported server actions are **suffixed `Action`** — `createMachineAction`, `markAsReadAction`. This is the house style for new code, not a universal invariant: a set of older actions under `src/app/**/actions.ts` predate the convention. Name new actions with the suffix; **don't** rename existing ones to match (the rename is churn with a real chance of missing a call site), and **don't assume an unsuffixed export isn't a Server Action** — several are wired straight into `useActionState`.
-- Every action checks authorization through `checkPermission()` from `~/lib/permissions/helpers` (CORE-ARCH-008). Never hand-roll a role comparison — `pinpoint-security` covers what counts as a non-gating comparison and how the `permissions-audit-allow` audit treats it.
-- Actions return `Result<T, C>` from `~/lib/result.ts` (`ok(...)` / `err(...)`), not thrown exceptions, so `useActionState` can render the failure.
-- Report failures through `serverActionError()` from `~/lib/observability/report-error` rather than a bare `console.error` — that's what routes the error to Sentry with action context.
-- Zod schemas live in a separate `schemas.ts` next to the action (a Next.js requirement — `"use server"` files may only export async functions).
+Build every exported Server Action with `createProtectedAction` from `~/lib/actions` (CORE-ARCH-013). `createPublicAction` is the same pipeline for an action signed-out visitors may call, such as public issue reporting: `context.user` is `null` for them and their access level is `"unauthenticated"`. The pipeline authenticates, validates, loads, checks the permission, runs the handler, rethrows `redirect()`, and reports anything thrown as `SERVER` through `serverActionError()`, in that order; the handler holds only the action's own work.
+
+Worked example: `src/app/(app)/settings/reporting/actions.ts`, which maps FormData into a schema, checks a static permission, and keeps one extra rule in the handler. `src/lib/actions/pipeline.test.ts` exercises every option.
+
+The options, in pipeline order:
+
+- `schema` validates the input; a failure returns `VALIDATION` with the first zod issue's message. Without `mapInput` the action takes the schema's input type.
+- `mapInput` turns the raw argument into the value the schema parses. For a form, `formFields(formData, ["fieldA", "fieldB"])` reads the named string fields, with a missing field or a file as `null`, so the schema owns every message.
+- `load` fetches the resource the permission check needs and returns `err("NOT_FOUND", …)` when it is missing. The permission callback and the handler receive it as `context.resource`, so the action queries it once.
+- `permission` is a permission id, or a callback returning `{ permission, ownershipContext }` built from `context.resource` for ownership rules. It runs through `checkPermission()` (CORE-ARCH-008); a role comparison anywhere else is a bug, and `pinpoint-security` covers the non-gating exceptions. A denial returns `FORBIDDEN` with `forbiddenMessage`.
+- `serverErrorMessage` replaces the generic `SERVER` message; `actionName` names the operation in the Sentry report.
+
+The result is `Result<T, C>` from `~/lib/result` (`ok(...)` / `err(...)`), never a thrown exception, so `useActionState` can render the failure. Its codes are `UNAUTHORIZED` (signed out), `VALIDATION`, `FORBIDDEN`, and `SERVER`, plus whatever the handler and `load` return; type it as `ProtectedActionResult<T, ExtraCodes>`.
+
+A `"use server"` file exports only async functions, so keep the pipeline in a module-level const and export a named async function that calls it, with the `(prevState, formData)` signature when `useActionState` drives it. Zod schemas an action shares with client code live in a `schemas.ts` beside it for the same reason.
+
+Two helpers sit beside the pipeline in `~/lib/actions`: `revalidateMachine(initials, tabs)` revalidates `/m/<initials>` and each named tab beneath it, and `rethrowIfRedirect(error)` is the redirect passthrough for a `catch` outside the pipeline.
+
+The exceptions (signed-out auth flows, redirect-only OAuth and consent actions) and the backlog of hand-rolled actions are the allowlists in `src/test/lint/protected-action-ratchet.test.ts`. Migrating an action means deleting its line there; the test fails until you do.
+
+Exported actions are **suffixed `Action`** — `createMachineAction`, `markAsReadAction`. Older actions predate the convention: name new ones with the suffix, leave existing names alone (a rename risks missing a call site), and treat an unsuffixed export as a possible Server Action, since several are wired straight into `useActionState`.
 
 ### Transactional service functions (side effects after commit — CORE-ARCH-011)
 
@@ -233,6 +250,10 @@ Three guardrails enforce this, so a violation fails loudly instead of silently s
 Data access lives in **colocated** `_data.ts` / `queries.ts` files next to the route that uses it, wrapped in `cache()` from React so a layout and its page don't double-hit the DB in one render pass. There is **no** `src/server/data-access/` directory — don't create one.
 
 Revalidate with `revalidatePath` — that's the convention throughout. `revalidateTag` has **zero** usages in `src/`; if you think you need it, you're introducing a second caching convention.
+
+### Stored rich text
+
+A prose column a person writes in the rich text editor (machine description, owner's requirements, Collection description) is validated with `validateProseMirrorDoc` (`~/lib/tiptap/validate`) before it is saved. It checks the doc's shape, applies the 10k plain-text / 100k JSON size caps, and reports a whitespace-only doc as `"empty"` so the column stores NULL. Map its result to your action's own error copy; don't write another size check.
 
 ### Machine status is derived, never stored
 

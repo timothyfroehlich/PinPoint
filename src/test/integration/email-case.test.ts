@@ -1,16 +1,8 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { invitedUsers, issues, machines } from "~/server/db/schema";
 import { createTestMachine } from "~/test/helpers/factories";
-
-// Mock the database to use the PGlite instance
-vi.mock("~/server/db", async () => {
-  const { getTestDb } = await import("~/test/setup/pglite");
-  return {
-    db: await getTestDb(),
-  };
-});
 
 describe("Case-insensitive email handling (CITEXT)", () => {
   setupTestDb();

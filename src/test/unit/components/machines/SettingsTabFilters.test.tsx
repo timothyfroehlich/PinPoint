@@ -1,9 +1,11 @@
 /**
- * SettingsTab — the filter row (PP-tn6t).
+ * SettingsTab — the filter row (machine-settings spec §2.5).
  *
- * The filter is two independent controls that AND together:
- *   · a SINGLE-SELECT category segment — All / Mine / Owner's / Community
- *   · an INDEPENDENT Tournament toggle
+ * The filter is three kinds of control that AND together:
+ *   · a SINGLE-SELECT category segment — All / Mine / Community
+ *   · INDEPENDENT House and Tournament tag toggles
+ *   · an "Others' personal" toggle — other people's personal sets are hidden
+ *     by default (§2.5), and every chip counts over what that toggle leaves
  *
  * The permutations are where the bugs live (a stuck toggle, a category that
  * can't be cleared, a count that doesn't partition), so this file walks the
@@ -32,9 +34,9 @@ vi.mock("~/app/(app)/m/[initials]/(tabs)/settings/actions", () => ({
   saveSettingsSetAction: vi.fn(),
   deleteSettingsSetAction: vi.fn(),
   duplicateSettingsSetAction: vi.fn(),
+  makeCommunitySettingsSetAction: vi.fn(),
+  setSettingsSetTagAction: vi.fn(),
   setPreferredSettingsSetAction: vi.fn(),
-  setTournamentTagAction: vi.fn(),
-  publishSettingsSetAction: vi.fn(),
   updateMachineSettingsInstructionsAction: vi.fn(),
   updateMachineSettingsRequestsAction: vi.fn(),
 }));
@@ -63,7 +65,7 @@ beforeAll(() => {
 });
 
 // ---------------------------------------------------------------------------
-// Fixture — the six demo sets, by the two axes that drive the filter
+// Fixture — the five demo sets, by the axes that drive the filter
 // ---------------------------------------------------------------------------
 
 const OWNER = "owner-member";
@@ -71,26 +73,39 @@ const TECH = "tech-user";
 const STRANGER = "stranger-user";
 const MACHINE = "machine-afm";
 
+const HOUSE = { id: "tag-house", slug: "house", name: "House" };
+const TOURNAMENT = {
+  id: "tag-tournament",
+  slug: "tournament",
+  name: "Tournament",
+};
+
 /** Names are the fixture's identity — assertions compare these. */
 const SET = {
-  ownerDefault: "Tournament (competition)",
-  ownerPublic: "Full reference (every section type)",
-  ownerDraft: "New ruleset (draft)",
-  communityTournament: "Weekly league setup",
-  communityPublic: "House standard",
-  communityDraft: "Draft — testing steeper tilt",
+  // Owner's community set: preferred House, tagged House + Tournament.
+  preferredHouse: "Tournament (competition)",
+  // Owner's personal House set.
+  ownerPersonal: "Full reference (every section type)",
+  // Technician's community set: preferred Tournament, tagged Tournament.
+  preferredTournament: "Weekly league setup",
+  // Technician's personal House set.
+  techPersonal: "Draft — testing steeper tilt",
+  // Technician's community House set.
+  communityHouse: "House standard",
 } as const;
 
 function makeSet(over: Partial<SettingsSetData> & { name: string }) {
   return {
     id: over.name,
-    isPreferred: false,
-    isOwnerSet: false,
-    isPublic: true,
-    isTournament: false,
+    isPreferredHouse: false,
+    isPreferredTournament: false,
+    isCommunity: false,
+    tags: [HOUSE],
     createdById: TECH,
     canEdit: false,
-    canSetDefault: false,
+    canDelete: false,
+    canMakeCommunity: false,
+    canCurate: false,
     updatedBy: "Someone",
     updatedById: null,
     updatedAt: "2026-07-24",
@@ -101,42 +116,28 @@ function makeSet(over: Partial<SettingsSetData> & { name: string }) {
 }
 
 /**
- * The full six-set corpus, as an admin (who can view every set) sees it.
- * Non-admin viewers see a subset — that filtering happens in the QUERY, not in
- * this component, so these tests always hand the component the full corpus and
- * vary only the viewer identity.
+ * The full corpus, in insertion (creation) order. Every viewer receives every
+ * set (§2.5); the component alone decides which ones the filters show.
  */
 function corpus(): SettingsSetData[] {
   return [
     makeSet({
-      name: SET.ownerDefault,
-      isOwnerSet: true,
-      isPreferred: true,
-      isTournament: true,
+      name: SET.preferredHouse,
+      isCommunity: true,
+      isPreferredHouse: true,
+      tags: [HOUSE, TOURNAMENT],
       createdById: OWNER,
     }),
+    makeSet({ name: SET.ownerPersonal, createdById: OWNER }),
     makeSet({
-      name: SET.ownerPublic,
-      isOwnerSet: true,
-      createdById: OWNER,
-    }),
-    makeSet({
-      name: SET.ownerDraft,
-      isOwnerSet: true,
-      isPublic: false,
-      createdById: OWNER,
-    }),
-    makeSet({
-      name: SET.communityTournament,
-      isTournament: true,
+      name: SET.preferredTournament,
+      isCommunity: true,
+      isPreferredTournament: true,
+      tags: [TOURNAMENT],
       createdById: TECH,
     }),
-    makeSet({ name: SET.communityPublic, createdById: TECH }),
-    makeSet({
-      name: SET.communityDraft,
-      isPublic: false,
-      createdById: TECH,
-    }),
+    makeSet({ name: SET.techPersonal, createdById: TECH }),
+    makeSet({ name: SET.communityHouse, isCommunity: true, createdById: TECH }),
   ];
 }
 
@@ -179,116 +180,179 @@ function chip(label: string): HTMLElement {
   return screen.getByRole("button", { name: new RegExp(`^${label} \\d+$`) });
 }
 
-const tournamentChip = (): HTMLElement => chip("Tournament");
+const OTHERS = "Others' personal";
 
 // ---------------------------------------------------------------------------
-// The matrix: category × Tournament
+// The matrix: category × House × Tournament × Others' personal
 // ---------------------------------------------------------------------------
 
-type Category = "All" | "Mine" | "Owner's" | "Community";
+type Category = "All" | "Mine" | "Community";
 
 interface Case {
   viewer: string;
   category: Category;
+  house: boolean;
   tournament: boolean;
+  others: boolean;
   expected: string[];
 }
 
 /**
- * Every category × Tournament combination. The default set is pinned to the
- * top; everything else keeps insertion order, so `expected` is order-sensitive
- * and also guards the pinning.
+ * The preferred sets are pinned to the top (House, then Tournament);
+ * everything else keeps insertion order, so `expected` is order-sensitive and
+ * also guards the pinning.
  */
 const CASES: Case[] = [
-  // --- Stranger (neither owner nor author): Mine is hidden, Owner's shows ---
+  // --- Stranger (authored nothing): others' personal sets hidden by default,
+  //     every preferred set shown ------------------------------------------
   {
     viewer: STRANGER,
     category: "All",
+    house: false,
     tournament: false,
-    expected: [
-      SET.ownerDefault,
-      SET.ownerPublic,
-      SET.ownerDraft,
-      SET.communityTournament,
-      SET.communityPublic,
-      SET.communityDraft,
-    ],
+    others: false,
+    expected: [SET.preferredHouse, SET.preferredTournament, SET.communityHouse],
   },
   {
     viewer: STRANGER,
     category: "All",
-    tournament: true,
-    expected: [SET.ownerDefault, SET.communityTournament],
-  },
-  {
-    viewer: STRANGER,
-    category: "Owner's",
+    house: false,
     tournament: false,
-    expected: [SET.ownerDefault, SET.ownerPublic, SET.ownerDraft],
-  },
-  {
-    viewer: STRANGER,
-    category: "Owner's",
-    tournament: true,
-    expected: [SET.ownerDefault],
-  },
-  {
-    viewer: STRANGER,
-    category: "Community",
-    tournament: false,
+    others: true,
     expected: [
-      SET.communityTournament,
-      SET.communityPublic,
-      SET.communityDraft,
+      SET.preferredHouse,
+      SET.preferredTournament,
+      SET.ownerPersonal,
+      SET.techPersonal,
+      SET.communityHouse,
     ],
   },
   {
     viewer: STRANGER,
-    category: "Community",
-    tournament: true,
-    expected: [SET.communityTournament],
+    category: "All",
+    house: true,
+    tournament: false,
+    others: true,
+    expected: [
+      SET.preferredHouse,
+      SET.ownerPersonal,
+      SET.techPersonal,
+      SET.communityHouse,
+    ],
   },
-  // --- Technician: authored the three community sets, so Mine appears -------
+  {
+    viewer: STRANGER,
+    category: "All",
+    house: false,
+    tournament: true,
+    others: true,
+    expected: [SET.preferredHouse, SET.preferredTournament],
+  },
+  {
+    viewer: STRANGER,
+    category: "All",
+    house: true,
+    tournament: true,
+    others: false,
+    expected: [SET.preferredHouse],
+  },
+  {
+    viewer: STRANGER,
+    category: "Community",
+    house: false,
+    tournament: false,
+    others: true,
+    expected: [SET.preferredHouse, SET.preferredTournament, SET.communityHouse],
+  },
+  {
+    viewer: STRANGER,
+    category: "Community",
+    house: true,
+    tournament: false,
+    others: true,
+    expected: [SET.preferredHouse, SET.communityHouse],
+  },
+  // --- Technician: their own personal set shows; the owner's does not -----
   {
     viewer: TECH,
-    category: "Mine",
+    category: "All",
+    house: false,
     tournament: false,
+    others: false,
     expected: [
-      SET.communityTournament,
-      SET.communityPublic,
-      SET.communityDraft,
+      SET.preferredHouse,
+      SET.preferredTournament,
+      SET.techPersonal,
+      SET.communityHouse,
     ],
   },
   {
     viewer: TECH,
     category: "Mine",
-    tournament: true,
-    expected: [SET.communityTournament],
-  },
-  // --- Machine owner: "Owner's" is hidden (redundant with Mine) ------------
-  {
-    viewer: OWNER,
-    category: "Mine",
+    house: false,
     tournament: false,
-    expected: [SET.ownerDefault, SET.ownerPublic, SET.ownerDraft],
+    others: false,
+    expected: [SET.preferredTournament, SET.techPersonal, SET.communityHouse],
+  },
+  {
+    viewer: TECH,
+    category: "Mine",
+    house: true,
+    tournament: false,
+    others: false,
+    expected: [SET.techPersonal, SET.communityHouse],
+  },
+  {
+    viewer: TECH,
+    category: "Mine",
+    house: false,
+    tournament: true,
+    others: false,
+    expected: [SET.preferredTournament],
+  },
+  // --- Machine owner: Mine is the owner's own sets --------------------------
+  {
+    viewer: OWNER,
+    category: "All",
+    house: false,
+    tournament: false,
+    others: false,
+    expected: [
+      SET.preferredHouse,
+      SET.preferredTournament,
+      SET.ownerPersonal,
+      SET.communityHouse,
+    ],
   },
   {
     viewer: OWNER,
     category: "Mine",
+    house: false,
+    tournament: false,
+    others: false,
+    expected: [SET.preferredHouse, SET.ownerPersonal],
+  },
+  {
+    viewer: OWNER,
+    category: "Mine",
+    house: false,
     tournament: true,
-    expected: [SET.ownerDefault],
+    others: false,
+    expected: [SET.preferredHouse],
   },
 ];
 
-describe("SettingsTab filters — category × Tournament matrix", () => {
+describe("SettingsTab filters — category × tags × Others' personal matrix", () => {
   it.each(CASES)(
-    "viewer=$viewer category=$category tournament=$tournament",
-    async ({ viewer, category, tournament, expected }) => {
+    "viewer=$viewer category=$category house=$house tournament=$tournament others=$others",
+    async ({ viewer, category, house, tournament, others, expected }) => {
       const user = userEvent.setup();
       renderTab(viewer);
 
+      if (others) await user.click(chip(OTHERS));
       if (category !== "All") await user.click(chip(category));
-      if (tournament) await user.click(tournamentChip());
+      if (house) await user.click(chip("House"));
+      if (tournament) await user.click(chip("Tournament"));
 
       expect(visibleSetNames()).toEqual(expected);
     }
@@ -296,123 +360,126 @@ describe("SettingsTab filters — category × Tournament matrix", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Toggling back off — the reported bug (a Tournament filter you can't clear)
+// Toggling back off — a filter you can't clear is the classic bug here
 // ---------------------------------------------------------------------------
 
 describe("SettingsTab filters — controls clear again", () => {
-  it("the Tournament toggle turns back OFF and restores the full list", async () => {
-    const user = userEvent.setup();
-    renderTab(STRANGER);
-    const all = visibleSetNames();
-    expect(all).toHaveLength(6);
+  it.each(["House", "Tournament", OTHERS])(
+    "the %s toggle turns back OFF and restores the default list",
+    async (label) => {
+      const user = userEvent.setup();
+      renderTab(STRANGER);
+      const initial = visibleSetNames();
 
-    await user.click(tournamentChip());
-    expect(tournamentChip()).toHaveAttribute("aria-pressed", "true");
-    expect(visibleSetNames()).toEqual([
-      SET.ownerDefault,
-      SET.communityTournament,
-    ]);
+      await user.click(chip(label));
+      expect(chip(label)).toHaveAttribute("aria-pressed", "true");
+      expect(visibleSetNames()).not.toEqual(initial);
 
-    await user.click(tournamentChip());
-    expect(tournamentChip()).toHaveAttribute("aria-pressed", "false");
-    expect(visibleSetNames()).toEqual(all);
-  });
+      await user.click(chip(label));
+      expect(chip(label)).toHaveAttribute("aria-pressed", "false");
+      expect(visibleSetNames()).toEqual(initial);
+    }
+  );
 
   it("survives repeated Tournament toggling (no latched state)", async () => {
     const user = userEvent.setup();
     renderTab(STRANGER);
 
     for (let i = 0; i < 3; i++) {
-      await user.click(tournamentChip());
+      await user.click(chip("Tournament"));
       expect(visibleSetNames()).toHaveLength(2);
-      await user.click(tournamentChip());
-      expect(visibleSetNames()).toHaveLength(6);
+      await user.click(chip("Tournament"));
+      expect(visibleSetNames()).toHaveLength(3);
     }
   });
 
-  it("All is the row's reset — it clears the Tournament toggle too", async () => {
-    // The reported bug: with Tournament on, clicking "All" (the obvious escape
-    // hatch) left the list filtered, so the toggle felt impossible to clear.
+  it("All is the row's reset — it clears the category and both tag toggles", async () => {
     const user = userEvent.setup();
     renderTab(STRANGER);
 
     await user.click(chip("Community"));
-    await user.click(tournamentChip());
-    expect(visibleSetNames()).toEqual([SET.communityTournament]);
+    await user.click(chip("House"));
+    await user.click(chip("Tournament"));
+    expect(visibleSetNames()).toEqual([SET.preferredHouse]);
 
     await user.click(chip("All"));
-    expect(tournamentChip()).toHaveAttribute("aria-pressed", "false");
-    expect(visibleSetNames()).toHaveLength(6);
+    expect(chip("Community")).toHaveAttribute("aria-pressed", "false");
+    expect(chip("House")).toHaveAttribute("aria-pressed", "false");
+    expect(chip("Tournament")).toHaveAttribute("aria-pressed", "false");
+    expect(visibleSetNames()).toHaveLength(3);
   });
 
-  it("All clears Tournament even when the category is already All", async () => {
+  it("All clears a tag toggle even when the category is already All", async () => {
     const user = userEvent.setup();
     renderTab(STRANGER);
 
-    await user.click(tournamentChip());
+    await user.click(chip("Tournament"));
     expect(visibleSetNames()).toHaveLength(2);
 
     // Category never changed, so this click is a no-op unless "All" also
-    // resets the independent toggle.
+    // resets the independent toggles.
     await user.click(chip("All"));
-    expect(visibleSetNames()).toHaveLength(6);
+    expect(visibleSetNames()).toHaveLength(3);
   });
 
-  it("All reads as unselected while any filter is still applied", async () => {
+  it("All reads as unselected while any tag filter is still applied", async () => {
     const user = userEvent.setup();
     renderTab(STRANGER);
     expect(chip("All")).toHaveAttribute("aria-pressed", "true");
 
     // A lit "All" above a filtered list is the contradiction that hid the bug.
-    await user.click(tournamentChip());
+    await user.click(chip("House"));
     expect(chip("All")).toHaveAttribute("aria-pressed", "false");
 
-    await user.click(tournamentChip());
+    await user.click(chip("House"));
     expect(chip("All")).toHaveAttribute("aria-pressed", "true");
   });
 
   it("clicking the active category chip returns to All", async () => {
     const user = userEvent.setup();
-    renderTab(STRANGER);
+    renderTab(TECH);
 
-    await user.click(chip("Community"));
-    expect(chip("Community")).toHaveAttribute("aria-pressed", "true");
+    await user.click(chip("Mine"));
+    expect(chip("Mine")).toHaveAttribute("aria-pressed", "true");
     expect(visibleSetNames()).toHaveLength(3);
 
-    await user.click(chip("Community"));
-    expect(chip("Community")).toHaveAttribute("aria-pressed", "false");
+    await user.click(chip("Mine"));
+    expect(chip("Mine")).toHaveAttribute("aria-pressed", "false");
     expect(chip("All")).toHaveAttribute("aria-pressed", "true");
-    expect(visibleSetNames()).toHaveLength(6);
+    expect(visibleSetNames()).toHaveLength(4);
   });
 
   it("the category is single-select — picking another replaces it", async () => {
     const user = userEvent.setup();
-    renderTab(STRANGER);
+    renderTab(TECH);
 
+    await user.click(chip("Mine"));
     await user.click(chip("Community"));
-    await user.click(chip("Owner's"));
 
-    expect(chip("Owner's")).toHaveAttribute("aria-pressed", "true");
-    expect(chip("Community")).toHaveAttribute("aria-pressed", "false");
+    expect(chip("Community")).toHaveAttribute("aria-pressed", "true");
+    expect(chip("Mine")).toHaveAttribute("aria-pressed", "false");
     expect(visibleSetNames()).toEqual([
-      SET.ownerDefault,
-      SET.ownerPublic,
-      SET.ownerDraft,
+      SET.preferredHouse,
+      SET.preferredTournament,
+      SET.communityHouse,
     ]);
   });
 
-  it("Tournament stays on while the category changes underneath it", async () => {
+  it("a tag toggle stays on while the category changes underneath it", async () => {
     const user = userEvent.setup();
-    renderTab(STRANGER);
+    renderTab(TECH);
 
-    await user.click(tournamentChip());
+    await user.click(chip("Tournament"));
+    await user.click(chip("Mine"));
+    expect(chip("Tournament")).toHaveAttribute("aria-pressed", "true");
+    expect(visibleSetNames()).toEqual([SET.preferredTournament]);
+
     await user.click(chip("Community"));
-    expect(tournamentChip()).toHaveAttribute("aria-pressed", "true");
-    expect(visibleSetNames()).toEqual([SET.communityTournament]);
-
-    await user.click(chip("Owner's"));
-    expect(tournamentChip()).toHaveAttribute("aria-pressed", "true");
-    expect(visibleSetNames()).toEqual([SET.ownerDefault]);
+    expect(chip("Tournament")).toHaveAttribute("aria-pressed", "true");
+    expect(visibleSetNames()).toEqual([
+      SET.preferredHouse,
+      SET.preferredTournament,
+    ]);
   });
 });
 
@@ -421,30 +488,45 @@ describe("SettingsTab filters — controls clear again", () => {
 // ---------------------------------------------------------------------------
 
 describe("SettingsTab filters — chip counts", () => {
-  it("Owner's + Community partition All, drafts included", () => {
+  it("counts leave out others' personal sets until they are shown", async () => {
+    const user = userEvent.setup();
     renderTab(STRANGER);
-    expect(chip("All")).toHaveTextContent("All 6");
-    expect(chip("Owner's")).toHaveTextContent("Owner's 3");
+    expect(chip("All")).toHaveTextContent("All 3");
     expect(chip("Community")).toHaveTextContent("Community 3");
+    expect(chip("House")).toHaveTextContent("House 2");
     expect(chip("Tournament")).toHaveTextContent("Tournament 2");
+    expect(chip(OTHERS)).toHaveTextContent(`${OTHERS} 2`);
+
+    await user.click(chip(OTHERS));
+    expect(chip("All")).toHaveTextContent("All 5");
+    expect(chip("Community")).toHaveTextContent("Community 3");
+    expect(chip("House")).toHaveTextContent("House 4");
+    expect(chip("Tournament")).toHaveTextContent("Tournament 2");
+    expect(chip(OTHERS)).toHaveTextContent(`${OTHERS} 2`);
   });
 
-  it("counts are of the whole corpus, not the filtered view", async () => {
+  it("counts are of the pool, not the filtered view", async () => {
     const user = userEvent.setup();
     renderTab(STRANGER);
 
-    await user.click(tournamentChip());
+    await user.click(chip("Tournament"));
     expect(visibleSetNames()).toHaveLength(2);
     // Filtering the list must not renumber the chips.
-    expect(chip("All")).toHaveTextContent("All 6");
-    expect(chip("Owner's")).toHaveTextContent("Owner's 3");
+    expect(chip("All")).toHaveTextContent("All 3");
     expect(chip("Community")).toHaveTextContent("Community 3");
+    expect(chip("House")).toHaveTextContent("House 2");
+  });
+
+  it("the viewer's own personal set never counts as someone else's", () => {
+    renderTab(OWNER);
+    expect(chip("Mine")).toHaveTextContent("Mine 2");
+    expect(chip(OTHERS)).toHaveTextContent(`${OTHERS} 1`);
   });
 
   it("hides Mine for an anonymous viewer", () => {
     renderTab(null);
     expect(screen.queryByRole("button", { name: /^Mine \d+$/ })).toBeNull();
-    expect(chip("Owner's")).toBeInTheDocument();
+    expect(chip(OTHERS)).toHaveTextContent(`${OTHERS} 2`);
   });
 
   it("hides Mine for a signed-in viewer who authored nothing", () => {
@@ -452,10 +534,14 @@ describe("SettingsTab filters — chip counts", () => {
     expect(screen.queryByRole("button", { name: /^Mine \d+$/ })).toBeNull();
   });
 
-  it("hides Owner's for the machine owner (redundant with Mine)", () => {
-    renderTab(OWNER);
-    expect(screen.queryByRole("button", { name: /^Owner's \d+$/ })).toBeNull();
-    expect(chip("Mine")).toHaveTextContent("Mine 3");
+  it("hides Others' personal when no one else has a personal set", () => {
+    renderTab(
+      STRANGER,
+      corpus().filter((s) => s.isCommunity)
+    );
+    expect(
+      screen.queryByRole("button", { name: /^Others' personal \d+$/ })
+    ).toBeNull();
   });
 });
 
@@ -464,23 +550,27 @@ describe("SettingsTab filters — chip counts", () => {
 // ---------------------------------------------------------------------------
 
 describe("SettingsTab filters — empty intersection", () => {
-  it("shows the no-match message when the two filters exclude everything", async () => {
+  it("shows the no-match message when the filters exclude everything", async () => {
     const user = userEvent.setup();
-    // This viewer authored one non-tournament set, so Mine ∩ Tournament = ∅.
+    // This viewer authored one House-only set, so Mine ∩ Tournament = ∅.
     const sets = [
       makeSet({
-        name: SET.ownerDefault,
-        isOwnerSet: true,
-        isPreferred: true,
-        isTournament: true,
+        name: SET.preferredHouse,
+        isCommunity: true,
+        isPreferredHouse: true,
+        tags: [HOUSE, TOURNAMENT],
         createdById: OWNER,
       }),
-      makeSet({ name: SET.communityPublic, createdById: TECH }),
+      makeSet({
+        name: SET.communityHouse,
+        isCommunity: true,
+        createdById: TECH,
+      }),
     ];
     renderTab(TECH, sets);
 
     await user.click(chip("Mine"));
-    await user.click(tournamentChip());
+    await user.click(chip("Tournament"));
 
     expect(visibleSetNames()).toEqual([]);
     expect(

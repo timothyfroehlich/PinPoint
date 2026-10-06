@@ -17,8 +17,8 @@ test.describe("Status Overhaul E2E", () => {
     test.setTimeout(60000);
   });
 
-  test.afterEach(async ({ request }) => {
-    await cleanupTestEntities(request, {
+  test.afterEach(async () => {
+    await cleanupTestEntities({
       issueTitlePrefix: "E2E Status Overhaul Test",
     });
   });

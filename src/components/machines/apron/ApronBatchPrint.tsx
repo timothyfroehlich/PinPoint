@@ -1,9 +1,16 @@
 "use client";
 
 import type React from "react";
-import { useId, useRef, useState } from "react";
+import { useId, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { AlertTriangle, ChevronLeft, Download, Search } from "lucide-react";
+import {
+  AlertTriangle,
+  Check,
+  ChevronLeft,
+  Download,
+  ListChecks,
+  Search,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { PageHeader } from "~/components/layout/PageHeader";
@@ -29,6 +36,7 @@ import {
 } from "~/lib/machines/apron-imposition";
 import { formatDate } from "~/lib/dates";
 import { cn } from "~/lib/utils";
+import { setApronCardsQueuedAction } from "~/app/(app)/m/apron-cards/actions";
 import { ApronCardFace } from "./ApronCardFace";
 import {
   apronBatchFilename,
@@ -54,19 +62,32 @@ const PAPERS: readonly ApronPrintPaper[] = ["tabloid", "letter"];
 const MARGINS: readonly ApronPrintMargin[] = ["narrow", "standard"];
 
 /**
- * Print apron cards (spec apron-cards §12): every saved card grouped by apron
- * size, a Print run panel that counts sheets for the chosen paper and margin,
- * and downloads of one print file per size plus the order sheet. Each card
- * renders once off-screen to learn whether it fits (§12.3) and, when
- * downloading, to be captured at print resolution.
+ * Print apron cards (spec apron-cards §12, §13): every saved card grouped by
+ * apron size, a Print run panel that counts sheets for the chosen paper and
+ * margin, and downloads of one print file per size plus the order sheet. The
+ * page opens with the viewer's print queue selected, and Mark as printed takes
+ * the selected queued cards out of the queue. Each card renders once
+ * off-screen to learn whether it fits (§12.3) and, when downloading, to be
+ * captured at print resolution.
  */
 export function ApronBatchPrint({
   cards,
+  queuedIds,
 }: {
   cards: readonly BatchPrintCard[];
+  /** The viewer's print queue (§13.5). */
+  queuedIds: readonly string[];
 }): React.JSX.Element {
   const id = useId();
-  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const [queued, setQueued] = useState<ReadonlySet<string>>(
+    () => new Set(queuedIds)
+  );
+  // Queued cards that do not fit stay unselected: eligible() hides them until
+  // the override, and changing the override drops them (§13.5).
+  const [selected, setSelected] = useState<ReadonlySet<string>>(
+    () => new Set(queuedIds)
+  );
+  const [isQueueing, startQueueing] = useTransition();
   const [query, setQuery] = useState("");
   const [paper, setPaper] = useState<ApronPrintPaper>("tabloid");
   const [margin, setMargin] = useState<ApronPrintMargin>("narrow");
@@ -105,6 +126,56 @@ export function ApronBatchPrint({
   });
   const totalSheets = files.reduce((sum, file) => sum + file.sheets.length, 0);
   const busy = progress !== null;
+
+  const queuedCards = cards.filter((card) => queued.has(card.id));
+  const queuedPickable = queuedCards.filter(eligible);
+  const queuedChosen = chosen.filter((card) => queued.has(card.id));
+  const queuedNotFit = queuedCards.filter(
+    (card) => overflowing[card.id]
+  ).length;
+
+  const selectQueued = (): void => {
+    setSelected((current) => {
+      const next = new Set(current);
+      for (const card of queuedPickable) next.add(card.id);
+      return next;
+    });
+  };
+
+  const setCardsQueued = (cardIds: string[], value: boolean): void => {
+    startQueueing(async () => {
+      const result = await setApronCardsQueuedAction({
+        cardIds,
+        queued: value,
+      });
+      if (!result.ok) {
+        toast.error(result.message);
+        return;
+      }
+      setQueued((current) => {
+        const next = new Set(current);
+        for (const cardId of cardIds) {
+          if (value) next.add(cardId);
+          else next.delete(cardId);
+        }
+        return next;
+      });
+      if (!value) {
+        toast.success(
+          `Removed ${count(cardIds.length, "card", "cards")} from your print queue`,
+          {
+            duration: 10_000,
+            action: {
+              label: "Undo",
+              onClick: () => {
+                setCardsQueued(cardIds, true);
+              },
+            },
+          }
+        );
+      }
+    });
+  };
 
   const toggle = (cardId: string): void => {
     setSelected((current) => {
@@ -214,6 +285,33 @@ export function ApronBatchPrint({
             />
           </div>
 
+          {queuedCards.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-primary/40 bg-primary/10 px-4 py-2.5 text-sm">
+              <ListChecks
+                className="size-4 shrink-0 text-primary"
+                aria-hidden="true"
+              />
+              <span className="font-medium">
+                Your print queue: {count(queuedCards.length, "card", "cards")}
+              </span>
+              <span className="text-muted-foreground">
+                {queuedChosen.length} selected
+                {queuedNotFit > 0 ? ` · ${queuedNotFit} doesn't fit` : ""}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="ml-auto"
+                disabled={
+                  busy || queuedPickable.every((card) => selected.has(card.id))
+                }
+                onClick={selectQueued}
+              >
+                Select queued cards
+              </Button>
+            </div>
+          ) : null}
+
           {groups.length === 0 ? (
             <p className="rounded-lg border border-border bg-card p-6 text-sm text-muted-foreground">
               {cards.length === 0 ? "No saved cards" : "No matching machines"}
@@ -277,9 +375,16 @@ export function ApronBatchPrint({
                           <span className="truncate font-medium">
                             {card.machineName}
                           </span>
-                          <span className="truncate text-sm text-muted-foreground">
-                            {card.cardName} ·{" "}
-                            {APRON_CARD_TEMPLATES[card.template].label}
+                          <span className="flex min-w-0 flex-wrap gap-x-1.5 text-sm text-muted-foreground">
+                            <span className="truncate">
+                              {card.cardName} ·{" "}
+                              {APRON_CARD_TEMPLATES[card.template].label}
+                            </span>
+                            {queued.has(card.id) ? (
+                              <span className="font-medium text-primary">
+                                Queued
+                              </span>
+                            ) : null}
                           </span>
                         </span>
                         {overflowing[card.id] ? (
@@ -415,17 +520,14 @@ export function ApronBatchPrint({
                   disabled={busy}
                   onChange={() => {
                     // Cards that do not fit leave the run with the override,
-                    // so ticking it again never brings them back (§12.3).
-                    if (override) {
-                      setSelected(
-                        (current) =>
-                          new Set(
-                            [...current].filter(
-                              (cardId) => !overflowing[cardId]
-                            )
-                          )
-                      );
-                    }
+                    // so ticking it again never brings them back (§12.3);
+                    // ticking it never selects a queued one (§13.5).
+                    setSelected(
+                      (current) =>
+                        new Set(
+                          [...current].filter((cardId) => !overflowing[cardId])
+                        )
+                    );
                     setOverride(!override);
                   }}
                 />
@@ -459,6 +561,29 @@ export function ApronBatchPrint({
               Download order sheet
             </Button>
           </div>
+
+          {queuedChosen.length > 0 ? (
+            <div className="flex flex-col gap-2 border-t border-border pt-5">
+              <Button
+                variant="outline"
+                disabled={busy || isQueueing}
+                onClick={() => {
+                  setCardsQueued(
+                    queuedChosen.map((card) => card.id),
+                    false
+                  );
+                }}
+              >
+                <Check className="size-4" aria-hidden="true" />
+                Mark as printed
+              </Button>
+              <p className="text-center text-sm text-muted-foreground">
+                Removes{" "}
+                {count(queuedChosen.length, "selected card", "selected cards")}{" "}
+                from your print queue
+              </p>
+            </div>
+          ) : null}
         </aside>
       </div>
 

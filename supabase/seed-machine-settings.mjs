@@ -2,28 +2,25 @@
 /**
  * Machine Settings Sets Demo Seed (PP-43q3, PP-tn6t) — local and preview
  *
- * Populates the `machine_settings_sets` table for ONE showcase machine, Attack
- * from Mars (AFM), so the Machine Settings tab always has something meaningful
- * to demo in local dev / design review. The six sets are spread across every
- * axis of the PP-tn6t ownership/visibility model so all the badges appear —
- * both kinds (owner/community) × both visibilities (public/private draft), with
- * the Tournament tag present on some and absent on others:
+ * Populates settings sets for Attack from Mars (AFM), so the Machine Settings
+ * tab always has something meaningful to demo in local dev / design review,
+ * covering every badge in docs/feature-specs/machine-settings.md — personal and
+ * community sets, the House and Tournament tags, and both preferred sets:
  *
- *   1. "Tournament (competition)" — the Owner's default (owner set, public,
- *      preferred) AND Tournament-tagged, showing the tag is orthogonal to the
- *      default. Created by AFM's owner. Realistic WPC competition adjustments.
- *   2. "Full reference (every section type)" — an owner set, public, not the
- *      default — a kitchen-sink set exercising EVERY section kind (software,
- *      two tables, a dip bank, three notes) so the UI's full range shows.
- *   3. "Weekly league setup" — a Community set (public, Tournament-tagged)
- *      created by a technician, showing the co-edited kind + a non-owner author.
- *   4. "Draft — testing steeper tilt" — a Community Private draft created by a
- *      technician, showing the private-draft badge (visible to its creator and
- *      admins only).
- *   5. "House standard" — a Community set, public, NOT Tournament-tagged (the
- *      contrast to set 3): a plain community badge. Created by a technician.
- *   6. "New ruleset (draft)" — an Owner Private draft (owner-authored, not
- *      public, not the default): an owner set still in the draft state.
+ *   1. "Tournament (competition)" — community, tagged House AND Tournament, the
+ *      preferred House set. Created by AFM's owner. Realistic WPC adjustments.
+ *   2. "Full reference (every section type)" — the owner's personal set, House —
+ *      a kitchen-sink set exercising EVERY section kind (software, two tables, a
+ *      dip bank, three notes) so the UI's full range shows.
+ *   3. "Weekly league setup" — community, Tournament, the preferred Tournament
+ *      set, created by a technician.
+ *   4. "Draft — testing steeper tilt" — a technician's personal set, House.
+ *   5. "House standard" — community, House, not preferred.
+ *   6. "New ruleset (draft)" — the owner's personal set, House.
+ *
+ * Godzilla and Medieval Madness (also in the seeded "APC Tournament Bank"
+ * collection) each get a preferred House and a preferred Tournament set, so a
+ * collection's settings sheet has several machines to compare.
  *
  * The data shape mirrors the `SettingsSection` union in
  * src/lib/machines/settings-types.ts. Persisted rows do NOT carry the
@@ -43,7 +40,10 @@
  * write, including when the preview controller invokes this script.
  */
 
-import postgres from "postgres";
+import {
+  createScriptClient,
+  resolveScriptDatabaseUrl,
+} from "../scripts/lib/pg-client.mjs";
 
 import { assertNotPinPointProduction } from "../scripts/lib/db-target.mjs";
 
@@ -52,12 +52,7 @@ import { assertNotPinPointProduction } from "../scripts/lib/db-target.mjs";
 // from CI / the preview pipeline runners (AGENTS.md §7). The preview "Seed
 // machine settings demo" step crashed with ENETUNREACH against the :5432 host
 // before this was switched.
-const databaseUrl = process.env.POSTGRES_URL;
-
-if (!databaseUrl) {
-  console.error("❌ POSTGRES_URL is not defined");
-  process.exit(1);
-}
+const databaseUrl = resolveScriptDatabaseUrl();
 
 // Before the client is constructed and before any network call: never prod.
 assertNotPinPointProduction(databaseUrl, "POSTGRES_URL");
@@ -76,8 +71,8 @@ function doc(text) {
  * protected "owner" sets) and `techId` (a technician — makes the co-edited
  * "community" sets). `sections` matches the persist-ready `SettingsSection[]`
  * shape (no client `_key`); the display order of `sections` is the array order
- * here. Each set carries its own `isOwnerSet` / `isPublic` / `isPreferred` /
- * `isTournament` / `createdBy` so the demo covers every PP-tn6t badge combo.
+ * here. Each set carries its own kind, preferred flags, built-in tags, and
+ * `createdBy`.
  */
 function buildSets(afmId, ownerId, techId) {
   return [
@@ -89,10 +84,10 @@ function buildSets(afmId, ownerId, techId) {
     {
       machineId: afmId,
       name: "Tournament (competition)",
-      isOwnerSet: true,
-      isPublic: true,
-      isPreferred: true,
-      isTournament: true,
+      isCommunity: true,
+      isPreferredHouse: true,
+      isPreferredTournament: false,
+      tags: ["house", "tournament"],
       createdBy: ownerId,
       description: doc(
         "Competition setup for league and tournament play: 3 balls, no extra balls, replays off."
@@ -132,10 +127,10 @@ function buildSets(afmId, ownerId, techId) {
     {
       machineId: afmId,
       name: "Full reference (every section type)",
-      isOwnerSet: true,
-      isPublic: true,
-      isPreferred: false,
-      isTournament: false,
+      isCommunity: false,
+      isPreferredHouse: false,
+      isPreferredTournament: false,
+      tags: ["house"],
       createdBy: ownerId,
       description: doc(
         "Reference set exercising every section type and field — software adjustments, two generic tables, a DIP bank, and preset + custom notes. Demo content, not a competition setup."
@@ -251,10 +246,10 @@ function buildSets(afmId, ownerId, techId) {
     {
       machineId: afmId,
       name: "Weekly league setup",
-      isOwnerSet: false,
-      isPublic: true,
-      isPreferred: false,
-      isTournament: true,
+      isCommunity: true,
+      isPreferredHouse: false,
+      isPreferredTournament: true,
+      tags: ["tournament"],
       createdBy: techId,
       description: doc(
         "Shared setup the crew keeps current for the Tuesday league night — mirrors the owner's competition floor but with a shorter ball saver for pace."
@@ -290,10 +285,10 @@ function buildSets(afmId, ownerId, techId) {
     {
       machineId: afmId,
       name: "Draft — testing steeper tilt",
-      isOwnerSet: false,
-      isPublic: false,
-      isPreferred: false,
-      isTournament: false,
+      isCommunity: false,
+      isPreferredHouse: false,
+      isPreferredTournament: false,
+      tags: ["house"],
       createdBy: techId,
       description: doc(
         "Work in progress — trying a tighter tilt before proposing it to the group. Not shared yet."
@@ -329,10 +324,10 @@ function buildSets(afmId, ownerId, techId) {
     {
       machineId: afmId,
       name: "House standard",
-      isOwnerSet: false,
-      isPublic: true,
-      isPreferred: false,
-      isTournament: false,
+      isCommunity: true,
+      isPreferredHouse: false,
+      isPreferredTournament: false,
+      tags: ["house"],
       createdBy: techId,
       description: doc(
         "Everyday casual setup for open play — a little more forgiving than the competition floor. Kept current by the crew."
@@ -360,10 +355,10 @@ function buildSets(afmId, ownerId, techId) {
     {
       machineId: afmId,
       name: "New ruleset (draft)",
-      isOwnerSet: true,
-      isPublic: false,
-      isPreferred: false,
-      isTournament: false,
+      isCommunity: false,
+      isPreferredHouse: false,
+      isPreferredTournament: false,
+      tags: ["house"],
       createdBy: ownerId,
       description: doc(
         "Sketching out a slightly harder house ruleset. Not ready to make this the default yet — still testing it on location."
@@ -393,8 +388,55 @@ function buildSets(afmId, ownerId, techId) {
   ];
 }
 
+/**
+ * A preferred House and a preferred Tournament set for a collection machine:
+ * community sets with a few typical software differences.
+ */
+function buildBankSets(machineId, techId) {
+  const software = (rows) => [
+    {
+      id: "sec-software",
+      kind: "software",
+      baseline: "Factory Install",
+      rows,
+    },
+  ];
+  return [
+    {
+      machineId,
+      name: "House",
+      isCommunity: true,
+      isPreferredHouse: true,
+      isPreferredTournament: false,
+      tags: ["house"],
+      createdBy: techId,
+      description: null,
+      sections: software([
+        { id: "A.1 01", name: "Balls Per Game", value: "3" },
+        { id: "A.1 03", name: "Maximum Extra Balls", value: "3" },
+        { id: "A.2 09", name: "Ball Saver", value: "On (8 seconds)" },
+      ]),
+    },
+    {
+      machineId,
+      name: "Tournament",
+      isCommunity: true,
+      isPreferredHouse: false,
+      isPreferredTournament: true,
+      tags: ["tournament"],
+      createdBy: techId,
+      description: null,
+      sections: software([
+        { id: "A.1 01", name: "Balls Per Game", value: "3" },
+        { id: "A.1 03", name: "Maximum Extra Balls", value: "0" },
+        { id: "A.2 09", name: "Ball Saver", value: "Off" },
+      ]),
+    },
+  ];
+}
+
 async function run() {
-  const sql = postgres(databaseUrl, { prepare: false });
+  const sql = createScriptClient(databaseUrl);
 
   try {
     const [afm] = await sql`
@@ -492,36 +534,63 @@ async function run() {
 
     const sets = buildSets(afm.id, ownerId, techId);
 
-    // Deterministic: wipe AFM's existing sets, then insert this pair. Clearing
-    // first also sidesteps the partial unique index on is_preferred (a stale
-    // preferred row would otherwise collide with set 1's insert).
-    await sql`DELETE FROM machine_settings_sets WHERE machine_id = ${afm.id}`;
+    // Built-in House and Tournament tags. Migration 0105 inserts them, but the
+    // fast reset truncates tables without re-running migrations, so make sure.
+    await sql`
+      INSERT INTO settings_tags (slug, name, is_builtin)
+      VALUES ('house', 'House', true), ('tournament', 'Tournament', true)
+      ON CONFLICT (slug) DO NOTHING
+    `;
+    const tagRows = await sql`
+      SELECT id, slug FROM settings_tags WHERE slug IN ('house', 'tournament')
+    `;
+    const tagIdBySlug = new Map(tagRows.map((t) => [t.slug, t.id]));
 
-    for (const set of sets) {
-      await sql`
+    async function insertSet(set) {
+      const [row] = await sql`
         INSERT INTO machine_settings_sets (
           machine_id, name, description, sections,
-          is_owner_set, is_public, is_preferred, is_tournament,
+          is_community, is_preferred, is_preferred_tournament,
           created_by, updated_by, created_at, updated_at
         ) VALUES (
           ${set.machineId},
           ${set.name},
           ${set.description ? sql.json(set.description) : null},
           ${sql.json(set.sections)},
-          ${set.isOwnerSet},
-          ${set.isPublic},
-          ${set.isPreferred},
-          ${set.isTournament},
+          ${set.isCommunity},
+          ${set.isPreferredHouse},
+          ${set.isPreferredTournament},
           ${set.createdBy ?? author},
           ${set.createdBy ?? author},
           NOW(),
           NOW()
         )
+        RETURNING id
       `;
+      for (const slug of set.tags) {
+        await sql`
+          INSERT INTO machine_settings_set_tags (set_id, tag_id, added_by)
+          VALUES (${row.id}, ${tagIdBySlug.get(slug)}, ${set.createdBy ?? author})
+        `;
+      }
+    }
+
+    // Deterministic: wipe each demo machine's sets (tags cascade), then insert.
+    // Clearing first also sidesteps the preferred partial unique indexes.
+    await sql`DELETE FROM machine_settings_sets WHERE machine_id = ${afm.id}`;
+    for (const set of sets) await insertSet(set);
+
+    const bankMachines = await sql`
+      SELECT id, name FROM machines
+      WHERE name IN ('Godzilla', 'Medieval Madness')
+    `;
+    for (const machine of bankMachines) {
+      await sql`DELETE FROM machine_settings_sets WHERE machine_id = ${machine.id}`;
+      for (const set of buildBankSets(machine.id, techId)) await insertSet(set);
     }
 
     console.log(
-      `✅ Machine settings seeded: ${sets.length} sets (owner default+tournament, owner public, owner draft, community public+tournament, community public, community draft) + owner requests + access instructions on Attack from Mars (AFM).`
+      `✅ Machine settings seeded: ${sets.length} sets on Attack from Mars (AFM) + owner requests + access instructions; preferred House and Tournament sets on ${String(bankMachines.length)} more machine(s).`
     );
   } finally {
     await sql.end();

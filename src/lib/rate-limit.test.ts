@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 /**
  * Unit coverage for the shared rate-limit checker factory (PP-ql95).
  *
- * The seven exported checkers are built from one `makeLimitChecker` factory, so
+ * The exported checkers are built from one `makeLimitChecker` factory, so
  * these tests exercise the behavior the factory centralizes — lazy limiter
  * init, the Redis-unconfigured fallback, fail-closed-in-prod / fail-open-in-dev
  * semantics, IP "unknown" handling, and email lowercasing — through a
@@ -274,6 +274,132 @@ describe("rate-limit checker factory", () => {
 
     // One Ratelimit constructed for the single checker, despite two calls.
     expect(ctorMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("rate-limit limiter table (live Redis bucket identity)", () => {
+  // Redis prefixes name live production buckets: changing one resets every
+  // counter under it. This table was captured from the code before the LIMITS
+  // table refactor (PP-az4d.18) and must stay byte-identical.
+  const EXPECTED = [
+    ["checkLoginIpLimit", "ratelimit:login:ip", "sliding", 10, "15 m", "ip-1"],
+    [
+      "checkLoginAccountLimit",
+      "ratelimit:login:account",
+      "fixed",
+      5,
+      "15 m",
+      "a@b.c",
+    ],
+    ["checkSignupLimit", "ratelimit:signup:ip", "sliding", 3, "1 h", "ip-1"],
+    [
+      "checkForgotPasswordLimit",
+      "ratelimit:forgot-password:email",
+      "fixed",
+      3,
+      "1 h",
+      "a@b.c",
+    ],
+    [
+      "checkPublicIssueLimit",
+      "ratelimit:public-issue:ip",
+      "sliding",
+      5,
+      "15 m",
+      "ip-1",
+    ],
+    [
+      "checkAuthenticatedIssueLimit",
+      "ratelimit:report:user",
+      "sliding",
+      20,
+      "15 m",
+      "user-1",
+    ],
+    [
+      "checkPinballMapLinkLimit",
+      "ratelimit:pinballmap-link:user",
+      "fixed",
+      5,
+      "15 m",
+      "user-1",
+    ],
+    [
+      "checkImageUploadLimit",
+      "ratelimit:image-upload:ip",
+      "sliding",
+      10,
+      "1 h",
+      "ip-1",
+    ],
+    [
+      "checkMcpRequestLimit",
+      "ratelimit:mcp:request",
+      "sliding",
+      120,
+      "1 m",
+      "u",
+    ],
+    ["checkMcpWriteLimit", "ratelimit:mcp:write", "sliding", 20, "1 m", "u"],
+  ] as const;
+
+  beforeEach(() => {
+    vi.resetModules();
+    vi.unstubAllEnvs();
+    vi.clearAllMocks();
+    stubRedisConfigured();
+    stubProduction();
+    limitMock.mockResolvedValue({
+      success: true,
+      limit: 1,
+      remaining: 1,
+      reset: 0,
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it.each(EXPECTED)(
+    "%s builds the %s limiter with an unchanged algorithm, limit and window",
+    async (exportName, prefix, algorithm, count, window, key) => {
+      const mod = await import("./rate-limit");
+      await mod[exportName](key);
+
+      expect(ctorMock).toHaveBeenCalledTimes(1);
+      expect(ctorMock).toHaveBeenCalledWith(
+        expect.objectContaining({ prefix, analytics: true })
+      );
+      const windowMock =
+        algorithm === "sliding" ? slidingWindowMock : fixedWindowMock;
+      const otherMock =
+        algorithm === "sliding" ? fixedWindowMock : slidingWindowMock;
+      expect(windowMock).toHaveBeenCalledExactlyOnceWith(count, window);
+      expect(otherMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it("builds the quick-search IP and user limiters with unchanged prefixes", async () => {
+    const mod = await import("./rate-limit");
+    await mod.checkQuickSearchLimit("ip-1");
+    await mod.checkQuickSearchLimit("ip-1", "user-1");
+
+    expect(ctorMock.mock.calls.map(([o]) => o)).toEqual([
+      expect.objectContaining({
+        prefix: "ratelimit:quick-search:ip",
+        analytics: true,
+      }),
+      expect.objectContaining({
+        prefix: "ratelimit:quick-search:user",
+        analytics: true,
+      }),
+    ]);
+    expect(slidingWindowMock.mock.calls).toEqual([
+      [60, "1 m"],
+      [120, "1 m"],
+    ]);
+    expect(fixedWindowMock).not.toHaveBeenCalled();
   });
 });
 

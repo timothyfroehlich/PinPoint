@@ -4,6 +4,9 @@ import { notFound } from "next/navigation";
 import { MachineGroupShell } from "~/components/collections/MachineGroupShell";
 import { EditCollectionDialog } from "~/components/collections/EditCollectionDialog";
 import { CollectionShareDialog } from "~/components/collections/CollectionShareDialog";
+import { ClampedDescription } from "~/components/collections/ClampedDescription";
+import { RichTextDisplay } from "~/components/editor/RichTextDisplay";
+import { docIsEmpty, docToPlainText } from "~/lib/tiptap/types";
 import {
   getEditorCollaborators,
   getGrantableMembers,
@@ -70,6 +73,7 @@ export default async function CollectionLayout({
         <EditCollectionDialog
           collectionId={data.collection.id}
           currentName={data.collection.name}
+          currentDescription={data.collection.description}
           allMachines={allMachines}
           currentIds={data.collection.machines.map((m) => m.id)}
           canDelete={data.viewerCanManage}
@@ -78,12 +82,23 @@ export default async function CollectionLayout({
     );
   }
 
+  // Saves store a blank description as null; the text check also covers an
+  // empty doc written some other way, so the header never paints an empty block.
+  const { description } = data.collection;
+  const descriptionBlock =
+    !docIsEmpty(description) && docToPlainText(description).trim() ? (
+      <ClampedDescription>
+        <RichTextDisplay content={description} />
+      </ClampedDescription>
+    ) : null;
+
   return (
     <MachineGroupShell
       title={data.collection.name}
       machines={data.collection.machines}
       basePath={`/c/${data.handle}`}
       action={headerAction}
+      description={descriptionBlock}
     >
       {children}
     </MachineGroupShell>

@@ -7,9 +7,10 @@
 
 import {
   type AccessLevel,
+  type PermissionId,
   type PermissionValue,
   getPermission,
-  PERMISSIONS_BY_ID,
+  PERMISSION_IDS,
 } from "./matrix";
 import type { UserRole } from "~/lib/types";
 
@@ -48,7 +49,7 @@ export function getAccessLevel(role: UserRole | undefined | null): AccessLevel {
  * @returns true if permission is granted, false otherwise
  */
 export function checkPermission(
-  permissionId: string,
+  permissionId: PermissionId,
   accessLevel: AccessLevel,
   context?: OwnershipContext
 ): boolean {
@@ -85,7 +86,7 @@ export type PermissionState =
   | { allowed: false; reason: "unauthenticated" | "role" | "ownership" };
 
 export function getPermissionState(
-  permissionId: string,
+  permissionId: PermissionId,
   accessLevel: AccessLevel,
   context?: OwnershipContext
 ): PermissionState {
@@ -128,7 +129,7 @@ export function getPermissionState(
  * Useful for tooltip text on disabled controls.
  */
 export function getPermissionDeniedReason(
-  permissionId: string,
+  permissionId: PermissionId,
   accessLevel: AccessLevel,
   context?: OwnershipContext
 ): string | null {
@@ -160,7 +161,7 @@ export function getPermissionDeniedReason(
  * Returns true only if ALL permissions are granted.
  */
 export function checkPermissions(
-  permissionIds: string[],
+  permissionIds: readonly PermissionId[],
   accessLevel: AccessLevel,
   context?: OwnershipContext
 ): boolean {
@@ -171,7 +172,7 @@ export function checkPermissions(
  * Check if ANY of the given permissions are granted.
  */
 export function checkAnyPermission(
-  permissionIds: string[],
+  permissionIds: readonly PermissionId[],
   accessLevel: AccessLevel,
   context?: OwnershipContext
 ): boolean {
@@ -185,8 +186,8 @@ export function checkAnyPermission(
 export function getGrantedPermissions(
   accessLevel: AccessLevel,
   context?: OwnershipContext
-): string[] {
-  return Object.keys(PERMISSIONS_BY_ID).filter((id) =>
+): PermissionId[] {
+  return PERMISSION_IDS.filter((id) =>
     checkPermission(id, accessLevel, context)
   );
 }
@@ -196,7 +197,7 @@ export function getGrantedPermissions(
  * Useful when you need to know if a permission is conditional.
  */
 export function getRawPermissionValue(
-  permissionId: string,
+  permissionId: PermissionId,
   accessLevel: AccessLevel
 ): PermissionValue {
   return getPermission(permissionId, accessLevel);
@@ -206,7 +207,7 @@ export function getRawPermissionValue(
  * Check if a permission is conditional (requires ownership check).
  */
 export function isConditionalPermission(
-  permissionId: string,
+  permissionId: PermissionId,
   accessLevel: AccessLevel
 ): boolean {
   const value = getPermission(permissionId, accessLevel);

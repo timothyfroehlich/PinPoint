@@ -5,6 +5,7 @@ import {
   createTestMachine,
   createTestUser,
 } from "~/test/helpers/factories";
+import { signInAs, signOut } from "~/test/helpers/mock-auth";
 import {
   collectionMachines,
   collections,
@@ -18,23 +19,9 @@ import { plainTextToDoc } from "~/lib/tiptap/types";
 import type { ExportIssuesResult } from "~/app/(app)/issues/export-action";
 
 // --- boundary mocks -------------------------------------------------------
-const mockGetUser = vi.fn();
-vi.mock("~/lib/supabase/server", () => ({
-  createClient: () => Promise.resolve({ auth: { getUser: mockGetUser } }),
-}));
-vi.mock("~/server/db", async () => {
-  const { getTestDb } = await import("~/test/setup/pglite");
-  return { db: await getTestDb() };
-});
+vi.mock("~/lib/supabase/server", () => import("~/test/helpers/mock-auth"));
 
 const { exportIssuesAction } = await import("~/app/(app)/issues/export-action");
-
-function signIn(userId: string): void {
-  mockGetUser.mockResolvedValue({
-    data: { user: { id: userId } },
-    error: null,
-  });
-}
 
 /** The Issue ID column of an export, in row order. */
 function exportedIds(result: ExportIssuesResult): string[] {
@@ -61,7 +48,7 @@ describe("exportIssuesAction — PGlite integration (CORE-TEST-004, CORE-TEST-00
   const VIEW_TOKEN = "share-token-for-tests";
 
   beforeEach(async () => {
-    mockGetUser.mockReset();
+    signOut();
     const db = await getTestDb();
     await db.insert(userProfiles).values([
       createTestUser({ id: OWNER, firstName: "Olive", lastName: "Owner" }),
@@ -166,7 +153,7 @@ describe("exportIssuesAction — PGlite integration (CORE-TEST-004, CORE-TEST-00
   });
 
   it("exports only a Collection's issues when its owner opens it by id", async () => {
-    signIn(OWNER);
+    signInAs(OWNER);
     const result = await exportIssuesAction({
       scope: { kind: "collection", handle: collectionId },
     });
@@ -174,7 +161,7 @@ describe("exportIssuesAction — PGlite integration (CORE-TEST-004, CORE-TEST-00
   });
 
   it("narrows within the scope and never widens it with a client machine filter", async () => {
-    signIn(OWNER);
+    signInAs(OWNER);
     const result = await exportIssuesAction({
       filtersJson: JSON.stringify({ machine: ["IN", "OUT"] }),
       scope: { kind: "collection", handle: collectionId },
@@ -190,7 +177,7 @@ describe("exportIssuesAction — PGlite integration (CORE-TEST-004, CORE-TEST-00
   });
 
   it("refuses a Collection id the viewer cannot open, as the tab does", async () => {
-    signIn(STRANGER);
+    signInAs(STRANGER);
     const result = await exportIssuesAction({
       scope: { kind: "collection", handle: collectionId },
     });
@@ -199,7 +186,7 @@ describe("exportIssuesAction — PGlite integration (CORE-TEST-004, CORE-TEST-00
   });
 
   it("exports a shared Collection through its view token", async () => {
-    signIn(STRANGER);
+    signInAs(STRANGER);
     const result = await exportIssuesAction({
       scope: { kind: "collection", handle: VIEW_TOKEN },
     });
@@ -207,7 +194,7 @@ describe("exportIssuesAction — PGlite integration (CORE-TEST-004, CORE-TEST-00
   });
 
   it("exports an owner Collection's issues", async () => {
-    signIn(STRANGER);
+    signInAs(STRANGER);
     const result = await exportIssuesAction({
       scope: { kind: "owner", userId: OWNER },
     });
@@ -215,7 +202,7 @@ describe("exportIssuesAction — PGlite integration (CORE-TEST-004, CORE-TEST-00
   });
 
   it("exports a Tag's issues", async () => {
-    signIn(STRANGER);
+    signInAs(STRANGER);
     const result = await exportIssuesAction({
       scope: { kind: "tag", type: "manufacturer", slug: "williams" },
     });
@@ -223,7 +210,7 @@ describe("exportIssuesAction — PGlite integration (CORE-TEST-004, CORE-TEST-00
   });
 
   it("exports every issue on /issues when no scope is named", async () => {
-    signIn(STRANGER);
+    signInAs(STRANGER);
     const result = await exportIssuesAction({
       filtersJson: JSON.stringify({ sort: "issue_asc" }),
     });
@@ -232,7 +219,7 @@ describe("exportIssuesAction — PGlite integration (CORE-TEST-004, CORE-TEST-00
   });
 
   it("keeps the machine-page export: every status, whatever the presence", async () => {
-    signIn(STRANGER);
+    signInAs(STRANGER);
     const result = await exportIssuesAction({ machineInitials: "OFF" });
     expect(exportedIds(result)).toEqual(["OFF-01"]);
   });
@@ -242,7 +229,7 @@ describe("exportIssuesAction — PGlite integration (CORE-TEST-004, CORE-TEST-00
   // ---------------------------------------------------------------------------
   describe("authentication and validation", () => {
     it("returns UNAUTHORIZED when user is not signed in", async () => {
-      mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
+      signOut();
 
       const result = await exportIssuesAction({});
 
@@ -253,7 +240,7 @@ describe("exportIssuesAction — PGlite integration (CORE-TEST-004, CORE-TEST-00
     });
 
     it("returns VALIDATION for invalid machineInitials", async () => {
-      signIn(STRANGER);
+      signInAs(STRANGER);
 
       const result = await exportIssuesAction({ machineInitials: "AB@CD" });
 
@@ -264,7 +251,7 @@ describe("exportIssuesAction — PGlite integration (CORE-TEST-004, CORE-TEST-00
     });
 
     it("returns VALIDATION for malformed filtersJson", async () => {
-      signIn(STRANGER);
+      signInAs(STRANGER);
 
       const result = await exportIssuesAction({ filtersJson: "not-json" });
 
@@ -275,7 +262,7 @@ describe("exportIssuesAction — PGlite integration (CORE-TEST-004, CORE-TEST-00
     });
 
     it("returns VALIDATION rather than exporting everything when filters fail the schema", async () => {
-      signIn(STRANGER);
+      signInAs(STRANGER);
 
       const result = await exportIssuesAction({
         filtersJson: JSON.stringify({ status: ["invalid-status"] }),
@@ -294,7 +281,7 @@ describe("exportIssuesAction — PGlite integration (CORE-TEST-004, CORE-TEST-00
   // ---------------------------------------------------------------------------
   describe("empty results", () => {
     it("returns EMPTY when no issues match filters", async () => {
-      signIn(STRANGER);
+      signInAs(STRANGER);
 
       const result = await exportIssuesAction({
         filtersJson: JSON.stringify({ q: "nonexistent-query-string" }),
@@ -312,7 +299,7 @@ describe("exportIssuesAction — PGlite integration (CORE-TEST-004, CORE-TEST-00
   // ---------------------------------------------------------------------------
   describe("CSV output and formatting", () => {
     it("produces correct headers in order", async () => {
-      signIn(STRANGER);
+      signInAs(STRANGER);
 
       const result = await exportIssuesAction({});
 
@@ -326,7 +313,7 @@ describe("exportIssuesAction — PGlite integration (CORE-TEST-004, CORE-TEST-00
     });
 
     it("formats general export filename as pinpoint-issues-YYYY-MM-DD.csv", async () => {
-      signIn(STRANGER);
+      signInAs(STRANGER);
 
       const result = await exportIssuesAction({});
 
@@ -339,7 +326,7 @@ describe("exportIssuesAction — PGlite integration (CORE-TEST-004, CORE-TEST-00
     });
 
     it("formats machine export filename with machine initials", async () => {
-      signIn(STRANGER);
+      signInAs(STRANGER);
 
       const result = await exportIssuesAction({ machineInitials: "IN" });
 
@@ -352,7 +339,7 @@ describe("exportIssuesAction — PGlite integration (CORE-TEST-004, CORE-TEST-00
     });
 
     it("formats reporters correctly: user name, invited name, and Anonymous", async () => {
-      signIn(STRANGER);
+      signInAs(STRANGER);
 
       const result = await exportIssuesAction({
         filtersJson: JSON.stringify({ sort: "issue_asc" }),
@@ -370,7 +357,7 @@ describe("exportIssuesAction — PGlite integration (CORE-TEST-004, CORE-TEST-00
     });
 
     it("maps row values to correct columns", async () => {
-      signIn(STRANGER);
+      signInAs(STRANGER);
 
       const result = await exportIssuesAction({ machineInitials: "IN" });
 
@@ -401,7 +388,7 @@ describe("exportIssuesAction — PGlite integration (CORE-TEST-004, CORE-TEST-00
   // ---------------------------------------------------------------------------
   describe("filter parsing", () => {
     it("coerces ISO date strings in filtersJson into Date objects", async () => {
-      signIn(STRANGER);
+      signInAs(STRANGER);
 
       const result = await exportIssuesAction({
         filtersJson: JSON.stringify({
@@ -417,7 +404,7 @@ describe("exportIssuesAction — PGlite integration (CORE-TEST-004, CORE-TEST-00
     });
 
     it("filters by watched issues for the signed-in user", async () => {
-      signIn(STRANGER);
+      signInAs(STRANGER);
 
       const result = await exportIssuesAction({
         filtersJson: JSON.stringify({ watching: true, sort: "issue_asc" }),
@@ -436,7 +423,7 @@ describe("exportIssuesAction — PGlite integration (CORE-TEST-004, CORE-TEST-00
   // ---------------------------------------------------------------------------
   describe("server errors", () => {
     it("returns SERVER error when database query throws", async () => {
-      signIn(STRANGER);
+      signInAs(STRANGER);
       const db = await getTestDb();
       const spy = vi
         .spyOn(db.query.issues, "findMany")
@@ -455,7 +442,7 @@ describe("exportIssuesAction — PGlite integration (CORE-TEST-004, CORE-TEST-00
     });
 
     it("returns SERVER error when a scope loader throws", async () => {
-      signIn(STRANGER);
+      signInAs(STRANGER);
       const exportScope = await import("~/app/(app)/issues/export-scope");
       const spy = vi
         .spyOn(exportScope, "resolveExportScopeInitials")
