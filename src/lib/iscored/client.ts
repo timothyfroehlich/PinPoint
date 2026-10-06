@@ -2,6 +2,7 @@ import "server-only";
 
 import { cache as reactCache } from "react";
 import { log } from "~/lib/logger";
+import { reportError } from "~/lib/observability/report-error";
 import {
   ISCORED_BASE_URL,
   ISCORED_CACHE_TTL_MS,
@@ -216,6 +217,11 @@ async function fetchAndCacheScores(user: string): Promise<void> {
     cache.lastFetchedAt = Date.now();
   } catch (err) {
     log.warn({ err, user }, "Failed to fetch iScored scores");
+    reportError(err, {
+      action: "iscored.fetchScores",
+      bestEffort: true,
+      user,
+    });
     cache.lastFetchedAt = Date.now();
   }
 }
@@ -448,6 +454,11 @@ async function fetchAndCacheGames(user: string): Promise<void> {
     gamesCache.lastFetchedAt = Date.now();
   } catch (err) {
     log.warn({ err, user }, "Failed to fetch iScored gameroom games");
+    reportError(err, {
+      action: "iscored.fetchGameroomGames",
+      bestEffort: true,
+      user,
+    });
     markFetchFailure();
   }
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { log } from "~/lib/logger";
+import { reportError } from "~/lib/observability/report-error";
 import {
   authorizeQuickSearch,
   limitQuickSearch,
@@ -17,6 +18,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     return NextResponse.json(await listQuickSearchMachines());
   } catch (error) {
     log.error({ err: error }, "Quick search machine list failed");
+    reportError(error, { action: "quickSearch.machines" });
     return NextResponse.json({ error: "Search failed" }, { status: 500 });
   }
 }
