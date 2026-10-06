@@ -18,8 +18,8 @@ import { fillReportForm } from "../support/page-helpers.js";
 const PUBLIC_PREFIX = "E2E Public Report";
 
 test.describe("Public Issue Reporting", () => {
-  test.afterEach(async ({ request }) => {
-    await cleanupTestEntities(request, {
+  test.afterEach(async () => {
+    await cleanupTestEntities({
       issueTitlePrefix: PUBLIC_PREFIX,
     });
   });
