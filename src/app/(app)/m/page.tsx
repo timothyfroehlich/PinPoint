@@ -15,6 +15,7 @@ import { lineupToReviewCount } from "~/lib/pinballmap/lineup-comparison";
 import { loadLineupData } from "~/lib/pinballmap/lineup-data";
 import { toMachineViewSearchParams } from "~/lib/machines/view/state";
 import { loadMachineViewSavedViews } from "~/lib/machines/view/saved-views";
+import { getQueuedApronCardIds } from "~/app/(app)/m/apron-cards/_data";
 
 interface MachinesPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -51,14 +52,19 @@ export default async function MachinesPage({
     viewSearchParams
   );
   if (redirectTo) redirect(redirectTo);
-  const [result, lineupData] = await Promise.all([
+  const [result, lineupData, queuedApronCardIds] = await Promise.all([
     loadMachineView({
       scope: { kind: "all" },
       preset: "machines",
       searchParams: viewSearchParams,
     }),
     canViewLineup ? loadLineupData() : Promise.resolve(null),
+    // The viewer's print queue count on Print apron cards (apron-cards §13.4).
+    canPrintApronCards && viewer.userId !== undefined
+      ? getQueuedApronCardIds(viewer.userId)
+      : Promise.resolve([]),
   ]);
+  const apronQueueCount = queuedApronCardIds.length;
   // The "to review" count comes from the same stored-data comparison the
   // lineup page renders, so the badge can never disagree with the page it links
   // to (§4.1). It is zero until there is a lineup to compare (§2.4–§2.5).
@@ -115,7 +121,10 @@ export default async function MachinesPage({
   const pageActions = (
     <>
       {lineupButton}
-      <MachinesPrintMenu canPrintApronCards={canPrintApronCards} />
+      <MachinesPrintMenu
+        canPrintApronCards={canPrintApronCards}
+        apronQueueCount={apronQueueCount}
+      />
       {addMachineButton}
     </>
   );

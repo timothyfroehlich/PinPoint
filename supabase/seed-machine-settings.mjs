@@ -43,7 +43,10 @@
  * write, including when the preview controller invokes this script.
  */
 
-import postgres from "postgres";
+import {
+  createScriptClient,
+  resolveScriptDatabaseUrl,
+} from "../scripts/lib/pg-client.mjs";
 
 import { assertNotPinPointProduction } from "../scripts/lib/db-target.mjs";
 
@@ -52,12 +55,7 @@ import { assertNotPinPointProduction } from "../scripts/lib/db-target.mjs";
 // from CI / the preview pipeline runners (AGENTS.md §7). The preview "Seed
 // machine settings demo" step crashed with ENETUNREACH against the :5432 host
 // before this was switched.
-const databaseUrl = process.env.POSTGRES_URL;
-
-if (!databaseUrl) {
-  console.error("❌ POSTGRES_URL is not defined");
-  process.exit(1);
-}
+const databaseUrl = resolveScriptDatabaseUrl();
 
 // Before the client is constructed and before any network call: never prod.
 assertNotPinPointProduction(databaseUrl, "POSTGRES_URL");
@@ -671,7 +669,7 @@ const SHEET_SETS = {
 };
 
 async function run() {
-  const sql = postgres(databaseUrl, { prepare: false });
+  const sql = createScriptClient(databaseUrl);
 
   try {
     const [afm] = await sql`
