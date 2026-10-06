@@ -17,16 +17,24 @@ Exit status: 0 when the generated statements are all in the reviewed SQL,
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from pathlib import Path
 
 BREAKPOINT = "--> statement-breakpoint"
 
 
+BLOCK_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
+
+
 def statements(sql: str) -> list[str]:
-    """Split migration SQL into statements, dropping comment lines and whitespace."""
+    """Split migration SQL into statements, dropping comments and whitespace.
+
+    Block comments go first, so a statement commented out in the reviewed SQL
+    does not count as present.
+    """
     result: list[str] = []
-    for chunk in sql.split(BREAKPOINT):
+    for chunk in BLOCK_COMMENT.sub(" ", sql).split(BREAKPOINT):
         lines = [
             line.strip()
             for line in chunk.splitlines()
@@ -49,9 +57,20 @@ def missing_from_reviewed(generated: str, reviewed: str) -> list[str]:
 
 
 def hand_written(generated: str, reviewed: str) -> list[str]:
-    """Reviewed statements that Drizzle did not generate."""
-    generated_set = set(statements(generated))
-    return [s for s in statements(reviewed) if s not in generated_set]
+    """Reviewed SQL left over once every generated statement is taken out.
+
+    Same text matching as missing_from_reviewed, so a generated statement that
+    shares a chunk with a hand-written one is not listed as hand-written.
+    """
+    generated_statements = statements(generated)
+    result: list[str] = []
+    for chunk in statements(reviewed):
+        for statement in generated_statements:
+            chunk = chunk.replace(statement, " ")
+        chunk = " ".join(chunk.split())
+        if chunk:
+            result.append(chunk)
+    return result
 
 
 def main(argv: list[str] | None = None) -> int:

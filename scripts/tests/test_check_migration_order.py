@@ -12,7 +12,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from check_migration_order import (  # noqa: E402
     check_against_base,
     check_tree,
-    find_repo_root,
     main,
 )
 
@@ -51,7 +50,7 @@ BASE = [("0000_init", 1000), ("0001_users", 2000)]
 
 def test_current_repo_passes():
     """The live journal passes (single live-repo test)."""
-    root = find_repo_root(Path(__file__).resolve().parent)
+    root = Path(__file__).resolve().parents[2]
     assert check_tree(root / "drizzle") == []
 
 

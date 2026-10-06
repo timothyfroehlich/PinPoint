@@ -47,14 +47,6 @@ TAG_PATTERN = re.compile(r"^(\d{4})_[A-Za-z0-9_-]+$")
 GRANDFATHERED_WHEN = frozenset({("0012_fix_rls_user_metadata", 1738972800000)})
 
 
-def find_repo_root(start: Path) -> Path:
-    """Walk up until a directory containing package.json is found."""
-    for candidate in (start, *start.parents):
-        if (candidate / "package.json").is_file():
-            return candidate
-    return start
-
-
 def load_entries(drizzle_dir: Path) -> list[dict[str, object]]:
     journal = json.loads((drizzle_dir / "meta" / "_journal.json").read_text())
     entries = journal.get("entries")
@@ -196,7 +188,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    root = args.root or find_repo_root(Path(__file__).resolve().parent)
+    # scripts/ sits directly under the repository root.
+    root = args.root or Path(__file__).resolve().parents[1]
     drizzle_dir = root / "drizzle"
     errors = check_tree(drizzle_dir)
     if args.base_dir is not None:

@@ -98,12 +98,14 @@ async function tryMigrationLock(): Promise<boolean> {
 }
 
 async function describeLockHolder(): Promise<string> {
-  // A one-key advisory lock stores the key's low 32 bits in objid.
+  // A one-key (bigint) advisory lock stores the key's high 32 bits in classid
+  // and its low 32 bits in objid.
   const rows = await sql<{ pid: number; backend_start: string | null }[]>`
     SELECT l.pid, a.backend_start::text AS backend_start
     FROM pg_locks l
     LEFT JOIN pg_stat_activity a USING (pid)
     WHERE l.locktype = 'advisory' AND l.granted AND l.objsubid = 1
+      AND l.classid::bigint = ((hashtext(${MIGRATION_LOCK_KEY})::bigint >> 32) & 4294967295)
       AND l.objid::bigint = (hashtext(${MIGRATION_LOCK_KEY})::bigint & 4294967295)
   `;
   const [holder] = rows;

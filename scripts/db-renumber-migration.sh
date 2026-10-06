@@ -33,6 +33,7 @@ die() {
 
 repo_root=$(git rev-parse --show-toplevel)
 cd "$repo_root"
+command -v jq >/dev/null || die "jq is required (brew install jq)."
 
 git rev-parse -q --verify MERGE_HEAD >/dev/null ||
   die "no merge in progress. Run \`git merge origin/main\` first."
@@ -70,8 +71,7 @@ work_dir=$(mktemp -d)
 index_file=$(git rev-parse --git-path index)
 drizzle_touched=0
 renumbered=0
-new_tag=""
-before=""
+untracked_before=""
 
 # On any failure after drizzle/ is touched, put the merge back the way the
 # script found it: restore the saved index (its drizzle/ conflicts unresolved,
@@ -81,15 +81,19 @@ before=""
 cleanup() {
   if [[ $drizzle_touched -eq 1 && $renumbered -eq 0 ]]; then
     cp "$work_dir/index" "$index_file"
-    git checkout -m -- drizzle/ 2>/dev/null || true
-    if [[ -n $new_tag && $new_tag != "$before" ]]; then
-      local path
-      for path in "drizzle/${new_tag}.sql" "drizzle/meta/${new_tag%%_*}_snapshot.json"; do
-        git ls-files --error-unmatch -- "$path" >/dev/null 2>&1 || rm -f -- "$path"
-      done
+    # Delete only untracked drizzle/ files that appeared during this run, which
+    # covers a drizzle-kit run that wrote files and then failed.
+    local path
+    while IFS= read -r path; do
+      [[ -n $path ]] && ! grep -Fxq -- "$path" <<< "$untracked_before" && rm -f -- "$path"
+    done < <(git ls-files --others --exclude-standard -- drizzle/)
+    if git checkout -m -- drizzle/ 2>/dev/null; then
+      printf '\nThe merge is back where the script found it, drizzle/ conflicts unresolved.\n' >&2
+      printf 'Run git merge --abort to start over, or finish by hand (pinpoint-deployment skill, "Migration Conflicts").\n' >&2
+    else
+      printf '\nCould not rebuild the drizzle/ conflict files; the working tree may not match the index.\n' >&2
+      printf 'Run git merge --abort to start over.\n' >&2
     fi
-    printf '\nThe merge is back where the script found it, drizzle/ conflicts unresolved.\n' >&2
-    printf 'Run git merge --abort to start over, or finish by hand (pinpoint-deployment skill, "Migration Conflicts").\n' >&2
   fi
   rm -rf "$work_dir"
 }
@@ -100,6 +104,7 @@ git archive "$base_side" drizzle | tar -x -C "$work_dir/base"
 
 # Take the base branch's drizzle/ and drop this branch's files from the index.
 cp "$index_file" "$work_dir/index"
+untracked_before=$(git ls-files --others --exclude-standard -- drizzle/)
 drizzle_touched=1
 git checkout "$base_side" -- drizzle/
 git rm -q -f --ignore-unmatch "drizzle/${old_tag}.sql"

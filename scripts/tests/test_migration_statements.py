@@ -51,6 +51,19 @@ def test_hand_written_statement_in_the_same_chunk_still_matches():
     )
 
 
+def test_commented_out_statement_does_not_count_as_present():
+    reviewed = '/* ALTER TABLE "tags" ADD COLUMN "slug" text; */\nUPDATE "tags" SET "name" = "name";'
+    assert missing_from_reviewed(
+        'ALTER TABLE "tags" ADD COLUMN "slug" text;', reviewed
+    ) == ['ALTER TABLE "tags" ADD COLUMN "slug" text;']
+
+
+def test_shared_chunk_lists_only_the_hand_written_part():
+    generated = 'ALTER TABLE "tags" ADD COLUMN "slug" text;'
+    reviewed = generated + '\nUPDATE "tags" SET "slug" = "name";\n'
+    assert hand_written(generated, reviewed) == ['UPDATE "tags" SET "slug" = "name";']
+
+
 def test_base_branch_drift_is_reported():
     """A pending column drop on the base branch shows up in the regenerated SQL."""
     drifted = (

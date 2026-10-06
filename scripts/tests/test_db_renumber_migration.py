@@ -57,6 +57,10 @@ if [[ $custom -eq 1 ]]; then
 else
   cp "$FAKE_GENERATED" "drizzle/$tag.sql"
 fi
+if [[ -n ${FAKE_FAIL_AFTER_WRITE:-} ]]; then
+  echo "drizzle-kit: aborted" >&2
+  exit 1
+fi
 """
 
 INIT = ("0000_init", 1000, "CREATE TABLE a (id int);\n")
@@ -138,7 +142,7 @@ def mid_merge_repo(
 
 
 def run_script(
-    repo: Path, tmp_path: Path, generated: str
+    repo: Path, tmp_path: Path, generated: str, *, fail_after_write: bool = False
 ) -> subprocess.CompletedProcess:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir(exist_ok=True)
@@ -157,6 +161,7 @@ def run_script(
             **GIT_ENV,
             "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
             "FAKE_GENERATED": str(fake_generated),
+            **({"FAKE_FAIL_AFTER_WRITE": "1"} if fail_after_write else {}),
         },
         check=False,
     )
@@ -205,6 +210,20 @@ def test_stops_on_extra_generated_statements_and_restores_the_conflicted_merge(
     assert scratch.exists()
     assert git(repo, "merge", "--abort", check=False).returncode == 0
     assert git(repo, "status", "--porcelain").stdout == "?? drizzle/scratch-notes.sql\n"
+
+
+def test_drizzle_kit_failing_after_a_partial_write_leaves_no_files(tmp_path: Path):
+    repo = mid_merge_repo(tmp_path)
+    scratch = repo / "drizzle" / "scratch-notes.sql"
+    scratch.write_text("-- mine, untracked\n")
+    result = run_script(repo, tmp_path, GENERATED, fail_after_write=True)
+
+    assert result.returncode != 0
+    assert not (repo / "drizzle" / "0002_mine.sql").exists()
+    assert not (repo / "drizzle" / "meta" / "0002_snapshot.json").exists()
+    assert scratch.exists()
+    unmerged = git(repo, "diff", "--name-only", "--diff-filter=U").stdout
+    assert "drizzle/meta/_journal.json" in unmerged
 
 
 def test_custom_fallback_when_drizzle_generates_nothing(tmp_path: Path):
