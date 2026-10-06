@@ -64,9 +64,20 @@ function createTransport(): EmailTransport | null {
 
 const transport = createTransport();
 
+/**
+ * Collapse a subject to one line. Subjects interpolate user-entered text
+ * (issue titles, machine names) that can carry newlines, and Resend rejects
+ * any subject containing `\n` — every email for that issue failed (PP-f4w0,
+ * Sentry PINPOINT-32). Control characters and whitespace runs become a single
+ * space so every sender and transport gets the same header-safe subject.
+ */
+function toSingleLineSubject(subject: string): string {
+  return subject.replace(/[\s\p{Cc}]+/gu, " ").trim();
+}
+
 export async function sendEmail({
   to,
-  subject,
+  subject: rawSubject,
   html,
   inReplyTo,
   references,
@@ -75,6 +86,8 @@ export async function sendEmail({
   // CORE-ARCH-011 tripwire: email must be sent post-commit, never inside a
   // transaction (the Doodle Bug, PP-2053).
   assertNotInTransaction("sendEmail");
+
+  const subject = toSingleLineSubject(rawSubject);
 
   log.info({ to: maskEmail(to), subject }, "[Email] Attempting to send email");
 

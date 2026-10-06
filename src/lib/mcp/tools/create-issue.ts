@@ -3,7 +3,7 @@ import "server-only";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { after } from "next/server";
 import { z } from "zod";
-import { ISSUE_TITLE_MAX } from "~/lib/issues/title";
+import { ISSUE_TITLE_MAX, issueTitleSchema } from "~/lib/issues/title";
 
 import { dispatchNotification } from "~/lib/notifications";
 import { checkPermission } from "~/lib/permissions/helpers";
@@ -27,20 +27,15 @@ import {
 } from "./shared";
 import type { McpAuthContext } from "~/lib/mcp/verify-token";
 
-const createIssueSchema = z.object({
+export const createIssueSchema = z.object({
   machine: z
     .string()
     .trim()
     .min(1)
     .describe("Machine initials (case-insensitive) or UUID to file against."),
-  title: z
-    .string()
-    .trim()
-    .min(1, "Title is required")
-    .max(ISSUE_TITLE_MAX)
-    .describe(
-      `Short summary of the problem, at most ${ISSUE_TITLE_MAX} characters.`
-    ),
+  title: issueTitleSchema({ required: "Title is required" }).describe(
+    `One-line summary of the problem, at most ${ISSUE_TITLE_MAX} characters; line breaks become spaces.`
+  ),
   description: z
     .string()
     .trim()

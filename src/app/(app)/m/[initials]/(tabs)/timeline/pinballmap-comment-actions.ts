@@ -15,7 +15,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { z } from "zod";
-import { ISSUE_TITLE_MAX, ISSUE_TITLE_MAX_MESSAGE } from "~/lib/issues/title";
+import { ISSUE_TITLE_MAX_MESSAGE, issueTitleSchema } from "~/lib/issues/title";
 
 import { formatIssueId } from "~/lib/issues/utils";
 import { log } from "~/lib/logger";
@@ -41,11 +41,10 @@ import {
 const convertSchema = z.object({
   machineId: z.string().uuid(),
   conditionId: z.coerce.number().int().positive(),
-  title: z
-    .string()
-    .trim()
-    .min(1, "Title is required")
-    .max(ISSUE_TITLE_MAX, ISSUE_TITLE_MAX_MESSAGE),
+  title: issueTitleSchema({
+    required: "Title is required",
+    tooLong: ISSUE_TITLE_MAX_MESSAGE,
+  }),
   severity: z.enum(["cosmetic", "minor", "major", "unplayable"], {
     message: "Select a severity",
   }),
