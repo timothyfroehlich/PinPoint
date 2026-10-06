@@ -40,7 +40,8 @@ export function ListTitleRow({
   actions,
 }: ListTitleRowProps): React.JSX.Element {
   return (
-    <div className="flex min-h-11 items-center gap-1.5 md:gap-3">
+    // Actions that still do not fit as icon buttons wrap below the title.
+    <div className="flex min-h-11 flex-wrap items-center gap-x-1.5 gap-y-2 md:gap-x-3">
       <h1 className="shrink-0 text-2xl font-bold tracking-tight md:text-3xl">
         {title}
       </h1>

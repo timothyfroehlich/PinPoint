@@ -6,7 +6,7 @@ interface Props {
   /** Line above the title, e.g. a tag's breadcrumb. */
   eyebrow?: React.ReactNode;
   summary: CollectionSummary;
-  /** Owner-only action slot rendered to the right of the title/count block. */
+  /** Action slot rendered to the right of the title/count block. */
   action?: React.ReactNode;
 }
 
@@ -32,8 +32,9 @@ export function CollectionHeader({
     parts.push(plural(summary.openIssues, "open issue"));
   }
   return (
-    <header className="flex items-center justify-between gap-3">
-      <div className="min-w-0">
+    // The action wraps below the title and summary before squeezing them.
+    <header className="flex flex-wrap items-center justify-between gap-3">
+      <div className="min-w-0 flex-[1_1_14rem]">
         {eyebrow ? <div className="mb-1">{eyebrow}</div> : null}
         <h1 className="min-w-0 truncate text-2xl font-bold text-foreground sm:text-3xl">
           {title}
