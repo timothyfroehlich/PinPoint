@@ -122,8 +122,6 @@ function createSwrCache<T>(options: SwrCacheOptions<T>): SwrCache<T> {
 }
 
 interface IscoredJsonLogMessages {
-  /** `reportError` action for an unreadable response body. */
-  action: string;
   nonOk: string;
   notJson: string;
   networkFailure: string;
@@ -165,7 +163,12 @@ async function fetchIscoredJson(
   try {
     text = await res.text();
   } catch (err) {
-    reportError(err, { action: messages.action, bestEffort: true, user });
+    // Log-only on purpose, a deliberate exception to CORE-ARCH-015: a timeout
+    // during the body read is the same iScored outage as the pre-header
+    // timeout safeFetch logs without reporting, and reporting one but not the
+    // other would raise a Sentry event every refresh for the length of the
+    // outage. Only the cache-loader throw (an unexpected bug) is reported.
+    log.warn({ err, user }, messages.networkFailure);
     return { ok: false };
   }
 
@@ -315,7 +318,6 @@ async function loadScores(
     `${ISCORED_BASE_URL}/api/${encodeURIComponent(user)}/getAllScores?max=10`,
     user,
     {
-      action: "iscored.fetchScores",
       nonOk: "iScored API returned non-OK status",
       notJson: "iScored API response was not valid JSON",
       networkFailure: "Failed to fetch iScored scores",
@@ -459,7 +461,6 @@ async function loadGames(user: string): Promise<IscoredGame[] | null> {
     `${ISCORED_BASE_URL}/api/${encodeURIComponent(user)}`,
     user,
     {
-      action: "iscored.fetchGameroomGames",
       nonOk: "iScored API returned non-OK status for gameroom games",
       notJson: "iScored gameroom games API response was not valid JSON",
       networkFailure: "Failed to fetch iScored gameroom games",
