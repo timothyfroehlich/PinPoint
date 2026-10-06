@@ -404,7 +404,7 @@ describe("issue action permission wiring — action-level integration (PP-x4li.1
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.code).toBe("UNAUTHORIZED");
+      expect(result.code).toBe("FORBIDDEN");
     }
   });
 

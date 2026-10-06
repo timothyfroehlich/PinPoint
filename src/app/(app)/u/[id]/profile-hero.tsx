@@ -2,11 +2,12 @@ import type React from "react";
 import Link from "next/link";
 import { Pencil } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "~/components/ui/avatar";
+import type { UserRole } from "~/lib/types";
 
 interface ProfileHeroProps {
   name: string;
   pronouns: string | null;
-  role: "guest" | "member" | "technician" | "admin";
+  role: UserRole;
   avatarUrl: string | null;
   memberSince: string;
   isOwn: boolean;

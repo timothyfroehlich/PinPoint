@@ -148,7 +148,6 @@ async function seenRows(): Promise<
     isPresent: boolean;
     missedRuns: number;
     generation: number;
-    announcedAt: Date | null;
   }[]
 > {
   const db = await getTestDb();
@@ -158,7 +157,6 @@ async function seenRows(): Promise<
       isPresent: pinballmapRegionSeenMachines.isPresent,
       missedRuns: pinballmapRegionSeenMachines.missedRuns,
       generation: pinballmapRegionSeenMachines.generation,
-      announcedAt: pinballmapRegionSeenMachines.announcedAt,
     })
     .from(pinballmapRegionSeenMachines);
 }
@@ -298,11 +296,11 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
       announced: 0,
       pending: 0,
     });
-    // No flood: everything was born already-announced.
+    // No flood: bootstrap back-fills membership without queuing any event.
     expect(discord.posts).toEqual([]);
+    expect(await eventRows()).toEqual([]);
     const rows = await seenRows();
     expect(rows).toHaveLength(2);
-    expect(rows.every((r) => r.announcedAt !== null)).toBe(true);
     // The one-time location snapshot preserves venue names for a later removal,
     // after that venue no longer appears in Pinball Map's current region list.
     expect(pbm.locationCalls).toBe(1);
@@ -339,14 +337,12 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
         lmxId: 1,
         locationId: 26454,
         pinballmapMachineId: 6412,
-        announcedAt: new Date(),
       },
       {
         region: "austin",
         lmxId: 2,
         locationId: 999,
         pinballmapMachineId: 7,
-        announcedAt: new Date(),
       },
     ]);
     pbm.entries = [lmx({ lmxId: 1 })];
@@ -379,14 +375,12 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
         lmxId: 1,
         locationId: 26454,
         pinballmapMachineId: 6412,
-        announcedAt: new Date(),
       },
       {
         region: "austin",
         lmxId: 2,
         locationId: 999,
         pinballmapMachineId: 7,
-        announcedAt: new Date(),
       },
     ]);
     pbm.entries = [lmx({ lmxId: 1 })];
@@ -495,7 +489,7 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
     expect(run).toMatchObject({ discovered: 1, announced: 0, pending: 1 });
     expect(discord.posts).toEqual([]);
     expect(await seenRows()).toContainEqual(
-      expect.objectContaining({ lmxId: 2, announcedAt: null })
+      expect.objectContaining({ lmxId: 2, isPresent: true })
     );
 
     pbm.locationsError = null;
@@ -568,7 +562,7 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
     expect(run).toMatchObject({ announced: 0, pending: 1 });
     expect(discord.posts).toEqual([]);
     expect(await seenRows()).toContainEqual(
-      expect.objectContaining({ lmxId: 2, announcedAt: null })
+      expect.objectContaining({ lmxId: 2, isPresent: true })
     );
 
     // The empty refresh still spent the cooldown (PP-o355.44); a later refresh
@@ -914,7 +908,6 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
         lmxId: 1,
         locationId: 26454,
         pinballmapMachineId: 6412,
-        announcedAt: new Date(),
       },
       {
         region: "austin",
@@ -923,7 +916,6 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
         pinballmapMachineId: 7,
         isPresent: false,
         missedRuns: 2,
-        announcedAt: null,
       },
     ]);
     await db.insert(pinballmapRegionAlertState).values({
@@ -1055,12 +1047,12 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
     expect(run.discovered).toBe(299);
     expect(run.announced).toBe(0);
     expect(run.pending).toBe(0);
-    // Nothing posted, and the seen-set self-heals: every row is now announced,
+    // Nothing posted, and the seen-set self-heals: every row is present again,
     // so the next genuine arrival is the only thing that can be announced.
     expect(discord.posts).toEqual([]);
     const rows = await seenRows();
     expect(rows).toHaveLength(300);
-    expect(rows.every((r) => r.announcedAt !== null)).toBe(true);
+    expect(rows.every((r) => r.isPresent)).toBe(true);
   });
 
   it("silently reconciles removals from the same snapshot that triggers re-bootstrap", async () => {
@@ -1301,7 +1293,6 @@ describe("GET /api/cron/pinballmap-region-alerts", () => {
         pinballmapMachineId: 100,
         isPresent: true,
         missedRuns: 0,
-        announcedAt: new Date(),
       },
       {
         region: "austin",
@@ -1310,7 +1301,6 @@ describe("GET /api/cron/pinballmap-region-alerts", () => {
         pinballmapMachineId: 101,
         isPresent: true,
         missedRuns: 0,
-        announcedAt: new Date(),
       },
     ]);
 
@@ -1361,7 +1351,6 @@ describe("GET /api/cron/pinballmap-region-alerts", () => {
         lmxId: 1,
         locationId: 26454,
         pinballmapMachineId: 6412,
-        announcedAt: new Date(),
         isPresent: true,
       },
     ]);

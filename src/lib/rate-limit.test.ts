@@ -24,6 +24,11 @@ vi.mock("~/lib/logger", () => ({
   log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
+const { reportErrorMock } = vi.hoisted(() => ({ reportErrorMock: vi.fn() }));
+vi.mock("~/lib/observability/report-error", () => ({
+  reportError: reportErrorMock,
+}));
+
 // Imported by the module for getClientIp; never exercised here.
 vi.mock("next/headers", () => ({ headers: vi.fn() }));
 
@@ -193,7 +198,8 @@ describe("rate-limit checker factory", () => {
   it("fails closed in production when the limiter throws", async () => {
     stubRedisConfigured();
     stubProduction();
-    limitMock.mockRejectedValue(new Error("redis down"));
+    const failure = new Error("redis down");
+    limitMock.mockRejectedValue(failure);
 
     const before = Date.now();
     const { checkLoginIpLimit } = await import("./rate-limit");
@@ -201,6 +207,11 @@ describe("rate-limit checker factory", () => {
 
     expect(result.success).toBe(false);
     expect(result.reset).toBeGreaterThanOrEqual(before + 300_000);
+    // CORE-ARCH-015: the swallowed limiter failure reaches Sentry.
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      failure,
+      expect.objectContaining({ action: "rateLimit.check" })
+    );
   });
 
   it("passes the limiter's own result through on success", async () => {

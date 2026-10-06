@@ -4,7 +4,11 @@ import type {
   IssuePriority,
   IssueFrequency,
 } from "~/lib/types";
-import { ISSUE_FREQUENCY_VALUES } from "~/lib/types";
+import {
+  ISSUE_FREQUENCY_VALUES,
+  ISSUE_PRIORITY_VALUES,
+  ISSUE_SEVERITY_VALUES,
+} from "~/lib/types";
 import { ALL_ISSUE_STATUSES } from "~/lib/issues/status";
 
 export const ISSUE_PAGE_SIZES = [15, 25, 50] as const;
@@ -58,13 +62,8 @@ export interface IssueFilters {
   currentUserId?: string | undefined; // Server-side only, for watching filter
 }
 
-const VALID_SEVERITIES: IssueSeverity[] = [
-  "cosmetic",
-  "minor",
-  "major",
-  "unplayable",
-];
-const VALID_PRIORITIES: IssuePriority[] = ["low", "medium", "high"];
+const VALID_SEVERITIES: readonly IssueSeverity[] = ISSUE_SEVERITY_VALUES;
+const VALID_PRIORITIES: readonly IssuePriority[] = ISSUE_PRIORITY_VALUES;
 const VALID_FREQUENCIES: readonly IssueFrequency[] = ISSUE_FREQUENCY_VALUES;
 
 /**

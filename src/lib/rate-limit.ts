@@ -25,6 +25,7 @@ import { Redis } from "@upstash/redis";
 import { headers } from "next/headers";
 import { createHash } from "node:crypto";
 import { log } from "~/lib/logger";
+import { reportError } from "~/lib/observability/report-error";
 import { errorMessage } from "~/lib/errors";
 import { maskEmail } from "~/lib/logging/mask";
 import { BLOB_CONFIG } from "~/lib/blob/config";
@@ -352,6 +353,7 @@ function makeLimitChecker(
             : { err, ip: limitKey },
         `${label} rate limit check failed`
       );
+      reportError(error, { action: "rateLimit.check", keyType, label });
       if (isProductionRuntime()) {
         return failClosedResult();
       }
