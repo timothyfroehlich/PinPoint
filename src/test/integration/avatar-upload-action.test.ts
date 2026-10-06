@@ -50,7 +50,7 @@ vi.mock("~/lib/blob/client", () => ({
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
-import { uploadAvatarAction } from "~/server/actions/avatar";
+import { uploadAvatarAction } from "~/app/(app)/u/[id]/avatar-action";
 
 function fileForm(name: string, type: string, bytes = 2048): FormData {
   const f = new FormData();

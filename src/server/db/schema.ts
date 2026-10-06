@@ -24,7 +24,7 @@ import {
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 import { type TimelineEventData } from "~/lib/timeline/types";
 import { type MachineTimelineEventData } from "~/lib/timeline/machine-event-types";
-import { type TimelineEventSourceType } from "~/lib/timeline/machine-events";
+import { type TimelineEventSourceType } from "~/lib/timeline/machine-event-types";
 import { type TimelineTag } from "~/lib/timeline/machine-tags";
 import { type SettingsSection } from "~/lib/machines/settings-types";
 import type { LocationSnapshot } from "~/lib/pinballmap/types";
