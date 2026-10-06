@@ -54,23 +54,18 @@ test.describe("Machine Details - Extended", () => {
       .locator(".ProseMirror");
     await textarea.fill("Please handle with care - vintage machine");
 
-    // The display updates optimistically. Wait for the save to finish before
-    // reloading, or the navigation can abort the Server Action in Firefox.
-    const [saveResponse] = await Promise.all([
-      page.waitForResponse(
-        (response) =>
-          new URL(response.url()).pathname === maintenancePath &&
-          response.request().method() === "POST"
-      ),
-      page.getByTestId("machine-owner-requirements-save").click(),
-    ]);
-    expect(saveResponse.ok()).toBe(true);
-    await saveResponse.finished();
+    // Save requirements. The display closes and re-renders the Edit pencil
+    // once the transition completes. Wait on that user-visible state rather
+    // than a network response stream (PP-ujw4).
+    await page.getByTestId("machine-owner-requirements-save").click();
 
-    // Verify it saved
+    // Verify it saved and exited edit mode
     await expect(
       page.getByTestId("machine-owner-requirements-display")
     ).toContainText("Please handle with care - vintage machine");
+    await expect(
+      page.getByTestId("machine-owner-requirements-edit")
+    ).toBeVisible();
 
     // Now navigate to an issue for this machine to check the callout. The
     // issues list lives on the Service tab and renders cards flat (no
