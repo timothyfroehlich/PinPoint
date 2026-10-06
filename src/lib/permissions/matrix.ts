@@ -96,7 +96,7 @@ export const ACCESS_LEVEL_DESCRIPTIONS: Record<AccessLevel, string> = {
 
 type RolePermissions = Record<AccessLevel, PermissionValue>;
 
-interface PermissionDefinition {
+export interface PermissionDefinition {
   /** Permission identifier */
   id: string;
   /** Human-readable label for the help page */
@@ -107,20 +107,24 @@ interface PermissionDefinition {
   access: RolePermissions;
 }
 
-interface PermissionCategory {
+export interface PermissionCategory {
   /** Category identifier */
   id: string;
   /** Human-readable label */
   label: string;
   /** Permissions in this category */
-  permissions: PermissionDefinition[];
+  permissions: readonly PermissionDefinition[];
 }
 
 /**
  * The complete permissions matrix.
  * This is the single source of truth for all permissions in the system.
+ *
+ * Declared `as const satisfies` so every permission id is a string literal type:
+ * `PermissionId` is derived from it, and a misspelled id at a call site fails
+ * `tsc` instead of silently denying (getPermission fails closed at runtime).
  */
-export const PERMISSIONS_MATRIX: PermissionCategory[] = [
+const PERMISSIONS_MATRIX_DEFINITION = [
   {
     id: "issues",
     label: "Issues",
@@ -780,7 +784,28 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
       },
     ],
   },
-];
+] as const satisfies readonly PermissionCategory[];
+
+/**
+ * Every permission id declared in the matrix, as a literal union.
+ */
+export type PermissionId =
+  (typeof PERMISSIONS_MATRIX_DEFINITION)[number]["permissions"][number]["id"];
+
+/**
+ * The matrix as consumers iterate it (widened ids and values; the literal
+ * ids live in `PermissionId`).
+ */
+export const PERMISSIONS_MATRIX: readonly PermissionCategory[] =
+  PERMISSIONS_MATRIX_DEFINITION;
+
+/**
+ * Every permission id, in matrix order.
+ */
+export const PERMISSION_IDS: readonly PermissionId[] =
+  PERMISSIONS_MATRIX_DEFINITION.flatMap((category) =>
+    category.permissions.map((permission) => permission.id)
+  );
 
 /**
  * Flattened permission lookup for quick access.
@@ -801,7 +826,7 @@ export const PERMISSIONS_BY_ID: Record<string, PermissionDefinition> =
  * Get the permission value for a specific permission and access level.
  */
 export function getPermission(
-  permissionId: string,
+  permissionId: PermissionId,
   accessLevel: AccessLevel
 ): PermissionValue {
   const permission = PERMISSIONS_BY_ID[permissionId];
@@ -824,7 +849,7 @@ export function getPermission(
  * @throws Error if the permission value is "own", "owner", or "own_or_owner"
  */
 export function hasPermission(
-  permissionId: string,
+  permissionId: PermissionId,
   accessLevel: AccessLevel
 ): boolean {
   const value = getPermission(permissionId, accessLevel);
@@ -848,7 +873,7 @@ export function hasPermission(
  * to checkPermission() in helpers.ts for an accurate result.
  */
 export function requiresOwnershipCheck(
-  permissionId: string,
+  permissionId: PermissionId,
   accessLevel: AccessLevel
 ): boolean {
   const value = getPermission(permissionId, accessLevel);

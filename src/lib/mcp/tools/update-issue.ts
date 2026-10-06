@@ -9,6 +9,7 @@ import { ISSUE_STATUS_VALUES } from "~/lib/issues/status";
 import { dispatchNotification, type DeliveryPlan } from "~/lib/notifications";
 import { reportError } from "~/lib/observability/report-error";
 import { checkPermission } from "~/lib/permissions/helpers";
+import type { PermissionId } from "~/lib/permissions/matrix";
 import {
   assignIssue,
   updateIssueFrequency,
@@ -71,7 +72,7 @@ type UpdatableField = (typeof UPDATABLE_FIELDS)[number];
  * {@link UPDATABLE_FIELDS} without a permission decision fails to compile
  * (CORE-ARCH-008).
  */
-export const UPDATE_FIELD_PERMISSIONS: Record<UpdatableField, string> = {
+export const UPDATE_FIELD_PERMISSIONS: Record<UpdatableField, PermissionId> = {
   title: "issues.update.reporting",
   status: "issues.update.reporting",
   severity: "issues.update.reporting",
