@@ -175,10 +175,10 @@ a blank Full-E2E cell is often correct by design) is in the
 
 ## MCP server & API routes
 
-| Feature surface                         | Unit | Integration | Smoke | Full E2E | Representative tests                                                                                     |
-| --------------------------------------- | :--: | :---------: | :---: | :------: | -------------------------------------------------------------------------------------------------------- |
-| MCP tools (create / update issue, etc.) |  ✓   |      ✓      |       |          | `lib/mcp/tools/create-issue.test.ts`, `lib/mcp/verify-token.test.ts`, `mcp-tools.test.ts`                |
-| API routes (search, logs, cleanup)      |  ✓   |      ✓      |       |          | `api/quick-search/route.test.ts`, `api/client-logs.route.test.ts`, `api/test-data/cleanup/route.test.ts` |
+| Feature surface                         | Unit | Integration | Smoke | Full E2E | Representative tests                                                                                 |
+| --------------------------------------- | :--: | :---------: | :---: | :------: | ---------------------------------------------------------------------------------------------------- |
+| MCP tools (create / update issue, etc.) |  ✓   |      ✓      |       |          | `lib/mcp/tools/create-issue.test.ts`, `lib/mcp/verify-token.test.ts`, `mcp-tools.test.ts`            |
+| API routes (search, logs, mock uploads) |  ✓   |      ✓      |       |          | `api/quick-search/route.test.ts`, `api/client-logs.route.test.ts`, `uploads/[...path]/route.test.ts` |
 
 ## Cross-cutting: permissions & roles
 

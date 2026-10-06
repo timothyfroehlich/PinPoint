@@ -15,6 +15,7 @@ import {
   ACCESS_LEVEL_LABELS,
   PERMISSIONS_MATRIX,
   type AccessLevel,
+  type PermissionDefinition,
   type PermissionValue,
 } from "~/lib/permissions/matrix";
 
@@ -44,13 +45,6 @@ function PermissionValueCell({
   );
 }
 
-interface PermissionDefinition {
-  id: string;
-  label: string;
-  description: string;
-  access: Record<AccessLevel, PermissionValue>;
-}
-
 interface GroupedPermission {
   id: string;
   label: string;
@@ -60,7 +54,7 @@ interface GroupedPermission {
 }
 
 function groupPermissions(
-  permissions: PermissionDefinition[]
+  permissions: readonly PermissionDefinition[]
 ): GroupedPermission[] {
   const grouped: GroupedPermission[] = [];
   let i = 0;

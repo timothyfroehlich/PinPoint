@@ -15,9 +15,9 @@ const testEmails = new Set<string>();
 test.describe("Machine with Inline Invite (Smoke)", () => {
   test.use({ storageState: STORAGE_STATE.admin });
 
-  test.afterEach(async ({ request }) => {
+  test.afterEach(async () => {
     if (testMachines.size > 0 || testEmails.size > 0) {
-      await cleanupTestEntities(request, {
+      await cleanupTestEntities({
         machineInitials: Array.from(testMachines),
         userEmails: Array.from(testEmails),
       });

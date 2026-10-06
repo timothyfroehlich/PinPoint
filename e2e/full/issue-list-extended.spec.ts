@@ -21,9 +21,9 @@ test.describe("Issue List Features - Extended", () => {
     createdIssueTitlePrefix = undefined;
   });
 
-  test.afterEach(async ({ request }) => {
+  test.afterEach(async () => {
     if (createdIssueTitlePrefix) {
-      await cleanupTestEntities(request, {
+      await cleanupTestEntities({
         issueTitlePrefix: createdIssueTitlePrefix,
       });
     }
