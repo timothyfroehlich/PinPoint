@@ -750,6 +750,13 @@
       "when": 1791272295747,
       "tag": "0106_settings-sets-model",
       "breakpoints": true
+    },
+    {
+      "idx": 107,
+      "version": "7",
+      "when": 1791288905888,
+      "tag": "0107_drop-settings-set-old-flags",
+      "breakpoints": true
     }
   ]
 }
