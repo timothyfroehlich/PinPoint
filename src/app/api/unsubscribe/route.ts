@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "~/server/db";
 import { notificationPreferences } from "~/server/db/schema";
-import { verifyUnsubscribeToken } from "~/lib/notifications/channels/email-channel";
+import { verifyUnsubscribeToken } from "~/lib/notifications/unsubscribe-token";
 
 export function GET(request: NextRequest): NextResponse {
   const uid = request.nextUrl.searchParams.get("uid");
