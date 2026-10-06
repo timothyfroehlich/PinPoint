@@ -1164,3 +1164,138 @@ def test_unusable_codex_review_is_not_inherited() -> None:
     assert summary["coverage"] is None
     assert run.returncode == 1
     assert "FAIL: reviewed: stale review" in run.stdout
+
+
+# ---------------------------------------------------------------------------------
+# Migration renumber merges (spec §8.12, PP-ncxx.4)
+# ---------------------------------------------------------------------------------
+
+
+def write_migrations(repo: Path, migrations: list[tuple[str, int, str]]) -> None:
+    """Write drizzle/ for (tag, when, sql) migrations: journal, SQL and snapshots."""
+    drizzle = repo / "drizzle"
+    (drizzle / "meta").mkdir(parents=True, exist_ok=True)
+    entries = []
+    for idx, (tag, when, sql) in enumerate(migrations):
+        entries.append(
+            {"idx": idx, "version": "7", "when": when, "tag": tag, "breakpoints": True}
+        )
+        (drizzle / f"{tag}.sql").write_text(sql)
+        (drizzle / "meta" / f"{tag[:4]}_snapshot.json").write_text(
+            json.dumps({"id": f"id-{tag}", "prevId": f"prev-{idx}"})
+        )
+    (drizzle / "meta" / "_journal.json").write_text(
+        json.dumps({"version": "7", "dialect": "postgresql", "entries": entries})
+    )
+
+
+INIT = ("0000_init", 1000, "CREATE TABLE a (id int);\n")
+THEIRS = ("0001_theirs", 3000, "CREATE TABLE b (id int);\n")
+MINE_SQL = "ALTER TABLE a ADD COLUMN note text;--> statement-breakpoint\nUPDATE a SET note = 'x';\n"
+
+
+@contextmanager
+def git_repo_with_migration_merge(
+    variant: str = "renumber",
+) -> Iterator[tuple[Path, str, str]]:
+    """Branch adds 0001_mine, main adds 0001_theirs, and the merge renumbers ours to 0002.
+
+    Variants break one renumber-merge condition each. Yields (repo, reviewed_sha, head_sha).
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = Path(tmp) / "repo"
+        repo.mkdir()
+        subprocess.run(["git", "init", "-q", "-b", "main", str(repo)], check=True)
+        (repo / "app.txt").write_text("app\n")
+        write_migrations(repo, [INIT])
+        git_cmd("add", "-A", cwd=repo)
+        git_cmd("commit", "-qm", "initial commit", cwd=repo)
+
+        git_cmd("checkout", "-qb", "feat", cwd=repo)
+        write_migrations(repo, [INIT, ("0001_mine", 2000, MINE_SQL)])
+        git_cmd("add", "-A", cwd=repo)
+        git_cmd("commit", "-qm", "feature migration (reviewed)", cwd=repo)
+        reviewed_sha = git_cmd("rev-parse", "HEAD", cwd=repo)
+
+        git_cmd("checkout", "-q", "main", cwd=repo)
+        write_migrations(repo, [INIT, THEIRS])
+        git_cmd("add", "-A", cwd=repo)
+        git_cmd("commit", "-qm", "main migration", cwd=repo)
+
+        git_cmd("checkout", "-q", "feat", cwd=repo)
+        subprocess.run(
+            ["git", "merge", "-q", "--no-ff", "main"],
+            cwd=repo,
+            check=False,
+            capture_output=True,
+        )
+        # The renumber resolution: main's drizzle/, ours re-appended as 0002.
+        git_cmd("checkout", "main", "--", "drizzle", cwd=repo)
+        git_cmd("rm", "-q", "drizzle/0001_mine.sql", cwd=repo)
+        sql = MINE_SQL.replace("'x'", "'y'") if variant == "sql_changed" else MINE_SQL
+        when = 2500 if variant == "old_when" else 4000
+        write_migrations(repo, [INIT, THEIRS, ("0002_mine", when, sql)])
+        if variant == "outside_change":
+            (repo / "app.txt").write_text("unreviewed change\n")
+        if variant == "base_migration_edited":
+            (repo / "drizzle" / "0001_theirs.sql").write_text(
+                "CREATE TABLE c (id int);\n"
+            )
+        if variant == "old_file_kept":
+            (repo / "drizzle" / "0001_mine.sql").write_text(MINE_SQL)
+        git_cmd("add", "-A", cwd=repo)
+        git_cmd("commit", "-qm", "Merge main, renumber migration", cwd=repo)
+        head_sha = git_cmd("rev-parse", "HEAD", cwd=repo)
+        yield repo, reviewed_sha, head_sha
+
+
+def test_migration_renumber_merge_inherits_review_record() -> None:
+    with git_repo_with_migration_merge() as (repo, reviewed_sha, head_sha):
+        with gate_env(
+            comment_pages=[[claude_review_record(reviewed_sha)]],
+            head_sha=head_sha,
+        ) as env:
+            summary = review_summary(env, cwd=repo)
+            run = run_gate("check_review_happened", env, cwd=repo)
+
+    assert summary["label"] == "approved"
+    assert summary["coverage"]["inherited_from"] == reviewed_sha
+    assert summary["coverage"]["inherited_via"] == "migration renumber merge from main"
+    assert run.returncode == 0
+    assert (
+        f"(inherited from {reviewed_sha[:7]}; migration renumber merge from main)"
+        in run.stdout
+    )
+
+
+@pytest.mark.parametrize(
+    "variant",
+    [
+        "sql_changed",
+        "old_when",
+        "outside_change",
+        "base_migration_edited",
+        "old_file_kept",
+    ],
+)
+def test_migration_merge_that_breaks_a_condition_stays_stale(variant: str) -> None:
+    with git_repo_with_migration_merge(variant) as (repo, reviewed_sha, head_sha):
+        with gate_env(
+            comment_pages=[[claude_review_record(reviewed_sha)]],
+            head_sha=head_sha,
+        ) as env:
+            summary = review_summary(env, cwd=repo)
+
+    assert summary["label"] == "stale review"
+    assert summary["checkers"]["claude"]["verdict"] == "stale"
+
+
+def test_clean_merge_still_reports_pure_merge() -> None:
+    with git_repo_with_merge() as (repo, reviewed_sha, head_sha):
+        with gate_env(
+            comment_pages=[[claude_review_record(reviewed_sha)]],
+            head_sha=head_sha,
+        ) as env:
+            summary = review_summary(env, cwd=repo)
+
+    assert summary["coverage"]["inherited_via"] == "pure merge from main"

@@ -215,11 +215,85 @@ _codex_check() {
 }
 
 # ---------------------------------------------------------------------------------
-# Pure merge check: returns 0 if head is a clean merge of origin/main (or base_ref)
-# over reviewed_sha without any unreviewed feature commits.
+# Migration renumber merge (spec §8.12, PP-ncxx.4): a merge of the base branch whose
+# only resolution renumbers the branch's Drizzle migrations after the base side's,
+# which is what scripts/db-renumber-migration.sh produces. Returns 0 when:
+# - the clean merge conflicts only under drizzle/, and every path outside drizzle/
+#   matches it
+# - the base side's drizzle/ files are unchanged apart from the journal growing
+# - the journal is the base side's entries followed, in order, by one entry per
+#   branch migration with the same name, the next idx, a later `when`, and
+#   byte-identical SQL
+# - the only files added under drizzle/ are those entries' SQL and snapshots
+# The regenerated snapshots are not compared; they hold no SQL that runs.
 # ---------------------------------------------------------------------------------
+_is_migration_renumber_merge() {
+  local branch_parent=$1 main_parent=$2 merge=$3
+  local out status=0 clean_tree conflicted
+  out=$(git merge-tree --write-tree --name-only "$branch_parent" "$main_parent" 2>/dev/null) || status=$?
+  [[ $status -le 1 ]] || return 1
+  clean_tree=$(head -n1 <<< "$out")
+  conflicted=$(sed -n '2,/^$/p' <<< "$out" | sed '/^$/d')
+  if [[ -n "$conflicted" ]] && grep -qv '^drizzle/' <<< "$conflicted"; then
+    return 1
+  fi
+  git diff --quiet "$clean_tree" "$merge" -- ':(top)' ':(top,exclude)drizzle' 2>/dev/null || return 1
+
+  local merge_base main_journal merge_journal branch_journal base_journal pairs
+  merge_base=$(git merge-base "$branch_parent" "$main_parent" 2>/dev/null) || return 1
+  main_journal=$(git show "${main_parent}:drizzle/meta/_journal.json" 2>/dev/null) || return 1
+  merge_journal=$(git show "${merge}:drizzle/meta/_journal.json" 2>/dev/null) || return 1
+  branch_journal=$(git show "${branch_parent}:drizzle/meta/_journal.json" 2>/dev/null) || return 1
+  base_journal=$(git show "${merge_base}:drizzle/meta/_journal.json" 2>/dev/null) || return 1
+
+  # One "old_tag new_tag" line per branch migration, or FAIL.
+  pairs=$(jq -rn --argjson main "$main_journal" --argjson merged "$merge_journal" \
+    --argjson branch "$branch_journal" --argjson base "$base_journal" '
+    ($base.entries | map(.tag)) as $base_tags
+    | [ $branch.entries[] | select(.tag as $t | $base_tags | index($t) | not) ] as $mine
+    | ($main.entries | length) as $n
+    | ($main.entries | map(.when) | max // 0) as $newest
+    | $merged.entries[$n:] as $added
+    | if ($mine | length) == 0
+         or $merged.entries[:$n] != $main.entries
+         or ($added | length) != ($mine | length)
+      then "FAIL"
+      else
+        [ range(0; $mine | length) as $i
+          | $added[$i] as $a | $mine[$i] as $o
+          | if ($a.tag | test("^[0-9]{4}_") | not)
+               or ($a.tag[0:4] | tonumber) != $a.idx
+               or $a.idx != $n + $i
+               or ($a.tag | sub("^[0-9]+_"; "")) != ($o.tag | sub("^[0-9]+_"; ""))
+               or $a.when <= (if $i == 0 then $newest else $added[$i - 1].when end)
+            then "FAIL" else "\($o.tag) \($a.tag)" end ]
+        | if any(.[]; . == "FAIL") then "FAIL" else .[] end
+      end' 2>/dev/null) || return 1
+  [[ -n "$pairs" && "$pairs" != *FAIL* ]] || return 1
+
+  local expected="M"$'\t'"drizzle/meta/_journal.json" old_tag new_tag old_blob new_blob changes
+  while read -r old_tag new_tag; do
+    old_blob=$(git rev-parse -q --verify "${branch_parent}:drizzle/${old_tag}.sql") || return 1
+    new_blob=$(git rev-parse -q --verify "${merge}:drizzle/${new_tag}.sql") || return 1
+    [[ "$old_blob" == "$new_blob" ]] || return 1
+    expected+=$'\n'"A"$'\t'"drizzle/${new_tag}.sql"
+    expected+=$'\n'"A"$'\t'"drizzle/meta/${new_tag:0:4}_snapshot.json"
+  done <<< "$pairs"
+
+  changes=$(git diff --no-renames --name-status "$main_parent" "$merge" -- ':(top)drizzle' 2>/dev/null) || return 1
+  [[ "$(sort <<< "$changes")" == "$(sort <<< "$expected")" ]] || return 1
+}
+
+# ---------------------------------------------------------------------------------
+# Pure merge check: returns 0 if head is a merge of origin/main (or base_ref) over
+# reviewed_sha without any unreviewed feature commits. Each merge commit is either
+# clean or a migration renumber merge (above). Sets _MERGE_INHERIT_KIND to
+# "pure merge from main" or "migration renumber merge from main" for the gate text.
+# ---------------------------------------------------------------------------------
+_MERGE_INHERIT_KIND=""
 _is_pure_merge_from_main() {
   local pr=$1 reviewed_sha=$2 head=$3 base_ref=${4:-main}
+  _MERGE_INHERIT_KIND="pure merge from main"
   [[ -z "$reviewed_sha" || -z "$head" || "$reviewed_sha" == "$head" ]] && return 1
 
   # Object presence check: both reviewed_sha and head must be valid commits
@@ -259,7 +333,7 @@ _is_pure_merge_from_main() {
   # - One parent must be a descendant of reviewed_sha (the feature branch side)
   # - One parent must be on main_ref (the main side)
   # - The merge must be a clean merge: its tree matches git merge-tree --write-tree
-  local m parents p1 p2 clean_tree actual_tree parent_array
+  local m parents p1 p2 clean_tree actual_tree parent_array branch_parent main_parent
   for m in $merge_commits; do
     parents=$(git rev-list --parents -n 1 "$m" 2>/dev/null | cut -d' ' -f2-)
     read -r -a parent_array <<< "$parents"
@@ -270,17 +344,21 @@ _is_pure_merge_from_main() {
 
     if git merge-base --is-ancestor "$reviewed_sha" "$p1" 2>/dev/null && \
        git merge-base --is-ancestor "$p2" "$main_ref" 2>/dev/null; then
-      : # valid order: branch merged main
+      branch_parent=$p1 main_parent=$p2 # valid order: branch merged main
     elif git merge-base --is-ancestor "$reviewed_sha" "$p2" 2>/dev/null && \
          git merge-base --is-ancestor "$p1" "$main_ref" 2>/dev/null; then
-      : # reverse order
+      branch_parent=$p2 main_parent=$p1 # reverse order
     else
       return 1
     fi
 
-    clean_tree=$(git merge-tree --write-tree "$p1" "$p2" 2>/dev/null) || return 1
     actual_tree=$(git rev-parse "${m}^{tree}" 2>/dev/null) || return 1
-    [[ "$clean_tree" == "$actual_tree" ]] || return 1
+    if clean_tree=$(git merge-tree --write-tree "$p1" "$p2" 2>/dev/null) && \
+       [[ "$clean_tree" == "$actual_tree" ]]; then
+      continue
+    fi
+    _is_migration_renumber_merge "$branch_parent" "$main_parent" "$m" || return 1
+    _MERGE_INHERIT_KIND="migration renumber merge from main"
   done
 
   return 0
@@ -325,7 +403,7 @@ _review_summary() {
     local cl_sha
     cl_sha=$(jq -r '.sha' <<< "$claude")
     if _is_pure_merge_from_main "$pr" "$cl_sha" "$head" "$base_ref"; then
-      claude=$(jq -c '. + { verdict: "covers", form: "review_record", inherited: true, inherited_from: .sha }' <<< "$claude")
+      claude=$(jq -c --arg via "$_MERGE_INHERIT_KIND" '. + { verdict: "covers", form: "review_record", inherited: true, inherited_from: .sha, inherited_via: $via }' <<< "$claude")
     fi
   fi
 
@@ -340,7 +418,7 @@ _review_summary() {
       COMMENTED|CHANGES_REQUESTED) cx_form="reviewed" ;;
     esac
     if [[ -n "$cx_form" ]] && _is_pure_merge_from_main "$pr" "$cx_sha" "$head" "$base_ref"; then
-      codex=$(jq -c --arg form "$cx_form" '. + { verdict: "covers", form: $form, inherited: true, inherited_from: .sha }' <<< "$codex")
+      codex=$(jq -c --arg form "$cx_form" --arg via "$_MERGE_INHERIT_KIND" '. + { verdict: "covers", form: $form, inherited: true, inherited_from: .sha, inherited_via: $via }' <<< "$codex")
     fi
   fi
 
@@ -373,7 +451,7 @@ _checker_lines() {
     | .key as $k | .value as $v
     | ({ claude: "Claude review", codex: "Codex" }[$k] // $k) as $name
     | if $v.verdict == "covers" then
-        (if ($v.inherited // false) then "  \($name): covers head \($h) (inherited from \($v.inherited_from[0:7]); pure merge from main)"
+        (if ($v.inherited // false) then "  \($name): covers head \($h) (inherited from \($v.inherited_from[0:7]); \($v.inherited_via // "pure merge from main"))"
          else "  \($name): covers head \($h)" end)
       elif $v.verdict == "changes_requested" then "  \($name): requested changes on head \($h)"
       elif $v.verdict == "stale" then "  \($name): newest evidence names \($v.sha[0:7]), head is \($h)"
@@ -536,11 +614,12 @@ check_review_happened() {
   if [ "$RS_LABEL" = "approved" ]; then
     local who
     who=$(jq -r '.coverage.checker' <<< "$RS_SUMMARY")
-    local inherited from_sha suffix=""
+    local inherited from_sha via suffix=""
     inherited=$(jq -r '.coverage.inherited // false' <<< "$RS_SUMMARY")
     if [ "$inherited" = "true" ]; then
       from_sha=$(jq -r '.coverage.inherited_from // .coverage.sha' <<< "$RS_SUMMARY")
-      suffix=" (inherited from ${from_sha:0:7}; pure merge from main)"
+      via=$(jq -r '.coverage.inherited_via // "pure merge from main"' <<< "$RS_SUMMARY")
+      suffix=" (inherited from ${from_sha:0:7}; ${via})"
     fi
     if [ "$who" = "claude" ]; then
       echo "PASS: reviewed: Claude Code review ($(jq -r '.coverage.level' <<< "$RS_SUMMARY")) covers head SHA ${RS_HEAD_SHA:0:7}${suffix}"

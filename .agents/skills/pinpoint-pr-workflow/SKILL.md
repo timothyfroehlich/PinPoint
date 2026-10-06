@@ -175,9 +175,11 @@ bash scripts/workflow/merge-pr.sh <PR> --human --force
 
 #### Pushing after the review
 
-Any push invalidates review coverage for the previous SHA — except a clean merge of `main`,
-which the gate carries the record across (PP-ojoj). Any other push needs replacement CI, a
-new review round, and a new record (3.4 steps 4–5).
+Any push invalidates review coverage for the previous SHA, with two exceptions the gate
+carries the record across: a clean merge of `main` (PP-ojoj), and a merge of `main` whose only
+resolution is `bash scripts/db-renumber-migration.sh` renumbering the branch's migration with
+its SQL unchanged (PP-ncxx.4; spec §8.12 lists the conditions). Any other push needs
+replacement CI, a new review round, and a new record (3.4 steps 4–5).
 
 #### Readiness is not review
 
