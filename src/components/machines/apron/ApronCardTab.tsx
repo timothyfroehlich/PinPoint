@@ -58,9 +58,9 @@ import { saveApronCardsAction } from "~/app/(app)/m/[initials]/(tabs)/apron/acti
 import { APRON_CARDS_MAX } from "~/app/(app)/m/[initials]/(tabs)/apron/schemas";
 import { DeleteCardDialog, RenameCardDialog } from "./ApronCardDialogs";
 import {
-  ApronCardExportMenu,
+  ApronCardExportDialog,
   type ExportableApronCard,
-} from "./ApronCardExportMenu";
+} from "./ApronCardExportDialog";
 import { ApronCardPreview } from "./ApronCardPreview";
 
 // The card prints list markers (spec §3.7), so its editors show them too.
@@ -82,6 +82,10 @@ export interface ApronCardTabProps {
   scanUrl: string;
   /** The machine-management capability (spec §3.6, §11.7). */
   canEdit: boolean;
+  /** Which saved cards are in the viewer's print queue (spec §13.2). */
+  queuedCardIds: readonly string[];
+  /** How many cards the viewer's print queue holds across all machines. */
+  queueCount: number;
 }
 
 /**
@@ -98,6 +102,8 @@ export function ApronCardTab({
   savedCards,
   scanUrl,
   canEdit,
+  queuedCardIds,
+  queueCount,
 }: ApronCardTabProps): React.JSX.Element {
   const id = useId();
   const [saved, setSaved] = useState(savedCards);
@@ -233,11 +239,14 @@ export function ApronCardTab({
     [saved, identity, mainDescription]
   );
   const exportMenu = (className?: string): React.JSX.Element => (
-    <ApronCardExportMenu
+    <ApronCardExportDialog
+      machineName={identity.name}
       machineInitials={machineInitials}
       scanUrl={scanUrl}
       cards={exportable}
       initialCardId={selected?.id ?? null}
+      queuedCardIds={queuedCardIds}
+      queueCount={queueCount}
       {...(className ? { className } : {})}
     />
   );
