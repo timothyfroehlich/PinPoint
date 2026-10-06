@@ -1,2 +1,5 @@
 export { MachineView } from "./MachineView";
-export type { MachineSelectionHandler } from "./field-catalog";
+export type {
+  MachineRowAction,
+  MachineSelectionHandler,
+} from "./field-catalog";

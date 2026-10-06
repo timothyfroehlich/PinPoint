@@ -2,6 +2,7 @@ import type React from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { MachineGroupShell } from "~/components/collections/MachineGroupShell";
+import { PrintSettingsSheetsLink } from "~/components/machines/settings/PrintSettingsSheetsLink";
 import { EditTagMachinesDialog } from "~/components/tags/EditTagMachinesDialog";
 import { TagActionsMenu } from "~/components/tags/TagActionsMenu";
 import { TagTrail } from "~/components/tags/TagTrail";
@@ -58,18 +59,21 @@ export default async function TagLayout({
       machines={tag.machines}
       basePath={tag.href}
       action={
-        editor && move ? (
-          <div className="flex items-center gap-2">
-            <EditTagMachinesDialog {...editor} />
-            <TagActionsMenu
-              tagId={editor.tagId}
-              name={editor.tagName}
-              machineCount={editor.currentIds.length}
-              parentHref={editor.parentHref}
-              move={move}
-            />
-          </div>
-        ) : null
+        <div className="flex items-center gap-2">
+          <PrintSettingsSheetsLink machines={tag.machines} />
+          {editor && move ? (
+            <>
+              <EditTagMachinesDialog {...editor} />
+              <TagActionsMenu
+                tagId={editor.tagId}
+                name={editor.tagName}
+                machineCount={editor.currentIds.length}
+                parentHref={editor.parentHref}
+                move={move}
+              />
+            </>
+          ) : null}
+        </div>
       }
     >
       {children}

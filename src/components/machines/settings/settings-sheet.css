@@ -1,0 +1,253 @@
+/* Printed settings sheet (PP-k3km, settings-sheets spec §3). Paper, not app
+ * surface: black on white with grayscale-safe emphasis, so it ignores the dark
+ * app tokens the same way the apron card does. Sizes are 12px (9pt) minimum
+ * for legibility on paper. */
+.settings-sheet {
+  color: #111111;
+  background: #ffffff;
+  font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 1.35;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-sheet__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  border-bottom: 2px solid #111111;
+  padding-bottom: 8px;
+}
+
+.settings-sheet__kicker {
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #444444;
+}
+
+.settings-sheet__title {
+  margin: 2px 0 0;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.settings-sheet__header-right {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.settings-sheet__direction {
+  display: inline-block;
+  font-size: 14px;
+  font-weight: 700;
+  border: 2px solid #111111;
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+
+.settings-sheet__printed {
+  color: #444444;
+  margin-top: 4px;
+}
+
+.settings-sheet__summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.45;
+}
+
+.settings-sheet__instruction {
+  font-weight: 600;
+}
+
+.settings-sheet__summary-items {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 14px;
+}
+
+.settings-sheet__columns {
+  column-count: 2;
+  column-gap: 18px;
+}
+
+.settings-sheet__machine {
+  break-inside: avoid;
+  border: 1px solid #333333;
+  border-radius: 4px;
+  padding: 7px 10px 8px;
+  margin: 0 0 10px;
+}
+
+.settings-sheet__machine-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.settings-sheet__machine-name {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.settings-sheet__initials {
+  font-weight: 600;
+  color: #333333;
+  border: 1px solid #555555;
+  border-radius: 3px;
+  padding: 0 4px;
+}
+
+.settings-sheet__done {
+  margin-left: auto;
+  color: #444444;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.settings-sheet__blank {
+  display: inline-block;
+  width: 48px;
+  border-bottom: 1px solid #444444;
+}
+
+.settings-sheet__meta {
+  color: #555555;
+  margin: 2px 0 5px;
+}
+
+.settings-sheet__warn {
+  font-weight: 700;
+  border: 1.5px solid #111111;
+  background: #eeeeee;
+  padding: 3px 6px;
+  margin: 0 0 5px;
+}
+
+.settings-sheet__row {
+  display: grid;
+  column-gap: 8px;
+  padding: 3px 0;
+  border-top: 1px solid #cccccc;
+}
+
+.settings-sheet__row--compare {
+  grid-template-columns: 52px minmax(0, 0.9fr) minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.settings-sheet__row--step {
+  grid-template-columns: 12px 52px minmax(0, 1.4fr) minmax(0, 1fr);
+}
+
+.settings-sheet__row--head {
+  border-top: 0;
+  padding: 0 0 2px;
+  font-weight: 700;
+  color: #333333;
+}
+
+.settings-sheet__loc {
+  font-weight: 600;
+  color: #333333;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.settings-sheet__cell {
+  display: flex;
+  gap: 5px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.settings-sheet__set-to {
+  overflow-wrap: anywhere;
+}
+
+/* A difference on a full-sets sheet (§3.9). */
+.settings-sheet__differs {
+  font-weight: 700;
+}
+
+.settings-sheet__row--record {
+  grid-template-columns: 12px 52px minmax(0, 1.2fr) minmax(0, 0.8fr) minmax(
+      0,
+      0.8fr
+    );
+}
+
+.settings-sheet__row--blank {
+  grid-template-columns: 64px minmax(0, 1.4fr) minmax(0, 0.8fr) minmax(0, 0.8fr);
+}
+
+.settings-sheet__row--write-in {
+  border-top: 0;
+  padding: 0;
+}
+
+/* A space to write a value in by hand. */
+.settings-sheet__write-in {
+  display: block;
+  min-height: 18px;
+  border-bottom: 1px solid #888888;
+}
+
+.settings-sheet__value--derived {
+  font-style: italic;
+  font-weight: 400;
+  color: #555555;
+}
+
+.settings-sheet__box {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid #111111;
+  border-radius: 2px;
+  margin-top: 2px;
+  box-sizing: border-box;
+}
+
+.settings-sheet__step {
+  font-weight: 700;
+  margin: 4px 0 2px;
+}
+
+.settings-sheet__note {
+  display: flex;
+  gap: 5px;
+  padding: 4px 0 0;
+  border-top: 1px solid #cccccc;
+  white-space: pre-line;
+}
+
+.settings-sheet__notes-lines {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 6px;
+  row-gap: 0;
+  margin-top: 6px;
+  color: #444444;
+}
+
+.settings-sheet__notes-label {
+  grid-row: 1;
+  align-self: end;
+}
+
+.settings-sheet__line {
+  grid-column: 2;
+  height: 20px;
+  border-bottom: 1px solid #888888;
+}
+
+.settings-sheet__line:nth-of-type(3) {
+  grid-column: 1 / -1;
+}

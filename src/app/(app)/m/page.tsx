@@ -1,7 +1,7 @@
 import type React from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { MapPin, Plus, Printer } from "lucide-react";
+import { ClipboardList, MapPin, Plus, Printer } from "lucide-react";
 import { MachineView } from "~/components/machines/view";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
@@ -101,6 +101,15 @@ export default async function MachinesPage({
       </Link>
     </Button>
   ) : null;
+  // Open to everyone (settings-sheets §2.1).
+  const printSettingsSheetsButton = (
+    <Button asChild variant="outline" className="max-md:size-11 max-md:px-0">
+      <Link href="/m/settings-sheets" aria-label="Print settings sheets">
+        <ClipboardList className="size-4 md:mr-2" aria-hidden="true" />
+        <span className="max-md:hidden">Print settings sheets</span>
+      </Link>
+    </Button>
+  );
   const addMachineButton = canCreateMachine ? (
     <Button
       asChild
@@ -118,16 +127,14 @@ export default async function MachinesPage({
       </Link>
     </Button>
   ) : null;
-  const pageActions =
-    lineupButton === null &&
-    printApronCardsButton === null &&
-    addMachineButton === null ? undefined : (
-      <>
-        {lineupButton}
-        {printApronCardsButton}
-        {addMachineButton}
-      </>
-    );
+  const pageActions = (
+    <>
+      {lineupButton}
+      {printApronCardsButton}
+      {printSettingsSheetsButton}
+      {addMachineButton}
+    </>
+  );
 
   if (result.scopeCount === 0) {
     return (

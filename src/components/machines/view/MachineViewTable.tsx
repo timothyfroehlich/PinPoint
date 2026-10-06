@@ -12,6 +12,7 @@ import { cn } from "~/lib/utils";
 import {
   MACHINE_VIEW_FIELD_RENDERERS,
   MachineIdentity,
+  type MachineRowAction,
   type MachineSelectionHandler,
 } from "./field-catalog";
 
@@ -21,6 +22,7 @@ interface MachineViewTableProps {
   mobileMode: "compact" | "table";
   onSort: (field: MachineViewFieldId) => void;
   onMachineSelect?: MachineSelectionHandler | undefined;
+  rowAction?: MachineRowAction | undefined;
 }
 
 function SortHeader({
@@ -83,6 +85,7 @@ export function MachineViewTable({
   mobileMode,
   onSort,
   onMachineSelect,
+  rowAction,
 }: MachineViewTableProps): React.JSX.Element {
   const fields = state.columns.filter(
     (field): field is Exclude<MachineViewFieldId, "machine"> =>
@@ -117,6 +120,14 @@ export function MachineViewTable({
                   onSort={onSort}
                 />
               ))}
+              {rowAction ? (
+                <th
+                  scope="col"
+                  className="sticky top-0 z-20 h-10 w-px border-b border-outline-variant bg-card px-3 pr-4"
+                >
+                  <span className="sr-only">Actions</span>
+                </th>
+              ) : null}
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -150,6 +161,11 @@ export function MachineViewTable({
                     </td>
                   );
                 })}
+                {rowAction ? (
+                  <td className="h-14 w-px whitespace-nowrap px-3 py-1 pr-4 text-right">
+                    {rowAction(row)}
+                  </td>
+                ) : null}
               </tr>
             ))}
           </tbody>

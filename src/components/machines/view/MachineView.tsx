@@ -57,7 +57,10 @@ import {
 } from "./MachineSummaryWidgets";
 import { MachineViewCompactList } from "./MachineViewCompactList";
 import { MachineViewTable } from "./MachineViewTable";
-import type { MachineSelectionHandler } from "./field-catalog";
+import type {
+  MachineRowAction,
+  MachineSelectionHandler,
+} from "./field-catalog";
 import { buildMachineFilters } from "./machine-filters";
 
 const MOBILE_MODE_STORAGE_KEY = "pinpoint:machine-view:mobile-mode";
@@ -79,6 +82,15 @@ interface MachineViewProps {
   /** The page actions beside the title (list-views §3.2). */
   actions?: React.ReactNode;
   onMachineSelect?: MachineSelectionHandler | undefined;
+  /**
+   * An action at the end of each row, such as Add on Print settings sheets
+   * (settings-sheets §2.2).
+   */
+  rowAction?: MachineRowAction | undefined;
+  /** An action in the List Header that applies to the whole result. */
+  listAction?: React.ReactNode;
+  /** Whether the Summary Widgets show. A picker Surface leaves them out. */
+  showSummary?: boolean;
 }
 
 interface AppliedView {
@@ -142,6 +154,9 @@ export function MachineView({
   title,
   actions,
   onMachineSelect,
+  rowAction,
+  listAction,
+  showSummary = true,
 }: MachineViewProps): React.JSX.Element {
   const router = useRouter();
   const pathname = usePathname();
@@ -443,7 +458,7 @@ export function MachineView({
             />
           ) : undefined
         }
-        summary={summary}
+        summary={showSummary ? summary : undefined}
         search={
           <ListSearchField
             id="machine-view-search"
@@ -458,6 +473,7 @@ export function MachineView({
         sort={sort}
         display={display}
         pagination={pagination}
+        exportControl={listAction}
         busy={isPending}
         onResetAll={resetFilters}
         emptyState={(discard) =>
@@ -484,6 +500,7 @@ export function MachineView({
           <MachineViewCompactList
             rows={result.rows}
             onMachineSelect={onMachineSelect}
+            rowAction={rowAction}
           />
         ) : null}
         <MachineViewTable
@@ -495,6 +512,7 @@ export function MachineView({
             update(nextSort);
           }}
           onMachineSelect={onMachineSelect}
+          rowAction={rowAction}
         />
       </ListView>
     </div>
