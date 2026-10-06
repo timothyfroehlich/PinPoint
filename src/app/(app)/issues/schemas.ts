@@ -6,7 +6,7 @@
  */
 
 import { z } from "zod";
-import { ISSUE_TITLE_MAX, ISSUE_TITLE_MAX_MESSAGE } from "~/lib/issues/title";
+import { ISSUE_TITLE_MAX_MESSAGE, issueTitleSchema } from "~/lib/issues/title";
 import { ISSUE_FREQUENCY_VALUES } from "~/lib/types";
 import { ISSUE_STATUS_VALUES } from "~/lib/issues/status";
 
@@ -142,11 +142,10 @@ export const deleteCommentSchema = z.object({
  */
 export const updateIssueTitleSchema = z.object({
   issueId: uuidish,
-  title: z
-    .string()
-    .trim()
-    .min(1, "Title cannot be empty")
-    .max(ISSUE_TITLE_MAX, ISSUE_TITLE_MAX_MESSAGE),
+  title: issueTitleSchema({
+    required: "Title cannot be empty",
+    tooLong: ISSUE_TITLE_MAX_MESSAGE,
+  }),
 });
 
 /**
