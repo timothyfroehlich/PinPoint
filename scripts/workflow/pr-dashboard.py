@@ -18,6 +18,10 @@ import sys
 from pathlib import Path
 from typing import Any
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from gh_cli import run_gh  # noqa: E402
+
 CONNECTION_PAGE_SIZE = 100
 CI_GATE_NAME = "CI Gate"
 GATES_SCRIPT = Path(__file__).resolve().parent / "_pr-gates.sh"
@@ -31,10 +35,7 @@ class DashboardError(RuntimeError):
 
 
 def gh(*args: str) -> str:
-    result = subprocess.run(["gh", *args], capture_output=True, text=True)
-    if result.returncode != 0:
-        raise DashboardError(result.stderr.strip() or f"gh {args[0]} failed")
-    return result.stdout.strip()
+    return run_gh(*args, error=DashboardError)
 
 
 def _repository_slug() -> tuple[str, str]:

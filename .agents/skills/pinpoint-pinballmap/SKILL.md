@@ -17,6 +17,8 @@ All PinballMap access goes through `~/lib/pinballmap` and `getPinballMapClient`.
 
 Keep the API token and members' linked tokens server-side, use the existing Vault-backed path for write credentials (`~/lib/pinballmap/user-credentials`), and never log credentialed URLs. Do not perform external HTTP inside a database transaction.
 
+Outbound lineup writes (add, remove, Insider Connected, confirm) run through `~/lib/pinballmap/outbound-write` and `~/lib/pinballmap/outbound-remove`. They own the mutation lease, the PBM call before the transaction, and the locked stored-lineup edit (`editStoredSnapshot`, `mutationLeaseOwnsLocation`). A new push reuses that plumbing; its Server Action keeps only auth, parsing, revalidation and the return shape.
+
 ## Keep traffic polite and bounded
 
 Render the stored location snapshot. Refresh it only through `syncLocationSnapshot`:
