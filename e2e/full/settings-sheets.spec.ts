@@ -93,6 +93,15 @@ test.describe("Print settings sheets", () => {
     await expect(
       page.getByRole("radio", { name: /Set up and restore/ })
     ).toBeChecked();
+
+    // Once the list has rewritten the URL, a reload restores the run from
+    // this tab's storage.
+    await expect(page).not.toHaveURL(/[?&]m=/);
+    await page.reload();
+    await expect(printRunRow(page, "Medieval Madness")).toContainText(
+      "9 changes"
+    );
+    await expect(printRunRow(page, "Godzilla")).toBeVisible();
   });
 
   test("a tag default that finds several sets asks which one", async ({

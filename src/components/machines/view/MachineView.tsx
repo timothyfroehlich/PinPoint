@@ -91,6 +91,8 @@ interface MachineViewProps {
   listAction?: React.ReactNode;
   /** Whether the Summary Widgets show. A picker Surface leaves them out. */
   showSummary?: boolean;
+  /** Told when a new result starts and finishes loading. */
+  onBusyChange?: ((busy: boolean) => void) | undefined;
 }
 
 interface AppliedView {
@@ -157,6 +159,7 @@ export function MachineView({
   rowAction,
   listAction,
   showSummary = true,
+  onBusyChange,
 }: MachineViewProps): React.JSX.Element {
   const router = useRouter();
   const pathname = usePathname();
@@ -174,6 +177,7 @@ export function MachineView({
   const [viewId, setViewId] = React.useState(serverViewId);
   React.useEffect(() => setViewId(serverViewId), [serverViewId]);
   React.useEffect(() => setState(result.state), [result.state]);
+  React.useEffect(() => onBusyChange?.(isPending), [isPending, onBusyChange]);
 
   React.useEffect(() => {
     try {

@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { Check, ChevronLeft, Eye, Plus, Printer, X } from "lucide-react";
+import { z } from "zod";
 
 import { loadPrintRunMachinesAction } from "~/app/(app)/m/settings-sheets/actions";
 import { PageHeader } from "~/components/layout/PageHeader";
@@ -76,7 +77,15 @@ interface StoredRun {
   rows: PrintRunRow[];
 }
 
-function isStoredRun(value: unknown): value is StoredRun {
+const storedRowSchema = z.object({
+  machineId: z.string(),
+  from: z.string().optional(),
+  to: z.string().optional(),
+});
+
+function isStoredRun(
+  value: unknown
+): value is { options: PrintRunOptions; rows: unknown[] } {
   if (typeof value !== "object" || value === null) return false;
   return "options" in value && "rows" in value && Array.isArray(value.rows);
 }
@@ -105,10 +114,18 @@ function readStoredRun(): StoredRun | null {
           ? options.coverage
           : "differences",
       },
-      rows: parsed.rows.filter(
-        (row): row is PrintRunRow =>
-          typeof row === "object" && typeof row.machineId === "string"
-      ),
+      rows: parsed.rows.flatMap((row): PrintRunRow[] => {
+        const result = storedRowSchema.safeParse(row);
+        if (!result.success) return [];
+        const { machineId, from, to } = result.data;
+        return [
+          {
+            machineId,
+            ...(from !== undefined ? { from } : {}),
+            ...(to !== undefined ? { to } : {}),
+          },
+        ];
+      }),
     };
   } catch {
     // Storage can be unavailable or hold something else; start empty.
@@ -192,6 +209,8 @@ export function SettingsSheetsBuilder({
   const [adding, startAdding] = React.useTransition();
   const [previewOpen, setPreviewOpen] = React.useState(false);
   const [loadError, setLoadError] = React.useState(false);
+  // While the list loads a new result, its matches are the previous filter's.
+  const [listBusy, setListBusy] = React.useState(false);
 
   const loadMachines = React.useCallback(
     async (ids: string[]): Promise<PrintRunMachine[]> => {
@@ -219,13 +238,26 @@ export function SettingsSheetsBuilder({
     setRestored(true);
     const stored = readStoredRun();
     if (stored === null || stored.rows.length === 0) return;
+    // The rows come back at once, so the run is never written back empty
+    // while their machines load; machines no longer On the Floor drop out.
     setOptions(stored.options);
+    setRows(stored.rows);
     startAdding(async () => {
-      const loaded = await loadMachines(stored.rows.map((r) => r.machineId));
-      const ids = new Set(loaded.map((machine) => machine.id));
-      setRows(stored.rows.filter((row) => ids.has(row.machineId)));
+      const ids = stored.rows.map((r) => r.machineId);
+      const outcome = await loadPrintRunMachinesAction(ids);
+      if (!outcome.ok) {
+        setLoadError(true);
+        return;
+      }
+      setMachines((current) => {
+        const next = new Map(current);
+        for (const machine of outcome.value) next.set(machine.id, machine);
+        return next;
+      });
+      const loaded = new Set(outcome.value.map((machine) => machine.id));
+      setRows((current) => current.filter((row) => loaded.has(row.machineId)));
     });
-  }, [loadMachines, restored]);
+  }, [restored]);
 
   React.useEffect(() => {
     if (restored) writeStoredRun({ options, rows });
@@ -274,15 +306,24 @@ export function SettingsSheetsBuilder({
   }
 
   const loadedMachines = [...machines.values()];
-  const statuses = new Map(
-    rows.map((row) => {
-      const machine = machines.get(row.machineId);
-      return [
-        row.machineId,
-        machine === undefined ? null : printRunRowStatus(machine, row, options),
-      ] as const;
-    })
+  const statuses = React.useMemo(
+    () =>
+      new Map(
+        rows.map((row) => {
+          const machine = machines.get(row.machineId);
+          return [
+            row.machineId,
+            machine === undefined
+              ? null
+              : printRunRowStatus(machine, row, options),
+          ] as const;
+        })
+      ),
+    [machines, options, rows]
   );
+  // Print and Preview wait until every row's machine has loaded, so neither
+  // leaves a machine out.
+  const loading = adding || rows.some((row) => !machines.has(row.machineId));
   const printing = rows.filter((row) => {
     const status = statuses.get(row.machineId);
     return (
@@ -329,7 +370,7 @@ export function SettingsSheetsBuilder({
       type="button"
       size="sm"
       variant="outline"
-      disabled={toAdd.length === 0 || adding}
+      disabled={toAdd.length === 0 || adding || listBusy}
       onClick={() => add(toAdd)}
       className="whitespace-nowrap"
     >
@@ -424,6 +465,7 @@ export function SettingsSheetsBuilder({
               rowAction={rowAction}
               listAction={listAction}
               showSummary={false}
+              onBusyChange={setListBusy}
             />
           </section>
 
@@ -508,13 +550,13 @@ export function SettingsSheetsBuilder({
             <Button
               type="button"
               variant="outline"
-              disabled={rows.length === 0}
+              disabled={rows.length === 0 || loading}
               onClick={() => setPreviewOpen(true)}
             >
               <Eye className="size-4" aria-hidden="true" />
               Preview
             </Button>
-            {rows.length === 0 ? (
+            {rows.length === 0 || loading ? (
               <Button type="button" disabled>
                 <Printer className="size-4" aria-hidden="true" />
                 Print
@@ -562,16 +604,19 @@ export function SettingsSheetsBuilder({
           </div>
           <div className="min-h-0 overflow-auto rounded-md bg-muted p-4">
             <div className="mx-auto w-[8.5in] bg-white p-[0.5in] shadow-lg">
-              <SettingsSheetDocument
-                sheet={buildSettingsSheet(
-                  printRunInputs(loadedMachines, rows, options),
-                  options.coverage
-                )}
-                direction={options.direction}
-                coverage={options.coverage}
-                labels={labels}
-                printedAt={new Date().toISOString()}
-              />
+              {/* Built only while open: it compares every set in the run. */}
+              {previewOpen ? (
+                <SettingsSheetDocument
+                  sheet={buildSettingsSheet(
+                    printRunInputs(loadedMachines, rows, options),
+                    options.coverage
+                  )}
+                  direction={options.direction}
+                  coverage={options.coverage}
+                  labels={labels}
+                  printedAt={new Date().toISOString()}
+                />
+              ) : null}
             </div>
           </div>
         </DialogContent>

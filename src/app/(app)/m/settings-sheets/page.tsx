@@ -60,8 +60,10 @@ export default async function PrintSettingsSheetsPage({
   };
   // The ids reach the client only as `addableIds`.
   const { matchingIds = [], ...listResult } = result;
+  // A link that names a run, even an empty one (a group with no machines On
+  // the Floor), opens that run rather than this tab's last one.
   const initialRun =
-    query.initials.length === 0
+    rawSearchParams["m"] === undefined
       ? null
       : {
           options: query.options,
