@@ -238,6 +238,7 @@ export async function uploadIssueImage(formData: FormData): Promise<
       },
       "Upload action failed"
     );
+    reportError(caughtErr, { action: "uploadIssueImage" });
     return err("BLOB", errorMessage(caughtErr, "Upload failed"));
   }
 }

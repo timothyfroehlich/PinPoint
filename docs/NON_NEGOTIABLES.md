@@ -1,7 +1,7 @@
 # PinPoint Non‑Negotiables
 
 **Last Updated**: 2026-10-06
-**Version**: 2.9 (CORE-ARCH-013 added: Server Actions go through `createProtectedAction` — PP-az4d.4). Prior: 2.8 (CORE-ARCH-015 added: a caught error not returned to the user goes to `reportError`; cron routes use `runCron` — PP-az4d.3). Prior: 2.7 (CORE-ARCH-014 added: one write path per mutation; CORE-ARCH-010 amended: share load-bearing code at two copies, reuse existing helpers — PP-az4d.1)
+**Version**: 2.11 (CORE-TS-002 amended: a `*_VALUES` array is the single source for zod, Drizzle and TS unions — PP-az4d.13). Prior: 2.10 (CORE-ARCH-016 added: third-party HTTP goes through `~/lib/http/external` with a per-request timeout — PP-az4d.11). Prior: 2.9 (CORE-ARCH-013 added: Server Actions go through `createProtectedAction` — PP-az4d.4). Prior: 2.8 (CORE-ARCH-015 added: a caught error not returned to the user goes to `reportError`; cron routes use `runCron` — PP-az4d.3). Prior: 2.7 (CORE-ARCH-014 added: one write path per mutation; CORE-ARCH-010 amended: share load-bearing code at two copies, reuse existing helpers — PP-az4d.1)
 
 > **Canonical catalog**: this document defines the canonical `CORE-*` rules for PinPoint. Portable skills (`.agents/skills/`) and agent context (`AGENTS.md`) cite rules by ID and provide domain/task-specific procedures.
 
@@ -42,6 +42,7 @@
 25. A mutation with more than one entry point lives in `src/services`; entry points parse, authorize, and call it (CORE-ARCH-014)
 26. A caught error that is not returned to the user goes to `reportError`, never to a bare `log.error`; cron routes use `runCron` (CORE-ARCH-015)
 27. Server Actions are built with `createProtectedAction` / `createPublicAction` from `~/lib/actions` (CORE-ARCH-013)
+28. Third-party HTTP calls go through `~/lib/http/external` with a per-request timeout (CORE-ARCH-016)
 
 ---
 
@@ -58,8 +59,8 @@
 
 - **Severity:** High
 - **Why:** Divergent shapes cause bugs
-- **Do:** Reuse domain types from `~/lib/types`
-- **Don't:** Declare look‑alike types in multiple places
+- **Do:** Reuse domain types from `~/lib/types`. A value set with a `*_VALUES` array (`ISSUE_SEVERITY_VALUES`, `USER_ROLES`, `NOTIFICATION_TYPE_VALUES`, `ISSUE_STATUS_VALUES`) has that array as its single source: `z.enum(X_VALUES)`, Drizzle `text(..., { enum: X_VALUES })`, and `type X = (typeof X_VALUES)[number]` all derive from it. Give a new value set its array before a second site needs the list.
+- **Don't:** Declare look‑alike types in multiple places. Restate a value set's literals by hand in a union, `z.enum([...])`, or Drizzle `enum: [...]`, and cast an array (`as unknown as [T, ...T[]]`) to fit a Drizzle enum: pass the `as const` array as is.
 
 **CORE-TS-003:** DB vs App boundary
 
@@ -443,6 +444,13 @@
 - **Do:** Send every caught error that is not returned to the user through `reportError(err, { action: "<area.operation>" })` from `~/lib/observability/report-error`: one call captures to Sentry and writes the structured log. A Server Action that also returns an `err` Result uses `serverActionError(...)`. Write each cron route as `return runCron(request, "<action>", async () => ({ ok: true, ... }))` from `~/lib/cron/run-cron`: it applies the `CRON_SECRET` gate, reports any thrown failure, and answers with the single failure status (500). A cron job that fails by returning a result value throws that failure inside the callback. An error tolerated by design is still reported, with `bestEffort: true` in the context.
 - **Don't:** Pair `catch` with a bare `log.error`. Don't add `try`/`catch` to a cron route; `runCron` owns it.
 
+**CORE-ARCH-016:** Third-party HTTP calls go through `~/lib/http/external` with a timeout
+
+- **Severity:** Required
+- **Why:** `fetch` has no deadline of its own. A third party that accepts the connection and never answers holds the request until the platform kills the function: a Server Action spins with no result, and a cron run dies without reporting. PinballMap and Discord had no timeout until PP-az4d.11, while iScored, OPDB and PinTips each set their own. Both clients had also copied the network-error fallback and the 429 retry, and copies drift.
+- **Do:** Send each server-side request to a third-party API through `safeFetch(url, init, { timeoutMs, networkErrorLog })` from `~/lib/http/external`, and wrap a send that may hit a 429 in `withRetryAfter`. Name each `timeoutMs` as a constant in the client, chosen per endpoint class; it bounds one attempt, headers and body together, so a retry gets a fresh budget. A timeout and a network failure both arrive as the synthetic 599 (`NETWORK_ERROR_STATUS`), so classify that one status. An integration guard such as `assertPinballMapNetworkAllowed` runs before the call, outside the 599 conversion. SDK clients (Supabase, Resend, Vercel Blob) own their transport and are out of scope. OPDB and PinTips predate the helper; move them onto it with their next change (iScored moved in PP-az4d.19).
+- **Don't:** Call `fetch` directly for a third-party API, or send one without a timeout.
+
 ---
 
 ## Integrations
@@ -709,7 +717,7 @@ If all Yes → ship it. Perfect is the enemy of done.
 - CORE‑SEC‑001..010: Security
 - CORE‑PERF‑001..003: Performance (incl. image priority + preconnect)
 - CORE‑TEST‑001..006: Testing
-- CORE‑ARCH‑001, 004..015: Architecture (002, 003 retired)
+- CORE‑ARCH‑001, 004..016: Architecture (002, 003 retired)
 - CORE‑RESP‑001..004: Responsive framework
 - CORE‑UI‑001..006: UI & styling + Browser support / MWG catalog (005, 006)
 - CORE‑A11Y‑001..006: Accessibility floor

@@ -9,7 +9,7 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { SEVERITY_CONFIG } from "~/lib/issues/status";
-import { type IssueSeverity } from "~/lib/types";
+import { ISSUE_SEVERITY_VALUES, type IssueSeverity } from "~/lib/types";
 
 interface SeveritySelectProps {
   value: IssueSeverity | "";
@@ -21,12 +21,7 @@ interface SeveritySelectProps {
   testId?: string;
 }
 
-const severityOptions: IssueSeverity[] = [
-  "cosmetic",
-  "minor",
-  "major",
-  "unplayable",
-];
+const severityOptions: readonly IssueSeverity[] = ISSUE_SEVERITY_VALUES;
 
 export function SeveritySelect({
   value,

@@ -23,6 +23,7 @@ import {
   pinballmapState,
 } from "~/server/db/schema";
 import type { LocationSnapshot } from "~/lib/pinballmap/types";
+import type * as ReportErrorModule from "~/lib/observability/report-error";
 
 vi.mock("~/server/db", async () => {
   const { getTestDb } = await import("~/test/setup/pglite");
@@ -34,6 +35,12 @@ vi.mock("~/server/db", async () => {
 vi.mock("~/lib/pinballmap/client", async () => {
   const { getMockClient } = await import("~/lib/pinballmap/client-mock");
   return { getPinballMapClient: () => Promise.resolve(getMockClient()) };
+});
+
+// Spy on reportError without dropping the module's other exports.
+vi.mock("~/lib/observability/report-error", async (importOriginal) => {
+  const actual = await importOriginal<typeof ReportErrorModule>();
+  return { ...actual, reportError: vi.fn() };
 });
 
 const CHECKED_BY = "00000000-0000-4000-8000-000000000001";
@@ -1066,5 +1073,142 @@ describe("tracked-location concurrency guards", () => {
       reason: "concurrent_change",
     });
     expect((await getPinballMapState())?.locationId).toBe(26454);
+  });
+});
+
+describe("withPinballMapMutationLease (PP-az4d.20)", () => {
+  setupTestDb();
+
+  // The five outbound lineup flows share this one claim/release block, so a
+  // lease left held after a thrown flow would block every configuration
+  // change and unleased refresh for the full lease window.
+  it("releases the lease when the body throws, and rethrows", async () => {
+    const db = await getTestDb();
+    const { withPinballMapMutationLease } =
+      await import("~/lib/pinballmap/mutation-lease");
+    const { getPinballMapState } = await import("~/lib/pinballmap/state");
+    await db
+      .insert(pinballmapState)
+      .values({ id: "singleton", locationId: 26454 });
+
+    let heldDuringBody: string | null = null;
+    await expect(
+      withPinballMapMutationLease(26454, 0, async (lease) => {
+        heldDuringBody = (await getPinballMapState())?.mutationLeaseId ?? null;
+        expect(heldDuringBody).toBe(lease.id);
+        throw new Error("PBM exploded");
+      })
+    ).rejects.toThrow("PBM exploded");
+
+    expect(heldDuringBody).not.toBeNull();
+    expect(await getPinballMapState()).toMatchObject({
+      mutationLeaseId: null,
+      mutationLeaseExpiresAt: null,
+    });
+  });
+
+  it("skips the body and returns SERVER while another writer holds the lease", async () => {
+    const db = await getTestDb();
+    const { withPinballMapMutationLease } =
+      await import("~/lib/pinballmap/mutation-lease");
+    const { getPinballMapState } = await import("~/lib/pinballmap/state");
+    const otherLease = "00000000-0000-4000-8000-000000000097";
+    await db.insert(pinballmapState).values({
+      id: "singleton",
+      locationId: 26454,
+      mutationLeaseId: otherLease,
+      mutationLeaseExpiresAt: sql`now() + interval '1 minute'`,
+    });
+    const body = vi.fn();
+
+    const result = await withPinballMapMutationLease(26454, 0, body);
+
+    expect(body).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ ok: false, code: "SERVER" });
+    // The other writer's lease is untouched.
+    expect((await getPinballMapState())?.mutationLeaseId).toBe(otherLease);
+  });
+
+  describe("when the lease release itself fails", () => {
+    // A real database failure on the release UPDATE only: a trigger rejects
+    // the write that clears the lease, after the body has already run.
+    async function failLeaseRelease(): Promise<void> {
+      const db = await getTestDb();
+      await db.execute(sql`
+        CREATE OR REPLACE FUNCTION fail_lease_release() RETURNS trigger AS $$
+        BEGIN
+          RAISE EXCEPTION 'lease release failed';
+        END;
+        $$ LANGUAGE plpgsql
+      `);
+      await db.execute(sql`
+        CREATE TRIGGER fail_lease_release BEFORE UPDATE ON pinballmap_state
+        FOR EACH ROW WHEN (NEW.mutation_lease_id IS NULL)
+        EXECUTE FUNCTION fail_lease_release()
+      `);
+    }
+
+    async function restoreLeaseRelease(): Promise<void> {
+      const db = await getTestDb();
+      await db.execute(
+        sql`DROP TRIGGER IF EXISTS fail_lease_release ON pinballmap_state`
+      );
+      await db.execute(sql`DROP FUNCTION IF EXISTS fail_lease_release()`);
+    }
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it("returns the body's success result and reports the release failure (PP-az4d.29)", async () => {
+      const db = await getTestDb();
+      const { withPinballMapMutationLease } =
+        await import("~/lib/pinballmap/mutation-lease");
+      const { reportError } = await import("~/lib/observability/report-error");
+      await db
+        .insert(pinballmapState)
+        .values({ id: "singleton", locationId: 26454 });
+      await failLeaseRelease();
+
+      try {
+        const result = await withPinballMapMutationLease(26454, 0, () =>
+          Promise.resolve({ ok: true as const, value: "landed" })
+        );
+
+        expect(result).toEqual({ ok: true, value: "landed" });
+        expect(reportError).toHaveBeenCalledTimes(1);
+        expect(reportError).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({
+            action: "pinballmap.releaseMutationLease",
+            bestEffort: true,
+          })
+        );
+      } finally {
+        await restoreLeaseRelease();
+      }
+    });
+
+    it("still propagates the body's own error rather than the release error", async () => {
+      const db = await getTestDb();
+      const { withPinballMapMutationLease } =
+        await import("~/lib/pinballmap/mutation-lease");
+      const { reportError } = await import("~/lib/observability/report-error");
+      await db
+        .insert(pinballmapState)
+        .values({ id: "singleton", locationId: 26454 });
+      await failLeaseRelease();
+
+      try {
+        await expect(
+          withPinballMapMutationLease(26454, 0, () =>
+            Promise.reject(new Error("PBM exploded"))
+          )
+        ).rejects.toThrow("PBM exploded");
+        expect(reportError).toHaveBeenCalledTimes(1);
+      } finally {
+        await restoreLeaseRelease();
+      }
+    });
   });
 });

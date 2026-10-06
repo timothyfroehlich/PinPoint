@@ -3,9 +3,8 @@ import { FilePenLine } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Button } from "~/components/ui/button";
-import { checkPermission } from "~/lib/permissions/helpers";
-import { getUserAccessLevel } from "~/lib/permissions/access";
-import { createClient } from "~/lib/supabase/server";
+import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
+import { getViewer } from "~/lib/auth/viewer";
 import { getLoginUrl } from "~/lib/url";
 import { QuickReportGrid } from "~/app/(app)/report/(tabbed)/quick/quick-report-grid";
 
@@ -13,13 +12,10 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export default async function MultipleReportPage(): Promise<React.JSX.Element> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { userId, role } = await getViewer();
 
-  if (!user) redirect(getLoginUrl("/report/multiple"));
-  const accessLevel = await getUserAccessLevel(user.id);
+  if (!userId) redirect(getLoginUrl("/report/multiple"));
+  const accessLevel = getAccessLevel(role);
   if (!checkPermission("issues.report.quick", accessLevel)) redirect("/report");
 
   return (

@@ -1,9 +1,9 @@
 import type React from "react";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
-import { createClient } from "~/lib/supabase/server";
+import { getViewer } from "~/lib/auth/viewer";
 import { db } from "~/server/db";
-import { machines, userProfiles } from "~/server/db/schema";
+import { machines } from "~/server/db/schema";
 import { deriveMachineStatus } from "~/lib/machines/status";
 import { RichTextDisplay } from "~/components/editor/RichTextDisplay";
 import { docIsEmpty, docToPlainText } from "~/lib/tiptap/types";
@@ -62,19 +62,9 @@ export default async function MachineInfoTab({
 }): Promise<React.JSX.Element> {
   const { initials } = await params;
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { userId, role } = await getViewer();
 
-  const currentUserProfile = user
-    ? await db.query.userProfiles.findFirst({
-        where: eq(userProfiles.id, user.id),
-        columns: { role: true },
-      })
-    : null;
-
-  const accessLevel = getAccessLevel(currentUserProfile?.role);
+  const accessLevel = getAccessLevel(role);
 
   const { machine } = await getMachineForLayout(initials);
   if (!machine) {
@@ -84,14 +74,14 @@ export default async function MachineInfoTab({
   const openIssues = machine.issues;
 
   const ownershipContext: OwnershipContext = {
-    userId: user?.id,
+    userId,
     machineOwnerId: machine.ownerId ?? undefined,
   };
 
   // Who may post timeline notes; their unposted note is kept as a draft.
   const composerUserId =
-    user && checkPermission("machines.timeline.comment.add", accessLevel)
-      ? user.id
+    userId && checkPermission("machines.timeline.comment.add", accessLevel)
+      ? userId
       : null;
 
   const machineStatus = deriveMachineStatus(openIssues);

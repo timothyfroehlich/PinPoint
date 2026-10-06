@@ -1,9 +1,81 @@
 {
-  "id": "1f06c213-653c-4a2f-8f66-6baca8e10685",
+  "id": "65d44e4f-e897-474b-8cdc-b23c615de5cb",
   "prevId": "6d451837-dcf5-404f-b7ee-598948306b95",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
+    "public.apron_card_print_queue": {
+      "name": "apron_card_print_queue",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "card_id": {
+          "name": "card_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_apron_card_print_queue_card_id": {
+          "name": "idx_apron_card_print_queue_card_id",
+          "columns": [
+            {
+              "expression": "card_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "apron_card_print_queue_user_id_user_profiles_id_fk": {
+          "name": "apron_card_print_queue_user_id_user_profiles_id_fk",
+          "tableFrom": "apron_card_print_queue",
+          "tableTo": "user_profiles",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "apron_card_print_queue_card_id_machine_apron_cards_id_fk": {
+          "name": "apron_card_print_queue_card_id_machine_apron_cards_id_fk",
+          "tableFrom": "apron_card_print_queue",
+          "tableTo": "machine_apron_cards",
+          "columnsFrom": ["card_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "apron_card_print_queue_user_id_card_id_pk": {
+          "name": "apron_card_print_queue_user_id_card_id_pk",
+          "columns": ["user_id", "card_id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": true
+    },
     "auth.users": {
       "name": "users",
       "schema": "auth",
@@ -1531,6 +1603,27 @@
         },
         "is_community": {
           "name": "is_community",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "is_owner_set": {
+          "name": "is_owner_set",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "is_public": {
+          "name": "is_public",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "is_tournament": {
+          "name": "is_tournament",
           "type": "boolean",
           "primaryKey": false,
           "notNull": true,
@@ -4137,69 +4230,6 @@
         "settings_tags_slug_format": {
           "name": "settings_tags_slug_format",
           "value": "\"settings_tags\".\"slug\" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'"
-        }
-      },
-      "isRLSEnabled": true
-    },
-    "public.tag_slug_aliases": {
-      "name": "tag_slug_aliases",
-      "schema": "",
-      "columns": {
-        "slug": {
-          "name": "slug",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "tag_id": {
-          "name": "tag_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "idx_tag_slug_aliases_tag": {
-          "name": "idx_tag_slug_aliases_tag",
-          "columns": [
-            {
-              "expression": "tag_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "tag_slug_aliases_tag_id_tags_id_fk": {
-          "name": "tag_slug_aliases_tag_id_tags_id_fk",
-          "tableFrom": "tag_slug_aliases",
-          "tableTo": "tags",
-          "columnsFrom": ["tag_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "tag_slug_aliases_slug_format": {
-          "name": "tag_slug_aliases_slug_format",
-          "value": "\"tag_slug_aliases\".\"slug\" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'"
         }
       },
       "isRLSEnabled": true

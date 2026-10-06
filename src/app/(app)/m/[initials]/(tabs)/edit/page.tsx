@@ -1,9 +1,9 @@
 import type React from "react";
 import { notFound, redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
-import { createClient } from "~/lib/supabase/server";
+import { getViewer } from "~/lib/auth/viewer";
 import { db } from "~/server/db";
-import { userProfiles, machines } from "~/server/db/schema";
+import { machines } from "~/server/db/schema";
 import {
   getAccessLevel,
   checkPermission,
@@ -80,30 +80,20 @@ export default async function MachineEditPage({
   // sync below; this names why.
   const pbmAddFailed = (await searchParams)[PBM_ADD_FAILED_PARAM] === "1";
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { userId, role } = await getViewer();
 
   const { machine } = await getMachineForLayout(initials);
   if (!machine) {
     notFound();
   }
 
-  const currentUserProfile = user
-    ? await db.query.userProfiles.findFirst({
-        where: eq(userProfiles.id, user.id),
-        columns: { role: true },
-      })
-    : null;
-
-  const accessLevel = getAccessLevel(currentUserProfile?.role);
+  const accessLevel = getAccessLevel(role);
   const ownershipContext: OwnershipContext = {
-    userId: user?.id,
+    userId,
     machineOwnerId: machine.ownerId ?? undefined,
   };
 
-  if (!user) {
+  if (!userId) {
     redirect(`/m/${initials}`);
   }
 
@@ -183,7 +173,7 @@ export default async function MachineEditPage({
       // status row pushes or links out (spec 8.2, 8.6). Read off the row, never
       // by decrypting the token.
       canPush
-        ? getPinballMapLinkStatus(user.id)
+        ? getPinballMapLinkStatus(userId)
         : Promise.resolve({ status: "not_linked" } as const),
     ]);
 
@@ -268,7 +258,7 @@ export default async function MachineEditPage({
 
   const canEditAnyMachine = checkPermission("machines.edit", accessLevel);
   const isOwner =
-    user.id === machine.ownerId || user.id === machine.invitedOwnerId;
+    userId === machine.ownerId || userId === machine.invitedOwnerId;
 
   const locationUrl =
     pbmState?.locationId != null

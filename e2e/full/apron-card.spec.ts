@@ -12,11 +12,15 @@
  * - a signed-out visitor gets no tab and cannot print;
  * - a member opens Print apron cards from the Machines list, picks a card,
  *   and downloads its size's print file; a card that does not fit needs the
- *   page's override (§12).
+ *   page's override (§12);
+ * - a member queues a card from Export, the Machines list shows the count,
+ *   the print page opens with it selected, and Mark as printed clears it
+ *   (§13).
  *
  * The edit-permission split and the save action's rules are covered at the
  * integration layer (src/test/integration/apron-card-actions.test.ts,
- * machine-apron-tab.test.tsx). Each test seeds its own machine, so no seeded
+ * machine-apron-tab.test.tsx); who may queue and whose queue is whose, in
+ * apron-print-queue.test.ts. Each test seeds its own machine, so no seeded
  * row is mutated.
  */
 
@@ -287,5 +291,51 @@ test.describe("Print apron cards", () => {
     await expect(tooLong).toBeDisabled();
     await run.getByLabel("Include cards that don't fit").check();
     await expect(tooLong).toBeEnabled();
+  });
+
+  test("queues a card from Export and marks it printed", async ({ page }) => {
+    await page.goto(`/m/${fits.initials}/apron`);
+    await page.getByRole("button", { name: "Export" }).click();
+    const dialog = page.getByRole("dialog", { name: "Export apron card" });
+    await dialog
+      .getByRole("button", { name: "Add Card 1 to print queue" })
+      .click();
+    await expect(
+      dialog.getByText("Card 1 is in your print queue")
+    ).toBeVisible();
+    await expect(dialog.getByText("Queued")).toBeVisible();
+    await page.keyboard.press("Escape");
+
+    await page.goto("/m");
+    await page
+      .getByRole("link", {
+        name: /^Print apron cards, \d+ in your print queue$/,
+      })
+      .click();
+    await expect(page).toHaveURL("/m/apron-cards");
+
+    // The page opens with the queue selected (§13.5).
+    await page
+      .getByRole("searchbox", { name: "Search machines" })
+      .fill(fits.name);
+    await expect(page.getByRole("checkbox", { name: fits.name })).toBeChecked();
+
+    const run = page.getByRole("complementary", { name: "Print run" });
+    await run.getByRole("button", { name: "Mark as printed" }).click();
+    await expect(
+      page.getByText("Removed 1 card from your print queue")
+    ).toBeVisible();
+    await expect(
+      run.getByRole("button", { name: "Mark as printed" })
+    ).toHaveCount(0);
+
+    // The queue no longer holds it on the next visit.
+    await page.reload();
+    await page
+      .getByRole("searchbox", { name: "Search machines" })
+      .fill(fits.name);
+    await expect(
+      page.getByRole("checkbox", { name: fits.name })
+    ).not.toBeChecked();
   });
 });
