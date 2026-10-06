@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """The one `gh` CLI wrapper shared by the Python workflow scripts.
 
 pr-dashboard.py and pr-watch.py each need "run gh, return stdout, raise on a
