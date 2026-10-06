@@ -50,6 +50,7 @@
 
 import { readFileSync } from "node:fs";
 
+import { loadEnvFile } from "./lib/env-file.mjs";
 import { createScriptClient } from "./lib/pg-client.mjs";
 import {
   describeTarget,
@@ -110,33 +111,18 @@ function parseArgs(argv) {
 }
 
 /**
- * Read POSTGRES_URL* out of a dotenv file into the environment.
- *
- * Exists so a connection string never has to be pasted onto a command line,
- * where it lands in shell history and in this tool's own logs. Only the two
- * keys this script uses are read; everything else in the file is ignored.
+ * Read POSTGRES_URL* out of a dotenv file into the environment (see
+ * scripts/lib/env-file.mjs for the precedence rule). Only the two keys this
+ * script uses are read.
  */
-function loadEnvFile(path, { required = true } = {}) {
-  let contents;
+function loadConnectionStrings(path, { required }) {
   try {
-    contents = readFileSync(path, "utf8");
+    loadEnvFile(path, {
+      keys: ["POSTGRES_URL", "POSTGRES_URL_READONLY"],
+      required,
+    });
   } catch (error) {
-    // A missing default file is not an error — the caller may have exported the
-    // variables instead. An explicitly named one that cannot be read is.
-    if (!required) return;
-    throw new UsageError(`Cannot read env file ${path}: ${error.message}`);
-  }
-  for (const line of contents.split("\n")) {
-    const match = /^\s*(POSTGRES_URL(?:_READONLY)?)\s*=\s*(.*)$/.exec(line);
-    if (!match) continue;
-    const value = match[2].trim().replace(/^["']|["']$/g, "");
-    // Standard dotenv precedence: an already-exported variable wins over the
-    // file, so an explicit `export POSTGRES_URL_READONLY=<prod>` is never
-    // silently swapped out for a worktree's local `.env.local`. Getting which
-    // database this points at wrong is the one failure this tool cannot have.
-    if (value && process.env[match[1]] === undefined) {
-      process.env[match[1]] = value;
-    }
+    throw new UsageError(error.message);
   }
 }
 
@@ -176,9 +162,9 @@ async function main() {
   // `.env.local` by default, so the documented invocations work in a checkout
   // without anyone having to remember `--env`; absent, it is skipped rather than
   // fatal. An exported variable wins over the file (dotenv precedence, see
-  // loadEnvFile), so an operator who exported a prod URL and happens to run from
+  // scripts/lib/env-file.mjs), so an operator who exported a prod URL and happens to run from
   // a worktree gets prod, not the worktree's local stack silently swapped in.
-  loadEnvFile(args.envFile ?? ".env.local", {
+  loadConnectionStrings(args.envFile ?? ".env.local", {
     required: args.envFile !== null,
   });
 
