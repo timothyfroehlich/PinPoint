@@ -1,3 +1,4 @@
+import type { SettingsPreferredSlot } from "~/lib/machines/settings-types";
 import type { MachinePresenceStatus } from "~/lib/machines/presence";
 import type { IssueFrequency, IssueSeverity, IssueStatus } from "~/lib/types";
 
@@ -28,14 +29,29 @@ export type MachineTimelineEventData =
     }
   | { kind: "description_updated" }
   | { kind: "owner_requirements_updated" }
-  // === sourceType='lifecycle', tag='settings' (PP-43q3, default-off) ===
-  // `setName` is an immutable snapshot of the set's name at event time (a
-  // deleted set has no row to resolve from; created/updated/preferred mirror
-  // the name_changed string-snapshot precedent).
+  // === sourceType='lifecycle', settings sets (machine-settings spec §5) ===
+  // `setName` (and `tagName`) are immutable snapshots at event time — a
+  // deleted set has no row to resolve from (the name_changed precedent).
+  // Tag `settings` (shown by default): created, deleted, preferred changes.
+  // Tag `settings_edit` (hidden by default): edits, tagging, made community.
   | { kind: "settings_set_created"; setName: string }
   | { kind: "settings_set_updated"; setName: string }
   | { kind: "settings_set_deleted"; setName: string }
+  // Legacy (PP-43q3): only older rows carry it; nothing emits it now.
   | { kind: "settings_set_preferred"; setName: string }
+  | {
+      kind: "settings_set_tagged";
+      setName: string;
+      tagName: string;
+      added: boolean;
+    }
+  | { kind: "settings_set_made_community"; setName: string }
+  | {
+      kind: "settings_preferred_changed";
+      setName: string;
+      slot: SettingsPreferredSlot;
+      action: "set" | "cleared";
+    }
   // === sourceType='lifecycle' — Pinball Map (PP-o355.12, PP-o355.21) ===
   //
   // Two kinds, because the two facts are genuinely different and a reader needs

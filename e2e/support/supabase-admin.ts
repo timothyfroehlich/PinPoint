@@ -104,11 +104,10 @@ export async function createTestMachine(ownerId: string, initials?: string) {
  * `sections` is the persist-ready `SettingsSection[]` shape (no client `_key`).
  * Returns the inserted set's id.
  *
- * PP-tn6t: seeds a PUBLIC set so it is visible to every viewer (a private draft
- * would only show to its creator/admin — the pre-visibility-model default these
- * specs assume). Left as a community-kind set (is_owner_set defaults false) so
- * it stays broadly editable by staff; the owner-set-protection paths are covered
- * at the action layer.
+ * Seeds a COMMUNITY set (machine-settings spec §2.3) so staff can edit it and
+ * the Settings tab shows it by default — a personal set with no author would
+ * be editable by nobody and hidden under "Others' personal" (§2.5). Personal-
+ * set rules are covered at the action layer.
  */
 export async function seedSettingsSet(
   machineId: string,
@@ -122,7 +121,7 @@ export async function seedSettingsSet(
       name,
       sections,
       is_preferred: false,
-      is_public: true,
+      is_community: true,
     })
     .select("id")
     .single();

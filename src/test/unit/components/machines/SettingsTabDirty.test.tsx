@@ -23,6 +23,7 @@ import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 import { SettingsTab } from "~/components/machines/settings/SettingsTab";
 import {
   duplicateSettingsSetAction,
+  makeCommunitySettingsSetAction,
   saveSettingsSetAction,
   setPreferredSettingsSetAction,
   updateMachineSettingsRequestsAction,
@@ -79,9 +80,9 @@ vi.mock("~/app/(app)/m/[initials]/(tabs)/settings/actions", () => ({
   saveSettingsSetAction: vi.fn(),
   deleteSettingsSetAction: vi.fn(),
   duplicateSettingsSetAction: vi.fn(),
+  makeCommunitySettingsSetAction: vi.fn(),
+  setSettingsSetTagAction: vi.fn(),
   setPreferredSettingsSetAction: vi.fn(),
-  setTournamentTagAction: vi.fn(),
-  publishSettingsSetAction: vi.fn(),
   updateMachineSettingsInstructionsAction: vi.fn(),
   updateMachineSettingsRequestsAction: vi.fn(),
 }));
@@ -129,24 +130,32 @@ beforeEach(() => {
 // Fixtures
 // ---------------------------------------------------------------------------
 
-// Shared defaults for the sharing/visibility fields (PP-tn6t). Tests that care
+// Shared defaults for the kind / tag / rights fields (machine-settings spec
+// §2–§4). A community set, so a viewer other than its author still sees it
+// (other people's personal sets are hidden by default, §2.5). Tests that care
 // about read-only rendering pass `{ canEdit: false }`.
 function setDefaults(): Pick<
   SettingsSetData,
-  | "isOwnerSet"
-  | "isPublic"
-  | "isTournament"
+  | "isPreferredHouse"
+  | "isPreferredTournament"
+  | "isCommunity"
+  | "tags"
   | "createdById"
   | "canEdit"
-  | "canSetDefault"
+  | "canDelete"
+  | "canMakeCommunity"
+  | "canCurate"
 > {
   return {
-    isOwnerSet: false,
-    isPublic: true,
-    isTournament: false,
+    isPreferredHouse: false,
+    isPreferredTournament: false,
+    isCommunity: true,
+    tags: [],
     createdById: "u1",
     canEdit: true,
-    canSetDefault: false,
+    canDelete: false,
+    canMakeCommunity: false,
+    canCurate: false,
   };
 }
 
@@ -154,7 +163,6 @@ function oneSet(over: Partial<SettingsSetData> = {}): SettingsSetData {
   return {
     id: "set-1",
     name: "Comp rules",
-    isPreferred: false,
     ...setDefaults(),
     updatedBy: "You",
     updatedById: "u1",
@@ -178,7 +186,6 @@ function twoNoteSet(over: Partial<SettingsSetData> = {}): SettingsSetData {
   return {
     id: "set-1",
     name: "Comp rules",
-    isPreferred: false,
     ...setDefaults(),
     updatedBy: "You",
     updatedById: "u1",
@@ -208,7 +215,6 @@ function dipSet(over: Partial<SettingsSetData> = {}): SettingsSetData {
   return {
     id: "set-1",
     name: "Comp rules",
-    isPreferred: false,
     ...setDefaults(),
     updatedBy: "You",
     updatedById: "u1",
@@ -792,17 +798,18 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
       screen.getByRole("button", { name: "More options for this set" })
     );
 
-    // The new set is the owner's first, so it is optimistically the Owner's
-    // default — the menu item reads "Unset owner's default". Both it and
-    // Duplicate act on a persisted row, so they're disabled until first save.
-    const ownerDefault = await screen.findByRole("menuitem", {
-      name: /owner's default/i,
+    // The machine has no preferred House set, so the new set is optimistically
+    // the preferred House set (spec §4.4) — the menu item reads "Unset
+    // preferred House". Both it and Duplicate act on a persisted row, so
+    // they're disabled until first save.
+    const preferred = await screen.findByRole("menuitem", {
+      name: "Unset preferred House",
     });
     const duplicate = screen.getByRole("menuitem", { name: "Duplicate" });
-    expect(ownerDefault).toHaveAttribute("aria-disabled", "true");
+    expect(preferred).toHaveAttribute("aria-disabled", "true");
     expect(duplicate).toHaveAttribute("aria-disabled", "true");
 
-    await user.click(ownerDefault);
+    await user.click(preferred);
     expect(vi.mocked(setPreferredSettingsSetAction)).not.toHaveBeenCalled();
     expect(vi.mocked(duplicateSettingsSetAction)).not.toHaveBeenCalled();
   });
@@ -1526,65 +1533,128 @@ describe("SettingsTab — data-loss regression (A1, 🔴)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Category filter chip counts (PP-tn6t) — "Owner's" and "Community" are KINDS
-// and must partition "All" regardless of visibility. Regression: a community
-// PRIVATE draft used to fall out of the Community count (isPublic gate), so the
-// chips didn't sum to All.
+// Set ⋮ menu — preferred slots (machine-settings spec §4.2–§4.3)
 // ---------------------------------------------------------------------------
 
-describe("SettingsTab — category chip counts partition by kind", () => {
-  it("Owner's + Community counts sum to All, including private drafts of each kind", () => {
-    // A viewer who is neither the owner nor any set's creator: "Owner's" shows
-    // (viewer isn't the owner) and "Mine" hides (0 authored), so the two kind
-    // chips are the whole partition.
-    const sets: SettingsSetData[] = [
+describe("SettingsTab — set menu offers a preferred slot only where it applies", () => {
+  it("offers 'Set as preferred Tournament' only on a Tournament-tagged set a curator views, and it calls the action", async () => {
+    const user = userEvent.setup();
+    const setPreferred = vi.mocked(setPreferredSettingsSetAction);
+    setPreferred.mockReset();
+    setPreferred.mockResolvedValue({ success: true });
+    const house = { id: "tag-house", slug: "house", name: "House" };
+    const tournament = {
+      id: "tag-tournament",
+      slug: "tournament",
+      name: "Tournament",
+    };
+    // Insertion order is DOM order (none is preferred, so nothing is pinned).
+    const sets = [
       oneSet({
-        id: "owner-public",
-        isOwnerSet: true,
-        isPublic: true,
-        createdById: "owner-y",
+        id: "tagged",
+        name: "Tagged",
+        tags: [house, tournament],
+        canCurate: true,
       }),
       oneSet({
-        id: "owner-draft",
-        isOwnerSet: true,
-        isPublic: false, // owner private draft
-        createdById: "owner-y",
+        id: "untagged",
+        name: "Untagged",
+        tags: [house],
+        canCurate: true,
       }),
+      // Its author's set on a machine where they can no longer curate.
       oneSet({
-        id: "community-public",
-        isOwnerSet: false,
-        isPublic: true,
-        createdById: "tech-z",
-      }),
-      oneSet({
-        id: "community-draft",
-        isOwnerSet: false,
-        isPublic: false, // community private draft — the regression case
-        createdById: "tech-z",
+        id: "no-curate",
+        name: "No curate",
+        tags: [tournament],
+        canCurate: false,
+        canDelete: true,
       }),
     ];
-
     render(
       <SettingsTab
         canCreate
-        viewerId="viewer-x"
-        machineOwnerId="owner-y"
+        viewerId="u1"
+        machineOwnerId="u9"
         machineId="m1"
         initialSets={sets}
         settingsRequests={null}
         settingsInstructions={null}
       />
     );
+    const menuButton = (i: number): HTMLElement => {
+      const button = screen.getAllByRole("button", {
+        name: "More options for this set",
+      })[i];
+      if (!button) throw new Error(`no menu button ${String(i)}`);
+      return button;
+    };
+    const SET_TOURNAMENT = "Set as preferred Tournament";
 
-    // Chips read "<label> <count>"; both kinds count their private drafts, so
-    // Owner's 2 + Community 2 = All 4.
-    expect(screen.getByRole("button", { name: /^All 4$/ })).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /^Owner's 2$/ })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /^Community 2$/ })
-    ).toBeInTheDocument();
+    for (const i of [1, 2]) {
+      await user.click(menuButton(i));
+      await screen.findAllByRole("menuitem");
+      expect(
+        screen.queryByRole("menuitem", { name: SET_TOURNAMENT })
+      ).toBeNull();
+      await user.keyboard("{Escape}");
+    }
+    expect(setPreferred).not.toHaveBeenCalled();
+
+    await user.click(menuButton(0));
+    await user.click(
+      await screen.findByRole("menuitem", { name: SET_TOURNAMENT })
+    );
+    expect(setPreferred).toHaveBeenCalledWith({
+      id: "tagged",
+      slot: "tournament",
+      preferred: true,
+    });
+  });
+});
+
+describe("SettingsTab — making a set community (spec §2.3)", () => {
+  it("drops the author's delete right when they can't curate the machine", async () => {
+    const user = userEvent.setup();
+    const makeCommunity = vi.mocked(makeCommunitySettingsSetAction);
+    makeCommunity.mockReset();
+    makeCommunity.mockResolvedValue({ success: true });
+    render(
+      <SettingsTab
+        canCreate
+        viewerId="u1"
+        machineOwnerId="u9"
+        machineId="m1"
+        initialSets={[
+          // The viewer's personal set on a machine they can no longer curate.
+          oneSet({
+            isCommunity: false,
+            canCurate: false,
+            canEdit: true,
+            canDelete: true,
+            canMakeCommunity: true,
+          }),
+        ]}
+        settingsRequests={null}
+        settingsInstructions={null}
+      />
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "More options for this set" })
+    );
+    await user.click(
+      await screen.findByRole("menuitem", { name: "Make community set" })
+    );
+
+    expect(makeCommunity).toHaveBeenCalledWith({ id: "set-1" });
+    // A community set is edited and deleted by curators only, so the menu,
+    // which held only author actions, goes away.
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("button", { name: "More options for this set" })
+      ).toBeNull();
+    });
   });
 });
 
