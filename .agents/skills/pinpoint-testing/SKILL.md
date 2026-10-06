@@ -124,7 +124,16 @@ Each of these makes a test pass without proving the contract. A new test matchin
 
 Mocking `~/server/db` with canned return values, or mocking `drizzle-orm` at all, means your assertions only prove the mock returned what you told it to.
 
-The house pattern instead forwards the `db` singleton to worker-scoped PGlite, so the real SQL executes against real Postgres — `vi.mock("~/server/db", …)` returning `{ db: await getTestDb() }`. This is how you integration-test a service function that imports the singleton directly instead of accepting it as a parameter. `src/test/integration/transaction-tripwire.test.ts` is a representative example. It composes with CORE-TEST-001 rather than violating it: `getTestDb()` hands back the **worker-scoped** instance, so no per-test database is created.
+The house pattern instead forwards the `db` singleton to worker-scoped PGlite, so the real SQL executes against real Postgres. This is how you integration-test a service function that imports the singleton directly instead of accepting it as a parameter. It composes with CORE-TEST-001 rather than violating it: `getTestDb()` hands back the **worker-scoped** instance, so no per-test database is created.
+
+**The forward is global in the `integration` Vitest project.** [`src/test/setup/integration-db.ts`](../../../src/test/setup/integration-db.ts) is a `setupFiles` entry for that project only, so every file under `src/test/integration/` (outside `supabase/`) already has `~/server/db` forwarded; a new test file needs no `vi.mock("~/server/db", …)` of its own. A file that needs a different shape (a wrapped `transaction`, as in `admin/discord-vault-orphan-cleanup.test.ts`) declares its own `vi.mock("~/server/db", …)`, which wins; a file that needs the real module calls `vi.unmock("~/server/db")`. Unit-project tests are unaffected and still declare the forward themselves.
+
+### Integration presets
+
+Reach for these before writing a local `signIn` helper or a run of `db.insert(...)` seeding:
+
+- **Signed-in user:** `vi.mock("~/lib/supabase/server", () => import("~/test/helpers/mock-auth"))`, then `signInAs(userId)` / `signOut()` from [`mock-auth.ts`](../../../src/test/helpers/mock-auth.ts). It models `createClient().auth.getUser()` only and starts signed out; a test whose code under test calls other Supabase client methods keeps its own mock.
+- **Seed rows:** `seedUser`, `seedMachine`, `seedIssue` from [`seed.ts`](../../../src/test/helpers/seed.ts) insert through the test db and return the row. `seedUser` also inserts the matching `auth.users` row (`{ authUser: false }` skips it), `seedMachine` generates unique initials, and `seedIssue` reserves its number from the machine's counter as the issues service does. The object-only factories in `factories.ts` remain for rows the code under test inserts.
 
 ## Host / environment gotchas
 

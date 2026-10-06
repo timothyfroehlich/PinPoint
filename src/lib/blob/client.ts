@@ -5,19 +5,11 @@ import fs from "fs/promises";
 import { log } from "~/lib/logger";
 import { errorMessage } from "~/lib/errors";
 import { assertNotInTransaction } from "~/server/db/transaction-context";
-
-function shouldUseMockBlobStorage(): boolean {
-  if (process.env["MOCK_BLOB_STORAGE"] === "true") {
-    return true;
-  }
-
-  // Local/dev fallback: if no blob token is configured, use mock storage.
-  // Production should fail loudly when blob credentials are missing.
-  return (
-    process.env.NODE_ENV !== "production" &&
-    !process.env["BLOB_READ_WRITE_TOKEN"]
-  );
-}
+import {
+  getMockUploadsDir,
+  MOCK_UPLOADS_URL_PREFIX,
+  shouldUseMockBlobStorage,
+} from "~/lib/blob/mock-storage";
 
 /**
  * Uploads a file to Vercel Blob storage.
@@ -35,7 +27,7 @@ export async function uploadToBlob(
   // Mock implementation for local testing without Vercel credentials
   if (shouldUseMockBlobStorage()) {
     // Determine local path in public/uploads and sanitize to prevent path traversal
-    const publicDir = path.join(process.cwd(), "public", "uploads");
+    const publicDir = getMockUploadsDir();
     // Remove any leading slashes or ../ segments to keep it within publicDir
     const safePathname = pathname
       .replace(/^(\.\.[/\\])+/, "")
@@ -57,7 +49,10 @@ export async function uploadToBlob(
     const port = process.env["PORT"] ?? "3000";
     const baseUrl =
       process.env["NEXT_PUBLIC_SITE_URL"] ?? `http://localhost:${port}`;
-    const url = `${baseUrl}/uploads/${pathname}`;
+    // `next start` only serves public/ files that existed when it started, so
+    // a fresh upload falls through to the mock-upload route
+    // (src/app/uploads/[...path]/route.ts), which reads the same directory.
+    const url = `${baseUrl}${MOCK_UPLOADS_URL_PREFIX}${pathname}`;
 
     return {
       url,
@@ -96,7 +91,7 @@ export async function deleteFromBlob(pathname: string): Promise<void> {
   // Mock implementation for local testing
   if (shouldUseMockBlobStorage()) {
     try {
-      const publicDir = path.join(process.cwd(), "public", "uploads");
+      const publicDir = getMockUploadsDir();
       // Extract pathname from full URLs (production stores URLs, not pathnames)
       let resolved = pathname;
       try {

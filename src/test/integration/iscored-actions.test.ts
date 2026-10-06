@@ -9,22 +9,15 @@
 import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { authUsers, machines, userProfiles } from "~/server/db/schema";
 import { getIscoredGamesAction } from "~/app/(app)/m/iscored-actions";
 import { getGameroomGames } from "~/lib/iscored/client";
 import { isIscoredConfigured } from "~/lib/iscored/config";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
+import { signInAs, signOut } from "~/test/helpers/mock-auth";
+import { seedMachine, seedUser } from "~/test/helpers/seed";
 import type { IscoredGame } from "~/lib/iscored/types";
 
-vi.mock("~/server/db", async () => {
-  const { getTestDb } = await import("~/test/setup/pglite");
-  return { db: await getTestDb() };
-});
-
-const { getUserMock } = vi.hoisted(() => ({ getUserMock: vi.fn() }));
-vi.mock("~/lib/supabase/server", () => ({
-  createClient: () => Promise.resolve({ auth: { getUser: getUserMock } }),
-}));
+vi.mock("~/lib/supabase/server", () => import("~/test/helpers/mock-auth"));
 vi.mock("~/lib/iscored/client", () => ({ getGameroomGames: vi.fn() }));
 vi.mock("~/lib/iscored/config", () => ({ isIscoredConfigured: vi.fn() }));
 
@@ -38,7 +31,7 @@ describe("getIscoredGamesAction", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    getUserMock.mockResolvedValue({ data: { user: null } });
+    signOut();
     vi.mocked(isIscoredConfigured).mockReturnValue(true);
     vi.mocked(getGameroomGames).mockResolvedValue(mockGames);
   });
@@ -48,39 +41,11 @@ describe("getIscoredGamesAction", () => {
   async function makeUser(
     role: "guest" | "member" | "technician" | "admin"
   ): Promise<string> {
-    const db = await getTestDb();
-    const id = randomUUID();
-    await db.insert(authUsers).values({ id, email: `${id}@example.com` });
-    await db.insert(userProfiles).values({
-      id,
-      email: `${id}@example.com`,
-      firstName: "Test",
-      lastName: "User",
-      role,
-    });
-    return id;
+    return (await seedUser({ role })).id;
   }
 
-  let machineCounter = 0;
   async function makeMachine(ownerId: string | null): Promise<string> {
-    const db = await getTestDb();
-    machineCounter += 1;
-    const [machine] = await db
-      .insert(machines)
-      .values({
-        name: `Test Machine ${machineCounter}`,
-        initials: `IS${String(machineCounter).padStart(3, "0")}`,
-        ownerId,
-      })
-      .returning({ id: machines.id });
-    if (!machine) throw new Error("machine insert failed");
-    return machine.id;
-  }
-
-  function mockAuth(userId: string | null): void {
-    getUserMock.mockResolvedValue({
-      data: { user: userId ? { id: userId } : null },
-    });
+    return (await seedMachine({ ownerId })).id;
   }
 
   it("returns error when user is not authenticated", async () => {
@@ -92,7 +57,7 @@ describe("getIscoredGamesAction", () => {
 
   it("returns error when the authenticated user has no profile even when another profile exists", async () => {
     await makeUser("admin");
-    mockAuth(randomUUID());
+    signInAs(randomUUID());
     expect(await getIscoredGamesAction()).toEqual({
       error: "User profile not found",
     });
@@ -102,7 +67,7 @@ describe("getIscoredGamesAction", () => {
   it.each(["guest", "member"] as const)(
     "refuses a %s without machine context",
     async (role) => {
-      mockAuth(await makeUser(role));
+      signInAs(await makeUser(role));
       expect(await getIscoredGamesAction()).toEqual({
         error: "Permission denied",
       });
@@ -111,7 +76,7 @@ describe("getIscoredGamesAction", () => {
   );
 
   it("returns error when machine lookup throws", async () => {
-    mockAuth(await makeUser("member"));
+    signInAs(await makeUser("member"));
     const db = await getTestDb();
     vi.spyOn(db.query.machines, "findFirst").mockRejectedValueOnce(
       new Error("Connection reset")
@@ -123,7 +88,7 @@ describe("getIscoredGamesAction", () => {
   });
 
   it("returns error when iScored is not configured", async () => {
-    mockAuth(await makeUser("admin"));
+    signInAs(await makeUser("admin"));
     vi.mocked(isIscoredConfigured).mockReturnValue(false);
     expect(await getIscoredGamesAction()).toEqual({
       error: "iScored is not configured",
@@ -132,7 +97,7 @@ describe("getIscoredGamesAction", () => {
   });
 
   it("returns error when getGameroomGames throws", async () => {
-    mockAuth(await makeUser("admin"));
+    signInAs(await makeUser("admin"));
     vi.mocked(getGameroomGames).mockRejectedValue(new Error("Network failure"));
     expect(await getIscoredGamesAction()).toEqual({
       error: "Failed to fetch iScored games",
@@ -145,7 +110,7 @@ describe("getIscoredGamesAction", () => {
     // Seed unowned machine first so a missing where clause returns the wrong machine
     await makeMachine(otherMemberId);
     const ownedMachineId = await makeMachine(callerId);
-    mockAuth(callerId);
+    signInAs(callerId);
 
     const result = await getIscoredGamesAction({ machineId: ownedMachineId });
     expect(result).toEqual({ games: mockGames });
@@ -158,7 +123,7 @@ describe("getIscoredGamesAction", () => {
     // Seed owned machine first so a where: eq(ownerId, user.id) or missing where returns the owned machine
     await makeMachine(callerId);
     const unownedMachineId = await makeMachine(otherMemberId);
-    mockAuth(callerId);
+    signInAs(callerId);
 
     const result = await getIscoredGamesAction({ machineId: unownedMachineId });
     expect(result).toEqual({ error: "Permission denied" });
@@ -167,7 +132,7 @@ describe("getIscoredGamesAction", () => {
 
   it("refuses a member when machine does not exist", async () => {
     const memberId = await makeUser("member");
-    mockAuth(memberId);
+    signInAs(memberId);
 
     const result = await getIscoredGamesAction({ machineId: randomUUID() });
     expect(result).toEqual({ error: "Permission denied" });
@@ -178,7 +143,7 @@ describe("getIscoredGamesAction", () => {
     const ownerId = await makeUser("member");
     const guestId = await makeUser("guest");
     const machineId = await makeMachine(ownerId);
-    mockAuth(guestId);
+    signInAs(guestId);
 
     const result = await getIscoredGamesAction({ machineId });
     expect(result).toEqual({ error: "Permission denied" });
@@ -189,7 +154,7 @@ describe("getIscoredGamesAction", () => {
     "lets a %s fetch games without machine ownership context",
     async (role) => {
       const staffId = await makeUser(role);
-      mockAuth(staffId);
+      signInAs(staffId);
 
       const result = await getIscoredGamesAction();
       expect(result).toEqual({ games: mockGames });

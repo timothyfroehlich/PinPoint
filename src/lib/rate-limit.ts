@@ -28,6 +28,7 @@ import { log } from "~/lib/logger";
 import { errorMessage } from "~/lib/errors";
 import { maskEmail } from "~/lib/logging/mask";
 import { BLOB_CONFIG } from "~/lib/blob/config";
+import { isProductionRuntime } from "~/lib/runtime-env";
 
 /**
  * Rate limit check result
@@ -58,12 +59,6 @@ function failClosedResult(): RateLimitResult {
  */
 function failOpenResult(): RateLimitResult {
   return { success: true, limit: 0, remaining: 0, reset: 0 };
-}
-
-function isProductionEnv(): boolean {
-  const vercelEnv = process.env["VERCEL_ENV"];
-  if (vercelEnv) return vercelEnv === "production";
-  return process.env.NODE_ENV === "production";
 }
 
 /**
@@ -106,7 +101,7 @@ let redisClient: Redis | null | undefined;
 function getRedis(): Redis | null {
   if (redisClient === undefined) {
     redisClient = createRedisClient();
-    if (!redisClient && !isProductionEnv()) {
+    if (!redisClient && !isProductionRuntime()) {
       log.info(
         { action: "rate-limit" },
         "Redis not configured — rate limiting disabled in non-production environment"
@@ -342,7 +337,7 @@ function makeLimitChecker(
     let limitKey = key;
 
     if (keyType === "ip" && limitKey === "unknown") {
-      if (isProductionEnv()) {
+      if (isProductionRuntime()) {
         log.warn(
           { action: "rate-limit" },
           "Client IP unavailable - using shared fallback key"
@@ -362,7 +357,7 @@ function makeLimitChecker(
     }
 
     if (!limiter) {
-      if (isProductionEnv()) {
+      if (isProductionRuntime()) {
         log.error(
           { action: "rate-limit" },
           "Rate limiting unavailable in production - blocking request"
@@ -397,7 +392,7 @@ function makeLimitChecker(
             : { err, ip: limitKey },
         `${label} rate limit check failed`
       );
-      if (isProductionEnv()) {
+      if (isProductionRuntime()) {
         return failClosedResult();
       }
       return failOpenResult();

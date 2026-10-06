@@ -22,7 +22,7 @@ Cite the `CORE-*` rule ID (e.g. `CORE-SEC-007`) in a review comment when a chang
 - **Server-first (CORE-ARCH-001).** Flag `"use client"` on a component with no interactivity (no event handlers, browser APIs, or client state). Server Components are the default.
 - **Minimal client payload (CORE-SEC-006).** Flag a `"use client"` component that receives a whole ORM row or domain object as a prop; the server→client boundary should pass only the fields the component uses. The RSC payload is visible in page source.
 - **Migrations only (CORE-ARCH-009).** Schema changes go through `db:generate` + `db:migrate`. Flag any `drizzle-kit push` or Supabase-migration usage. Every new `.sql` migration must have a matching `_snapshot.json`.
-- **Action auth through the pipeline.** Flag a new Server Action that hand-rolls `getUser()`, validation, and permission checks instead of wrapping its handler in `createProtectedAction`. Signed-out auth flows and redirect-only OAuth actions are exempt. PP-az4d.4 adds this rule to the `CORE-*` catalog.
+- **Action auth through the pipeline (CORE-ARCH-013).** Flag a new Server Action that hand-rolls `getUser()`, validation, and permission checks instead of wrapping its handler in `createProtectedAction` (or `createPublicAction` for signed-out callers). Signed-out auth flows and redirect-only OAuth actions are exempt.
 - **One write path per mutation (CORE-ARCH-014).** Flag a Server Action, MCP tool, or cron route that performs a mutation an existing `src/services` function already performs, instead of calling it.
 - **Reuse known helpers (CORE-ARCH-010).** Flag code that re-implements one of these:
   - `createProtectedAction` (`~/lib/actions`): Server Action auth, validation, permission, redirect, and error handling.

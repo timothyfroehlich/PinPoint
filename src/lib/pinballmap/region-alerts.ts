@@ -372,40 +372,6 @@ interface SnapshotResult {
   incompleteMissing: number;
 }
 
-/**
- * Synchronize the old additions-only delivery column into the new event queue.
- * This is idempotent and covers a rolling deploy where the old runtime inserts or
- * settles a generation-zero addition after the migration backfill ran.
- */
-async function synchronizeLegacyEvents(region: string): Promise<void> {
-  await db.transaction(async (tx) => {
-    await tx.execute(sql`
-      insert into ${pinballmapRegionAlertEvents}
-        (region, lmx_id, generation, event_type, location_id,
-         pinballmap_machine_id, detected_at)
-      select region, lmx_id, 0, 'added', location_id,
-             pinballmap_machine_id, first_seen_at
-      from ${pinballmapRegionSeenMachines}
-      where region = ${region}
-        and generation = 0
-        and announced_at is null
-      on conflict (region, lmx_id, generation, event_type) do nothing
-    `);
-    await tx.execute(sql`
-      update ${pinballmapRegionAlertEvents} as event
-      set announced_at = membership.announced_at
-      from ${pinballmapRegionSeenMachines} as membership
-      where event.region = ${region}
-        and event.region = membership.region
-        and event.lmx_id = membership.lmx_id
-        and event.generation = 0
-        and event.event_type = 'added'
-        and event.announced_at is null
-        and membership.announced_at is not null
-    `);
-  });
-}
-
 /** Apply one validated full-region snapshot using only database work. */
 async function applySnapshot(
   region: string,
@@ -474,21 +440,6 @@ async function applySnapshot(
         incompleteMissing: missing.length,
       };
     }
-
-    // Rolling-deploy compatibility. This is database-only and stays inside the
-    // same transaction as detection (CORE-ARCH-011).
-    await tx.execute(sql`
-      insert into ${pinballmapRegionAlertEvents}
-        (region, lmx_id, generation, event_type, location_id,
-         pinballmap_machine_id, detected_at)
-      select region, lmx_id, 0, 'added', location_id,
-             pinballmap_machine_id, first_seen_at
-      from ${pinballmapRegionSeenMachines}
-      where region = ${region}
-        and generation = 0
-        and announced_at is null
-      on conflict (region, lmx_id, generation, event_type) do nothing
-    `);
 
     const currentById = new Map(current.map((row) => [row.lmxId, row]));
     const newEntries = observed.filter(
@@ -727,24 +678,6 @@ async function markAnnounced(
           )
         )
       );
-
-    const legacyAdditions = events.filter(
-      (event) => event.eventType === "added" && event.generation === 0
-    );
-    if (legacyAdditions.length > 0) {
-      await tx
-        .update(pinballmapRegionSeenMachines)
-        .set({ announcedAt })
-        .where(
-          and(
-            eq(pinballmapRegionSeenMachines.region, region),
-            inArray(
-              pinballmapRegionSeenMachines.lmxId,
-              legacyAdditions.map((event) => event.lmxId)
-            )
-          )
-        );
-    }
   });
 }
 
@@ -1066,7 +999,6 @@ export async function runRegionMachineAlerts(opts?: {
       );
     }
 
-    await synchronizeLegacyEvents(region);
     const pending = await readPending(region);
     if (pending.length > 0 && !locationNamesFresh) {
       locationNames = (await refreshLocationNames(region, locationNames)).names;
