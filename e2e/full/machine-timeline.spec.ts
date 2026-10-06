@@ -164,9 +164,9 @@ test.describe("Machine Timeline (PP-0x98)", () => {
     // sweep would delete another project's issue mid-reassign.
     let reassignTitle: string | null = null;
 
-    test.afterEach(async ({ request }) => {
+    test.afterEach(async () => {
       if (reassignTitle === null) return;
-      await cleanupTestEntities(request, {
+      await cleanupTestEntities({
         issueTitlePrefix: reassignTitle,
       });
       reassignTitle = null;

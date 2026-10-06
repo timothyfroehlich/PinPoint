@@ -386,7 +386,7 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
   console.log("✅ Pre-flight checks passed");
 
   // Sweep throwaway invite-signup users (…@example.com) that accumulate in
-  // auth.users across runs. Neither db:fast-reset nor /api/test-data/cleanup
+  // auth.users across runs. Neither db:fast-reset nor cleanupTestEntities
   // can delete auth.users rows (the Postgres role lacks the privilege), so
   // without this they grow unbounded. Once auth.users exceeds one Admin-API
   // page (GoTrue defaults to 50/page), any *unpaginated* listUsers() email

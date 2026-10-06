@@ -38,7 +38,7 @@ test.describe("User Invitation & Signup Flow", () => {
     });
   });
 
-  test.afterEach(async ({ request }) => {
+  test.afterEach(async () => {
     // Restore HD machine owner to admin before deleting the test user so the
     // foreign key is valid when the user row is removed.
     if (hdOwnerChanged) {
@@ -48,7 +48,7 @@ test.describe("User Invitation & Signup Flow", () => {
     }
 
     if (testEmails.size > 0) {
-      await cleanupTestEntities(request, {
+      await cleanupTestEntities({
         userEmails: Array.from(testEmails),
       });
       testEmails.clear();

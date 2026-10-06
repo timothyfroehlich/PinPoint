@@ -48,7 +48,6 @@ test.describe("Pinball Map lineup page (PP-o355.65)", () => {
 
     test("reaches the page from the machines list and the admin menu, and every row leads where it says", async ({
       page,
-      request,
     }) => {
       const toAddInitials = getTestMachineInitials();
       const unlinkedInitials = getTestMachineInitials();
@@ -159,7 +158,7 @@ test.describe("Pinball Map lineup page (PP-o355.65)", () => {
           new RegExp(`/m/${unlinkedInitials}/edit$`)
         );
       } finally {
-        await cleanupTestEntities(request, {
+        await cleanupTestEntities({
           machineInitials: [toAddInitials, unlinkedInitials],
         });
         await deletePinballMapCatalogEntries([toAddTitleId, entryTitleId]);
