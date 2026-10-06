@@ -109,7 +109,7 @@ When the user asks for one of these, say so and name the closest option. Do not 
 - **Delete** a machine, issue or comment. Closest for a machine: set `presenceStatus` to `removed`. Closest for an issue: close it with status `duplicate` or `wont_fix`. A comment has no closest option; it stays as written.
 - **Edit or hide a comment.**
 - **Change a machine's initials.**
-- **Delete a settings set, or make one the Owner's default.** Both are done in the machine's Settings tab in the web app.
+- **Delete a settings set, or choose a machine's preferred House or Tournament set.** Both are done in the machine's Settings tab in the web app.
 - **Change Pinball Map itself.** PinPoint tools only record what PinPoint wants (`intent`, `insiderConnected`). A person must open the machine in the PinPoint web app and push the update to Pinball Map. Never tell the user a machine "is listed" or "is on Pinball Map" because you set its lineup setting (the `intent` parameter) to `on`; say PinPoint now wants it listed and a person must push the update.
 - **Enter hand-entered model details** (manufacturer, year, designers, artists).
 - **Look up anyone's email address.** PinPoint never returns them; do not ask for or guess them.

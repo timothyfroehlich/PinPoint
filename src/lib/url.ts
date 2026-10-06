@@ -1,4 +1,5 @@
 import { log } from "~/lib/logger";
+import { isProductionRuntime } from "~/lib/runtime-env";
 
 /**
  * Retrieves the canonical site URL.
@@ -56,8 +57,10 @@ export function resolveRequestUrl(headers: Headers): string {
 export function requireSiteUrl(action: string): string {
   const url = getSiteUrl();
 
-  // In production, we must have a real domain.
-  if (process.env.NODE_ENV === "production") {
+  // In production, we must have a real domain. A local production build run
+  // for E2E (`next start` with VERCEL_ENV=development) legitimately uses
+  // localhost, so this keys on the deployment, not on NODE_ENV alone.
+  if (isProductionRuntime()) {
     // If we resolved to localhost, that's definitely an error in production.
     if (
       url.startsWith("http://localhost") ||

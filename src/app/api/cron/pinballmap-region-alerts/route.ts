@@ -1,7 +1,6 @@
-import { NextResponse } from "next/server";
-import { assertCronAuthorized } from "~/lib/cron/auth";
+import type { NextResponse } from "next/server";
+import { runCron } from "~/lib/cron/run-cron";
 import { log } from "~/lib/logger";
-import { reportError } from "~/lib/observability/report-error";
 import { runRegionMachineAlerts } from "~/lib/pinballmap/region-alerts";
 
 /**
@@ -43,22 +42,12 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 export async function GET(request: Request): Promise<NextResponse> {
-  const denied = assertCronAuthorized(request);
-  if (denied) return denied;
-
-  try {
+  return runCron(request, "pinballmap.regionAlerts", async () => {
     const run = await runRegionMachineAlerts();
     log.info(
       { ...run, action: "pinballmap.regionAlerts" },
       "Pinball Map region machine-alert run"
     );
-    return NextResponse.json({ ok: true, ...run });
-  } catch (err) {
-    // `reportError`, not a bare `log.error` (PP-a5y): we CATCH here to return a
-    // 502, and Sentry's auto-capture only ever sees uncaught exceptions — so a
-    // bare log would make every failure of this job invisible to monitoring, with
-    // a Vercel log line that ages out as the only evidence it ever ran badly.
-    reportError(err, { action: "pinballmap.regionAlerts" });
-    return NextResponse.json({ error: "Region alert failed" }, { status: 502 });
-  }
+    return { ok: true, ...run };
+  });
 }

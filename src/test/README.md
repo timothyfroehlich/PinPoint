@@ -7,9 +7,12 @@ This directory contains all test-related files for PinPoint v2.
 ```
 src/test/
 ├── setup/              # Test setup and configuration
-│   └── pglite.ts       # Worker-scoped PGlite instance
+│   ├── pglite.ts       # Worker-scoped PGlite instance
+│   └── integration-db.ts # Integration-project setupFiles: forwards ~/server/db to PGlite
 ├── helpers/            # Test utilities
-│   ├── factories.ts    # Test data factories
+│   ├── factories.ts    # Test data factories (objects only)
+│   ├── seed.ts         # seedUser / seedMachine / seedIssue: insert and return the row
+│   ├── mock-auth.ts    # ~/lib/supabase/server stand-in: signInAs / signOut
 │   └── mocks.ts        # Mock implementations (Supabase, etc.)
 ├── unit/               # Unit tests (pure functions, utilities)
 │   └── example.test.ts

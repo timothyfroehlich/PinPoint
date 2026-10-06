@@ -46,9 +46,8 @@ export async function runListSettingsSets(
   }
 
   const machine = await resolveMachine(args.machine);
-  // getMachineSettingsSets is the Settings tab's own query: it applies the
-  // visibility rules (another user's private draft is left out) and computes
-  // per-set edit rights.
+  // getMachineSettingsSets is the Settings tab's own query: every set is
+  // visible to everyone (machine-settings spec §2.5), with per-set rights.
   const [notes, sets, versions] = await Promise.all([
     db.query.machines.findFirst({
       where: eq(machines.id, machine.id),
@@ -83,10 +82,10 @@ export async function runListSettingsSets(
         id: set.id,
         version: versionById.get(set.id) ?? null,
         name: set.name,
-        kind: set.isOwnerSet ? "owner" : "community",
-        isOwnersDefault: set.isPreferred,
-        isPublic: set.isPublic,
-        isTournament: set.isTournament,
+        kind: set.isCommunity ? "community" : "personal",
+        isPreferredHouse: set.isPreferredHouse,
+        isPreferredTournament: set.isPreferredTournament,
+        tags: set.tags.map((t) => t.name),
         canEdit: set.canEdit,
         updatedBy: set.updatedBy,
         updatedAt: set.updatedAt,
@@ -104,7 +103,7 @@ export function registerListSettingsSets(server: McpServer): void {
     {
       title: "List a machine's settings sets",
       description:
-        "Read every settings set on a machine you can see — the Owner's default, public sets, and your own private drafts — with full contents: software adjustment rows, tables, DIP switch banks, and notes. Also returns the machine's owner requests and how-to-change-settings notes. Use before create_settings_set to avoid duplicating an existing set, and before update_settings_set to get the set id, version and current sections.",
+        "Read every settings set on a machine with full contents: software adjustment rows, tables, DIP switch banks, and notes. Each set is personal (only its author edits it) or community (technicians, the owner and admins edit it), carries settings tags such as House and Tournament, and may be the machine's preferred House or preferred Tournament set. Also returns the machine's owner requests and how-to-change-settings notes. Use before create_settings_set to avoid duplicating an existing set, and before update_settings_set to get the set id, version and current sections.",
       inputSchema: listSettingsSetsSchema,
       annotations: READ_ONLY_TOOL_ANNOTATIONS,
     },
