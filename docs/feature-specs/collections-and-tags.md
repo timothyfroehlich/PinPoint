@@ -27,10 +27,11 @@
 - **2.1** A signed-in member, technician, or admin can create a Collection. Guests and anonymous visitors cannot.
 - **2.2** A Collection has a required name of at most 120 characters. Names need not be unique, even for one owner.
 - **2.3** A Collection's machines are exactly the ones added to it. Adding or removing a machine never changes the machine itself.
-- **2.4** Renaming a Collection and changing its machines save together as one change; a failed save changes nothing.
+- **2.4** Renaming a Collection, changing its description, and changing its machines save together as one change; a failed save changes nothing.
 - **2.5** A Collection can include machines in any presence state.
 - **2.6** Only the owner can delete a Collection. Deleting it removes the Collection, its machine list, its Editors, and its View Link; the machines and their issues are unaffected. Deletion asks for confirmation and cannot be undone.
 - **2.7** The machine choice for adding to a Collection leaves out Removed machines, except ones already in the Collection.
+- **2.8** A Collection can have a description: optional formatted text with bold, italic, headings, lists, and links. It is written when the Collection is created or edited.
 
 ---
 
@@ -43,7 +44,7 @@
 - **3.5** A View Link never leaks through the Referer header of pages reached from it.
 - **3.6** A View Link grants read-only access. Viewers who arrive through one see edit, share, or delete controls only when they already hold that access themselves.
 - **3.7** The owner can grant Editor access to named signed-in accounts and revoke it. Guests cannot be Editors, and the owner cannot grant access to themselves.
-- **3.8** The owner and Editors can rename the Collection and change its machines. Only the owner can delete it, change its View Link, or manage Editors. Admins can view any Collection but cannot edit or manage one they do not own.
+- **3.8** The owner and Editors can rename the Collection, change its description, and change its machines. Only the owner can delete it, change its View Link, or manage Editors. Admins can view any Collection but cannot edit or manage one they do not own.
 - **3.9** Collection surfaces identify people by name only, never by email address.
 
 ---
@@ -56,6 +57,7 @@
 - **4.4** The Issues tab shows only issues on the group's machines. Its filters can narrow that set but never widen it.
 - **4.5** The Timeline tab shows one chronological feed across the group's machines, each entry labeled with its machine. Its filters can narrow that set but never widen it. The feed is read-only.
 - **4.6** An empty Collection shows people who can edit it a way to add machines, and shows everyone else that the Collection has no machines yet.
+- **4.7** A Collection's description appears under its header on every tab, to everyone who can open the Collection, including through its View Link. A description longer than three lines shows its first three with a Show more control. A Collection without a description shows nothing there.
 
 ---
 
@@ -117,7 +119,7 @@
 
 - **10.1** _Retired 2026-10-02._ Hand-applied tags are now §11. Number kept so older citations don't dangle.
 - **10.2** _Retired 2026-10-02._ Exclusive hand-applied tag types are now §11.5–11.7. Number kept so older citations don't dangle.
-- **10.3** Collection descriptions are deferred.
+- **10.3** _Retired 2026-10-05._ Collection descriptions are now 2.8 and 4.7. Number kept so older citations don't dangle.
 - **10.4** Saving a Collection reached through a View Link to My Collections is deferred.
 - **10.5** A public directory of Collections is deferred.
 - **10.6** Adding a machine to a Collection from the machine's own page is deferred.
@@ -170,6 +172,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-05 | Added Collection descriptions, written by the owner and Editors and shown under the header on every tab (2.4, 2.8, 3.8, 4.7); retired deferred item 10.3. |
 | 2026-10-05 | Turning a View Link back on creates a new link instead of restoring the earlier one (3.4). |
 | 2026-10-05 | Added Tag and Collection filters on the Machines and Issues lists (§12). |
 | 2026-10-03 | Removed machines are archived: left out of the add-machine choice (2.7), header counts (4.2), Collection counts (5.2), and tag counts (7.9); 7.2 drops its every-presence default, which machine-views §9.2 now sets. |
