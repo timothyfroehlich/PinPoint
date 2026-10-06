@@ -53,6 +53,10 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from gh_cli import run_gh  # noqa: E402
+
 REPO_OWNER = "timothyfroehlich"
 REPO_NAME = "PinPoint"
 READY_LABEL = "ready-for-review"
@@ -107,10 +111,7 @@ def emit(msg: str) -> None:
 
 def gh(*args: str) -> str:
     """Run a gh CLI command, returning stdout. Raises RuntimeError on failure."""
-    result = subprocess.run(["gh", *args], capture_output=True, text=True)
-    if result.returncode != 0:
-        raise RuntimeError(result.stderr.strip() or f"gh {args[0]} failed")
-    return result.stdout.strip()
+    return run_gh(*args, error=RuntimeError)
 
 
 # ---------------------------------------------------------------------------
