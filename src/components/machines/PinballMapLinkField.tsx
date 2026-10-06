@@ -939,7 +939,13 @@ export function PinballMapLinkField({
                     ? { value: String(selectedEditionId) }
                     : {})}
                   onValueChange={(v) => {
-                    setSelectedEditionId(Number(v));
+                    // A form reset replays the Select's mount-time value
+                    // (pinpoint-ui "Radix Select form resets") — undefined
+                    // when it mounted before an edition was chosen. That is
+                    // not a selection; Number() of it is NaN (PINPOINT-34).
+                    const id = Number.parseInt(v, 10);
+                    if (!Number.isSafeInteger(id)) return;
+                    setSelectedEditionId(id);
                     markUserChanged();
                     onDirty?.();
                   }}
