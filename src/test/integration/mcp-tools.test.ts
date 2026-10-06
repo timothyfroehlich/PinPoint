@@ -66,7 +66,10 @@ vi.mock("next/server", () => ({
 
 import { runAddIssueComment } from "~/lib/mcp/tools/add-issue-comment";
 import { runAddMachine } from "~/lib/mcp/tools/add-machine";
-import { runCreateIssue } from "~/lib/mcp/tools/create-issue";
+import {
+  createIssueSchema,
+  runCreateIssue,
+} from "~/lib/mcp/tools/create-issue";
 import {
   createSettingsSetSchema,
   runCreateSettingsSet,
@@ -93,7 +96,10 @@ import {
   ensureBuiltinSettingsTags,
   updateSettingsSet,
 } from "~/services/machine-settings";
-import { runUpdateIssue } from "~/lib/mcp/tools/update-issue";
+import {
+  runUpdateIssue,
+  updateIssueSchema,
+} from "~/lib/mcp/tools/update-issue";
 import {
   runUpdateSettingsSet,
   updateSettingsSetSchema,
@@ -1534,6 +1540,29 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       expect(row?.title).toBe("left flipper dead");
     });
 
+    it("stores a multi-line title as one line (PP-61u5)", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine();
+
+      // Parsed through the tool's registered input schema, as the MCP server
+      // does before it calls the handler.
+      const outcome = await runCreateIssue(
+        createIssueSchema.parse({
+          machine: machine.initials,
+          title: "\nleft flipper\r\n\r\ndead\t",
+        }),
+        ctx("admin", admin)
+      );
+
+      expect(outcome.result).toMatchObject({ title: "left flipper dead" });
+      const db = await getTestDb();
+      const row = await db.query.issues.findFirst({
+        where: eq(issues.id, outcome.issueId ?? ""),
+        columns: { title: true },
+      });
+      expect(row?.title).toBe("left flipper dead");
+    });
+
     it("throws not_found when the machine is unknown", async () => {
       const admin = await makeUser("admin");
       await expect(
@@ -2451,6 +2480,33 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
         field: "status",
         changed: false,
       });
+    });
+
+    it("stores a multi-line title as one line (PP-61u5)", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Twilight Zone" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "clock stuck" },
+        ctx("admin", admin)
+      );
+
+      // Parsed through the tool's registered input schema, as the MCP server
+      // does before it calls the handler.
+      const outcome = await runUpdateIssue(
+        updateIssueSchema.parse({
+          machine: machine.initials,
+          number: 1,
+          title: "clock stuck\r\nat 11:30\t",
+        }),
+        ctx("admin", admin)
+      );
+
+      const db = await getTestDb();
+      const row = await db.query.issues.findFirst({
+        where: eq(issues.id, outcome.issueId ?? ""),
+        columns: { title: true },
+      });
+      expect(row?.title).toBe("clock stuck at 11:30");
     });
 
     it("unassigns when the assignee is an empty string", async () => {

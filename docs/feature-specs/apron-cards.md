@@ -4,7 +4,7 @@
 
 **What this document is.** The requirements for PinPoint's printed apron cards: what the card shows, what data it draws on, and how that data is authored. No implementation detail — design records and code carry that. It describes the intended final state only; what the code does or used to do lives solely in the Known divergences table. Each requirement is numbered for citation. When code and spec disagree, either the code is wrong or this document gets amended — never silently neither.
 
-**Related records.** [apron-cards-mockup.html](apron-cards-mockup.html) (card face, both size variants). [apron-cards-editor-mockup.html](apron-cards-editor-mockup.html) (authoring surface — Service/Manage entry points, overflow handling, Export menu, mobile). Bead PP-esta (build tracking); PP-esta.1 (edition-name parsing survey, informs §7). [Credits placement canvas](https://claude.ai/artifact/XJMscXb6HAoHvpMTiKpbCy) (option A, both sizes); bead PP-tv2u (credits). [Card templates canvas](https://claude.ai/artifact/NLAnYXFFC4j3748otKxoPq) (Side rail is option A, Header band option B); bead PP-s3fa (templates).
+**Related records.** [apron-cards-mockup.html](apron-cards-mockup.html) (card face, both size variants). [apron-cards-editor-mockup.html](apron-cards-editor-mockup.html) (authoring surface — Service/Manage entry points, overflow handling, Export menu, mobile). Bead PP-esta (build tracking); PP-esta.1 (edition-name parsing survey, informs §7). [Credits placement canvas](https://claude.ai/artifact/XJMscXb6HAoHvpMTiKpbCy) (option A, both sizes); bead PP-tv2u (credits). [Card templates canvas](https://claude.ai/artifact/NLAnYXFFC4j3748otKxoPq) (Side rail is option A, Header band option B); bead PP-s3fa (templates). [Batch print canvas](https://claude.ai/artifact/GYhoaAnjLSZo7eDD46zTz4) (layout A; print queue Q1a export dialog and Q3 page); beads PP-qab5 (batch printing), PP-uksf (print queue).
 
 ---
 
@@ -19,6 +19,7 @@
 - **Credits** — the people credited for a machine's game, in two roles: design and art. They come from the Open Pinball Database (OPDB), or are entered by hand for an uncataloged machine. Each role has its own per-card display setting.
 - **Edition** — the "<X> Edition" line shown under the title. Sourced only from Pinball Map's grouped-family data (PP-esta.1); PinPoint never derives an edition by parsing an ungrouped Pinball Map name.
 - **Scan target** — the URL the card's QR code encodes: the machine's scan hub, tagged with an `apron` source so that traffic is distinguishable from other QR sources.
+- **Print queue** — a member's own list of saved cards waiting to be printed. Each member has one; no one else sees or changes it.
 - **Title fit** — the rule that sizes and wraps a machine's name to the card's identity panel: shrink from a maximum size until the single longest word fits the panel on one line, keep shrinking until the full title wraps to three lines or fewer, then keep shrinking until everything in the identity panel fits above the APC logo, down to a floor size below which the title may still exceed three lines rather than shrink further. A line may break at a space, after a hyphen, or after an ellipsis, and nowhere else; a word is the text between those break points, so Lights...Camera...Action! is three words and Harley-Davidson two. Never breaks a word mid-word.
 
 ## 2. Data inputs
@@ -77,7 +78,8 @@
 - **9.2** At least one export format renders the card at its exact physical dimensions (§1's apron size), suitable for printing at 100% with no fit-to-page scaling. Export may offer more than one format; adding a format does not change the authoring flow in §3.
 - **9.3** Exporting a saved card requires signed-in membership. A member who cannot edit the machine can export its card but cannot change its size or content.
 - **9.4** Export offers every saved card and marks each card that does not fit.
-- **9.5** Exporting a card that does not fit requires ticking an explicit override in the export menu each time; the override is not saved.
+- **9.5** Exporting a card that does not fit requires ticking an explicit override each time it is exported; the override is not saved.
+- **9.6** Export shows a preview of the chosen saved card, and every action it offers (each download format, printing, and the print queue in §13.2) applies to that one card.
 
 ## 10. Credits
 
@@ -111,6 +113,15 @@
 - **12.9** Each sheet prints a short mark at the sheet edge on every cut line, and a line outside the cards naming the apron size and the sheet's number in its file.
 - **12.10** Downloading also offers an order sheet for the print shop: the paper, full color, single-sided, actual-size printing with no fit-to-page, and for each file its sheet count, card count, and cut positions measured from the sheet's left and top edges, in cutting order.
 
+## 13. Print queue
+
+- **13.1** Every member has a print queue (§1). Using it requires the same signed-in membership as exporting a card (§9.3).
+- **13.2** From a saved card's export, a member adds that card to their print queue or removes it. Export marks each saved card that is in the member's queue.
+- **13.3** A queued card stays queued when it is edited; batch printing prints its saved state at the time of printing. Deleting a saved card removes it from every queue. A queue counts and offers only cards the Print apron cards page lists (§12.2).
+- **13.4** The Machines list's entry to the Print apron cards page shows how many cards are in the member's print queue whenever it holds any.
+- **13.5** The Print apron cards page opens with the member's queued cards selected, apart from cards that cannot be selected (§12.3). It marks each queued card in the list, shows how many cards are queued, how many of those are selected, and how many do not fit, and offers selecting all of the member's selectable queued cards at once.
+- **13.6** Mark as printed removes the selected queued cards from the member's print queue; queued cards that are not selected stay. It is offered only while the selection includes a queued card, and it can be undone immediately afterwards.
+
 ## Known divergences
 
 | Requirement | Current implementation gap |
@@ -121,6 +132,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-05 | Added §13 Print queue: each member queues saved cards from Export, and the Print apron cards page opens with them selected and offers Mark as printed. Export applies to one chosen card shown in a preview (§1, §9.5, §9.6). |
 | 2026-10-04 | Added §12 Batch printing: a Print apron cards page selects saved cards across machines and downloads one N-up print file per apron size, plus an order sheet for the print shop. |
 | 2026-10-04 | Apron sizes: Stern/SPIKE becomes Stern / Data East / Sega and WPC becomes Williams / WPC; adds Bally solid state, Bally EM, Gottlieb EM, and Williams EM (§1, §4.1). |
 | 2026-10-03 | Card templates: each saved card chooses Standard, Side rail, or Header band; the two new templates give description and tip more room and show no credits (§1, §2.3, §3.1, §3.6, §5.1–§5.7, §6.5, §10.2, §10.5). |

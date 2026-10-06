@@ -39,7 +39,7 @@
 - **3.1** A Collection is private by default. Its owner, its Editors, and admins can open it by its address; anyone else gets the same not-found response as a Collection that does not exist.
 - **3.2** A Collection's address alone never grants access. A person whose access is revoked gets the not-found response on their next visit.
 - **3.3** The owner can turn on a View Link. Anyone with the link, including anonymous visitors, can see the Collection's Overview, Issues, and Timeline, and nothing else.
-- **3.4** Turning a View Link off revokes every copy of it immediately. Turning it back on restores the same link. A View Link has no expiry.
+- **3.4** Turning a View Link off revokes every copy of it immediately. Turning it back on creates a new link; copies of the earlier link stay revoked. A View Link has no expiry.
 - **3.5** A View Link never leaks through the Referer header of pages reached from it.
 - **3.6** A View Link grants read-only access. Viewers who arrive through one see edit, share, or delete controls only when they already hold that access themselves.
 - **3.7** The owner can grant Editor access to named signed-in accounts and revoke it. Guests cannot be Editors, and the owner cannot grant access to themselves.
@@ -162,7 +162,7 @@
 
 | Requirement | Divergence                         | Resolution |
 | :---------- | :--------------------------------- | :--------- |
-| 6.2         | Owner Collections require sign-in. | PP-wqit.9  |
+| 6.2         | Owner Collections require sign-in. | PP-jb9v.6  |
 
 ---
 
@@ -170,6 +170,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-05 | Turning a View Link back on creates a new link instead of restoring the earlier one (3.4). |
 | 2026-10-05 | Added Tag and Collection filters on the Machines and Issues lists (§12). |
 | 2026-10-03 | Removed machines are archived: left out of the add-machine choice (2.7), header counts (4.2), Collection counts (5.2), and tag counts (7.9); 7.2 drops its every-presence default, which machine-views §9.2 now sets. |
 | 2026-10-02 | Added hand-applied tags, with or without a hand-applied tag type, curated by technicians and admins and applied by machine owners to their own machines. Tag types can be exclusive. Names are capped at 20 characters. The tag browse lists hand-applied tags with no machines. Retired deferred items 10.1–10.2 and deferred tag merging. |
