@@ -1,5 +1,5 @@
 {
-  "id": "6c6c81c0-fa06-4389-81cd-31f6deedbeaa",
+  "id": "869c8604-20e6-4ac8-9237-10a939c49d3c",
   "prevId": "ca4a96a7-9db2-40a1-a8d9-cdd6e0873bd5",
   "version": "7",
   "dialect": "postgresql",
@@ -1695,7 +1695,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "machine_settings_sets_preferred_is_community": {
+          "name": "machine_settings_sets_preferred_is_community",
+          "value": "\"machine_settings_sets\".\"is_community\" OR NOT (\"machine_settings_sets\".\"is_preferred\" OR \"machine_settings_sets\".\"is_preferred_tournament\")"
+        }
+      },
       "isRLSEnabled": true
     },
     "public.machine_tags": {

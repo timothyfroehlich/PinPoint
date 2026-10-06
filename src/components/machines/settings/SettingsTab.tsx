@@ -733,7 +733,9 @@ export function SettingsTab({
       return;
     }
     // Exclusive per slot; a set made preferred becomes a community set, so the
-    // viewer's rights on it follow the community rules from now on.
+    // viewer's rights on it follow the community rules from now on: curators
+    // edit and delete it (admins, who alone delete any set, always curate), and
+    // its author loses rights they held only as author.
     applyRowChange((s) => {
       if (s.id !== id) return next ? { ...s, [key]: false } : s;
       if (!next || s.isCommunity) return { ...s, [key]: next };
@@ -743,7 +745,7 @@ export function SettingsTab({
         isCommunity: true,
         canMakeCommunity: false,
         canEdit: s.canCurate,
-        canDelete: s.canCurate || s.canDelete,
+        canDelete: s.canCurate,
       };
     });
   }
@@ -792,7 +794,7 @@ export function SettingsTab({
             isCommunity: true,
             canMakeCommunity: false,
             canEdit: s.canCurate,
-            canDelete: s.canCurate || s.canDelete,
+            canDelete: s.canCurate,
           }
     );
   }

@@ -23,6 +23,7 @@ import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 import { SettingsTab } from "~/components/machines/settings/SettingsTab";
 import {
   duplicateSettingsSetAction,
+  makeCommunitySettingsSetAction,
   saveSettingsSetAction,
   setPreferredSettingsSetAction,
   updateMachineSettingsRequestsAction,
@@ -1608,6 +1609,51 @@ describe("SettingsTab — set menu offers a preferred slot only where it applies
       id: "tagged",
       slot: "tournament",
       preferred: true,
+    });
+  });
+});
+
+describe("SettingsTab — making a set community (spec §2.3)", () => {
+  it("drops the author's delete right when they can't curate the machine", async () => {
+    const user = userEvent.setup();
+    const makeCommunity = vi.mocked(makeCommunitySettingsSetAction);
+    makeCommunity.mockReset();
+    makeCommunity.mockResolvedValue({ success: true });
+    render(
+      <SettingsTab
+        canCreate
+        viewerId="u1"
+        machineOwnerId="u9"
+        machineId="m1"
+        initialSets={[
+          // The viewer's personal set on a machine they can no longer curate.
+          oneSet({
+            isCommunity: false,
+            canCurate: false,
+            canEdit: true,
+            canDelete: true,
+            canMakeCommunity: true,
+          }),
+        ]}
+        settingsRequests={null}
+        settingsInstructions={null}
+      />
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "More options for this set" })
+    );
+    await user.click(
+      await screen.findByRole("menuitem", { name: "Make community set" })
+    );
+
+    expect(makeCommunity).toHaveBeenCalledWith({ id: "set-1" });
+    // A community set is edited and deleted by curators only, so the menu,
+    // which held only author actions, goes away.
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("button", { name: "More options for this set" })
+      ).toBeNull();
     });
   });
 });

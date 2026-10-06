@@ -43,4 +43,6 @@ SELECT s."id", t."id", s."created_by" FROM "machine_settings_sets" s JOIN "setti
 INSERT INTO "machine_settings_set_tags" ("set_id", "tag_id", "added_by")
 SELECT s."id", t."id", s."created_by" FROM "machine_settings_sets" s JOIN "settings_tags" t ON t."slug" = 'house' WHERE s."is_preferred" OR NOT s."is_tournament";--> statement-breakpoint
 -- Settings edits move to their own timeline tag, hidden by default (§5.2).
-UPDATE "timeline_events" SET "tag" = 'settings_edit' WHERE "tag" = 'settings' AND "event_data"->>'kind' = 'settings_set_updated';
+UPDATE "timeline_events" SET "tag" = 'settings_edit' WHERE "tag" = 'settings' AND "event_data"->>'kind' = 'settings_set_updated';--> statement-breakpoint
+-- A preferred set is always a community set (§4.2); holds once the kind backfill above has run.
+ALTER TABLE "machine_settings_sets" ADD CONSTRAINT "machine_settings_sets_preferred_is_community" CHECK ("machine_settings_sets"."is_community" OR NOT ("machine_settings_sets"."is_preferred" OR "machine_settings_sets"."is_preferred_tournament"));
