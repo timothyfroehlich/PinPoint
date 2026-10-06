@@ -9,25 +9,22 @@
 
 import { after } from "next/server";
 import { createClient } from "~/lib/supabase/server";
-import { db, type DbTransaction } from "~/server/db";
+import { db } from "~/server/db";
 import {
-  applyMachinePbmLink,
   createMachine,
-  carryExcludedReason,
   IC_INELIGIBLE_MESSAGE,
   isTitleIcEligible,
+  MachineNotFoundError,
   planMachinePbmLink,
+  updateMachine,
   updateMachinePresence,
   type Machine,
+  type MachineOwnerAssignment,
   type MachinePbmLinkPlan,
+  type PromoteGuest,
 } from "~/services/machines";
 import { PBM_ADD_FAILED_PARAM } from "~/lib/pinballmap/create-flow";
-import {
-  machines,
-  machineWatchers,
-  userProfiles,
-  invitedUsers,
-} from "~/server/db/schema";
+import { machines, userProfiles, invitedUsers } from "~/server/db/schema";
 import { createMachineSchema, updateMachineSchema } from "./schemas";
 import { resolvePbmLinkColumnsForCreate } from "~/lib/pinballmap/link-columns";
 import { importPinballMapCommentsAfterCoverageChange } from "~/lib/pinballmap/comment-import";
@@ -38,11 +35,7 @@ import { z } from "zod";
 import { eq, and, exists } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { log } from "~/lib/logger";
-import {
-  planNotification,
-  dispatchNotification,
-  getChannels,
-} from "~/lib/notifications";
+import { dispatchNotification } from "~/lib/notifications";
 import {
   reportError,
   serverActionError,
@@ -57,10 +50,6 @@ import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { getUserAccessLevel } from "~/lib/permissions/access";
 import { getPermission } from "~/lib/permissions/matrix";
 import { isPgErrorCode } from "~/lib/db/postgres-errors";
-import {
-  emitMachineUpdated,
-  toMachineOwnerRef,
-} from "~/lib/timeline/machine-lifecycle-helpers";
 import { createMachineTimelineEvent } from "~/lib/timeline/machine-events";
 import {
   VALID_MACHINE_PRESENCE_STATUSES,
@@ -124,38 +113,7 @@ function proseChanged(
   );
 }
 
-/** The `owner_requirements_updated` marker event, inside the caller's tx. */
-async function emitOwnerRequirementsUpdated(
-  tx: DbTransaction,
-  machineId: string,
-  actorId: string
-): Promise<void> {
-  await createMachineTimelineEvent(
-    machineId,
-    {
-      sourceType: "lifecycle",
-      tag: "lifecycle",
-      eventData: { kind: "owner_requirements_updated" },
-      actorId,
-    },
-    tx
-  );
-}
-
 const NEXT_REDIRECT_DIGEST_PREFIX = "NEXT_REDIRECT;";
-
-/**
- * Sentinel thrown from inside `updateMachineAction`'s transaction when the
- * UPDATE returns no rows (machine deleted between the load and the update).
- * Caught at the top-level handler so we can return `NOT_FOUND` rather than
- * surfacing a generic server error.
- */
-class MachineNotFoundError extends Error {
-  constructor() {
-    super("Machine not found");
-    this.name = "MachineNotFoundError";
-  }
-}
 
 const isNextRedirectError = (error: unknown): error is { digest: string } => {
   if (typeof error !== "object" || error === null || !("digest" in error)) {
@@ -1000,7 +958,13 @@ export async function updateMachineAction(
       pbmPlan = planned.plan;
     }
 
-    // Handle forcePromoteUserId path
+    // Resolve the incoming owner, if this submit names one. Two routes: an
+    // admin promoting a guest into ownership (`forcePromoteUserId`, promoted in
+    // the same transaction as the owner change), or an existing member or
+    // invited user.
+    let newOwner: MachineOwnerAssignment | undefined = undefined;
+    let promoteGuest: PromoteGuest | undefined = undefined;
+
     if (forcePromoteUserId !== undefined) {
       if (!checkPermission("admin.users.promote.guestToMember", accessLevel)) {
         return err(
@@ -1031,198 +995,14 @@ export async function updateMachineAction(
         return err("VALIDATION", "Selected user is not a guest.");
       }
 
-      const machineOwnerId = targetActive ? forcePromoteUserId : undefined;
-      const machineInvitedOwnerId = targetInvited
-        ? forcePromoteUserId
-        : undefined;
-      const oldOwnerId = currentMachine.ownerId;
-
-      // Atomic: promote + update machine + update watcher
-      const { machine, ownerEventId } = await db.transaction(async (tx) => {
-        // Promote guest to member
-        if (targetActive) {
-          await tx
-            .update(userProfiles)
-            .set({ role: "member" })
-            .where(eq(userProfiles.id, forcePromoteUserId));
-        } else {
-          await tx
-            .update(invitedUsers)
-            .set({ role: "member" })
-            .where(eq(invitedUsers.id, forcePromoteUserId));
-        }
-
-        // Update machine
-        const [updatedMachine] = await tx
-          .update(machines)
-          .set({
-            ...(name !== undefined && { name }),
-            ...(presenceStatus !== undefined && { presenceStatus }),
-            ownerId: machineOwnerId ?? null,
-            invitedOwnerId: machineInvitedOwnerId ?? null,
-            ...(descriptionWrite !== undefined && {
-              description: descriptionWrite,
-            }),
-            ...(ownerRequirementsWrite !== undefined && {
-              ownerRequirements: ownerRequirementsWrite,
-            }),
-            ...(iscoredGameId !== undefined && { iscoredGameId }),
-          })
-          .where(eq(machines.id, id))
-          .returning();
-
-        if (!updatedMachine) {
-          throw new Error("Machine update failed");
-        }
-
-        if (ownerRequirementsChanged) {
-          await emitOwnerRequirementsUpdated(tx, id, user.id);
-        }
-
-        if (pbmPlan) {
-          const selectionWithFreshReason = carryExcludedReason(
-            validation.data,
-            {
-              pinballmapExcluded: updatedMachine.pinballmapExcluded,
-              pinballmapExcludedReason: updatedMachine.pinballmapExcludedReason,
-            }
-          );
-          await applyMachinePbmLink(
-            tx,
-            id,
-            {
-              ...pbmPlan,
-              columns: {
-                ...pbmPlan.columns,
-                pinballmapExcludedReason:
-                  selectionWithFreshReason.pinballmapExcludedReason ?? null,
-              },
-            },
-            user.id,
-            updatedMachine.pinballmapIntent
-          );
-        }
-
-        // Add new owner as watcher if active user
-        if (machineOwnerId) {
-          await tx
-            .insert(machineWatchers)
-            .values({
-              machineId: id,
-              userId: machineOwnerId,
-              watchMode: "subscribe",
-            })
-            .onConflictDoUpdate({
-              target: [machineWatchers.machineId, machineWatchers.userId],
-              set: { watchMode: "subscribe" },
-            });
-        }
-
-        // Lifecycle: emit one event per tracked field that changed.
-        // Atomic with the update — if an emit fails, the update rolls back.
-        const ownerEventId = await emitMachineUpdated(
-          tx,
-          {
-            id: currentMachine.id,
-            name: currentMachine.name,
-            owner: toMachineOwnerRef(
-              currentMachine.ownerId,
-              currentMachine.invitedOwnerId
-            ),
-            presenceStatus: currentMachine.presenceStatus,
-          },
-          {
-            name: name ?? currentMachine.name,
-            ownerChanged: true,
-            owner: toMachineOwnerRef(machineOwnerId, machineInvitedOwnerId),
-            presenceStatus,
-          },
-          user.id
-        );
-
-        if (oldOwnerId !== (machineOwnerId ?? null) && !ownerEventId) {
-          throw new Error("Owner changed without a timeline event");
-        }
-
-        return { machine: updatedMachine, ownerEventId };
-      });
-
-      // Post-commit side effects — best-effort: do not fail the action on notification errors
-      try {
-        // Resolve channels once for all notifications in this block (PP-rfc).
-        const channels = await getChannels();
-
-        // Remove old owner watcher and notify them
-        if (ownerEventId && oldOwnerId && oldOwnerId !== machineOwnerId) {
-          await db
-            .delete(machineWatchers)
-            .where(
-              and(
-                eq(machineWatchers.machineId, id),
-                eq(machineWatchers.userId, oldOwnerId)
-              )
-            );
-          await dispatchNotification(
-            await planNotification(
-              {
-                type: "machine_ownership_changed",
-                resourceId: machine.id,
-                resourceType: "machine",
-                eventId: ownerEventId,
-                actorId: user.id,
-                includeActor: false,
-                machineName: machine.name,
-                ownershipChange: "removed",
-                additionalRecipientIds: [oldOwnerId],
-              },
-              undefined,
-              channels
-            )
-          );
-        }
-
-        // Notify new owner
-        if (ownerEventId && machineOwnerId && machineOwnerId !== oldOwnerId) {
-          await dispatchNotification(
-            await planNotification(
-              {
-                type: "machine_ownership_changed",
-                resourceId: machine.id,
-                resourceType: "machine",
-                eventId: ownerEventId,
-                actorId: user.id,
-                includeActor: false,
-                machineName: machine.name,
-                ownershipChange: "added",
-                additionalRecipientIds: [machineOwnerId],
-              },
-              undefined,
-              channels
-            )
-          );
-        }
-      } catch (sideEffectError: unknown) {
-        reportError(sideEffectError, {
-          action: "updateMachineNotifyForcePromote",
-          bestEffort: true,
-          machineId: machine.id,
-        });
-      }
-
-      revalidatePath("/m");
-      revalidatePath(`/m/${machine.initials}`);
-      revalidatePath(`/m/${machine.initials}/edit`);
-
-      return ok({ machineId: machine.id });
-    }
-
-    // Resolve owner type if provided (non-forcePromote path)
-    let finalOwnerId: string | null | undefined = undefined;
-    let finalInvitedOwnerId: string | null | undefined = undefined;
-    let shouldUpdateOwner = false;
-
-    if (ownerId) {
-      shouldUpdateOwner = true;
+      newOwner = targetActive
+        ? { ownerId: forcePromoteUserId, invitedOwnerId: null }
+        : { ownerId: null, invitedOwnerId: forcePromoteUserId };
+      promoteGuest = {
+        userId: forcePromoteUserId,
+        type: targetActive ? "active" : "invited",
+      };
+    } else if (ownerId) {
       const activeOwner = await db.query.userProfiles.findFirst({
         where: eq(userProfiles.id, ownerId),
       });
@@ -1243,8 +1023,7 @@ export async function updateMachineAction(
             }
           );
         }
-        finalOwnerId = ownerId;
-        finalInvitedOwnerId = null; // Reset invited if setting active
+        newOwner = { ownerId, invitedOwnerId: null };
       } else {
         // Verify the ID exists in invited_users before assigning
         const invitedOwner = await db.query.invitedUsers.findFirst({
@@ -1269,198 +1048,38 @@ export async function updateMachineAction(
             }
           );
         }
-        finalInvitedOwnerId = ownerId;
-        finalOwnerId = null; // Reset active if setting invited
+        newOwner = { ownerId: null, invitedOwnerId: ownerId };
       }
     }
 
-    const oldOwnerId = currentMachine.ownerId;
-
-    // Every non-PinballMap column this submit touches. Each edit surface posts
-    // only the fields it renders, so this is routinely a subset — and on the PBM
-    // picker's own save it is EMPTY, which is why it cannot go straight into a
-    // `.set()`: Drizzle rejects an update with no values, and the link columns
-    // now travel separately (`applyMachinePbmLink`).
-    const detailValues = {
-      ...(name !== undefined && { name }),
-      ...(presenceStatus !== undefined && { presenceStatus }),
-      ...(shouldUpdateOwner && {
-        ownerId: finalOwnerId,
-        invitedOwnerId: finalInvitedOwnerId,
-      }),
-      ...(descriptionWrite !== undefined && {
-        description: descriptionWrite,
-      }),
-      ...(ownerRequirementsWrite !== undefined && {
-        ownerRequirements: ownerRequirementsWrite,
-      }),
-      ...(iscoredGameId !== undefined && { iscoredGameId }),
-    };
-
-    // Atomic: update machine + reconcile watcher rows + emit lifecycle events.
-    // Notifications stay outside the tx as best-effort side effects.
-    const { machine, ownerEventId } = await db.transaction(async (tx) => {
-      const [updatedMachine] =
-        Object.keys(detailValues).length > 0
-          ? await tx
-              .update(machines)
-              .set(detailValues)
-              .where(eq(machines.id, id))
-              .returning()
-          : // Nothing outside the PBM block changed. Read the row instead of
-            // writing it, so the NOT_FOUND check below still runs and the
-            // caller still gets a machine back.
-            await tx
-              .select()
-              .from(machines)
-              .where(eq(machines.id, id))
-              .for("update")
-              .limit(1);
-
-      if (!updatedMachine) {
-        throw new MachineNotFoundError();
-      }
-
-      if (ownerRequirementsChanged) {
-        await emitOwnerRequirementsUpdated(tx, id, user.id);
-      }
-
-      if (pbmPlan) {
-        const selectionWithFreshReason = carryExcludedReason(validation.data, {
-          pinballmapExcluded: updatedMachine.pinballmapExcluded,
-          pinballmapExcludedReason: updatedMachine.pinballmapExcludedReason,
-        });
-        await applyMachinePbmLink(
-          tx,
-          id,
-          {
-            ...pbmPlan,
-            columns: {
-              ...pbmPlan.columns,
-              pinballmapExcludedReason:
-                selectionWithFreshReason.pinballmapExcludedReason ?? null,
-            },
-          },
-          user.id,
-          updatedMachine.pinballmapIntent
-        );
-      }
-
-      // Handle owner changes in machine_watchers (inside tx so they roll back
-      // with the update if anything below fails).
-      if (shouldUpdateOwner) {
-        // 1. Remove old owner from watchers (notification sent post-commit)
-        if (oldOwnerId && oldOwnerId !== finalOwnerId) {
-          await tx
-            .delete(machineWatchers)
-            .where(
-              and(
-                eq(machineWatchers.machineId, id),
-                eq(machineWatchers.userId, oldOwnerId)
-              )
-            );
-        }
-
-        // 2. Add new owner as subscriber (notification sent post-commit)
-        if (finalOwnerId && finalOwnerId !== oldOwnerId) {
-          await tx
-            .insert(machineWatchers)
-            .values({
-              machineId: id,
-              userId: finalOwnerId,
-              watchMode: "subscribe",
-            })
-            .onConflictDoUpdate({
-              target: [machineWatchers.machineId, machineWatchers.userId],
-              set: { watchMode: "subscribe" },
-            });
-        }
-      }
-
-      // Lifecycle: emit one event per tracked field that changed.
-      // Atomic with the update — if an emit fails, the update rolls back.
-      const ownerEventId = await emitMachineUpdated(
-        tx,
-        {
-          id: currentMachine.id,
-          name: currentMachine.name,
-          owner: toMachineOwnerRef(
-            currentMachine.ownerId,
-            currentMachine.invitedOwnerId
-          ),
-          presenceStatus: currentMachine.presenceStatus,
-        },
-        {
-          name: name ?? currentMachine.name,
-          ownerChanged: shouldUpdateOwner,
-          owner: toMachineOwnerRef(finalOwnerId, finalInvitedOwnerId),
-          presenceStatus,
-        },
-        user.id
-      );
-
-      if (
-        shouldUpdateOwner &&
-        oldOwnerId !== (finalOwnerId ?? null) &&
-        !ownerEventId
-      ) {
-        throw new Error("Owner changed without a timeline event");
-      }
-
-      return { machine: updatedMachine, ownerEventId };
+    // One transaction, in the service shared with the MCP `update_machine`
+    // tool (CORE-ARCH-014): promotion, the column writes, the PinballMap link,
+    // watcher reconciliation, lifecycle events, and notification planning.
+    const { machine, deliveryPlan } = await updateMachine({
+      machineId: id,
+      actorUserId: user.id,
+      current: {
+        name: currentMachine.name,
+        ownerId: currentMachine.ownerId,
+        invitedOwnerId: currentMachine.invitedOwnerId,
+        presenceStatus: currentMachine.presenceStatus,
+      },
+      name,
+      presenceStatus,
+      newOwner,
+      promoteGuest,
+      description: descriptionWrite,
+      ownerRequirements: ownerRequirementsWrite,
+      iscoredGameId,
+      pbmLink: pbmPlan
+        ? { plan: pbmPlan, selection: validation.data }
+        : undefined,
     });
 
-    // Post-commit side effects — best-effort: do not fail the action on notification errors
-    if (shouldUpdateOwner) {
-      try {
-        // Resolve channels once for all notifications in this block (PP-rfc).
-        const channels = await getChannels();
-
-        if (ownerEventId && oldOwnerId && oldOwnerId !== finalOwnerId) {
-          await dispatchNotification(
-            await planNotification(
-              {
-                type: "machine_ownership_changed",
-                resourceId: machine.id,
-                resourceType: "machine",
-                eventId: ownerEventId,
-                actorId: user.id,
-                includeActor: false,
-                machineName: machine.name,
-                ownershipChange: "removed",
-                additionalRecipientIds: [oldOwnerId],
-              },
-              undefined,
-              channels
-            )
-          );
-        }
-        if (ownerEventId && finalOwnerId && finalOwnerId !== oldOwnerId) {
-          await dispatchNotification(
-            await planNotification(
-              {
-                type: "machine_ownership_changed",
-                resourceId: machine.id,
-                resourceType: "machine",
-                eventId: ownerEventId,
-                actorId: user.id,
-                includeActor: false,
-                machineName: machine.name,
-                ownershipChange: "added",
-                additionalRecipientIds: [finalOwnerId],
-              },
-              undefined,
-              channels
-            )
-          );
-        }
-      } catch (sideEffectError: unknown) {
-        reportError(sideEffectError, {
-          action: "updateMachineNotify",
-          bestEffort: true,
-          machineId: machine.id,
-        });
-      }
+    // Ownership emails and Discord DMs go out after the response, never inside
+    // the transaction (CORE-ARCH-011).
+    if (deliveryPlan.deliveries.length > 0) {
+      after(() => dispatchNotification(deliveryPlan));
     }
 
     revalidatePath("/m");
