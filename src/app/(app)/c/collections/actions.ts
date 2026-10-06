@@ -18,12 +18,8 @@ import {
   machines,
   userProfiles,
 } from "~/server/db/schema";
-import {
-  docToPlainText,
-  extractMentions,
-  proseMirrorDocValueSchema,
-  type ProseMirrorDoc,
-} from "~/lib/tiptap/types";
+import { extractMentions, type ProseMirrorDoc } from "~/lib/tiptap/types";
+import { validateProseMirrorDoc } from "~/lib/tiptap/validate";
 
 type ActionResult<T = undefined> =
   { success: true; data?: T } | { success: false; error: string };
@@ -53,8 +49,8 @@ const nameSchema = z.string().trim().min(1, "Name is required").max(120);
 /**
  * Validate and normalize an optional Collection description (spec 2.8). A
  * blank doc (no text once trimmed) is stored as null, so "no description"
- * has one representation and the header shows nothing (spec 4.7). Size caps
- * match the machine description: 10k plain text / 100k serialized JSON.
+ * has one representation and the header shows nothing (spec 4.7). Shares the
+ * machine description's checks and size caps (validateProseMirrorDoc).
  * Mentions are rejected: descriptions never notify anyone, so a mention node
  * can only come from a hand-crafted payload (the editor has them disabled).
  */
@@ -62,18 +58,20 @@ function parseDescription(
   value: unknown
 ): { ok: true; value: ProseMirrorDoc | null } | { ok: false; error: string } {
   if (value === null) return { ok: true, value: null };
-  const parsed = proseMirrorDocValueSchema.safeParse(value);
-  if (!parsed.success) return { ok: false, error: "Invalid description" };
-  const doc = parsed.data;
-  const plainText = docToPlainText(doc);
-  if (plainText.length > 10_000 || JSON.stringify(doc).length > 100_000) {
-    return { ok: false, error: "Description is too long" };
+  const result = validateProseMirrorDoc(value);
+  switch (result.status) {
+    case "invalid":
+      return { ok: false, error: "Invalid description" };
+    case "too-long":
+      return { ok: false, error: "Description is too long" };
+    case "empty":
+      return { ok: true, value: null };
+    case "ok":
+      if (extractMentions(result.doc).length > 0) {
+        return { ok: false, error: "Descriptions can't mention people" };
+      }
+      return { ok: true, value: result.doc };
   }
-  if (extractMentions(doc).length > 0) {
-    return { ok: false, error: "Descriptions can't mention people" };
-  }
-  if (plainText.trim().length === 0) return { ok: true, value: null };
-  return { ok: true, value: doc };
 }
 
 export async function createCollectionAction(input: {
