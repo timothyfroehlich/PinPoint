@@ -22,7 +22,7 @@ import {
 import { getMachineOwnerId } from "~/lib/issues/owner";
 import { getMachineChoices } from "~/lib/machines/queries";
 import { CLOSED_STATUSES } from "~/lib/issues/status";
-import { formatIssueId } from "~/lib/issues/utils";
+import { formatIssueId, parseIssueNumber } from "~/lib/issues/utils";
 import type { IssueWithAllRelations } from "~/lib/types";
 import { EditableIssueTitle } from "./editable-issue-title";
 import { getIssueForDetail } from "./_data";
@@ -67,9 +67,11 @@ export default async function IssueDetailPage({
     });
   }
 
-  const issueNum = parseInt(issueNumber, 10);
+  // Require a clean positive integer: parseInt would accept "1abc"/"1.5" and
+  // silently render issue 1 instead of 404 (PP-xlod).
+  const issueNum = parseIssueNumber(issueNumber);
 
-  if (isNaN(issueNum) || issueNum < 1) {
+  if (issueNum === null) {
     notFound();
   }
 

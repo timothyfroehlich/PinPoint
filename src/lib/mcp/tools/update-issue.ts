@@ -3,7 +3,7 @@ import "server-only";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { after } from "next/server";
 import { z } from "zod";
-import { ISSUE_TITLE_MAX } from "~/lib/issues/title";
+import { ISSUE_TITLE_MAX, issueTitleSchema } from "~/lib/issues/title";
 
 import { ISSUE_STATUS_VALUES } from "~/lib/issues/status";
 import { dispatchNotification, type DeliveryPlan } from "~/lib/notifications";
@@ -80,7 +80,7 @@ export const UPDATE_FIELD_PERMISSIONS: Record<UpdatableField, string> = {
   assignee: "issues.update.triage",
 };
 
-const updateIssueSchema = z.object({
+export const updateIssueSchema = z.object({
   machine: z
     .string()
     .trim()
@@ -91,14 +91,10 @@ const updateIssueSchema = z.object({
     .int()
     .min(1)
     .describe("The issue number within that machine, as shown in its URL."),
-  title: z
-    .string()
-    .trim()
-    .min(1)
-    .max(ISSUE_TITLE_MAX)
+  title: issueTitleSchema()
     .optional()
     .describe(
-      `New title for the issue, at most ${ISSUE_TITLE_MAX} characters.`
+      `New one-line title for the issue, at most ${ISSUE_TITLE_MAX} characters; line breaks become spaces.`
     ),
   status: z
     .enum(ISSUE_STATUS_VALUES)
