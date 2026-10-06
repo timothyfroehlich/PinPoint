@@ -17,7 +17,9 @@ All PinballMap access goes through `~/lib/pinballmap` and `getPinballMapClient`.
 
 Keep the API token and members' linked tokens server-side, use the existing Vault-backed path for write credentials (`~/lib/pinballmap/user-credentials`), and never log credentialed URLs. Do not perform external HTTP inside a database transaction.
 
-Outbound lineup writes (add, remove, Insider Connected, confirm) run through `~/lib/pinballmap/outbound-write` and `~/lib/pinballmap/outbound-remove`. They own the mutation lease, the PBM call before the transaction, and the locked stored-lineup edit (`editStoredSnapshot`, `mutationLeaseOwnsLocation`). A new push reuses that plumbing; its Server Action keeps only auth, parsing, revalidation and the return shape.
+Outbound lineup writes (add, remove, Insider Connected, confirm) run through `~/lib/pinballmap/outbound-write` and `~/lib/pinballmap/outbound-remove`. Each flow runs inside `withPinballMapMutationLease` (`~/lib/pinballmap/mutation-lease`), which claims the lease, returns the "being changed" `SERVER` error when it is held, and releases it however the flow ends. Inside, the PBM call runs before the transaction, and the transaction checks `mutationLeaseOwnsLocation` before the locked stored-lineup edit (`editStoredSnapshot`). A new push reuses that plumbing; its Server Action keeps only auth, parsing, revalidation and the return shape.
+
+The `pinballmap_state` singleton's code is split by concern behind the `~/lib/pinballmap/state` barrel: `runtime-state` (the row read), `mutation-lease` (the lease and `PINBALLMAP_STATE_ID`), `refresh-allowance` (the manual-refresh token bucket and its `stampSyncAttempt` claim), `location-sync` (`syncLocationSnapshot`) and `tracked-location` (check, commit and clear the tracked location). Import from the barrel unless you need a lease internal.
 
 ## Keep traffic polite and bounded
 
@@ -29,7 +31,7 @@ Render the stored location snapshot. Refresh it only through `syncLocationSnapsh
 
 A Server Action or route invoked when a page opens is automated, not a manual refresh; it must not call `syncLocationSnapshot`.
 
-Preserve the live client's serialized writes and bounded `429` handling. Reuse stored tokens rather than obtaining credentials again per request.
+Preserve the live client's serialized writes and bounded `429` handling; the per-request timeouts, the 599 network-error fallback and the one `Retry-After` retry live in `~/lib/http/external` (`safeFetch`, `withRetryAfter`; CORE-ARCH-016), shared with the Discord client. The budgets are constants at the top of `client-live.ts`. Reuse stored tokens rather than obtaining credentials again per request.
 
 ## Attribute and test correctly
 

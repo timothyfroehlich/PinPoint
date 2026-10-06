@@ -8,6 +8,12 @@ inputs:
   browsers:
     description: Space-separated browsers to install on a cache miss (for example "chromium webkit").
     required: true
+  with-deps:
+    description: >-
+      "true" also installs the browsers' apt packages on a cache miss. Pass
+      "false" when the job installs system dependencies itself.
+    required: false
+    default: "true"
   save-cache:
     description: >-
       "true" saves the cache after the job. Only main's comprehensive E2E job
@@ -34,27 +40,31 @@ runs:
     # No restore-keys: a prefix match would carry every earlier browser
     # revision forward into each new save. A Playwright bump pays one cold
     # download on main, then every job hits the new key.
-    - name: Cache Playwright browsers
-      id: cache-save
-      if: inputs.save-cache == 'true'
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
-      with:
-        path: ~/.cache/ms-playwright
-        key: ${{ runner.os }}-playwright-all-${{ steps.version.outputs.version }}
-
     - name: Restore Playwright browsers
-      id: cache-restore
-      if: inputs.save-cache != 'true'
+      id: restore
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache/restore@v6.1.0
       with:
         path: ~/.cache/ms-playwright
-        key: ${{ runner.os }}-playwright-all-${{ steps.version.outputs.version }}
+        key: ${{ runner.os }}-${{ runner.arch }}-playwright-all-${{ steps.version.outputs.version }}
 
     - name: Install Playwright browsers
-      if: steps.cache-save.outputs.cache-hit != 'true' && steps.cache-restore.outputs.cache-hit != 'true'
+      if: steps.restore.outputs.cache-hit != 'true'
       shell: bash
       env:
         BROWSERS: ${{ inputs.browsers }}
+        WITH_DEPS: ${{ inputs.with-deps }}
       run: |
+        flags=()
+        if [ "$WITH_DEPS" = "true" ]; then flags+=(--with-deps); fi
         # shellcheck disable=SC2086  # word-split the browser list on purpose
-        pnpm exec playwright install --with-deps $BROWSERS
+        pnpm exec playwright install "${flags[@]}" $BROWSERS
+
+    # Saved right after the install, not in actions/cache's post step: that
+    # step only runs when the whole job succeeds, so a red main would leave
+    # every PR without the cache until main went green again.
+    - name: Save Playwright browsers
+      if: inputs.save-cache == 'true' && steps.restore.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache/save@v6.1.0
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ steps.restore.outputs.cache-primary-key }}

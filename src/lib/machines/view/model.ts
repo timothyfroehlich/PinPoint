@@ -7,6 +7,7 @@ import type {
   MachineViewSummary,
 } from "~/lib/types";
 import { MACHINE_PRESENCE_RANK } from "~/lib/machines/presence";
+import { ISSUE_SEVERITY_VALUES } from "~/lib/types";
 import {
   MACHINE_STATUS_RANK,
   SEVERITY_RANK,
@@ -19,12 +20,7 @@ export interface MachineViewCandidate extends MachineViewRow {
   legacyModelName: string;
 }
 
-const ISSUE_SEVERITIES: IssueSeverity[] = [
-  "cosmetic",
-  "minor",
-  "major",
-  "unplayable",
-];
+const ISSUE_SEVERITIES: readonly IssueSeverity[] = ISSUE_SEVERITY_VALUES;
 
 const COLLATOR = new Intl.Collator(undefined, {
   numeric: true,
