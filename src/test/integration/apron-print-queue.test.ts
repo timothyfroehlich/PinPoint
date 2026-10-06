@@ -120,7 +120,7 @@ describe("apron card print queue (PP-uksf)", () => {
       queued: true,
     });
 
-    expect(asGuest).toMatchObject({ ok: false, code: "UNAUTHORIZED" });
+    expect(asGuest).toMatchObject({ ok: false, code: "FORBIDDEN" });
     expect(signedOut).toMatchObject({ ok: false, code: "UNAUTHORIZED" });
     expect(await getQueuedApronCardIds(guest)).toEqual([]);
   });
