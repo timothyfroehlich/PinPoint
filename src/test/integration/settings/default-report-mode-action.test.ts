@@ -2,14 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
-import { createTestUser } from "~/test/helpers/factories";
-import { authUsers, userProfiles } from "~/server/db/schema";
+import { signInAs, signOut } from "~/test/helpers/mock-auth";
+import { seedUser } from "~/test/helpers/seed";
+import { userProfiles } from "~/server/db/schema";
 import { updateDefaultReportModeAction } from "~/app/(app)/settings/reporting/actions";
 
 // External boundary mocks
-vi.mock("~/lib/supabase/server", () => ({
-  createClient: vi.fn(),
-}));
+vi.mock("~/lib/supabase/server", () => import("~/test/helpers/mock-auth"));
 
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
@@ -18,23 +17,6 @@ vi.mock("next/cache", () => ({
 vi.mock("next/navigation", () => ({
   redirect: vi.fn(),
 }));
-
-// Forward ~/server/db to worker-scoped PGlite
-vi.mock("~/server/db", async () => {
-  const { getTestDb } = await import("~/test/setup/pglite");
-  return { db: await getTestDb() };
-});
-
-async function mockAuth(userId: string | null) {
-  const { createClient } = await import("~/lib/supabase/server");
-  vi.mocked(createClient).mockResolvedValue({
-    auth: {
-      getUser: vi.fn().mockResolvedValue({
-        data: { user: userId ? { id: userId } : null },
-      }),
-    },
-  } as unknown as Awaited<ReturnType<typeof createClient>>);
-}
 
 function reportModes(mobile: string, desktop: string): FormData {
   const formData = new FormData();
@@ -51,33 +33,25 @@ describe("updateDefaultReportModeAction — PGlite integration (CORE-TEST-004)",
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    const db = await getTestDb();
 
-    await db.insert(authUsers).values([
-      { id: MEMBER_ID, email: "member-report-mode@test.com" },
-      { id: GUEST_ID, email: "guest-report-mode@test.com" },
-    ]);
-
-    await db.insert(userProfiles).values([
-      createTestUser({
-        id: MEMBER_ID,
-        role: "member",
-        email: "member-report-mode@test.com",
-        mobileReportMode: "detailed",
-        desktopReportMode: "quick",
-      }),
-      createTestUser({
-        id: GUEST_ID,
-        role: "guest",
-        email: "guest-report-mode@test.com",
-        mobileReportMode: "quick",
-        desktopReportMode: "quick",
-      }),
-    ]);
+    await seedUser({
+      id: MEMBER_ID,
+      role: "member",
+      email: "member-report-mode@test.com",
+      mobileReportMode: "detailed",
+      desktopReportMode: "quick",
+    });
+    await seedUser({
+      id: GUEST_ID,
+      role: "guest",
+      email: "guest-report-mode@test.com",
+      mobileReportMode: "quick",
+      desktopReportMode: "quick",
+    });
   });
 
   it("saves both settings for an authorized reporter in the database", async () => {
-    await mockAuth(MEMBER_ID);
+    signInAs(MEMBER_ID);
 
     const result = await updateDefaultReportModeAction(
       undefined,
@@ -101,7 +75,7 @@ describe("updateDefaultReportModeAction — PGlite integration (CORE-TEST-004)",
   });
 
   it("rejects invalid values before updating and leaves database untouched", async () => {
-    await mockAuth(MEMBER_ID);
+    signInAs(MEMBER_ID);
 
     const result = await updateDefaultReportModeAction(
       undefined,
@@ -121,7 +95,7 @@ describe("updateDefaultReportModeAction — PGlite integration (CORE-TEST-004)",
   });
 
   it("rejects Multiple when batch access is absent and leaves database untouched", async () => {
-    await mockAuth(GUEST_ID);
+    signInAs(GUEST_ID);
 
     const result = await updateDefaultReportModeAction(
       undefined,
@@ -141,7 +115,7 @@ describe("updateDefaultReportModeAction — PGlite integration (CORE-TEST-004)",
   });
 
   it("requires a signed-in account and leaves database untouched", async () => {
-    await mockAuth(null);
+    signOut();
 
     const result = await updateDefaultReportModeAction(
       undefined,

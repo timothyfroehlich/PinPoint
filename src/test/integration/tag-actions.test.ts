@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { asDbOrTx, getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { createTestMachine, createTestUser } from "~/test/helpers/factories";
+import { signInAs as signInAsUser, signOut } from "~/test/helpers/mock-auth";
 import {
   machines,
   machineTags,
@@ -11,15 +12,7 @@ import {
 } from "~/server/db/schema";
 
 // --- boundary mocks -------------------------------------------------------
-const mockGetUser = vi.fn();
-vi.mock("~/lib/supabase/server", () => ({
-  createClient: () => Promise.resolve({ auth: { getUser: mockGetUser } }),
-}));
-// Route the production `db` import at the worker-scoped PGlite instance.
-vi.mock("~/server/db", async () => {
-  const { getTestDb } = await import("~/test/setup/pglite");
-  return { db: await getTestDb() };
-});
+vi.mock("~/lib/supabase/server", () => import("~/test/helpers/mock-auth"));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 const {
@@ -55,10 +48,8 @@ const people = {
 };
 
 function signInAs(who: Who): void {
-  mockGetUser.mockResolvedValue({
-    data: { user: who === "anonymous" ? null : { id: people[who].id } },
-    error: null,
-  });
+  if (who === "anonymous") signOut();
+  else signInAsUser(people[who].id);
 }
 
 /** Insert a tag type straight into the database, bypassing the actions. */
@@ -154,7 +145,7 @@ describe("hand-applied tag actions", () => {
   setupTestDb();
 
   beforeEach(async () => {
-    mockGetUser.mockReset();
+    signOut();
     const db = await getTestDb();
     await db.insert(userProfiles).values(Object.values(people));
     await db
