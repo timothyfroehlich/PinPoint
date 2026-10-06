@@ -63,7 +63,7 @@ export const NOT_LINKED_MESSAGE =
   "Link your Pinball Map account in Settings to change the lineup from here.";
 
 /** Human-facing text for a PBM write failure, by reason. */
-export function pbmWriteFailureMessage(failure: PbmWriteFailure): string {
+function pbmWriteFailureMessage(failure: PbmWriteFailure): string {
   switch (failure.reason) {
     case "rate_limited":
       return "Pinball Map is rate-limiting us. Try again in a few minutes.";

@@ -347,7 +347,13 @@ export async function setPinballmapIntentAction(
  * hides the transient error for this code and relies on re-rendering into its
  * standing note.
  */
-function revalidateIfLinkFailed(result: { ok: boolean; code?: string }): void {
+function revalidateIfLinkFailed<C extends string>(
+  result: Result<unknown, C>,
+  // Only a flow that can report `PBM_AUTH_FAILED` may be passed: a result
+  // whose codes lack it (or a renamed code) needs a `never` argument, so the
+  // call fails to compile instead of silently skipping the revalidation.
+  ..._canFailAuth: "PBM_AUTH_FAILED" extends C ? [] : [never]
+): void {
   if (!result.ok && result.code === "PBM_AUTH_FAILED") {
     revalidatePath("/settings");
     revalidatePath("/m", "layout");
