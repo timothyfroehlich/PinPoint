@@ -11,10 +11,11 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PinballMapLinkField } from "./PinballMapLinkField";
 import {
+  listPinballMapEditionsAction,
   resolvePinballMapLinkAction,
   searchPinballMapFamiliesAction,
 } from "~/app/(app)/m/pinballmap-actions";
@@ -573,6 +574,65 @@ describe("PinballMapLinkField — onSelectionChange", () => {
     expect(onSelectionChange).toHaveBeenLastCalledWith({
       manual: true,
       pinballmapMachineId: null,
+    });
+  });
+
+  it("keeps the chosen edition through a form reset (PINPOINT-34)", async () => {
+    // The create form resets itself on success. Radix replays the edition
+    // Select's mount-time value — undefined, since it mounted before an
+    // edition was chosen — which used to report NaN as the selected title.
+    vi.mocked(searchPinballMapFamiliesAction).mockResolvedValue([
+      {
+        machineGroupId: 9,
+        pinballmapMachineId: null,
+        name: "Godzilla",
+        manufacturer: "Stern",
+        year: 2021,
+        editionCount: 2,
+      },
+    ]);
+    vi.mocked(listPinballMapEditionsAction).mockResolvedValue([
+      {
+        pinballmapMachineId: 501,
+        name: "Godzilla (Pro)",
+        manufacturer: "Stern",
+        year: 2021,
+      },
+      {
+        pinballmapMachineId: 502,
+        name: "Godzilla (Premium)",
+        manufacturer: "Stern",
+        year: 2021,
+      },
+    ]);
+    const onSelectionChange = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <form data-testid="form">
+        <PinballMapLinkField onSelectionChange={onSelectionChange} />
+      </form>
+    );
+
+    await user.click(screen.getByRole("combobox"));
+    await user.type(screen.getByPlaceholderText(/medieval madness/i), "god");
+    await user.click(await screen.findByText("Godzilla"));
+    await user.click(await screen.findByTestId("pinballmap-edition-select"));
+    await user.click(await screen.findByRole("option", { name: /Premium/ }));
+    expect(onSelectionChange).toHaveBeenLastCalledWith({
+      manual: false,
+      pinballmapMachineId: 502,
+    });
+
+    act(() => {
+      screen.getByTestId<HTMLFormElement>("form").reset();
+    });
+
+    for (const [selection] of onSelectionChange.mock.calls) {
+      expect(Number.isNaN(selection.pinballmapMachineId)).toBe(false);
+    }
+    expect(onSelectionChange).toHaveBeenLastCalledWith({
+      manual: false,
+      pinballmapMachineId: 502,
     });
   });
 });

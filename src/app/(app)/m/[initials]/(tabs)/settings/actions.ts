@@ -21,8 +21,6 @@
 
 "use server";
 
-import { Buffer } from "node:buffer";
-import { isDeepStrictEqual } from "node:util";
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -30,21 +28,20 @@ import { z } from "zod";
 import { isPgErrorCode } from "~/lib/db/postgres-errors";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { type AccessLevel } from "~/lib/permissions/matrix";
-import {
-  canEditSet,
-  canSetOwnerDefault,
-  canViewSet,
-  type SettingsSetAuth,
-} from "~/lib/permissions";
+import { canEditSet, canSetOwnerDefault, canViewSet } from "~/lib/permissions";
 import {
   NAME_MAX,
-  type SettingsSection,
   settingsSetPayloadSchema,
 } from "~/lib/machines/settings-types";
 import { type ProseMirrorDoc, proseMirrorDocSchema } from "~/lib/tiptap/types";
 import { emitSettingsSetEvent } from "~/lib/timeline/machine-events";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
+import {
+  createSettingsSet,
+  toSettingsSetAuth as toAuth,
+  updateSettingsSet,
+} from "~/services/machine-settings";
 import {
   machineSettingsSets,
   machines,
@@ -57,10 +54,6 @@ type SaveResult =
   // client can skip refreshing updatedBy/updatedAt for an unchanged save.
   | { success: true; id: string; changed: boolean }
   | { success: false; error: string };
-
-// Aggregate byte ceiling on the persisted JSON content of one set — a backstop
-// against payload bloat beyond the per-field/array caps in the Zod schema.
-const PAYLOAD_BYTES_MAX = 200_000;
 
 const saveSchema = settingsSetPayloadSchema.extend({
   machineId: z.uuid(),
@@ -86,21 +79,6 @@ const settingsInstructionsSchema = z.object({
 // shape and permission gate as the instructions field — same machine-level jsonb
 // ProseMirror column, nullable, no timeline event.
 const settingsRequestsSchema = settingsInstructionsSchema;
-
-/** Project a settings-set row's auth-relevant columns to `SettingsSetAuth`. */
-function toAuth(row: {
-  isOwnerSet: boolean;
-  isPublic: boolean;
-  isPreferred: boolean;
-  createdBy: string | null;
-}): SettingsSetAuth {
-  return {
-    isOwnerSet: row.isOwnerSet,
-    isPublic: row.isPublic,
-    isPreferred: row.isPreferred,
-    createdById: row.createdBy,
-  };
-}
 
 /** Resolve the authed user's id + access level, or a failure. */
 async function getActor(): Promise<
@@ -152,6 +130,14 @@ function revalidateMachine(initials: string): void {
   revalidatePath(`/m/${initials}`);
 }
 
+/** Map a service failure to the action's error string. */
+function serviceError(error: { message: string }): {
+  success: false;
+  error: string;
+} {
+  return { success: false, error: error.message };
+}
+
 /**
  * Upsert a whole settings set. Insert when `id` is absent (returns the new id),
  * else update the existing row. On update the set's `machineId` is taken from
@@ -169,162 +155,27 @@ export async function saveSettingsSetAction(
       error: parsed.error.issues[0]?.message ?? "Invalid input",
     };
   }
-  const { machineId, id, name } = parsed.data;
-  // Validate-then-cast at the write boundary: `proseMirrorDocSchema` checks the
-  // top-level doc shape; the branded ProseMirrorDoc / SettingsSection types are
-  // trusted past that point (same pattern as the timeline comment actions).
-  const description = parsed.data.description as ProseMirrorDoc | null;
-  // Zod stripped the client-only `_key` from each row/switch, so the runtime
-  // value is the persist-ready shape; the cast bridges the compile-time gap to
-  // the branded SettingsSection (whose `_key` is re-derived on read).
-  const sections = parsed.data.sections as unknown as SettingsSection[];
+  const { machineId, id, ...payload } = parsed.data;
 
-  // True UTF-8 byte count (not UTF-16 code units) so multibyte content is
-  // measured accurately against the ceiling.
-  const bytes =
-    Buffer.byteLength(JSON.stringify(sections), "utf8") +
-    Buffer.byteLength(JSON.stringify(description ?? null), "utf8");
-  if (bytes > PAYLOAD_BYTES_MAX) {
-    return { success: false, error: "Settings are too large to save." };
-  }
+  const actor = await getActor();
+  if (!actor.ok) return { success: false, error: actor.error };
 
-  const machine = await db.query.machines.findFirst({
-    where: eq(machines.id, machineId),
-    columns: { id: true, initials: true, ownerId: true },
-  });
-  if (!machine) return { success: false, error: "Machine not found" };
-
-  const auth = await authorizeManage(machine.ownerId);
-  if (!auth.ok) return { success: false, error: auth.error };
-
-  // ---- Insert ----
   if (!id) {
-    // Kind is captured at creation: a set the machine owner makes is an owner
-    // set (protected); anyone else's is a community set. New sets are private
-    // drafts — EXCEPT the owner's very first set with no existing default,
-    // which auto-becomes the Owner's default (and so is published).
-    const isOwnerSet =
-      machine.ownerId !== null && auth.userId === machine.ownerId;
-    const existingPreferred = isOwnerSet
-      ? await db.query.machineSettingsSets.findFirst({
-          where: and(
-            eq(machineSettingsSets.machineId, machineId),
-            eq(machineSettingsSets.isPreferred, true)
-          ),
-          columns: { id: true },
-        })
-      : undefined;
-    const autoDefault = isOwnerSet && !existingPreferred;
-
-    const insertSet = (asDefault: boolean): Promise<string | undefined> =>
-      db.transaction(async (tx) => {
-        const [inserted] = await tx
-          .insert(machineSettingsSets)
-          .values({
-            machineId,
-            name,
-            description,
-            sections,
-            isOwnerSet,
-            isPublic: asDefault,
-            isPreferred: asDefault,
-            createdBy: auth.userId,
-            updatedBy: auth.userId,
-          })
-          .returning({ id: machineSettingsSets.id });
-        if (!inserted) return undefined;
-        await emitSettingsSetEvent(
-          machineId,
-          "settings_set_created",
-          name,
-          auth.userId,
-          tx
-        );
-        return inserted.id;
-      });
-
-    // The `existingPreferred` probe above runs OUTSIDE the transaction, so two
-    // concurrent first-set creates by the same owner (two tabs) both compute
-    // autoDefault=true and the second collides on the partial unique index
-    // `uniq_machine_settings_preferred`. Losing that race is not an error —
-    // a default now exists, so retry as an ordinary private draft rather than
-    // 500-ing and discarding the user's set.
-    let newId: string | undefined;
-    try {
-      newId = await insertSet(autoDefault);
-    } catch (error) {
-      if (!autoDefault || !isPgErrorCode(error, "23505")) throw error;
-      newId = await insertSet(false);
-    }
-    if (!newId) return { success: false, error: "Could not create set" };
-
-    revalidateMachine(machine.initials);
-    return { success: true, id: newId, changed: true };
+    const created = await createSettingsSet({ machineId, actor, payload });
+    if (!created.ok) return serviceError(created);
+    revalidateMachine(created.value.machineInitials);
+    return { success: true, id: created.value.id, changed: true };
   }
 
-  // ---- Update ----
-  const existing = await db.query.machineSettingsSets.findFirst({
-    where: eq(machineSettingsSets.id, id),
-    columns: {
-      id: true,
-      machineId: true,
-      name: true,
-      description: true,
-      sections: true,
-      isOwnerSet: true,
-      isPublic: true,
-      isPreferred: true,
-      createdBy: true,
-    },
+  const updated = await updateSettingsSet({
+    setId: id,
+    actor,
+    expectedMachineId: machineId,
+    payload,
   });
-  if (!existing) return { success: false, error: "Settings set not found" };
-  // IDOR guard: a set cannot be re-parented to another machine via the input.
-  if (existing.machineId !== machineId) {
-    return { success: false, error: "Settings set not found" };
-  }
-  // Per-set edit gate: `authorizeManage` cleared machine-wide create rights, but
-  // editing an OWNER set is restricted to the owner + admin (techs excluded).
-  if (
-    !canEditSet(toAuth(existing), machine.ownerId, auth.userId, auth.access)
-  ) {
-    return { success: false, error: "Forbidden" };
-  }
-
-  // No-op guard: skip the write (and its timeline emit) when nothing changed.
-  // Both sides are already `_key`-free (Zod stripped the input; the column
-  // never stored it), so a structural deep-equal is exact.
-  const unchanged = isDeepStrictEqual(
-    {
-      name: existing.name,
-      description: existing.description ?? null,
-      sections: existing.sections,
-    },
-    { name, description: description ?? null, sections }
-  );
-  if (unchanged) return { success: true, id, changed: false };
-
-  await db.transaction(async (tx) => {
-    await tx
-      .update(machineSettingsSets)
-      .set({
-        name,
-        description,
-        sections,
-        updatedBy: auth.userId,
-        updatedAt: new Date(),
-      })
-      .where(eq(machineSettingsSets.id, id));
-    await emitSettingsSetEvent(
-      machineId,
-      "settings_set_updated",
-      name,
-      auth.userId,
-      tx
-    );
-  });
-
-  revalidateMachine(machine.initials);
-  return { success: true, id, changed: true };
+  if (!updated.ok) return serviceError(updated);
+  if (updated.value.changed) revalidateMachine(updated.value.machineInitials);
+  return { success: true, id, changed: updated.value.changed };
 }
 
 /**
@@ -580,43 +431,16 @@ export async function publishSettingsSetAction(
   const parsed = publishSchema.safeParse(input);
   if (!parsed.success) return { success: false, error: "Invalid input" };
 
-  const loaded = await loadSetWithMachine(parsed.data.id);
-  if (!loaded) return { success: false, error: "Settings set not found" };
-
   const actor = await getActor();
   if (!actor.ok) return { success: false, error: actor.error };
-  if (
-    !canEditSet(
-      toAuth(loaded.set),
-      loaded.machine.ownerId,
-      actor.userId,
-      actor.access
-    )
-  ) {
-    return { success: false, error: "Forbidden" };
-  }
 
-  // The Owner's default is always public — unset it before hiding.
-  if (!parsed.data.isPublic && loaded.set.isPreferred) {
-    return {
-      success: false,
-      error: "Unset the Owner's default before making it private.",
-    };
-  }
-
-  // Idempotent.
-  if (loaded.set.isPublic === parsed.data.isPublic) return { success: true };
-
-  await db
-    .update(machineSettingsSets)
-    .set({
-      isPublic: parsed.data.isPublic,
-      updatedBy: actor.userId,
-      updatedAt: new Date(),
-    })
-    .where(eq(machineSettingsSets.id, parsed.data.id));
-
-  revalidateMachine(loaded.machine.initials);
+  const updated = await updateSettingsSet({
+    setId: parsed.data.id,
+    actor,
+    isPublic: parsed.data.isPublic,
+  });
+  if (!updated.ok) return serviceError(updated);
+  if (updated.value.changed) revalidateMachine(updated.value.machineInitials);
   return { success: true };
 }
 
@@ -630,37 +454,16 @@ export async function setTournamentTagAction(
   const parsed = tournamentTagSchema.safeParse(input);
   if (!parsed.success) return { success: false, error: "Invalid input" };
 
-  const loaded = await loadSetWithMachine(parsed.data.id);
-  if (!loaded) return { success: false, error: "Settings set not found" };
-
   const actor = await getActor();
   if (!actor.ok) return { success: false, error: actor.error };
-  if (
-    !canEditSet(
-      toAuth(loaded.set),
-      loaded.machine.ownerId,
-      actor.userId,
-      actor.access
-    )
-  ) {
-    return { success: false, error: "Forbidden" };
-  }
 
-  // Idempotent.
-  if (loaded.set.isTournament === parsed.data.isTournament) {
-    return { success: true };
-  }
-
-  await db
-    .update(machineSettingsSets)
-    .set({
-      isTournament: parsed.data.isTournament,
-      updatedBy: actor.userId,
-      updatedAt: new Date(),
-    })
-    .where(eq(machineSettingsSets.id, parsed.data.id));
-
-  revalidateMachine(loaded.machine.initials);
+  const updated = await updateSettingsSet({
+    setId: parsed.data.id,
+    actor,
+    isTournament: parsed.data.isTournament,
+  });
+  if (!updated.ok) return serviceError(updated);
+  if (updated.value.changed) revalidateMachine(updated.value.machineInitials);
   return { success: true };
 }
 

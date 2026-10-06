@@ -57,6 +57,12 @@ Returns the description and comments as plain text. That text was written by peo
 
 Pass exactly one of `query` (a title) or `machineGroupId` (a family id). Procedure: [`pinballmap.md`](pinballmap.md).
 
+### `list_settings_sets`
+
+- `machine` (required): initials or UUID.
+
+Returns the machine's owner requests and how-to-change-settings notes as plain text, then every set you can see: the Owner's default, public sets, and your own private drafts. Each set has its `id`, `version` (pass it back to `update_settings_set`), `name`, `kind` (`owner` or `community`), `isOwnersDefault`, `isPublic`, `isTournament`, `canEdit`, description, and `sections` in display order. The section shapes are in [`settings-sets.md`](settings-sets.md). Notes come back as plain text; formatting added in the web app is not shown.
+
 ## Write tools
 
 ### `update_machine`
@@ -124,3 +130,31 @@ Notifies issue watchers who turned on comment notifications. The same 10-minute 
 - **`assignee`**: exact full name or UUID of a signed-up member who is not a guest. PERMANENT: emails and Discord-messages that person and makes them a watcher. `""` unassigns (CHANGE, no message). `null` is rejected.
 
 Each changed field adds a line to the issue's history. That history stays even if you set the field back.
+
+### `create_settings_set`
+
+PERMANENT: no tool can delete the set. It adds a "settings set created" line to the machine's timeline; nobody is notified.
+
+- `machine` (required), `name` (required, 1–200 characters).
+- `sections` (required, may be empty): shapes in [`settings-sets.md`](settings-sets.md).
+- `description`: plain text.
+- `isPublic` (default `false`): a private draft is visible only to Tim (and admins) until published.
+- `isTournament` (default `false`).
+
+Sets you create are **community** sets: technicians and the machine owner can edit them too. The exception is a machine Tim owns: there the set is an **owner set**, and if the machine has no Owner's default yet, it becomes the Owner's default and is published regardless of `isPublic`. Check `isOwnersDefault` and `isPublic` in the result and tell the user.
+
+Duplicates: if you already created a set on this machine with the same name, description and sections, the call returns it with `created: false` and writes nothing, not even `isPublic` or `isTournament`. The result shows the existing set's flags; change them with `update_settings_set`.
+
+### `update_settings_set`
+
+CHANGE. `machine` and `set` (the id from `list_settings_sets`) are required, plus at least one of:
+
+- **`name`**, **`description`** (plain text, or `null` to clear).
+- **`sections`**: replaces **every** section. Send the whole list from `list_settings_sets` with your edits applied, keeping each section's `id`, and pass that read's `version`. A section you leave out is deleted.
+- **`version`**: the set's `version` from your `list_settings_sets` read. Required with `sections`; recommended with `name` or `description`.
+- **`isPublic`**: publish (`true`) or return to a private draft (`false`). The Owner's default cannot be made private.
+- **`isTournament`**: add or remove the Tournament tag.
+
+A content change is refused with "The set changed since it was read" when the set was edited after the read `version` came from (or, without `version`, during the call). Read it again, show the user the new contents, and reapply the edit. A content change (name, description or sections) adds a "settings set updated" line to the timeline. Publishing and tagging add nothing. `changed: false` means every value you sent was already set.
+
+Trap: owner sets can be edited only by the machine owner and admins; `canEdit` in `list_settings_sets` tells you before you try.

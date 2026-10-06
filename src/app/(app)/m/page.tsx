@@ -1,7 +1,7 @@
 import type React from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { MapPin, Plus } from "lucide-react";
+import { MapPin, Plus, Printer } from "lucide-react";
 import { MachineView } from "~/components/machines/view";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
@@ -36,6 +36,11 @@ export default async function MachinesPage({
   // only viewers who can open it.
   const canViewLineup = checkPermission(
     "machines.pinballmap.sync",
+    accessLevel
+  );
+  // Batch printing uses one card's export gate (apron-cards §12.1).
+  const canPrintApronCards = checkPermission(
+    "machines.apron.export",
     accessLevel
   );
   const viewSearchParams = toListSearchParams(rawSearchParams);
@@ -88,6 +93,14 @@ export default async function MachinesPage({
       </Link>
     </Button>
   ) : null;
+  const printApronCardsButton = canPrintApronCards ? (
+    <Button asChild variant="outline" className="max-md:size-11 max-md:px-0">
+      <Link href="/m/apron-cards" aria-label="Print apron cards">
+        <Printer className="size-4 md:mr-2" aria-hidden="true" />
+        <span className="max-md:hidden">Print apron cards</span>
+      </Link>
+    </Button>
+  ) : null;
   const addMachineButton = canCreateMachine ? (
     <Button
       asChild
@@ -106,9 +119,12 @@ export default async function MachinesPage({
     </Button>
   ) : null;
   const pageActions =
-    lineupButton === null && addMachineButton === null ? undefined : (
+    lineupButton === null &&
+    printApronCardsButton === null &&
+    addMachineButton === null ? undefined : (
       <>
         {lineupButton}
+        {printApronCardsButton}
         {addMachineButton}
       </>
     );

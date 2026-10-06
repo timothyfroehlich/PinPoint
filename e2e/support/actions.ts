@@ -337,6 +337,39 @@ export async function retryNavClick(
 }
 
 /**
+ * Selects a user in OwnerSelect (the machine owner picker) by typing their
+ * name into its search input.
+ *
+ * Searching bypasses the "Show guests and invited users" checkbox filter
+ * (per OwnerSelect: when query is non-empty, all matching users are shown)
+ * and keeps the match at the top of the list. Scrolling to an item instead
+ * fails once the list outgrows the popover: the item stays outside the
+ * viewport and the click never lands. The name must match one user.
+ *
+ * Uses keyboard Enter rather than pointer click to confirm the selection.
+ * cmdk's keyboard handler fires the "cmdk-item-select" event on the currently
+ * aria-selected item, which is more reliable on mobile touch emulation where
+ * Playwright's synthesized pointer events can fail to trigger cmdk's onClick
+ * even when the element is correctly targeted (PP-pvbq regression).
+ */
+export async function selectOwnerBySearch(page: Page, name: string) {
+  const searchInput = page.getByPlaceholder("Search users...");
+  await searchInput.fill(name);
+  const list = page.locator("[data-slot=command-list]");
+  const item = list
+    .locator("[data-slot=command-item]")
+    .filter({ hasText: name });
+  await expect(item).toBeVisible({ timeout: 5000 });
+  // Wait for cmdk to mark the item as keyboard-selected (aria-selected="true").
+  // cmdk auto-selects the first visible item when the search query changes;
+  // pressing Enter on the focused search input then fires onSelect on that item.
+  await expect(item).toHaveAttribute("aria-selected", "true", {
+    timeout: 3000,
+  });
+  await searchInput.press("Enter");
+}
+
+/**
  * Selects an option from a shadcn/ui Select component.
  * Clicks the trigger, waits for the dropdown, then clicks the option.
  */

@@ -40,13 +40,13 @@
 
 - **4.1** Search matches issue titles, issue IDs (such as AFM-12), machine names and initials, people's names, description text, and comment text.
 - **4.2** The Primary Filters, in order, are Status, Severity, Priority, Machine, Assignee, and Machine Presence.
-- **4.3** The Secondary Filters, in order, are Created, Updated, Frequency, Machine owner, Reporter, and Watching.
+- **4.3** The Secondary Filters, in order, are Created, Updated, Frequency, Machine owner, Machine tag, Machine collection, Reporter, and Watching. Machine tag and Machine collection follow collections-and-tags §12.
 - **4.4** Status offers every status grouped by status group; selecting a group selects all its statuses. The control reads "Open" when exactly the Open statuses are selected.
 - **4.5** Machine searches machines by name and initials, leaving out Removed machines unless Machine Presence includes Removed, and offers a My machines shortcut (machines the person owns, other than Removed ones). A machine already selected stays listed.
 - **4.6** Assignee searches people by name and offers Me and Unassigned shortcuts.
 - **4.7** Machine Presence offers every presence state.
 - **4.8** Created and Updated are date ranges.
-- **4.9** Me, My machines, and Watching appear only to signed-in people.
+- **4.9** Me, My machines, Watching, and Machine collection appear only to signed-in people.
 - **4.10** Machine owner searches people by name and offers Me and Unassigned shortcuts; Unassigned matches machines with no owner. Reporter searches people by name and offers a Me shortcut.
 
 ---
@@ -72,7 +72,7 @@
 
 ## 7. URL State
 
-- **7.1** Canonical parameters are `q`, `status`, `severity`, `priority`, `machine`, `assignee`, `presence`, `created`, `updated`, `frequency`, `owner`, `reporter`, `watching`, `sort`, `dir`, `page`, `pageSize`, and `view`.
+- **7.1** Canonical parameters are `q`, `status`, `severity`, `priority`, `machine`, `assignee`, `presence`, `created`, `updated`, `frequency`, `owner`, `tag`, `collection`, `reporter`, `watching`, `sort`, `dir`, `page`, `pageSize`, and `view`.
 - **7.2** The older parameters `page_size`, a composite `sort` such as `updated_desc`, `include_inactive_machines`, and the separate created and updated date bounds open correctly and are rewritten to the canonical form (list-views §9.4).
 - **7.3** Machine values are machine initials; people are stable IDs plus the `me` and `unassigned` sentinels; `me` means whoever is viewing.
 - **7.4** A link to Issues for one machine, from a machine page or a Machine View cell, also sets Machine Presence to every presence state, so the machine's issues show whatever its presence.
@@ -96,6 +96,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-05 | Machine tag and Machine collection Secondary Filters (4.3, 4.9) and their `tag` and `collection` parameters (7.1). |
 | 2026-10-04 | Search also matches description text (4.1). Machine owner offers Me and Unassigned shortcuts and Reporter offers Me (4.10). |
 | 2026-10-03 | Machine and My machines leave out Removed machines unless Machine Presence includes Removed (4.5). |
 | 2026-10-03 | §3.1: on a narrow phone the second line wraps rather than truncating. |
