@@ -703,7 +703,7 @@ jobs:
     # Explicit code/deps guard mirrors the three PR E2E siblings. It is the
     # only thing keeping this job off docs-only main pushes: like them it
     # needs only `changes`, so no skipped upstream job cascades a skip. (PP-x0ke.)
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
+    if: ${{ (github.event_name == 'pull_request' || github.event_name == 'push' && github.ref == 'refs/heads/main') && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
     needs: changes
     # Backstop only — the real limit is the Playwright step's own timeout (see
     # the comment there). Must stay above setup + that timeout, or a job
