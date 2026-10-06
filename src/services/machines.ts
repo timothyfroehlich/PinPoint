@@ -988,7 +988,7 @@ export function carryExcludedReason(
  * If the locked row is missing entirely, the machine was deleted mid-flight; the
  * plan is void, so it is thrown away and re-planned rather than written. Same
  * read-modify-write serialization `editStoredSnapshot` uses in
- * `m/pinballmap-actions.ts`, for the same reason.
+ * `~/lib/pinballmap/outbound-write`, for the same reason.
  *
  * A missing row is reported as `not_found` rather than a success payload
  * describing a link that was never stored (CORE-ARCH-012). An exclusion
