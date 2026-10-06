@@ -444,7 +444,7 @@ describe("uploadIssueImage — action integration (PGlite)", () => {
     mockRateLimitPass();
     mockBlobUpload();
 
-    const { uploadIssueImage } = await import("~/server/actions/images");
+    const { uploadIssueImage } = await import("~/lib/blob/image-actions");
 
     const formData = new FormData();
     formData.append("issueId", issueId);
@@ -538,7 +538,7 @@ describe("uploadIssueImage — action integration (PGlite)", () => {
       etag: "mock-etag",
     });
 
-    const { uploadIssueImage } = await import("~/server/actions/images");
+    const { uploadIssueImage } = await import("~/lib/blob/image-actions");
 
     const formData = new FormData();
     formData.append("issueId", issue.id);
@@ -580,7 +580,7 @@ describe("uploadIssueImage — action integration (PGlite)", () => {
     }));
     await db.insert(issueImages).values(existingImages);
 
-    const { uploadIssueImage } = await import("~/server/actions/images");
+    const { uploadIssueImage } = await import("~/lib/blob/image-actions");
 
     // Uploading for a new issue must succeed (no lifetime user quota)
     const formData = new FormData();
@@ -613,7 +613,7 @@ describe("uploadIssueImage — action integration (PGlite)", () => {
     }));
     await db.insert(issueImages).values(existingImages);
 
-    const { uploadIssueImage } = await import("~/server/actions/images");
+    const { uploadIssueImage } = await import("~/lib/blob/image-actions");
 
     const formData = new FormData();
     formData.append("issueId", issueId);

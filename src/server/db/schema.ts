@@ -24,7 +24,7 @@ import {
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 import { type TimelineEventData } from "~/lib/timeline/types";
 import { type MachineTimelineEventData } from "~/lib/timeline/machine-event-types";
-import { type TimelineEventSourceType } from "~/lib/timeline/machine-events";
+import { type TimelineEventSourceType } from "~/lib/timeline/machine-event-types";
 import { type TimelineTag } from "~/lib/timeline/machine-tags";
 import { type SettingsSection } from "~/lib/machines/settings-types";
 import type { LocationSnapshot } from "~/lib/pinballmap/types";
@@ -428,6 +428,30 @@ export const machineApronCards = pgTable(
       t.machineId,
       t.name
     ),
+  })
+).enableRLS();
+
+/**
+ * Apron card print queue (spec apron-cards §13): each member's own list of
+ * saved cards waiting to be printed. A row is one queued card; deleting the
+ * card or the member removes it (§13.3).
+ */
+export const apronCardPrintQueue = pgTable(
+  "apron_card_print_queue",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => userProfiles.id, { onDelete: "cascade" }),
+    cardId: uuid("card_id")
+      .notNull()
+      .references(() => machineApronCards.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.userId, t.cardId] }),
+    cardIdIdx: index("idx_apron_card_print_queue_card_id").on(t.cardId),
   })
 ).enableRLS();
 
@@ -1820,6 +1844,20 @@ export const machineApronCardsRelations = relations(
     machine: one(machines, {
       fields: [machineApronCards.machineId],
       references: [machines.id],
+    }),
+  })
+);
+
+export const apronCardPrintQueueRelations = relations(
+  apronCardPrintQueue,
+  ({ one }) => ({
+    user: one(userProfiles, {
+      fields: [apronCardPrintQueue.userId],
+      references: [userProfiles.id],
+    }),
+    card: one(machineApronCards, {
+      fields: [apronCardPrintQueue.cardId],
+      references: [machineApronCards.id],
     }),
   })
 );

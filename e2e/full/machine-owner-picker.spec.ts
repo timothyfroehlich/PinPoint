@@ -61,7 +61,7 @@ test.describe("Machine Owner Picker — promote-dialog journeys (PP-6oi)", () =>
     //
     // `@example.com`, NOT `@test.com`: nothing else can reclaim a leaked
     // auth.users row. `db:fast-reset` deliberately never truncates the auth
-    // schema, and `/api/test-data/cleanup` lacks the privilege, so the ONLY
+    // schema, and `cleanupTestEntities` lacks the privilege, so the ONLY
     // sweeper is global-setup's `cleanupInviteSignupUsers`, whose filter is
     // `@example.com`. A run that dies between this hook and the afterEach
     // (worker kill, timeout) would leave a `@test.com` row in auth.users
@@ -76,7 +76,7 @@ test.describe("Machine Owner Picker — promote-dialog journeys (PP-6oi)", () =>
     guestUserId = user.id;
   });
 
-  test.afterEach(async ({ request }) => {
+  test.afterEach(async () => {
     const userId = guestUserId;
     guestUserId = null;
 
@@ -85,7 +85,7 @@ test.describe("Machine Owner Picker — promote-dialog journeys (PP-6oi)", () =>
     let machineError: Error | null = null;
     try {
       if (testMachines.size > 0) {
-        await cleanupTestEntities(request, {
+        await cleanupTestEntities({
           machineInitials: Array.from(testMachines),
         });
       }

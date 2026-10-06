@@ -1,14 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { asDbOrTx, getTestDb, setupTestDb } from "~/test/setup/pglite";
-import { userProfiles, machines } from "~/server/db/schema";
-import { createTestUser, createTestMachine } from "~/test/helpers/factories";
+import { seedMachine, seedUser } from "~/test/helpers/seed";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 
 vi.mock("server-only", () => ({}));
-vi.mock("~/server/db", async () => {
-  const { getTestDb } = await import("~/test/setup/pglite");
-  return { db: await getTestDb() };
-});
 
 const { getMachineTimeline, createMachineComment } =
   await import("~/lib/timeline/machine-events");
@@ -27,22 +22,11 @@ describe("getMachineTimeline author scope", () => {
 
   beforeEach(async () => {
     const db = await getTestDb();
-    await db
-      .insert(userProfiles)
-      .values([
-        createTestUser({ id: ALICE, firstName: "Alice", lastName: "A" }),
-        createTestUser({ id: BOB, firstName: "Bob", lastName: "B" }),
-      ]);
-    const [a] = await db
-      .insert(machines)
-      .values(createTestMachine({ initials: "AA", name: "Game A" }))
-      .returning({ id: machines.id });
-    const [b] = await db
-      .insert(machines)
-      .values(createTestMachine({ initials: "BB", name: "Game B" }))
-      .returning({ id: machines.id });
-    m1 = a.id;
-    m2 = b.id;
+    const seedOpts = { authUser: false };
+    await seedUser({ id: ALICE, firstName: "Alice", lastName: "A" }, seedOpts);
+    await seedUser({ id: BOB, firstName: "Bob", lastName: "B" }, seedOpts);
+    m1 = (await seedMachine({ initials: "AA", name: "Game A" })).id;
+    m2 = (await seedMachine({ initials: "BB", name: "Game B" })).id;
     // Alice notes on two machines; Bob notes on one.
     await createMachineComment(
       m1,
