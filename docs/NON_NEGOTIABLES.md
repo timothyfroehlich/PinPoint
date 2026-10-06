@@ -1,7 +1,7 @@
 # PinPoint Non‑Negotiables
 
-**Last Updated**: 2026-10-05
-**Version**: 2.7 (CORE-ARCH-014 added: one write path per mutation; CORE-ARCH-010 amended: share load-bearing code at two copies, reuse existing helpers — PP-az4d.1)
+**Last Updated**: 2026-10-06
+**Version**: 2.8 (CORE-ARCH-016 added: third-party HTTP goes through `~/lib/http/external` with a per-request timeout — PP-az4d.11). Prior: 2.7 (CORE-ARCH-014 added: one write path per mutation; CORE-ARCH-010 amended: share load-bearing code at two copies, reuse existing helpers — PP-az4d.1)
 
 > **Canonical catalog**: this document defines the canonical `CORE-*` rules for PinPoint. Portable skills (`.agents/skills/`) and agent context (`AGENTS.md`) cite rules by ID and provide domain/task-specific procedures.
 
@@ -40,6 +40,7 @@
 23. External side effects (HTTP, email, Discord, blob, Vault RPC) never run inside a DB transaction; deliver them post-commit (CORE-ARCH-011)
 24. A bug-fix regression test fails on the pre-fix code; tests reach production through real callers' seams (CORE-TEST-007/008)
 25. A mutation with more than one entry point lives in `src/services`; entry points parse, authorize, and call it (CORE-ARCH-014)
+26. Third-party HTTP calls go through `~/lib/http/external` with a per-request timeout (CORE-ARCH-016)
 
 ---
 
@@ -426,6 +427,13 @@
 - **Do:** Put a mutation reachable from more than one entry point — a web Server Action, an MCP tool, a cron route — in `src/services`. Each entry point parses its input, authorizes the caller, and calls the service. Adding a second entry point to a mutation that lives in one entry point moves the mutation into `src/services` first.
 - **Don't:** Copy a service's transaction, event, or notification logic into an entry point.
 
+**CORE-ARCH-016:** Third-party HTTP calls go through `~/lib/http/external` with a timeout
+
+- **Severity:** Required
+- **Why:** `fetch` has no deadline of its own. A third party that accepts the connection and never answers holds the request until the platform kills the function: a Server Action spins with no result, and a cron run dies without reporting. PinballMap and Discord had no timeout until PP-az4d.11, while iScored, OPDB and PinTips each set their own. Both clients had also copied the network-error fallback and the 429 retry, and copies drift.
+- **Do:** Send each server-side request to a third-party API through `safeFetch(url, init, { timeoutMs, networkErrorLog })` from `~/lib/http/external`, and wrap a send that may hit a 429 in `withRetryAfter`. Name each `timeoutMs` as a constant in the client, chosen per endpoint class; it bounds one attempt, headers and body together, so a retry gets a fresh budget. A timeout and a network failure both arrive as the synthetic 599 (`NETWORK_ERROR_STATUS`), so classify that one status. An integration guard such as `assertPinballMapNetworkAllowed` runs before the call, outside the 599 conversion. SDK clients (Supabase, Resend, Vercel Blob) own their transport and are out of scope. iScored, OPDB and PinTips predate the helper; move them onto it with their next change.
+- **Don't:** Call `fetch` directly for a third-party API, or send one without a timeout.
+
 ---
 
 ## Integrations
@@ -692,7 +700,7 @@ If all Yes → ship it. Perfect is the enemy of done.
 - CORE‑SEC‑001..010: Security
 - CORE‑PERF‑001..003: Performance (incl. image priority + preconnect)
 - CORE‑TEST‑001..006: Testing
-- CORE‑ARCH‑001, 004..012, 014: Architecture (002, 003 retired)
+- CORE‑ARCH‑001, 004..012, 014, 016: Architecture (015 reserved) (002, 003 retired)
 - CORE‑RESP‑001..004: Responsive framework
 - CORE‑UI‑001..006: UI & styling + Browser support / MWG catalog (005, 006)
 - CORE‑A11Y‑001..006: Accessibility floor
