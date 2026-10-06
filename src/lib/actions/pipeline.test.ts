@@ -61,21 +61,20 @@ describe("createProtectedAction", () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
-  it("returns VALIDATION_ERROR without checking permission or running the handler", async () => {
+  it("returns the first VALIDATION issue without checking permission or running the handler", async () => {
     const handler = vi.fn(() => Promise.resolve(ok("done")));
     const action = createProtectedAction({
-      schema: z.object({ count: z.number().int().positive() }),
+      schema: z.object({
+        count: z.number().int().positive("Count must be positive"),
+        name: z.string().min(1, "Name is required"),
+      }),
       permission: "issues.watch",
       handler,
     });
 
-    const result = await action({ count: -1 });
-
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.code).toBe("VALIDATION_ERROR");
-      expect(result.message).toContain("count");
-    }
+    await expect(action({ count: -1, name: "" })).resolves.toEqual(
+      err("VALIDATION", "Count must be positive")
+    );
     expect(mocks.getUserAccessLevel).not.toHaveBeenCalled();
     expect(mocks.checkPermission).not.toHaveBeenCalled();
     expect(handler).not.toHaveBeenCalled();
@@ -222,7 +221,7 @@ describe("createProtectedAction", () => {
           { length: number },
           | "HANDLER_ERROR"
           | "UNAUTHORIZED"
-          | "VALIDATION_ERROR"
+          | "VALIDATION"
           | "FORBIDDEN"
           | "SERVER"
         >

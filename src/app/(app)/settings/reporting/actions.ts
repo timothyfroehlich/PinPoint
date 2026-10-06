@@ -34,7 +34,7 @@ const updateDefaultReportModeProtected = createProtectedAction({
         desktopMode: formData.get("desktopReportMode"),
       });
     if (!parsed.success) {
-      return err("VALIDATION_ERROR", "Choose valid report screens.");
+      return err("VALIDATION", "Choose valid report screens.");
     }
 
     if (

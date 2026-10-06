@@ -1,7 +1,6 @@
 import "server-only";
 
 import type { User } from "@supabase/supabase-js";
-import { isRedirectError } from "next/dist/client/components/redirect-error";
 import type { z } from "zod";
 
 import { serverActionError } from "~/lib/observability/report-error";
@@ -14,10 +13,12 @@ import type { AccessLevel } from "~/lib/permissions/matrix";
 import { err, type Result } from "~/lib/result";
 import { createClient } from "~/lib/supabase/server";
 
+import { rethrowIfRedirect } from "./redirect";
+
 export type PermissionId = Parameters<typeof checkPermission>[0];
 
 export type ProtectedActionErrorCode =
-  "UNAUTHORIZED" | "VALIDATION_ERROR" | "FORBIDDEN" | "SERVER";
+  "UNAUTHORIZED" | "VALIDATION" | "FORBIDDEN" | "SERVER";
 
 export type ProtectedActionResult<
   TOutput,
@@ -85,7 +86,10 @@ export function createProtectedAction<
       if (options.schema) {
         const validation = options.schema.safeParse(rawInput);
         if (!validation.success) {
-          return err("VALIDATION_ERROR", validation.error.message);
+          return err(
+            "VALIDATION",
+            validation.error.issues[0]?.message ?? "Invalid input"
+          );
         }
         input = validation.data;
       }
@@ -112,9 +116,7 @@ export function createProtectedAction<
 
       return await options.handler(input, context);
     } catch (error) {
-      if (isRedirectError(error)) {
-        throw error;
-      }
+      rethrowIfRedirect(error);
 
       return serverActionError(
         error,
