@@ -1,8 +1,9 @@
 import type React from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ClipboardList, MapPin, Plus, Printer } from "lucide-react";
+import { MapPin, Plus } from "lucide-react";
 import { MachineView } from "~/components/machines/view";
+import { MachinesPrintMenu } from "~/components/machines/MachinesPrintMenu";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
 import { Button } from "~/components/ui/button";
@@ -38,7 +39,8 @@ export default async function MachinesPage({
     "machines.pinballmap.sync",
     accessLevel
   );
-  // Batch printing uses one card's export gate (apron-cards §12.1).
+  // Batch printing apron cards uses one card's export gate (apron-cards
+  // §12.1); settings sheets are open to everyone (settings-sheets §2.1).
   const canPrintApronCards = checkPermission(
     "machines.apron.export",
     accessLevel
@@ -93,23 +95,6 @@ export default async function MachinesPage({
       </Link>
     </Button>
   ) : null;
-  const printApronCardsButton = canPrintApronCards ? (
-    <Button asChild variant="outline" className="max-md:size-11 max-md:px-0">
-      <Link href="/m/apron-cards" aria-label="Print apron cards">
-        <Printer className="size-4 md:mr-2" aria-hidden="true" />
-        <span className="max-md:hidden">Print apron cards</span>
-      </Link>
-    </Button>
-  ) : null;
-  // Open to everyone (settings-sheets §2.1).
-  const printSettingsSheetsButton = (
-    <Button asChild variant="outline" className="max-md:size-11 max-md:px-0">
-      <Link href="/m/settings-sheets" aria-label="Print settings sheets">
-        <ClipboardList className="size-4 md:mr-2" aria-hidden="true" />
-        <span className="max-md:hidden">Print settings sheets</span>
-      </Link>
-    </Button>
-  );
   const addMachineButton = canCreateMachine ? (
     <Button
       asChild
@@ -130,8 +115,7 @@ export default async function MachinesPage({
   const pageActions = (
     <>
       {lineupButton}
-      {printApronCardsButton}
-      {printSettingsSheetsButton}
+      <MachinesPrintMenu canPrintApronCards={canPrintApronCards} />
       {addMachineButton}
     </>
   );

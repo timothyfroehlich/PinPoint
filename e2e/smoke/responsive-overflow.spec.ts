@@ -60,6 +60,8 @@ const authenticatedRoutes = [
   "/m/pinball-map",
   // Print apron cards (apron-cards spec §12).
   "/m/apron-cards",
+  // Print settings sheets (settings-sheets spec §2).
+  "/m/settings-sheets",
   `/m/${machineInitials}`,
   `/m/${machineInitials}/settings`,
   `/m/${machineInitials}/maintenance`,
