@@ -25,6 +25,8 @@ Always import and use the custom client creator from `~/lib/supabase/server`. On
 
 After creating an SSR client, call `await supabase.auth.getUser()` immediately; do not run other logic between client creation and that call (CORE-SSR-002).
 
+Pages and layouts get the signed-in user from `getViewer()` (`~/lib/auth/viewer`, see `pinpoint-ui` Data access), which makes that call once per render.
+
 `src/lib/supabase/admin.ts` legitimately builds the server-only, service-role
 admin client from `@supabase/supabase-js`; importing types or specific utilities
 from that package is also fine.

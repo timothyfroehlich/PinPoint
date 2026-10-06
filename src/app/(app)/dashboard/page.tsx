@@ -8,7 +8,7 @@ import {
   Wrench,
   Sparkles,
 } from "lucide-react";
-import { createClient } from "~/lib/supabase/server";
+import { getViewer } from "~/lib/auth/viewer";
 import { db } from "~/server/db";
 import { loadDashboardData } from "~/lib/dashboard/queries";
 import { formatDate } from "~/lib/dates";
@@ -38,14 +38,10 @@ const getDashboardData = cache(async (userId?: string) =>
  * - Recently reported issues (last 10)
  */
 export default async function DashboardPage(): Promise<React.JSX.Element> {
-  // Auth guard - check if user is authenticated (CORE-SSR-002)
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { userId } = await getViewer();
 
   // Fetch all dashboard data with caching (public allowed)
-  const data = await getDashboardData(user?.id);
+  const data = await getDashboardData(userId);
 
   const {
     assignedIssues,
@@ -115,9 +111,9 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                 </Link>
 
                 {/* Issues Assigned to Me */}
-                {user && (
+                {userId && (
                   <Link
-                    href={`/issues?assignee=${user.id}&status=new,confirmed,in_progress,need_parts,need_help,wait_owner`}
+                    href={`/issues?assignee=${userId}&status=new,confirmed,in_progress,need_parts,need_help,wait_owner`}
                   >
                     <Card className="border-outline-variant bg-card hover:border-primary/50 hover:glow-primary transition-[color,background-color,border-color,box-shadow] duration-150 cursor-pointer h-full">
                       <CardHeader>
@@ -231,7 +227,7 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
         </div>
 
         {/* Issues Assigned to Me Section */}
-        {user && (
+        {userId && (
           <div className="lg:col-span-3">
             <h2 className="text-xl font-semibold text-foreground mb-4">
               Issues Assigned to Me
