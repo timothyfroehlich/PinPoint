@@ -109,8 +109,8 @@ const HAND_ROLLED = new Set([
   "src/app/(app)/settings/pinballmap/actions.ts#unlinkPinballMapAccountAction",
   "src/app/(app)/u/[id]/actions.ts#updateProfileAction",
   "src/app/(auth)/actions.ts#logoutAction",
-  "src/server/actions/avatar.ts#uploadAvatarAction",
-  "src/server/actions/images.ts#uploadIssueImage",
+  "src/app/(app)/u/[id]/avatar-action.ts#uploadAvatarAction",
+  "src/lib/blob/image-actions.ts#uploadIssueImage",
 ]);
 
 const ROOT = process.cwd();

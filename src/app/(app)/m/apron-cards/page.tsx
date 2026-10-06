@@ -10,7 +10,7 @@ import { getViewer } from "~/lib/collections/viewer";
 import { buildMachineHubUrl } from "~/lib/machines/hub-url";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { getLoginUrl, resolveRequestUrl } from "~/lib/url";
-import { getPrintableApronCards } from "./_data";
+import { getPrintableApronCards, getQueuedApronCardIds } from "./_data";
 
 export const metadata: Metadata = { title: "Print apron cards" };
 
@@ -26,8 +26,9 @@ export default async function PrintApronCardsPage(): Promise<React.JSX.Element> 
     return <Forbidden role={viewer.role} backUrl="/m" />;
   }
 
-  const [cards, requestHeaders] = await Promise.all([
+  const [cards, queuedIds, requestHeaders] = await Promise.all([
     getPrintableApronCards(),
+    getQueuedApronCardIds(viewer.userId),
     headers(),
   ]);
   const siteUrl = resolveRequestUrl(requestHeaders);
@@ -39,6 +40,7 @@ export default async function PrintApronCardsPage(): Promise<React.JSX.Element> 
           ...card,
           scanUrl: buildMachineHubUrl(siteUrl, card.machineInitials),
         }))}
+        queuedIds={queuedIds}
       />
     </PageContainer>
   );
