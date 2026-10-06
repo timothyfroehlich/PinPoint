@@ -593,6 +593,152 @@ test.describe("Tag type changes", () => {
     });
   });
 
+  test.describe("merge a tag", () => {
+    const prefix = getTestPrefix();
+    const typeName = `Mrg ${prefix}`;
+    const source = `Old ${prefix}`;
+    const target = `New ${prefix}`;
+    let both: { id: string; initials: string } | null = null;
+    let onlySource: { id: string; initials: string } | null = null;
+
+    test.beforeAll(async () => {
+      const ownerId = await getProfileIdByEmail(TEST_USERS.admin.email);
+      both = await createTestMachine(ownerId);
+      onlySource = await createTestMachine(ownerId);
+      await createTestTagType(typeName, {
+        exclusive: false,
+        tags: [source, target],
+      });
+      await addTestMachineTags(both.id, [source, target]);
+      await addTestMachineTags(onlySource.id, [source]);
+    });
+
+    test.afterAll(async () => {
+      await deleteTestTagType(typeName).catch(() => undefined);
+      for (const m of [both, onlySource]) {
+        if (m) await deleteTestMachine(m.id).catch(() => undefined);
+      }
+    });
+
+    test("merges a tag into another; its machines and old links move to the target", async ({
+      page,
+    }) => {
+      if (!both || !onlySource) throw new Error("Test machines not created");
+      const typeSlug = testTagSlug(typeName);
+      const oldPath = `/c/tags/${typeSlug}/${testTagSlug(source)}`;
+      const newPath = `/c/tags/${typeSlug}/${testTagSlug(target)}`;
+
+      await page.goto(oldPath);
+      await expect(
+        page.getByRole("heading", { level: 1, name: source })
+      ).toBeVisible();
+      await page.getByRole("button", { name: "Tag actions" }).click();
+      await page
+        .getByRole("menuitem", { name: "Merge into another tag…" })
+        .click();
+      const dialog = page.getByRole("dialog", {
+        name: `Merge ${source} into another tag`,
+      });
+      await expect(dialog.getByText(`${typeName} · 2 machines`)).toBeVisible();
+      const merge = dialog.getByRole("button", { name: "Merge tags" });
+      await expect(merge).toBeDisabled();
+      await dialog
+        .getByLabel("Merge into")
+        .selectOption({ label: `${target} · 1 machine` });
+      await expect(
+        dialog.getByText(
+          `All 2 machines will be tagged ${target} (1 already is).`,
+          { exact: false }
+        )
+      ).toBeVisible();
+      await expect(dialog.getByRole("alert")).toHaveCount(0);
+      await merge.click();
+
+      // --- Lands on the target, which now holds both machines --------------
+      await expect(page).toHaveURL(new RegExp(`${newPath}$`));
+      await expect(
+        page.getByRole("heading", { level: 1, name: target })
+      ).toBeVisible();
+      await expect(page.getByTestId("collection-summary")).toContainText(
+        "2 machines"
+      );
+
+      // --- The merged tag's addresses open the target (11.19) --------------
+      await page.goto(oldPath);
+      await expect(page).toHaveURL(new RegExp(`${newPath}$`));
+      await page.goto(`${oldPath}/issues`);
+      await expect(page).toHaveURL(new RegExp(`${newPath}/issues$`));
+
+      // --- The machine that held only the source now holds the target -------
+      await page.goto(`/m/${onlySource.initials}`);
+      const tags = page.getByTestId("machine-tags");
+      await expect(
+        tags.getByRole("link", { name: target, exact: true })
+      ).toHaveAttribute("href", newPath);
+      await expect(
+        tags.getByRole("link", { name: source, exact: true })
+      ).toHaveCount(0);
+    });
+  });
+
+  test.describe("merge blocked", () => {
+    const prefix = getTestPrefix();
+    const looseType = `Lse ${prefix}`;
+    const exclusiveType = `Exc ${prefix}`;
+    const source = `Src ${prefix}`;
+    const into = `Tgt ${prefix}`;
+    const held = `Hld ${prefix}`;
+    let machine: { id: string; initials: string; name: string } | null = null;
+
+    test.beforeAll(async () => {
+      const ownerId = await getProfileIdByEmail(TEST_USERS.admin.email);
+      machine = await createTestMachine(ownerId);
+      await createTestTagType(looseType, { exclusive: false, tags: [source] });
+      await createTestTagType(exclusiveType, {
+        exclusive: true,
+        tags: [into, held],
+      });
+      await addTestMachineTags(machine.id, [source, held]);
+    });
+
+    test.afterAll(async () => {
+      for (const name of [looseType, exclusiveType]) {
+        await deleteTestTagType(name).catch(() => undefined);
+      }
+      if (machine) await deleteTestMachine(machine.id).catch(() => undefined);
+    });
+
+    test("refuses a merge that would leave a machine with two exclusive tags", async ({
+      page,
+    }) => {
+      if (!machine) throw new Error("Test machine was not created");
+      await page.goto(
+        `/c/tags/${testTagSlug(looseType)}/${testTagSlug(source)}`
+      );
+      await page.getByRole("button", { name: "Tag actions" }).click();
+      await page
+        .getByRole("menuitem", { name: "Merge into another tag…" })
+        .click();
+      const dialog = page.getByRole("dialog", {
+        name: `Merge ${source} into another tag`,
+      });
+      await dialog
+        .getByLabel("Merge into")
+        .selectOption({ label: `${into} · 0 machines` });
+      await expect(dialog.getByRole("alert")).toHaveText(
+        `1 machine would hold two ${exclusiveType} tags`
+      );
+      await expect(
+        dialog.getByRole("link", { name: machine.name })
+      ).toHaveAttribute("href", `/m/${machine.initials}`);
+      await expect(dialog.getByText(held, { exact: true })).toBeVisible();
+      await expect(
+        dialog.getByRole("button", { name: "Merge tags" })
+      ).toBeDisabled();
+      await assertNoA11yViolations(page);
+    });
+  });
+
   test.describe("move blocked", () => {
     const prefix = getTestPrefix();
     const sourceType = `Src ${prefix}`;
