@@ -736,6 +736,13 @@
       "when": 1791087419613,
       "tag": "0104_assigned-event-assignee-ids",
       "breakpoints": true
+    },
+    {
+      "idx": 105,
+      "version": "7",
+      "when": 1791256237164,
+      "tag": "0105_single-line-issue-titles",
+      "breakpoints": true
     }
   ]
 }
