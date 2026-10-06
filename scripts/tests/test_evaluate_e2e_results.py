@@ -1,8 +1,8 @@
 """Unit tests for scripts/workflow/evaluate-e2e-results.sh.
 
 This script is the ONLY thing that can turn a red comprehensive E2E suite into a red
-job — its two Playwright steps carry `continue-on-error: true` so that non-gating
-Mobile Safari failures don't fail the job. Everything it gets wrong is silent.
+job — each comprehensive leg's Playwright step carries `continue-on-error: true` so
+that non-gating Mobile Safari failures don't fail the job. Everything it gets wrong is silent.
 
 Three ways it was silent before PP-jxhy, each pinned by tests below:
 
@@ -29,8 +29,6 @@ import json
 import re
 import subprocess
 from pathlib import Path
-
-import pytest
 
 SCRIPT_PATH = Path(__file__).parent.parent / "workflow" / "evaluate-e2e-results.sh"
 
@@ -399,20 +397,38 @@ def test_missing_arguments_fail(tmp_path: Path) -> None:
     assert "usage:" in proc.stderr
 
 
-@pytest.mark.parametrize("workflow_label", ["Smoke", "Full"])
-def test_workflow_invokes_script_with_matching_paths(workflow_label: str) -> None:
-    """The workflow must pass a per-run results path, not a shared results.json.
-
-    Both steps writing one file is what let a dead full run inherit the smoke run's
-    green report, so the distinct filenames are load-bearing rather than cosmetic.
-    """
+def _comprehensive_job() -> str:
     ci = _ci_yml()
-    suffix = workflow_label.lower()
-    assert f"PLAYWRIGHT_JSON_OUTPUT_NAME: playwright-report/results-{suffix}.json" in ci
-    assert (
-        f"bash scripts/workflow/evaluate-e2e-results.sh {workflow_label} "
-        f"playwright-report/results-{suffix}.json" in ci
+    return ci.split("\n  test-e2e-comprehensive:\n", 1)[1].split("\n  gitleaks:", 1)[0]
+
+
+def _step(job: str, name_prefix: str) -> str:
+    """One step's YAML, without comments, from its `- name:` line to the next step.
+
+    Comments are dropped because the comment block above the NEXT step sits
+    between the two `- name:` lines and talks about continue-on-error itself.
+    """
+    block = job.split(f"      - name: {name_prefix}", 1)[1]
+    block = block.split("\n      - name: ", 1)[0]
+    return "\n".join(
+        line for line in block.splitlines() if not line.lstrip().startswith("#")
     )
+
+
+def test_workflow_evaluates_the_report_its_run_wrote() -> None:
+    """The evaluate step must read the path the run step writes, after clearing it.
+
+    A report left by anything earlier, read as this run's verdict, is the false
+    green PP-jxhy found: the reporter writes once, at the end, so a run that
+    dies leaves the old file in place.
+    """
+    job = _comprehensive_job()
+    run_step = _step(job, "Run Comprehensive")
+    evaluate = _step(job, "Evaluate gating browser results")
+    path = "playwright-report/results.json"
+    assert f"PLAYWRIGHT_JSON_OUTPUT_NAME: {path}" in run_step
+    assert f"rm -f {path}" in run_step
+    assert f'evaluate-e2e-results.sh "$LABEL" {path}' in evaluate
 
 
 def _ci_yml() -> str:
@@ -421,17 +437,24 @@ def _ci_yml() -> str:
     ).read_text()
 
 
-def test_both_evaluate_steps_are_continue_on_error() -> None:
-    """A red Smoke must not abort the job before Full ever runs.
+def test_the_evaluate_step_is_the_gate() -> None:
+    """The run step must not fail the leg; the evaluate step must.
 
-    If the Smoke evaluate step's `exit 1` ended the job, one red smoke spec
-    would leave main's full-suite health unknown for that commit — a missing
-    verdict, which is the class this whole gate exists to remove.
+    The run step is continue-on-error because Mobile Safari is non-gating: a red
+    WebKit spec fails Playwright but must not fail the leg. That leaves the
+    evaluate step as the only thing that turns a red gating browser, a missing
+    report, or an empty run into a red leg, so it must NOT be continue-on-error.
     """
-    ci = _ci_yml()
-    for step_id in ("verdict-smoke", "verdict-full"):
-        block = ci.split(f"id: {step_id}", 1)[1][:200]
-        assert "continue-on-error: true" in block, step_id
+    job = _comprehensive_job()
+    assert "continue-on-error: true" in _step(job, "Run Comprehensive")
+    assert "continue-on-error" not in _step(job, "Evaluate gating browser results")
+    assert "continue-on-error" not in _step(job, "Select this shard's spec files")
+
+
+def test_one_red_leg_does_not_cancel_the_others() -> None:
+    """fail-fast would cancel the sibling legs and leave their verdicts unknown."""
+    job = _comprehensive_job()
+    assert "fail-fast: false" in job.split("steps:", 1)[0]
 
 
 def test_a_push_to_main_is_not_cancelled_by_the_next_push() -> None:
@@ -454,18 +477,11 @@ def test_a_push_to_main_is_not_cancelled_by_the_next_push() -> None:
     assert "cancel-in-progress: true" in block
 
 
-def test_a_dedicated_step_gates_on_both_verdicts() -> None:
-    """Something still has to fail the job once both suites have reported."""
-    ci = _ci_yml()
-    assert "steps.verdict-smoke.outcome == 'failure'" in ci
-    assert "steps.verdict-full.outcome == 'failure'" in ci
-
-
 def test_job_timeout_exceeds_the_sum_of_step_budgets() -> None:
-    """The backstop must clear both step budgets plus a COLD-cache setup.
+    """The backstop must clear the step budget plus a COLD-cache setup.
 
-    Both caches key on the lockfile hash, so every dependency bump that lands
-    on main misses them and pays install + browser download.
+    The node_modules cache keys on the lockfile hash, so every dependency bump
+    that lands on main misses it and pays a full install.
     """
     ci = _ci_yml()
     job = ci.split("test-e2e-comprehensive:", 1)[1].split("\n  gitleaks:", 1)[0]
