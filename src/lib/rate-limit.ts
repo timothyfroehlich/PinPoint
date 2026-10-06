@@ -20,7 +20,7 @@
  * @see PP-rw29
  */
 
-import { Ratelimit } from "@upstash/ratelimit";
+import { Ratelimit, type Duration } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { headers } from "next/headers";
 import { createHash } from "node:crypto";
@@ -112,196 +112,6 @@ function getRedis(): Redis | null {
 }
 
 /**
- * Login rate limiters
- * - IP-based: 10 attempts per 15 minutes (sliding window)
- * - Account-based: 5 attempts per 15 minutes (fixed window)
- */
-function createLoginIpLimiter(): Ratelimit | null {
-  const redis = getRedis();
-  if (!redis) return null;
-
-  return new Ratelimit({
-    redis,
-    limiter: Ratelimit.slidingWindow(10, "15 m"),
-    prefix: "ratelimit:login:ip",
-    analytics: true,
-  });
-}
-
-function createLoginAccountLimiter(): Ratelimit | null {
-  const redis = getRedis();
-  if (!redis) return null;
-
-  return new Ratelimit({
-    redis,
-    limiter: Ratelimit.fixedWindow(5, "15 m"),
-    prefix: "ratelimit:login:account",
-    analytics: true,
-  });
-}
-
-/**
- * Signup rate limiter
- * - IP-based: 3 signups per hour (sliding window)
- */
-function createSignupLimiter(): Ratelimit | null {
-  const redis = getRedis();
-  if (!redis) return null;
-
-  return new Ratelimit({
-    redis,
-    limiter: Ratelimit.slidingWindow(3, "1 h"),
-    prefix: "ratelimit:signup:ip",
-    analytics: true,
-  });
-}
-
-/**
- * Forgot password rate limiter
- * - Email-based: 3 requests per hour (fixed window)
- */
-function createForgotPasswordLimiter(): Ratelimit | null {
-  const redis = getRedis();
-  if (!redis) return null;
-
-  return new Ratelimit({
-    redis,
-    limiter: Ratelimit.fixedWindow(3, "1 h"),
-    prefix: "ratelimit:forgot-password:email",
-    analytics: true,
-  });
-}
-
-/**
- * Public Issue rate limiter
- * - IP-based: 5 submissions per 15 minutes (sliding window)
- */
-function createPublicIssueLimiter(): Ratelimit | null {
-  const redis = getRedis();
-  if (!redis) return null;
-
-  return new Ratelimit({
-    redis,
-    limiter: Ratelimit.slidingWindow(5, "15 m"),
-    prefix: "ratelimit:public-issue:ip",
-    analytics: true,
-  });
-}
-
-/**
- * Authenticated Issue rate limiter
- * - User-based: 20 submissions per 15 minutes (sliding window)
- */
-function createAuthenticatedIssueLimiter(): Ratelimit | null {
-  const redis = getRedis();
-  if (!redis) return null;
-
-  return new Ratelimit({
-    redis,
-    limiter: Ratelimit.slidingWindow(20, "15 m"),
-    prefix: "ratelimit:report:user",
-    analytics: true,
-  });
-}
-
-/**
- * Pinball Map account-link limiter (pinballmap spec 8.4)
- * - User-based: 5 sign-in attempts per 15 minutes (fixed window)
- *
- * Each attempt forwards a login and password to Pinball Map's auth_details,
- * which Pinball Map itself caps at 10 per minute for our whole API token,
- * shared with its signup and password-reset endpoints.
- * Without a per-member cap, PinPoint would be an unthrottled password-guessing
- * proxy against Pinball Map accounts, and one member could spend the shared
- * allowance for everyone. Same shape as the login account limiter.
- */
-function createPinballMapLinkLimiter(): Ratelimit | null {
-  const redis = getRedis();
-  if (!redis) return null;
-
-  return new Ratelimit({
-    redis,
-    limiter: Ratelimit.fixedWindow(5, "15 m"),
-    prefix: "ratelimit:pinballmap-link:user",
-    analytics: true,
-  });
-}
-
-/**
- * Image Upload rate limiter
- * - IP-based: 10 uploads per hour (sliding window)
- */
-function createImageUploadLimiter(): Ratelimit | null {
-  const redis = getRedis();
-  if (!redis) return null;
-
-  return new Ratelimit({
-    redis,
-    limiter: Ratelimit.slidingWindow(BLOB_CONFIG.RATE_LIMIT.PER_HOUR, "1 h"),
-    prefix: "ratelimit:image-upload:ip",
-    analytics: true,
-  });
-}
-
-function createMcpRequestLimiter(): Ratelimit | null {
-  const redis = getRedis();
-  if (!redis) return null;
-
-  return new Ratelimit({
-    redis,
-    limiter: Ratelimit.slidingWindow(120, "1 m"),
-    prefix: "ratelimit:mcp:request",
-    analytics: true,
-  });
-}
-
-function createMcpWriteLimiter(): Ratelimit | null {
-  const redis = getRedis();
-  if (!redis) return null;
-
-  return new Ratelimit({
-    redis,
-    limiter: Ratelimit.slidingWindow(20, "1 m"),
-    prefix: "ratelimit:mcp:write",
-    analytics: true,
-  });
-}
-
-/**
- * Anonymous quick search rate limiter
- * - 60 requests per minute (sliding window)
- * - Keyed by client IP
- */
-function createQuickSearchIpLimiter(): Ratelimit | null {
-  const redis = getRedis();
-  if (!redis) return null;
-
-  return new Ratelimit({
-    redis,
-    limiter: Ratelimit.slidingWindow(60, "1 m"),
-    prefix: "ratelimit:quick-search:ip",
-    analytics: true,
-  });
-}
-
-/**
- * Authenticated member quick search rate limiter
- * - 120 requests per minute (sliding window)
- * - Keyed by user ID (hashed)
- */
-function createQuickSearchUserLimiter(): Ratelimit | null {
-  const redis = getRedis();
-  if (!redis) return null;
-
-  return new Ratelimit({
-    redis,
-    limiter: Ratelimit.slidingWindow(120, "1 m"),
-    prefix: "ratelimit:quick-search:user",
-    analytics: true,
-  });
-}
-
-/**
  * Whether a limit bucket is keyed by client IP, account email, or user ID.
  * IP-keyed checks apply the "unknown IP" handling; email-keyed checks
  * normalize the key to lowercase and mask it in logs; user-keyed checks
@@ -309,25 +119,175 @@ function createQuickSearchUserLimiter(): Ratelimit | null {
  */
 type RateLimitKeyType = "ip" | "email" | "user";
 
+/** Declarative definition of one rate-limit bucket. */
+interface LimitDefinition {
+  /** Upstash algorithm: sliding window or fixed window. */
+  algorithm: "sliding" | "fixed";
+  /** Maximum requests allowed per window. */
+  limit: number;
+  /** Window length in Upstash `Duration` notation (e.g. "15 m"). */
+  window: Duration;
+  /**
+   * Redis key prefix. This names the live production bucket: changing it
+   * resets every counter under it. `rate-limit.test.ts` pins every value.
+   */
+  prefix: string;
+  /** Human-readable label used in the failure log message. */
+  label: string;
+  /** Whether the key is a client IP, account email, or user ID. */
+  keyType: RateLimitKeyType;
+}
+
 /**
- * Build a rate-limit checker for one limiter bucket.
+ * Every rate-limit bucket in one table. Each entry produces one exported
+ * `check*Limit` checker below; add a bucket here rather than writing a new
+ * limiter factory.
  *
- * The seven auth/report limiters differ only in three ways: the Ratelimit
- * configuration (owned by the passed `createLimiter`), whether the key is an
- * IP, account email, or user ID (`keyType`), and the log label. Everything else —
- * lazy limiter initialization, the Redis-unconfigured fallback, and the
+ * Pinball Map account link (pinballmap spec 8.4): each attempt forwards a
+ * login and password to Pinball Map's auth_details, which Pinball Map itself
+ * caps at 10 per minute for our whole API token, shared with its signup and
+ * password-reset endpoints. Without a per-member cap, PinPoint would be an
+ * unthrottled password-guessing proxy against Pinball Map accounts, and one
+ * member could spend the shared allowance for everyone. Same shape as the
+ * login account limiter.
+ */
+const LIMITS = {
+  // Login: IP 10 per 15 min (sliding), account 5 per 15 min (fixed)
+  loginIp: {
+    algorithm: "sliding",
+    limit: 10,
+    window: "15 m",
+    prefix: "ratelimit:login:ip",
+    label: "Login IP",
+    keyType: "ip",
+  },
+  loginAccount: {
+    algorithm: "fixed",
+    limit: 5,
+    window: "15 m",
+    prefix: "ratelimit:login:account",
+    label: "Login account",
+    keyType: "email",
+  },
+  signup: {
+    algorithm: "sliding",
+    limit: 3,
+    window: "1 h",
+    prefix: "ratelimit:signup:ip",
+    label: "Signup",
+    keyType: "ip",
+  },
+  forgotPassword: {
+    algorithm: "fixed",
+    limit: 3,
+    window: "1 h",
+    prefix: "ratelimit:forgot-password:email",
+    label: "Forgot password",
+    keyType: "email",
+  },
+  publicIssue: {
+    algorithm: "sliding",
+    limit: 5,
+    window: "15 m",
+    prefix: "ratelimit:public-issue:ip",
+    label: "Public issue",
+    keyType: "ip",
+  },
+  authenticatedIssue: {
+    algorithm: "sliding",
+    limit: 20,
+    window: "15 m",
+    prefix: "ratelimit:report:user",
+    label: "Authenticated issue",
+    keyType: "user",
+  },
+  pinballMapLink: {
+    algorithm: "fixed",
+    limit: 5,
+    window: "15 m",
+    prefix: "ratelimit:pinballmap-link:user",
+    label: "Pinball Map link",
+    keyType: "user",
+  },
+  imageUpload: {
+    algorithm: "sliding",
+    limit: BLOB_CONFIG.RATE_LIMIT.PER_HOUR,
+    window: "1 h",
+    prefix: "ratelimit:image-upload:ip",
+    label: "Image upload",
+    keyType: "ip",
+  },
+  mcpRequest: {
+    algorithm: "sliding",
+    limit: 120,
+    window: "1 m",
+    prefix: "ratelimit:mcp:request",
+    label: "MCP request",
+    keyType: "user",
+  },
+  mcpWrite: {
+    algorithm: "sliding",
+    limit: 20,
+    window: "1 m",
+    prefix: "ratelimit:mcp:write",
+    label: "MCP write",
+    keyType: "user",
+  },
+  // Quick search: anonymous 60/min keyed by IP, members 120/min keyed by user ID
+  quickSearchIp: {
+    algorithm: "sliding",
+    limit: 60,
+    window: "1 m",
+    prefix: "ratelimit:quick-search:ip",
+    label: "Quick search IP",
+    keyType: "ip",
+  },
+  quickSearchUser: {
+    algorithm: "sliding",
+    limit: 120,
+    window: "1 m",
+    prefix: "ratelimit:quick-search:user",
+    label: "Quick search user",
+    keyType: "user",
+  },
+} as const satisfies Record<string, LimitDefinition>;
+
+/**
+ * Build the Upstash limiter for one bucket definition.
+ * Returns null when Redis is not configured (graceful degradation).
+ */
+function createLimiter(definition: LimitDefinition): Ratelimit | null {
+  const redis = getRedis();
+  if (!redis) return null;
+
+  const { algorithm, limit, window, prefix } = definition;
+  return new Ratelimit({
+    redis,
+    limiter:
+      algorithm === "sliding"
+        ? Ratelimit.slidingWindow(limit, window)
+        : Ratelimit.fixedWindow(limit, window),
+    prefix,
+    analytics: true,
+  });
+}
+
+/**
+ * Build a rate-limit checker for one bucket of the LIMITS table.
+ *
+ * The buckets differ only in their definition (algorithm, limit, window,
+ * Redis prefix), whether the key is an IP, account email, or user ID
+ * (`keyType`), and the log label. Everything else — lazy limiter
+ * initialization, the Redis-unconfigured fallback, and the
  * fail-closed-in-production / fail-open-in-development semantics — is shared.
  *
- * @param createLimiter - Factory for this bucket's limiter (returns null when Redis is unconfigured)
- * @param options.label - Human-readable label used in the failure log message
- * @param options.keyType - Whether the key is a client IP, account email, or user ID
+ * @param definition - The bucket's entry in LIMITS
  * @returns An async checker `(key) => Promise<RateLimitResult>`
  */
 function makeLimitChecker(
-  createLimiter: () => Ratelimit | null,
-  options: { label: string; keyType: RateLimitKeyType }
+  definition: LimitDefinition
 ): (key: string) => Promise<RateLimitResult> {
-  const { label, keyType } = options;
+  const { label, keyType } = definition;
 
   // Each checker keeps its own lazily-created limiter. `undefined` means
   // "not yet attempted"; `null` means "attempted, Redis unconfigured".
@@ -353,7 +313,7 @@ function makeLimitChecker(
     }
 
     if (limiter === undefined) {
-      limiter = createLimiter();
+      limiter = createLimiter(definition);
     }
 
     if (!limiter) {
@@ -436,10 +396,7 @@ export async function getClientIp(customHeaders?: Headers): Promise<string> {
  * @returns Allow/deny result. Fails closed in production, and open in
  *   development, when rate limiting is unavailable.
  */
-export const checkLoginIpLimit = makeLimitChecker(createLoginIpLimiter, {
-  label: "Login IP",
-  keyType: "ip",
-});
+export const checkLoginIpLimit = makeLimitChecker(LIMITS.loginIp);
 
 /**
  * Check public issue rate limit (IP-based)
@@ -448,13 +405,7 @@ export const checkLoginIpLimit = makeLimitChecker(createLoginIpLimiter, {
  * @returns Allow/deny result. Fails closed in production, and open in
  *   development, when rate limiting is unavailable.
  */
-export const checkPublicIssueLimit = makeLimitChecker(
-  createPublicIssueLimiter,
-  {
-    label: "Public issue",
-    keyType: "ip",
-  }
-);
+export const checkPublicIssueLimit = makeLimitChecker(LIMITS.publicIssue);
 
 /**
  * Hashes an identifier to a pseudonymous string so raw user identifiers
@@ -471,8 +422,7 @@ function hashIdentifier(identifier: string): string {
  * @returns Rate limit result, or success if Redis not configured
  */
 export const checkAuthenticatedIssueLimit = makeLimitChecker(
-  createAuthenticatedIssueLimiter,
-  { label: "Authenticated issue", keyType: "user" }
+  LIMITS.authenticatedIssue
 );
 
 /**
@@ -482,10 +432,7 @@ export const checkAuthenticatedIssueLimit = makeLimitChecker(
  * @returns Allow/deny result. Fails closed in production, and open in
  *   development, when rate limiting is unavailable.
  */
-export const checkPinballMapLinkLimit = makeLimitChecker(
-  createPinballMapLinkLimiter,
-  { label: "Pinball Map link", keyType: "user" }
-);
+export const checkPinballMapLinkLimit = makeLimitChecker(LIMITS.pinballMapLink);
 
 /**
  * Check image upload rate limit (IP-based)
@@ -494,38 +441,17 @@ export const checkPinballMapLinkLimit = makeLimitChecker(
  * @returns Allow/deny result. Fails closed in production, and open in
  *   development, when rate limiting is unavailable.
  */
-export const checkImageUploadLimit = makeLimitChecker(
-  createImageUploadLimiter,
-  {
-    label: "Image upload",
-    keyType: "ip",
-  }
-);
+export const checkImageUploadLimit = makeLimitChecker(LIMITS.imageUpload);
 
 /** Check the aggregate authenticated MCP transport budget for a user+client. */
-export const checkMcpRequestLimit = makeLimitChecker(createMcpRequestLimiter, {
-  label: "MCP request",
-  keyType: "user",
-});
+export const checkMcpRequestLimit = makeLimitChecker(LIMITS.mcpRequest);
 
 /** Check the narrower mutation budget for a user+OAuth-client key. */
-export const checkMcpWriteLimit = makeLimitChecker(createMcpWriteLimiter, {
-  label: "MCP write",
-  keyType: "user",
-});
+export const checkMcpWriteLimit = makeLimitChecker(LIMITS.mcpWrite);
 
-const checkQuickSearchUserLimit = makeLimitChecker(
-  createQuickSearchUserLimiter,
-  {
-    label: "Quick search user",
-    keyType: "user",
-  }
-);
+const checkQuickSearchUserLimit = makeLimitChecker(LIMITS.quickSearchUser);
 
-const checkQuickSearchIpLimit = makeLimitChecker(createQuickSearchIpLimiter, {
-  label: "Quick search IP",
-  keyType: "ip",
-});
+const checkQuickSearchIpLimit = makeLimitChecker(LIMITS.quickSearchIp);
 
 /**
  * Check quick search rate limit:
@@ -553,10 +479,7 @@ export async function checkQuickSearchLimit(
  * @returns Allow/deny result. Fails closed in production, and open in
  *   development, when rate limiting is unavailable.
  */
-export const checkSignupLimit = makeLimitChecker(createSignupLimiter, {
-  label: "Signup",
-  keyType: "ip",
-});
+export const checkSignupLimit = makeLimitChecker(LIMITS.signup);
 
 /**
  * Check login rate limit (account-based)
@@ -565,10 +488,7 @@ export const checkSignupLimit = makeLimitChecker(createSignupLimiter, {
  * @returns Allow/deny result. Fails closed in production, and open in
  *   development, when rate limiting is unavailable.
  */
-export const checkLoginAccountLimit = makeLimitChecker(
-  createLoginAccountLimiter,
-  { label: "Login account", keyType: "email" }
-);
+export const checkLoginAccountLimit = makeLimitChecker(LIMITS.loginAccount);
 
 /**
  * Check forgot password rate limit (email-based)
@@ -577,10 +497,7 @@ export const checkLoginAccountLimit = makeLimitChecker(
  * @returns Allow/deny result. Fails closed in production, and open in
  *   development, when rate limiting is unavailable.
  */
-export const checkForgotPasswordLimit = makeLimitChecker(
-  createForgotPasswordLimiter,
-  { label: "Forgot password", keyType: "email" }
-);
+export const checkForgotPasswordLimit = makeLimitChecker(LIMITS.forgotPassword);
 
 /**
  * Format reset time for user-friendly message
