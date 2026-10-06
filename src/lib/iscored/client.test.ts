@@ -502,6 +502,27 @@ describe("iscored client", () => {
       expect(scores).toEqual([]);
     });
 
+    it("waits the full 15s TTL before retrying after a failed scores fetch", async () => {
+      vi.useFakeTimers();
+      const initialTime = 1000000;
+      vi.setSystemTime(initialTime);
+
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(new Response("Server Error", { status: 500 }));
+
+      await getAllScoresForMachine("77956");
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+      vi.setSystemTime(initialTime + 14_000);
+      await getAllScoresForMachine("77956");
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+      vi.setSystemTime(initialTime + 16_000);
+      await getAllScoresForMachine("77956");
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+    });
+
     it("handles network/timeout errors without throwing", async () => {
       vi.spyOn(globalThis, "fetch").mockRejectedValueOnce(
         new Error("Network connection failed")
@@ -620,6 +641,38 @@ describe("iscored client", () => {
 
       const games = await getGameroomGames();
       expect(games).toEqual([]);
+    });
+
+    it("retries a failed games fetch after 15s rather than the 1-hour TTL", async () => {
+      vi.useFakeTimers();
+      const initialTime = 1000000;
+      vi.setSystemTime(initialTime);
+
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValueOnce(new Response("Server Error", { status: 500 }))
+        .mockResolvedValue(
+          new Response(JSON.stringify(mockGameroomGames), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          })
+        );
+
+      expect(await getGameroomGames()).toEqual([]);
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+      // Within the retry interval the failure is still served from cache.
+      vi.setSystemTime(initialTime + 10_000);
+      await getGameroomGames();
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+      // Past 15s the next read serves the stale list and refreshes behind it.
+      vi.setSystemTime(initialTime + 16_000);
+      expect(await getGameroomGames()).toEqual([]);
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+      await vi.waitFor(async () => {
+        expect(await getGameroomGames()).toHaveLength(3);
+      });
     });
 
     it("preserves existing cached games when upstream response contains malformed records", async () => {
