@@ -17,6 +17,7 @@ import type {
   NotificationType,
   RecipientReason,
 } from "~/lib/notifications/events";
+import { buildDefaultPrefs } from "./default-preferences";
 import { getChannels } from "./channels/registry";
 import type {
   ChannelContext,
@@ -28,8 +29,6 @@ import type {
 export type { NotificationChannel };
 export { getChannels };
 export type { NotificationEvent, NotificationType, RecipientReason };
-
-type NotificationPreferences = typeof notificationPreferences.$inferSelect;
 
 /**
  * Narrow a channel to one that performs external delivery. Narrowing the whole
@@ -540,44 +539,4 @@ export async function createNotification(
 ): Promise<void> {
   const plan = await planNotification(props);
   await dispatchNotification(plan);
-}
-
-/**
- * Fallback prefs used within this module when a user has no row in
- * notification_preferences.
- */
-function buildDefaultPrefs(userId: string): NotificationPreferences {
-  return {
-    userId,
-    emailEnabled: true,
-    inAppEnabled: true,
-    suppressOwnActions: false,
-    emailNotifyOnAssigned: true,
-    inAppNotifyOnAssigned: true,
-    emailNotifyOnStatusChange: false,
-    inAppNotifyOnStatusChange: false,
-    emailNotifyOnNewComment: false,
-    inAppNotifyOnNewComment: false,
-    emailNotifyOnMentioned: true,
-    inAppNotifyOnMentioned: true,
-    emailNotifyOnNewIssue: true,
-    inAppNotifyOnNewIssue: false,
-    emailWatchNewIssuesGlobal: false,
-    inAppWatchNewIssuesGlobal: false,
-    discordEnabled: true,
-    discordNotifyOnAssigned: true,
-    discordNotifyOnStatusChange: false,
-    discordNotifyOnNewComment: false,
-    discordNotifyOnMentioned: true,
-    discordNotifyOnNewIssue: true,
-    discordWatchNewIssuesGlobal: false,
-    emailNotifyOnPinballMapComment: true,
-    inAppNotifyOnPinballMapComment: true,
-    discordNotifyOnPinballMapComment: true,
-    discordDmBlockedAt: null,
-    discordOnboardedAt: null,
-    discordNoticeVersion: 0,
-    discordNoticeLeaseId: null,
-    discordNoticeLeaseExpiresAt: null,
-  };
 }

@@ -5,10 +5,19 @@ import { useMemo } from "react";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { MultiSelect } from "~/components/ui/multi-select";
+import { RichTextEditor } from "~/components/editor/RichTextEditorDynamic";
+import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 
 interface Props {
   name: string;
   onNameChange: (name: string) => void;
+  /**
+   * The editor's starting content. The editor is uncontrolled after mount, so
+   * this is the saved description (or null), not the in-progress edit; the
+   * dialog remounts its content on every open, which restarts the editor here.
+   */
+  initialDescription: ProseMirrorDoc | null;
+  onDescriptionChange: (doc: ProseMirrorDoc) => void;
   selected: string[];
   onSelectedChange: (ids: string[]) => void;
   allMachines: { id: string; initials: string; name: string }[];
@@ -17,13 +26,15 @@ interface Props {
 }
 
 /**
- * The shared "name + machine set" form body used by both the create and edit
+ * The shared "name + description + machine set" form body used by both the create and edit
  * collection dialogs (the load-bearing duplicate — DRYed at two per Tim's
  * Rule-of-Three caveat). Fully controlled; the parent owns submit + errors.
  */
 export function CollectionFields({
   name,
   onNameChange,
+  initialDescription,
+  onDescriptionChange,
   selected,
   onSelectedChange,
   allMachines,
@@ -57,6 +68,19 @@ export function CollectionFields({
           required
           maxLength={120}
           enterKeyHint="done"
+        />
+      </div>
+
+      <div className="space-y-2">
+        {/* No htmlFor: the editor is a contenteditable widget with no
+            focusable id. Its accessible name comes from `ariaLabel`. */}
+        <Label>Description</Label>
+        <RichTextEditor
+          content={initialDescription}
+          onChange={onDescriptionChange}
+          mentionsEnabled={false}
+          placeholder="What is this collection for?"
+          ariaLabel="Description"
         />
       </div>
 

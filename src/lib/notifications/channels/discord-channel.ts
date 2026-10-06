@@ -3,6 +3,10 @@ import type { DiscordConfig } from "~/lib/discord/config";
 import { formatDiscordMessage } from "~/lib/discord/messages";
 import { getSiteUrl } from "~/lib/url";
 import { log } from "~/lib/logger";
+import {
+  DISCORD_PREFERENCE_COLUMNS,
+  shouldDeliverForChannel,
+} from "./should-deliver";
 import type {
   DeliveryChannel,
   NotificationPreferencesRow,
@@ -27,31 +31,12 @@ export function createDiscordChannel(config: DiscordConfig): DeliveryChannel {
       type: NotificationType,
       recipientReason?: RecipientReason
     ): boolean {
-      if (!prefs.discordEnabled) return false;
-      switch (type) {
-        case "issue_assigned":
-          return prefs.discordNotifyOnAssigned;
-        case "issue_status_changed":
-          return prefs.discordNotifyOnStatusChange;
-        case "new_comment":
-          return prefs.discordNotifyOnNewComment;
-        case "new_issue":
-          if (recipientReason === "global_watcher") {
-            return prefs.discordWatchNewIssuesGlobal;
-          }
-          if (recipientReason) return prefs.discordNotifyOnNewIssue;
-          return (
-            prefs.discordNotifyOnNewIssue || prefs.discordWatchNewIssuesGlobal
-          );
-        case "machine_ownership_changed":
-          // Parity with email: critical event — preference cannot opt out
-          // (only the main discordEnabled switch can).
-          return true;
-        case "mentioned":
-          return prefs.discordNotifyOnMentioned;
-        case "pinballmap_comment":
-          return prefs.discordNotifyOnPinballMapComment;
-      }
+      return shouldDeliverForChannel(
+        DISCORD_PREFERENCE_COLUMNS,
+        prefs,
+        type,
+        recipientReason
+      );
     },
     async deliver(ctx: ChannelContext): Promise<DeliveryResult> {
       if (!ctx.discordUserId) return { ok: false, reason: "skipped" };

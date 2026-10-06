@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
+import type { NextResponse } from "next/server";
 import { refreshCatalog } from "~/lib/pinballmap/catalog";
-import { assertCronAuthorized } from "~/lib/cron/auth";
+import { runCron } from "~/lib/cron/run-cron";
 import { log } from "~/lib/logger";
 
 /**
@@ -16,18 +16,12 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 export async function GET(request: Request): Promise<NextResponse> {
-  const denied = assertCronAuthorized(request);
-  if (denied) return denied;
-
-  try {
+  return runCron(request, "pinballmap.refreshCatalog", async () => {
     const count = await refreshCatalog();
     log.info(
       { count, action: "pinballmap.refreshCatalog" },
       "Catalog refreshed"
     );
-    return NextResponse.json({ ok: true, count });
-  } catch (err) {
-    log.error({ err }, "PinballMap catalog refresh cron failed");
-    return NextResponse.json({ error: "Refresh failed" }, { status: 500 });
-  }
+    return { ok: true, count };
+  });
 }

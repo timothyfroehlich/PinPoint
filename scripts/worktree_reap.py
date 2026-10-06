@@ -44,7 +44,6 @@ a removal is never cut off halfway.
 """
 
 import argparse
-import fcntl
 import json
 import os
 import re
@@ -66,6 +65,7 @@ from worktree_setup import (  # noqa: E402
     derive_project_id,
     is_main_worktree,
     list_worktrees,
+    load_slots,
     read_config_project_id,
     read_stored_backend,
     run_docker,
@@ -532,15 +532,8 @@ def remove_project(pid: str, project: Project, daemon: Daemon, quiet: bool) -> b
 def gone_slots() -> dict[str, int] | None:
     """Manifest entries whose worktree directory (or its `.git`) is gone, or
     None when the manifest can't be read (unknown, not zero)."""
-    try:
-        with open(worktree_cleanup.MANIFEST_PATH) as f:
-            fcntl.flock(f.fileno(), fcntl.LOCK_SH)
-            slots = json.loads(f.read()).get("slots", {})
-    except FileNotFoundError:
-        return {}
-    except (OSError, ValueError, AttributeError):
-        return None
-    if not isinstance(slots, dict):
+    slots = load_slots(worktree_cleanup.MANIFEST_PATH)
+    if slots is None:
         return None
     return {
         path: slot
