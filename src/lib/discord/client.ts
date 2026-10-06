@@ -1,5 +1,5 @@
 import "server-only";
-import { DISCORD_API } from "~/lib/discord/api";
+import { DISCORD_API, DISCORD_TIMEOUT_MS } from "~/lib/discord/api";
 import {
   safeFetch as externalFetch,
   withRetryAfter,
@@ -242,6 +242,7 @@ async function readDiscordErrorCode(res: Response): Promise<number | null> {
 
 function safeFetch(url: string, init: RequestInit): Promise<Response> {
   return externalFetch(url, init, {
+    timeoutMs: DISCORD_TIMEOUT_MS,
     networkErrorLog: {
       fields: { url, action: "sendDm.fetch" },
       message: "Discord fetch failed",

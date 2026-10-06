@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { checkDiscordChannel, fetchDiscordChannelName } from "./channel-check";
 import { DISCORD_MESSAGE_FLAGS, postChannelMessage, sendDm } from "./client";
 
 const ORIGINAL_FETCH = globalThis.fetch;
@@ -343,5 +344,91 @@ describe("postChannelMessage", () => {
         content: "hi",
       })
     ).toEqual({ ok: false, reason: "not_configured" });
+  });
+});
+
+describe("request timeouts", () => {
+  /**
+   * A fetch that never answers: it settles only when its signal aborts, the
+   * way a real fetch rejects on abort. Without a deadline the call hangs and
+   * the test times out.
+   */
+  function installHangingFetch(): void {
+    globalThis.fetch = vi.fn(
+      (_input: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          const signal = init?.signal;
+          if (!signal) return;
+          signal.addEventListener(
+            "abort",
+            () => {
+              reject(
+                signal.reason instanceof Error
+                  ? signal.reason
+                  : new Error("aborted")
+              );
+            },
+            { once: true }
+          );
+        })
+    );
+  }
+
+  /**
+   * Fake timers do not drive `AbortSignal.timeout`, so the spy records the
+   * budget each request asks for and hands back a deadline that fires in
+   * milliseconds.
+   */
+  function shrinkDeadlines(): number[] {
+    const budgets: number[] = [];
+    const realTimeout = AbortSignal.timeout.bind(AbortSignal);
+    vi.spyOn(AbortSignal, "timeout").mockImplementation((ms) => {
+      budgets.push(ms);
+      return realTimeout(5);
+    });
+    return budgets;
+  }
+
+  beforeEach(() => {
+    vi.useRealTimers();
+    installHangingFetch();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("sendDm aborts a hung DM-channel open after 15s and reports transient", async () => {
+    const budgets = shrinkDeadlines();
+    expect(
+      await sendDm({ botToken: "t", discordUserId: "u", content: "hi" })
+    ).toEqual({ ok: false, reason: "transient" });
+    expect(budgets).toEqual([15_000]);
+  });
+
+  it("postChannelMessage aborts a hung post after 15s and reports transient", async () => {
+    const budgets = shrinkDeadlines();
+    expect(
+      await postChannelMessage({
+        botToken: "t",
+        channelId: "chan-1",
+        content: "hi",
+      })
+    ).toEqual({ ok: false, reason: "transient" });
+    expect(budgets).toEqual([15_000]);
+  });
+
+  it("checkDiscordChannel aborts a hung read after 15s and reports couldnt_check", async () => {
+    const budgets = shrinkDeadlines();
+    expect(await checkDiscordChannel("t", "chan-1")).toEqual({
+      status: "couldnt_check",
+      statusDetail: "Discord was unreachable",
+    });
+    expect(budgets).toEqual([15_000]);
+  });
+
+  it("fetchDiscordChannelName aborts a hung read after 15s and returns no name", async () => {
+    const budgets = shrinkDeadlines();
+    expect(await fetchDiscordChannelName("t", "chan-1")).toBeUndefined();
+    expect(budgets).toEqual([15_000]);
   });
 });
