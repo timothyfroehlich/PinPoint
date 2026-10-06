@@ -523,6 +523,15 @@ describe("iscored client", () => {
       expect(fetchSpy).toHaveBeenCalledTimes(2);
     });
 
+    it("handles a body read that fails mid-response without throwing", async () => {
+      const res = new Response("ignored", { status: 200 });
+      vi.spyOn(res, "text").mockRejectedValueOnce(new Error("body aborted"));
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(res);
+
+      const scores = await getAllScoresForMachine("77956");
+      expect(scores).toEqual([]);
+    });
+
     it("handles network/timeout errors without throwing", async () => {
       vi.spyOn(globalThis, "fetch").mockRejectedValueOnce(
         new Error("Network connection failed")

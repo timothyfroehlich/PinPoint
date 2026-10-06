@@ -3,6 +3,7 @@ import "server-only";
 import { cache as reactCache } from "react";
 import { NETWORK_ERROR_STATUS, safeFetch } from "~/lib/http/external";
 import { log } from "~/lib/logger";
+import { reportError } from "~/lib/observability/report-error";
 import {
   ISCORED_BASE_URL,
   ISCORED_CACHE_TTL_MS,
@@ -61,7 +62,11 @@ function createSwrCache<T>(options: SwrCacheOptions<T>): SwrCache<T> {
     try {
       loaded = await load(key);
     } catch (err) {
-      log.warn({ err, key }, "iScored cache load threw");
+      reportError(err, {
+        action: "iscored.cacheLoad",
+        bestEffort: true,
+        user: key,
+      });
     }
     if (loaded === null) {
       lastFetchedAt = Date.now() - ttlMs + failureRetryMs;
@@ -117,6 +122,8 @@ function createSwrCache<T>(options: SwrCacheOptions<T>): SwrCache<T> {
 }
 
 interface IscoredJsonLogMessages {
+  /** `reportError` action for an unreadable response body. */
+  action: string;
   nonOk: string;
   notJson: string;
   networkFailure: string;
@@ -158,7 +165,7 @@ async function fetchIscoredJson(
   try {
     text = await res.text();
   } catch (err) {
-    log.warn({ err, user }, messages.networkFailure);
+    reportError(err, { action: messages.action, bestEffort: true, user });
     return { ok: false };
   }
 
@@ -308,6 +315,7 @@ async function loadScores(
     `${ISCORED_BASE_URL}/api/${encodeURIComponent(user)}/getAllScores?max=10`,
     user,
     {
+      action: "iscored.fetchScores",
       nonOk: "iScored API returned non-OK status",
       notJson: "iScored API response was not valid JSON",
       networkFailure: "Failed to fetch iScored scores",
@@ -451,6 +459,7 @@ async function loadGames(user: string): Promise<IscoredGame[] | null> {
     `${ISCORED_BASE_URL}/api/${encodeURIComponent(user)}`,
     user,
     {
+      action: "iscored.fetchGameroomGames",
       nonOk: "iScored API returned non-OK status for gameroom games",
       notJson: "iScored gameroom games API response was not valid JSON",
       networkFailure: "Failed to fetch iScored gameroom games",
