@@ -11,32 +11,29 @@ on:
 
 permissions: read-all  # zizmor: ignore[excessive-permissions]
 
-# Cancel superseded PR runs; never cancel a push to main.
+# PR runs: a new push cancels the run in progress. Main runs: one at a time,
+# never cancelled mid-run.
 #
 # A PR push supersedes the one before it — same branch, same question, and the
 # older answer is worthless — so cancelling saves runners with nothing lost.
-# A push to main is the opposite: each one is a distinct commit whose result is
-# the thing we want, and `test-e2e-comprehensive` takes ~30 minutes to produce
-# it. Under a shared `${{ github.ref }}` group every merge cancelled the
-# previous merge's run, so on any evening with more than one merge per half
-# hour that job was cancelled far more often than it finished — leaving the
-# same silent non-verdict PP-jxhy set out to remove, reached by a different
-# route. (Observed on run 31755670441: Smoke evaluated clean, then the Full
-# step was cancelled 30 minutes in by two later merges, and both the Full
-# evaluate and the gating step skipped.)
 #
-# Appending the SHA on `push` gives every main commit its own group, so main
-# runs neither cancel nor queue behind each other. Pull-request runs keep the
-# ref-based group and the old behaviour exactly.
+# Main shares one group with `cancel-in-progress: false`. A running main run
+# always finishes, so the post-merge comprehensive verdict is never cut off
+# mid-suite (run 31755670441 lost its Full verdict that way under PP-tbhv's
+# original shared group with cancel-in-progress). GitHub keeps at most one
+# more run waiting: a newer push to main cancels the waiting run before it
+# starts and waits in its place. Commits in a merge burst therefore get no run
+# of their own; the newest commit's run covers them, and a red result there
+# may come from any change in the burst.
 #
-# Not job-level `concurrency` on that job: job-level groups govern queueing
-# between jobs, they do not exempt a job from the workflow-level cancel. Not
-# `cancel-in-progress: false` either — main runs would then serialize, so one
-# 30-minute comprehensive job delays the next main run by up to 30 minutes and
-# they pile up. (PP-tbhv.)
+# This replaces per-SHA groups (PP-tbhv), which never cancelled but let every
+# merge run at once — up to 10 concurrent main runs in a day, each holding
+# runners under the account's 20-job cap while PR jobs queued. Serializing is
+# affordable because the comprehensive job's legs run in parallel (PP-yva7.3),
+# so a main run takes ~15 minutes, not ~45. (PP-yva7.7.)
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'push' && github.sha || '' }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # Detect which files changed so non-website PRs skip the expensive jobs
