@@ -24,7 +24,7 @@ export default async function TagIssuesPage({
   if (!resolved) notFound();
   const canonical = canonicalTagPath(
     resolved,
-    type,
+    { type, slug },
     "/issues",
     rawSearchParams
   );
