@@ -8,27 +8,18 @@
  * (§11.6), template included (§5.5).
  */
 
-import { randomUUID } from "node:crypto";
 import { asc, eq } from "drizzle-orm";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  authUsers,
-  machineApronCards,
-  machines,
-  userProfiles,
-} from "~/server/db/schema";
+import { machineApronCards } from "~/server/db/schema";
 import { docToPlainText, plainTextToDoc } from "~/lib/tiptap/types";
 import { saveApronCardsAction } from "~/app/(app)/m/[initials]/(tabs)/apron/actions";
 import type { SavedApronCardInput } from "~/app/(app)/m/[initials]/(tabs)/apron/schemas";
+import { signInAs, signOut } from "~/test/helpers/mock-auth";
+import { seedMachine, seedUser } from "~/test/helpers/seed";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 
-vi.mock("~/server/db", async () => {
-  const { getTestDb } = await import("~/test/setup/pglite");
-  return { db: await getTestDb() };
-});
-
-vi.mock("~/lib/supabase/server", () => ({ createClient: vi.fn() }));
+vi.mock("~/lib/supabase/server", () => import("~/test/helpers/mock-auth"));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 describe("saveApronCardsAction (PP-o23o)", () => {
@@ -37,44 +28,11 @@ describe("saveApronCardsAction (PP-o23o)", () => {
   async function makeUser(
     role: "guest" | "member" | "technician" | "admin"
   ): Promise<string> {
-    const db = await getTestDb();
-    const id = randomUUID();
-    await db.insert(authUsers).values({ id, email: `${id}@example.com` });
-    await db.insert(userProfiles).values({
-      id,
-      email: `${id}@example.com`,
-      firstName: "Test",
-      lastName: "User",
-      role,
-    });
-    return id;
+    return (await seedUser({ role })).id;
   }
 
-  let machineCounter = 0;
   async function makeMachine(ownerId: string | null): Promise<string> {
-    const db = await getTestDb();
-    machineCounter += 1;
-    const [machine] = await db
-      .insert(machines)
-      .values({
-        name: "Test Machine",
-        initials: `AP${String(machineCounter).padStart(3, "0")}`,
-        ownerId,
-      })
-      .returning({ id: machines.id });
-    if (!machine) throw new Error("machine insert failed");
-    return machine.id;
-  }
-
-  async function mockAuth(userId: string | null): Promise<void> {
-    const { createClient } = await import("~/lib/supabase/server");
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: userId ? { id: userId } : null },
-        }),
-      },
-    } as unknown as Awaited<ReturnType<typeof createClient>>);
+    return (await seedMachine({ ownerId })).id;
   }
 
   async function savedCards(machineId: string) {
@@ -121,7 +79,7 @@ describe("saveApronCardsAction (PP-o23o)", () => {
   it("lets the machine's owner save every card field", async () => {
     const owner = await makeUser("member");
     const machineId = await makeMachine(owner);
-    await mockAuth(owner);
+    signInAs(owner);
 
     const result = await save(machineId, [card("Card 1")]);
     expect(result.ok).toBe(true);
@@ -144,7 +102,7 @@ describe("saveApronCardsAction (PP-o23o)", () => {
   it("adds, updates, and deletes cards in one save, keeping their order", async () => {
     const owner = await makeUser("member");
     const machineId = await makeMachine(owner);
-    await mockAuth(owner);
+    signInAs(owner);
     const [first, second] = await seedCards(machineId, ["Card 1", "Card 2"]);
     if (!first || !second) throw new Error("seed failed");
 
@@ -186,7 +144,7 @@ describe("saveApronCardsAction (PP-o23o)", () => {
   it("swaps two cards' names in one save (§11.5)", async () => {
     const owner = await makeUser("member");
     const machineId = await makeMachine(owner);
-    await mockAuth(owner);
+    signInAs(owner);
     const [a, b] = await seedCards(machineId, ["League", "Casual"]);
     if (!a || !b) throw new Error("seed failed");
 
@@ -204,7 +162,7 @@ describe("saveApronCardsAction (PP-o23o)", () => {
   it("lets a new card take the name of one deleted in the same save", async () => {
     const owner = await makeUser("member");
     const machineId = await makeMachine(owner);
-    await mockAuth(owner);
+    signInAs(owner);
     const [old] = await seedCards(machineId, ["Card 1"]);
     if (!old) throw new Error("seed failed");
 
@@ -217,7 +175,7 @@ describe("saveApronCardsAction (PP-o23o)", () => {
   it("deletes a machine's only card (§11.5)", async () => {
     const owner = await makeUser("member");
     const machineId = await makeMachine(owner);
-    await mockAuth(owner);
+    signInAs(owner);
     const [only] = await seedCards(machineId, ["Card 1"]);
     if (!only) throw new Error("seed failed");
 
@@ -228,7 +186,7 @@ describe("saveApronCardsAction (PP-o23o)", () => {
   it("stores only the formatting the card prints (§3.7)", async () => {
     const owner = await makeUser("member");
     const machineId = await makeMachine(owner);
-    await mockAuth(owner);
+    signInAs(owner);
 
     await save(machineId, [
       card("Card 1", {
@@ -256,7 +214,7 @@ describe("saveApronCardsAction (PP-o23o)", () => {
   it("refuses to update a card deleted elsewhere since the page loaded", async () => {
     const owner = await makeUser("member");
     const machineId = await makeMachine(owner);
-    await mockAuth(owner);
+    signInAs(owner);
     const [gone] = await seedCards(machineId, ["Card 1"]);
     if (!gone) throw new Error("seed failed");
     await save(machineId, [], [gone.id]);
@@ -272,7 +230,7 @@ describe("saveApronCardsAction (PP-o23o)", () => {
   it("refuses a card name another editor added since the page loaded", async () => {
     const owner = await makeUser("member");
     const machineId = await makeMachine(owner);
-    await mockAuth(owner);
+    signInAs(owner);
     await seedCards(machineId, ["Tournament"]);
 
     const result = await save(machineId, [card("Tournament")]);
@@ -286,7 +244,7 @@ describe("saveApronCardsAction (PP-o23o)", () => {
       const owner = await makeUser("member");
       const editor = await makeUser(role);
       const machineId = await makeMachine(owner);
-      await mockAuth(editor);
+      signInAs(editor);
 
       expect((await save(machineId, [card("Card 1")])).ok).toBe(true);
     }
@@ -298,7 +256,7 @@ describe("saveApronCardsAction (PP-o23o)", () => {
       const owner = await makeUser("member");
       const other = await makeUser(role);
       const machineId = await makeMachine(owner);
-      await mockAuth(other);
+      signInAs(other);
 
       const result = await save(machineId, [card("Card 1")]);
       expect(result).toMatchObject({ ok: false, code: "UNAUTHORIZED" });
@@ -309,7 +267,7 @@ describe("saveApronCardsAction (PP-o23o)", () => {
 
   it("refuses a signed-out caller", async () => {
     const machineId = await makeMachine(null);
-    await mockAuth(null);
+    signOut();
 
     expect(await save(machineId, [card("Card 1")])).toMatchObject({
       ok: false,
@@ -320,7 +278,7 @@ describe("saveApronCardsAction (PP-o23o)", () => {
   it("rejects a card without a supported size (§4.3)", async () => {
     const owner = await makeUser("member");
     const machineId = await makeMachine(owner);
-    await mockAuth(owner);
+    signInAs(owner);
 
     const result = await save(machineId, [
       // @ts-expect-error -- an untrusted client can send any string
@@ -332,7 +290,7 @@ describe("saveApronCardsAction (PP-o23o)", () => {
   it("caps a machine's cards even across saves that each send few", async () => {
     const owner = await makeUser("member");
     const machineId = await makeMachine(owner);
-    await mockAuth(owner);
+    signInAs(owner);
     await seedCards(
       machineId,
       Array.from({ length: 20 }, (_, i) => `Card ${i + 1}`)
@@ -348,7 +306,7 @@ describe("saveApronCardsAction (PP-o23o)", () => {
   it("rejects card text padded past the stored size limit", async () => {
     const owner = await makeUser("member");
     const machineId = await makeMachine(owner);
-    await mockAuth(owner);
+    signInAs(owner);
 
     const result = await save(machineId, [
       card("Card 1", {
@@ -364,7 +322,7 @@ describe("saveApronCardsAction (PP-o23o)", () => {
   it("rejects a card that is both updated and deleted", async () => {
     const owner = await makeUser("member");
     const machineId = await makeMachine(owner);
-    await mockAuth(owner);
+    signInAs(owner);
     const [only] = await seedCards(machineId, ["Card 1"]);
     if (!only) throw new Error("seed failed");
 
@@ -380,7 +338,7 @@ describe("saveApronCardsAction (PP-o23o)", () => {
   it("rejects two cards with the same name (§11.2)", async () => {
     const owner = await makeUser("member");
     const machineId = await makeMachine(owner);
-    await mockAuth(owner);
+    signInAs(owner);
 
     const result = await save(machineId, [card("Card 1"), card(" Card 1 ")]);
     expect(result).toMatchObject({ ok: false, code: "VALIDATION" });

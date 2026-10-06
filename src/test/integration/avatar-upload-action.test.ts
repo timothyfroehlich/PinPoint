@@ -13,28 +13,15 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
-import { createTestUser } from "~/test/helpers/factories";
+import { signInAs } from "~/test/helpers/mock-auth";
+import { seedUser } from "~/test/helpers/seed";
 import { userProfiles } from "~/server/db/schema";
 
 const ME = "00000000-0000-0000-0000-0000000000c1";
 const OLD_AVATAR_URL =
   "https://x.public.blob.vercel-storage.com/user-avatars/old.png";
 
-// Route the production `db` import to the PGlite worker instance.
-vi.mock("~/server/db", async () => {
-  const { getTestDb } = await import("~/test/setup/pglite");
-  return { db: await getTestDb() };
-});
-
-vi.mock("~/lib/supabase/server", () => ({
-  createClient: () =>
-    Promise.resolve({
-      auth: {
-        getUser: () =>
-          Promise.resolve({ data: { user: { id: ME } }, error: null }),
-      },
-    }),
-}));
+vi.mock("~/lib/supabase/server", () => import("~/test/helpers/mock-auth"));
 
 const deleteFromBlob = vi.fn((..._args: unknown[]) =>
   Promise.resolve(undefined)
@@ -63,10 +50,8 @@ describe("uploadAvatarAction", () => {
 
   beforeEach(async () => {
     deleteFromBlob.mockClear();
-    const db = await getTestDb();
-    await db
-      .insert(userProfiles)
-      .values(createTestUser({ id: ME, avatarUrl: OLD_AVATAR_URL }));
+    await seedUser({ id: ME, avatarUrl: OLD_AVATAR_URL }, { authUser: false });
+    signInAs(ME);
   });
 
   it("uploads a valid image, stores the url, and cleans up the old avatar", async () => {
