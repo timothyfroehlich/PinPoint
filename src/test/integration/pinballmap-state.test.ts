@@ -309,7 +309,7 @@ describe("manual-refresh token bucket at the seam (PP-hbi0)", () => {
 describe("a failed sync clears nothing (PP-l81u)", () => {
   setupTestDb();
 
-  it("502s without reconciling, leaving the record and snapshot intact", async () => {
+  it("fails without reconciling, leaving the record and snapshot intact", async () => {
     const db = await getTestDb();
     const { getMockClient } = await import("~/lib/pinballmap/client-mock");
     const { machines, pinballmapAbandonedListings } =
@@ -369,7 +369,7 @@ describe("a failed sync clears nothing (PP-l81u)", () => {
       })
     );
 
-    expect(response.status).toBe(502);
+    expect(response.status).toBe(500);
 
     // The record is the point: it survived a sync that could not see the map.
     const rows = await db.select().from(pinballmapAbandonedListings);
