@@ -33,7 +33,9 @@ describe("parseIssueNumber", () => {
     expect(parseIssueNumber("abc")).toBeNull();
   });
 
-  it("rejects numbers beyond the safe-integer range", () => {
+  it("rejects numbers beyond the 32-bit issue_number column", () => {
+    expect(parseIssueNumber("2147483647")).toBe(2147483647);
+    expect(parseIssueNumber("2147483648")).toBeNull();
     expect(parseIssueNumber("99999999999999999999")).toBeNull();
   });
 });
