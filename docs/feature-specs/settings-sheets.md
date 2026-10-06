@@ -24,7 +24,7 @@
 - **2.2** The page's machine list is a Machine View Surface (list-views §1, machine-views §2.4): the same search, Primary Filters, List Header, rows, and pagination as the Machines list, with an Add action on each row. Its Page Preset filters to machines On the Floor.
 - **2.3** Only machines On the Floor can be added. The list offers adding every machine its current filters show at once.
 - **2.4** The default sets sit with the machine list, so they are chosen before machines are added. Changing a default updates every print run row whose sets the person has not changed by hand.
-- **2.5** The print run lists each added machine with its From set and To set, both changeable to any of the machine's sets, what its block would print, and a way to remove it. A row whose default finds no set, or more than one (§6.3), is marked and stays off the sheet until a set is chosen.
+- **2.5** The print run lists each added machine with its From set and To set, both changeable to any of the machine's sets, what its block would print, and a way to remove it. A row whose default finds more than one set (§6.3) is marked and stays off the sheet until a set is chosen. A row whose default finds no set is marked and prints as §5 describes.
 - **2.6** Each Collection's page and each machine tag's page links to this page with its machines On the Floor already added.
 - **2.7** A Print run panel holds the direction, the coverage, the number of machines that will print, Preview, and Print. Set up and differences only are preselected. On a phone the panel's totals stay in view, as on Print apron cards.
 - **2.8** Preview shows the sheet as it will print without opening the print dialog. Print opens the sheet on its own page without app navigation and opens the browser's print dialog; that page offers Print again and a way back to the print run.
@@ -51,9 +51,9 @@
 
 ## 5. Machines a sheet cannot fully cover
 
-- **5.1** A machine with a To set and no From set gets a block marked **no From set — manual restore required**. Set up still lists the To set's rows; restore lists nothing it cannot back up.
-- **5.2** A machine with no To set takes no block; the sheet lists it in a single line of machines with no To set.
-- **5.3** A sheet never prints a blank where a value is unknown; it names why the value is missing.
+- **5.1** A machine with a To set and no From set gets a block marked **no From set — record original values**. Each of the To set's rows has a blank to write the machine's value before changing it. The block ends with four blank rows, each with a location, setting, original value, and new value, for any other setting the person changes. Restore prints the same rows and blanks.
+- **5.2** A machine with no To set gets a block marked **no To set** that holds only the four blank rows.
+- **5.3** Apart from the spaces for writing in §5.1 and §5.2, a sheet never leaves a value empty where it is unknown; it names why the value is missing.
 
 ## 6. Printing by settings tag
 
