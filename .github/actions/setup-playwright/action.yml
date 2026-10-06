@@ -8,6 +8,12 @@ inputs:
   browsers:
     description: Space-separated browsers to install on a cache miss (for example "chromium webkit").
     required: true
+  with-deps:
+    description: >-
+      "true" also installs the browsers' apt packages on a cache miss. Pass
+      "false" when the job installs system dependencies itself.
+    required: false
+    default: "true"
   save-cache:
     description: >-
       "true" saves the cache after the job. Only main's comprehensive E2E job
@@ -40,7 +46,7 @@ runs:
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
       with:
         path: ~/.cache/ms-playwright
-        key: ${{ runner.os }}-playwright-all-${{ steps.version.outputs.version }}
+        key: ${{ runner.os }}-${{ runner.arch }}-playwright-all-${{ steps.version.outputs.version }}
 
     - name: Restore Playwright browsers
       id: cache-restore
@@ -48,13 +54,16 @@ runs:
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache/restore@v6.1.0
       with:
         path: ~/.cache/ms-playwright
-        key: ${{ runner.os }}-playwright-all-${{ steps.version.outputs.version }}
+        key: ${{ runner.os }}-${{ runner.arch }}-playwright-all-${{ steps.version.outputs.version }}
 
     - name: Install Playwright browsers
       if: steps.cache-save.outputs.cache-hit != 'true' && steps.cache-restore.outputs.cache-hit != 'true'
       shell: bash
       env:
         BROWSERS: ${{ inputs.browsers }}
+        WITH_DEPS: ${{ inputs.with-deps }}
       run: |
+        flags=()
+        if [ "$WITH_DEPS" = "true" ]; then flags+=(--with-deps); fi
         # shellcheck disable=SC2086  # word-split the browser list on purpose
-        pnpm exec playwright install --with-deps $BROWSERS
+        pnpm exec playwright install "${flags[@]}" $BROWSERS

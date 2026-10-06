@@ -707,14 +707,16 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       # Always, even on a cache hit: the cache holds browser binaries, not the
-      # apt packages WebKit needs.
-      - name: Install Playwright system dependencies (WebKit)
-        run: pnpm exec playwright install-deps webkit
+      # apt packages WebKit needs. Installed once here, so the setup action
+      # skips its own --with-deps on a miss.
+      - name: Install Playwright system dependencies
+        run: pnpm exec playwright install-deps chromium webkit
 
       - name: Setup Playwright browsers
         uses: $/.github/actions/setup-playwright
         with:
           browsers: chromium webkit
+          with-deps: "false"
           save-cache: "true"
 
       - name: Setup Supabase
