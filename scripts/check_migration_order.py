@@ -43,7 +43,8 @@ TAG_PATTERN = re.compile(r"^(\d{4})_[A-Za-z0-9_-]+$")
 # placeholder timestamp (2025-02-08) after 0011 (2026-02-06). Prod's policies
 # show its fix in effect (no RLS policy reads user_metadata, checked 2026-10-06),
 # so the entry is grandfathered rather than rewritten.
-GRANDFATHERED_WHEN = frozenset({"0012_fix_rls_user_metadata"})
+# Pinned to the exact (tag, when), so a later edit to that entry is still caught.
+GRANDFATHERED_WHEN = frozenset({("0012_fix_rls_user_metadata", 1738972800000)})
 
 
 def find_repo_root(start: Path) -> Path:
@@ -92,7 +93,7 @@ def check_tree(drizzle_dir: Path) -> list[str]:
 
         if not isinstance(when, int):
             errors.append(f"{tag}: when is not an integer timestamp")
-        elif when <= newest_when and tag not in GRANDFATHERED_WHEN:
+        elif when <= newest_when and (tag, when) not in GRANDFATHERED_WHEN:
             errors.append(
                 f"{tag}: when {when} is not later than {newest_tag} ({newest_when}); "
                 "production would skip it. Regenerate the migration "

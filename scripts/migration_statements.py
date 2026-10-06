@@ -38,9 +38,14 @@ def statements(sql: str) -> list[str]:
 
 
 def missing_from_reviewed(generated: str, reviewed: str) -> list[str]:
-    """Generated statements that the reviewed SQL does not contain."""
-    reviewed_set = set(statements(reviewed))
-    return [s for s in statements(generated) if s not in reviewed_set]
+    """Generated statements that the reviewed SQL does not contain.
+
+    Matched as text within the reviewed SQL rather than chunk for chunk, so a
+    hand-written statement appended to a generated one without a breakpoint
+    still counts the generated one as present.
+    """
+    reviewed_text = " ".join(statements(reviewed))
+    return [s for s in statements(generated) if s not in reviewed_text]
 
 
 def hand_written(generated: str, reviewed: str) -> list[str]:

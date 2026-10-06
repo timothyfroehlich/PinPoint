@@ -74,12 +74,20 @@ def test_equal_when_fails(tmp_path: Path):
 
 def test_grandfathered_entry_is_allowed_but_does_not_lower_the_bar(tmp_path: Path):
     """0012 may be older than 0011; 0013 must still be newer than 0011."""
-    migrations = [(f"{i:04d}_m{i}", 1000 + i) for i in range(12)]
-    migrations.append(("0012_fix_rls_user_metadata", 1))
-    migrations.append(("0013_after", 1005))
+    later = 1738972800000 + 1000
+    migrations = [(f"{i:04d}_m{i}", later + i) for i in range(12)]
+    migrations.append(("0012_fix_rls_user_metadata", 1738972800000))
+    migrations.append(("0013_after", later + 5))
     errors = check_tree(write_tree(tmp_path, migrations))
     assert len(errors) == 1
     assert errors[0].startswith("0013_after")
+
+
+def test_grandfathered_entry_with_a_changed_when_fails(tmp_path: Path):
+    migrations = [(f"{i:04d}_m{i}", 1738972800000 + 1000 + i) for i in range(12)]
+    migrations.append(("0012_fix_rls_user_metadata", 1))
+    errors = check_tree(write_tree(tmp_path, migrations))
+    assert any(e.startswith("0012_fix_rls_user_metadata") for e in errors)
 
 
 def test_number_that_does_not_match_idx_fails(tmp_path: Path):

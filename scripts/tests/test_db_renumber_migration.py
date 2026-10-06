@@ -185,18 +185,26 @@ def test_renumbers_and_keeps_reviewed_sql_byte_for_byte(tmp_path: Path):
     assert git(repo, "rev-list", "--merges", "-n1", "HEAD").stdout.strip()
 
 
-def test_stops_on_extra_generated_statements_and_leaves_merge_abortable(
+def test_stops_on_extra_generated_statements_and_restores_the_conflicted_merge(
     tmp_path: Path,
 ):
     repo = mid_merge_repo(tmp_path)
+    scratch = repo / "drizzle" / "scratch-notes.sql"
+    scratch.write_text("-- mine, untracked\n")
     drift = GENERATED + '--> statement-breakpoint\nALTER TABLE "b" DROP COLUMN "x";'
     result = run_script(repo, tmp_path, drift)
 
     assert result.returncode == 1
     assert 'ALTER TABLE "b" DROP COLUMN "x";' in result.stderr
     assert "git merge --abort" in result.stderr
+    # The drizzle/ conflicts are back, so a plain commit cannot drop the migration.
+    unmerged = git(repo, "diff", "--name-only", "--diff-filter=U").stdout
+    assert "drizzle/meta/_journal.json" in unmerged
+    assert git(repo, "commit", "-q", "--no-edit", check=False).returncode != 0
+    assert not (repo / "drizzle" / "0002_mine.sql").exists()
+    assert scratch.exists()
     assert git(repo, "merge", "--abort", check=False).returncode == 0
-    assert git(repo, "status", "--porcelain").stdout == ""
+    assert git(repo, "status", "--porcelain").stdout == "?? drizzle/scratch-notes.sql\n"
 
 
 def test_custom_fallback_when_drizzle_generates_nothing(tmp_path: Path):

@@ -67,17 +67,28 @@ old_number=${old_tag%%_*}
 name=${old_tag#*_}
 
 work_dir=$(mktemp -d)
+index_file=$(git rev-parse --git-path index)
 drizzle_touched=0
 renumbered=0
+new_tag=""
+before=""
 
-# On any failure after drizzle/ is touched, drop drizzle-kit's working-tree
-# edits and generated files so the index and tree agree again; otherwise
-# `git merge --abort` refuses ("not uptodate").
+# On any failure after drizzle/ is touched, put the merge back the way the
+# script found it: restore the saved index (its drizzle/ conflicts unresolved,
+# so `git commit` refuses rather than concluding the merge without this
+# branch's migration), rewrite the conflicted files from it, and delete only
+# the files drizzle-kit generated.
 cleanup() {
   if [[ $drizzle_touched -eq 1 && $renumbered -eq 0 ]]; then
-    git checkout -- drizzle/ 2>/dev/null || true
-    git clean -fq -- drizzle/ 2>/dev/null || true
-    printf '\ndrizzle/ now holds the base branch version with this branch'"'"'s migration removed.\n' >&2
+    cp "$work_dir/index" "$index_file"
+    git checkout -m -- drizzle/ 2>/dev/null || true
+    if [[ -n $new_tag && $new_tag != "$before" ]]; then
+      local path
+      for path in "drizzle/${new_tag}.sql" "drizzle/meta/${new_tag%%_*}_snapshot.json"; do
+        git ls-files --error-unmatch -- "$path" >/dev/null 2>&1 || rm -f -- "$path"
+      done
+    fi
+    printf '\nThe merge is back where the script found it, drizzle/ conflicts unresolved.\n' >&2
     printf 'Run git merge --abort to start over, or finish by hand (pinpoint-deployment skill, "Migration Conflicts").\n' >&2
   fi
   rm -rf "$work_dir"
@@ -88,6 +99,7 @@ mkdir -p "$work_dir/base"
 git archive "$base_side" drizzle | tar -x -C "$work_dir/base"
 
 # Take the base branch's drizzle/ and drop this branch's files from the index.
+cp "$index_file" "$work_dir/index"
 drizzle_touched=1
 git checkout "$base_side" -- drizzle/
 git rm -q -f --ignore-unmatch "drizzle/${old_tag}.sql"

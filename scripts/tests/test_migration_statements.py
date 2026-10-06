@@ -42,6 +42,15 @@ def test_generated_subset_of_reviewed_passes_and_reports_hand_written():
     ]
 
 
+def test_hand_written_statement_in_the_same_chunk_still_matches():
+    """A backfill appended to the last generated statement, without a breakpoint."""
+    reviewed = 'ALTER TABLE "tags" ADD COLUMN "slug" text;\nUPDATE "tags" SET "slug" = "name";\n'
+    assert (
+        missing_from_reviewed('ALTER TABLE "tags" ADD COLUMN "slug" text;', reviewed)
+        == []
+    )
+
+
 def test_base_branch_drift_is_reported():
     """A pending column drop on the base branch shows up in the regenerated SQL."""
     drifted = (

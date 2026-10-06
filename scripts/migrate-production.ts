@@ -132,7 +132,9 @@ async function acquireMigrationLock(): Promise<void> {
 
 async function releaseMigrationLock(): Promise<void> {
   try {
-    await sql`SELECT pg_advisory_unlock(hashtext(${MIGRATION_LOCK_KEY}))`;
+    // unlock_all, not a single unlock: advisory locks count per session, so a
+    // reused backend that already held this lock would otherwise keep one hold.
+    await sql`SELECT pg_advisory_unlock_all()`;
   } catch {
     // The connection is going away; closing it below is the fallback.
   }
