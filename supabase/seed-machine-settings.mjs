@@ -536,7 +536,13 @@ async function run() {
 
     const sets = buildSets(afm.id, ownerId, techId);
 
-    // Built-in House and Tournament tags (migration 0105 inserts them).
+    // Built-in House and Tournament tags. Migration 0105 inserts them, but the
+    // fast reset truncates tables without re-running migrations, so make sure.
+    await sql`
+      INSERT INTO settings_tags (slug, name, is_builtin)
+      VALUES ('house', 'House', true), ('tournament', 'Tournament', true)
+      ON CONFLICT (slug) DO NOTHING
+    `;
     const tagRows = await sql`
       SELECT id, slug FROM settings_tags WHERE slug IN ('house', 'tournament')
     `;
