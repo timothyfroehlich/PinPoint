@@ -4,8 +4,8 @@
  * Two matrix permissions gate them:
  * - `tags.manage` (technicians, admins): create, rename, and delete tag types
  *   and tags, change a tag type's exclusivity, move a tag between tag types,
- *   and set a tag's machines from its page (11.1–11.3, 11.7–11.9, 11.11,
- *   11.16).
+ *   merge one tag into another, and set a tag's machines from its page
+ *   (11.1–11.3, 11.7–11.9, 11.11, 11.16–11.17).
  * - `tags.apply` (machine owners on their machines, technicians, admins): put
  *   one tag on one machine or take it off, as a machine's page does (11.4).
  *
@@ -17,9 +17,10 @@
 
 "use server";
 
-import { and, eq, inArray, like, ne, or, type SQL } from "drizzle-orm";
+import { and, asc, eq, inArray, like, ne, or, type SQL } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
+import { createProtectedAction } from "~/lib/actions";
 import {
   getPostgresErrorConstraint,
   isPgErrorCode,
@@ -27,7 +28,7 @@ import {
 import { serverActionError } from "~/lib/observability/report-error";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import type { AccessLevel } from "~/lib/permissions/matrix";
-import { err, ok } from "~/lib/result";
+import { err, ok, type Result } from "~/lib/result";
 import { createClient } from "~/lib/supabase/server";
 import {
   slugifyTagName,
@@ -37,6 +38,7 @@ import {
 } from "~/lib/tags/names";
 import {
   exclusiveConflicts,
+  mergeConflicts,
   moveConflicts,
   typesWithTagName,
 } from "~/lib/tags/conflicts";
@@ -51,6 +53,7 @@ import {
   machines,
   machineTags,
   tags,
+  tagSlugAliases,
   tagTypes,
   userProfiles,
 } from "~/server/db/schema";
@@ -59,12 +62,14 @@ import {
   createTagTypeSchema,
   deleteTagSchema,
   deleteTagTypeSchema,
+  mergeTagSchema,
   moveTagSchema,
   renameTagSchema,
   renameTagTypeSchema,
   setMachineTagSchema,
   setTagMachinesSchema,
   setTagTypeExclusiveSchema,
+  type TagActionCode,
   type TagActionResult,
   type TagConflictResult,
 } from "./schemas";
@@ -143,10 +148,14 @@ function revalidateTags(machineInitials: Iterable<string> = []): void {
   }
 }
 
-/** Slugs already taken in `table` that `base` or `base-N` would collide with. */
+/**
+ * Slugs already taken in `table` that `base` or `base-N` would collide with.
+ * A new tag also avoids the slugs of merged tags, which lead to the tags they
+ * were merged into (spec 11.19).
+ */
 async function takenSlugs(
   tx: DbTransaction,
-  table: typeof tags | typeof tagTypes,
+  table: typeof tags | typeof tagTypes | typeof tagSlugAliases,
   base: string
 ): Promise<Set<string>> {
   const rows = await tx
@@ -347,7 +356,11 @@ export async function createTagAction(input: {
         type = row;
       }
       const base = slugifyTagName(name, TAG_SLUG_FALLBACK);
-      const slug = uniqueSlug(base, await takenSlugs(tx, tags, base));
+      const taken = new Set([
+        ...(await takenSlugs(tx, tags, base)),
+        ...(await takenSlugs(tx, tagSlugAliases, base)),
+      ]);
+      const slug = uniqueSlug(base, taken);
       const [row] = await tx
         .insert(tags)
         .values({
@@ -518,6 +531,132 @@ export async function moveTagAction(input: {
   if (!outcome.ok) return outcome;
   revalidateTags(outcome.value.initials);
   return ok({ href: outcome.value.href });
+}
+
+type Merged = Result<{ href: string; initials: string[] }, TagActionCode>;
+
+const mergeTagProtected = createProtectedAction({
+  actionName: "mergeTagAction",
+  schema: mergeTagSchema,
+  permission: "tags.manage",
+  forbiddenMessage: "Not allowed",
+  handler: async ({
+    tagId,
+    targetTagId,
+  }): Promise<TagActionResult<{ href: string }>> => {
+    let outcome: Merged;
+    try {
+      outcome = await db.transaction(async (tx): Promise<Merged> => {
+        // The source is deleted and the target must keep its type (see
+        // loadTag). Locked in id order, so opposite merges cannot deadlock.
+        const locked = await tx
+          .select({
+            id: tags.id,
+            slug: tags.slug,
+            name: tags.name,
+            tagTypeId: tags.tagTypeId,
+            typeExclusive: tags.typeExclusive,
+          })
+          .from(tags)
+          .where(inArray(tags.id, [tagId, targetTagId]))
+          .orderBy(asc(tags.id))
+          .for("update");
+        const source = locked.find((row) => row.id === tagId);
+        const target = locked.find((row) => row.id === targetTagId);
+        if (!source || !target) return err("NOT_FOUND", "Tag not found");
+
+        let typeSlug: string | null = null;
+        if (target.tagTypeId !== null) {
+          // Shared, so the type's exclusivity cannot change under the merge.
+          const [type] = await tx
+            .select({ slug: tagTypes.slug, name: tagTypes.name })
+            .from(tagTypes)
+            .where(eq(tagTypes.id, target.tagTypeId))
+            .for("share");
+          if (!type) return err("NOT_FOUND", "Tag type not found");
+          typeSlug = type.slug;
+          if (target.typeExclusive) {
+            const conflicts = mergeConflicts(await moveConflicts(tx, tagId), {
+              typeId: target.tagTypeId,
+              name: target.name,
+            });
+            if (conflicts.length > 0) {
+              return err(
+                "CONFLICT",
+                wouldHoldTwoMessage(type.name, conflicts.length)
+              );
+            }
+          }
+        }
+
+        const holders = await tx
+          .select({
+            machineId: machineTags.machineId,
+            addedAt: machineTags.addedAt,
+            addedBy: machineTags.addedBy,
+            initials: machines.initials,
+          })
+          .from(machineTags)
+          .innerJoin(machines, eq(machines.id, machineTags.machineId))
+          .where(eq(machineTags.tagId, tagId));
+
+        // Links that led to the source lead to the target now (11.19). The
+        // repoint runs first: deleting the source cascades to its aliases.
+        await tx
+          .update(tagSlugAliases)
+          .set({ tagId: targetTagId })
+          .where(eq(tagSlugAliases.tagId, tagId));
+        // Cascades: tags → machine_tags, which frees a machine's one tag of
+        // an exclusive type when the target shares the source's type.
+        await tx.delete(tags).where(eq(tags.id, tagId));
+        await tx
+          .insert(tagSlugAliases)
+          .values({ slug: source.slug, tagId: targetTagId });
+        if (holders.length > 0) {
+          // Machines already holding the target keep their row. Any other
+          // unique violation is a concurrent write and fails the merge.
+          await tx
+            .insert(machineTags)
+            .values(
+              holders.map((holder) => ({
+                machineId: holder.machineId,
+                tagId: targetTagId,
+                tagTypeId: target.tagTypeId,
+                typeExclusive: target.typeExclusive,
+                addedAt: holder.addedAt,
+                addedBy: holder.addedBy,
+              }))
+            )
+            .onConflictDoNothing({
+              target: [machineTags.machineId, machineTags.tagId],
+            });
+        }
+        return ok({
+          href: handTagHref(typeSlug, target.slug),
+          initials: holders.map((holder) => holder.initials),
+        });
+      });
+    } catch (error) {
+      return writeFailure(error, "mergeTagAction");
+    }
+    if (!outcome.ok) return outcome;
+    revalidateTags(outcome.value.initials);
+    return ok({ href: outcome.value.href });
+  },
+});
+
+/**
+ * Merge a hand-applied tag into another, in any tag type or none (spec
+ * 11.17): every machine holding it holds the target afterward, and it is
+ * deleted. Refused when a machine would hold two tags of the target's
+ * exclusive tag type (11.18). Its slug then leads to the target's page
+ * (11.19), as do the slugs of tags merged into it earlier.
+ */
+export async function mergeTagAction(input: {
+  tagId: string;
+  targetTagId: string;
+}): Promise<TagActionResult<{ href: string }>> {
+  return await mergeTagProtected(input);
 }
 
 // --- Machines on a tag -------------------------------------------------------

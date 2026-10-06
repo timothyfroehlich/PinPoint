@@ -60,6 +60,18 @@ export const moveTagSchema = z.object({
   tagTypeId: z.uuid().nullable(),
 });
 
+/** Merge a hand-applied tag into another hand-applied tag (spec 11.17). */
+export const mergeTagSchema = z
+  .object({
+    /** The tag merged away, which is deleted. */
+    tagId: z.uuid(),
+    /** The tag its machines and links go to. */
+    targetTagId: z.uuid(),
+  })
+  .refine((input) => input.tagId !== input.targetTagId, {
+    message: "Pick another tag",
+  });
+
 export type TagActionCode =
   | "UNAUTHORIZED"
   | "FORBIDDEN"

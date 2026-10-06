@@ -1353,6 +1353,29 @@ export const machineTags = pgTable(
 ).enableRLS();
 
 /**
+ * The slug of a hand-applied tag that was merged away, and the tag it was
+ * merged into (spec collections-and-tags 11.19): links to the old page open
+ * the target's. A tag page resolves by slug alone, so a new tag never takes a
+ * slug listed here. Deleting the target drops its aliases.
+ */
+export const tagSlugAliases = pgTable(
+  "tag_slug_aliases",
+  {
+    slug: text("slug").primaryKey(),
+    tagId: uuid("tag_id")
+      .notNull()
+      .references(() => tags.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    slugFormat: check("tag_slug_aliases_slug_format", TAG_SLUG_FORMAT(t.slug)),
+    tagIdx: index("idx_tag_slug_aliases_tag").on(t.tagId),
+  })
+).enableRLS();
+
+/**
  * Settings tags (spec machine-settings.md §3): system-wide, public labels on
  * settings sets, separate from machine tags. House and Tournament are built-in
  * (`is_builtin`, fixed slugs `house` / `tournament`) and always exist; every

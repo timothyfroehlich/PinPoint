@@ -26,7 +26,12 @@ export default async function TagOverviewPage({
   ]);
   const resolved = await getTagForLayout(type, slug);
   if (!resolved) notFound();
-  const canonical = canonicalTagPath(resolved, type, "", rawSearchParams);
+  const canonical = canonicalTagPath(
+    resolved,
+    { type, slug },
+    "",
+    rawSearchParams
+  );
   if (canonical !== null) redirect(canonical);
   const { tag } = resolved;
 
