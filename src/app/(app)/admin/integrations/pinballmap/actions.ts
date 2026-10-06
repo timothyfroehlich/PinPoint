@@ -20,7 +20,10 @@ import {
   checkDiscordChannel,
   fetchDiscordChannelName,
 } from "~/lib/discord/channel-check";
-import { getPinballMapState } from "~/lib/pinballmap/state";
+import {
+  PINBALLMAP_STATE_ID,
+  getPinballMapState,
+} from "~/lib/pinballmap/state";
 import { normalizeRegion } from "~/lib/pinballmap/config";
 import { bootstrapRegion } from "~/lib/pinballmap/region-alerts";
 import { eq } from "drizzle-orm";
@@ -268,7 +271,7 @@ export async function saveRegionAlertConfigAction(
     await db
       .insert(pinballmapState)
       .values({
-        id: "singleton",
+        id: PINBALLMAP_STATE_ID,
         regionAlertRegion: normalizedRegion,
         regionAlertChannelId: alertChannelId,
         regionAlertStatus: status,
@@ -381,7 +384,7 @@ export async function sendRegionAlertTestAction(
             updatedAt: new Date(),
             updatedBy: authorization.userId,
           })
-          .where(eq(pinballmapState.id, "singleton"));
+          .where(eq(pinballmapState.id, PINBALLMAP_STATE_ID));
       }
       revalidatePath(INTEGRATIONS_PATH);
       return {
@@ -413,7 +416,7 @@ export async function sendRegionAlertTestAction(
             updatedAt: new Date(),
             updatedBy: authorization.userId,
           })
-          .where(eq(pinballmapState.id, "singleton"));
+          .where(eq(pinballmapState.id, PINBALLMAP_STATE_ID));
       }
 
       revalidatePath(INTEGRATIONS_PATH);
@@ -438,7 +441,7 @@ export async function sendRegionAlertTestAction(
           updatedAt: new Date(),
           updatedBy: authorization.userId,
         })
-        .where(eq(pinballmapState.id, "singleton"));
+        .where(eq(pinballmapState.id, PINBALLMAP_STATE_ID));
     }
     revalidatePath(INTEGRATIONS_PATH);
 

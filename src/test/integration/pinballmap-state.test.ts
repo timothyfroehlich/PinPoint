@@ -1068,3 +1068,57 @@ describe("tracked-location concurrency guards", () => {
     expect((await getPinballMapState())?.locationId).toBe(26454);
   });
 });
+
+describe("withPinballMapMutationLease (PP-az4d.20)", () => {
+  setupTestDb();
+
+  // The five outbound lineup flows share this one claim/release block, so a
+  // lease left held after a thrown flow would block every configuration
+  // change and unleased refresh for the full lease window.
+  it("releases the lease when the body throws, and rethrows", async () => {
+    const db = await getTestDb();
+    const { withPinballMapMutationLease } =
+      await import("~/lib/pinballmap/mutation-lease");
+    const { getPinballMapState } = await import("~/lib/pinballmap/state");
+    await db
+      .insert(pinballmapState)
+      .values({ id: "singleton", locationId: 26454 });
+
+    let heldDuringBody: string | null = null;
+    await expect(
+      withPinballMapMutationLease(26454, 0, async (lease) => {
+        heldDuringBody = (await getPinballMapState())?.mutationLeaseId ?? null;
+        expect(heldDuringBody).toBe(lease.id);
+        throw new Error("PBM exploded");
+      })
+    ).rejects.toThrow("PBM exploded");
+
+    expect(heldDuringBody).not.toBeNull();
+    expect(await getPinballMapState()).toMatchObject({
+      mutationLeaseId: null,
+      mutationLeaseExpiresAt: null,
+    });
+  });
+
+  it("skips the body and returns SERVER while another writer holds the lease", async () => {
+    const db = await getTestDb();
+    const { withPinballMapMutationLease } =
+      await import("~/lib/pinballmap/mutation-lease");
+    const { getPinballMapState } = await import("~/lib/pinballmap/state");
+    const otherLease = "00000000-0000-4000-8000-000000000097";
+    await db.insert(pinballmapState).values({
+      id: "singleton",
+      locationId: 26454,
+      mutationLeaseId: otherLease,
+      mutationLeaseExpiresAt: sql`now() + interval '1 minute'`,
+    });
+    const body = vi.fn();
+
+    const result = await withPinballMapMutationLease(26454, 0, body);
+
+    expect(body).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ ok: false, code: "SERVER" });
+    // The other writer's lease is untouched.
+    expect((await getPinballMapState())?.mutationLeaseId).toBe(otherLease);
+  });
+});
