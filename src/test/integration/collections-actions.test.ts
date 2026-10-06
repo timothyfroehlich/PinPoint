@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { createTestMachine, createTestUser } from "~/test/helpers/factories";
-import { signInAs, signOut } from "~/test/helpers/mock-auth";
 import {
   collections,
   collectionMachines,
@@ -12,9 +11,28 @@ import {
 } from "~/server/db/schema";
 
 // --- boundary mocks -------------------------------------------------------
-// Vary the signed-in user per test with signInAs / signOut.
-vi.mock("~/lib/supabase/server", () => import("~/test/helpers/mock-auth"));
+// Vary the signed-in user per test by resolving mockGetUser.
+const mockGetUser = vi.fn();
+vi.mock("~/lib/supabase/server", () => ({
+  createClient: () => Promise.resolve({ auth: { getUser: mockGetUser } }),
+}));
+// Route the production `db` import at the worker-scoped PGlite instance.
+vi.mock("~/server/db", async () => {
+  const { getTestDb } = await import("~/test/setup/pglite");
+  return { db: await getTestDb() };
+});
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+
+function signIn(userId: string): void {
+  mockGetUser.mockResolvedValue({
+    data: { user: { id: userId } },
+    error: null,
+  });
+}
+
+function signOut(): void {
+  mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
+}
 
 async function membershipOf(collectionId: string): Promise<Set<string>> {
   const db = await getTestDb();
@@ -27,7 +45,7 @@ async function membershipOf(collectionId: string): Promise<Set<string>> {
 
 describe("collection actions", () => {
   setupTestDb();
-  beforeEach(() => signOut());
+  beforeEach(() => mockGetUser.mockReset());
 
   it("createCollectionAction: member creates; returns id; guest denied", async () => {
     const db = await getTestDb();
@@ -37,7 +55,7 @@ describe("collection actions", () => {
     const { createCollectionAction } =
       await import("~/app/(app)/c/collections/actions");
 
-    signInAs(member.id);
+    signIn(member.id);
     const created = await createCollectionAction({ name: "My Faves" });
     expect(created.success).toBe(true);
     if (!created.success) throw new Error("expected success");
@@ -48,7 +66,7 @@ describe("collection actions", () => {
     expect(row?.ownerId).toBe(member.id);
     expect(row?.name).toBe("My Faves");
 
-    signInAs(guest.id);
+    signIn(guest.id);
     const before = await db.select().from(collections);
     const denied = await createCollectionAction({ name: "Nope" });
     expect(denied.success).toBe(false);
@@ -63,7 +81,7 @@ describe("collection actions", () => {
     const { createCollectionAction } =
       await import("~/app/(app)/c/collections/actions");
 
-    signInAs(member.id);
+    signIn(member.id);
     const blank = await createCollectionAction({ name: "   " });
     expect(blank.success).toBe(false);
 
@@ -82,7 +100,7 @@ describe("collection actions", () => {
     const { createCollectionAction } =
       await import("~/app/(app)/c/collections/actions");
 
-    signInAs(member.id);
+    signIn(member.id);
     const created = await createCollectionAction({
       name: "Bank",
       machineIds: [a.id, b.id],
@@ -101,7 +119,7 @@ describe("collection actions", () => {
     const { createCollectionAction } =
       await import("~/app/(app)/c/collections/actions");
 
-    signInAs(member.id);
+    signIn(member.id);
     const before = await db.select().from(collections);
     const result = await createCollectionAction({
       name: "Bank",
@@ -139,7 +157,7 @@ describe("collection actions", () => {
 
     const { updateCollectionAction } =
       await import("~/app/(app)/c/collections/actions");
-    signInAs(owner.id);
+    signIn(owner.id);
     const result = await updateCollectionAction({
       collectionId: collection.id,
       name: "Renamed Set",
@@ -166,7 +184,7 @@ describe("collection actions", () => {
 
     const { updateCollectionAction } =
       await import("~/app/(app)/c/collections/actions");
-    signInAs(owner.id);
+    signIn(owner.id);
     const result = await updateCollectionAction({
       collectionId: collection.id,
       name: "New Name",
@@ -195,7 +213,7 @@ describe("collection actions", () => {
 
     const { updateCollectionAction } =
       await import("~/app/(app)/c/collections/actions");
-    signInAs(owner.id);
+    signIn(owner.id);
     const result = await updateCollectionAction({
       collectionId: collection.id,
       name: "   ",
@@ -225,7 +243,7 @@ describe("collection actions", () => {
     const { updateCollectionAction } =
       await import("~/app/(app)/c/collections/actions");
     // Admin is not the owner — manage is owner-only.
-    signInAs(intruder.id);
+    signIn(intruder.id);
     const result = await updateCollectionAction({
       collectionId: collection.id,
       name: "Hijacked",
@@ -243,7 +261,7 @@ describe("collection actions", () => {
 
     const { updateCollectionAction } =
       await import("~/app/(app)/c/collections/actions");
-    signInAs(owner.id);
+    signIn(owner.id);
     const result = await updateCollectionAction({
       collectionId: crypto.randomUUID(),
       name: "Whatever",
@@ -272,7 +290,7 @@ describe("collection actions", () => {
 
     const { setCollectionSharingAction } =
       await import("~/app/(app)/c/collections/actions");
-    signInAs(owner.id);
+    signIn(owner.id);
 
     // Off by default.
     expect(await tokenOf(collection.id)).toBeNull();
@@ -318,7 +336,7 @@ describe("collection actions", () => {
     const { setCollectionSharingAction } =
       await import("~/app/(app)/c/collections/actions");
     const { getCollectionByViewToken } = await import("~/lib/collections/user");
-    signInAs(owner.id);
+    signIn(owner.id);
 
     // Enable and confirm the minted token resolves the collection — the link is
     // live (this is exactly what the /c/<token> resolver does).
@@ -366,7 +384,7 @@ describe("collection actions", () => {
       await import("~/app/(app)/c/collections/actions");
 
     // Admin is not the owner — sharing is owner-only.
-    signInAs(intruder.id);
+    signIn(intruder.id);
     const denied = await setCollectionSharingAction({
       collectionId: collection.id,
       enabled: true,
@@ -394,7 +412,7 @@ describe("collection actions", () => {
 
     const { setCollectionSharingAction } =
       await import("~/app/(app)/c/collections/actions");
-    signInAs(owner.id);
+    signIn(owner.id);
 
     // A form/RPC caller can smuggle the string "false" past the compile-time
     // boolean type. Pre-fix, `!"false"` is falsy so the action took the ENABLE
@@ -414,7 +432,7 @@ describe("collection actions", () => {
     const owner = createTestUser({ role: "member" });
     const db = await getTestDb();
     await db.insert(userProfiles).values(owner);
-    signInAs(owner.id);
+    signIn(owner.id);
 
     const result = await setCollectionSharingAction({
       collectionId: "not-a-uuid",
@@ -437,7 +455,7 @@ describe("collection actions", () => {
       await import("~/app/(app)/c/collections/actions");
 
     // Non-owner delete denied — row still present.
-    signInAs(other.id);
+    signIn(other.id);
     const delDenied = await deleteCollectionAction({
       collectionId: collection.id,
     });
@@ -449,7 +467,7 @@ describe("collection actions", () => {
     ).toBeTruthy();
 
     // Owner delete succeeds.
-    signInAs(owner.id);
+    signIn(owner.id);
     const deleted = await deleteCollectionAction({
       collectionId: collection.id,
     });
@@ -488,7 +506,7 @@ describe("collection actions", () => {
       await import("~/app/(app)/c/collections/actions");
 
     // The granted editor can rename + change machines.
-    signInAs(editor.id);
+    signIn(editor.id);
     const ok = await updateCollectionAction({
       collectionId: collection.id,
       name: "Renamed",
@@ -499,7 +517,7 @@ describe("collection actions", () => {
     expect(await membershipOf(collection.id)).toEqual(new Set([b.id]));
 
     // A signed-in non-collaborator cannot.
-    signInAs(stranger.id);
+    signIn(stranger.id);
     const denied = await updateCollectionAction({
       collectionId: collection.id,
       name: "Nope",
@@ -522,7 +540,7 @@ describe("collection actions", () => {
     const { addCollectionCollaboratorAction } =
       await import("~/app/(app)/c/collections/actions");
 
-    signInAs(owner.id);
+    signIn(owner.id);
     expect(
       (
         await addCollectionCollaboratorAction({
@@ -547,7 +565,7 @@ describe("collection actions", () => {
     expect(rows).toHaveLength(1);
 
     // A non-owner cannot grant.
-    signInAs(target.id);
+    signIn(target.id);
     const denied = await addCollectionCollaboratorAction({
       collectionId: collection.id,
       userId: other.id,
@@ -569,7 +587,7 @@ describe("collection actions", () => {
       await import("~/app/(app)/c/collections/actions");
 
     // Guests can't create collections, so they can't be granted edit access.
-    signInAs(owner.id);
+    signIn(owner.id);
     const denied = await addCollectionCollaboratorAction({
       collectionId: collection.id,
       userId: guest.id,
@@ -602,7 +620,7 @@ describe("collection actions", () => {
       await import("~/app/(app)/c/collections/actions");
 
     // Editor can edit while granted.
-    signInAs(editor.id);
+    signIn(editor.id);
     expect(
       (
         await updateCollectionAction({
@@ -614,14 +632,14 @@ describe("collection actions", () => {
     ).toBe(true);
 
     // Owner revokes; a non-owner cannot revoke.
-    signInAs(editor.id);
+    signIn(editor.id);
     const revokeDenied = await removeCollectionCollaboratorAction({
       collectionId: collection.id,
       userId: editor.id,
     });
     expect(revokeDenied.success).toBe(false);
 
-    signInAs(owner.id);
+    signIn(owner.id);
     expect(
       (
         await removeCollectionCollaboratorAction({
@@ -632,7 +650,7 @@ describe("collection actions", () => {
     ).toBe(true);
 
     // The removed editor immediately loses edit access.
-    signInAs(editor.id);
+    signIn(editor.id);
     const denied = await updateCollectionAction({
       collectionId: collection.id,
       name: "Nope",
