@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 
 vi.mock("~/app/(app)/u/[id]/actions", () => ({ updateProfileAction: vi.fn() }));
-vi.mock("~/server/actions/avatar", () => ({
+vi.mock("~/app/(app)/u/[id]/avatar-action", () => ({
   uploadAvatarAction: vi.fn(),
 }));
 vi.mock("next/navigation", () => ({

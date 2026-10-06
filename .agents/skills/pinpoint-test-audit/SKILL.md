@@ -16,7 +16,7 @@ Two modes:
 
 Discovery is read-only; report evidence before editing. For broad scope, split into parallel lanes by area:
 
-- Server actions (`actions.ts` beside their routes under `src/app/`, plus `src/server/actions/`) and services (`src/services/`, `src/lib/<domain>/`);
+- Server actions (`actions.ts` / `*-action(s).ts` beside their routes under `src/app/`, plus cross-cutting ones like `src/lib/blob/image-actions.ts`) and services (`src/services/`, `src/lib/<domain>/`);
 - Route handlers and the request proxy (`src/app/api/`, `src/proxy.ts`, `src/lib/supabase/middleware.ts`);
 - Components and hooks (`src/components/`, `src/hooks/`);
 - E2E and smoke specs (`e2e/full/`, `e2e/smoke/`);

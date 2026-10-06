@@ -455,7 +455,7 @@ jobs:
     # server's first-compile cost again, and takes another slot under the
     # account's concurrent-job cap. (PP-yva7.2.)
     # ==============================================================================
-    name: E2E Smoke Tests (Chromium) (shard ${{ matrix.shard }}/2)
+    name: E2E Smoke Tests (Chromium) (shard ${{ matrix.shard }}/${{ strategy.job-total }})
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
     needs: changes
@@ -492,44 +492,22 @@ jobs:
         if: steps.cache-restore.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
 
-      - name: Resolve Playwright version
-        id: playwright-version
-        run: |
-          set -o pipefail
-          version=$(pnpm exec playwright --version | awk '{print $2}')
-          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
-            echo "::error::could not resolve the Playwright version (got '$version')"
-            exit 1
-          fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-
-      - name: Cache Playwright browsers
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
-        id: playwright-cache
+      - name: Setup Playwright browsers
+        uses: $/.github/actions/setup-playwright
         with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ steps.playwright-version.outputs.version }}
-          # A PR can only read its own caches and main's, and only main's
-          # comprehensive job saves from main. Its chromium+webkit cache covers
-          # chromium, so a PR's first run restores browsers from it.
-          restore-keys: |
-            ${{ runner.os }}-playwright-all-${{ steps.playwright-version.outputs.version }}
-
-      - name: Install Playwright browsers
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium
+          browsers: chromium
 
       - name: Setup Supabase
         uses: $/.github/actions/setup-supabase
 
       - name: Run Smoke Tests (Chromium)
         env:
-          SHARD: ${{ matrix.shard }}
+          SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
           MOCK_BLOB_STORAGE: "true"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
           UNSUBSCRIBE_SIGNING_SECRET: "ci-test-only-not-a-real-secret-0000000000000000000000000000000000"
-        run: pnpm exec playwright test e2e/smoke --project=chromium --shard="$SHARD/2"
+        run: pnpm exec playwright test e2e/smoke --project=chromium --shard="$SHARD"
 
       - name: Upload Playwright report
         if: failure()
@@ -545,7 +523,7 @@ jobs:
     #
     # Runs smoke tests with Mobile Chrome browser to catch mobile-specific issues.
     # ==============================================================================
-    name: E2E Smoke Tests (Mobile Chrome) (shard ${{ matrix.shard }}/2)
+    name: E2E Smoke Tests (Mobile Chrome) (shard ${{ matrix.shard }}/${{ strategy.job-total }})
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
     needs: changes
@@ -582,44 +560,22 @@ jobs:
         if: steps.cache-restore.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
 
-      - name: Resolve Playwright version
-        id: playwright-version
-        run: |
-          set -o pipefail
-          version=$(pnpm exec playwright --version | awk '{print $2}')
-          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
-            echo "::error::could not resolve the Playwright version (got '$version')"
-            exit 1
-          fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-
-      - name: Cache Playwright browsers
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
-        id: playwright-cache
+      - name: Setup Playwright browsers
+        uses: $/.github/actions/setup-playwright
         with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ steps.playwright-version.outputs.version }}
-          # A PR can only read its own caches and main's, and only main's
-          # comprehensive job saves from main. Its chromium+webkit cache covers
-          # chromium, so a PR's first run restores browsers from it.
-          restore-keys: |
-            ${{ runner.os }}-playwright-all-${{ steps.playwright-version.outputs.version }}
-
-      - name: Install Playwright browsers
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium
+          browsers: chromium
 
       - name: Setup Supabase
         uses: $/.github/actions/setup-supabase
 
       - name: Run Smoke Tests (Mobile Chrome)
         env:
-          SHARD: ${{ matrix.shard }}
+          SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
           MOCK_BLOB_STORAGE: "true"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
           UNSUBSCRIBE_SIGNING_SECRET: "ci-test-only-not-a-real-secret-0000000000000000000000000000000000"
-        run: pnpm exec playwright test e2e/smoke --project="Mobile Chrome" --shard="$SHARD/2"
+        run: pnpm exec playwright test e2e/smoke --project="Mobile Chrome" --shard="$SHARD"
 
       - name: Upload Playwright report
         if: failure()
@@ -635,7 +591,7 @@ jobs:
     #
     # Runs full test suite with chromium browser.
     # ==============================================================================
-    name: E2E Full Tests (Chromium) (shard ${{ matrix.shard }}/2)
+    name: E2E Full Tests (Chromium) (shard ${{ matrix.shard }}/${{ strategy.job-total }})
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
     needs: changes
@@ -672,44 +628,22 @@ jobs:
         if: steps.cache-restore.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
 
-      - name: Resolve Playwright version
-        id: playwright-version
-        run: |
-          set -o pipefail
-          version=$(pnpm exec playwright --version | awk '{print $2}')
-          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
-            echo "::error::could not resolve the Playwright version (got '$version')"
-            exit 1
-          fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-
-      - name: Cache Playwright browsers
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
-        id: playwright-cache
+      - name: Setup Playwright browsers
+        uses: $/.github/actions/setup-playwright
         with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ steps.playwright-version.outputs.version }}
-          # A PR can only read its own caches and main's, and only main's
-          # comprehensive job saves from main. Its chromium+webkit cache covers
-          # chromium, so a PR's first run restores browsers from it.
-          restore-keys: |
-            ${{ runner.os }}-playwright-all-${{ steps.playwright-version.outputs.version }}
-
-      - name: Install Playwright browsers
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium
+          browsers: chromium
 
       - name: Setup Supabase
         uses: $/.github/actions/setup-supabase
 
       - name: Run Full Tests (Chromium)
         env:
-          SHARD: ${{ matrix.shard }}
+          SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
           MOCK_BLOB_STORAGE: "true"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
           UNSUBSCRIBE_SIGNING_SECRET: "ci-test-only-not-a-real-secret-0000000000000000000000000000000000"
-        run: pnpm exec playwright test --config=playwright.config.full.ts --project=chromium --shard="$SHARD/2"
+        run: pnpm exec playwright test --config=playwright.config.full.ts --project=chromium --shard="$SHARD"
 
       - name: Upload Playwright report
         if: failure()
@@ -812,30 +746,16 @@ jobs:
         if: steps.cache-restore.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
 
-      - name: Resolve Playwright version
-        id: playwright-version
-        run: |
-          set -o pipefail
-          version=$(pnpm exec playwright --version | awk '{print $2}')
-          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
-            echo "::error::could not resolve the Playwright version (got '$version')"
-            exit 1
-          fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-
-      - name: Cache Playwright browsers
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
-        id: playwright-cache
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-all-${{ steps.playwright-version.outputs.version }}
-
+      # Always, even on a cache hit: the cache holds browser binaries, not the
+      # apt packages WebKit needs.
       - name: Install Playwright system dependencies (WebKit)
         run: pnpm exec playwright install-deps webkit
 
-      - name: Install Playwright browsers
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium webkit
+      - name: Setup Playwright browsers
+        uses: $/.github/actions/setup-playwright
+        with:
+          browsers: chromium webkit
+          save-cache: "true"
 
       - name: Setup Supabase
         uses: $/.github/actions/setup-supabase

@@ -9,6 +9,8 @@ export {
   // Types
   type PermissionValue,
   type AccessLevel,
+  type PermissionDefinition,
+  type PermissionId,
   // Constants
   ACCESS_LEVELS,
   ACCESS_LEVEL_LABELS,

@@ -44,7 +44,6 @@ test.describe("PinballMap abandoned-listing notice (PP-l81u)", () => {
 
   test("retitling a listed machine leaves a notice on Manage and a warning on Info", async ({
     page,
-    request,
   }) => {
     const prefix = getTestPrefix();
     const initials = getTestMachineInitials();
@@ -146,7 +145,7 @@ test.describe("PinballMap abandoned-listing notice (PP-l81u)", () => {
         page.getByTestId("machine-pinballmap-config-issue")
       ).toHaveAttribute("href", `/m/${initials}/edit`);
     } finally {
-      await cleanupTestEntities(request, { machineInitials: [initials] });
+      await cleanupTestEntities({ machineInitials: [initials] });
       await deletePinballMapCatalogEntries([oldTitleId, newTitleId]);
       // The stored lineup is shared across every spec in the run, so an entry
       // left in it would make some other machine's title look present.

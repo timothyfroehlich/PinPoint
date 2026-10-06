@@ -88,6 +88,7 @@ runs:
           echo "node=${node_version}"
           echo "pnpm=${pnpm_version}"
           echo "pnpm-store-path=$(pnpm store path --silent)"
+          echo "pnpm-store-restore-key=pnpm-store-${RUNNER_OS}-${RUNNER_ARCH}-node-${node_version}-pnpm-${pnpm_version}-"
           echo "pnpm-store-key=pnpm-store-${RUNNER_OS}-${RUNNER_ARCH}-node-${node_version}-pnpm-${pnpm_version}-${LOCK_HASH}"
           echo "node-modules-key=node-modules-${RUNNER_OS}-${RUNNER_ARCH}-node-${node_version}-pnpm-${pnpm_version}-${PACKAGE_HASH}-${LOCK_HASH}"
         } >> "$GITHUB_OUTPUT"
@@ -98,3 +99,8 @@ runs:
       with:
         path: ${{ steps.cache-identity.outputs.pnpm-store-path }}
         key: ${{ steps.cache-identity.outputs.pnpm-store-key }}
+        # A lockfile change misses the exact key in every job at once (the E2E
+        # jobs do not wait for `setup`). The previous lockfile's store still
+        # holds nearly every package, so install fetches only what changed.
+        restore-keys: |
+          ${{ steps.cache-identity.outputs.pnpm-store-restore-key }}
