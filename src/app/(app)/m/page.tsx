@@ -14,6 +14,7 @@ import { lineupToReviewCount } from "~/lib/pinballmap/lineup-comparison";
 import { loadLineupData } from "~/lib/pinballmap/lineup-data";
 import { toListSearchParams } from "~/lib/list-view/url-state";
 import { loadMachineViewSavedViews } from "~/lib/machines/view/saved-views";
+import { getQueuedApronCardIds } from "~/app/(app)/m/apron-cards/_data";
 
 interface MachinesPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -49,14 +50,19 @@ export default async function MachinesPage({
     viewSearchParams
   );
   if (redirectTo) redirect(redirectTo);
-  const [result, lineupData] = await Promise.all([
+  const [result, lineupData, queuedApronCardIds] = await Promise.all([
     loadMachineView({
       scope: { kind: "all" },
       preset: "machines",
       searchParams: viewSearchParams,
     }),
     canViewLineup ? loadLineupData() : Promise.resolve(null),
+    // The viewer's print queue count on Print apron cards (apron-cards §13.4).
+    canPrintApronCards && viewer.userId !== undefined
+      ? getQueuedApronCardIds(viewer.userId)
+      : Promise.resolve([]),
   ]);
+  const apronQueueCount = queuedApronCardIds.length;
   // The "to review" count comes from the same stored-data comparison the
   // lineup page renders, so the badge can never disagree with the page it links
   // to (§4.1). It is zero until there is a lineup to compare (§2.4–§2.5).
@@ -94,10 +100,30 @@ export default async function MachinesPage({
     </Button>
   ) : null;
   const printApronCardsButton = canPrintApronCards ? (
-    <Button asChild variant="outline" className="max-md:size-11 max-md:px-0">
-      <Link href="/m/apron-cards" aria-label="Print apron cards">
+    <Button
+      asChild
+      variant="outline"
+      className="relative max-md:size-11 max-md:px-0"
+    >
+      <Link
+        href="/m/apron-cards"
+        aria-label={
+          apronQueueCount > 0
+            ? `Print apron cards, ${apronQueueCount} in your print queue`
+            : "Print apron cards"
+        }
+      >
         <Printer className="size-4 md:mr-2" aria-hidden="true" />
         <span className="max-md:hidden">Print apron cards</span>
+        {apronQueueCount > 0 ? (
+          <span
+            aria-hidden="true"
+            className="inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-semibold tabular-nums text-on-primary max-md:absolute max-md:-top-1.5 max-md:-right-1.5 md:ml-2"
+            data-testid="apron-print-queue-count"
+          >
+            {apronQueueCount}
+          </span>
+        ) : null}
       </Link>
     </Button>
   ) : null;

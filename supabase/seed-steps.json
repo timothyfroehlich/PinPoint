@@ -1,0 +1,55 @@
+{
+  "description": "The ordered seed steps for a local database. Each script names a package.json script. db:reset and db:fast-reset both run this whole list through scripts/lib/seed-steps.mjs; the e2e global-setup fallback runs the entries marked minimal. scripts/check-seed-steps.mjs fails if package.json, the CI setup action, or global-setup drift from it. Add a new seed here, not in those places.",
+  "steps": [
+    {
+      "script": "db:_seed",
+      "minimal": true,
+      "note": "supabase/seed.sql: the base rows every other seed builds on."
+    },
+    {
+      "script": "db:_seed-users",
+      "minimal": true,
+      "note": "Creates the auth users and user_profiles. Idempotent over an auth.users that survives a fast-reset (PP-3vdr.6)."
+    },
+    {
+      "script": "db:_seed-collections",
+      "note": "machines is truncated CASCADE, which clears collections. Omitting this left collections empty after every fast-reset (PP-tn6t)."
+    },
+    {
+      "script": "db:_seed-tags",
+      "note": "machines CASCADE clears machine_tags, so the memberships need reseeding. The seed replaces its own types and tags."
+    },
+    {
+      "script": "db:_seed-machine-settings",
+      "note": "machines CASCADE clears machine_settings_sets. Omitting this left it empty after every fast-reset (PP-tn6t)."
+    },
+    {
+      "script": "db:_seed-discord",
+      "note": "Discord integration demo data."
+    },
+    {
+      "script": "db:_seed-timeline-backfill",
+      "note": "Idempotent NOT-EXISTS backfill of timeline events."
+    },
+    {
+      "script": "db:_seed-timeline-demo",
+      "note": "Timeline demo events."
+    },
+    {
+      "script": "db:_seed-pinballmap-catalog",
+      "note": "Not truncated by fast-reset, but an E2E-only database never runs db:reset, so without this step the mirror stays empty and the model picker searches nothing with no error (PP-o355.21). An idempotent upsert, so re-running only refreshes."
+    },
+    {
+      "script": "db:_seed-opdb",
+      "note": "Same never-seeded reason as the catalog: the OPDB copy is not truncated but E2E-only databases would otherwise get no rows (PP-wqit.12)."
+    },
+    {
+      "script": "db:_seed-pintips",
+      "note": "Placeholder tips, same never-seeded reason (PP-a0be)."
+    },
+    {
+      "script": "db:_seed-pinballmap-state",
+      "note": "Reached by the fast-reset TRUNCATE (the state seed writes machine link columns, and machines CASCADE clears them) as well as the never-seeded case (PP-tn6t)."
+    }
+  ]
+}
