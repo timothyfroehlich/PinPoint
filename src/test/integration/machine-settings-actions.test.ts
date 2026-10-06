@@ -739,7 +739,8 @@ describe("Machine settings Server Actions", () => {
     await mockAuth(stranger.id);
     expect(await rename("Hijacked")).toEqual({
       success: false,
-      error: "Forbidden",
+      error:
+        "Only technicians, the machine owner, and admins can edit a community set.",
     });
     expect(await deleteSettingsSetAction({ id: set.id })).toEqual({
       success: false,

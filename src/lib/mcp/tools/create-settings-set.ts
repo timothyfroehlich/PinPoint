@@ -5,10 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { isDeepStrictEqual } from "node:util";
 import { z } from "zod";
 
-import {
-  BUILTIN_SETTINGS_TAG_NAMES,
-  BUILTIN_SETTINGS_TAGS,
-} from "~/lib/machines/settings-types";
+import { BUILTIN_SETTINGS_TAG_NAMES } from "~/lib/machines/settings-types";
 import { db } from "~/server/db";
 import { machineSettingsSets } from "~/server/db/schema";
 import { createSettingsSet } from "~/services/machine-settings";
@@ -46,11 +43,11 @@ export const createSettingsSetSchema = z.object({
   sections: z
     .array(mcpSettingsSectionSchema)
     .describe("The set's sections, in display order."),
-  tags: z
-    .array(z.enum(BUILTIN_SETTINGS_TAGS))
+  tournament: z
+    .boolean()
     .optional()
     .describe(
-      'Built-in settings tags to start with: "house" (day-to-day setup) and/or "tournament". Default ["house"].'
+      "Also tag the set Tournament. Every new set is tagged House; remove House afterwards with update_settings_set if it is not a day-to-day setup."
     ),
 });
 
@@ -98,7 +95,7 @@ export async function runCreateSettingsSet(
       result: {
         created: false,
         reason:
-          "You already created an identical set on this machine. tags were not applied; change them with update_settings_set.",
+          "You already created an identical set on this machine. tournament was not applied; change tags with update_settings_set.",
         id: existing.id,
         kind: existing.isCommunity ? "community" : "personal",
         machine: machine.initials,
@@ -112,7 +109,8 @@ export async function runCreateSettingsSet(
     machineId: machine.id,
     actor: { userId: ctx.userId, access: ctx.accessLevel },
     payload,
-    ...(args.tags !== undefined ? { builtinTags: args.tags } : {}),
+    // Every new set is tagged House (spec §2.1); Tournament is added on request.
+    builtinTags: args.tournament ? ["house", "tournament"] : ["house"],
   });
   if (!created.ok) {
     throw new McpToolError(
@@ -144,7 +142,7 @@ export function registerCreateSettingsSet(server: McpServer): void {
     {
       title: "Create a settings set",
       description:
-        "Add a settings set to a machine: named, with software adjustment rows (menu code, name, value, plus the baseline install they change from), tables, DIP switch banks, and plain-text notes (e.g. rubbers and post positions). The set is your personal set — only you can edit it — tagged House unless tags says otherwise. To let technicians and the owner edit it, follow with update_settings_set makeCommunity. Exception: on a machine with no preferred House set, a House-tagged set becomes the preferred House set and so a community set. Call list_settings_sets first so you don't duplicate an existing set. Adds a timeline entry on the machine.",
+        "Add a settings set to a machine: named, with software adjustment rows (menu code, name, value, plus the baseline install they change from), tables, DIP switch banks, and plain-text notes (e.g. rubbers and post positions). The set is your personal set — only you can edit it — tagged House, plus Tournament when tournament is true. To let technicians and the owner edit it, follow with update_settings_set makeCommunity. Exception: on a machine with no preferred House set, the new set becomes the preferred House set and so a community set. Call list_settings_sets first so you don't duplicate an existing set. Adds a timeline entry on the machine.",
       inputSchema: createSettingsSetSchema,
       annotations: WRITE_TOOL_ANNOTATIONS,
     },

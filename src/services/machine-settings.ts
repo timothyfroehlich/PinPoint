@@ -128,6 +128,30 @@ export async function ensureBuiltinSettingsTags(
   return { house: house.id, tournament: tournament.id };
 }
 
+/** A rule refused the write inside its transaction; rolls the write back. */
+class IneligibleError extends Error {}
+
+/**
+ * Lock a set's row for the rest of the transaction and read its preferred
+ * flags. Tagging and preferring both take this lock, so "a preferred set keeps
+ * its tag" (spec §4.2) can't be broken by the two racing each other.
+ */
+async function lockPreferredFlags(
+  setId: string,
+  tx: DbTransaction
+): Promise<{ isPreferredHouse: boolean; isPreferredTournament: boolean }> {
+  const [row] = await tx
+    .select({
+      isPreferredHouse: machineSettingsSets.isPreferredHouse,
+      isPreferredTournament: machineSettingsSets.isPreferredTournament,
+    })
+    .from(machineSettingsSets)
+    .where(eq(machineSettingsSets.id, setId))
+    .for("update");
+  if (!row) throw new IneligibleError("Settings set not found");
+  return row;
+}
+
 /** Which built-in tags a set carries. */
 async function builtinSlotsOf(
   setId: string,
@@ -384,7 +408,9 @@ export async function updateSettingsSet({
   ) {
     return err(
       "denied",
-      set.isCommunity ? "Forbidden" : "Only its author can edit a personal set."
+      set.isCommunity
+        ? "Only technicians, the machine owner, and admins can edit a community set."
+        : "Only its author can edit a personal set."
     );
   }
   const communityChanged = makeCommunity === true && !set.isCommunity;
@@ -498,47 +524,56 @@ export async function setSettingsSetTag({
   if (!canManageMachineSettings(machine.ownerId, actor.userId, actor.access)) {
     return err("denied", "Forbidden");
   }
-  const isPreferredInSlot =
-    tag === "house" ? set.isPreferredHouse : set.isPreferredTournament;
-  if (!applied && isPreferredInSlot) {
-    return err(
-      "invalid",
-      `Unset the preferred ${BUILTIN_SETTINGS_TAG_NAMES[tag]} set before removing its tag.`
-    );
-  }
-
-  const changed = await db.transaction(async (tx) => {
-    const builtin = await ensureBuiltinSettingsTags(tx);
-    const tagId = builtin[tag];
-    const rows = applied
-      ? await tx
-          .insert(machineSettingsSetTags)
-          .values({ setId, tagId, addedBy: actor.userId })
-          .onConflictDoNothing()
-          .returning({ setId: machineSettingsSetTags.setId })
-      : await tx
-          .delete(machineSettingsSetTags)
-          .where(
-            and(
-              eq(machineSettingsSetTags.setId, setId),
-              eq(machineSettingsSetTags.tagId, tagId)
+  let changed: boolean;
+  try {
+    changed = await db.transaction(async (tx) => {
+      if (!applied) {
+        const flags = await lockPreferredFlags(setId, tx);
+        const isPreferredInSlot =
+          tag === "house"
+            ? flags.isPreferredHouse
+            : flags.isPreferredTournament;
+        if (isPreferredInSlot) {
+          throw new IneligibleError(
+            `Unset the preferred ${BUILTIN_SETTINGS_TAG_NAMES[tag]} set before removing its tag.`
+          );
+        }
+      }
+      const builtin = await ensureBuiltinSettingsTags(tx);
+      const tagId = builtin[tag];
+      const rows = applied
+        ? await tx
+            .insert(machineSettingsSetTags)
+            .values({ setId, tagId, addedBy: actor.userId })
+            .onConflictDoNothing()
+            .returning({ setId: machineSettingsSetTags.setId })
+        : await tx
+            .delete(machineSettingsSetTags)
+            .where(
+              and(
+                eq(machineSettingsSetTags.setId, setId),
+                eq(machineSettingsSetTags.tagId, tagId)
+              )
             )
-          )
-          .returning({ setId: machineSettingsSetTags.setId });
-    if (rows.length === 0) return false;
-    await emitSettingsSetEvent(
-      machine.id,
-      {
-        kind: "settings_set_tagged",
-        setName: set.name,
-        tagName: BUILTIN_SETTINGS_TAG_NAMES[tag],
-        added: applied,
-      },
-      actor.userId,
-      tx
-    );
-    return true;
-  });
+            .returning({ setId: machineSettingsSetTags.setId });
+      if (rows.length === 0) return false;
+      await emitSettingsSetEvent(
+        machine.id,
+        {
+          kind: "settings_set_tagged",
+          setName: set.name,
+          tagName: BUILTIN_SETTINGS_TAG_NAMES[tag],
+          added: applied,
+        },
+        actor.userId,
+        tx
+      );
+      return true;
+    });
+  } catch (error) {
+    if (error instanceof IneligibleError) return err("invalid", error.message);
+    throw error;
+  }
 
   return ok({
     id: set.id,
@@ -594,6 +629,7 @@ export async function setPreferredSettingsSet({
   try {
     await db.transaction(async (tx) => {
       if (preferred) {
+        await lockPreferredFlags(setId, tx);
         const builtin = await ensureBuiltinSettingsTags(tx);
         const slots = await builtinSlotsOf(setId, builtin, tx);
         if (!slots.has(slot)) {
@@ -663,8 +699,6 @@ export async function setPreferredSettingsSet({
     changed: true,
   });
 }
-
-class IneligibleError extends Error {}
 
 // ---------------------------------------------------------------------------
 // Delete / duplicate

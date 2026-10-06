@@ -6,7 +6,11 @@ import { z } from "zod";
 
 import { db } from "~/server/db";
 import { machineSettingsSets } from "~/server/db/schema";
-import { BUILTIN_SETTINGS_TAGS } from "~/lib/machines/settings-types";
+import {
+  BUILTIN_SETTINGS_TAG_NAMES,
+  BUILTIN_SETTINGS_TAGS,
+} from "~/lib/machines/settings-types";
+import { canManageMachineSettings } from "~/lib/permissions";
 import {
   setSettingsSetTag,
   updateSettingsSet,
@@ -108,9 +112,41 @@ export async function runUpdateSettingsSet(
       description: true,
       sections: true,
       updatedAt: true,
+      isPreferredHouse: true,
+      isPreferredTournament: true,
     },
   });
   if (current?.machineId !== machine.id) throw notFound;
+
+  // Tag changes run after the content write, each in its own transaction, so
+  // refuse up front the ones the service would refuse: a call that is going to
+  // fail must not land half of its changes first.
+  const tagChanges = BUILTIN_SETTINGS_TAGS.flatMap((tag) => {
+    const applied = tag === "house" ? args.house : args.tournament;
+    return applied === undefined ? [] : [{ tag, applied }];
+  });
+  if (
+    tagChanges.length > 0 &&
+    !canManageMachineSettings(machine.ownerId, ctx.userId, ctx.accessLevel)
+  ) {
+    throw new McpToolError(
+      "denied",
+      "Only technicians, admins, and the machine owner can tag its settings sets."
+    );
+  }
+  for (const { tag, applied } of tagChanges) {
+    const preferred =
+      tag === "house"
+        ? current.isPreferredHouse
+        : current.isPreferredTournament;
+    if (!applied && preferred) {
+      const slot = BUILTIN_SETTINGS_TAG_NAMES[tag];
+      throw new McpToolError(
+        "invalid",
+        `This is the machine's preferred ${slot} set, so it keeps the ${slot} tag. Unset it as preferred in the web app first.`
+      );
+    }
+  }
 
   const wantsContent =
     args.name !== undefined ||
@@ -164,9 +200,7 @@ export async function runUpdateSettingsSet(
 
   const actor = { userId: ctx.userId, access: ctx.accessLevel };
   let tagsChanged = false;
-  for (const tag of BUILTIN_SETTINGS_TAGS) {
-    const applied = tag === "house" ? args.house : args.tournament;
-    if (applied === undefined) continue;
+  for (const { tag, applied } of tagChanges) {
     const tagged = await setSettingsSetTag({
       setId: args.set,
       actor,

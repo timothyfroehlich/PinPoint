@@ -31,7 +31,7 @@ Never invent a value, a menu code or a switch number the source does not state. 
 
 1. Find the machine (`SKILL.md` §6), then call `list_settings_sets` on it. When a set already covers the same purpose, propose `update_settings_set` on it instead of a new set.
 2. Show the change preview with every section and every row written out, in order, exactly as you will send them, followed by the skipped content and the possible issues. One set is one numbered change; a batch of machines is one change per machine, at most 10 per preview.
-3. A new set is Tim's personal set, tagged House unless the user says it is a tournament setup (`tags: ["tournament"]`). On a machine with no preferred House set, a House-tagged set becomes the preferred House set and a community set; say so in the preview. When the user wants technicians to maintain the set, follow with `update_settings_set` `makeCommunity: true` and say that it can't be undone.
+3. A new set is Tim's personal set, tagged House; pass `tournament: true` when the user says it is a tournament setup, and remove House afterwards only if they say it is not a day-to-day setup. On a machine with no preferred House set, the new set becomes the preferred House set and a community set; say so in the preview. When the user wants technicians to maintain the set, follow with `update_settings_set` `makeCommunity: true` and say that it can't be undone.
 
 ## Editing a set
 

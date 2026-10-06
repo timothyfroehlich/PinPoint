@@ -138,11 +138,11 @@ PERMANENT: no tool can delete the set. It adds a "settings set created" line to 
 - `machine` (required), `name` (required, 1–200 characters).
 - `sections` (required, may be empty): shapes in [`settings-sets.md`](settings-sets.md).
 - `description`: plain text.
-- `tags` (default `["house"]`): built-in tags to start with, `"house"` and/or `"tournament"`.
+- `tournament` (default `false`): also tag the set Tournament. Every new set is tagged House.
 
-A set you create is Tim's **personal** set: everyone can see it, and only Tim can edit it. To let technicians and the machine owner edit it too, follow with `update_settings_set` `makeCommunity: true`. The exception: on a machine with no preferred House set, a House-tagged set becomes the preferred House set and so a community set. Check `kind` and `isPreferredHouse` in the result and tell the user.
+A set you create is Tim's **personal** set: everyone can see it, and only Tim can edit it. To let technicians and the machine owner edit it too, follow with `update_settings_set` `makeCommunity: true`. The exception: on a machine with no preferred House set, the new set becomes the preferred House set and so a community set. Check `kind` and `isPreferredHouse` in the result and tell the user.
 
-Duplicates: if you already created a set on this machine with the same name, description and sections, the call returns it with `created: false` and writes nothing, not even `tags`. Change tags with `update_settings_set`.
+Duplicates: if you already created a set on this machine with the same name, description and sections, the call returns it with `created: false` and writes nothing, not even `tournament`. Change tags with `update_settings_set`.
 
 ### `update_settings_set`
 
@@ -152,7 +152,7 @@ CHANGE. `machine` and `set` (the id from `list_settings_sets`) are required, plu
 - **`sections`**: replaces **every** section. Send the whole list from `list_settings_sets` with your edits applied, keeping each section's `id`, and pass that read's `version`. A section you leave out is deleted.
 - **`version`**: the set's `version` from your `list_settings_sets` read. Required with `sections`; recommended with `name` or `description`.
 - **`makeCommunity: true`**: turn Tim's personal set into a community set. Only the set's author can, and it cannot be undone.
-- **`house`**, **`tournament`**: apply (`true`) or remove (`false`) that tag. Technicians, admins and the machine owner can tag any set on the machine. A preferred set keeps its tag until it is unset in the web app.
+- **`house`**, **`tournament`**: apply (`true`) or remove (`false`) that tag. Technicians, admins and the machine owner can tag any set on the machine. A preferred set keeps its tag until it is unset in the web app. A call with a tag change it can't make is refused before anything is written.
 
 A content change is refused with "The set changed since it was read" when the set was edited after the read `version` came from (or, without `version`, during the call). Read it again, show the user the new contents, and reapply the edit. Every change adds a line to the machine's timeline (edits and tags under the hidden-by-default "Settings edits" filter); nobody is notified. Tagging and `makeCommunity` don't change `version`. `changed: false` means every value you sent was already set.
 

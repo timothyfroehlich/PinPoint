@@ -4240,7 +4240,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       ]);
     });
 
-    it("creates a personal set with the requested tags when the machine already has a preferred House set", async () => {
+    it("creates a personal set tagged House and Tournament when asked for Tournament and a preferred House set exists", async () => {
       const tech = await makeUser("technician");
       const machine = await seedMachine();
       await seedSet(machine.id, { isCommunity: true, isPreferredHouse: true }, [
@@ -4250,7 +4250,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       const outcome = await runCreateSettingsSet(
         createSettingsSetSchema.parse({
           ...tournamentArgs(machine.initials),
-          tags: ["tournament"],
+          tournament: true,
         }),
         ctx("technician", tech)
       );
@@ -4259,7 +4259,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
         created: true,
         kind: "personal",
         isPreferredHouse: false,
-        tags: ["Tournament"],
+        tags: ["House", "Tournament"],
       });
       const { id } = outcome.result as { id: string };
       expect(await storedSet(id)).toMatchObject({
@@ -4267,7 +4267,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
         isPreferredHouse: false,
         createdBy: tech,
       });
-      expect(await storedTagSlugs(id)).toEqual(["tournament"]);
+      expect(await storedTagSlugs(id)).toEqual(["house", "tournament"]);
     });
 
     it("returns the existing set when an identical create is retried", async () => {
@@ -4503,6 +4503,30 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       });
       expect(await storedTagSlugs(setId)).toEqual(["tournament"]);
       expect((await storedSet(setId)).updatedAt).toEqual(before.updatedAt);
+    });
+
+    it("refuses a rename plus removing the preferred set's tag before writing anything", async () => {
+      const tech = await makeUser("technician");
+      const machine = await seedMachine();
+      const setId = await seedSet(
+        machine.id,
+        { createdBy: tech, isCommunity: true, isPreferredTournament: true },
+        ["tournament"]
+      );
+
+      await expect(
+        runUpdateSettingsSet(
+          updateSettingsSetSchema.parse({
+            machine: machine.initials,
+            set: setId,
+            name: "Renamed",
+            tournament: false,
+          }),
+          ctx("technician", tech)
+        )
+      ).rejects.toMatchObject({ reason: "invalid" });
+      expect((await storedSet(setId)).name).not.toBe("Renamed");
+      expect(await storedTagSlugs(setId)).toEqual(["tournament"]);
     });
 
     it("refuses a technician editing another user's personal set", async () => {

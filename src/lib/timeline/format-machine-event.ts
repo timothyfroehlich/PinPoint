@@ -62,7 +62,7 @@ export function formatMachineEvent(
       return `Marked "${event.setName}" as the preferred settings set`;
     case "settings_set_tagged":
       return event.added
-        ? `Tagged settings set "${event.setName}" ${event.tagName}`
+        ? `Added the ${event.tagName} tag to settings set "${event.setName}"`
         : `Removed the ${event.tagName} tag from settings set "${event.setName}"`;
     case "settings_set_made_community":
       return `Settings set "${event.setName}" made a community set`;
