@@ -3,25 +3,20 @@
 import { z } from "zod";
 
 import { db } from "~/server/db";
+import { createPublicAction } from "~/lib/actions";
 import { getPrintRunMachines } from "~/lib/machines/settings-sheet-queries";
-import {
-  PRINT_RUN_MAX_MACHINES,
-  type PrintRunMachine,
-} from "~/lib/machines/settings-sheet-run";
-import { type Result, ok, err } from "~/lib/result";
-
-const machineIdsSchema = z.array(z.uuid()).max(PRINT_RUN_MAX_MACHINES);
+import { PRINT_RUN_MAX_MACHINES } from "~/lib/machines/settings-sheet-run";
+import { ok } from "~/lib/result";
 
 /**
  * Loads machines being added to a settings sheet print run, with their sets.
  * Public like the page itself (settings-sheets §2.1): every settings set is
- * visible to anyone who can open its machine (machine-settings §2.5). Only
- * machines On the Floor come back (§2.3).
+ * visible to anyone who can open its machine (machine-settings §2.5), so it
+ * checks no permission. Only machines On the Floor come back (§2.3).
  */
-export async function loadPrintRunMachinesAction(
-  machineIds: string[]
-): Promise<Result<PrintRunMachine[], "VALIDATION">> {
-  const parsed = machineIdsSchema.safeParse(machineIds);
-  if (!parsed.success) return err("VALIDATION", "Invalid machines");
-  return ok(await getPrintRunMachines(db, { kind: "ids", ids: parsed.data }));
-}
+export const loadPrintRunMachinesAction = createPublicAction({
+  actionName: "loadPrintRunMachines",
+  schema: z.array(z.uuid()).max(PRINT_RUN_MAX_MACHINES),
+  handler: async (machineIds) =>
+    ok(await getPrintRunMachines(db, { kind: "ids", ids: machineIds })),
+});
