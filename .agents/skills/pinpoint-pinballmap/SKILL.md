@@ -29,7 +29,7 @@ Render the stored location snapshot. Refresh it only through `syncLocationSnapsh
 
 A Server Action or route invoked when a page opens is automated, not a manual refresh; it must not call `syncLocationSnapshot`.
 
-Preserve the live client's serialized writes and bounded `429` handling. Reuse stored tokens rather than obtaining credentials again per request.
+Preserve the live client's serialized writes and bounded `429` handling; the per-request timeouts, the 599 network-error fallback and the one `Retry-After` retry live in `~/lib/http/external` (`safeFetch`, `withRetryAfter`; CORE-ARCH-016), shared with the Discord client. The budgets are constants at the top of `client-live.ts`. Reuse stored tokens rather than obtaining credentials again per request.
 
 ## Attribute and test correctly
 
