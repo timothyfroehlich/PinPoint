@@ -394,11 +394,17 @@ jobs:
           set +a
           pnpm run test:ensure-schema
 
+  # The Supabase integration and E2E jobs need only `changes`, so they start
+  # within a minute of the run instead of after static, integration and
+  # migrations finish (~5 minutes in). They install dependencies themselves on
+  # a node_modules cache miss, so they never depended on `setup`'s output.
+  # Nothing passes unchecked: CI Gate still needs every job. The cost is runner
+  # time spent on E2E in a run that static goes on to fail. (PP-yva7.1.)
   test-integration-supabase:
     name: Supabase Integration Tests
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
-    needs: [changes, setup, static, linters, test-integration, test-migrations]
+    needs: changes
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
@@ -438,12 +444,24 @@ jobs:
     # E2E Smoke Tests (Chromium Only)
     #
     # Runs smoke tests with chromium browser only for fast feedback.
+    #
+    # This and its two PR siblings each split into 2 Playwright shards
+    # (`--shard`). playwright.config.ts sets fullyParallel, so the split is by
+    # test, not by file, and both halves come out even (51/51 smoke tests,
+    # 62/57 full, measured with --list). Each shard runs auth-setup itself and
+    # gets its own database. More shards each pay ~2 minutes of job setup and
+    # the dev server's first-compile cost again, so 2 is the measured sweet
+    # spot until E2E moves to a production build (PP-izj5). (PP-yva7.2.)
     # ==============================================================================
-    name: E2E Smoke Tests (Chromium)
+    name: E2E Smoke Tests (Chromium) (shard ${{ matrix.shard }}/2)
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
-    needs: [changes, setup, static, linters, test-integration, test-migrations]
+    needs: changes
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
@@ -472,14 +490,16 @@ jobs:
         if: steps.cache-restore.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
 
+      - name: Resolve Playwright version
+        id: playwright-version
+        run: echo "version=$(pnpm exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
       - name: Cache Playwright browsers
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
+          key: ${{ runner.os }}-playwright-chromium-${{ steps.playwright-version.outputs.version }}
 
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
@@ -490,17 +510,18 @@ jobs:
 
       - name: Run Smoke Tests (Chromium)
         env:
+          SHARD: ${{ matrix.shard }}
           MOCK_BLOB_STORAGE: "true"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
           UNSUBSCRIBE_SIGNING_SECRET: "ci-test-only-not-a-real-secret-0000000000000000000000000000000000"
-        run: pnpm exec playwright test e2e/smoke --project=chromium
+        run: pnpm exec playwright test e2e/smoke --project=chromium --shard="$SHARD/2"
 
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # ratchet:actions/upload-artifact@v7.0.1
         with:
-          name: playwright-report-smoke-chromium
+          name: playwright-report-smoke-chromium-shard-${{ matrix.shard }}
           path: playwright-report/
           retention-days: 7
 
@@ -510,11 +531,15 @@ jobs:
     #
     # Runs smoke tests with Mobile Chrome browser to catch mobile-specific issues.
     # ==============================================================================
-    name: E2E Smoke Tests (Mobile Chrome)
+    name: E2E Smoke Tests (Mobile Chrome) (shard ${{ matrix.shard }}/2)
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
-    needs: [changes, setup, static, linters, test-integration, test-migrations]
+    needs: changes
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
@@ -543,14 +568,16 @@ jobs:
         if: steps.cache-restore.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
 
+      - name: Resolve Playwright version
+        id: playwright-version
+        run: echo "version=$(pnpm exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
       - name: Cache Playwright browsers
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
+          key: ${{ runner.os }}-playwright-chromium-${{ steps.playwright-version.outputs.version }}
 
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
@@ -561,17 +588,18 @@ jobs:
 
       - name: Run Smoke Tests (Mobile Chrome)
         env:
+          SHARD: ${{ matrix.shard }}
           MOCK_BLOB_STORAGE: "true"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
           UNSUBSCRIBE_SIGNING_SECRET: "ci-test-only-not-a-real-secret-0000000000000000000000000000000000"
-        run: pnpm exec playwright test e2e/smoke --project="Mobile Chrome"
+        run: pnpm exec playwright test e2e/smoke --project="Mobile Chrome" --shard="$SHARD/2"
 
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # ratchet:actions/upload-artifact@v7.0.1
         with:
-          name: playwright-report-smoke-mobile-chrome
+          name: playwright-report-smoke-mobile-chrome-shard-${{ matrix.shard }}
           path: playwright-report/
           retention-days: 7
 
@@ -581,11 +609,15 @@ jobs:
     #
     # Runs full test suite with chromium browser.
     # ==============================================================================
-    name: E2E Full Tests (Chromium)
+    name: E2E Full Tests (Chromium) (shard ${{ matrix.shard }}/2)
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
-    needs: [changes, setup, static, linters, test-integration, test-migrations]
+    needs: changes
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
@@ -614,14 +646,16 @@ jobs:
         if: steps.cache-restore.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
 
+      - name: Resolve Playwright version
+        id: playwright-version
+        run: echo "version=$(pnpm exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
       - name: Cache Playwright browsers
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
+          key: ${{ runner.os }}-playwright-chromium-${{ steps.playwright-version.outputs.version }}
 
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
@@ -632,17 +666,18 @@ jobs:
 
       - name: Run Full Tests (Chromium)
         env:
+          SHARD: ${{ matrix.shard }}
           MOCK_BLOB_STORAGE: "true"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
           UNSUBSCRIBE_SIGNING_SECRET: "ci-test-only-not-a-real-secret-0000000000000000000000000000000000"
-        run: pnpm exec playwright test --config=playwright.config.full.ts --project=chromium
+        run: pnpm exec playwright test --config=playwright.config.full.ts --project=chromium --shard="$SHARD/2"
 
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # ratchet:actions/upload-artifact@v7.0.1
         with:
-          name: playwright-report-full-chromium
+          name: playwright-report-full-chromium-shard-${{ matrix.shard }}
           path: playwright-report/
           retention-days: 7
 
@@ -655,21 +690,21 @@ jobs:
     # ==============================================================================
     name: E2E Comprehensive Tests (Post-Merge)
     runs-on: ubuntu-latest
-    # Explicit code/deps guard mirrors the three PR E2E siblings, rather than
-    # leaning on the `setup`-skip cascade to keep it off docs-only main pushes —
-    # an implicit guard a future refactor could break. (PP-x0ke.)
+    # Explicit code/deps guard mirrors the three PR E2E siblings. It is the
+    # only thing keeping this job off docs-only main pushes: like them it
+    # needs only `changes`, so no skipped upstream job cascades a skip. (PP-x0ke.)
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
-    needs: [changes, setup, static, linters, test-integration, test-migrations]
+    needs: changes
     # Backstop only — the real limits are per-step (see the comment above the
     # Playwright steps). Must stay above setup + both step timeouts, or a job
     # cancellation silently swallows the verdict again. (PP-jxhy.)
     #
     # 25 + 40 of step budget = 65, so this leaves 25 minutes for setup. Sized
-    # for the COLD-cache case, not the warm one: both caches key on
-    # `hashFiles('pnpm-lock.yaml')`, so every dependency bump that lands on
-    # main — the most frequent push there is — misses both and the job pays
-    # `pnpm install --frozen-lockfile` plus a full chromium+webkit browser
-    # download, realistically 8-12 minutes against ~2.5 warm.
+    # for the COLD-cache case, not the warm one: the node_modules cache keys on
+    # the lockfile, so every dependency bump that lands on main — the most
+    # frequent push there is — misses it and the job pays
+    # `pnpm install --frozen-lockfile`, plus a full chromium+webkit browser
+    # download whenever that bump moves Playwright itself.
     timeout-minutes: 90
     steps:
       - name: Harden Runner
@@ -699,15 +734,18 @@ jobs:
         if: steps.cache-restore.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
 
+      - name: Resolve Playwright version
+        id: playwright-version
+        run: echo "version=$(pnpm exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
       - name: Cache Playwright browsers
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-all-${{ hashFiles('pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-playwright-all-${{ steps.playwright-version.outputs.version }}
           restore-keys: |
-            ${{ runner.os }}-playwright-all-
-            ${{ runner.os }}-playwright-chromium-
+            ${{ runner.os }}-playwright-chromium-${{ steps.playwright-version.outputs.version }}
 
       - name: Install Playwright system dependencies (WebKit)
         run: pnpm exec playwright install-deps webkit
