@@ -446,12 +446,14 @@ jobs:
     # Runs smoke tests with chromium browser only for fast feedback.
     #
     # This and its two PR siblings each split into 2 Playwright shards
-    # (`--shard`). playwright.config.ts sets fullyParallel, so the split is by
-    # test, not by file, and both halves come out even (51/51 smoke tests,
-    # 62/57 full, measured with --list). Each shard runs auth-setup itself and
-    # gets its own database. More shards each pay ~2 minutes of job setup and
-    # the dev server's first-compile cost again, so 2 is the measured sweet
-    # spot until E2E moves to a production build (PP-izj5). (PP-yva7.2.)
+    # (`--shard`). The smoke jobs use playwright.config.ts, which sets
+    # fullyParallel, so smoke splits by test and comes out even (51/51 tests;
+    # ~200s per shard against ~420s unsplit). playwright.config.full.ts does
+    # not, so Full splits by file and runs uneven (62/57 tests, 396s/267s on
+    # the first run). Each shard runs auth-setup itself and gets its own
+    # database. Every extra shard pays ~2 minutes of job setup and the dev
+    # server's first-compile cost again, and takes another slot under the
+    # account's concurrent-job cap. (PP-yva7.2.)
     # ==============================================================================
     name: E2E Smoke Tests (Chromium) (shard ${{ matrix.shard }}/2)
     runs-on: ubuntu-latest
@@ -492,7 +494,14 @@ jobs:
 
       - name: Resolve Playwright version
         id: playwright-version
-        run: echo "version=$(pnpm exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+        run: |
+          set -o pipefail
+          version=$(pnpm exec playwright --version | awk '{print $2}')
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            echo "::error::could not resolve the Playwright version (got '$version')"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Cache Playwright browsers
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
@@ -500,6 +509,11 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-chromium-${{ steps.playwright-version.outputs.version }}
+          # A PR can only read its own caches and main's, and only main's
+          # comprehensive job saves from main. Its chromium+webkit cache covers
+          # chromium, so a PR's first run restores browsers from it.
+          restore-keys: |
+            ${{ runner.os }}-playwright-all-${{ steps.playwright-version.outputs.version }}
 
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
@@ -570,7 +584,14 @@ jobs:
 
       - name: Resolve Playwright version
         id: playwright-version
-        run: echo "version=$(pnpm exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+        run: |
+          set -o pipefail
+          version=$(pnpm exec playwright --version | awk '{print $2}')
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            echo "::error::could not resolve the Playwright version (got '$version')"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Cache Playwright browsers
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
@@ -578,6 +599,11 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-chromium-${{ steps.playwright-version.outputs.version }}
+          # A PR can only read its own caches and main's, and only main's
+          # comprehensive job saves from main. Its chromium+webkit cache covers
+          # chromium, so a PR's first run restores browsers from it.
+          restore-keys: |
+            ${{ runner.os }}-playwright-all-${{ steps.playwright-version.outputs.version }}
 
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
@@ -648,7 +674,14 @@ jobs:
 
       - name: Resolve Playwright version
         id: playwright-version
-        run: echo "version=$(pnpm exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+        run: |
+          set -o pipefail
+          version=$(pnpm exec playwright --version | awk '{print $2}')
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            echo "::error::could not resolve the Playwright version (got '$version')"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Cache Playwright browsers
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
@@ -656,6 +689,11 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-chromium-${{ steps.playwright-version.outputs.version }}
+          # A PR can only read its own caches and main's, and only main's
+          # comprehensive job saves from main. Its chromium+webkit cache covers
+          # chromium, so a PR's first run restores browsers from it.
+          restore-keys: |
+            ${{ runner.os }}-playwright-all-${{ steps.playwright-version.outputs.version }}
 
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
@@ -736,7 +774,14 @@ jobs:
 
       - name: Resolve Playwright version
         id: playwright-version
-        run: echo "version=$(pnpm exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+        run: |
+          set -o pipefail
+          version=$(pnpm exec playwright --version | awk '{print $2}')
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            echo "::error::could not resolve the Playwright version (got '$version')"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Cache Playwright browsers
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
@@ -744,8 +789,6 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-all-${{ steps.playwright-version.outputs.version }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-${{ steps.playwright-version.outputs.version }}
 
       - name: Install Playwright system dependencies (WebKit)
         run: pnpm exec playwright install-deps webkit
@@ -988,8 +1031,8 @@ jobs:
   #     skips on pull_request events, so `skipped` must pass.
   #   - `cancelled` fails because a job that hits its timeout-minutes reports
   #     `cancelled` — a hung E2E run must not leave the gate green (PP-jxhy).
-  #   - `changes` and `setup` are listed so a failure there, which skips every
-  #     downstream job, cannot pass as a skip.
+  #   - `changes` and `setup` are listed so a failure there, which skips the
+  #     jobs that need it, cannot pass as a skip.
   #
   # On push to main this also carries the post-merge full-matrix verdict
   # (test-e2e-comprehensive, PP-x0ke): a red or hung run turns CI Gate red on

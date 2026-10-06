@@ -16,9 +16,10 @@
 # full/ or smoke/, never at e2e/ root or in a sibling directory. (PP-8oeq.)
 #
 # Both invocations pass --project=chromium, mirroring the required CI jobs
-# (ci.yml: "E2E Full Tests (Chromium)" and "E2E Smoke Tests (Chromium)"). This
-# is a correctness requirement, not a speed one: the configs declare four
-# browser projects, Playwright runs them concurrently in one process, and
+# (ci.yml: "E2E Full Tests (Chromium)" and "E2E Smoke Tests (Chromium)", each
+# split into shards). This is a correctness requirement, not a speed one: the
+# configs declare four browser projects, Playwright runs them concurrently in
+# one process, and
 # several specs write singleton seeded rows (the member's own profile, machine
 # owners, machine settings). Two projects then interleave on the same row and
 # each asserts the other's value — measured, 9 such failures on firefox and
