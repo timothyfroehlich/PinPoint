@@ -16,7 +16,7 @@ import {
   proseMirrorDocValueSchema,
   type ProseMirrorDoc,
 } from "~/lib/tiptap/types";
-import type { ImageMetadata } from "~/types/images";
+import type { ImageMetadata } from "~/lib/types/images";
 
 /**
  * Comment drafts: what someone has typed and the photos they have uploaded

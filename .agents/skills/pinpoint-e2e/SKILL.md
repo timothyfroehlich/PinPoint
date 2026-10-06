@@ -3,7 +3,7 @@ name: pinpoint-e2e
 description: >-
   E2E testing guide for PinPoint (Playwright, isolation, Mailpit, Supabase).
   Covers local/preview dev autologin and opt-outs, global-setup reset chains,
-  the /api/test-data/cleanup endpoint, selector strategy (roles and labels
+  the cleanupTestEntities direct-database helper, selector strategy (roles and labels
   first, testids next, CSS never), auth roles and loginAs/STORAGE_STATE
   scaffolding, the assertNoA11yViolations axe-core accessibility scan, and
   session timeout debugging. Use when authoring, debugging, or fixing Playwright

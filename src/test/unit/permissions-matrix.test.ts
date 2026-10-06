@@ -114,6 +114,9 @@ describe("getPermission", () => {
   });
 
   it("should return false for unknown permissions", () => {
+    // Typed ids reject this at compile time; the runtime still fails closed
+    // for any untyped caller.
+    // @ts-expect-error -- deliberately not a PermissionId
     expect(getPermission("nonexistent.permission", "admin")).toBe(false);
   });
 

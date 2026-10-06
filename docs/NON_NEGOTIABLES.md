@@ -1,7 +1,7 @@
 # PinPoint Non‑Negotiables
 
 **Last Updated**: 2026-10-06
-**Version**: 2.8 (CORE-ARCH-015 added: a caught error not returned to the user goes to `reportError`; cron routes use `runCron` — PP-az4d.3). Prior: 2.7 (CORE-ARCH-014 added: one write path per mutation; CORE-ARCH-010 amended: share load-bearing code at two copies, reuse existing helpers — PP-az4d.1)
+**Version**: 2.9 (CORE-ARCH-013 added: Server Actions go through `createProtectedAction` — PP-az4d.4). Prior: 2.8 (CORE-ARCH-015 added: a caught error not returned to the user goes to `reportError`; cron routes use `runCron` — PP-az4d.3). Prior: 2.7 (CORE-ARCH-014 added: one write path per mutation; CORE-ARCH-010 amended: share load-bearing code at two copies, reuse existing helpers — PP-az4d.1)
 
 > **Canonical catalog**: this document defines the canonical `CORE-*` rules for PinPoint. Portable skills (`.agents/skills/`) and agent context (`AGENTS.md`) cite rules by ID and provide domain/task-specific procedures.
 
@@ -41,6 +41,7 @@
 24. A bug-fix regression test fails on the pre-fix code; tests reach production through real callers' seams (CORE-TEST-007/008)
 25. A mutation with more than one entry point lives in `src/services`; entry points parse, authorize, and call it (CORE-ARCH-014)
 26. A caught error that is not returned to the user goes to `reportError`, never to a bare `log.error`; cron routes use `runCron` (CORE-ARCH-015)
+27. Server Actions are built with `createProtectedAction` / `createPublicAction` from `~/lib/actions` (CORE-ARCH-013)
 
 ---
 
@@ -326,7 +327,7 @@
 - **Why:** An export, flag, bypass parameter, or wrapper that exists only for a test is production surface with no production caller. It ships, it can be misused, and it keeps the test coupled to internals the real boundary already exposes.
 - **Do:** Test through the seam production callers use (the Server Action, route handler, service function, or rendered component). When a helper's branches matter, reach them through that boundary's inputs.
 - **Don't:** Export an internal helper, add an `isTest`/bypass parameter, or add an injection hook solely so a unit or integration test can reach it.
-- **Scope:** The E2E harness is not a seam under this rule. Surfaces that exist to drive a browser suite against a running app and are refused in production — the dev-autologin opt-out (`x-skip-autologin` / `skip_autologin`) and `/api/test-data/cleanup` — are owned by `pinpoint-e2e`.
+- **Scope:** The E2E harness is not a seam under this rule. Surfaces that exist to drive a browser suite against a running app and are refused in production — the dev-autologin opt-out (`x-skip-autologin` / `skip_autologin`) and the mock-upload route (`src/app/uploads/[...path]/route.ts`) — are owned by `pinpoint-e2e`.
 
 **CORE-TEST-009:** One primary test owner per contract
 
@@ -419,6 +420,14 @@
 - **Why:** PinPoint does not support JavaScript-disabled browsers, and a visibly broken control is an acceptable outcome when JavaScript fails to load — the user can see something is wrong and retry. What is not acceptable is a control that reports success for an action it could not perform: the user walks away believing the change was saved. Visible breakage is recoverable; false confirmation is not. Replaces the progressive-enhancement non-negotiable retired on 2026-07-27 (see the Rule IDs appendix), after an audit found that only ~7 of ~28 submission surfaces worked without JavaScript and that the public `/report` entry point — the rule's flagship surface — was unconditionally broken. Audit and reasoning: `docs/superpowers/specs/2026-07-27-core-arch-002-scope-design.md` (PP-nw80).
 - **Do:** When a control cannot perform its action — a dependency is unavailable, JavaScript is not running, a precondition is unmet — let it visibly do nothing, or surface a real error. Rely on server-side validation to reject submissions that could not have carried valid input.
 - **Don't:** Render a success message, toast, or confirmation for a submission whose input could not have been collected. Don't wire a save control that submits unchanged state and confirms it as a change.
+
+**CORE-ARCH-013:** Server Actions go through `createProtectedAction`
+
+- **Severity:** Required
+- **Why:** A hand-rolled Server Action repeats the authentication, validation, permission, redirect, and error-reporting sequence, and each copy drifts: the 2026-10-05 audit (PP-az4d) found three different redirect checks, two validation error codes, and permission checks that ran before or after the resource load depending on the file. `createProtectedAction` (`~/lib/actions`) runs the sequence once.
+- **Do:** Build every exported Server Action with `createProtectedAction`, or `createPublicAction` when signed-out visitors may call it. The worked example and the option list live in `pinpoint-ui` § Server Actions.
+- **Don't:** Call `auth.getUser()`, `safeParse`, or `checkPermission()` by hand in a new Server Action. Exceptions: the signed-out auth flows (login, signup, forgot and reset password) and the redirect-only OAuth and consent actions.
+- **Enforced by:** `src/test/lint/protected-action-ratchet.test.ts` fails when an exported Server Action outside its allowlist is built without the pipeline, and when an allowlisted action is migrated or deleted. The allowlist only shrinks (PP-az4d.4).
 
 **CORE-ARCH-014:** One write path per mutation
 
@@ -700,7 +709,7 @@ If all Yes → ship it. Perfect is the enemy of done.
 - CORE‑SEC‑001..010: Security
 - CORE‑PERF‑001..003: Performance (incl. image priority + preconnect)
 - CORE‑TEST‑001..006: Testing
-- CORE‑ARCH‑001, 004..012, 014, 015: Architecture (013 reserved) (002, 003 retired)
+- CORE‑ARCH‑001, 004..015: Architecture (002, 003 retired)
 - CORE‑RESP‑001..004: Responsive framework
 - CORE‑UI‑001..006: UI & styling + Browser support / MWG catalog (005, 006)
 - CORE‑A11Y‑001..006: Accessibility floor

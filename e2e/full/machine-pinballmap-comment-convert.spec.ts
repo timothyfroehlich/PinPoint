@@ -31,7 +31,6 @@ test.describe("Pinball Map comment conversion (PP-o355.4)", () => {
 
   test("converting from one cabinet links every copy of the comment to the issue", async ({
     page,
-    request,
   }) => {
     // Run-scoped id far above Pinball Map's real condition ids, so parallel
     // runs never collide on the primary key.
@@ -83,7 +82,7 @@ test.describe("Pinball Map comment conversion (PP-o355.4)", () => {
         siblingRow.getByRole("button", { name: "Convert to issue" })
       ).toHaveCount(0);
     } finally {
-      await cleanupTestEntities(request, {
+      await cleanupTestEntities({
         machineIds,
         issueTitlePrefix: `[${getTestPrefix()}]`,
       });

@@ -219,12 +219,23 @@ async function seedCatalog(
 }
 
 /**
- * Un-announce every seen row, so a bootstrap back-fill can be reused as a large
- * pending backlog without fetching 600+ entries a second time.
+ * Queue an unannounced `added` event for every seen row, so a bootstrap
+ * back-fill can be reused as a large pending backlog without fetching 600+
+ * entries a second time.
  */
 async function markAllPending(): Promise<void> {
   const db = await getTestDb();
-  await db.update(pinballmapRegionSeenMachines).set({ announcedAt: null });
+  const seen = await db.select().from(pinballmapRegionSeenMachines);
+  await db.insert(pinballmapRegionAlertEvents).values(
+    seen.map((row) => ({
+      region: row.region,
+      lmxId: row.lmxId,
+      generation: row.generation,
+      eventType: "added" as const,
+      locationId: row.locationId,
+      pinballmapMachineId: row.pinballmapMachineId,
+    }))
+  );
 }
 
 /** A mirror last written long enough ago that the cooldown has expired. */
@@ -815,14 +826,14 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
     const failed = await runRegionMachineAlerts();
 
     expect(failed).toMatchObject({ discovered: 1, announced: 0, pending: 1 });
-    const pendingRow = (await seenRows()).find((r) => r.lmxId === 2);
-    expect(pendingRow?.announcedAt).toBeNull();
+    const pendingEvent = (await eventRows()).find((r) => r.lmxId === 2);
+    expect(pendingEvent?.announcedAt).toBeNull();
 
     // Next run: nothing new upstream, but the pending row is retried.
     discord.result = { ok: true };
     const retried = await runRegionMachineAlerts();
     expect(retried).toMatchObject({ discovered: 0, announced: 1, pending: 0 });
-    const settled = (await seenRows()).find((r) => r.lmxId === 2);
+    const settled = (await eventRows()).find((r) => r.lmxId === 2);
     expect(settled?.announcedAt).not.toBeNull();
   });
 
@@ -887,31 +898,6 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
         generation: 0,
         eventType: "removed",
         announcedAt: null,
-      }),
-    ]);
-  });
-
-  it("adopts an old-runtime pending addition into the event queue", async () => {
-    await seedCatalog([{ machineId: 6412, name: "Godzilla" }]);
-    const db = await getTestDb();
-    await db.insert(pinballmapRegionSeenMachines).values({
-      region: "austin",
-      lmxId: 1,
-      locationId: 26454,
-      pinballmapMachineId: 6412,
-      announcedAt: null,
-    });
-    pbm.entries = [lmx({ lmxId: 1 })];
-
-    const run = await runRegionMachineAlerts();
-
-    expect(run).toMatchObject({ discovered: 0, announced: 1, pending: 0 });
-    expect(await eventRows()).toEqual([
-      expect.objectContaining({
-        lmxId: 1,
-        generation: 0,
-        eventType: "added",
-        announcedAt: expect.any(Date),
       }),
     ]);
   });
