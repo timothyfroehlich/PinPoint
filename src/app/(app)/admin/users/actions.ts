@@ -16,6 +16,7 @@ import { requireSiteUrl } from "~/lib/url";
 import { inviteUserSchema, updateUserRoleSchema } from "./schema";
 import { log } from "~/lib/logger";
 import { errorMessage } from "~/lib/errors";
+import type { UserRole } from "~/lib/types";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { type Result, ok, err } from "~/lib/result";
 
@@ -186,7 +187,7 @@ async function verifyAdmin(userId: string): Promise<void> {
 
 export async function updateUserRole(
   userId: string,
-  newRole: "guest" | "member" | "technician" | "admin",
+  newRole: UserRole,
   userType: "active" | "invited" = "active"
 ): Promise<void> {
   const supabase = await createClient();
