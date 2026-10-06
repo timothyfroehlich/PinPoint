@@ -324,7 +324,7 @@
 - **Why:** An export, flag, bypass parameter, or wrapper that exists only for a test is production surface with no production caller. It ships, it can be misused, and it keeps the test coupled to internals the real boundary already exposes.
 - **Do:** Test through the seam production callers use (the Server Action, route handler, service function, or rendered component). When a helper's branches matter, reach them through that boundary's inputs.
 - **Don't:** Export an internal helper, add an `isTest`/bypass parameter, or add an injection hook solely so a unit or integration test can reach it.
-- **Scope:** The E2E harness is not a seam under this rule. Surfaces that exist to drive a browser suite against a running app and are refused in production — the dev-autologin opt-out (`x-skip-autologin` / `skip_autologin`) and `/api/test-data/cleanup` — are owned by `pinpoint-e2e`.
+- **Scope:** The E2E harness is not a seam under this rule. Surfaces that exist to drive a browser suite against a running app and are refused in production — the dev-autologin opt-out (`x-skip-autologin` / `skip_autologin`) and the mock-upload route (`src/app/uploads/[...path]/route.ts`) — are owned by `pinpoint-e2e`.
 
 **CORE-TEST-009:** One primary test owner per contract
 

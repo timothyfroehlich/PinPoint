@@ -468,7 +468,7 @@ export async function getProfileIdByEmail(email: string): Promise<string> {
  * Delete throwaway invite-signup auth users (emails ending in `@example.com`)
  * that accumulate in `auth.users` across E2E runs.
  *
- * Neither `db:fast-reset` nor the `/api/test-data/cleanup` endpoint can remove
+ * Neither `db:fast-reset` nor `cleanupTestEntities` (`cleanup.ts`) can remove
  * `auth.users` rows — the Postgres role can't DELETE from the auth schema, so
  * only the Admin API can. Left unswept, these rows pile up unbounded and once
  * `auth.users` exceeds a page (~50) they broke unpaginated `listUsers()` email

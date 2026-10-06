@@ -40,7 +40,6 @@ test.describe("Pinball Map Insider Connected toggle (PP-o355.59, PP-o355.67)", (
   ]) {
     test(`${icEligible ? "shows" : "hides"} the toggle for an ${icEligible ? "eligible" : "ineligible"} title`, async ({
       page,
-      request,
     }) => {
       const initials = getTestMachineInitials();
       // Run-scoped ids, one block per run, so parallel workers never share a
@@ -98,7 +97,7 @@ test.describe("Pinball Map Insider Connected toggle (PP-o355.59, PP-o355.67)", (
         await expect(dontSync).toBeChecked();
         await expect(outOfSync).toHaveCount(0);
       } finally {
-        await cleanupTestEntities(request, { machineInitials: [initials] });
+        await cleanupTestEntities({ machineInitials: [initials] });
         await deletePinballMapCatalogEntries([titleId]);
         // The stored lineup is shared across every spec in the run.
         await removeLmxFromStoredLineup([lmxId]);

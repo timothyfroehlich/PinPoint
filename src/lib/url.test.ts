@@ -51,6 +51,7 @@ describe("requireSiteUrl", () => {
 
   it("throws error in production if nothing is set (new behavior)", async () => {
     vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("VERCEL_ENV", undefined);
     vi.stubEnv("NEXT_PUBLIC_SITE_URL", undefined);
     vi.stubEnv("VERCEL_URL", undefined);
     vi.stubEnv("PORT", "3000");
@@ -60,6 +61,30 @@ describe("requireSiteUrl", () => {
     expect(() => requireSiteUrl("test")).toThrowError(
       /Configuration Error: NEXT_PUBLIC_SITE_URL is missing/
     );
+  });
+
+  it("refuses a localhost site URL on the Vercel production deployment", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "http://localhost:3000");
+
+    const { requireSiteUrl } = await import("./url");
+
+    expect(() => requireSiteUrl("test")).toThrowError(
+      /Configuration Error: NEXT_PUBLIC_SITE_URL is missing/
+    );
+  });
+
+  it("allows localhost for a local production build run as a development deployment", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("VERCEL_ENV", "development");
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", undefined);
+    vi.stubEnv("VERCEL_URL", undefined);
+    vi.stubEnv("PORT", "3000");
+
+    const { requireSiteUrl } = await import("./url");
+
+    expect(requireSiteUrl("test")).toBe("http://localhost:3000");
   });
 });
 
