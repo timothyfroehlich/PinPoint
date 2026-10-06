@@ -1,7 +1,7 @@
 # PinPoint Non‑Negotiables
 
-**Last Updated**: 2026-10-05
-**Version**: 2.7 (CORE-ARCH-015 added: a caught error not returned to the user goes to `reportError`; cron routes use `runCron` — PP-az4d.3). Prior: 2.6 (CORE-TEST-007..010 added: failure-first regressions, no test-only seams, one owner per contract, failing tests are evidence — PP-wptk)
+**Last Updated**: 2026-10-06
+**Version**: 2.8 (CORE-ARCH-015 added: a caught error not returned to the user goes to `reportError`; cron routes use `runCron` — PP-az4d.3). Prior: 2.7 (CORE-ARCH-014 added: one write path per mutation; CORE-ARCH-010 amended: share load-bearing code at two copies, reuse existing helpers — PP-az4d.1)
 
 > **Canonical catalog**: this document defines the canonical `CORE-*` rules for PinPoint. Portable skills (`.agents/skills/`) and agent context (`AGENTS.md`) cite rules by ID and provide domain/task-specific procedures.
 
@@ -32,14 +32,15 @@
 15. Email addresses never displayed outside admin / settings (CORE-SEC-007)
 16. Permissions go through `checkPermission()`; matrix must match enforcement (CORE-ARCH-008)
 17. Mock third-party SDKs at their boundary; no live external services in E2E (CORE-TEST-006)
-18. Rule of Three before abstracting (CORE-ARCH-010)
+18. Rule of Three before abstracting; reuse helpers that already exist (CORE-ARCH-010)
 19. Baseline Widely available is the browser-support floor; look up patterns via the modern-web-guidance catalog (CORE-UI-005/006)
 20. Forms ship with the correct input `type`, `autocomplete` token, `:user-invalid` styling, and visible required indicators (CORE-FORM-001..006)
 21. Accessibility floor: skip link, semantic table markup, `motion-reduce:` paired with animations, no `<div role="button">`, `title` is not a tooltip (CORE-A11Y-001..006)
 22. Image priority and preconnect discipline: `priority` is for the LCP candidate only; preconnect to known image origins (CORE-PERF-003)
 23. External side effects (HTTP, email, Discord, blob, Vault RPC) never run inside a DB transaction; deliver them post-commit (CORE-ARCH-011)
 24. A bug-fix regression test fails on the pre-fix code; tests reach production through real callers' seams (CORE-TEST-007/008)
-25. A caught error that is not returned to the user goes to `reportError`, never to a bare `log.error`; cron routes use `runCron` (CORE-ARCH-015)
+25. A mutation with more than one entry point lives in `src/services`; entry points parse, authorize, and call it (CORE-ARCH-014)
+26. A caught error that is not returned to the user goes to `reportError`, never to a bare `log.error`; cron routes use `runCron` (CORE-ARCH-015)
 
 ---
 
@@ -401,9 +402,9 @@
 **CORE-ARCH-010:** Rule of Three before abstracting
 
 - **Severity:** Required
-- **Why:** Premature abstractions invented for the first or second use case usually fit one of those shapes badly and force the third to bend. Pre-beta code with no scale data can't predict the right shape.
-- **Do:** Wait until you have three concrete instances before extracting a helper, hook, or service abstraction. Inline duplication is cheaper than the wrong abstraction.
-- **Don't:** Build a DAL, service layer, error hierarchy, or shared hook because you "might need it later." Don't refactor on the second duplication.
+- **Why:** Premature abstractions invented for the first or second use case usually fit one of those shapes badly and force the third to bend. Two exceptions. Load-bearing code — a transaction, an auth gate, a notification sequence — drifts when copied, and the drift ships as a defect, so it is shared at two copies. And the rule limits _creating_ abstractions, never using them: the 2026-10-05 audit (PP-az4d) found most Server Actions hand-rolling the auth that `createProtectedAction` already provides, and the web machine edit re-implementing `src/services/machines.ts` (see CORE-ARCH-014).
+- **Do:** Wait until you have three concrete instances before extracting a helper, hook, or abstraction for ordinary code; inline duplication is cheaper than the wrong abstraction. Share at two copies when the duplicated code is large or load-bearing. Before writing a helper, search `src/services`, `src/lib`, and the owning skill for one that exists, and use it.
+- **Don't:** Build a DAL, error hierarchy, or shared hook because you "might need it later." Don't refactor ordinary code on the second duplication. Don't re-implement a helper that exists because adopting it means touching more code.
 
 **CORE-ARCH-011:** External side effects never run inside a DB transaction
 
@@ -418,6 +419,13 @@
 - **Why:** PinPoint does not support JavaScript-disabled browsers, and a visibly broken control is an acceptable outcome when JavaScript fails to load — the user can see something is wrong and retry. What is not acceptable is a control that reports success for an action it could not perform: the user walks away believing the change was saved. Visible breakage is recoverable; false confirmation is not. Replaces the progressive-enhancement non-negotiable retired on 2026-07-27 (see the Rule IDs appendix), after an audit found that only ~7 of ~28 submission surfaces worked without JavaScript and that the public `/report` entry point — the rule's flagship surface — was unconditionally broken. Audit and reasoning: `docs/superpowers/specs/2026-07-27-core-arch-002-scope-design.md` (PP-nw80).
 - **Do:** When a control cannot perform its action — a dependency is unavailable, JavaScript is not running, a precondition is unmet — let it visibly do nothing, or surface a real error. Rely on server-side validation to reject submissions that could not have carried valid input.
 - **Don't:** Render a success message, toast, or confirmation for a submission whose input could not have been collected. Don't wire a save control that submits unchanged state and confirms it as a change.
+
+**CORE-ARCH-014:** One write path per mutation
+
+- **Severity:** Required
+- **Why:** Two implementations of one mutation drift, and the same change then behaves differently depending on where it came from. The 2026-10-05 audit (PP-az4d) found the web machine edit (`updateMachineAction` in `src/app/(app)/m/actions.ts`) re-implementing `updateMachineOwner` and `updateMachineName` from `src/services/machines.ts`, which the MCP tools call. The two paths had already diverged on ownership notifications: the action awaited `dispatchNotification` inline, while the service plans in the transaction and dispatches after commit. PP-az4d.7 consolidates them.
+- **Do:** Put a mutation reachable from more than one entry point — a web Server Action, an MCP tool, a cron route — in `src/services`. Each entry point parses its input, authorizes the caller, and calls the service. Adding a second entry point to a mutation that lives in one entry point moves the mutation into `src/services` first.
+- **Don't:** Copy a service's transaction, event, or notification logic into an entry point.
 
 **CORE-ARCH-015:** A caught error that is not returned to the user goes to `reportError`
 
@@ -692,7 +700,7 @@ If all Yes → ship it. Perfect is the enemy of done.
 - CORE‑SEC‑001..010: Security
 - CORE‑PERF‑001..003: Performance (incl. image priority + preconnect)
 - CORE‑TEST‑001..006: Testing
-- CORE‑ARCH‑001, 004..012, 015: Architecture (013, 014 reserved) (002, 003 retired)
+- CORE‑ARCH‑001, 004..012, 014, 015: Architecture (013 reserved) (002, 003 retired)
 - CORE‑RESP‑001..004: Responsive framework
 - CORE‑UI‑001..006: UI & styling + Browser support / MWG catalog (005, 006)
 - CORE‑A11Y‑001..006: Accessibility floor
