@@ -23,7 +23,10 @@
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
-import type { MachineTimelineEventData } from "~/lib/timeline/machine-event-types";
+import type {
+  MachineTimelineEventData,
+  TimelineEventSourceType,
+} from "~/lib/timeline/machine-event-types";
 import { tagSchema, type TimelineTag } from "~/lib/timeline/machine-tags";
 import {
   resolvePerson,
@@ -41,7 +44,7 @@ import {
   userProfiles,
 } from "~/server/db/schema";
 
-type SystemSourceType = "lifecycle" | "issue";
+type SystemSourceType = Extract<TimelineEventSourceType, "lifecycle" | "issue">;
 
 /**
  * A person attached to a timeline event (PP-tv9l). Stored as a stable id
@@ -51,13 +54,6 @@ type SystemSourceType = "lifecycle" | "issue";
  */
 export type TimelinePersonRef =
   { role: string; userId: string } | { role: string; invitedId: string };
-
-/**
- * All valid values for `timeline_events.source_type`. Used as the column's
- * `$type` annotation in the schema so reads/writes are statically checked.
- */
-export type TimelineEventSourceType =
-  SystemSourceType | "comment" | "pinballmap";
 
 export interface CreateTimelineEventArgs {
   sourceType: SystemSourceType;

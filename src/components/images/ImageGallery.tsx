@@ -9,7 +9,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "~/components/ui/dialog";
-import { type GalleryImage } from "~/types/images";
+import { type GalleryImage } from "~/lib/types/images";
 
 interface ImageGalleryProps {
   images: GalleryImage[];
