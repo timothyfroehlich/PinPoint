@@ -1,6 +1,6 @@
 import type React from "react";
 import { redirect, notFound } from "next/navigation";
-import { createClient } from "~/lib/supabase/server";
+import { getViewer } from "~/lib/auth/viewer";
 import { getLoginUrl } from "~/lib/url";
 import { reportError } from "~/lib/observability/report-error";
 import { db } from "~/server/db";
@@ -25,18 +25,15 @@ import { PageHeader } from "~/components/layout/PageHeader";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { DefaultReportModeForm } from "./reporting/default-report-mode-form";
 export default async function SettingsPage(): Promise<React.JSX.Element> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { userId } = await getViewer();
 
-  if (!user) {
+  if (!userId) {
     redirect(getLoginUrl("/settings"));
   }
 
   // Fetch user profile
   const profile = await db.query.userProfiles.findFirst({
-    where: eq(userProfiles.id, user.id),
+    where: eq(userProfiles.id, userId),
   });
 
   if (!profile) {
@@ -47,21 +44,21 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
     // render a 404 rather than looping.
     reportError(new Error("Authenticated user has no user_profiles row"), {
       action: "settings-page.missing-profile",
-      userId: user.id,
+      userId,
     });
     notFound();
   }
 
   // Fetch notification preferences
   let preferences = await db.query.notificationPreferences.findFirst({
-    where: eq(notificationPreferences.userId, user.id),
+    where: eq(notificationPreferences.userId, userId),
   });
 
   // Create default preferences if they don't exist (fallback for old users)
   if (!preferences) {
     [preferences] = await db
       .insert(notificationPreferences)
-      .values({ userId: user.id })
+      .values({ userId })
       .returning();
   }
 
@@ -77,8 +74,8 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
     db
       .select({ count: count() })
       .from(machines)
-      .where(eq(machines.ownerId, user.id)),
-    getReassignmentTargets(user.id),
+      .where(eq(machines.ownerId, userId)),
+    getReassignmentTargets(userId),
   ]);
 
   const ownedMachineCount = ownedMachinesResult[0]?.count ?? 0;
@@ -99,9 +96,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
       await db
         .select({ count: count() })
         .from(userProfiles)
-        .where(
-          and(eq(userProfiles.role, "admin"), ne(userProfiles.id, user.id))
-        )
+        .where(and(eq(userProfiles.role, "admin"), ne(userProfiles.id, userId)))
     )[0]?.count === 0;
 
   return (
@@ -114,7 +109,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
             Profile Settings
           </h2>
           <Link
-            href={`/u/${user.id}`}
+            href={`/u/${userId}`}
             className="text-primary text-sm hover:underline"
           >
             View your public profile →

@@ -1,4 +1,4 @@
-import { createClient } from "~/lib/supabase/server";
+import { getViewer } from "~/lib/auth/viewer";
 import type React from "react";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
@@ -95,12 +95,9 @@ function UserRow({
 }
 
 export default async function AdminUsersPage(): Promise<React.JSX.Element> {
-  const supabase = await createClient();
-  const {
-    data: { user: currentUser },
-  } = await supabase.auth.getUser();
+  const { userId } = await getViewer();
 
-  if (!currentUser) {
+  if (!userId) {
     return <></>; // Layout handles redirect
   }
 
@@ -127,7 +124,7 @@ export default async function AdminUsersPage(): Promise<React.JSX.Element> {
               <UserRow
                 key={`${user.status}-${user.id}`}
                 user={user}
-                currentUserId={currentUser.id}
+                currentUserId={userId}
               />
             ))}
           </TableBody>

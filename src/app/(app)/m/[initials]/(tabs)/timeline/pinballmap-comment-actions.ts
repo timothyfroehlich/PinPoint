@@ -16,6 +16,7 @@ import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { z } from "zod";
 import { ISSUE_TITLE_MAX_MESSAGE, issueTitleSchema } from "~/lib/issues/title";
+import { ISSUE_SEVERITY_VALUES } from "~/lib/types";
 
 import { formatIssueId } from "~/lib/issues/utils";
 import { log } from "~/lib/logger";
@@ -45,7 +46,7 @@ const convertSchema = z.object({
     required: "Title is required",
     tooLong: ISSUE_TITLE_MAX_MESSAGE,
   }),
-  severity: z.enum(["cosmetic", "minor", "major", "unplayable"], {
+  severity: z.enum(ISSUE_SEVERITY_VALUES, {
     message: "Select a severity",
   }),
 });

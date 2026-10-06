@@ -1,12 +1,10 @@
 import type React from "react";
 import { notFound } from "next/navigation";
-import { eq } from "drizzle-orm";
 import { getMachineForLayout } from "~/app/(app)/m/[initials]/_data";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { getMachineSettingsSets } from "~/lib/machines/settings-queries";
-import { createClient } from "~/lib/supabase/server";
+import { getViewer } from "~/lib/auth/viewer";
 import { db } from "~/server/db";
-import { userProfiles } from "~/server/db/schema";
 import { SettingsTab } from "~/components/machines/settings/SettingsTab";
 
 // The soft-keyboard `interactive-widget=resizes-content` viewport now ships
@@ -32,29 +30,20 @@ export default async function MachineSettingsTab({
     notFound();
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const profile = user
-    ? await db.query.userProfiles.findFirst({
-        where: eq(userProfiles.id, user.id),
-        columns: { role: true },
-      })
-    : null;
+  const { userId, role } = await getViewer();
 
-  const access = getAccessLevel(profile?.role);
+  const access = getAccessLevel(role);
   const machineOwnerId = machine.owner?.id ?? null;
 
   // Machine-wide gate for the "Add set" button (creating rides on the existing
   // matrix entry); per-set edit rights are computed per row in the query.
   const canCreate = checkPermission("machines.settings.manage", access, {
-    userId: user?.id,
+    userId,
     machineOwnerId,
   });
 
   const sets = await getMachineSettingsSets(db, machine.id, {
-    viewerId: user?.id ?? null,
+    viewerId: userId ?? null,
     access,
     machineOwnerId,
   });
@@ -63,7 +52,7 @@ export default async function MachineSettingsTab({
     <div className="space-y-6">
       <SettingsTab
         canCreate={canCreate}
-        viewerId={user?.id ?? null}
+        viewerId={userId ?? null}
         machineOwnerId={machineOwnerId}
         machineId={machine.id}
         initialSets={sets}

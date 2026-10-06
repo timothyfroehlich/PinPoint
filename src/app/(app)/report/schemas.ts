@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { ISSUE_STATUS_VALUES } from "~/lib/issues/status";
-import { ISSUE_FREQUENCY_VALUES } from "~/lib/types";
+import {
+  ISSUE_FREQUENCY_VALUES,
+  ISSUE_PRIORITY_VALUES,
+  ISSUE_SEVERITY_VALUES,
+} from "~/lib/types";
 import { ISSUE_TITLE_MAX_MESSAGE, issueTitleSchema } from "~/lib/issues/title";
 
 export const publicIssueSchema = z.object({
@@ -14,11 +18,11 @@ export const publicIssueSchema = z.object({
     .trim()
     .max(20000, "Description is too long")
     .optional(),
-  severity: z.enum(["cosmetic", "minor", "major", "unplayable"], {
+  severity: z.enum(ISSUE_SEVERITY_VALUES, {
     message: "Select a severity",
   }),
   priority: z
-    .enum(["low", "medium", "high"], {
+    .enum(ISSUE_PRIORITY_VALUES, {
       message: "Select a priority",
     })
     .optional(),
