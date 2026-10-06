@@ -15,6 +15,11 @@ interface MachineGroupShellProps {
   /** Route prefix the tabs hang off, e.g. `/c/owner/<id>`. */
   basePath: string;
   action?: React.ReactNode;
+  /**
+   * Shown between the header and the tab strip on every tab. Only a
+   * Collection passes one (spec collections-and-tags 4.7).
+   */
+  description?: React.ReactNode;
   children: React.ReactNode;
 }
 
@@ -29,6 +34,7 @@ export async function MachineGroupShell({
   machines,
   basePath,
   action,
+  description,
   children,
 }: MachineGroupShellProps): Promise<React.JSX.Element> {
   const health = await getMachineViewHealth(
@@ -52,6 +58,7 @@ export async function MachineGroupShell({
           summary={summary}
           action={action}
         />
+        {description}
         <CollectionTabStrip
           basePath={basePath}
           openIssueCount={summary.openIssues}
