@@ -668,7 +668,9 @@ jobs:
     # database — the cross-project seeded-state check this job exists for
     # (pinpoint-e2e skill, PP-168u). --shard splits in project order and would
     # put each browser on a different leg. Before the split one runner ran
-    # Smoke then Full serially, ~35 minutes of tests. (PP-yva7.3.)
+    # Smoke then Full serially, ~35 minutes of tests; the validation run on
+    # #2421 took 7-13 minutes of tests per leg, and Smoke 1/2 is the long pole
+    # because responsive-overflow.spec.ts is one file of 117 tests. (PP-yva7.3.)
     # ==============================================================================
     name: E2E Comprehensive ${{ matrix.suite }} ${{ matrix.shard }}/${{ matrix.total }} (Post-Merge)
     runs-on: ubuntu-latest
