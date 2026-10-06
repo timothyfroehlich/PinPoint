@@ -740,8 +740,15 @@
     {
       "idx": 105,
       "version": "7",
-      "when": 1791257983054,
-      "tag": "0105_apron-card-print-queue",
+      "when": 1791256237164,
+      "tag": "0105_single-line-issue-titles",
+      "breakpoints": true
+    },
+    {
+      "idx": 106,
+      "version": "7",
+      "when": 1791259545139,
+      "tag": "0106_apron-card-print-queue",
       "breakpoints": true
     }
   ]
