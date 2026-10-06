@@ -94,16 +94,35 @@ If it ever returns: check the CLI version first. Either bump it, or label the st
 
 Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like schema snapshots; manual edits corrupt the `prevId` chain.
 
+### Why a hand renumber breaks production silently
+
+drizzle-orm's migrator does not match migrations by name. It reads the newest `created_at` in `drizzle.__drizzle_migrations` and applies only journal entries whose `when` is later. Rename your 0107 to 0108 by hand and it keeps its original `when`; if the 0107 that merged first was generated later, production skips yours and records nothing. CI's `test-migrations` job applies everything to an empty database and cannot see it, so `scripts/check_migration_order.py` (in `pnpm run check`, and against the base branch in CI) fails any entry whose `when` is not later than every earlier one. `0012_fix_rls_user_metadata` is the one grandfathered exception.
+
 ### Protocol when meta conflicts on merge
 
+Branch with one migration — the usual case:
+
+1. `git merge origin/main`. Resolve and stage every conflict outside `drizzle/`, `schema.ts` especially.
+2. `bash scripts/db-renumber-migration.sh`. It takes main's `drizzle/`, regenerates your migration under its old name (next number, fresh `when`, a snapshot chained to main's), checks that every generated statement is already in your reviewed SQL, puts the reviewed SQL back byte-for-byte (hand-written backfills included), runs the order check, and stages `drizzle/`.
+3. `pnpm run db:reset`, then `git commit` to conclude the merge.
+4. Tell the merge orchestrator the new number.
+
+The script stops, without shipping anything, when the regenerated migration does more than the reviewed one: your `schema.ts` resolution changed the branch's schema, or main carries deliberate drift that a later migration applies (an expand/contract column drop, where `schema.ts` already omits the columns). Finish those by hand.
+
+By hand (two migrations on the branch, or the script stopped):
+
 1. Take upstream's `drizzle/meta` (theirs).
-2. Delete your migration files (`.sql` + `_snapshot.json`).
+2. Set your migration `.sql` aside and delete it and its `_snapshot.json`.
 3. Resolve `schema.ts` manually.
-4. `pnpm db:generate` — Drizzle regenerates a fresh migration.
-5. Compare the new SQL to what you deleted; confirm intent preserved.
+4. `pnpm exec drizzle-kit generate --name <change>` — Drizzle regenerates a fresh migration with a fresh `when`.
+5. Compare the new SQL to what you set aside; carry over hand-written statements and drop anything that belongs to main's pending drift.
 6. `pnpm db:reset` to verify.
 
-Before merging any migration PR: every new `.sql` has a matching `_snapshot.json`; `pnpm db:generate` reports "No schema changes".
+Before merging any migration PR: every new `.sql` has a matching `_snapshot.json`, and `pnpm db:generate` reports "No schema changes" apart from drift a later migration on main is meant to apply.
+
+### Back-to-back migration merges
+
+Each merge starts its own production build, and `migrate:production` runs in each. `scripts/migrate-production.ts` takes a Postgres advisory lock first, so a second build waits for the first one's migrations ("Another deploy is migrating") and then finds nothing pending.
 
 ## Production Deploys (Vercel)
 

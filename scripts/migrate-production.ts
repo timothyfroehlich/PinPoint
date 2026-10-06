@@ -75,10 +75,29 @@ if (!connectionString) {
 const sql = postgres(connectionString, { max: 1, prepare: false });
 const db = drizzle(sql);
 
+// Two merges close together start two production builds, and drizzle's migrator
+// takes no lock of its own: both would read the same "newest applied" row and
+// both would run the pending migrations. A session-level advisory lock on the
+// one connection serializes them; the second build waits, then finds nothing
+// pending. The session pooler (:5432) gives this client its own backend for the
+// whole session, so a session lock holds. Closing the connection releases it.
+const MIGRATION_LOCK_KEY = "pinpoint.migrate-production";
+
+async function acquireMigrationLock(): Promise<void> {
+  const [row] = await sql<{ locked: boolean }[]>`
+    SELECT pg_try_advisory_lock(hashtext(${MIGRATION_LOCK_KEY})) AS locked
+  `;
+  if (row?.locked) return;
+  console.log("⏳ Another deploy is migrating; waiting for it to finish...");
+  await sql`SELECT pg_advisory_lock(hashtext(${MIGRATION_LOCK_KEY}))`;
+}
+
 async function main() {
   console.log("🔄 Running production migrations...");
 
   try {
+    await acquireMigrationLock();
+
     // Read migration journal to show what migrations exist
     const journalPath = join(process.cwd(), "drizzle", "meta", "_journal.json");
     const journal = JSON.parse(

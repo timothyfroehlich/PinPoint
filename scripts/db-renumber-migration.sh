@@ -1,0 +1,115 @@
+#!/usr/bin/env bash
+# Renumber this branch's Drizzle migration after the base branch's migrations,
+# keeping its reviewed SQL (hand-written statements included) byte-for-byte.
+#
+# Run it mid-merge: `git merge origin/main` stopped on drizzle/ conflicts, and
+# every conflict outside drizzle/ is resolved and staged (schema.ts especially).
+#
+#   bash scripts/db-renumber-migration.sh
+#
+# What it does:
+#   1. Takes the base branch's drizzle/ folder and drops this branch's migration
+#      files from the index.
+#   2. Regenerates the migration under its old name (`drizzle-kit generate --name`), which
+#      writes the next number, a fresh journal `when` and a snapshot that follows
+#      the base branch's. A fresh `when` matters: production applies only
+#      migrations newer than the newest one already applied
+#      (scripts/check_migration_order.py explains).
+#   3. Checks that every generated statement is already in the reviewed SQL
+#      (scripts/migration_statements.py), then puts the reviewed SQL back
+#      verbatim under the new number.
+#   4. Runs scripts/check_migration_order.py against the base branch and stages
+#      drizzle/. You conclude the merge with `git commit`.
+#
+# One migration per branch. A branch with two needs the manual protocol in the
+# pinpoint-deployment skill ("Migration Conflicts").
+
+set -euo pipefail
+
+die() {
+  printf 'db-renumber-migration: %s\n' "$*" >&2
+  exit 1
+}
+
+repo_root=$(git rev-parse --show-toplevel)
+cd "$repo_root"
+
+git rev-parse -q --verify MERGE_HEAD >/dev/null ||
+  die "no merge in progress. Run \`git merge origin/main\` first."
+
+base_side=MERGE_HEAD
+merge_base=$(git merge-base HEAD "$base_side")
+
+unresolved_outside=$(git diff --name-only --diff-filter=U | grep -v '^drizzle/' || true)
+if [[ -n "$unresolved_outside" ]]; then
+  die "resolve and stage these conflicts first:
+$unresolved_outside"
+fi
+
+if ! git diff --name-only --diff-filter=U | grep -q '^drizzle/'; then
+  printf 'No drizzle/ conflicts; nothing to renumber.\n'
+  exit 0
+fi
+
+journal_tags() {
+  git show "$1:drizzle/meta/_journal.json" | jq -r '.entries[].tag'
+}
+
+branch_tags=$(comm -13 <(journal_tags "$merge_base" | sort) <(journal_tags HEAD | sort))
+branch_count=$(grep -c . <<< "$branch_tags" || true)
+[[ "$branch_count" -eq 1 ]] ||
+  die "expected one migration on this branch, found ${branch_count}:
+${branch_tags}
+Use the manual protocol in the pinpoint-deployment skill."
+
+old_tag=$branch_tags
+old_number=${old_tag%%_*}
+name=${old_tag#*_}
+
+work_dir=$(mktemp -d)
+trap 'rm -rf "$work_dir"' EXIT
+git show "HEAD:drizzle/${old_tag}.sql" > "$work_dir/reviewed.sql"
+mkdir -p "$work_dir/base"
+git archive "$base_side" drizzle | tar -x -C "$work_dir/base"
+
+# Take the base branch's drizzle/ and drop this branch's files from the index.
+git checkout "$base_side" -- drizzle/
+git rm -q -f --ignore-unmatch "drizzle/${old_tag}.sql"
+if ! git cat-file -e "${base_side}:drizzle/meta/${old_number}_snapshot.json" 2>/dev/null; then
+  git rm -q -f --ignore-unmatch "drizzle/meta/${old_number}_snapshot.json"
+fi
+
+latest_tag() {
+  jq -r '.entries[-1].tag' drizzle/meta/_journal.json
+}
+
+before=$(latest_tag)
+pnpm exec drizzle-kit generate --name "$name"
+new_tag=$(latest_tag)
+if [[ "$new_tag" == "$before" ]]; then
+  # No schema changes: the reviewed migration was hand-written SQL only.
+  pnpm exec drizzle-kit generate --custom --name "$name"
+  new_tag=$(latest_tag)
+fi
+[[ "$new_tag" != "$before" ]] || die "drizzle-kit did not write a migration."
+
+if ! python3 scripts/migration_statements.py "drizzle/${new_tag}.sql" "$work_dir/reviewed.sql"; then
+  cat >&2 <<EOF
+
+db-renumber-migration: the regenerated migration does more than the reviewed one.
+Either the schema.ts merge resolution changed this branch's schema, or the base
+branch carries schema drift that a later migration is meant to apply. Shipping
+those statements would change what this migration does. Review them, then
+finish by hand (pinpoint-deployment skill, "Migration Conflicts"), or run
+\`git merge --abort\` and start over.
+EOF
+  exit 1
+fi
+
+cp "$work_dir/reviewed.sql" "drizzle/${new_tag}.sql"
+python3 scripts/check_migration_order.py --base-dir "$work_dir/base"
+git add drizzle/
+
+printf '\nRenumbered %s -> %s (SQL unchanged).\n' "$old_tag" "$new_tag"
+printf 'Next: pnpm run db:reset, then git commit to conclude the merge.\n'
+printf 'Tell the merge orchestrator the new number: %s\n' "${new_tag%%_*}"
