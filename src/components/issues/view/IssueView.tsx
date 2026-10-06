@@ -224,11 +224,15 @@ export function IssueView({
         sort={sort}
         display={display}
         pagination={pagination}
+        // The export action requires sign-in, so anonymous visitors are not
+        // offered Export.
         exportControl={
-          <ExportButton
-            query={serializeIssueViewState({ ...state, page: 1 }).toString()}
-            scope={exportScope}
-          />
+          result.signedIn ? (
+            <ExportButton
+              query={serializeIssueViewState({ ...state, page: 1 }).toString()}
+              scope={exportScope}
+            />
+          ) : undefined
         }
         busy={isPending}
         onResetAll={resetFilters}

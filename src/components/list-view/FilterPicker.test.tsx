@@ -112,6 +112,41 @@ describe("FilterPicker date ranges", () => {
     });
   });
 
+  it("applies an end only once its year is complete, keeping what is typed", () => {
+    const filter = rangeFilter();
+    render(<FilterPicker filter={filter} variant="popover" />);
+    const to = screen.getByLabelText("To");
+    // A date input reports the year digit by digit as it is typed.
+    for (const partial of ["0002-09-30", "0020-09-30", "0202-09-30"]) {
+      fireEvent.change(to, { target: { value: partial } });
+      expect(to).toHaveValue(partial);
+    }
+    expect(filter.onRangeChange).not.toHaveBeenCalled();
+    fireEvent.change(to, { target: { value: "2026-09-30" } });
+    expect(filter.onRangeChange).toHaveBeenCalledTimes(1);
+    expect(filter.onRangeChange).toHaveBeenCalledWith({
+      from: null,
+      to: "2026-09-30",
+    });
+  });
+
+  it("shows a new range from the host in place of what was typed", () => {
+    const filter = rangeFilter();
+    const { rerender } = render(
+      <FilterPicker filter={filter} variant="popover" />
+    );
+    fireEvent.change(screen.getByLabelText("From"), {
+      target: { value: "0020-01-01" },
+    });
+    rerender(
+      <FilterPicker
+        filter={{ ...filter, range: { from: "2026-01-01", to: null } }}
+        variant="popover"
+      />
+    );
+    expect(screen.getByLabelText("From")).toHaveValue("2026-01-01");
+  });
+
   it("reads the host's label rather than a count", () => {
     expect(
       filterSelectionText(rangeFilter({ valueLabel: "Since Sep 1, 2026" }))

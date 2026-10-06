@@ -72,7 +72,11 @@ export function peopleIn(
   return [...state.assignee, ...state.owner, ...state.reporter];
 }
 
-/** `state` without the machines and people that do not exist. */
+/**
+ * `state` without the machines and people that do not exist. Reporter
+ * offers no Unassigned (issues-list §4.10), so `unassigned` there is
+ * dropped like any other value that names nothing (list-views §9.3).
+ */
 export function keepExisting<State extends IssueViewSavedState>(
   state: State,
   machineSet: ReadonlyMap<string, string>,
@@ -86,7 +90,9 @@ export function keepExisting<State extends IssueViewSavedState>(
     machine: state.machine.filter((initials) => machineSet.has(initials)),
     assignee: keepPeople(state.assignee),
     owner: keepPeople(state.owner),
-    reporter: keepPeople(state.reporter),
+    reporter: keepPeople(state.reporter).filter(
+      (value) => value !== UNASSIGNED_PERSON_ID
+    ),
     watching: state.watching && viewerId !== null,
   };
 }
@@ -159,6 +165,9 @@ export async function loadIssueView({
     initials,
     name,
   }));
+  // My machines offers only the machines the control lists on its own, so
+  // a selected machine outside a tab's scope never joins it.
+  const offered = new Set(machineOptions.map((option) => option.initials));
   // A selected machine outside the options, such as one outside a tab's
   // scope, still shows by name on the control.
   for (const [initials, name] of selectedMachines) {
@@ -166,7 +175,6 @@ export async function loadIssueView({
       machineOptions.push({ initials, name });
     }
   }
-  const offered = new Set(machineOptions.map((option) => option.initials));
   // Every person who exists, plus any selected person the list lacks.
   const people = [...page.people];
   for (const [id, name] of selectedPeople) {

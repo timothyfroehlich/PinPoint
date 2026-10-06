@@ -393,6 +393,21 @@ describe("IssueView", () => {
     ).toEqual(["Alex"]);
   });
 
+  it("offers Export only to signed-in viewers, since exporting requires sign-in", () => {
+    const { unmount } = renderView({
+      result: result({ signedIn: false, myMachines: [] }),
+    });
+    expect(
+      screen.queryByRole("button", { name: "Export to CSV" })
+    ).not.toBeInTheDocument();
+    unmount();
+
+    renderView();
+    expect(
+      screen.getByRole("button", { name: "Export to CSV" })
+    ).toBeInTheDocument();
+  });
+
   it("searches without a placeholder, named for the list it searches (list-views §4.2)", () => {
     renderView();
     expect(

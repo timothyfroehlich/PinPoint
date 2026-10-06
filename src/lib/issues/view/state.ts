@@ -9,6 +9,7 @@ import {
   arraysEqual,
   canonicalFilterValues,
   canonicalPeopleValues,
+  parseDay,
   parsePageSize,
   positiveInteger,
   storedStateParams,
@@ -79,18 +80,6 @@ function parseSort(searchParams: ListSearchParams): {
         ? defaults.dir
         : ISSUE_VIEW_SORTS[sort].preferredDirection;
   return { sort, dir };
-}
-
-/** A calendar day `YYYY-MM-DD`, or null when `value` is not a real day. */
-export function parseDay(value: string | null | undefined): string | null {
-  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value ?? "");
-  if (!match) return null;
-  const day = `${match[1]}-${match[2]}-${match[3]}`;
-  const date = new Date(`${day}T00:00:00Z`);
-  return !Number.isNaN(date.getTime()) &&
-    date.toISOString().slice(0, 10) === day
-    ? day
-    : null;
 }
 
 /**

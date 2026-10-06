@@ -26,15 +26,10 @@ import {
   issueComments,
 } from "~/server/db/schema";
 import { OPEN_STATUSES } from "~/lib/issues/status";
-import { UNASSIGNED_PERSON_ID } from "~/lib/list-view/url-state";
+import { UNASSIGNED_PERSON_ID, UUID_PATTERN } from "~/lib/list-view/url-state";
 import { FORMER_USER_NAME } from "~/lib/timeline/resolve-person";
 import type { IssueViewSortDirection, IssueViewSortField } from "~/lib/types";
 import type { IssueFilters } from "./filters";
-
-// Postgres rejects a malformed uuid literal, so a person filter value that is
-// not UUID-shaped can name nobody and never reaches the query.
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** A person filter's account ids and whether it includes Unassigned. */
 function personValues(values: readonly string[]): {

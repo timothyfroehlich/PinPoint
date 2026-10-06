@@ -4,6 +4,7 @@ import * as React from "react";
 import { Search } from "lucide-react";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Input } from "~/components/ui/input";
+import { parsePlausibleDay } from "~/lib/list-view/url-state";
 import { cn } from "~/lib/utils";
 import type {
   ListDateRangeFilterModel,
@@ -260,7 +261,20 @@ function OptionsPicker({
   );
 }
 
-/** The two ends of a date range filter, each a calendar day or open. */
+/** What each date input shows: the range's ends, or empty when open. */
+function rangeDrafts(range: ListDateRangeFilterModel["range"]): {
+  from: string;
+  to: string;
+} {
+  return { from: range.from ?? "", to: range.to ?? "" };
+}
+
+/**
+ * The two ends of a date range filter, each a calendar day or open. A date
+ * input reports every keystroke, including a year typed digit by digit
+ * (0002, 0020, 0202, 2026), so each input keeps what it shows and an end is
+ * applied only once it is cleared or names a plausible day.
+ */
 function DateRangePicker({
   filter,
   variant,
@@ -270,10 +284,18 @@ function DateRangePicker({
 }): React.JSX.Element {
   const id = React.useId();
   const { range } = filter;
+  const [drafts, setDrafts] = React.useState(() => rangeDrafts(range));
+  // A new range from the host (a reset, another control, Back) replaces
+  // whatever the inputs show.
+  const [shownRange, setShownRange] = React.useState(range);
+  if (shownRange.from !== range.from || shownRange.to !== range.to) {
+    setShownRange(range);
+    setDrafts(rangeDrafts(range));
+  }
   const fieldClass = variant === "sheet" ? "h-11 text-base" : "h-9";
   const ends = [
-    { key: "from", label: "From", value: range.from },
-    { key: "to", label: "To", value: range.to },
+    { key: "from", label: "From", value: drafts.from },
+    { key: "to", label: "To", value: drafts.to },
   ] as const;
   return (
     <div
@@ -293,16 +315,18 @@ function DateRangePicker({
           <Input
             id={`${id}-${end.key}`}
             type="date"
-            value={end.value ?? ""}
+            value={end.value}
             max={end.key === "from" ? (range.to ?? undefined) : undefined}
             min={end.key === "to" ? (range.from ?? undefined) : undefined}
             onChange={(event) => {
-              const value =
-                event.target.value === "" ? null : event.target.value;
+              const typed = event.target.value;
+              setDrafts((current) => ({ ...current, [end.key]: typed }));
+              const day = typed === "" ? null : parsePlausibleDay(typed);
+              if (typed !== "" && day === null) return;
               filter.onRangeChange(
                 end.key === "from"
-                  ? { from: value, to: range.to }
-                  : { from: range.from, to: value }
+                  ? { from: day, to: range.to }
+                  : { from: range.from, to: day }
               );
             }}
             className={cn("flex-1", fieldClass)}

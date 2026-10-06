@@ -102,6 +102,24 @@ describe("loadIssueView", () => {
     expect(ids(result)).toEqual(["AA-02"]);
   });
 
+  it("ignores Unassigned for Reporter, which does not offer it (issues-list §4.10, list-views §9.3)", async () => {
+    const result = await load("reporter=unassigned&sort=id&dir=asc");
+    expect(result.state.reporter).toEqual([]);
+    expect(ids(result)).toEqual(["AA-01", "AA-02", "BB-01"]);
+
+    // Assignee keeps it (issues-list §4.6).
+    const assignee = await load("assignee=unassigned&sort=id&dir=asc");
+    expect(assignee.state.assignee).toEqual(["unassigned"]);
+    expect(ids(assignee)).toEqual(["BB-01"]);
+  });
+
+  it("offers My machines only from a tab's own machines, not a selected one outside it (issues-list §4.5)", async () => {
+    // The viewer owns AA, selected here from outside the tab's scope.
+    const result = await load("machine=AA", ["BB"]);
+    expect(result.machineOptions.map((m) => m.initials)).toEqual(["BB", "AA"]);
+    expect(result.myMachines).toEqual([]);
+  });
+
   it("leaves Removed machines out of Machine and My machines unless Presence includes Removed (issues-list §4.5)", async () => {
     const preset = await load("");
     expect(preset.machineOptions.map((m) => m.initials)).toEqual(["AA", "BB"]);
@@ -184,7 +202,8 @@ describe("issue Saved Views", () => {
       userId: VIEWER,
       host: "issues",
       name: "Mine",
-      state: saved,
+      // Reporter offers no Unassigned (issues-list §4.10).
+      state: { ...saved, reporter: ["unassigned"] },
       makeDefault: false,
     });
     if (!created.ok) throw new Error(created.message);
@@ -194,6 +213,7 @@ describe("issue Saved Views", () => {
       ...saved,
       assignee: ["me"],
       machine: ["AA"],
+      reporter: [],
     });
   });
 

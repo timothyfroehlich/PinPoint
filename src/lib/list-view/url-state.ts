@@ -62,6 +62,14 @@ export const UNASSIGNED_PERSON_ID = "unassigned";
 /** How the Unassigned shortcut and a record with nobody are named. */
 export const UNASSIGNED_PERSON_NAME = "Unassigned";
 
+/**
+ * The shape of a person id. Postgres rejects a malformed uuid literal, so a
+ * person filter value that is not UUID-shaped names nobody and is never
+ * looked up or queried.
+ */
+export const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const PEOPLE_SHORTCUTS = [ME_PERSON_ID, UNASSIGNED_PERSON_ID];
 
 /**
@@ -75,6 +83,35 @@ export function canonicalPeopleValues(values: readonly string[]): string[] {
     .filter((value) => !PEOPLE_SHORTCUTS.includes(value))
     .sort();
   return [...canonicalFilterValues(unique, PEOPLE_SHORTCUTS), ...people];
+}
+
+/** A calendar day `YYYY-MM-DD`, or null when `value` is not a real day. */
+export function parseDay(value: string | null | undefined): string | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value ?? "");
+  if (!match) return null;
+  const day = `${match[1]}-${match[2]}-${match[3]}`;
+  const date = new Date(`${day}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) &&
+    date.toISOString().slice(0, 10) === day
+    ? day
+    : null;
+}
+
+/** The earliest year a date filter end can plausibly name. */
+const EARLIEST_PLAUSIBLE_YEAR = 1900;
+
+/**
+ * `value` when it is a real calendar day from 1900 on, else null. A date
+ * input reports its year digit by digit as it is typed (0002, 0020, 0202,
+ * 2026), so only a plausible day is a finished entry worth applying.
+ */
+export function parsePlausibleDay(
+  value: string | null | undefined
+): string | null {
+  const day = parseDay(value);
+  return day !== null && Number(day.slice(0, 4)) >= EARLIEST_PLAUSIBLE_YEAR
+    ? day
+    : null;
 }
 
 /** A positive whole number from the URL, else `fallback`. */

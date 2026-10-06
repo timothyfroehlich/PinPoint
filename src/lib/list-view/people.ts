@@ -8,12 +8,8 @@ import {
   ME_PERSON_NAME,
   UNASSIGNED_PERSON_ID,
   UNASSIGNED_PERSON_NAME,
+  UUID_PATTERN,
 } from "./url-state";
-
-// Postgres rejects a malformed uuid literal, so only UUID-shaped values are
-// looked up; anything else cannot name a person.
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * The person filter values among `ids` that still name someone, with their
