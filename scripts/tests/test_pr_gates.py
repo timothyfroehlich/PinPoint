@@ -1201,11 +1201,19 @@ MINE_SQL = "ALTER TABLE a ADD COLUMN note text;--> statement-breakpoint\nUPDATE 
 @contextmanager
 def git_repo_with_migration_merge(
     variant: str = "renumber",
+    *,
+    names: tuple[str, ...] = ("mine",),
+    then_clean_merge: bool = False,
 ) -> Iterator[tuple[Path, str, str]]:
-    """Branch adds 0001_mine, main adds 0001_theirs, and the merge renumbers ours to 0002.
+    """Branch adds 0001_<name>…, main adds 0001_theirs, and the merge renumbers ours after it.
 
-    Variants break one renumber-merge condition each. Yields (repo, reviewed_sha, head_sha).
+    Variants break one renumber-merge condition each; then_clean_merge adds a later
+    clean merge of main. Yields (repo, reviewed_sha, head_sha).
     """
+    mine = [
+        (f"{k + 1:04d}_{name}", 2000 + k, f"{MINE_SQL}-- {name}\n")
+        for k, name in enumerate(names)
+    ]
     with tempfile.TemporaryDirectory() as tmp:
         repo = Path(tmp) / "repo"
         repo.mkdir()
@@ -1216,7 +1224,12 @@ def git_repo_with_migration_merge(
         git_cmd("commit", "-qm", "initial commit", cwd=repo)
 
         git_cmd("checkout", "-qb", "feat", cwd=repo)
-        write_migrations(repo, [INIT, ("0001_mine", 2000, MINE_SQL)])
+        write_migrations(repo, [INIT, *mine])
+        if variant == "branch_journal_edit_dropped":
+            journal_path = repo / "drizzle" / "meta" / "_journal.json"
+            journal = json.loads(journal_path.read_text())
+            journal["entries"][0]["breakpoints"] = False
+            journal_path.write_text(json.dumps(journal))
         if variant == "branch_drizzle_edit_dropped":
             (repo / "drizzle" / "0000_init.sql").write_text(
                 "CREATE TABLE a2 (id int);\n"
@@ -1243,12 +1256,17 @@ def git_repo_with_migration_merge(
             env={**os.environ, **GIT_ENV},
         )
         assert (repo / ".git" / "MERGE_HEAD").exists(), "merge did not start"
-        # The renumber resolution: main's drizzle/, ours re-appended as 0002.
+        # The renumber resolution: main's drizzle/, ours re-appended after 0001.
         git_cmd("checkout", "main", "--", "drizzle", cwd=repo)
-        git_cmd("rm", "-q", "drizzle/0001_mine.sql", cwd=repo)
-        sql = MINE_SQL.replace("'x'", "'y'") if variant == "sql_changed" else MINE_SQL
-        when = 2500 if variant == "old_when" else 4000
-        write_migrations(repo, [INIT, THEIRS, ("0002_mine", when, sql)])
+        for tag, _, _ in mine:
+            git_cmd("rm", "-q", f"drizzle/{tag}.sql", cwd=repo)
+        renumbered = []
+        for k, (tag, _, sql) in enumerate(mine):
+            if variant == "sql_changed":
+                sql = sql.replace("'x'", "'y'")
+            when = 2500 if variant == "old_when" else 4000 + k
+            renumbered.append((f"{k + 2:04d}{tag[4:]}", when, sql))
+        write_migrations(repo, [INIT, THEIRS, *renumbered])
         if variant == "outside_change":
             (repo / "app.txt").write_text("unreviewed change\n")
         if variant == "base_migration_edited":
@@ -1271,6 +1289,15 @@ def git_repo_with_migration_merge(
             journal_path.write_text(json.dumps(journal))
         git_cmd("add", "-A", cwd=repo)
         git_cmd("commit", "-qm", "Merge main, renumber migration", cwd=repo)
+        if then_clean_merge:
+            git_cmd("checkout", "-q", "main", cwd=repo)
+            (repo / "later.txt").write_text("later\n")
+            git_cmd("add", "-A", cwd=repo)
+            git_cmd("commit", "-qm", "main advances", cwd=repo)
+            git_cmd("checkout", "-q", "feat", cwd=repo)
+            git_cmd(
+                "merge", "-q", "--no-ff", "-m", "Merge main again", "main", cwd=repo
+            )
         head_sha = git_cmd("rev-parse", "HEAD", cwd=repo)
         yield repo, reviewed_sha, head_sha
 
@@ -1306,6 +1333,7 @@ def test_migration_renumber_merge_inherits_review_record() -> None:
         "journal_field_changed",
         "base_entry_changed",
         "branch_drizzle_edit_dropped",
+        "branch_journal_edit_dropped",
         "schema_conflict",
     ],
 )
@@ -1319,6 +1347,27 @@ def test_migration_merge_that_breaks_a_condition_stays_stale(variant: str) -> No
 
     assert summary["label"] == "stale review"
     assert summary["checkers"]["claude"]["verdict"] == "stale"
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"names": ("mine", "second")},
+        {"names": ("FAILED_jobs_index",)},
+        {"then_clean_merge": True},
+    ],
+    ids=["two_migrations", "tag_contains_fail", "later_clean_merge"],
+)
+def test_renumber_merge_shapes_inherit_with_renumber_label(kwargs: dict) -> None:
+    with git_repo_with_migration_merge(**kwargs) as (repo, reviewed_sha, head_sha):
+        with gate_env(
+            comment_pages=[[claude_review_record(reviewed_sha)]],
+            head_sha=head_sha,
+        ) as env:
+            summary = review_summary(env, cwd=repo)
+
+    assert summary["label"] == "approved"
+    assert summary["coverage"]["inherited_via"] == "migration renumber merge from main"
 
 
 def test_clean_merge_still_reports_pure_merge() -> None:

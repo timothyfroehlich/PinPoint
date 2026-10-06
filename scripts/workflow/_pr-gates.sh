@@ -220,8 +220,9 @@ _codex_check() {
 # which is what scripts/db-renumber-migration.sh produces. Returns 0 when:
 # - the clean merge conflicts only under drizzle/, and every path outside drizzle/
 #   matches it (a schema.ts conflict is a resolution someone has to review)
-# - the branch changed nothing under drizzle/ but its own migrations and the
-#   journal, so taking the base side's drizzle/ drops no reviewed change
+# - the branch changed nothing under drizzle/ but appending its own migrations
+#   (files and journal entries), so taking the base side's drizzle/ drops no
+#   reviewed change
 # - the base side's drizzle/ files are unchanged apart from the journal growing
 # - the journal is the base side's, followed in order by one entry per branch
 #   migration that matches the reviewed entry except for a later `when` and the
@@ -235,7 +236,8 @@ _is_migration_renumber_merge() {
   local branch_parent=$1 main_parent=$2 merge=$3 out=$4
   local clean_tree conflicted
   clean_tree=$(head -n1 <<< "$out")
-  conflicted=$(sed -n '2,/^$/p' <<< "$out" | sed '/^$/d')
+  # Conflicted paths run from line 2 to the first blank line; messages follow.
+  conflicted=$(awk 'NR == 1 { next } /^$/ { exit } { print }' <<< "$out")
   if [[ -n "$conflicted" ]] && grep -qv '^drizzle/' <<< "$conflicted"; then
     return 1
   fi
@@ -248,32 +250,34 @@ _is_migration_renumber_merge() {
   branch_journal=$(git show "${branch_parent}:drizzle/meta/_journal.json" 2>/dev/null) || return 1
   base_journal=$(git show "${merge_base}:drizzle/meta/_journal.json" 2>/dev/null) || return 1
 
-  # One "old_tag new_tag" line per branch migration, or FAIL.
+  # One "old_tag new_tag" line per branch migration; jq exits non-zero (error)
+  # when any condition fails.
   pairs=$(jq -rn --argjson main "$main_journal" --argjson merged "$merge_journal" \
     --argjson branch "$branch_journal" --argjson base "$base_journal" '
-    ($base.entries | map(.tag)) as $base_tags
-    | [ $branch.entries[] | select(.tag as $t | $base_tags | index($t) | not) ] as $mine
+    ($base.entries | length) as $b
+    | $branch.entries[$b:] as $mine
     | ($main.entries | length) as $n
     | ($main.entries | map(.when) | max // 0) as $newest
     | $merged.entries[$n:] as $added
     | if ($mine | length) == 0
+         or ($branch | del(.entries)) != ($base | del(.entries))
+         or $branch.entries[:$b] != $base.entries
          or ($merged | del(.entries)) != ($main | del(.entries))
          or $merged.entries[:$n] != $main.entries
          or ($added | length) != ($mine | length)
-      then "FAIL"
+      then error("not a renumber merge")
       else
-        [ range(0; $mine | length) as $i
-          | $added[$i] as $a | $mine[$i] as $o
-          | if ($a.tag | test("^[0-9]{4}_") | not)
-               or ($a.tag[0:4] | tonumber) != $a.idx
-               or $a.idx != $n + $i
-               or ($a.tag | sub("^[0-9]+_"; "")) != ($o.tag | sub("^[0-9]+_"; ""))
-               or ($a | del(.idx, .tag, .when)) != ($o | del(.idx, .tag, .when))
-               or $a.when <= (if $i == 0 then $newest else $added[$i - 1].when end)
-            then "FAIL" else "\($o.tag) \($a.tag)" end ]
-        | if any(.[]; . == "FAIL") then "FAIL" else .[] end
+        range(0; $mine | length) as $i
+        | $added[$i] as $a | $mine[$i] as $o
+        | if ($a.tag | test("^[0-9]{4}_") | not)
+             or ($a.tag[0:4] | tonumber) != $a.idx
+             or $a.idx != $n + $i
+             or ($a.tag | sub("^[0-9]+_"; "")) != ($o.tag | sub("^[0-9]+_"; ""))
+             or ($a | del(.idx, .tag, .when)) != ($o | del(.idx, .tag, .when))
+             or $a.when <= (if $i == 0 then $newest else $added[$i - 1].when end)
+          then error("not a renumber merge") else "\($o.tag) \($a.tag)" end
       end' 2>/dev/null) || return 1
-  [[ -n "$pairs" && "$pairs" != *FAIL* ]] || return 1
+  [[ -n "$pairs" ]] || return 1
 
   local journal="M"$'\t'"drizzle/meta/_journal.json"
   local expected=$journal branch_expected=$journal old_tag new_tag old_blob new_blob changes
