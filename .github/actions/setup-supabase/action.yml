@@ -93,7 +93,8 @@ runs:
         # The setting lives in the container's network namespace, so it does
         # NOT survive an auth-container restart. E2E global setup's normal
         # path (db:fast-reset) keeps the container; its full-reset fallback
-        # (db:_restart) recreates it and drops the setting.
+        # (`supabase db reset`, or db:reset on a remote backend) restarts it
+        # and drops the setting. Global setup warns when that happens.
         auth="supabase_auth_pinpoint"
         image=$(docker inspect --format '{{.Config.Image}}' "$auth") || {
           echo "::error::auth container $auth not found; cannot set tcp_tw_reuse"
