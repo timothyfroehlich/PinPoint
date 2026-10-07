@@ -8,8 +8,6 @@ import { z } from "zod";
 export const exportScopeSchema = z.discriminatedUnion("kind", [
   /** A standard Collection, by the handle in its URL: its id or view token. */
   z.object({ kind: z.literal("collection"), handle: z.string().min(1) }),
-  /** An owner Collection, by the owner's user id. */
-  z.object({ kind: z.literal("owner"), userId: z.uuid() }),
   /** A Tag, by its type and slug as they appear in its URL. */
   z.object({
     kind: z.literal("tag"),

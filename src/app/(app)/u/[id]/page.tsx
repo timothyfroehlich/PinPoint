@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import type React from "react";
 import { getViewer } from "~/lib/auth/viewer";
+import { ownerMachinesHref } from "~/lib/machines/links";
 import {
   getProfileById,
   getProfileActivityCounts,
@@ -71,7 +72,7 @@ export default async function ProfilePage({
             comments={counts.comments}
             machinesOwned={owned.total}
             fixed={counts.fixed}
-            collectionHref={`/c/owner/${id}`}
+            machinesHref={ownerMachinesHref(id)}
           />
 
           {profile.bio ? (

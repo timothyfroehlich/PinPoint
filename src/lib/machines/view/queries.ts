@@ -107,11 +107,9 @@ export async function getMachineViewBaseRows(
   const scopedMachineIds = await machineIdsForScope(tx, scope);
   if (scopedMachineIds?.length === 0) return [];
   const where =
-    scope.kind === "owner"
-      ? eq(machines.ownerId, scope.ownerId)
-      : scopedMachineIds === null
-        ? undefined
-        : inArray(machines.id, scopedMachineIds);
+    scopedMachineIds === null
+      ? undefined
+      : inArray(machines.id, scopedMachineIds);
   const rows = await tx.query.machines.findMany({
     where,
     columns: {
@@ -393,8 +391,6 @@ function scopeId(scope: MachineViewScope): string {
       return "";
     case "collection":
       return scope.collectionId;
-    case "owner":
-      return scope.ownerId;
     case "tag":
       return `${scope.tagType}/${scope.slug}`;
     case "handTag":
@@ -411,8 +407,6 @@ function scopeFromId(
       return { kind: "all" };
     case "collection":
       return { kind: "collection", collectionId: id };
-    case "owner":
-      return { kind: "owner", ownerId: id };
     case "tag": {
       // The tag type never contains "/"; the slug may, once decoded.
       const split = id.indexOf("/");
