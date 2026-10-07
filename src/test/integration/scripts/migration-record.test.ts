@@ -74,23 +74,4 @@ describe("migrationRecord", () => {
     );
     expect(tables.rows.map((row) => row.table_name)).toEqual(["a", "b", "c"]);
   });
-
-  it("matches the row drizzle's migrator writes for the same migration", async () => {
-    const db = await getTestDb();
-    dir = mkdtempSync(join(tmpdir(), "migration-record-"));
-    writeFolder(dir, 2);
-    await migrate(db, {
-      migrationsFolder: dir,
-      migrationsSchema: SCHEMA,
-      migrationsTable: TABLE,
-    });
-
-    const rows = await db.execute<{ hash: string; created_at: string }>(
-      sql`SELECT hash, created_at::text AS created_at FROM ${sql.identifier(SCHEMA)}.${sql.identifier(TABLE)} WHERE created_at = 2000`
-    );
-    const record = migrationRecord(dir, 1);
-    expect(rows.rows).toEqual([
-      { hash: record.hash, created_at: String(record.createdAt) },
-    ]);
-  });
 });

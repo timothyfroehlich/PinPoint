@@ -171,19 +171,23 @@ async function main() {
       journal.entries.indexOf(migrationEntry)
     );
 
-    // Check if already marked as applied: drizzle's rows carry the journal
-    // `when`; older runs of this script stored the tag as the hash. Matching on
-    // the content hash would confuse two migrations with identical files.
+    // Check if already marked as applied: drizzle's row for this migration has
+    // both its file hash and its journal `when` (either alone can be shared by
+    // another migration); older runs of this script stored the tag as the hash.
     const existingMigrations = await sql<{ created_at: string }[]>`
       SELECT hash, created_at
       FROM drizzle.__drizzle_migrations
-      WHERE created_at = ${record.createdAt} OR hash = ${migrationEntry.tag}
+      WHERE (hash = ${record.hash} AND created_at = ${record.createdAt})
+         OR hash = ${migrationEntry.tag}
     `;
 
     if (existingMigrations.length > 0) {
       console.log(
         `✅ Migration ${migrationEntry.tag} is already marked as applied`
       );
+      for (const row of existingMigrations) {
+        console.log(`   Recorded with created_at ${row.created_at}`);
+      }
       const legacy = existingMigrations.find(
         (row) => Number(row.created_at) !== record.createdAt
       );
@@ -209,7 +213,7 @@ async function main() {
     );
     if (hidden) {
       console.error(
-        `❌ ${hidden.tag} (and possibly others) is not recorded as applied and has an older journal \`when\`.\n` +
+        `❌ ${hidden.tag} (and possibly others) is not recorded as applied, and its journal \`when\` is not newer than ${migrationEntry.tag}'s.\n` +
           `   Marking ${migrationEntry.tag} would make drizzle's migrator skip them. Apply or mark them first.`
       );
       process.exitCode = 1;
