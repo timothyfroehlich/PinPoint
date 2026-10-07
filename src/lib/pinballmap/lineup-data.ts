@@ -47,9 +47,6 @@ export interface LineupData {
  * Everything the lineup comparison reads, from stored data only — the state
  * singleton, every machine, and the catalog rows it names. Nothing here calls
  * Pinball Map (CORE-PBM-001, lineup spec §2.3).
- *
- * Shared by the lineup page and the `/m` header's "to review" badge, so the
- * badge can never count differently from the page it links to (§4.1).
  */
 export async function loadLineupData(): Promise<LineupData> {
   const [state, machineRows] = await Promise.all([

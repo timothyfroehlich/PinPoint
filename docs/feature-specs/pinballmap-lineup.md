@@ -38,7 +38,7 @@ Every concept in `pinballmap.md` §1 applies unchanged — match, uncataloged, l
 
 ## 4. Summary
 
-- **4.1** The page states how many rows need review across all sections, the count in each section that has any, and that it compares machines not marked Removed. The machines list's link to the page shows the same count.
+- **4.1** The page states how many rows need review across all sections, the count in each section that has any, and that it compares machines not marked Removed.
 - **4.2** When no section has rows, the page says PinPoint and Pinball Map agree, with the number of titles in sync.
 
 ## 5. Sections
@@ -84,6 +84,7 @@ Changes to this document. Divergence-table rows are working state and are not lo
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-04 | §4.1: the machines list's link to the lineup page no longer shows the to-review count. |
 | 2026-09-30 | Renamed listing intent to lineup setting (and Insider Connected intent to Insider Connected setting) throughout, including title intent to title lineup setting; `pinballmap.md` §4.8 bans "intent" in user-facing copy. No behavior change. |
 | 2026-09-28 | §5.4: matching a machine to an entry sets it On the lineup; creating a machine for an entry opens the New Machine page with the entry's title selected and intent On. |
 | 2026-09-27 | Created. The lineup page at `/m/pinball-map` (§2), desktop-only (§2.6), with its header and refresh-failure notice (§3), summary count and nothing-to-review state (§4), four sections — Out of sync, In PinPoint, not linked, On Pinball Map, not linked, Availability conflict (§5) — in-sync and not-compared sections (§6), vocabulary (§7), and permissions (§8). |
