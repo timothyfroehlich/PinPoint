@@ -65,6 +65,23 @@ def test_statement_in_a_trailing_comment_does_not_count_as_present():
     ]
 
 
+def test_dashes_inside_quotes_are_not_comments():
+    """`--` inside a literal is text: '--old' and '--new' must not compare equal."""
+    reviewed = 'ALTER TABLE "t" ALTER COLUMN "c" SET DEFAULT \'--old\';'
+    generated = 'ALTER TABLE "t" ALTER COLUMN "c" SET DEFAULT \'--new\';'
+    assert missing_from_reviewed(generated, reviewed) == [generated]
+    assert missing_from_reviewed(reviewed, reviewed) == []
+
+
+def test_dollar_quoted_body_keeps_its_comment_markers():
+    body = (
+        "CREATE FUNCTION f() RETURNS int AS $fn$ SELECT 1; -- one\n$fn$ LANGUAGE sql;"
+    )
+    assert statements(body) == [
+        "CREATE FUNCTION f() RETURNS int AS $fn$ SELECT 1; -- one $fn$ LANGUAGE sql;"
+    ]
+
+
 def test_shared_chunk_lists_only_the_hand_written_part():
     generated = 'ALTER TABLE "tags" ADD COLUMN "slug" text;'
     reviewed = generated + '\nUPDATE "tags" SET "slug" = "name";\n'

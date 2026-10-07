@@ -24,21 +24,58 @@ from pathlib import Path
 BREAKPOINT = "--> statement-breakpoint"
 
 
-BLOCK_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
+DOLLAR_TAG = re.compile(r"\$[A-Za-z_][A-Za-z0-9_]*\$|\$\$")
+
+
+def strip_comments(sql: str) -> str:
+    """Replace `--` and `/* */` comments with a space, leaving quoted text alone.
+
+    Quoted text is a single-quoted literal, a double-quoted identifier, or a
+    dollar-quoted body, so a `--` or `/*` inside one is kept as written.
+    """
+    out: list[str] = []
+    i, n = 0, len(sql)
+    while i < n:
+        if sql.startswith("--", i):
+            end = sql.find("\n", i)
+            i = n if end == -1 else end
+            out.append(" ")
+        elif sql.startswith("/*", i):
+            end = sql.find("*/", i + 2)
+            i = n if end == -1 else end + 2
+            out.append(" ")
+        elif sql[i] in "'\"":
+            quote, j = sql[i], i + 1
+            while j < n:
+                if sql[j] == quote:
+                    if j + 1 < n and sql[j + 1] == quote:
+                        j += 2
+                        continue
+                    break
+                j += 1
+            out.append(sql[i : j + 1])
+            i = j + 1
+        elif (tag := DOLLAR_TAG.match(sql, i)) is not None:
+            end = sql.find(tag.group(0), tag.end())
+            j = n if end == -1 else end + len(tag.group(0))
+            out.append(sql[i:j])
+            i = j
+        else:
+            out.append(sql[i])
+            i += 1
+    return "".join(out)
 
 
 def statements(sql: str) -> list[str]:
     """Split migration SQL into statements, dropping comments and whitespace.
 
     Comments go first, so a statement commented out in the reviewed SQL does
-    not count as present.
+    not count as present. Only matching uses this; the SQL that ships is the
+    reviewed file, unchanged.
     """
     result: list[str] = []
-    for chunk in BLOCK_COMMENT.sub(" ", sql).split(BREAKPOINT):
-        # Drop `--` comments, whole-line or trailing, so text in a comment never
-        # counts as a statement. Only matching uses this; the SQL that ships is
-        # the reviewed file, unchanged.
-        lines = [line.split("--", 1)[0].strip() for line in chunk.splitlines()]
+    for chunk in sql.split(BREAKPOINT):
+        lines = [line.strip() for line in strip_comments(chunk).splitlines()]
         lines = [line for line in lines if line]
         if lines:
             result.append(" ".join(lines))

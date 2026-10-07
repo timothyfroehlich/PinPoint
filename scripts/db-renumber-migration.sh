@@ -52,8 +52,17 @@ $unresolved_outside"
 fi
 
 if ! git diff --name-only --diff-filter=U | grep -q '^drizzle/'; then
-  printf 'No drizzle/ conflicts; nothing to renumber.\n'
-  exit 0
+  # No textual conflict, but a hand renumber that kept an old `when` would
+  # still be skipped in production; the order check catches that.
+  check_dir=$(mktemp -d)
+  git archive "$base_side" drizzle | tar -x -C "$check_dir"
+  if python3 scripts/check_migration_order.py --base-dir "$check_dir"; then
+    rm -rf "$check_dir"
+    printf 'No drizzle/ conflicts and the migration order checks out; nothing to renumber.\n'
+    exit 0
+  fi
+  rm -rf "$check_dir"
+  die "no drizzle/ conflicts, but the migration order check failed (above)."
 fi
 
 journal_tags() {

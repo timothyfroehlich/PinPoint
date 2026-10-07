@@ -262,6 +262,19 @@ def test_refuses_when_the_branch_changed_other_drizzle_files(tmp_path: Path):
     assert "drizzle/meta/_journal.json" in unmerged
 
 
+def test_without_drizzle_conflicts_still_runs_the_order_check(tmp_path: Path):
+    """A hand renumber that kept its old `when` has no conflict left to resolve."""
+    repo = mid_merge_repo(tmp_path)
+    git(repo, "checkout", "main", "--", "drizzle")
+    git(repo, "rm", "-q", "drizzle/0001_mine.sql")
+    write_migrations(repo, [INIT, THEIRS, ("0002_mine", 2000, REVIEWED)])
+    git(repo, "add", "-A")
+    result = run_script(repo, tmp_path, GENERATED)
+
+    assert result.returncode == 1
+    assert "0002_mine: when 2000 is not later than 0001_theirs" in result.stderr
+
+
 def test_refuses_without_a_merge_in_progress(tmp_path: Path):
     repo = mid_merge_repo(tmp_path)
     git(repo, "merge", "--abort")
