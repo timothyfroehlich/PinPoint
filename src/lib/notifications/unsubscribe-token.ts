@@ -2,6 +2,7 @@ import "server-only";
 import { Buffer } from "node:buffer";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { log } from "~/lib/logger";
+import { isVercelProduction } from "~/lib/runtime-env";
 
 let warnedMissingSecret = false;
 
@@ -19,7 +20,7 @@ function getUnsubscribeSigningSecret(): string {
   const secret = process.env["UNSUBSCRIBE_SIGNING_SECRET"] ?? "";
   if (!secret && !warnedMissingSecret) {
     warnedMissingSecret = true;
-    if (process.env["VERCEL_ENV"] === "production") {
+    if (isVercelProduction()) {
       log.error(
         { action: "unsubscribe.signingSecretMissing" },
         "UNSUBSCRIBE_SIGNING_SECRET not set in production — unsubscribe links " +
