@@ -465,6 +465,15 @@ def test_assigned_file_absent_from_report_is_not_green(tmp_path: Path) -> None:
     assert "no verdict" in written
 
 
+def test_red_leg_names_its_failures_even_with_a_missing_file(tmp_path: Path) -> None:
+    payload = report(
+        files=[described("a.spec.ts", "A", [spec("chromium", "a breaks", False)])]
+    )
+    code, stdout, _ = run(tmp_path, payload, test_list=["a.spec.ts", "gone.spec.ts"])
+    assert code == 1
+    assert "a breaks" in stdout
+
+
 def test_assigned_file_with_only_skipped_tests_passes(tmp_path: Path) -> None:
     """A file quarantined with `test.describe.fixme` loads and skips; that is not a failure."""
     code, _, _ = run(tmp_path, _leg_report(), test_list=["a.spec.ts", "b.spec.ts"])

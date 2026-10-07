@@ -835,11 +835,18 @@ jobs:
           SHARD: ${{ matrix.shard }}/${{ matrix.total }}
           PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ runner.temp }}/e2e-list.json
         run: |
+          # --list exits non-zero on a spec load error; the shard script prints
+          # those errors from the report, so run it before failing on status.
+          list_status=0
           pnpm exec playwright test --config="$CONFIG" \
             --project=chromium --project="Mobile Chrome" \
-            --project="Mobile Safari" --list --reporter=json >/dev/null
+            --project="Mobile Safari" --list --reporter=json >/dev/null || list_status=$?
           python3 scripts/workflow/e2e-shard-files.py \
             "$RUNNER_TEMP/e2e-list.json" "$SHARD" >"$RUNNER_TEMP/e2e-shard.txt"
+          if [ "$list_status" -ne 0 ]; then
+            echo "::error::playwright --list exited $list_status"
+            exit "$list_status"
+          fi
           cat "$RUNNER_TEMP/e2e-shard.txt"
 
       # The Playwright step carries its OWN timeout-minutes, deliberately.

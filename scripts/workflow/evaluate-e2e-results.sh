@@ -7,7 +7,7 @@
 # can turn a red suite into a red job — so it has to be loud about every way
 # the suite can fail to produce a verdict, not just about failed specs.
 #
-# Two silent-failure paths it exists to close (PP-jxhy):
+# The silent-failure paths it exists to close (PP-jxhy, PP-yva7.3):
 #
 #   1. The run never finished. Playwright's JSON reporter writes the file once,
 #      at the end. A step that hits its timeout leaves no file — and if
@@ -139,26 +139,6 @@ if [ "$RUN_ERRORS" -gt 0 ]; then
   fail_no_verdict "\`${RESULTS}\` carries ${RUN_ERRORS} run-level error(s) outside any spec — see the step log above."
 fi
 
-if [ -n "$TEST_LIST" ]; then
-  # Read the list the way Playwright does: trimmed lines, skipping blanks and
-  # `#` comments.
-  if [ ! -r "$TEST_LIST" ]; then
-    fail_no_verdict "test list \`${TEST_LIST}\` is missing — the shard selection step did not write it."
-  fi
-  ASSIGNED_FILES=$(sed -e 's/\r$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' "$TEST_LIST" \
-    | { grep -v -e '^$' -e '^#' || true; } | sort -u)
-  if [ -z "$ASSIGNED_FILES" ]; then
-    fail_no_verdict "test list \`${TEST_LIST}\` names no file."
-  fi
-  REPORTED_FILES=$(jq -r '[.. | objects | select(has("specs")) | .specs[].file] | unique | .[]' "$RESULTS" | sort -u)
-  MISSING_FILES=$(comm -23 <(printf '%s\n' "$ASSIGNED_FILES") <(printf '%s\n' "$REPORTED_FILES"))
-  if [ -n "$MISSING_FILES" ]; then
-    echo "Assigned spec files absent from the report (${LABEL}):"
-    echo "$MISSING_FILES"
-    fail_no_verdict "$(printf '%s\n' "$MISSING_FILES" | wc -l | tr -d ' ') file(s) from \`${TEST_LIST}\` are absent from the report — see the step log above."
-  fi
-fi
-
 GATING_FAILS=$(jq -r --arg ng "$NON_GATING" "${JQ_GATING} | length" "$RESULTS")
 NON_GATING_FAILS=$(jq -r --arg ng "$NON_GATING" "${JQ_NON_GATING} | length" "$RESULTS")
 
@@ -211,6 +191,28 @@ if [ "$GATING_FAILS" -gt 0 ]; then
     emit_non_gating_summary
   } | summary
   exit 1
+fi
+
+# Checked after gating failures are named, so a red leg still lists its red
+# specs when an assigned file is also missing.
+if [ -n "$TEST_LIST" ]; then
+  # Read the list the way Playwright does: trimmed lines, skipping blanks and
+  # `#` comments.
+  if [ ! -r "$TEST_LIST" ]; then
+    fail_no_verdict "test list \`${TEST_LIST}\` is missing — the shard selection step did not write it."
+  fi
+  ASSIGNED_FILES=$(sed -e 's/\r$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' "$TEST_LIST" \
+    | { grep -v -e '^$' -e '^#' || true; } | sort -u)
+  if [ -z "$ASSIGNED_FILES" ]; then
+    fail_no_verdict "test list \`${TEST_LIST}\` names no file."
+  fi
+  REPORTED_FILES=$(jq -r '[.. | objects | select(has("specs")) | .specs[].file] | unique | .[]' "$RESULTS" | sort -u)
+  MISSING_FILES=$(comm -23 <(printf '%s\n' "$ASSIGNED_FILES") <(printf '%s\n' "$REPORTED_FILES"))
+  if [ -n "$MISSING_FILES" ]; then
+    echo "Assigned spec files absent from the report (${LABEL}):"
+    echo "$MISSING_FILES"
+    fail_no_verdict "$(printf '%s\n' "$MISSING_FILES" | wc -l | tr -d ' ') file(s) from \`${TEST_LIST}\` are absent from the report — see the step log above."
+  fi
 fi
 
 # auth.setup.ts runs on every comprehensive leg whatever its --test-list says,
