@@ -62,7 +62,7 @@ describe("migrationRecord", () => {
     // 0001 was applied by hand; mark it the way mark-migration-applied does.
     writeFolder(dir, 3);
     await db.execute(sql.raw(`CREATE TABLE ${SCHEMA}.b (id int)`));
-    const record = migrationRecord(dir, "0001_b");
+    const record = migrationRecord(dir, 1);
     await db.execute(
       sql`INSERT INTO ${sql.identifier(SCHEMA)}.${sql.identifier(TABLE)} (hash, created_at) VALUES (${record.hash}, ${record.createdAt})`
     );
@@ -88,7 +88,7 @@ describe("migrationRecord", () => {
     const rows = await db.execute<{ hash: string; created_at: string }>(
       sql`SELECT hash, created_at::text AS created_at FROM ${sql.identifier(SCHEMA)}.${sql.identifier(TABLE)} WHERE created_at = 2000`
     );
-    const record = migrationRecord(dir, "0001_b");
+    const record = migrationRecord(dir, 1);
     expect(rows.rows).toEqual([
       { hash: record.hash, created_at: String(record.createdAt) },
     ]);

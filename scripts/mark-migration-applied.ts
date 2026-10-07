@@ -168,7 +168,7 @@ async function main() {
 
     const record = migrationRecord(
       join(process.cwd(), "drizzle"),
-      migrationEntry.tag
+      journal.entries.indexOf(migrationEntry)
     );
 
     // Check if already marked as applied: drizzle's rows carry the journal

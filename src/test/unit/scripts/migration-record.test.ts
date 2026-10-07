@@ -28,6 +28,18 @@ describe("entryHiddenByMarking", () => {
     expect(entryHiddenByMarking(ENTRIES, m0012, 1000)).toBeUndefined();
   });
 
+  it("names an unapplied entry with the same when as the target", () => {
+    // drizzle applies an entry only when created_at < when, so a tie is hidden.
+    const twin = { tag: "0014_e", when: 4000 };
+    expect(entryHiddenByMarking([...ENTRIES, twin], m0013, 3000)?.tag).toBe(
+      "0014_e"
+    );
+  });
+
+  it("excludes the target by tag, not object identity", () => {
+    expect(entryHiddenByMarking(ENTRIES, { ...m0013 }, 3000)).toBeUndefined();
+  });
+
   it("has nothing to hide when the target is the oldest entry", () => {
     expect(entryHiddenByMarking(ENTRIES, m0010, 0)).toBeUndefined();
   });
