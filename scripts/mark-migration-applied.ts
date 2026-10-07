@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import postgres from "postgres";
 import { createInterface } from "node:readline/promises";
+import { createHash } from "node:crypto";
 import { readFileSync } from "fs";
 import { join } from "path";
 
@@ -166,10 +167,24 @@ async function main() {
     console.log(`🔍 Found migration: ${migrationEntry.tag}`);
 
     // Check if already marked as applied
+    // Record the row exactly as drizzle's migrator would: the sha256 of the
+    // migration file and the journal's `when` as created_at. The migrator
+    // applies only entries newer than the newest created_at, so stamping
+    // Date.now() here would make it skip every later journal entry.
+    const migrationSql = readFileSync(
+      join(process.cwd(), "drizzle", `${migrationEntry.tag}.sql`),
+      "utf-8"
+    );
+    const migrationHash = createHash("sha256")
+      .update(migrationSql)
+      .digest("hex");
+
+    // Older runs of this script stored the tag as the hash.
     const existingMigrations = await sql`
       SELECT hash, created_at
       FROM drizzle.__drizzle_migrations
-      WHERE hash = ${migrationEntry.tag}
+      WHERE hash IN (${migrationHash}, ${migrationEntry.tag})
+         OR created_at = ${migrationEntry.when}
     `;
 
     if (existingMigrations.length > 0) {
@@ -194,12 +209,9 @@ async function main() {
     // Mark migration as applied
     console.log(`📝 Marking migration ${migrationEntry.tag} as applied...`);
 
-    // Drizzle uses bigint timestamps (milliseconds since epoch)
-    const timestamp = Date.now();
-
     await sql`
       INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
-      VALUES (${migrationEntry.tag}, ${timestamp})
+      VALUES (${migrationHash}, ${migrationEntry.when})
     `;
 
     console.log(

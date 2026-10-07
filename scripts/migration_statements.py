@@ -47,8 +47,16 @@ def strip_comments(sql: str) -> str:
             i = n if end == -1 else end
             out.append(" ")
         elif sql.startswith("/*", i):
-            end = sql.find("*/", i + 2)
-            i = n if end == -1 else end + 2
+            # Postgres block comments nest.
+            depth, j = 1, i + 2
+            while j < n and depth:
+                if sql.startswith("/*", j):
+                    depth, j = depth + 1, j + 2
+                elif sql.startswith("*/", j):
+                    depth, j = depth - 1, j + 2
+                else:
+                    j += 1
+            i = j
             out.append(" ")
         elif sql[i] in "'\"":
             quote, j = sql[i], i + 1

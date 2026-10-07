@@ -85,6 +85,12 @@ def test_dollar_inside_an_identifier_is_not_a_dollar_quote():
     assert missing_from_reviewed(generated, reviewed) == [generated]
 
 
+def test_nested_block_comment_hides_the_whole_statement():
+    reviewed = '/* old: /* note */ ALTER TABLE "a" ADD COLUMN "c" text; */\nUPDATE "a" SET "id" = 1;'
+    generated = 'ALTER TABLE "a" ADD COLUMN "c" text;'
+    assert missing_from_reviewed(generated, reviewed) == [generated]
+
+
 def test_dollar_quoted_body_keeps_its_comment_markers():
     body = (
         "CREATE FUNCTION f() RETURNS int AS $fn$ SELECT 1; -- one\n$fn$ LANGUAGE sql;"
