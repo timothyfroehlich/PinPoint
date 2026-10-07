@@ -397,8 +397,9 @@ def test_push_change_detection_reaches_back_to_the_last_passing_main_run(
     Main runs one at a time and a newer merge cancels the waiting run, so a
     push's own `before` can skip a merge whose run never started. Diffing from
     `before` would let a docs-only merge's run skip E2E for the code merge it
-    superseded. Both filters take the reached-back base; the push audit keeps
-    `before`, because the PR-level audit already gated every lockfile change.
+    superseded. The code filter takes the reached-back base; the deps filter
+    and push audit stay per push, because every lockfile change was already
+    audited on its PR.
     (PP-yva7.7.)
     """
     changes = ci_workflow["jobs"]["changes"]
@@ -425,10 +426,8 @@ def test_push_change_detection_reaches_back_to_the_last_passing_main_run(
         "falling back to `before` can skip a superseded merge"
     )
 
-    for step_id in ("filter", "deps-filter"):
-        assert steps[step_id]["with"]["base"] == "${{ steps.base.outputs.sha }}", (
-            step_id
-        )
+    assert steps["filter"]["with"]["base"] == "${{ steps.base.outputs.sha }}"
+    assert "base" not in steps["deps-filter"]["with"], "deps stays per push"
     assert "steps.base.outputs.force == 'true'" in changes["outputs"]["deps"]
     assert steps["set-code"]["env"]["FORCE"] == "${{ steps.base.outputs.force }}"
 

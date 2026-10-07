@@ -23,11 +23,12 @@ permissions: read-all  # zizmor: ignore[excessive-permissions]
 # original shared group with cancel-in-progress). GitHub keeps at most one
 # more run waiting: a newer push to main cancels the waiting run before it
 # starts and waits in its place. Commits in a merge burst therefore get no run
-# of their own. The next run that executes covers them: the `changes` job diffs
-# against the last main commit a run passed on, not this push's `before`, so
-# their code still selects E2E and their lockfile still selects the audit. A
-# red result there may come from any commit since the last passing one, and
-# while main stays red every main run repeats the jobs the red range selects.
+# of their own. The next run that executes covers them: the `changes` job's
+# code filter diffs against the last main commit a run passed on, not this
+# push's `before`, so their code still selects E2E. (Dependency changes are
+# audited on their PRs; the push audit stays per push.) A red result may come
+# from any commit since the last passing one, and while main stays red every
+# main run repeats the jobs the red range selects.
 #
 # Re-run the newest main run, not an older one: a re-run joins this group as
 # the waiting run and cancels the newest merge's waiting run.
@@ -163,8 +164,9 @@ jobs:
       # so deps=true when ANY changed file is a dependency file (not ALL).
       - id: deps-filter
         uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d  # ratchet:dorny/paths-filter@v4.0.3
+        # Per push, not reached back: the push audit compares against
+        # `before`, and every lockfile change was already audited on its PR.
         with:
-          base: ${{ steps.base.outputs.sha }}
           filters: |
             deps:
               - 'pnpm-lock.yaml'
