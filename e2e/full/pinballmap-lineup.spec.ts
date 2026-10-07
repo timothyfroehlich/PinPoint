@@ -118,14 +118,50 @@ test.describe("Pinball Map lineup page (PP-o355.65)", () => {
           addRow.getByRole("button", { name: "Add to Pinball Map" })
         ).toBeVisible();
 
-        // The badge on /m shows the same count as the page.
-        const summary =
-          (await page.getByTestId("pbm-lineup-summary").textContent()) ?? "";
-        const pageCount = /(\d+) to review/.exec(summary)?.[1];
+        // The badge on /m shows the same "to review" count as the lineup page
+        // (pinballmap-lineup.md §4.1). Because parallel workers create and delete
+        // machines concurrently (e.g. apron-card, hand-tags, technician-role),
+        // poll both pages together until a quiet render produces matching counts.
+        await expect
+          .poll(
+            async () => {
+              await page.goto("/m");
+              const badgeEl = page.getByTestId("pinball-map-lineup-to-review");
+              const badgeValue = (await badgeEl.textContent())?.trim() ?? "";
+
+              await page.goto("/m/pinball-map");
+              const summaryText =
+                (await page.getByTestId("pbm-lineup-summary").textContent()) ??
+                "";
+              const pageValue = /(\d+) to review/.exec(summaryText)?.[1] ?? "";
+
+              return (
+                badgeValue.length > 0 &&
+                pageValue.length > 0 &&
+                badgeValue === pageValue
+              );
+            },
+            {
+              message:
+                "Expected /m badge count to match /m/pinball-map summary count",
+              timeout: 15_000,
+            }
+          )
+          .toBe(true);
+
+        // Verify the matching counts account for this test's own rows (at least 3)
+        // and that the badge matches its link aria-label on /m.
         await page.goto("/m");
-        await expect(
-          page.getByTestId("pinball-map-lineup-to-review")
-        ).toContainText(String(pageCount));
+        const badge = page.getByTestId("pinball-map-lineup-to-review");
+        await expect(badge).toBeVisible();
+        const badgeText = (await badge.textContent())?.trim() ?? "";
+        expect(Number.parseInt(badgeText, 10)).toBeGreaterThanOrEqual(3);
+
+        const lineupLink = page.getByTestId("pinball-map-lineup-button");
+        await expect(lineupLink).toHaveAttribute(
+          "aria-label",
+          `Pinball Map, ${badgeText} to review`
+        );
 
         // Entry point 2: the admin menu item.
         await page.getByTestId("user-menu-button").click();
