@@ -12,6 +12,7 @@ import {
   buildOrderBy,
 } from "~/lib/issues/filters-queries";
 import type { IssueFilters } from "~/lib/issues/filters";
+import { issueFiltersForExport } from "~/lib/issues/view/queries";
 import { generateCsv } from "~/lib/export/csv";
 import { extractFirstParagraph } from "~/lib/tiptap/first-paragraph";
 import { loadMentionNames } from "~/lib/tiptap/mention-names";
@@ -23,11 +24,7 @@ import {
   getIssueFrequencyLabel,
 } from "~/lib/issues/status";
 import { formatIssueId } from "~/lib/issues/utils";
-import {
-  exportIssuesSchema,
-  exportFiltersSchema,
-  type IssueExportScope,
-} from "./export-schema";
+import { exportIssuesSchema, type IssueExportScope } from "./export-schema";
 import { resolveExportScopeInitials } from "./export-scope";
 
 export type ExportIssuesResult = Result<
@@ -57,12 +54,13 @@ function formatDate(date: Date | null): string {
 }
 
 /**
- * Exports every issue matching the list's filters across all pages, within
- * the Surface's scope (issues-list §5.4): all issues on `/issues`, one
- * machine's issues from its page, or a Collection or Tag tab's issues.
+ * Exports every issue matching the list's View Configuration across all
+ * pages, within the Surface's scope (issues-list §5.4): all issues on
+ * `/issues`, one machine's issues from its page, or a Collection or Tag
+ * tab's issues.
  */
 export async function exportIssuesAction(input: {
-  filtersJson?: string;
+  query?: string;
   machineInitials?: string;
   scope?: IssueExportScope;
 }): Promise<ExportIssuesResult> {
@@ -84,58 +82,34 @@ export async function exportIssuesAction(input: {
       inputValidation.error.issues[0]?.message ?? "Invalid input"
     );
   }
-  const { filtersJson, machineInitials, scope } = inputValidation.data;
-
-  // 3. Parse filters
-  let filters: IssueFilters = {};
-  if (filtersJson) {
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(filtersJson) as unknown;
-    } catch {
-      return err("VALIDATION", "Invalid filter data.");
-    }
-    const filterValidation = exportFiltersSchema.safeParse(parsed);
-    // An unreadable filter must not widen the export to every issue.
-    if (!filterValidation.success) {
-      return err("VALIDATION", "Invalid filter data.");
-    }
-    filters = filterValidation.data;
-  }
+  const { query, machineInitials, scope } = inputValidation.data;
 
   try {
-    // Machine-page export: override machine filter
+    let filters: IssueFilters;
+    // A Collection or Tag Issues tab's machines (issues-list §2.2, §5.4),
+    // which the server resolves itself; no filter can widen them.
+    let scopeInitials: string[] | undefined;
     if (machineInitials) {
-      filters.machine = [machineInitials];
-      // Machine page exports ALL issues (no default status filter)
-      // Set status to empty array to mean "all statuses"
-      filters.status = [];
-      // Machine detail pages can show machines regardless of presence status
-      filters.includeInactiveMachines = true;
-    } else if (scope) {
-      // Collection or Tag Issues tab (issues-list §2.2, §5.4): the server
-      // resolves the tab's machines itself, and a requested machine filter
-      // narrows within them but never widens them.
-      // The scope loaders run inside the try so a loader failure is reported
-      // and returned as SERVER rather than thrown to the client.
-      const scopeInitials = await resolveExportScopeInitials(scope);
-      if (scopeInitials === null) {
-        return err("NOT_FOUND", "This list is not available.");
+      // Machine-page export: every issue on the machine, whatever its status
+      // or presence.
+      filters = { machine: [machineInitials], status: [], presence: [] };
+    } else {
+      // The list's own URL, parsed and validated exactly as the list does,
+      // so the export is the list across every page.
+      filters = await issueFiltersForExport(
+        new URLSearchParams(query ?? ""),
+        user.id
+      );
+      if (scope) {
+        // The scope loaders run inside the try so a loader failure is
+        // reported and returned as SERVER rather than thrown to the client.
+        const resolved = await resolveExportScopeInitials(scope);
+        if (resolved === null) {
+          return err("NOT_FOUND", "This list is not available.");
+        }
+        scopeInitials = resolved;
       }
-      const requested = filters.machine ?? [];
-      const scoped =
-        requested.length > 0
-          ? requested.filter((initials) => scopeInitials.includes(initials))
-          : scopeInitials;
-      // An empty machine filter would unscope the query, so stop here.
-      if (scoped.length === 0) {
-        return err("EMPTY", "No issues match the current filters.");
-      }
-      filters.machine = scoped;
     }
-
-    // Add currentUserId for watching filter
-    filters.currentUserId = user.id;
 
     // Fetch user role for isAdmin check in buildWhereConditions
     const userProfile = await db.query.userProfiles.findFirst({
@@ -145,8 +119,11 @@ export async function exportIssuesAction(input: {
     const isAdmin = userProfile?.role === "admin"; // permissions-audit-allow: SQL row-level filtering, not a request gate
 
     // 4. Query issues
-    const where = buildWhereConditions(filters, db, { isAdmin });
-    const orderBy = buildOrderBy(filters.sort);
+    const where = buildWhereConditions(filters, db, {
+      isAdmin,
+      scope: scopeInitials,
+    });
+    const orderBy = buildOrderBy(filters.sort, filters.dir);
 
     const issueRows = await db.query.issues.findMany({
       where: and(...where),

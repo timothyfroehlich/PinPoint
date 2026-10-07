@@ -41,18 +41,28 @@ export interface MachineChoice {
 /**
  * The machines a picker or filter offers, alphabetical by name. Removed
  * machines are left out unless `includeRemoved` is set; `keepInitials` keeps
- * specific machines listed anyway, such as ones already selected.
+ * specific machines listed anyway, such as ones already selected. `within`
+ * limits the choices to those machines, such as a Collection's.
  */
 export async function getMachineChoices(
   tx: DbTransaction = db,
-  options: { includeRemoved?: boolean; keepInitials?: readonly string[] } = {}
+  options: {
+    includeRemoved?: boolean;
+    keepInitials?: readonly string[];
+    within?: readonly string[];
+  } = {}
 ): Promise<MachineChoice[]> {
   const keep = options.keepInitials ?? [];
-  const where = options.includeRemoved
+  const presence = options.includeRemoved
     ? undefined
     : keep.length > 0
       ? or(machineNotRemoved(), inArray(machines.initials, [...keep]))
       : machineNotRemoved();
+  const within = options.within;
+  if (within?.length === 0) return [];
+  const where = within
+    ? and(inArray(machines.initials, [...within]), presence)
+    : presence;
   return tx.query.machines.findMany({
     where,
     columns: { id: true, initials: true, name: true },

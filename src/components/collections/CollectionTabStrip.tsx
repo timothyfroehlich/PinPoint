@@ -18,9 +18,11 @@ export function CollectionTabStrip({
   openIssueCount,
   status,
 }: CollectionTabStripProps): React.JSX.Element {
-  // Overview is the group's machine list: returning to it reopens its last
-  // view this tab session (list-views §11.1).
+  // Overview is the group's machine list and Issues its issue list:
+  // returning to either reopens its last view this tab session (list-views
+  // §11.1).
   const overviewHref = useListReturnHref(basePath);
+  const issuesHref = useListReturnHref(`${basePath}/issues`);
   return (
     <RouteTabStrip
       basePath={basePath}
@@ -31,6 +33,7 @@ export function CollectionTabStrip({
         {
           slug: "issues",
           label: "Issues",
+          href: issuesHref,
           badge: { count: openIssueCount, status },
         },
         { slug: "timeline", label: "Timeline" },

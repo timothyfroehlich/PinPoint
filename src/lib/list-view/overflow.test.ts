@@ -137,6 +137,27 @@ describe("planListHeader (list-views §8.2, §8.3)", () => {
     ).toMatchObject({ pager: "hidden", compactEdit: true });
   });
 
+  it("keeps no tab in place when there is no Applied View", () => {
+    // Save view (90) takes the edit slot; every tab may leave.
+    const noApplied = {
+      ...base,
+      appliedIndex: null,
+      editWidth: 90,
+      editCompactWidth: 90,
+    };
+    expect(
+      planListHeader({ ...noApplied, available: 100 + 2 + 90 + 202 })
+    ).toEqual({
+      visibleTabs: [],
+      showMoreViews: true,
+      pager: "hidden",
+      compactEdit: false,
+    });
+    expect(planListHeader({ ...noApplied, available: 50 }).visibleTabs).toEqual(
+      []
+    );
+  });
+
   it("falls back to the Applied View alone when nothing else fits", () => {
     expect(planListHeader({ ...base, available: 100 })).toEqual({
       visibleTabs: [0],

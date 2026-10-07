@@ -36,3 +36,5 @@ Never invent a value, a menu code or a switch number the source does not state. 
 ## Editing a set
 
 `sections` in `update_settings_set` replaces the whole list. Start from the sections `list_settings_sets` just returned, change only what the user asked for, and send the full list back with every section's `id` and the set's `version` from that read. A note whose text you send back unchanged keeps the formatting it had in the web app; a note you rewrite becomes plain text.
+
+To set or clear a machine's preferred House or Tournament set, pass `preferredHouse` or `preferredTournament` (`true` or `false`) to `update_settings_set`. Making a set preferred also turns a personal set into a community set and posts a visible timeline event on the machine. Only a set tagged with the slot's tag can be made preferred.

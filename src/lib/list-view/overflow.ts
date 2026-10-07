@@ -56,15 +56,15 @@ export interface ListHeaderFitInput {
   available: number;
   /** Each view tab's width, in order (the Applied View's tab included). */
   tabWidths: readonly number[];
-  /** Index of the Applied View's tab in `tabWidths`. */
-  appliedIndex: number;
+  /** Index of the Applied View's tab in `tabWidths`; null with no Applied View. */
+  appliedIndex: number | null;
   /** Width of More views, or 0 when the host never shows it. */
   moreViewsWidth: number;
   /** Whether More views shows even when every tab fits (it holds Saved Views or Manage views). */
   moreViewsAlways: boolean;
-  /** Width of Save and Discard changes; 0 when not Edited. */
+  /** Width of Save and Discard changes, or of Save view; 0 when neither shows. */
   editWidth: number;
-  /** Width of Save and the shorter "Discard"; 0 when not Edited. */
+  /** Width of Save and the shorter "Discard", or of Save view; 0 when neither shows. */
   editCompactWidth: number;
   /** The compact pager's width with its range text and without it. */
   pagerWidths: { full: number; compact: number };
@@ -103,9 +103,10 @@ function fitTabs(
     return { visibleTabs: all, showMoreViews: false };
   }
   // Tabs leave from the right; the Applied View's tab always stays (§8.2).
+  const pinned = appliedIndex === null ? [] : [appliedIndex];
   const others = all.filter((index) => index !== appliedIndex);
   for (let keep = others.length; keep >= 0; keep -= 1) {
-    const visible = [...others.slice(0, keep), appliedIndex].sort(
+    const visible = [...others.slice(0, keep), ...pinned].sort(
       (left, right) => left - right
     );
     if (leftWidth(visible, true) <= leftAvailable) {
@@ -142,7 +143,7 @@ export function planListHeader(input: ListHeaderFitInput): ListHeaderPlan {
     if (tabs) return { ...tabs, pager, compactEdit };
   }
   return {
-    visibleTabs: [input.appliedIndex],
+    visibleTabs: input.appliedIndex === null ? [] : [input.appliedIndex],
     showMoreViews: true,
     pager: "hidden",
     compactEdit: true,

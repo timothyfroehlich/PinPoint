@@ -296,9 +296,8 @@ describe("machine view database pipeline", () => {
     });
 
     expect(all.totalCount).toBe(0);
-    // Gamma is Removed: not counted, not in the headline total.
+    // Gamma is Removed: not counted.
     expect(all.summary.presence).toEqual({
-      total: 2,
       byPresence: {
         on_the_floor: 1,
         off_the_floor: 0,
@@ -311,8 +310,12 @@ describe("machine view database pipeline", () => {
       byStatus: { operational: 0, needs_service: 0, unplayable: 1 },
     });
     // The Collection tab holds Alpha and Gamma: only its own scope counts.
-    expect(collection.summary.presence.total).toBe(1);
-    expect(collection.summary.presence.byPresence.on_the_floor).toBe(1);
+    expect(collection.summary.presence.byPresence).toEqual({
+      on_the_floor: 1,
+      off_the_floor: 0,
+      on_loan: 0,
+      pending_arrival: 0,
+    });
     expect(collection.summary.playability.onTheFloor).toBe(1);
   });
 
