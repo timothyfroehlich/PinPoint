@@ -36,9 +36,8 @@ permissions: read-all  # zizmor: ignore[excessive-permissions]
 # This replaces per-SHA groups (PP-tbhv), which never cancelled but let every
 # merge run at once — up to 10 concurrent main runs in a day, each holding
 # runners under the account's 20-job cap while PR jobs queued. A main run takes
-# ~45 minutes until the comprehensive job's legs run in parallel (PP-yva7.3),
-# then ~15, so a merge normally waits at most one run before a run covering it
-# starts (a hung run holds the slot until its job timeouts end it).
+# ~15-20 minutes (the comprehensive legs run in parallel, PP-yva7.3), so a
+# merge normally waits at most one run before a run covering it starts (a hung run holds the slot until its job timeouts end it).
 # (PP-yva7.7.)
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -822,6 +821,7 @@ jobs:
       # must fail. After Setup Supabase because spec support modules read its
       # environment at import (e2e/support/supabase-admin.ts throws without it).
       - name: Select this shard's spec files
+        timeout-minutes: 5
         env:
           CONFIG: playwright.config.${{ matrix.suite }}.ts
           SHARD: ${{ matrix.shard }}/${{ matrix.total }}
@@ -866,12 +866,13 @@ jobs:
             --test-list "$RUNNER_TEMP/e2e-shard.txt"
 
       # The only step that fails the leg on test results. A missing report, an
-      # empty or all-skipped run, and run-level errors all fail it, not just
-      # red gating specs (evaluate-e2e-results.sh header).
+      # empty or all-skipped run, run-level errors, and an assigned file that
+      # executed no test all fail it, not just red gating specs
+      # (evaluate-e2e-results.sh header).
       - name: Evaluate gating browser results
         env:
           LABEL: ${{ matrix.suite }} ${{ matrix.shard }}/${{ matrix.total }}
-        run: bash scripts/workflow/evaluate-e2e-results.sh "$LABEL" playwright-report/results.json
+        run: bash scripts/workflow/evaluate-e2e-results.sh "$LABEL" playwright-report/results.json "$RUNNER_TEMP/e2e-shard.txt"
 
       - name: Upload Playwright report
         if: always()

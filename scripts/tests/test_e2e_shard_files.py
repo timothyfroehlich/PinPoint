@@ -22,10 +22,13 @@ shard_files = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(shard_files)
 
 
-def suite(file: str, tests_per_project: int, projects: int = 3) -> dict:
+BROWSERS = ["chromium", "Mobile Chrome", "Mobile Safari"]
+
+
+def suite(file: str, tests_per_project: int, projects: list[str] = BROWSERS) -> dict:
     """A file suite as `--list --reporter=json` emits it: specs nested under a describe."""
     specs = [
-        {"title": f"t{i}", "tests": [{"projectName": f"p{p}"} for p in range(projects)]}
+        {"title": f"t{i}", "tests": [{"projectName": p} for p in projects]}
         for i in range(tests_per_project)
     ]
     return {
@@ -42,9 +45,10 @@ REPORT = {
         suite("full/a.spec.ts", 2),
         suite("full/b.spec.ts", 2),
         suite("full/c.spec.ts", 1),
-        suite("../auth.setup.ts", 1, projects=1),
+        suite("auth.setup.ts", 1, projects=["auth-setup"]),
     ]
 }
+SPEC_FILES = sorted(s["file"] for s in REPORT["suites"] if s["file"] != "auth.setup.ts")
 
 
 def run(tmp_path: Path, report: dict, shard: str) -> subprocess.CompletedProcess[str]:
@@ -67,13 +71,33 @@ def test_shards_partition_every_file_exactly_once(tmp_path: Path, total: int) ->
         lines = result.stdout.splitlines()
         assert lines, f"shard {current}/{total} is empty"
         picked.extend(lines)
-    assert sorted(picked) == sorted(s["file"] for s in REPORT["suites"])
+    assert sorted(picked) == SPEC_FILES
 
 
 def test_counts_tests_in_nested_suites_across_projects() -> None:
     weights = shard_files.file_weights(REPORT)
     assert weights["full/big.spec.ts"] == 30
-    assert weights["../auth.setup.ts"] == 1
+
+
+def test_setup_project_files_are_not_sharded() -> None:
+    """auth.setup.ts runs on every leg as a dependency project, whatever the list says.
+
+    Listing it would weigh one leg down for nothing and let it count toward
+    filling the shards while running no browser spec.
+    """
+    assert "auth.setup.ts" not in shard_files.file_weights(REPORT)
+
+
+def test_setup_file_does_not_count_toward_filling_shards(tmp_path: Path) -> None:
+    report = {
+        "suites": [
+            suite("full/only.spec.ts", 3),
+            suite("auth.setup.ts", 1, projects=["auth-setup"]),
+        ]
+    }
+    result = run(tmp_path, report, "2/2")
+    assert result.returncode == 1
+    assert "cannot fill 2 shards" in result.stderr
 
 
 def test_balances_by_test_count_not_file_count() -> None:

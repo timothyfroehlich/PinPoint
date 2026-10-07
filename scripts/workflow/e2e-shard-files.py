@@ -38,11 +38,31 @@ def count_tests(node: Any) -> int:
     return 0
 
 
+# Dependency projects run on every leg whatever --test-list says, so their
+# files are not shardable: listing one would add weight to a leg for nothing,
+# and count toward filling the shards while running no browser spec.
+SETUP_PROJECTS = frozenset({"auth-setup"})
+
+
+def project_names(node: Any) -> set[str]:
+    """Every projectName under a report suite, at any nesting depth."""
+    if not isinstance(node, dict):
+        return set()
+    names = {
+        test.get("projectName", "")
+        for spec in node.get("specs", [])
+        for test in spec.get("tests", [])
+    }
+    for child in node.get("suites", []):
+        names |= project_names(child)
+    return names
+
+
 def file_weights(report: dict[str, Any]) -> dict[str, int]:
     weights: dict[str, int] = {}
     for suite in report.get("suites", []):
         file = suite.get("file")
-        if not file:
+        if not file or project_names(suite) <= SETUP_PROJECTS:
             continue
         weights[file] = weights.get(file, 0) + count_tests(suite)
     return weights

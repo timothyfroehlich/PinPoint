@@ -129,15 +129,27 @@ def described(file_title: str, describe_title: str, specs: list[dict]) -> dict:
 
 
 def run(
-    tmp_path: Path, payload: object | None, *, label: str = "Full"
+    tmp_path: Path,
+    payload: object | None,
+    *,
+    label: str = "Full",
+    test_list: list[str] | None = None,
 ) -> tuple[int, str, str]:
-    """Run the script against `payload`; `None` means write no file at all."""
+    """Run the script against `payload`; `None` means write no file at all.
+
+    `test_list` writes a leg's --test-list file and passes it as the third argument.
+    """
     results = tmp_path / "results.json"
     if payload is not None:
         results.write_text(payload if isinstance(payload, str) else json.dumps(payload))
     summary = tmp_path / "step-summary.md"
+    args = ["bash", str(SCRIPT_PATH), label, str(results)]
+    if test_list is not None:
+        listing = tmp_path / "e2e-shard.txt"
+        listing.write_text("".join(f"{line}\n" for line in test_list))
+        args.append(str(listing))
     proc = subprocess.run(
-        ["bash", str(SCRIPT_PATH), label, str(results)],
+        args,
         capture_output=True,
         text=True,
         env={
@@ -399,6 +411,74 @@ def test_missing_arguments_fail(tmp_path: Path) -> None:
     assert "usage:" in proc.stderr
 
 
+# --- 5. a leg's assigned files ---------------------------------------------------------
+
+
+def _with_file(entry: dict, file: str) -> dict:
+    return {**entry, "file": file}
+
+
+def _leg_report(*, skipped_file_status: str = "skipped") -> dict:
+    """A leg that ran a.spec.ts and auth-setup; b.spec.ts only has skipped tests."""
+    return report(
+        files=[
+            described("a.spec.ts", "A", [spec("chromium", "a works", True)]),
+            described(
+                "b.spec.ts",
+                "B",
+                [
+                    _with_file(
+                        spec("chromium", "b works", True, status=skipped_file_status),
+                        "b.spec.ts",
+                    )
+                ],
+            ),
+        ],
+        root_specs=[
+            _with_file(spec("auth-setup", "authenticate", True), "auth.setup.ts")
+        ],
+    )
+
+
+def test_every_assigned_file_ran_passes(tmp_path: Path) -> None:
+    code, _, _ = run(
+        tmp_path,
+        _leg_report(skipped_file_status="expected"),
+        test_list=["a.spec.ts", "b.spec.ts"],
+    )
+    assert code == 0
+
+
+def test_assigned_file_absent_from_report_is_not_green(tmp_path: Path) -> None:
+    """A --test-list path that matches nothing still leaves auth-setup green.
+
+    --test-list turns off Playwright's "no tests found" error, and the dependency
+    project runs regardless, so only this comparison notices the file never ran.
+    """
+    code, stdout, written = run(
+        tmp_path,
+        _leg_report(skipped_file_status="expected"),
+        test_list=["a.spec.ts", "b.spec.ts", "renamed/c.spec.ts"],
+    )
+    assert code == 1
+    assert "renamed/c.spec.ts" in stdout
+    assert "no verdict" in written
+
+
+def test_assigned_file_with_only_skipped_tests_is_not_green(tmp_path: Path) -> None:
+    code, stdout, _ = run(tmp_path, _leg_report(), test_list=["a.spec.ts", "b.spec.ts"])
+    assert code == 1
+    assert "b.spec.ts" in stdout
+
+
+def test_empty_test_list_is_not_green(tmp_path: Path) -> None:
+    code, _, written = run(
+        tmp_path, _leg_report(skipped_file_status="expected"), test_list=[]
+    )
+    assert code == 1
+    assert "no verdict" in written
+
+
 def _comprehensive_job() -> str:
     ci = _ci_yml()
     return ci.split("\n  test-e2e-comprehensive:\n", 1)[1].split("\n  gitleaks:", 1)[0]
@@ -430,7 +510,10 @@ def test_workflow_evaluates_the_report_its_run_wrote() -> None:
     path = "playwright-report/results.json"
     assert f"PLAYWRIGHT_JSON_OUTPUT_NAME: {path}" in run_step
     assert f"rm -f {path}" in run_step
-    assert f'evaluate-e2e-results.sh "$LABEL" {path}' in evaluate
+    assert (
+        f'evaluate-e2e-results.sh "$LABEL" {path} "$RUNNER_TEMP/e2e-shard.txt"'
+        in evaluate
+    )
 
 
 def _ci_yml() -> str:
@@ -451,6 +534,13 @@ def test_the_evaluate_step_is_the_gate() -> None:
     assert "continue-on-error: true" in _step(job, "Run Comprehensive")
     assert "continue-on-error" not in _step(job, "Evaluate gating browser results")
     assert "continue-on-error" not in _step(job, "Select this shard's spec files")
+
+
+def test_shard_selection_has_its_own_timeout() -> None:
+    """A hung `--list` must fail its step, not run out the job and read as cancelled."""
+    assert "timeout-minutes:" in _step(
+        _comprehensive_job(), "Select this shard's spec files"
+    )
 
 
 def test_matrix_legs_partition_each_suite() -> None:
