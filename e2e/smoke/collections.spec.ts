@@ -8,7 +8,7 @@
  * empty state. "Renders without 500" smoke — deeper behavior is covered by
  * integration tests (collections-actions / collections-user).
  *
- * Fixtures: the seeded member owns Attack from Mars (AFM) — see the collection-view
+ * Fixtures: the seeded member owns Attack from Mars (AFM) — see the owner-machines
  * spec — so it's a stable choice for the add-machine step.
  */
 

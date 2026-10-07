@@ -93,12 +93,12 @@ a blank Full-E2E cell is often correct by design) is in the
 
 ## Collections & tags
 
-| Feature surface                    | Unit | Integration | Smoke | Full E2E | Representative tests                                                                                                                                                     |
-| ---------------------------------- | :--: | :---------: | :---: | :------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Collections CRUD & view            |  ✓   |      ✓      |   ✓   |    ✓     | `components/collections/CreateCollectionDialog.test.tsx`, `collections-actions.test.ts`, `e2e/smoke/collection-view.spec.ts`, `e2e/full/collection-edit-sharing.spec.ts` |
-| Collaborators & share / view links |  ✓   |      ✓      |       |    ✓     | `components/collections/CollectionShareDialog.test.tsx`, `collections-collaborators.test.ts`, `e2e/full/collection-edit-sharing.spec.ts`                                 |
-| Owner collections                  |      |      ✓      |       |          | `collections-owner.test.ts`, `collections-user.test.ts`                                                                                                                  |
-| Tags (OPDB / manufacturer)         |  ✓   |      ✓      |       |          | `lib/tags/opdb.test.ts`, `opdb-tags.test.ts`, `manufacturer-tags.test.ts`                                                                                                |
+| Feature surface                    | Unit | Integration | Smoke | Full E2E | Representative tests                                                                                                                                                                             |
+| ---------------------------------- | :--: | :---------: | :---: | :------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Collections CRUD & view            |  ✓   |      ✓      |   ✓   |    ✓     | `components/collections/CreateCollectionDialog.test.tsx`, `collections-actions.test.ts`, `collections-user.test.ts`, `e2e/smoke/collections.spec.ts`, `e2e/full/collection-edit-sharing.spec.ts` |
+| Collaborators & share / view links |  ✓   |      ✓      |       |    ✓     | `components/collections/CollectionShareDialog.test.tsx`, `collections-collaborators.test.ts`, `e2e/full/collection-edit-sharing.spec.ts`                                                         |
+| A person's machines (Owner filter) |  ✓   |      ✓      |   ✓   |          | `test/unit/components/profiles/owned-machines.test.tsx`, `issue-export-scope.test.ts`, `e2e/smoke/owner-machines.spec.ts`                                                                        |
+| Tags (OPDB / manufacturer)         |  ✓   |      ✓      |       |          | `lib/tags/opdb.test.ts`, `opdb-tags.test.ts`, `manufacturer-tags.test.ts`                                                                                                                        |
 
 ## PinballMap integration
 
