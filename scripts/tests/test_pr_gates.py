@@ -1204,6 +1204,7 @@ def git_repo_with_migration_merge(
     *,
     names: tuple[str, ...] = ("mine",),
     then_clean_merge: bool = False,
+    renumber_twice: bool = False,
 ) -> Iterator[tuple[Path, str, str]]:
     """Branch adds 0001_<name>…, main adds 0001_theirs, and the merge renumbers ours after it.
 
@@ -1289,6 +1290,30 @@ def git_repo_with_migration_merge(
             journal_path.write_text(json.dumps(journal))
         git_cmd("add", "-A", cwd=repo)
         git_cmd("commit", "-qm", "Merge main, renumber migration", cwd=repo)
+        if renumber_twice:
+            # Main lands another migration; the branch renumbers again, 0002 -> 0003.
+            theirs2 = ("0002_theirs2", 5000, "CREATE TABLE c (id int);\n")
+            git_cmd("checkout", "-q", "main", cwd=repo)
+            write_migrations(repo, [INIT, THEIRS, theirs2])
+            git_cmd("add", "-A", cwd=repo)
+            git_cmd("commit", "-qm", "main migration 2", cwd=repo)
+            git_cmd("checkout", "-q", "feat", cwd=repo)
+            subprocess.run(
+                ["git", "merge", "-q", "--no-ff", "main"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                env={**os.environ, **GIT_ENV},
+            )
+            assert (repo / ".git" / "MERGE_HEAD").exists(), "merge did not start"
+            git_cmd("checkout", "main", "--", "drizzle", cwd=repo)
+            again = []
+            for k, (tag, _, sql) in enumerate(renumbered):
+                git_cmd("rm", "-q", f"drizzle/{tag}.sql", cwd=repo)
+                again.append((f"{k + 3:04d}{tag[4:]}", 6000 + k, sql))
+            write_migrations(repo, [INIT, THEIRS, theirs2, *again])
+            git_cmd("add", "-A", cwd=repo)
+            git_cmd("commit", "-qm", "Merge main, renumber again", cwd=repo)
         if then_clean_merge:
             git_cmd("checkout", "-q", "main", cwd=repo)
             (repo / "later.txt").write_text("later\n")
@@ -1355,8 +1380,9 @@ def test_migration_merge_that_breaks_a_condition_stays_stale(variant: str) -> No
         {"names": ("mine", "second")},
         {"names": ("FAILED_jobs_index",)},
         {"then_clean_merge": True},
+        {"renumber_twice": True},
     ],
-    ids=["two_migrations", "tag_contains_fail", "later_clean_merge"],
+    ids=["two_migrations", "tag_contains_fail", "later_clean_merge", "renumber_twice"],
 )
 def test_renumber_merge_shapes_inherit_with_renumber_label(kwargs: dict) -> None:
     with git_repo_with_migration_merge(**kwargs) as (repo, reviewed_sha, head_sha):
