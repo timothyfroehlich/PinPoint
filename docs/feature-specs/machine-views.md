@@ -107,7 +107,7 @@
 
 - **9.1** Machines offers five Built-in Views, in order: **On the floor** (On the Floor, by name — the Page Preset); **Needs attention** (On the Floor, Playability Needs service or Unplayable, worst first); **Service due** (On the Floor, oldest Last Serviced first); **All machines** (every presence state, by name); **Recently added** (every presence state except Removed, newest Date Added first, adding the Date Added field).
 - **9.2** Collections offer three Built-in Views, in order: **On the floor** (On the Floor, worst playability first — the Page Preset); **Needs attention** (On the Floor, Playability Needs service or Unplayable, worst first); **All machines** (every presence state, worst playability first).
-- **9.3** Unless 9.1 or 9.2 says otherwise, a Built-in View displays the Page Preset's fields at the Page Preset's page size.
+- **9.3** _Retired 2026-10-05._ Applying a Built-in View keeps the displayed fields and page size already showing (list-views §1). Number kept so older citations don't dangle.
 - **9.4** _Moved 2026-10-02_ to list-views §10.16.
 - **9.5** _Moved 2026-10-02_ to list-views §5.3 and §10.6.
 - **9.6** Built-in Views that share a name appear in the same order on every Surface.
@@ -125,7 +125,7 @@
 
 | Date | Change |
 | :-- | :-- |
-| 2026-10-05 | Tag and Collection Primary Filters (§3.12) and their `tag` and `collection` parameters (§4.1). |
+| 2026-10-05 | Built-in Views no longer set displayed fields or page size (§9.3). Tag and Collection Primary Filters (§3.12) and their `tag` and `collection` parameters (§4.1). |
 | 2026-10-04 | Collections open to On the Floor members by default (§4.8), matching §9.2. |
 | 2026-10-03 | Collections' Page Preset becomes On the floor (§9.2). |
 | 2026-10-03 | Presence and Last Activity join the default fields, Presence after Playability (§4.6); All machines and Recently added no longer add Presence (§9.1). Desktop and tablet rows are two lines, with manufacturer, year, and owner under the name (§3.2, §5.2); Owner, Manufacturer, and Year leave the default fields (§4.6). |

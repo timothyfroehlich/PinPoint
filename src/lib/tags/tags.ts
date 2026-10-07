@@ -3,7 +3,13 @@ import "server-only";
 import { cache } from "react";
 import { asc, eq, inArray, or } from "drizzle-orm";
 import { db, type DbTransaction } from "~/server/db";
-import { machines, machineTags, tags, tagTypes } from "~/server/db/schema";
+import {
+  machines,
+  machineTags,
+  tags,
+  tagSlugAliases,
+  tagTypes,
+} from "~/server/db/schema";
 import type { CollectionMachine } from "~/lib/collections/owner";
 import type { PickerMachine } from "~/lib/collections/user";
 import { isRemoved } from "~/lib/machines/presence";
@@ -275,22 +281,39 @@ export type ResolvedTag =
 
 function findHandTag(
   groups: readonly TagGroup[],
-  slug: string
+  matches: (tag: HandTag) => boolean
 ): ResolvedTag | null {
   for (const group of groups) {
     if (group.kind === "automatic") continue;
-    const tag = group.tags.find((candidate) => candidate.slug === slug);
+    const tag = group.tags.find(matches);
     if (tag) return { tag, group };
   }
   return null;
 }
 
 /**
+ * The id of the tag a merged tag's slug now leads to, or null when no merged
+ * tag had it (spec 11.19). Merging repoints older aliases, so this is always
+ * a tag that exists.
+ */
+export async function resolveTagSlugAlias(
+  tx: DbTransaction,
+  slug: string
+): Promise<string | null> {
+  const [row] = await tx
+    .select({ tagId: tagSlugAliases.tagId })
+    .from(tagSlugAliases)
+    .where(eq(tagSlugAliases.slug, slug));
+  return row?.tagId ?? null;
+}
+
+/**
  * The tag at `/c/tags/<typeSegment>/<slug>`, or null when there is none. An
  * automatic tag exists only while a machine carries it (spec 7.3). A
  * hand-applied tag's slug is unique on its own, so it resolves whatever the
- * type segment says; the caller redirects when `tag.href` is not the address
- * it was reached by.
+ * type segment says, and a merged tag's slug resolves to the tag it was
+ * merged into; the caller redirects when `tag.href` is not the address it was
+ * reached by.
  */
 export async function resolveTag(
   tx: DbTransaction,
@@ -307,7 +330,13 @@ export async function resolveTag(
   }
   // A hand-applied tag reached under any other segment, including an
   // automatic type's, is still that tag; the page redirects to its address.
-  return findHandTag(groups, slug);
+  const found = findHandTag(groups, (tag) => tag.slug === slug);
+  if (found) return found;
+  // A merged tag's slug leads to the tag it was merged into (11.19).
+  const aliasedId = await resolveTagSlugAlias(tx, slug);
+  return aliasedId === null
+    ? null
+    : findHandTag(groups, (tag) => tag.id === aliasedId);
 }
 
 /** Every tag a machine belongs to, in browse order (spec 7.4, 11.14). */

@@ -7,6 +7,7 @@ import {
   machines,
   machineTags,
   tags,
+  tagSlugAliases,
   tagTypes,
   userProfiles,
 } from "~/server/db/schema";
@@ -20,6 +21,7 @@ const {
   createTagTypeAction,
   deleteTagAction,
   deleteTagTypeAction,
+  mergeTagAction,
   moveTagAction,
   renameTagAction,
   renameTagTypeAction,
@@ -28,6 +30,8 @@ const {
   setTagTypeExclusiveAction,
 } = await import("~/app/(app)/c/tags/actions");
 const { resolveTag } = await import("~/lib/tags/tags");
+const { canonicalTagPath } =
+  await import("~/app/(app)/c/tags/[type]/[slug]/_data");
 
 const WHO = [
   "anonymous",
@@ -191,17 +195,18 @@ describe("hand-applied tag actions", () => {
     }
   );
 
-  // Spec 11.7, 11.16: matrix tags.manage.
+  // Spec 11.7, 11.16, 11.17: matrix tags.manage.
   it.each(
     (["anonymous", "guest", "member", "technician", "admin"] as const).map(
       (who) => ({ who, manage: who === "technician" || who === "admin" })
     )
   )(
-    "$who: change exclusivity and move tags=$manage",
+    "$who: change exclusivity, move and merge tags=$manage",
     async ({ who, manage }) => {
       const db = await getTestDb();
       const features = await insertType("Features", false);
       const tagId = await insertTag("Topper", null);
+      const kids = await insertTag("Kid-friendly", null);
       const deniedCode = who === "anonymous" ? "UNAUTHORIZED" : "FORBIDDEN";
       signInAs(who);
 
@@ -218,9 +223,17 @@ describe("hand-applied tag actions", () => {
       const moved = await moveTagAction({ tagId, tagTypeId: features.id });
       expect(moved.ok).toBe(manage);
       if (!moved.ok) expect(moved.code).toBe(deniedCode);
-      expect(await db.select({ typeId: tags.tagTypeId }).from(tags)).toEqual([
-        { typeId: manage ? features.id : null },
-      ]);
+      expect(
+        await db
+          .select({ typeId: tags.tagTypeId })
+          .from(tags)
+          .where(eq(tags.id, tagId))
+      ).toEqual([{ typeId: manage ? features.id : null }]);
+
+      const merged = await mergeTagAction({ tagId, targetTagId: kids });
+      expect(merged.ok).toBe(manage);
+      if (!merged.ok) expect(merged.code).toBe(deniedCode);
+      expect(await db.select().from(tags)).toHaveLength(manage ? 1 : 2);
     }
   );
 
@@ -760,6 +773,189 @@ describe("hand-applied tag actions", () => {
       expect(
         await moveTagAction({ tagId: topper, tagTypeId: crypto.randomUUID() })
       ).toMatchObject({ ok: false, code: "NOT_FOUND" });
+    });
+  });
+
+  describe("merging a tag into another (spec 11.17–11.19)", () => {
+    /** "<slug> → <tag name>" for every alias, sorted. */
+    async function aliases(): Promise<string[]> {
+      const db = await getTestDb();
+      const rows = await db
+        .select({ slug: tagSlugAliases.slug, tag: tags.name })
+        .from(tagSlugAliases)
+        .innerJoin(tags, eq(tags.id, tagSlugAliases.tagId));
+      return rows.map((row) => `${row.slug} → ${row.tag}`).sort();
+    }
+
+    it("moves the machines to the target, once each, and deletes the tag", async () => {
+      const db = await getTestDb();
+      const features = await insertType("Features", false);
+      const arcade = await insertTag("Arcade wall", null);
+      const topper = await insertTag("Topper", features);
+      await tagMachines([
+        [OWN.id, arcade],
+        [OTH.id, arcade],
+        [OTH.id, topper],
+        [THR.id, topper],
+      ]);
+      signInAs("technician");
+
+      expect(
+        await mergeTagAction({ tagId: arcade, targetTagId: topper })
+      ).toEqual({ ok: true, value: { href: "/c/tags/features/topper" } });
+      // The new rows carry the target's type columns.
+      expect(await membershipTypes()).toEqual([
+        `OTH:Topper:${features.id}:false`,
+        `OWN:Topper:${features.id}:false`,
+        `THR:Topper:${features.id}:false`,
+      ]);
+      expect(await db.select({ name: tags.name }).from(tags)).toEqual([
+        { name: "Topper" },
+      ]);
+      expect(await aliases()).toEqual(["arcade-wall → Topper"]);
+    });
+
+    it("sends the merged tag's page and tabs to the target's (11.19)", async () => {
+      const arcade = await insertTag("Arcade wall", null);
+      const features = await insertType("Features", false);
+      const topper = await insertTag("Topper", features);
+      signInAs("admin");
+      const merged = await mergeTagAction({
+        tagId: arcade,
+        targetTagId: topper,
+      });
+      if (!merged.ok) throw new Error(merged.message);
+
+      const tx = asDbOrTx(await getTestDb());
+      const old = { type: "other", slug: "arcade-wall" };
+      const resolved = await resolveTag(tx, old.type, old.slug);
+      if (!resolved) throw new Error("the merged tag's slug did not resolve");
+      expect(resolved.tag.href).toBe("/c/tags/features/topper");
+      // Only the slug differs here, and the redirect keeps the tab and query.
+      expect(
+        canonicalTagPath(resolved, { ...old, type: "features" }, "/issues", {
+          status: ["new", "confirmed"],
+        })
+      ).toBe("/c/tags/features/topper/issues?status=new&status=confirmed");
+      expect(canonicalTagPath(resolved, old, "/timeline")).toBe(
+        "/c/tags/features/topper/timeline"
+      );
+      expect(
+        canonicalTagPath(
+          resolved,
+          { type: "features", slug: "topper" },
+          "/timeline"
+        )
+      ).toBeNull();
+      expect(await resolveTag(tx, "other", "no-such-tag")).toBeNull();
+    });
+
+    it("merges into a tag of the same exclusive type", async () => {
+      const location = await insertType("Location", true);
+      const front = await insertTag("Front room", location);
+      const back = await insertTag("Back room", location);
+      await tagMachines([
+        [OWN.id, front],
+        [OTH.id, back],
+      ]);
+      signInAs("technician");
+
+      expect(
+        await mergeTagAction({ tagId: front, targetTagId: back })
+      ).toMatchObject({ ok: true });
+      expect(await membershipTypes()).toEqual([
+        `OTH:Back room:${location.id}:true`,
+        `OWN:Back room:${location.id}:true`,
+      ]);
+    });
+
+    it("follows chained merges to the last target", async () => {
+      const first = await insertTag("Arcade wall", null);
+      const second = await insertTag("Back wall", null);
+      const third = await insertTag("Wall", null);
+      await tagMachines([
+        [OWN.id, first],
+        [OTH.id, second],
+      ]);
+      signInAs("technician");
+
+      await mergeTagAction({ tagId: first, targetTagId: second });
+      await mergeTagAction({ tagId: second, targetTagId: third });
+      expect(await aliases()).toEqual([
+        "arcade-wall → Wall",
+        "back-wall → Wall",
+      ]);
+      expect(await memberships()).toEqual(["OTH:Wall", "OWN:Wall"]);
+      const tx = asDbOrTx(await getTestDb());
+      const resolved = await resolveTag(tx, "other", "arcade-wall");
+      expect(resolved?.tag.href).toBe("/c/tags/other/wall");
+    });
+
+    it("refuses a merge that would give a machine two tags of an exclusive type (11.18)", async () => {
+      const location = await insertType("Location", true);
+      const front = await insertTag("Front room", location);
+      const back = await insertTag("Back room", location);
+      const arcade = await insertTag("Arcade wall", null);
+      await tagMachines([
+        [OWN.id, arcade],
+        [OTH.id, arcade],
+        [THR.id, arcade],
+        // Already holding the target is fine; holding a sibling is not.
+        [OWN.id, front],
+        [THR.id, back],
+      ]);
+      signInAs("technician");
+      const before = await membershipTypes();
+
+      expect(
+        await mergeTagAction({ tagId: arcade, targetTagId: front })
+      ).toEqual({
+        ok: false,
+        code: "CONFLICT",
+        message: "1 machine would hold two Location tags",
+      });
+      expect(await membershipTypes()).toEqual(before);
+      expect(await aliases()).toEqual([]);
+      const db = await getTestDb();
+      expect(await db.select().from(tags)).toHaveLength(3);
+    });
+
+    it("refuses merging a tag into itself or a tag that does not exist", async () => {
+      const topper = await insertTag("Topper", null);
+      signInAs("admin");
+      expect(
+        await mergeTagAction({ tagId: topper, targetTagId: topper })
+      ).toMatchObject({ ok: false, code: "VALIDATION" });
+      // Automatic tags have no row, so no id the action could be handed.
+      expect(
+        await mergeTagAction({
+          tagId: topper,
+          targetTagId: crypto.randomUUID(),
+        })
+      ).toMatchObject({ ok: false, code: "NOT_FOUND" });
+      expect(
+        await mergeTagAction({
+          tagId: crypto.randomUUID(),
+          targetTagId: topper,
+        })
+      ).toMatchObject({ ok: false, code: "NOT_FOUND" });
+      const db = await getTestDb();
+      expect(await db.select().from(tags)).toHaveLength(1);
+    });
+
+    it("keeps a merged tag's slug from new tags", async () => {
+      const topper = await insertTag("Topper", null);
+      const shaker = await insertTag("Shaker motor", null);
+      signInAs("technician");
+      await mergeTagAction({ tagId: topper, targetTagId: shaker });
+
+      expect(
+        await createTagAction({ name: "Topper", tagTypeId: null })
+      ).toMatchObject({ ok: true, value: { href: "/c/tags/other/topper-2" } });
+      const tx = asDbOrTx(await getTestDb());
+      expect((await resolveTag(tx, "other", "topper"))?.tag.name).toBe(
+        "Shaker motor"
+      );
     });
   });
 });

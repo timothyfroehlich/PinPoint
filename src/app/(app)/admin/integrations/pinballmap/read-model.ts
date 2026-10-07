@@ -1,6 +1,7 @@
 import "server-only";
 
 import { log } from "~/lib/logger";
+import { reportError } from "~/lib/observability/report-error";
 import { getRegions } from "~/lib/pinballmap/client";
 import {
   getPinballMapState,
@@ -62,6 +63,10 @@ export async function getPinballMapAdminViewState(): Promise<PinballMapAdminView
         },
         "Failed to fetch regions from Pinball Map"
       );
+      reportError(err, {
+        action: "getPinballMapAdminViewState.getRegions",
+        bestEffort: true,
+      });
       return [{ id: 1, name: "austin", formalName: "Austin" }];
     }),
   ]);

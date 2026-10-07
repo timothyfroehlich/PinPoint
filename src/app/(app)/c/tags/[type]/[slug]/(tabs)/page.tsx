@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { MachineView } from "~/components/machines/view";
 import { EditTagMachinesDialog } from "~/components/tags/EditTagMachinesDialog";
 import { loadMachineView } from "~/lib/machines/view/queries";
-import { toMachineViewSearchParams } from "~/lib/machines/view/state";
+import { toListSearchParams } from "~/lib/list-view/url-state";
 import { loadMachineViewSavedViews } from "~/lib/machines/view/saved-views";
 import {
   canonicalTagPath,
@@ -26,7 +26,12 @@ export default async function TagOverviewPage({
   ]);
   const resolved = await getTagForLayout(type, slug);
   if (!resolved) notFound();
-  const canonical = canonicalTagPath(resolved, type, "", rawSearchParams);
+  const canonical = canonicalTagPath(
+    resolved,
+    { type, slug },
+    "",
+    rawSearchParams
+  );
   if (canonical !== null) redirect(canonical);
   const { tag } = resolved;
 
@@ -43,7 +48,7 @@ export default async function TagOverviewPage({
     );
   }
 
-  const viewSearchParams = toMachineViewSearchParams(rawSearchParams);
+  const viewSearchParams = toListSearchParams(rawSearchParams);
   const [{ savedViews }, result] = await Promise.all([
     loadMachineViewSavedViews("collection", viewSearchParams),
     loadMachineView({

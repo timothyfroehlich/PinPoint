@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { ApronBatchPrint } from "~/components/machines/apron/ApronBatchPrint";
 import { Forbidden } from "~/components/errors/Forbidden";
 import { PageContainer } from "~/components/layout/PageContainer";
-import { getViewer } from "~/lib/collections/viewer";
+import { getViewer } from "~/lib/auth/viewer";
 import { buildMachineHubUrl } from "~/lib/machines/hub-url";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { getLoginUrl, resolveRequestUrl } from "~/lib/url";

@@ -62,10 +62,7 @@ describe("MachineIssuesMenu", () => {
     // state so an off-floor machine's issues still show (issues-list §7.4).
     expect(
       screen.getByRole("menuitem", { name: /view all in issues list/i })
-    ).toHaveAttribute(
-      "href",
-      "/issues?machine=GZ&include_inactive_machines=true"
-    );
+    ).toHaveAttribute("href", "/issues?machine=GZ&presence=all");
 
     // Export item present.
     expect(

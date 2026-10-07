@@ -13,7 +13,7 @@ import { ensureUserProfile } from "~/lib/auth/profile";
 import { AppHeader } from "./AppHeader";
 import { BottomTabBar } from "./BottomTabBar";
 import changelogMeta from "@content/changelog-meta.json";
-import { getLastIssuesPath, getChangelogSeen } from "~/lib/cookies/preferences";
+import { getChangelogSeen } from "~/lib/cookies/preferences";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import {
   reportModePath,
@@ -29,10 +29,7 @@ export async function MainLayout({
   children: React.ReactNode;
 }): Promise<React.JSX.Element> {
   // Read user preferences from cookies (server-side)
-  const [issuesPath, changelogSeen] = await Promise.all([
-    getLastIssuesPath(),
-    getChangelogSeen(),
-  ]);
+  const changelogSeen = await getChangelogSeen();
 
   // Compute unread changelog count from metadata file
   const newChangelogCount = Math.max(
@@ -176,7 +173,6 @@ export async function MainLayout({
           role={userProfile?.role}
           userId={user?.id}
           notifications={enrichedNotifications}
-          issuesPath={issuesPath}
           newChangelogCount={newChangelogCount}
           reportHref={desktopReportHref}
         />
@@ -206,11 +202,7 @@ export async function MainLayout({
         </main>
 
         {/* Fixed bottom tab bar — mobile only (md:hidden is applied inside the component) */}
-        <BottomTabBar
-          role={userProfile?.role}
-          issuesPath={issuesPath}
-          reportHref={mobileReportHref}
-        />
+        <BottomTabBar role={userProfile?.role} reportHref={mobileReportHref} />
       </div>
     </QuickSearchProvider>
   );

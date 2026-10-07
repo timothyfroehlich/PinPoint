@@ -163,13 +163,13 @@ describe("exportIssuesAction — PGlite integration (CORE-TEST-004, CORE-TEST-00
   it("narrows within the scope and never widens it with a client machine filter", async () => {
     signInAs(OWNER);
     const result = await exportIssuesAction({
-      filtersJson: JSON.stringify({ machine: ["IN", "OUT"] }),
+      query: "machine=IN,OUT",
       scope: { kind: "collection", handle: collectionId },
     });
     expect(exportedIds(result)).toEqual(["IN-01"]);
 
     const outsideOnly = await exportIssuesAction({
-      filtersJson: JSON.stringify({ machine: ["OUT"] }),
+      query: "machine=OUT",
       scope: { kind: "collection", handle: collectionId },
     });
     expect(outsideOnly.ok).toBe(false);
@@ -212,7 +212,7 @@ describe("exportIssuesAction — PGlite integration (CORE-TEST-004, CORE-TEST-00
   it("exports every issue on /issues when no scope is named", async () => {
     signInAs(STRANGER);
     const result = await exportIssuesAction({
-      filtersJson: JSON.stringify({ sort: "issue_asc" }),
+      query: "sort=id&dir=asc",
     });
     // Default filters: open statuses on On the Floor machines.
     expect(exportedIds(result)).toEqual(["AL-01", "IN-01", "OUT-01"]);
@@ -250,10 +250,12 @@ describe("exportIssuesAction — PGlite integration (CORE-TEST-004, CORE-TEST-00
       }
     });
 
-    it("returns VALIDATION for malformed filtersJson", async () => {
+    it("returns VALIDATION for an oversized query", async () => {
       signInAs(STRANGER);
 
-      const result = await exportIssuesAction({ filtersJson: "not-json" });
+      const result = await exportIssuesAction({
+        query: `q=${"x".repeat(4000)}`,
+      });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -261,18 +263,17 @@ describe("exportIssuesAction — PGlite integration (CORE-TEST-004, CORE-TEST-00
       }
     });
 
-    it("returns VALIDATION rather than exporting everything when filters fail the schema", async () => {
+    it("ignores invalid values as the list does, never widening the export (list-views §9.3)", async () => {
       signInAs(STRANGER);
 
-      const result = await exportIssuesAction({
-        filtersJson: JSON.stringify({ status: ["invalid-status"] }),
+      const invalid = await exportIssuesAction({
+        query: "status=invalid-status&presence=nowhere&sort=id&dir=asc",
       });
+      const preset = await exportIssuesAction({ query: "sort=id&dir=asc" });
 
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.code).toBe("VALIDATION");
-        expect(result.message).toBe("Invalid filter data.");
-      }
+      // An invalid status or presence keeps the Page Preset's Open issues on
+      // On the Floor machines, exactly as the list shows them.
+      expect(exportedIds(invalid)).toEqual(exportedIds(preset));
     });
   });
 
@@ -284,7 +285,7 @@ describe("exportIssuesAction — PGlite integration (CORE-TEST-004, CORE-TEST-00
       signInAs(STRANGER);
 
       const result = await exportIssuesAction({
-        filtersJson: JSON.stringify({ q: "nonexistent-query-string" }),
+        query: "q=nonexistent-query-string",
       });
 
       expect(result.ok).toBe(false);
@@ -342,7 +343,7 @@ describe("exportIssuesAction — PGlite integration (CORE-TEST-004, CORE-TEST-00
       signInAs(STRANGER);
 
       const result = await exportIssuesAction({
-        filtersJson: JSON.stringify({ sort: "issue_asc" }),
+        query: "sort=id&dir=asc",
       });
 
       expect(result.ok).toBe(true);
@@ -387,13 +388,11 @@ describe("exportIssuesAction — PGlite integration (CORE-TEST-004, CORE-TEST-00
   // Filter parsing & coercion
   // ---------------------------------------------------------------------------
   describe("filter parsing", () => {
-    it("coerces ISO date strings in filtersJson into Date objects", async () => {
+    it("reads a Created range from the query (issues-list §4.8)", async () => {
       signInAs(STRANGER);
 
       const result = await exportIssuesAction({
-        filtersJson: JSON.stringify({
-          createdFrom: "2026-01-15T00:00:00.000Z",
-        }),
+        query: "created=2026-01-15..",
       });
 
       expect(result.ok).toBe(true);
@@ -407,7 +406,7 @@ describe("exportIssuesAction — PGlite integration (CORE-TEST-004, CORE-TEST-00
       signInAs(STRANGER);
 
       const result = await exportIssuesAction({
-        filtersJson: JSON.stringify({ watching: true, sort: "issue_asc" }),
+        query: "watching=true&sort=id&dir=asc",
       });
 
       expect(result.ok).toBe(true);

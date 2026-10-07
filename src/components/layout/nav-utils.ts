@@ -13,18 +13,14 @@ const ISSUE_DETAIL_PATTERN = /^\/m\/[^/]+\/i(\/|$)/;
  *
  * Special cases:
  * - Issue detail pages (`/m/[initials]/i/...`) activate the Issues tab, NOT Machines.
- * - The Issues href is resolved from the user's saved filter path (e.g. `/issues?status=open`).
+ * - `tabHref` is the item's plain path; a link may carry a remembered list
+ *   query (list-views §11.1), which never affects which item is active.
  */
-export function isNavItemActive(
-  tabHref: string,
-  pathname: string,
-  resolvedIssuesPath: string
-): boolean {
+export function isNavItemActive(tabHref: string, pathname: string): boolean {
   // Issue detail pages (/m/[initials]/i and /m/[initials]/i/[number]) belong to the Issues tab
   const isIssuePage = ISSUE_DETAIL_PATTERN.test(pathname);
 
-  const href = tabHref === "/issues" ? resolvedIssuesPath : tabHref;
-  const basePath = href.split("?")[0] ?? href;
+  const basePath = tabHref.split("?")[0] ?? tabHref;
 
   if (basePath === "/m") {
     // Machines tab: match /m/* but NOT issue detail pages
