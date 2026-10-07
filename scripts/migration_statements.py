@@ -46,7 +46,12 @@ def strip_comments(sql: str) -> str:
             out.append(" ")
         elif sql[i] in "'\"":
             quote, j = sql[i], i + 1
+            # E'...' strings also escape with a backslash.
+            escapes = quote == "'" and i > 0 and sql[i - 1] in "Ee"
             while j < n:
+                if escapes and sql[j] == "\\":
+                    j += 2
+                    continue
                 if sql[j] == quote:
                     if j + 1 < n and sql[j + 1] == quote:
                         j += 2

@@ -115,6 +115,8 @@ def check_tree(drizzle_dir: Path) -> list[str]:
             errors.append(f"drizzle/meta/{snapshot_path.name} is not in the journal")
             continue
         snapshot = json.loads(snapshot_path.read_text())
+        if not isinstance(snapshot.get("id"), str):
+            errors.append(f"drizzle/meta/{snapshot_path.name} has no id")
         if previous_id is not None and snapshot.get("prevId") != previous_id:
             errors.append(
                 f"drizzle/meta/{snapshot_path.name}: prevId does not match the "

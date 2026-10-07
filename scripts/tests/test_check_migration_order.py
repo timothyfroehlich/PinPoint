@@ -119,6 +119,12 @@ def test_missing_and_orphaned_files_fail(tmp_path: Path):
     assert any("0002_snapshot.json is not in the journal" in e for e in errors)
 
 
+def test_snapshot_without_an_id_fails(tmp_path: Path):
+    drizzle = write_tree(tmp_path, BASE)
+    (drizzle / "meta" / "0000_snapshot.json").write_text(json.dumps({"prevId": "x"}))
+    assert any("0000_snapshot.json has no id" in e for e in check_tree(drizzle))
+
+
 def test_broken_snapshot_chain_fails(tmp_path: Path):
     drizzle = write_tree(tmp_path, BASE)
     (drizzle / "meta" / "0001_snapshot.json").write_text(

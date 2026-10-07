@@ -83,7 +83,7 @@
     "check:rule-ids:orphans": "python3 scripts/check_rule_ids.py --orphans",
     "check:e2e-specs": "python3 scripts/check_e2e_spec_locations.py",
     "check:seed-steps": "node scripts/check-seed-steps.mjs",
-    "check:_run": "pnpm run check:prototype-clean && npm-run-all --silent --parallel typecheck typecheck:tests typecheck:e2e lint format:fix check:linters check:rule-ids check:e2e-specs check:seed-steps check:migration-order audit:role-checks audit:sm-structural check:behind-main",
+    "check:_run": "pnpm run check:prototype-clean && npm-run-all --silent --parallel typecheck typecheck:tests typecheck:e2e lint format:fix check:linters check:rule-ids check:e2e-specs check:seed-steps audit:role-checks audit:sm-structural check:behind-main && pnpm run --silent check:migration-order",
     "check": "python3 scripts/quiet-run.py --label check -- pnpm run check:_run",
     "check:human": "pnpm run check:_run",
     "preflight": "python3 scripts/quiet-run.py --label preflight -- bash scripts/workflow/preflight.sh",

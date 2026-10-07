@@ -153,10 +153,12 @@ fi
 if ! python3 scripts/migration_statements.py "drizzle/${new_tag}.sql" "$work_dir/reviewed.sql"; then
   cat >&2 <<EOF
 
-db-renumber-migration: the regenerated migration does more than the reviewed one.
-Either the schema.ts merge resolution changed this branch's schema, or the base
-branch carries schema drift that a later migration is meant to apply. Shipping
-those statements would change what this migration does.
+db-renumber-migration: the regenerated migration has statements the reviewed one lacks.
+Usual causes: the reviewed migration hand-edited a generated statement (a DEFAULT
+or backfill added to a NOT NULL column), the schema.ts merge resolution changed
+this branch's schema, or the base branch carries schema drift a later migration
+is meant to apply. Shipping the regenerated statements would change what this
+migration does.
 EOF
   exit 1
 fi

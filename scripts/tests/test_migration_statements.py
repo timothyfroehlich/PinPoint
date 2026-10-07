@@ -73,6 +73,12 @@ def test_dashes_inside_quotes_are_not_comments():
     assert missing_from_reviewed(reviewed, reviewed) == []
 
 
+def test_backslash_escaped_quote_in_an_e_string_does_not_flip_quote_state():
+    reviewed = 'UPDATE t SET s = E\'it\\\'s\';\n-- ALTER TABLE "t" DROP COLUMN "c";\n'
+    generated = 'ALTER TABLE "t" DROP COLUMN "c";'
+    assert missing_from_reviewed(generated, reviewed) == [generated]
+
+
 def test_dollar_quoted_body_keeps_its_comment_markers():
     body = (
         "CREATE FUNCTION f() RETURNS int AS $fn$ SELECT 1; -- one\n$fn$ LANGUAGE sql;"
