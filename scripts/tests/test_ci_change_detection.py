@@ -389,6 +389,46 @@ def test_setup_job_gates_on_code_or_deps(ci_workflow: dict) -> None:
     assert "needs.changes.outputs.deps == 'true'" in setup_if
 
 
+def test_push_change_detection_reaches_back_to_the_last_executed_main_run(
+    ci_workflow: dict,
+) -> None:
+    """A push to main diffs against the last main commit a CI run executed on.
+
+    Main runs one at a time and a newer merge cancels the waiting run, so a
+    push's own `before` can skip a merge whose run never started. Diffing from
+    `before` would let a docs-only merge's run skip E2E for the code merge it
+    superseded. Both filters and the push audit take the reached-back base.
+    (PP-yva7.7.)
+    """
+    changes = ci_workflow["jobs"]["changes"]
+    steps = {step.get("id"): step for step in changes["steps"]}
+
+    checkout = next(
+        s for s in changes["steps"] if "actions/checkout@" in s.get("uses", "")
+    )
+    assert checkout["with"]["fetch-depth"] == 0, "the diff must reach past `before`"
+
+    base = steps["base"]
+    assert base["if"] == "github.event_name == 'push'"
+    assert '.conclusion == "success" or .conclusion == "failure"' in base["run"], (
+        "a run cancelled while waiting never executed and must not be the base"
+    )
+    assert "git merge-base --is-ancestor" in base["run"]
+
+    for step_id in ("filter", "deps-filter"):
+        assert steps[step_id]["with"]["base"] == "${{ steps.base.outputs.sha }}", (
+            step_id
+        )
+    assert changes["outputs"]["base"] == "${{ steps.base.outputs.sha }}"
+
+    audit_env = next(
+        s["env"]
+        for s in ci_workflow["jobs"]["pnpm-audit"]["steps"]
+        if "BASE_SHA" in s.get("env", {})
+    )
+    assert "needs.changes.outputs.base" in audit_env["BASE_SHA"]
+
+
 def test_mixed_changes_trigger_tests(paths_filter: PathsFilterSimulator) -> None:
     """A PR mixing non-code files with a website file must trigger tests."""
     mixed_files = [

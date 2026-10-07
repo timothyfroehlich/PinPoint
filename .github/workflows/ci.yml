@@ -23,14 +23,17 @@ permissions: read-all  # zizmor: ignore[excessive-permissions]
 # original shared group with cancel-in-progress). GitHub keeps at most one
 # more run waiting: a newer push to main cancels the waiting run before it
 # starts and waits in its place. Commits in a merge burst therefore get no run
-# of their own; the newest commit's run covers them, and a red result there
-# may come from any change in the burst.
+# of their own. The next run that executes covers them: the `changes` job diffs
+# against the last main commit a run executed on, not this push's `before`, so
+# their code still selects E2E and their lockfile still selects the audit. A
+# red result there may come from any commit since that previous run.
 #
 # This replaces per-SHA groups (PP-tbhv), which never cancelled but let every
 # merge run at once — up to 10 concurrent main runs in a day, each holding
 # runners under the account's 20-job cap while PR jobs queued. A main run takes
 # ~45 minutes until the comprehensive job's legs run in parallel (PP-yva7.3),
-# then ~15, so a merge waits at most one run before its own starts. (PP-yva7.7.)
+# then ~15, so a merge waits at most one run before a run covering it starts.
+# (PP-yva7.7.)
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -63,6 +66,7 @@ jobs:
     outputs:
       code: ${{ steps.set-code.outputs.code }}
       deps: ${{ steps.deps-filter.outputs.deps }}
+      base: ${{ steps.base.outputs.sha }}
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
@@ -72,9 +76,37 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0  # the push diff below can reach back past `before`
+
+      # Main runs one at a time and a newer merge cancels the waiting run (see
+      # the concurrency block), so this push's `before` can skip merges whose
+      # run never started. Diffing against the last main commit a CI run
+      # actually executed on keeps those merges' changes selecting the jobs that
+      # cover them. A run cancelled while waiting reports `cancelled`; one that
+      # ran reports success or failure (a job timeout fails it). (PP-yva7.7.)
+      - name: Find the last main commit CI ran on
+        id: base
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          sha=$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?branch=main&event=push&status=completed&per_page=30" \
+            --jq '[.workflow_runs[] | select(.conclusion == "success" or .conclusion == "failure")][0].head_sha // empty') || sha=""
+          if [ -n "$sha" ] && git merge-base --is-ancestor "$sha" HEAD; then
+            echo "Diffing against $sha, the last main commit a CI run executed on."
+          else
+            echo "::warning::No executed main run found; diffing against this push's before ($BEFORE)."
+            sha="$BEFORE"
+          fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
       - id: filter
         uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d  # ratchet:dorny/paths-filter@v4.0.3
         with:
+          base: ${{ steps.base.outputs.sha }}
           predicate-quantifier: "every"
           filters: |
             has_code:
@@ -115,6 +147,7 @@ jobs:
       - id: deps-filter
         uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d  # ratchet:dorny/paths-filter@v4.0.3
         with:
+          base: ${{ steps.base.outputs.sha }}
           filters: |
             deps:
               - 'pnpm-lock.yaml'
@@ -891,7 +924,7 @@ jobs:
       # keeps pnpm's mise shim resolving from the checkout.
       - name: Run pnpm audit
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || needs.changes.outputs.base || github.event.before }}
         run: |
           # Writes "<id> <package>: <title>" per high/critical advisory in the
           # lockfile at $1 to $RUNNER_TEMP/$2.ids; fails when there is no report.
