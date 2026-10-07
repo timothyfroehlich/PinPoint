@@ -1,6 +1,5 @@
 import "server-only";
 
-import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 
 import { checkPermission } from "~/lib/permissions/helpers";
@@ -15,9 +14,9 @@ import {
 } from "~/lib/pinballmap/catalog";
 
 import {
+  defineTool,
   McpToolError,
   READ_ONLY_TOOL_ANNOTATIONS,
-  runTool,
   type ToolOutcome,
 } from "./shared";
 import type { McpAuthContext } from "~/lib/mcp/verify-token";
@@ -223,19 +222,12 @@ export async function runSearchPinballmapCatalog(
   return { result };
 }
 
-export function registerSearchPinballmapCatalog(server: McpServer): void {
-  server.registerTool(
-    "search_pinballmap_catalog",
-    {
-      title: "Search the Pinball Map catalog",
-      description:
-        "Search the local Pinball Map catalog mirror. Pass 'query' to search edition families and standalone titles; pass 'machineGroupId' to list individual editions for a multi-edition family. Returns matching titles with their pinballmapMachineId.",
-      inputSchema: searchPinballmapCatalogSchema,
-      annotations: READ_ONLY_TOOL_ANNOTATIONS,
-    },
-    (args, extra) =>
-      runTool("search_pinballmap_catalog", extra, (ctx) =>
-        runSearchPinballmapCatalog(args, ctx)
-      )
-  );
-}
+export const searchPinballmapCatalogTool = defineTool({
+  name: "search_pinballmap_catalog",
+  title: "Search the Pinball Map catalog",
+  description:
+    "Search the local Pinball Map catalog mirror. Pass 'query' to search edition families and standalone titles; pass 'machineGroupId' to list individual editions for a multi-edition family. Returns matching titles with their pinballmapMachineId.",
+  inputSchema: searchPinballmapCatalogSchema,
+  annotations: READ_ONLY_TOOL_ANNOTATIONS,
+  run: runSearchPinballmapCatalog,
+});

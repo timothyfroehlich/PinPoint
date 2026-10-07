@@ -1,6 +1,5 @@
 import "server-only";
 
-import type { McpServer } from "@modelcontextprotocol/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
@@ -26,10 +25,10 @@ import {
   toStoredSections,
 } from "./settings-set-shape";
 import {
+  defineTool,
   machineUrl,
   McpToolError,
   resolveMachine,
-  runTool,
   type ToolOutcome,
   WRITE_TOOL_ANNOTATIONS,
 } from "./shared";
@@ -334,22 +333,13 @@ export async function runUpdateSettingsSet(
   };
 }
 
-export function registerUpdateSettingsSet(server: McpServer): void {
-  server.registerTool(
-    "update_settings_set",
-    {
-      title: "Update a settings set",
-      description:
-        "Change a settings set's name, description, or sections, make your personal set a community set, apply or remove its House and Tournament tags, or set/clear it as the machine's preferred House or Tournament set. Making a set preferred also turns it into a community set and adds a timeline event. Supply machine and set id (from list_settings_sets) plus at least one field. sections replaces every section, so send the full list read from list_settings_sets with your edits applied. Content edits need edit rights: a personal set's author, or for a community set technicians, the owner and admins. Each change adds a timeline entry on the machine.",
-      inputSchema: updateSettingsSetSchema,
-      annotations: WRITE_TOOL_ANNOTATIONS,
-    },
-    (args, extra) =>
-      runTool(
-        "update_settings_set",
-        extra,
-        (ctx) => runUpdateSettingsSet(args, ctx),
-        { mutates: true }
-      )
-  );
-}
+export const updateSettingsSetTool = defineTool({
+  name: "update_settings_set",
+  title: "Update a settings set",
+  description:
+    "Change a settings set's name, description, or sections, make your personal set a community set, apply or remove its House and Tournament tags, or set/clear it as the machine's preferred House or Tournament set. Making a set preferred also turns it into a community set and adds a timeline event. Supply machine and set id (from list_settings_sets) plus at least one field. sections replaces every section, so send the full list read from list_settings_sets with your edits applied. Content edits need edit rights: a personal set's author, or for a community set technicians, the owner and admins. Each change adds a timeline entry on the machine.",
+  inputSchema: updateSettingsSetSchema,
+  annotations: WRITE_TOOL_ANNOTATIONS,
+  mutates: true,
+  run: runUpdateSettingsSet,
+});

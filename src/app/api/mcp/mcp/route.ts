@@ -6,7 +6,11 @@ import {
   MCP_RESOURCE_METADATA_PATH,
 } from "~/lib/mcp/config";
 import { registerPinpointTools } from "~/lib/mcp/tools";
-import { READ_ONLY_TOOL_ANNOTATIONS, runTool } from "~/lib/mcp/tools/shared";
+import {
+  defineTool,
+  READ_ONLY_TOOL_ANNOTATIONS,
+  registerToolDefinition,
+} from "~/lib/mcp/tools/shared";
 import { requireMcpAuthContext, verifyToken } from "~/lib/mcp/verify-token";
 import { checkMcpRequestLimit } from "~/lib/rate-limit";
 
@@ -24,29 +28,26 @@ export const maxDuration = 60;
  * Tools: the PinPoint tool catalog ({@link registerPinpointTools}) plus a
  * `whoami` diagnostic used to validate the connection end-to-end.
  */
+const whoamiTool = defineTool({
+  name: "whoami",
+  title: "Who am I",
+  description:
+    "Return the PinPoint identity, access level, client id, and auth mode resolved from the credential. Use this to confirm the connection is authenticated and authorized.",
+  annotations: READ_ONLY_TOOL_ANNOTATIONS,
+  run: (_args, auth) =>
+    Promise.resolve({
+      result: {
+        userId: auth.userId,
+        accessLevel: auth.accessLevel,
+        clientId: auth.clientId,
+        authMode: auth.authMode,
+      },
+    }),
+});
+
 const handler = createMcpHandler(
   (server) => {
-    server.registerTool(
-      "whoami",
-      {
-        title: "Who am I",
-        description:
-          "Return the PinPoint identity, access level, client id, and auth mode resolved from the credential. Use this to confirm the connection is authenticated and authorized.",
-        annotations: READ_ONLY_TOOL_ANNOTATIONS,
-      },
-      (ctx) =>
-        runTool("whoami", ctx, (auth) =>
-          Promise.resolve({
-            result: {
-              userId: auth.userId,
-              accessLevel: auth.accessLevel,
-              clientId: auth.clientId,
-              authMode: auth.authMode,
-            },
-          })
-        )
-    );
-
+    registerToolDefinition(server, whoamiTool);
     registerPinpointTools(server);
   },
   {

@@ -1,6 +1,5 @@
 import "server-only";
 
-import type { McpServer } from "@modelcontextprotocol/server";
 import { and, eq } from "drizzle-orm";
 import { isDeepStrictEqual } from "node:util";
 import { z } from "zod";
@@ -21,7 +20,7 @@ import {
   machineUrl,
   McpToolError,
   resolveMachine,
-  runTool,
+  defineTool,
   type ToolOutcome,
   WRITE_TOOL_ANNOTATIONS,
 } from "./shared";
@@ -136,22 +135,13 @@ export async function runCreateSettingsSet(
   };
 }
 
-export function registerCreateSettingsSet(server: McpServer): void {
-  server.registerTool(
-    "create_settings_set",
-    {
-      title: "Create a settings set",
-      description:
-        "Add a settings set to a machine: named, with software adjustment rows (menu code, name, value, plus the baseline install they change from), tables, DIP switch banks, and plain-text notes (e.g. rubbers and post positions). The set is your personal set — only you can edit it — tagged House, plus Tournament when tournament is true. To let technicians and the owner edit it, follow with update_settings_set makeCommunity. Exception: on a machine with no preferred House set, the new set becomes the preferred House set and so a community set. Call list_settings_sets first so you don't duplicate an existing set. Adds a timeline entry on the machine.",
-      inputSchema: createSettingsSetSchema,
-      annotations: WRITE_TOOL_ANNOTATIONS,
-    },
-    (args, extra) =>
-      runTool(
-        "create_settings_set",
-        extra,
-        (ctx) => runCreateSettingsSet(args, ctx),
-        { mutates: true }
-      )
-  );
-}
+export const createSettingsSetTool = defineTool({
+  name: "create_settings_set",
+  title: "Create a settings set",
+  description:
+    "Add a settings set to a machine: named, with software adjustment rows (menu code, name, value, plus the baseline install they change from), tables, DIP switch banks, and plain-text notes (e.g. rubbers and post positions). The set is your personal set — only you can edit it — tagged House, plus Tournament when tournament is true. To let technicians and the owner edit it, follow with update_settings_set makeCommunity. Exception: on a machine with no preferred House set, the new set becomes the preferred House set and so a community set. Call list_settings_sets first so you don't duplicate an existing set. Adds a timeline entry on the machine.",
+  inputSchema: createSettingsSetSchema,
+  annotations: WRITE_TOOL_ANNOTATIONS,
+  mutates: true,
+  run: runCreateSettingsSet,
+});

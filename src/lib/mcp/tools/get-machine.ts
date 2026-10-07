@@ -1,6 +1,5 @@
 import "server-only";
 
-import type { McpServer } from "@modelcontextprotocol/server";
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
@@ -11,13 +10,13 @@ import { issues } from "~/server/db/schema";
 
 import { buildMachinePinballmap } from "./pinballmap-block";
 import {
+  defineTool,
   getOwnerNamesByMachine,
   issueUrl,
   machineUrl,
   McpToolError,
   READ_ONLY_TOOL_ANNOTATIONS,
   resolveMachine,
-  runTool,
   type ToolOutcome,
 } from "./shared";
 import type { McpAuthContext } from "~/lib/mcp/verify-token";
@@ -92,17 +91,12 @@ export async function runGetMachine(
   };
 }
 
-export function registerGetMachine(server: McpServer): void {
-  server.registerTool(
-    "get_machine",
-    {
-      title: "Get machine detail",
-      description:
-        "Get full details for a machine by initials or UUID: name, presence status, owner name, Pinball Map link state, lineup setting and what the last-synced lineup shows (pinballmap.lineup), and recent open issues.",
-      inputSchema: getMachineSchema,
-      annotations: READ_ONLY_TOOL_ANNOTATIONS,
-    },
-    (args, extra) =>
-      runTool("get_machine", extra, (ctx) => runGetMachine(args, ctx))
-  );
-}
+export const getMachineTool = defineTool({
+  name: "get_machine",
+  title: "Get machine detail",
+  description:
+    "Get full details for a machine by initials or UUID: name, presence status, owner name, Pinball Map link state, lineup setting and what the last-synced lineup shows (pinballmap.lineup), and recent open issues.",
+  inputSchema: getMachineSchema,
+  annotations: READ_ONLY_TOOL_ANNOTATIONS,
+  run: runGetMachine,
+});

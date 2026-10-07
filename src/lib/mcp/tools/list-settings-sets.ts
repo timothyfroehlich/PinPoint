@@ -1,6 +1,5 @@
 import "server-only";
 
-import type { McpServer } from "@modelcontextprotocol/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
@@ -12,11 +11,11 @@ import { machineSettingsSets, machines } from "~/server/db/schema";
 
 import { docToMcpText, toMcpSection } from "./settings-set-shape";
 import {
+  defineTool,
   machineUrl,
   McpToolError,
   READ_ONLY_TOOL_ANNOTATIONS,
   resolveMachine,
-  runTool,
   type ToolOutcome,
 } from "./shared";
 import type { McpAuthContext } from "~/lib/mcp/verify-token";
@@ -97,19 +96,12 @@ export async function runListSettingsSets(
   };
 }
 
-export function registerListSettingsSets(server: McpServer): void {
-  server.registerTool(
-    "list_settings_sets",
-    {
-      title: "List a machine's settings sets",
-      description:
-        "Read every settings set on a machine with full contents: software adjustment rows, tables, DIP switch banks, and notes. Each set is personal (only its author edits it) or community (technicians, the owner and admins edit it), carries settings tags such as House and Tournament, and may be the machine's preferred House or preferred Tournament set. Also returns the machine's owner requests and how-to-change-settings notes. Use before create_settings_set to avoid duplicating an existing set, and before update_settings_set to get the set id, version and current sections.",
-      inputSchema: listSettingsSetsSchema,
-      annotations: READ_ONLY_TOOL_ANNOTATIONS,
-    },
-    (args, extra) =>
-      runTool("list_settings_sets", extra, (ctx) =>
-        runListSettingsSets(args, ctx)
-      )
-  );
-}
+export const listSettingsSetsTool = defineTool({
+  name: "list_settings_sets",
+  title: "List a machine's settings sets",
+  description:
+    "Read every settings set on a machine with full contents: software adjustment rows, tables, DIP switch banks, and notes. Each set is personal (only its author edits it) or community (technicians, the owner and admins edit it), carries settings tags such as House and Tournament, and may be the machine's preferred House or preferred Tournament set. Also returns the machine's owner requests and how-to-change-settings notes. Use before create_settings_set to avoid duplicating an existing set, and before update_settings_set to get the set id, version and current sections.",
+  inputSchema: listSettingsSetsSchema,
+  annotations: READ_ONLY_TOOL_ANNOTATIONS,
+  run: runListSettingsSets,
+});
