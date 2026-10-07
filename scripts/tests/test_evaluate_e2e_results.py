@@ -463,6 +463,8 @@ def test_assigned_file_absent_from_report_is_not_green(tmp_path: Path) -> None:
     assert code == 1
     assert "renamed/c.spec.ts" in stdout
     assert "no verdict" in written
+    assert "compare the list's paths" in written
+    assert "timeout or a crash" not in written
 
 
 def test_red_leg_names_its_failures_even_with_a_missing_file(tmp_path: Path) -> None:

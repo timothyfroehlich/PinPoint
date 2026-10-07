@@ -92,6 +92,7 @@ summary() {
 
 fail_no_verdict() {
   local reason="$1"
+  local hint="${2:-Check the test step above for a timeout or a crash.}"
   echo "::error::E2E ${LABEL}: no verdict — ${reason}"
   {
     echo "## E2E ${LABEL}: no verdict"
@@ -99,7 +100,7 @@ fail_no_verdict() {
     echo "${reason}"
     echo ''
     echo 'The run did not produce a usable report, so the suite cannot be'
-    echo 'called green. Check the test step above for a timeout or a crash.'
+    echo "called green. ${hint}"
   } | summary
   exit 1
 }
@@ -211,7 +212,8 @@ if [ -n "$TEST_LIST" ]; then
   if [ -n "$MISSING_FILES" ]; then
     echo "Assigned spec files absent from the report (${LABEL}):"
     echo "$MISSING_FILES"
-    fail_no_verdict "$(printf '%s\n' "$MISSING_FILES" | wc -l | tr -d ' ') file(s) from \`${TEST_LIST}\` are absent from the report — see the step log above."
+    fail_no_verdict "$(printf '%s\n' "$MISSING_FILES" | wc -l | tr -d ' ') file(s) from \`${TEST_LIST}\` are absent from the report — see the step log above." \
+      "The run finished; compare the list's paths with the spec file paths in the report, or look for a filter that dropped the file."
   fi
 fi
 
