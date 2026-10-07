@@ -329,7 +329,7 @@ test.describe("Responsive: no horizontal overflow", () => {
   });
 
   // The member-role `/m` entry above renders no header actions. An admin sees
-  // Pinball Map, Print apron cards, and Add Machine on the title row, which
+  // Pinball Map, the Print menu, and Add Machine on the title row, which
   // must stay inside the viewport down to the 320px floor (list-views §7.2).
   test.describe("machines list header as admin", () => {
     test.use({ storageState: STORAGE_STATE.admin });
@@ -342,7 +342,9 @@ test.describe("Responsive: no horizontal overflow", () => {
         const main = page.getByRole("main");
         for (const action of [
           main.getByRole("link", { name: "Pinball Map", exact: true }),
-          main.getByRole("link", { name: /^Print apron cards/ }),
+          // The Print menu trigger; its name gains the queue count when the
+          // admin has apron cards queued.
+          main.getByRole("button", { name: /^Print(,|$)/ }),
           main.getByRole("link", { name: "Add Machine", exact: true }),
         ]) {
           await expect(action).toBeInViewport({ ratio: 1 });
