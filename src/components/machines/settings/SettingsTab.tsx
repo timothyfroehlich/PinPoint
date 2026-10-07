@@ -28,6 +28,7 @@ import {
   type SettingsTagRef,
 } from "~/lib/machines/settings-types";
 import { type ProseMirrorDoc } from "~/lib/tiptap/types";
+import { siteDayOf } from "~/lib/time-zone";
 import { cn } from "~/lib/utils";
 import {
   deleteSettingsSetAction,
@@ -53,12 +54,10 @@ function isTempId(id: string): boolean {
   return id.startsWith("tmp-");
 }
 
+// The site-local day (America/Chicago), matching the `updatedAt` day the server
+// derives for a saved set.
 function today(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return siteDayOf(new Date());
 }
 
 /**

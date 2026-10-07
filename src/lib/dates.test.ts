@@ -1,104 +1,123 @@
-import { subDays, subMonths } from "date-fns";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   formatCompactAge,
+  formatCalendarDay,
   formatCompactAgeAgo,
   formatDate,
   formatDateTime,
+  formatMonthYear,
   formatRelative,
-  formatDayGroup,
   formatTimelineBucket,
+  isSiteToday,
 } from "./dates";
 
-describe("formatDayGroup", () => {
-  it("returns 'Today' for a same-day timestamp", () => {
-    expect(formatDayGroup(new Date())).toBe("Today");
+// Fixtures on Central time (America/Chicago):
+// - EVENING_NOW is 8:30 PM CDT on Tuesday, Oct 6 — already Oct 7 in UTC, so
+//   a UTC-day implementation files it (and everything after 7 PM) a day late.
+// - 2026-03-08 springs forward (2:00 CST → 3:00 CDT, 08:00Z); 2026-11-01
+//   falls back (2:00 CDT → 1:00 CST, 07:00Z).
+const EVENING_NOW = new Date("2026-10-07T01:30:00.000Z");
+
+describe("formatCalendarDay", () => {
+  it.each([
+    ["a bare day", "2026-10-04", "Oct 4, 2026"],
+    // iScored's venue-local wall time: an after-midnight score stays on its
+    // own day instead of sliding back through a zone conversion.
+    [
+      "an iScored after-midnight timestamp",
+      "2026-10-04 00:30:00",
+      "Oct 4, 2026",
+    ],
+    ["an iScored evening timestamp", "2026-10-04 21:34:46", "Oct 4, 2026"],
+    ["a fall-back day", "2026-11-01", "Nov 1, 2026"],
+  ])("prints %s as written", (_label, value, expected) => {
+    expect(formatCalendarDay(value)).toBe(expected);
   });
 
-  it("returns 'Yesterday' for a timestamp from the prior calendar day", () => {
-    expect(formatDayGroup(subDays(new Date(), 1))).toBe("Yesterday");
-  });
+  it.each(["", "Oct 4", "2026-02-30", "2026-10-041", "not a date"])(
+    "returns null for %j",
+    (value) => {
+      expect(formatCalendarDay(value)).toBeNull();
+    }
+  );
+});
 
-  it("returns a weekday name for 2–6 calendar days back", () => {
-    // 3 calendar days back lands inside the 2..6 weekday window. The exact
-    // weekday depends on `today` and the label is locale-formatted, so derive
-    // the expected value from the same Intl formatter rather than hard-coding
-    // English names (which would fail under a non-English runtime locale).
-    const date = subDays(new Date(), 3);
-    const expected = new Intl.DateTimeFormat(undefined, {
-      weekday: "long",
-    }).format(date);
-    expect(formatDayGroup(date)).toBe(expected);
-  });
-
-  it("returns the absolute medium date for timestamps a week or older", () => {
-    const date = subDays(new Date(), 14);
-    expect(formatDayGroup(date)).toBe(
-      new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(date)
-    );
+describe("isSiteToday", () => {
+  it.each([
+    ["the site day's first instant", "2026-10-06T05:00:00.000Z", true],
+    ["a UTC-tomorrow evening event", "2026-10-07T00:30:00.000Z", true],
+    ["the site day's last instant", "2026-10-07T04:59:59.999Z", true],
+    ["the previous site day's last instant", "2026-10-06T04:59:59.999Z", false],
+    ["the next site day's first instant", "2026-10-07T05:00:00.000Z", false],
+  ])("reads %s on Central time", (_label, iso, expected) => {
+    expect(isSiteToday(iso, EVENING_NOW)).toBe(expected);
   });
 });
 
 describe("formatTimelineBucket", () => {
-  it("returns a day-tier bucket for today", () => {
-    const bucket = formatTimelineBucket(new Date());
-    expect(bucket.tier).toBe("day");
-    expect(bucket.label).toBe("Today");
-    expect(bucket.key.startsWith("day-")).toBe(true);
-    expect(bucket.rowDateLabel).toBeUndefined();
+  it.each([
+    ["this morning", "2026-10-06T14:00:00.000Z", "day-2026-10-06", "Today"],
+    ["this evening", "2026-10-07T00:30:00.000Z", "day-2026-10-06", "Today"],
+    ["last night", "2026-10-06T03:00:00.000Z", "day-2026-10-05", "Yesterday"],
+    ["3 days back", "2026-10-03T15:00:00.000Z", "day-2026-10-03", "Saturday"],
+    ["6 days back", "2026-09-30T15:00:00.000Z", "day-2026-09-30", "Wednesday"],
+  ])(
+    "buckets %s by the site day at an evening-Central now",
+    (_label, iso, key, label) => {
+      expect(formatTimelineBucket(iso, EVENING_NOW)).toEqual({
+        key,
+        label,
+        tier: "day",
+      });
+    }
+  );
+
+  it("rolls a week or older into the site month, with the site date as its chip", () => {
+    // 10:00 PM CDT on Jul 31 — Aug 1 in UTC.
+    expect(
+      formatTimelineBucket("2026-08-01T03:00:00.000Z", EVENING_NOW)
+    ).toEqual({
+      key: "month-2026-07",
+      label: "July 2026",
+      tier: "month",
+      rowDateLabel: "Jul 31",
+    });
+    expect(
+      formatTimelineBucket("2026-09-29T15:00:00.000Z", EVENING_NOW).tier
+    ).toBe("month");
   });
 
-  it("returns a day-tier bucket for yesterday", () => {
-    const bucket = formatTimelineBucket(subDays(new Date(), 1));
-    expect(bucket.tier).toBe("day");
-    expect(bucket.label).toBe("Yesterday");
+  it.each([
+    // [label, event, now, expected label]
+    [
+      "the fall-back change",
+      "2026-11-01T04:30:00.000Z", // Oct 31, 11:30 PM CDT
+      "2026-11-02T05:30:00.000Z", // Nov 1, 11:30 PM CST (25 h later)
+      "Yesterday",
+    ],
+    [
+      "the spring-forward change",
+      "2026-03-08T05:30:00.000Z", // Mar 7, 11:30 PM CST
+      "2026-03-09T04:30:00.000Z", // Mar 8, 11:30 PM CDT (23 h later)
+      "Yesterday",
+    ],
+    [
+      "two days across the fall-back change",
+      "2026-10-31T04:30:00.000Z", // Fri Oct 30, 11:30 PM CDT
+      "2026-11-02T04:30:00.000Z", // Sun Nov 1, 10:30 PM CST
+      "Friday",
+    ],
+  ])("counts calendar days across %s", (_label, iso, now, label) => {
+    expect(formatTimelineBucket(iso, new Date(now)).label).toBe(label);
   });
 
-  it("returns a day-tier bucket with a weekday label for 3 days back", () => {
-    const date = subDays(new Date(), 3);
-    const bucket = formatTimelineBucket(date);
-    expect(bucket.tier).toBe("day");
-    // Locale-formatted weekday — derive the expectation from the same Intl
-    // formatter the implementation uses (see formatDayGroup test above).
-    expect(bucket.label).toBe(
-      new Intl.DateTimeFormat(undefined, { weekday: "long" }).format(date)
-    );
-  });
-
-  it("returns a month-tier bucket for timestamps 2 months back", () => {
-    const date = subMonths(new Date(), 2);
-    const bucket = formatTimelineBucket(date);
-    expect(bucket.tier).toBe("month");
-    expect(bucket.key.startsWith("month-")).toBe(true);
-    expect(bucket.rowDateLabel).toBeDefined();
-    // Label is a locale-formatted "month + year". Assert it contains the
-    // 4-digit year rather than requiring the year to be the trailing token —
-    // some locales are year-first.
-    expect(bucket.label).toContain(String(date.getFullYear()));
-  });
-
-  it("two same-day timestamps share a bucket key", () => {
-    const morning = new Date();
-    morning.setHours(8, 0, 0, 0);
-    const evening = new Date();
-    evening.setHours(20, 0, 0, 0);
-    expect(formatTimelineBucket(morning).key).toBe(
-      formatTimelineBucket(evening).key
-    );
-  });
-
-  it("two different-day timestamps in the same month share a month-tier key", () => {
-    const a = subMonths(new Date(), 3);
-    const b = new Date(a);
-    b.setDate(a.getDate() === 1 ? 28 : 1);
-    const bucketA = formatTimelineBucket(a);
-    const bucketB = formatTimelineBucket(b);
-    expect(bucketA.tier).toBe("month");
-    expect(bucketB.tier).toBe("month");
-    expect(bucketA.key).toBe(bucketB.key);
-    // But each row gets its own date chip.
-    expect(bucketA.rowDateLabel).not.toBe(bucketB.rowDateLabel);
+  it("keeps both 1:30 AMs of the fall-back day in one bucket", () => {
+    const now = new Date("2026-11-01T20:00:00.000Z");
+    const cdt = formatTimelineBucket("2026-11-01T06:30:00.000Z", now);
+    const cst = formatTimelineBucket("2026-11-01T07:30:00.000Z", now);
+    expect(cdt).toEqual({ key: "day-2026-11-01", label: "Today", tier: "day" });
+    expect(cst).toEqual(cdt);
   });
 });
 
@@ -175,19 +194,54 @@ describe("date formatter input and presentation contracts", () => {
   it.each(INPUTS)(
     "formats %s as medium date and medium date with short time",
     (_label, input) => {
-      expect(formatDate(input)).toBe(
-        new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(
-          FIXED_DATE
-        )
-      );
-      expect(formatDateTime(input)).toBe(
-        new Intl.DateTimeFormat(undefined, {
-          dateStyle: "medium",
-          timeStyle: "short",
-        }).format(FIXED_DATE)
-      );
+      // 08:30Z is 2:30 AM CST.
+      expect(formatDate(input)).toBe("Jan 15, 2026");
+      expect(formatDateTime(input)).toBe("Jan 15, 2026, 2:30 AM");
     }
   );
+
+  it.each([
+    // [label, instant, date, date and time]
+    [
+      "an evening-Central instant",
+      "2026-10-07T01:30:00.000Z",
+      "Oct 6, 2026",
+      "Oct 6, 2026, 8:30 PM",
+    ],
+    [
+      "the last minute of a standard-time day",
+      "2026-11-02T05:59:00.000Z",
+      "Nov 1, 2026",
+      "Nov 1, 2026, 11:59 PM",
+    ],
+    [
+      "the hour after springing forward",
+      "2026-03-08T08:30:00.000Z",
+      "Mar 8, 2026",
+      "Mar 8, 2026, 3:30 AM",
+    ],
+    [
+      "the first 1:30 AM of the fall-back day",
+      "2026-11-01T06:30:00.000Z",
+      "Nov 1, 2026",
+      "Nov 1, 2026, 1:30 AM",
+    ],
+    [
+      "the second 1:30 AM of the fall-back day",
+      "2026-11-01T07:30:00.000Z",
+      "Nov 1, 2026",
+      "Nov 1, 2026, 1:30 AM",
+    ],
+  ])("formats %s on the site clock", (_label, iso, date, dateTime) => {
+    expect(formatDate(iso)).toBe(date);
+    expect(formatDateTime(iso)).toBe(dateTime);
+  });
+
+  it("formats the month and year on the site calendar", () => {
+    // 8:00 PM CDT on Sep 30 — Oct 1 in UTC.
+    expect(formatMonthYear("2026-10-01T01:00:00.000Z")).toBe("Sep 2026");
+    expect(formatMonthYear(FIXED_DATE)).toBe("Jan 2026");
+  });
 
   it.each([
     ["Date", new Date("2026-04-18T11:00:00.000Z")],

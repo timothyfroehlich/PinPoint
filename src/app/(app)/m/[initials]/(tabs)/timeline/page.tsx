@@ -2,12 +2,12 @@ import type React from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
-import { isToday } from "date-fns";
 
 import { MachineTimelineActionsRow } from "~/components/machines/timeline/MachineTimelineActionsRow";
 import { TimelineBucketBanner } from "~/components/machines/timeline/TimelineBucketBanner";
 import { TimelineRow } from "~/components/machines/timeline/TimelineRow";
 import { bucketTimelineRows } from "~/lib/timeline/bucket-rows";
+import { isSiteToday } from "~/lib/dates";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/index";
 import { getViewer } from "~/lib/auth/viewer";
 import { getMachineTimeline } from "~/lib/timeline/machine-events";
@@ -167,7 +167,7 @@ export default async function MachineTimelinePage({
             const showRelativeTime =
               group.bucket.tier === "day" &&
               firstEntry !== undefined &&
-              isToday(firstEntry.row.createdAt);
+              isSiteToday(firstEntry.row.createdAt);
             return (
               <section key={group.bucket.key} className="pt-6 first:pt-0">
                 <TimelineBucketBanner bucket={group.bucket} />

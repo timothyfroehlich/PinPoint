@@ -27,7 +27,7 @@ describe("TopScoresCard", () => {
       rank: 1,
       playerName: "Alice",
       score: 125000000,
-      date: "2026-08-15T14:30:00Z",
+      date: "2026-08-15 00:30:00",
     },
     {
       id: 2,
@@ -36,7 +36,7 @@ describe("TopScoresCard", () => {
       rank: 2,
       playerName: "Bob",
       score: 95400000,
-      date: "2026-08-10T11:00:00Z",
+      date: "2026-08-10 21:00:00",
     },
     {
       id: 3,
@@ -45,7 +45,7 @@ describe("TopScoresCard", () => {
       rank: 3,
       playerName: "Charlie",
       score: 82100000,
-      date: "2026-08-01T09:00:00Z",
+      date: "2026-08-01 19:00:00",
     },
     {
       id: 4,
@@ -54,7 +54,7 @@ describe("TopScoresCard", () => {
       rank: 4,
       playerName: "Dave",
       score: 50000000,
-      date: "2026-07-20T08:00:00Z",
+      date: "2026-07-20 20:00:00",
     },
   ];
 
@@ -85,6 +85,8 @@ describe("TopScoresCard", () => {
       expect(within(rank1).getByText("Alice")).toBeInTheDocument();
       expect(within(rank1).getByText("125,000,000")).toBeInTheDocument();
       expect(within(rank1).getByText("1")).toHaveClass("bg-primary");
+      // iScored's venue-local after-midnight time keeps its own day.
+      expect(within(rank1).getByText("Aug 15, 2026")).toBeInTheDocument();
 
       // Rank 2 row
       const rank2 = screen.getByTestId("iscored-score-row-2");
