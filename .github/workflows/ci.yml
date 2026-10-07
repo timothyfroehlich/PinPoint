@@ -447,15 +447,15 @@ jobs:
     #
     # This and its two PR siblings each split into 2 Playwright shards
     # (`--shard`); GitHub appends the shard number to the job name. The name
-    # itself stays a plain string, because a skipped matrix job never expands
-    # its matrix and would show the raw expression. The smoke jobs use playwright.config.ts, which sets
-    # fullyParallel, so smoke splits by test and comes out even (51/51 tests;
-    # ~200s per shard against ~420s unsplit). playwright.config.full.ts does
-    # not, so Full splits by file and runs uneven (62/57 tests, 396s/267s on
-    # the first run). Each shard runs auth-setup itself and gets its own
-    # database. Every extra shard pays ~2 minutes of job setup and the dev
-    # server's first-compile cost again, and takes another slot under the
-    # account's concurrent-job cap. (PP-yva7.2.)
+    # itself stays a plain string, because a skipped matrix job never expands its
+    # matrix and would show the raw expression. The smoke jobs use
+    # playwright.config.ts, which sets fullyParallel, so smoke splits by test and
+    # comes out even (51/51 tests; ~200s per shard against ~420s unsplit).
+    # playwright.config.full.ts does not, so Full splits by file and runs uneven
+    # (62/57 tests, 396s/267s on the first run). Each shard runs auth-setup itself
+    # and gets its own database. Every extra shard pays ~2 minutes of job setup
+    # and the dev server's first-compile cost again, and takes another slot under
+    # the account's concurrent-job cap. (PP-yva7.2.)
     # ==============================================================================
     name: E2E Smoke Tests (Chromium)
     runs-on: ubuntu-latest

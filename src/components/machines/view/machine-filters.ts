@@ -21,7 +21,9 @@ import {
 import {
   arraysEqual,
   canonicalFilterValues,
-  canonicalOwnerValues,
+  canonicalPeopleValues,
+} from "~/lib/list-view/url-state";
+import {
   MACHINE_STATUS_VALUES,
   presenceEqual,
 } from "~/lib/machines/view/state";
@@ -139,7 +141,7 @@ export function buildMachineFilters({
         ...people,
       ]),
       atPreset: arraysEqual(state.owner, defaults.owner),
-      onChange: (values) => onChange({ owner: canonicalOwnerValues(values) }),
+      onChange: (values) => onChange({ owner: canonicalPeopleValues(values) }),
       onReset: () => onChange({ owner: defaults.owner }),
     },
   ];

@@ -38,8 +38,9 @@ runs:
         echo "version=$version" >> "$GITHUB_OUTPUT"
 
     # No restore-keys: a prefix match would carry every earlier browser
-    # revision forward into each new save. A Playwright bump pays one cold
-    # download on main, then every job hits the new key.
+    # revision forward into each new save. The PR that bumps Playwright
+    # installs in every shard on every push (PR jobs never save); after it
+    # merges, main's first run saves the new key and every job hits it.
     - name: Restore Playwright browsers
       id: restore
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache/restore@v6.1.0
@@ -47,15 +48,18 @@ runs:
         path: ~/.cache/ms-playwright
         key: ${{ runner.os }}-${{ runner.arch }}-playwright-all-${{ steps.version.outputs.version }}
 
+    # Runs on a hit too: `playwright install` skips browsers already on disk,
+    # so a hit costs seconds, and a cache saved without one of the requested
+    # browsers still gets it. System packages only on a miss, as before.
     - name: Install Playwright browsers
-      if: steps.restore.outputs.cache-hit != 'true'
       shell: bash
       env:
         BROWSERS: ${{ inputs.browsers }}
         WITH_DEPS: ${{ inputs.with-deps }}
+        CACHE_HIT: ${{ steps.restore.outputs.cache-hit }}
       run: |
         flags=()
-        if [ "$WITH_DEPS" = "true" ]; then flags+=(--with-deps); fi
+        if [ "$WITH_DEPS" = "true" ] && [ "$CACHE_HIT" != "true" ]; then flags+=(--with-deps); fi
         # shellcheck disable=SC2086  # word-split the browser list on purpose
         pnpm exec playwright install "${flags[@]}" $BROWSERS
 
