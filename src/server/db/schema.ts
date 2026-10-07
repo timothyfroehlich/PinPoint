@@ -624,10 +624,6 @@ export const pinTips = pgTable(
  * seven days. `generation` distinguishes each confirmed absent -> present return,
  * while `missedRuns` requires two consecutive successful absences before removal.
  * The separate event table below owns delivery and retry state.
- *
- * `announcedAt` is retained for migrate-before-build compatibility with the old
- * additions-only runtime. New generation-zero additions keep it in sync until
- * delivered; newer generations use only the event queue.
  */
 export const pinballmapRegionSeenMachines = pgTable(
   "pinballmap_region_seen_machines",
@@ -648,17 +644,9 @@ export const pinballmapRegionSeenMachines = pgTable(
     isPresent: boolean("is_present").notNull().default(true),
     missedRuns: integer("missed_runs").notNull().default(0),
     generation: integer("generation").notNull().default(0),
-    // Legacy additions-only delivery state; see the table comment above.
-    announcedAt: timestamp("announced_at", { withTimezone: true }),
   },
   (t) => ({
     pk: primaryKey({ columns: [t.region, t.lmxId] }),
-    // The job's hot read: "what is still waiting to be announced for this
-    // region". Partial, because the announced rows are the overwhelming majority
-    // and are never scanned again.
-    pendingIdx: index("idx_pinballmap_region_seen_pending")
-      .on(t.region, t.firstSeenAt)
-      .where(sql`announced_at is null`),
   })
 ).enableRLS();
 
