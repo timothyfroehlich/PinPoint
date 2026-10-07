@@ -392,7 +392,7 @@ def test_setup_job_gates_on_code_or_deps(ci_workflow: dict) -> None:
 def test_push_change_detection_reaches_back_to_the_last_executed_main_run(
     ci_workflow: dict,
 ) -> None:
-    """A push to main diffs against the last main commit a CI run executed on.
+    """A push to main diffs against the last main commit a CI run passed on.
 
     Main runs one at a time and a newer merge cancels the waiting run, so a
     push's own `before` can skip a merge whose run never started. Diffing from
@@ -406,12 +406,14 @@ def test_push_change_detection_reaches_back_to_the_last_executed_main_run(
     checkout = next(
         s for s in changes["steps"] if "actions/checkout@" in s.get("uses", "")
     )
-    assert checkout["with"]["fetch-depth"] == 0, "the diff must reach past `before`"
+    assert checkout["with"]["fetch-depth"] == (
+        "${{ github.event_name == 'push' && '0' || '1' }}"
+    ), "push runs need full history to diff past `before`"
 
     base = steps["base"]
     assert base["if"] == "github.event_name == 'push'"
-    assert '.conclusion == "success" or .conclusion == "failure"' in base["run"], (
-        "a run cancelled while waiting never executed and must not be the base"
+    assert "status=success" in base["run"], (
+        "only a passing run covered its commits; a failure may have skipped E2E"
     )
     assert "git merge-base --is-ancestor" in base["run"]
 

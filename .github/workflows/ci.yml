@@ -24,9 +24,12 @@ permissions: read-all  # zizmor: ignore[excessive-permissions]
 # more run waiting: a newer push to main cancels the waiting run before it
 # starts and waits in its place. Commits in a merge burst therefore get no run
 # of their own. The next run that executes covers them: the `changes` job diffs
-# against the last main commit a run executed on, not this push's `before`, so
+# against the last main commit a run passed on, not this push's `before`, so
 # their code still selects E2E and their lockfile still selects the audit. A
-# red result there may come from any commit since that previous run.
+# red result there may come from any commit since the previous run.
+#
+# Re-run the newest main run, not an older one: a re-run joins this group as
+# the waiting run and cancels the newest merge's waiting run.
 #
 # This replaces per-SHA groups (PP-tbhv), which never cancelled but let every
 # merge run at once — up to 10 concurrent main runs in a day, each holding
@@ -76,15 +79,19 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
         with:
           persist-credentials: false
-          fetch-depth: 0  # the push diff below can reach back past `before`
+          # Push runs diff back past `before` (next step); PR runs use the API.
+          # Strings, because a bare 0 is falsy in an expression.
+          fetch-depth: ${{ github.event_name == 'push' && '0' || '1' }}
 
       # Main runs one at a time and a newer merge cancels the waiting run (see
       # the concurrency block), so this push's `before` can skip merges whose
-      # run never started. Diffing against the last main commit a CI run
-      # actually executed on keeps those merges' changes selecting the jobs that
-      # cover them. A run cancelled while waiting reports `cancelled`; one that
-      # ran reports success or failure (a job timeout fails it). (PP-yva7.7.)
-      - name: Find the last main commit CI ran on
+      # run never started. Diffing against the last main commit a run PASSED on
+      # makes every change since then select the jobs that test it: a merge
+      # whose run was cancelled while waiting, cancelled mid-run, or failed
+      # before E2E ran (in setup, say) is still covered by the next run. Each
+      # passing run covered everything since the one before it, so the chain
+      # holds. (PP-yva7.7.)
+      - name: Find the last main commit CI passed on
         id: base
         if: github.event_name == 'push'
         env:
@@ -93,13 +100,18 @@ jobs:
           BEFORE: ${{ github.event.before }}
         run: |
           set -euo pipefail
-          sha=$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?branch=main&event=push&status=completed&per_page=30" \
-            --jq '[.workflow_runs[] | select(.conclusion == "success" or .conclusion == "failure")][0].head_sha // empty') || sha=""
-          if [ -n "$sha" ] && git merge-base --is-ancestor "$sha" HEAD; then
-            echo "Diffing against $sha, the last main commit a CI run executed on."
-          else
-            echo "::warning::No executed main run found; diffing against this push's before ($BEFORE)."
+          if ! sha=$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?branch=main&event=push&status=success&per_page=1" \
+            --jq '.workflow_runs[0].head_sha // empty'); then
+            echo "::warning::Could not list main's CI runs; diffing against this push's before ($BEFORE), which can miss superseded merges."
             sha="$BEFORE"
+          elif [ -z "$sha" ]; then
+            echo "::warning::No passing main run found; diffing against this push's before ($BEFORE)."
+            sha="$BEFORE"
+          elif ! git merge-base --is-ancestor "$sha" HEAD; then
+            echo "::warning::Last passing main run ($sha) is not an ancestor of this commit (a re-run of an older commit?); diffing against this push's before ($BEFORE)."
+            sha="$BEFORE"
+          else
+            echo "Diffing against $sha, the last main commit CI passed on."
           fi
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
 

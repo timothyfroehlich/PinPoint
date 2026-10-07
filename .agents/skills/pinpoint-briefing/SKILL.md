@@ -85,7 +85,7 @@ gh run list --branch main --status completed --limit 5 \
   --json status,conclusion,name,createdAt,url
 ```
 
-Flag any `conclusion == "failure"`. A `cancelled` main run was superseded by a newer merge before it started (main runs one at a time); the next executed run covers its commit (`pinpoint-pr-workflow` 5.1).
+Flag any `conclusion == "failure"`. A `cancelled` main run is usually one a newer merge superseded before it started (main runs one at a time); one cancelled mid-run was cut off by hand. Either way the next run diffs from the last passing main commit and covers it (`pinpoint-pr-workflow` 5.1).
 
 ### Group D: New GitHub Issues (last 5 days)
 
