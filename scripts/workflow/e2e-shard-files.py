@@ -96,6 +96,14 @@ def main(argv: list[str]) -> int:
     report = json.loads(Path(argv[1]).read_text(encoding="utf-8"))
     current, total = parse_shard(argv[2])
 
+    # A spec that fails to load is reported here and missing from `suites`, so
+    # it would be assigned to no leg and silently never run.
+    if report.get("errors"):
+        for error in report["errors"]:
+            print(f"error: {error.get('message', error)}", file=sys.stderr)
+        print("error: --list reported load errors; refusing to shard", file=sys.stderr)
+        return 1
+
     weights = file_weights(report)
     if len(weights) < total:
         print(

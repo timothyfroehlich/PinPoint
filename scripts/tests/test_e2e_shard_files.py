@@ -125,3 +125,12 @@ def test_rejects_malformed_shard(tmp_path: Path, shard: str) -> None:
     result = run(tmp_path, REPORT, shard)
     assert result.returncode != 0
     assert result.stdout == ""
+
+
+def test_refuses_to_shard_when_a_spec_failed_to_load(tmp_path: Path) -> None:
+    """A file that fails to load is absent from `suites`; sharding would drop it."""
+    report = {**REPORT, "errors": [{"message": "SyntaxError in full/broken.spec.ts"}]}
+    result = run(tmp_path, report, "1/2")
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert "broken.spec.ts" in result.stderr

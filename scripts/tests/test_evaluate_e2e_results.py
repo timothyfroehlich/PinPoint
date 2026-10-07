@@ -489,6 +489,39 @@ def test_blank_only_test_list_is_not_green(tmp_path: Path) -> None:
     assert "names no file" in written
 
 
+def test_leg_with_every_browser_test_skipped_is_not_green(tmp_path: Path) -> None:
+    """auth-setup always runs, so the stats-based checks alone would call this green."""
+    payload = report(
+        files=[
+            described("a.spec.ts", "A", [spec("chromium", "a", True, status="skipped")])
+        ],
+        root_specs=[
+            _with_file(spec("auth-setup", "authenticate", True), "auth.setup.ts")
+        ],
+    )
+    code, _, written = run(tmp_path, payload, test_list=["a.spec.ts"])
+    assert code == 1
+    assert "only auth-setup ran" in written
+
+
+def test_missing_test_list_file_explains_itself(tmp_path: Path) -> None:
+    results = tmp_path / "results.json"
+    results.write_text(json.dumps(_leg_report(skipped_file_status="expected")))
+    summary = tmp_path / "step-summary.md"
+    proc = subprocess.run(
+        ["bash", str(SCRIPT_PATH), "x", str(results), str(tmp_path / "absent.txt")],
+        capture_output=True,
+        text=True,
+        env={
+            "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin",
+            "GITHUB_STEP_SUMMARY": str(summary),
+        },
+        check=False,
+    )
+    assert proc.returncode == 1
+    assert "did not write it" in summary.read_text()
+
+
 def test_empty_test_list_is_not_green(tmp_path: Path) -> None:
     code, _, written = run(
         tmp_path, _leg_report(skipped_file_status="expected"), test_list=[]

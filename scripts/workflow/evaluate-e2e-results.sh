@@ -34,7 +34,10 @@
 #      strength of auth-setup alone. Given the list as a third argument, the
 #      script requires every file on it to appear in the report. A file whose
 #      tests are all skipped still appears: quarantining a whole file with
-#      `test.describe.fixme` is legitimate and must not turn main red.
+#      `test.describe.fixme` is legitimate and must not turn main red. A leg
+#      whose browser tests were ALL skipped fails, though: auth-setup alone
+#      would otherwise satisfy checks 2 and 3, so the script also requires an
+#      executed test outside the auth-setup project.
 #
 # Usage:
 #   bash scripts/workflow/evaluate-e2e-results.sh <label> <results-json-path> [<test-list>]
@@ -139,10 +142,13 @@ fi
 if [ -n "$TEST_LIST" ]; then
   # Read the list the way Playwright does: trimmed lines, skipping blanks and
   # `#` comments.
-  ASSIGNED_FILES=$(sed -e 's/\r$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' "$TEST_LIST" 2>/dev/null \
+  if [ ! -r "$TEST_LIST" ]; then
+    fail_no_verdict "test list \`${TEST_LIST}\` is missing — the shard selection step did not write it."
+  fi
+  ASSIGNED_FILES=$(sed -e 's/\r$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' "$TEST_LIST" \
     | { grep -v -e '^$' -e '^#' || true; } | sort -u)
   if [ -z "$ASSIGNED_FILES" ]; then
-    fail_no_verdict "test list \`${TEST_LIST}\` is missing or names no file."
+    fail_no_verdict "test list \`${TEST_LIST}\` names no file."
   fi
   REPORTED_FILES=$(jq -r '[.. | objects | select(has("specs")) | .specs[].file] | unique | .[]' "$RESULTS" | sort -u)
   MISSING_FILES=$(comm -23 <(printf '%s\n' "$ASSIGNED_FILES") <(printf '%s\n' "$REPORTED_FILES"))
@@ -205,6 +211,18 @@ if [ "$GATING_FAILS" -gt 0 ]; then
     emit_non_gating_summary
   } | summary
   exit 1
+fi
+
+# auth.setup.ts runs on every comprehensive leg whatever its --test-list says,
+# so a leg whose browser tests were all skipped still passes the two checks
+# above on auth-setup alone. Count executed tests outside the setup project.
+# Checked last, after gating failures are named: a failed auth-setup skips
+# every browser test, and its failure is the useful message.
+# shellcheck disable=SC2016  # jq program, not shell.
+BROWSER_TESTS_RUN=$(jq -r '[.. | objects | select(has("specs")) | .specs[].tests[]
+  | select(.projectName != "auth-setup" and .status != "skipped")] | length' "$RESULTS")
+if [ "$BROWSER_TESTS_RUN" -eq 0 ]; then
+  fail_no_verdict "\`${RESULTS}\` executed no browser test — only auth-setup ran."
 fi
 
 echo "Gating browsers green (${LABEL}) across ${TOTAL_SPECS} specs, ${TESTS_RUN} tests executed."

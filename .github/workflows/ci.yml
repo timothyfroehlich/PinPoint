@@ -747,6 +747,13 @@ jobs:
     # full chromium+webkit browser download whenever that bump moves
     # Playwright itself.
     timeout-minutes: 60
+    # Job-level so the shard-selection `--list` loads the suite with the same
+    # environment as the run; a spec that reads one of these at load time
+    # would otherwise be weighed, or listed, differently from how it runs.
+    env:
+      CONFIG: playwright.config.${{ matrix.suite }}.ts
+      MOCK_BLOB_STORAGE: "true"
+      UNSUBSCRIBE_SIGNING_SECRET: "ci-test-only-not-a-real-secret-0000000000000000000000000000000000"
     strategy:
       # Every leg must report: one red leg must not cancel the others and
       # leave their parts of main's verdict unknown.
@@ -825,7 +832,6 @@ jobs:
       - name: Select this shard's spec files
         timeout-minutes: 5
         env:
-          CONFIG: playwright.config.${{ matrix.suite }}.ts
           SHARD: ${{ matrix.shard }}/${{ matrix.total }}
           PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ runner.temp }}/e2e-list.json
         run: |
@@ -854,12 +860,9 @@ jobs:
         continue-on-error: true
         timeout-minutes: 30
         env:
-          CONFIG: playwright.config.${{ matrix.suite }}.ts
-          MOCK_BLOB_STORAGE: "true"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
           PLAYWRIGHT_JSON_OUTPUT_NAME: playwright-report/results.json
-          UNSUBSCRIBE_SIGNING_SECRET: "ci-test-only-not-a-real-secret-0000000000000000000000000000000000"
         run: |
           rm -f playwright-report/results.json
           pnpm exec playwright test --config="$CONFIG" \
