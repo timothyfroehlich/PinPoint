@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # evaluate-e2e-results.sh — turn a Playwright JSON report into a job verdict.
 #
-# The comprehensive post-merge E2E job runs its Playwright steps with
+# Each leg of the comprehensive post-merge E2E job runs its Playwright step with
 # `continue-on-error: true`, because Mobile Safari is non-gating and its
 # failures must not fail the job. That makes THIS script the only thing that
 # can turn a red suite into a red job — so it has to be loud about every way
@@ -10,11 +10,11 @@
 # Two silent-failure paths it exists to close (PP-jxhy):
 #
 #   1. The run never finished. Playwright's JSON reporter writes the file once,
-#      at the end. A step that hits its timeout leaves no file — and if a
-#      previous step in the same job wrote to the same path, leaves a STALE
-#      one. A stale green report read as this run's verdict is the worst
-#      outcome available, so the caller passes a per-run path and this script
-#      treats a missing or unparseable file as a hard failure.
+#      at the end. A step that hits its timeout leaves no file — and if
+#      anything earlier wrote the same path, leaves a STALE one. A stale green
+#      report read as this run's verdict is the worst outcome available, so the
+#      caller deletes the path before the run (`rm -f`) and this script treats
+#      a missing or unparseable file as a hard failure.
 #   2. Zero specs ran. A crash in global setup, a bad --project name, or a
 #      grep that matches nothing all yield a well-formed report with an empty
 #      spec list, which "no failures" would happily call green.

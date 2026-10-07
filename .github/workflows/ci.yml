@@ -739,13 +739,13 @@ jobs:
     # the comment there). Must stay above setup + that timeout, or a job
     # cancellation silently swallows the verdict again. (PP-jxhy.)
     #
-    # 20 minutes of step budget leaves 25 for setup. Sized for the COLD-cache
+    # 30 minutes of step budget leaves 25 for setup. Sized for the COLD-cache
     # case, not the warm one: the node_modules cache keys on the lockfile, so
     # every dependency bump that lands on main — the most frequent push there
     # is — misses it and the leg pays `pnpm install --frozen-lockfile`, plus a
     # full chromium+webkit browser download whenever that bump moves
     # Playwright itself.
-    timeout-minutes: 45
+    timeout-minutes: 55
     strategy:
       # Every leg must report: one red leg must not cancel the others and
       # leave their parts of main's verdict unknown.
@@ -809,7 +809,8 @@ jobs:
         with:
           browsers: chromium webkit
           with-deps: "false"
-          save-cache: "true"
+          # One leg saves; the others would race to upload the same key.
+          save-cache: ${{ matrix.suite == 'full' && matrix.shard == 1 }}
 
       - name: Setup Supabase
         uses: $/.github/actions/setup-supabase
@@ -818,7 +819,8 @@ jobs:
       # assignment covers exactly the files the run would load. Every leg
       # computes the same assignment, so the legs partition the suite. Not
       # continue-on-error: a leg that cannot pick its files has no verdict and
-      # must fail.
+      # must fail. After Setup Supabase because spec support modules read its
+      # environment at import (e2e/support/supabase-admin.ts throws without it).
       - name: Select this shard's spec files
         env:
           CONFIG: playwright.config.${{ matrix.suite }}.ts
@@ -839,13 +841,16 @@ jobs:
       # 31430839981 hid ten real failures. A step-level timeout paired with
       # `continue-on-error: true` instead marks the step failed and lets the
       # job carry on to its verdict. The job timeout above is only a backstop
-      # and must stay comfortably above this one. (PP-jxhy.)
+      # and must stay comfortably above this one. (PP-jxhy.) 30 minutes, not
+      # the ~13 a green leg takes: on a red main every failure costs a locator
+      # timeout plus retries (120s and 3 retries on Mobile Safari), and a leg
+      # that times out reports no verdict at all.
       #
       # continue-on-error is also what keeps Mobile Safari non-gating: a red
       # WebKit spec fails this step, and the evaluate step below decides.
       - name: Run Comprehensive ${{ matrix.suite }} Tests (all browsers)
         continue-on-error: true
-        timeout-minutes: 20
+        timeout-minutes: 30
         env:
           CONFIG: playwright.config.${{ matrix.suite }}.ts
           MOCK_BLOB_STORAGE: "true"

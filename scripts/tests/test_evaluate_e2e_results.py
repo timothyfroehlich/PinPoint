@@ -30,6 +30,8 @@ import re
 import subprocess
 from pathlib import Path
 
+import yaml
+
 SCRIPT_PATH = Path(__file__).parent.parent / "workflow" / "evaluate-e2e-results.sh"
 
 
@@ -449,6 +451,29 @@ def test_the_evaluate_step_is_the_gate() -> None:
     assert "continue-on-error: true" in _step(job, "Run Comprehensive")
     assert "continue-on-error" not in _step(job, "Evaluate gating browser results")
     assert "continue-on-error" not in _step(job, "Select this shard's spec files")
+
+
+def test_matrix_legs_partition_each_suite() -> None:
+    """Each suite's legs are shards 1..total exactly once, with one shared total.
+
+    e2e-shard-files.py partitions a suite into `total` shards, so a leg whose
+    `total` disagrees with its siblings, or a missing or duplicated shard
+    number, runs some spec files twice or not at all while every leg stays
+    green.
+    """
+    workflow = yaml.safe_load(_ci_yml())
+    legs = workflow["jobs"]["test-e2e-comprehensive"]["strategy"]["matrix"]["include"]
+    suites: dict[str, list[dict]] = {}
+    for leg in legs:
+        suites.setdefault(leg["suite"], []).append(leg)
+    assert set(suites) == {"smoke", "full"}
+    for suite, entries in suites.items():
+        totals = {leg["total"] for leg in entries}
+        assert len(totals) == 1, f"{suite} legs disagree on total: {totals}"
+        (total,) = totals
+        assert sorted(leg["shard"] for leg in entries) == list(range(1, total + 1)), (
+            suite
+        )
 
 
 def test_one_red_leg_does_not_cancel_the_others() -> None:
