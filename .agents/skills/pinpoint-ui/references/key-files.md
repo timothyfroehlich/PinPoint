@@ -27,16 +27,16 @@ These are the canonical pattern sources. Read these files to understand PinPoint
 
 ### Status & Filter System
 
-For the conventions these files embody — the status-group model, smart-badge
-grouping, "Me" / "My machines" quick-selects, and the CSS-only mobile approach —
+For the conventions these files embody — the status-group model, option
+groups, "Me" / "My machines" quick-selects, and the CSS-only mobile approach —
 read `filter-conventions.md`.
 
-| File                                            | What It Teaches                                                                     |
-| :---------------------------------------------- | :---------------------------------------------------------------------------------- |
-| `src/lib/issues/status.ts`                      | STATUS_CONFIG, STATUS_GROUPS, the status color system. Single source of truth.      |
-| `src/components/issues/IssueFilters.tsx`        | Smart badge grouping, filter composition, MultiSelect usage, "More Filters" pattern |
-| `src/components/issues/fields/StatusSelect.tsx` | Grouped select with icons, STATUS_GROUP_LABELS, separator pattern                   |
-| `src/components/ui/multi-select.tsx`            | Grouped/flat modes, indeterminate group headers, selected-items-first sorting       |
+| File                                            | What It Teaches                                                                |
+| :---------------------------------------------- | :----------------------------------------------------------------------------- |
+| `src/lib/issues/status.ts`                      | STATUS_CONFIG, STATUS_GROUPS, the status color system. Single source of truth. |
+| `src/components/issues/view/issue-filters.ts`   | Issue View filters on List View: grouped Status, shortcuts, Secondary Filters  |
+| `src/components/issues/fields/StatusSelect.tsx` | Grouped select with icons, STATUS_GROUP_LABELS, separator pattern              |
+| `src/components/ui/multi-select.tsx`            | Grouped/flat modes, indeterminate group headers, selected-items-first sorting  |
 
 ### Pickers & Selects
 
@@ -72,5 +72,5 @@ Every authenticated page should compose `<MainLayout>` → `<PageContainer>` →
 ## Label Standards
 
 - Status group labels: import `STATUS_GROUP_LABELS` from `src/lib/issues/status.ts`. Never hardcode the strings at a call site.
-- Quick-select labels for "current user" filters are **"Me"** (assignee — `src/components/issues/AssigneePicker.tsx`) and **"My machines"**. Reuse those exact strings rather than inventing "Mine" / "My games". **"My machines" filters _issues_ by the machines the current user owns**, so it lives on the issues side (`IssueFilters.tsx`), **not** in the machine list's filters (`src/components/machines/view/machine-filters.ts`) — a plausible-looking wrong turn. For the wiring (the `ownedMachineInitials` prop) see `filter-conventions.md` § Quick-selects.
+- Quick-select labels for "current user" filters are **"Me"** (assignee — `src/components/issues/AssigneePicker.tsx`) and **"My machines"**. Reuse those exact strings rather than inventing "Mine" / "My games". **"My machines" filters _issues_ by the machines the current user owns**, so it lives on the issues side (`src/components/issues/view/issue-filters.ts`), **not** in the machine list's filters (`src/components/machines/view/machine-filters.ts`) — a plausible-looking wrong turn. For the wiring (`IssueViewResult.myMachines`) see `filter-conventions.md` § Quick-selects.
 - Status `wait_owner`: render `STATUS_CONFIG.wait_owner.label`, never the raw enum value. Mockups occasionally spell it "Wait Owner" — **the config wins over the mockup**, and this has been decided; don't relitigate it from a design file.

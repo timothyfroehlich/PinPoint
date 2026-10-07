@@ -249,10 +249,10 @@ describe("Issue Filtering Integration", () => {
     expect(results).toHaveLength(3);
   });
 
-  it("includes inactive machine issues when includeInactiveMachines is true", async () => {
+  it("includes every presence state when Machine Presence is empty", async () => {
     const db = await getTestDb();
     const where = buildWhereConditions(
-      { status: [], includeInactiveMachines: true },
+      { status: [], presence: [] },
       asDbOrTx(db)
     );
     const results = await queryIssues(where);

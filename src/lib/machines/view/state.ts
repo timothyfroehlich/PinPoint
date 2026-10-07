@@ -14,11 +14,20 @@ import {
 } from "~/lib/machines/presence";
 import type { MachineStatus } from "~/lib/machines/status";
 import {
+  getMachineViewBuiltInViews,
   getMachineViewPreset,
   MACHINE_VIEW_FIELDS,
-  ME_OWNER_ID,
-  UNASSIGNED_OWNER_ID,
 } from "~/lib/machines/view/config";
+import {
+  arraysEqual,
+  canonicalFilterValues,
+  canonicalPeopleValues,
+  parsePageSize,
+  parseUrlList,
+  positiveInteger,
+  storedStateParams,
+  type ListSearchParams,
+} from "~/lib/list-view/url-state";
 
 /** Playability values in their canonical order (machine-views §3.12). */
 export const MACHINE_STATUS_VALUES = [
@@ -26,11 +35,6 @@ export const MACHINE_STATUS_VALUES = [
   "needs_service",
   "unplayable",
 ] as const satisfies readonly MachineStatus[];
-
-/** Page sizes (list-views §5.7). */
-export const MACHINE_VIEW_PAGE_SIZES = [
-  25, 50, 100,
-] as const satisfies readonly MachineViewPageSize[];
 
 export function isMachineViewField(
   value: string | null
@@ -40,82 +44,7 @@ export function isMachineViewField(
   );
 }
 
-export function isMachineViewPageSize(
-  value: number
-): value is MachineViewPageSize {
-  return MACHINE_VIEW_PAGE_SIZES.some((size) => size === value);
-}
-
-export interface MachineViewSearchParams {
-  get(name: string): string | null;
-}
-
-export function toMachineViewSearchParams(
-  values: Record<string, string | string[] | undefined>
-): URLSearchParams {
-  const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(values)) {
-    if (Array.isArray(value)) params.set(key, value.join(","));
-    else if (value !== undefined) params.set(key, value);
-  }
-  return params;
-}
-
-/** The values of a URL list that `allowed` names, in the URL's order. */
-function parseList<T extends string>(
-  value: string | null,
-  allowed: readonly T[]
-): T[] {
-  if (!value) return [];
-  const allowedSet = new Set<string>(allowed);
-  return [...new Set(value.split(","))].filter((item): item is T =>
-    allowedSet.has(item)
-  );
-}
-
-/**
- * The values of `values` that `allowed` names, in `allowed`'s order. A filter
- * selection is a set, so one order keeps the same selection the same
- * configuration however it was made (list-views §9.3, §10.3).
- */
-export function canonicalFilterValues<T extends string>(
-  values: readonly string[],
-  allowed: readonly T[]
-): T[] {
-  const selected = new Set(values);
-  return allowed.filter((value) => selected.has(value));
-}
-
-const OWNER_SHORTCUTS = [ME_OWNER_ID, UNASSIGNED_OWNER_ID];
-
-/**
- * An Owner selection in its canonical order: Me, then Unassigned, then
- * people by id. Ids are the only order every selection shares, since names
- * can change and an id may name nobody on this Surface (list-views §10.18).
- */
-export function canonicalOwnerValues(values: readonly string[]): string[] {
-  const unique = [...new Set(values)].filter(Boolean);
-  const people = unique
-    .filter((value) => !OWNER_SHORTCUTS.includes(value))
-    .sort();
-  return [...canonicalFilterValues(unique, OWNER_SHORTCUTS), ...people];
-}
-
-function positiveInteger(value: string | null, fallback: number): number {
-  if (!value || !/^[1-9]\d*$/.test(value)) return fallback;
-  const parsed = Number(value);
-  return Number.isSafeInteger(parsed) ? parsed : fallback;
-}
-
-export function arraysEqual<T>(
-  left: readonly T[],
-  right: readonly T[]
-): boolean {
-  return (
-    left.length === right.length &&
-    left.every((value, index) => value === right[index])
-  );
-}
+export type MachineViewSearchParams = ListSearchParams;
 
 export function presenceEqual(
   left: MachineViewState["presence"],
@@ -156,15 +85,12 @@ export function parseMachineViewState(
       : sort === defaults.sort
         ? defaults.dir
         : MACHINE_VIEW_FIELDS[sort].preferredDirection;
-  const requestedPageSize = positiveInteger(
+  const pageSize: MachineViewPageSize = parsePageSize(
     searchParams.get("pageSize"),
     defaults.pageSize
   );
-  const pageSize: MachineViewPageSize = isMachineViewPageSize(requestedPageSize)
-    ? requestedPageSize
-    : defaults.pageSize;
   // Displayed fields keep the URL's order: it is the order they show in.
-  const requestedColumns = parseList(
+  const requestedColumns = parseUrlList(
     searchParams.get("columns"),
     MACHINE_VIEW_FIELD_IDS
   ).filter((field) => preset.permittedFields.includes(field));
@@ -187,7 +113,7 @@ export function parseMachineViewState(
       searchParams.get("severity")?.split(",") ?? [],
       ISSUE_SEVERITY_VALUES
     ),
-    owner: canonicalOwnerValues(searchParams.get("owner")?.split(",") ?? []),
+    owner: canonicalPeopleValues(searchParams.get("owner")?.split(",") ?? []),
     sort,
     dir,
     page: positiveInteger(searchParams.get("page"), defaults.page),
@@ -272,15 +198,25 @@ export function toMachineViewSavedState(
 }
 
 /**
- * The canonical URL parameters that open a Saved View: its configuration at
- * page 1 (list-views §10.6), relative to the Page Preset (§9.5), naming the view.
+ * A Built-in View applied to the current configuration (list-views §1): its
+ * search, filters, and sorting with the displayed fields and page size
+ * already showing, plus the fields the view adds, such as Recently added's
+ * Date Added (machine-views §9.1).
  */
-export function savedMachineViewSearchParams(
-  saved: MachineViewSavedState,
+export function applyMachineBuiltInView(
   presetId: MachineViewPresetId,
-  viewId: string
-): URLSearchParams {
-  return serializeMachineViewState({ ...saved, page: 1 }, presetId, viewId);
+  view: { id: string; state: MachineViewSavedState },
+  current: MachineViewSavedState
+): MachineViewSavedState {
+  const addsFields =
+    getMachineViewBuiltInViews(presetId).find(
+      (definition) => definition.id === view.id
+    )?.addsFields ?? [];
+  return {
+    ...view.state,
+    pageSize: current.pageSize,
+    columns: [...new Set([...current.columns, ...addsFields])],
+  };
 }
 
 /** The keys of a stored configuration, which are also its URL parameters. */
@@ -304,17 +240,6 @@ const SAVED_STATE_KEYS = [
  */
 const SAVED_STATE_PRESET: MachineViewPresetId = "machines";
 
-function storedParamValue(value: unknown): string | null {
-  if (typeof value === "string") return value;
-  if (typeof value === "number") return String(value);
-  if (Array.isArray(value)) {
-    return value
-      .filter((item): item is string => typeof item === "string")
-      .join(",");
-  }
-  return null;
-}
-
 /**
  * Validates a configuration to store or one read back from storage exactly as
  * URL parameters are validated (list-views §9.3, §10.14): values that no
@@ -329,29 +254,11 @@ function storedParamValue(value: unknown): string | null {
 export function normalizeMachineViewSavedState(
   stored: unknown
 ): MachineViewSavedState {
-  const params = new URLSearchParams();
-  if (typeof stored === "object" && stored !== null) {
-    for (const key of SAVED_STATE_KEYS) {
-      const value = storedParamValue(
-        Object.getOwnPropertyDescriptor(stored, key)?.value
-      );
-      if (value !== null) params.set(key, value);
-    }
-  }
   return toMachineViewSavedState(
-    parseMachineViewState(params, SAVED_STATE_PRESET)
-  );
-}
-
-/** Whether two configurations are the same view, ignoring the page. */
-export function machineViewSavedStatesEqual(
-  left: MachineViewSavedState,
-  right: MachineViewSavedState,
-  presetId: MachineViewPresetId
-): boolean {
-  return (
-    serializeMachineViewState({ ...left, page: 1 }, presetId).toString() ===
-    serializeMachineViewState({ ...right, page: 1 }, presetId).toString()
+    parseMachineViewState(
+      storedStateParams(stored, SAVED_STATE_KEYS),
+      SAVED_STATE_PRESET
+    )
   );
 }
 

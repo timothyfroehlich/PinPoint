@@ -7,6 +7,12 @@ import type {
 } from "~/lib/types";
 import { MACHINE_VIEW_FIELD_IDS } from "~/lib/types";
 import { VALID_MACHINE_PRESENCE_STATUSES } from "~/lib/machines/presence";
+import {
+  ME_PERSON_ID,
+  ME_PERSON_NAME,
+  UNASSIGNED_PERSON_ID,
+  UNASSIGNED_PERSON_NAME,
+} from "~/lib/list-view/url-state";
 
 /**
  * Optional per-row enrichment a field needs before it can display or sort.
@@ -17,18 +23,18 @@ import { VALID_MACHINE_PRESENCE_STATUSES } from "~/lib/machines/presence";
 export type MachineViewDependency = "service" | "activity";
 
 /** The owner filter value for machines with no owner (machine-views §4.2). */
-export const UNASSIGNED_OWNER_ID = "unassigned";
+export const UNASSIGNED_OWNER_ID = UNASSIGNED_PERSON_ID;
 /** How the Unassigned shortcut and an ownerless machine are named (§3.13). */
-export const UNASSIGNED_OWNER_NAME = "Unassigned";
+export const UNASSIGNED_OWNER_NAME = UNASSIGNED_PERSON_NAME;
 /**
  * The owner filter value for whoever is viewing (machine-views §4.2). It is
  * resolved per viewer when the filter runs, so one URL or Saved View means
  * each signed-in person's own machines. For an anonymous visitor the filter
  * is dropped, so the list shows every machine in the rest of the view.
  */
-export const ME_OWNER_ID = "me";
+export const ME_OWNER_ID = ME_PERSON_ID;
 /** How the Me shortcut is named (machine-views §3.13). */
-export const ME_OWNER_NAME = "Me";
+export const ME_OWNER_NAME = ME_PERSON_NAME;
 
 type DirectionLabels = Record<MachineViewSortDirection, string>;
 
@@ -187,26 +193,41 @@ export const MACHINE_VIEW_PRESETS: Record<
 };
 
 /**
- * Built-in Views (spec machine-views.md §9): named configurations PinPoint
- * defines for each Page Preset, the same for every viewer. Ids are stable URL
- * `view` values; views that share a name share an id and appear in the same
- * order on every Surface (§9.6). Exactly one per preset is the Page Preset.
+ * Built-in Views (spec machine-views.md §9): named filters and sorting
+ * PinPoint defines for each Page Preset, the same for every viewer. Applying
+ * one keeps the displayed fields and page size already showing and adds the
+ * fields it names (list-views §1); `state` is the view applied to the Page
+ * Preset, which is what a Default View opens. Ids are stable URL `view`
+ * values; views that share a name share an id and appear in the same order
+ * on every Surface (§9.6). Exactly one per preset is the Page Preset.
  */
 export interface MachineViewBuiltInViewDefinition {
   id: string;
   name: string;
   state: MachineViewSavedState;
+  /** Fields applying the view adds to those showing (§9.1). */
+  addsFields: readonly MachineViewFieldId[];
 }
 
 function builtIn(
   presetId: MachineViewPresetId,
   id: string,
   name: string,
-  overrides: Partial<MachineViewSavedState>
+  overrides: Partial<Omit<MachineViewSavedState, "columns" | "pageSize">>,
+  addsFields: readonly MachineViewFieldId[] = []
 ): MachineViewBuiltInViewDefinition {
   const { page: _page, ...defaults } =
     MACHINE_VIEW_PRESETS[presetId].defaultState;
-  return { id, name, state: { ...defaults, ...overrides } };
+  return {
+    id,
+    name,
+    state: {
+      ...defaults,
+      ...overrides,
+      columns: [...defaults.columns, ...addsFields],
+    },
+    addsFields,
+  };
 }
 
 const NEEDS_ATTENTION: Partial<MachineViewSavedState> = {
@@ -231,15 +252,20 @@ export const MACHINE_VIEW_BUILT_IN_VIEWS: Record<
     builtIn("machines", "all-machines", "All machines", {
       presence: "all",
     }),
-    builtIn("machines", "recently-added", "Recently added", {
-      // Every presence state except Removed (machine-views §9.1).
-      presence: VALID_MACHINE_PRESENCE_STATUSES.filter(
-        (presence) => presence !== "removed"
-      ),
-      sort: "dateAdded",
-      dir: "desc",
-      columns: [...DEFAULT_COLUMNS, "dateAdded"],
-    }),
+    builtIn(
+      "machines",
+      "recently-added",
+      "Recently added",
+      {
+        // Every presence state except Removed (machine-views §9.1).
+        presence: VALID_MACHINE_PRESENCE_STATUSES.filter(
+          (presence) => presence !== "removed"
+        ),
+        sort: "dateAdded",
+        dir: "desc",
+      },
+      ["dateAdded"]
+    ),
   ],
   collection: [
     builtIn("collection", "on-the-floor", "On the floor", {}),

@@ -17,10 +17,10 @@
 - **Surface** — a place where a List View appears: Machines, Issues, or one tab of one individual Collection or Tag. Every Collection or Tag tab is its own Surface.
 - **View Configuration** — the displayed fields, search, filters, sorting, and page size a List View shows. Page number is not part of it.
 - **Saved View** — a named, personal View Configuration owned by one account and belonging to one List Host. It can be applied on every Surface of that host.
-- **Built-in View** — a named View Configuration PinPoint defines for a Surface, the same for every viewer. One Built-in View on each Surface is its Page Preset.
+- **Built-in View** — a named set of filters and sorting PinPoint defines for a Surface, the same for every viewer, with an empty search. Applying one keeps the displayed fields and page size already showing, adding any field its host names for it. One Built-in View on each Surface has its Page Preset's filters and sorting.
 - **Default View** — the one Saved View or Built-in View an account marks to open on its host's main page (Machines or Issues) when the URL carries no view configuration.
-- **Applied View** — the Saved View or Built-in View the current View Configuration came from.
-- **Edited** — the state of a List View whose current View Configuration differs from its Applied View.
+- **Applied View** — the account's Saved View the current View Configuration came from, or else the Built-in View whose search, filters, and sorting it has. A List View that has left every Built-in View this way has no Applied View.
+- **Edited** — the state of a List View whose Applied View is one of the account's Saved Views and whose current View Configuration differs from it.
 - **Primary Filter** — a filter a host shows inline beside search. **Secondary Filter** — a filter a host shows only under More.
 - **List Header** — the bar at the top of the list box holding the Saved View controls, sort, compact pager, export, and View options.
 
@@ -42,14 +42,14 @@
 - **3.3** Active filters are never repeated as a separate chip row; each filter control shows its own current value.
 - **3.4** At 1440×900 the first rows of the list are visible without scrolling, with the Summary Widgets open.
 - **3.5** While a new result is loading the rows dim and the list is marked busy; the controls stay usable.
-- **3.6** A View Configuration that matches nothing shows an empty state; when the List View is Edited, its action returns to the Applied View.
+- **3.6** A View Configuration that matches nothing shows an empty state. When the List View is Edited, its action returns to the Applied View; when it has no Applied View, its action opens the Page Preset.
 
 ---
 
 ## 4. Search and Filters
 
 - **4.1** Search runs 250 ms after typing stops, or immediately on Enter.
-- **4.2** The search field names what it searches in its placeholder or a hint.
+- **4.2** The search field shows no placeholder. Its accessible name says which list it searches.
 - **4.3** Each Primary Filter is a dropdown button labeled with the filter's name; when set, it shows its value (one value) or a count of values (several).
 - **4.4** A filter whose options are long lists of records (machines, people) has a search box that narrows its options as the person types, plus the shortcuts its host names.
 - **4.5** More holds every Secondary Filter, and any Primary Filter that does not fit (§8.1).
@@ -63,8 +63,8 @@
 ## 5. List Header
 
 - **5.1** On desktop the List Header shows the Surface's Built-in Views as tabs, then More views holding the account's Saved Views and any Built-in View that does not fit. The Applied View is marked current; a Saved View that is applied shows as a tab while it is applied.
-- **5.2** When the List View is Edited, the current tab shows Edited, and the List Header offers Save and Discard changes.
-- **5.3** Save offers Save changes when the Applied View is the account's own Saved View, and always offers Save as new. A Built-in View can only be saved as new.
+- **5.2** When the List View is Edited, its Saved View's tab shows Edited, and the List Header offers Save and Discard changes. When it has no Applied View, the List Header offers Save view to signed-in accounts.
+- **5.3** Save offers Save changes and Save as new. Save view saves the current View Configuration as a new Saved View.
 - **5.4** Discard changes returns to the Applied View's configuration at page 1.
 - **5.5** The List Header shows the sort control, a compact pager (range, previous, next), Export when the host offers it, and View options.
 - **5.6** View options holds page size and, for hosts with columns, the displayed fields.
@@ -84,10 +84,10 @@
 
 - **7.1** Below the md breakpoint a List View uses the phone layout: title row, Summary Widgets, search on its own row, then the list box.
 - **7.2** The title row holds the title, the Summary Row toggle (widgets §2.5), and the host's page actions; actions that do not fit become icon buttons with accessible names. On a Collection or Tag tab, whose title row belongs to the Collection or Tag page, the Summary Row toggle sits on its own row between the page's tabs and the search field.
-- **7.3** The phone List Header holds the Applied View's name as a button that opens the Saved Views sheet, and a Filters icon button showing a count of filters not at their Page Preset value.
+- **7.3** The phone List Header holds the Applied View's name, or "Views" when there is none, as a button that opens the Saved Views sheet, and a Filters icon button showing a count of filters not at their Page Preset value.
 - **7.4** When the List View is Edited, the Applied View's name carries a marker that is announced as "edited".
 - **7.5** The Filters button opens one sheet holding Sort, the Primary Filters, the Secondary Filters under More filters, and Display (page size). Selecting a filter opens its options inside the sheet; the sheet's footer offers Reset all, which returns every filter to the Page Preset's values and keeps search, sort, and page size, and a button that shows the result count and closes the sheet.
-- **7.6** The Saved Views sheet offers, when Edited, Save changes (own Saved View only), Save as new, and Discard changes; then the Built-in Views, then the account's Saved Views, then Manage views.
+- **7.6** The Saved Views sheet offers, when Edited, Save changes, Save as new, and Discard changes, and when there is no Applied View, Save view; then the Built-in Views, then the account's Saved Views, then Manage views.
 - **7.7** The list box runs edge to edge with no card border; rows align with the page's horizontal padding.
 - **7.8** The pager is a 44px bar pinned above the tab bar, with Previous, the range ("1–25 of 84"), and Next. The list leaves room so its last row can scroll clear of the pager.
 - **7.9** Every phone control is at least 44px tall or wide.
@@ -99,7 +99,7 @@
 - **8.1** When the Primary Filters do not fit beside search, they move into More from the right, one at a time, in the host's order.
 - **8.2** When the List Header's tabs do not fit, Saved View tabs move into More views from the right; the Applied View's tab always stays visible.
 - **8.3** When the List Header is still crowded, the compact pager drops its range text, then disappears; then Discard changes shortens to Discard, and then the Applied View's tab name truncates. The pager below the list remains, and shows the result range even when there is only one page.
-- **8.4** When the Summary Widgets do not fit side by side, they stack full-width in a collapsible section (widgets §2.4).
+- **8.4** When the Summary Widgets do not fit side by side, they stack full-width in a collapsible section (widgets §2.4), and the Summary Row toggle moves to the title row, or to its own row on a Collection or Tag tab (§7.2).
 - **8.5** No List View width between 320px and 1440px scrolls the page horizontally.
 
 ---
@@ -161,13 +161,7 @@
 ## Known divergences (code vs spec)
 
 | Requirement | Divergence | Resolution |
-| :-- | :-- | :-- |
-| §2.1 | Issues and Collection Issues tabs use their own toolbar, pager, and URL handling. | PP-jb9v |
-| §3–§8, §12 | Issues and Collection Issues tabs don't use the shared layout, List Header, phone sheets, or overflow rules. | PP-jb9v |
-| §5.7 | Issues offers 15, 25, and 50 per page, defaulting to 15. | PP-jb9v |
-| §9.2, §9.4 | Issues uses snake_case parameters and a composite sort value. | PP-jb9v |
-| §10 | Issues has no Saved Views. | PP-jb9v |
-| §11 | Issues restores the last URL from a cookie across sessions. | PP-jb9v |
+| :---------- | :--------- | :--------- |
 
 ---
 
@@ -175,7 +169,8 @@
 
 | Date | Change |
 | :-- | :-- |
-| 2026-10-04 | Reset all returns filters to the Page Preset (§7.5); Built-in Views stay reachable as tabs or in More views (§10.12); the List Header's crowding order and the single-page result range (§8.3); per-filter Reset (§4.9); a Page Preset URL names its Built-in View when the account's Default View is another view (§10.10); empty-state action only when Edited (§3.6). |
+| 2026-10-05 | Built-in Views are starting points: they set filters and sorting only, leaving one leaves no Applied View and offers Save view, and only a changed Saved View is Edited (§1, §3.6, §5.2, §5.3, §7.3, §7.6). The Summary Row toggle moves to the title row whenever the Summary Widgets stack (§8.4). |
+| 2026-10-04 | Reset all returns filters to the Page Preset (§7.5); Built-in Views stay reachable as tabs or in More views (§10.12); the List Header's crowding order and the single-page result range (§8.3); per-filter Reset (§4.9); a Page Preset URL names its Built-in View when the account's Default View is another view (§10.10); empty-state action only when Edited (§3.6). The search field shows no placeholder (§4.2). |
 | 2026-10-03 | On a Collection or Tag tab the Summary Row toggle sits on its own row between the page's tabs and search (§7.2). |
 | 2026-10-03 | Stacked Summary Widgets sit in a collapsible section (§8.4). |
 | 2026-10-02 | Default View controls appear only on the Machines and Issues pages (§10.8). |

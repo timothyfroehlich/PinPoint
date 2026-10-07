@@ -124,7 +124,7 @@ describe("MachineViewTable", () => {
     );
     expect(href.pathname).toBe("/issues");
     expect(href.searchParams.get("machine")).toBe("AFM");
-    expect(href.searchParams.get("include_inactive_machines")).toBe("true");
+    expect(href.searchParams.get("presence")).toBe("all");
     expect(issueLink).toHaveClass(SEVERITY_CONFIG.major.iconColor);
     expect(issueLink.closest("td")).toHaveClass("text-right");
     expect(
