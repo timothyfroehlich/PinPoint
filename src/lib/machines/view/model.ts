@@ -221,6 +221,8 @@ export function applyMachineViewState(
   rows: MachineViewCandidate[];
   totalCount: number;
   page: number;
+  /** Every matching machine's id, on all pages, in sort order. */
+  matchingIds: string[];
 } {
   const query = state.q.toLocaleLowerCase();
   const filteredRows = rows.filter((row) =>
@@ -237,6 +239,7 @@ export function applyMachineViewState(
     rows: sorted.slice(offset, offset + state.pageSize),
     totalCount: sorted.length,
     page,
+    matchingIds: sorted.map((row) => row.id),
   };
 }
 

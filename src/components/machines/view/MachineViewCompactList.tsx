@@ -6,12 +6,14 @@ import {
   MachineIdentity,
   OpenIssueCount,
   PlayabilityDot,
+  type MachineRowAction,
   type MachineSelectionHandler,
 } from "./field-catalog";
 
 interface MachineViewCompactListProps {
   rows: MachineViewRow[];
   onMachineSelect?: MachineSelectionHandler | undefined;
+  rowAction?: MachineRowAction | undefined;
 }
 
 /**
@@ -23,6 +25,7 @@ interface MachineViewCompactListProps {
 export function MachineViewCompactList({
   rows,
   onMachineSelect,
+  rowAction,
 }: MachineViewCompactListProps): React.JSX.Element {
   return (
     // Rows align with the page's horizontal padding (list-views §7.7).
@@ -45,6 +48,7 @@ export function MachineViewCompactList({
           <div className="shrink-0">
             <OpenIssueCount row={row} variant="compact" />
           </div>
+          {rowAction ? <div className="shrink-0">{rowAction(row)}</div> : null}
         </li>
       ))}
     </ul>
