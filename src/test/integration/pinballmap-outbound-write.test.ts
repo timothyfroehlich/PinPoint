@@ -27,6 +27,7 @@ import {
 } from "~/server/db/schema";
 import type { LocationSnapshot, PbmWriteFailure } from "~/lib/pinballmap/types";
 import type * as UserCredentialsModule from "~/lib/pinballmap/user-credentials";
+import { siteDayOf } from "~/lib/time-zone";
 
 vi.mock("~/server/db", async () => {
   const { getTestDb } = await import("~/test/setup/pglite");
@@ -1791,16 +1792,13 @@ describe("Lineup page: Confirm lineup (PGlite)", () => {
     await mockAuthAs(admin.id);
     await seedLink(admin.id);
     await seedConfirmable([], new Date());
-    const today = new Date().toISOString().slice(0, 10);
-    const fd = new FormData();
-    fd.set("today", today);
 
-    const result = await confirmPinballmapLineupAction(undefined, fd);
+    const result = await confirmPinballmapLineupAction();
 
     expect(result).toEqual({ ok: true, value: {} });
     expect(pbm.confirmed).toEqual([26454]);
     const state = await db.query.pinballmapState.findFirst();
-    expect(state?.snapshotJson?.dateLastUpdated).toBe(today);
+    expect(state?.snapshotJson?.dateLastUpdated).toBe(siteDayOf(new Date()));
   });
 
   it("refuses a member, even one who owns machines, before calling Pinball Map", async () => {
@@ -1813,11 +1811,9 @@ describe("Lineup page: Confirm lineup (PGlite)", () => {
       .insert(machines)
       .values({ name: "Mine", initials: "MINE", ownerId: member.id });
     await seedConfirmable([], new Date());
-    const fd = new FormData();
-    fd.set("today", new Date().toISOString().slice(0, 10));
 
     expect((await checkConfirmLineupAction()).ok).toBe(false);
-    const result = await confirmPinballmapLineupAction(undefined, fd);
+    const result = await confirmPinballmapLineupAction();
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.code).toBe("UNAUTHORIZED");
@@ -1833,10 +1829,8 @@ describe("Lineup page: Confirm lineup (PGlite)", () => {
     await seedLink(admin.id);
     await seedConfirmable([], new Date());
     pbm.confirmResult = { ok: false, reason: "unauthorized" };
-    const fd = new FormData();
-    fd.set("today", new Date().toISOString().slice(0, 10));
 
-    const result = await confirmPinballmapLineupAction(undefined, fd);
+    const result = await confirmPinballmapLineupAction();
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.code).toBe("PBM_AUTH_FAILED");
@@ -1859,11 +1853,9 @@ describe("Lineup page: Confirm lineup (PGlite)", () => {
     const admin = await createUser("admin");
     await mockAuthAs(admin.id);
     await seedConfirmable([], new Date());
-    const fd = new FormData();
-    fd.set("today", new Date().toISOString().slice(0, 10));
 
     const checkResult = await checkConfirmLineupAction();
-    const result = await confirmPinballmapLineupAction(undefined, fd);
+    const result = await confirmPinballmapLineupAction();
 
     expect(checkResult.ok).toBe(false);
     if (!checkResult.ok) expect(checkResult.code).toBe("NOT_LINKED");
