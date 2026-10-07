@@ -201,9 +201,21 @@ def main(argv: list[str] | None = None) -> int:
     # scripts/ sits directly under the repository root.
     root = args.root or Path(__file__).resolve().parents[1]
     drizzle_dir = root / "drizzle"
-    errors = check_tree(drizzle_dir)
-    if args.base_dir is not None:
-        errors += check_against_base(drizzle_dir, args.base_dir / "drizzle")
+    try:
+        errors = check_tree(drizzle_dir)
+        if args.base_dir is not None:
+            errors += check_against_base(drizzle_dir, args.base_dir / "drizzle")
+    except (OSError, ValueError) as error:
+        # Includes json.JSONDecodeError, e.g. conflict markers mid-merge.
+        print(
+            f"Migration order check failed: cannot read drizzle/: {error}",
+            file=sys.stderr,
+        )
+        print(
+            "  - mid-merge with drizzle/ conflicts? bash scripts/db-renumber-migration.sh",
+            file=sys.stderr,
+        )
+        return 1
 
     if errors:
         print("Migration order check failed:", file=sys.stderr)

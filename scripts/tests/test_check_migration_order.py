@@ -195,3 +195,11 @@ def test_main_exit_codes(tmp_path: Path, capsys):
     (root / "drizzle" / "0001_users.sql").write_text("-- edited\n")
     assert main(["--root", str(root), "--base-dir", str(base_root)]) == 1
     assert "Migration order check failed" in capsys.readouterr().err
+
+
+def test_unreadable_journal_reports_instead_of_raising(tmp_path: Path, capsys):
+    root = tmp_path / "repo"
+    drizzle = write_tree(root, BASE)
+    (drizzle / "meta" / "_journal.json").write_text("<<<<<<< HEAD\n{}\n")
+    assert main(["--root", str(root)]) == 1
+    assert "cannot read drizzle/" in capsys.readouterr().err

@@ -25,6 +25,12 @@ BREAKPOINT = "--> statement-breakpoint"
 
 
 DOLLAR_TAG = re.compile(r"\$[A-Za-z_][A-Za-z0-9_]*\$|\$\$")
+IDENT_CHAR = re.compile(r"[A-Za-z0-9_$]")
+
+
+def _after_identifier(sql: str, i: int) -> bool:
+    """True when position i continues an identifier (Postgres allows `$` there)."""
+    return i > 0 and IDENT_CHAR.match(sql[i - 1]) is not None
 
 
 def strip_comments(sql: str) -> str:
@@ -47,7 +53,12 @@ def strip_comments(sql: str) -> str:
         elif sql[i] in "'\"":
             quote, j = sql[i], i + 1
             # E'...' strings also escape with a backslash.
-            escapes = quote == "'" and i > 0 and sql[i - 1] in "Ee"
+            escapes = (
+                quote == "'"
+                and i > 0
+                and sql[i - 1] in "Ee"
+                and not _after_identifier(sql, i - 1)
+            )
             while j < n:
                 if escapes and sql[j] == "\\":
                     j += 2
@@ -60,7 +71,10 @@ def strip_comments(sql: str) -> str:
                 j += 1
             out.append(sql[i : j + 1])
             i = j + 1
-        elif (tag := DOLLAR_TAG.match(sql, i)) is not None:
+        elif (
+            not _after_identifier(sql, i)
+            and (tag := DOLLAR_TAG.match(sql, i)) is not None
+        ):
             end = sql.find(tag.group(0), tag.end())
             j = n if end == -1 else end + len(tag.group(0))
             out.append(sql[i:j])
