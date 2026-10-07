@@ -1,8 +1,9 @@
 import type React from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { MapPin, Plus, Printer } from "lucide-react";
+import { MapPin, Plus } from "lucide-react";
 import { MachineView } from "~/components/machines/view";
+import { MachinesPrintMenu } from "~/components/machines/MachinesPrintMenu";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
 import { Button } from "~/components/ui/button";
@@ -10,8 +11,6 @@ import { EmptyState } from "~/components/ui/empty-state";
 import { getViewer } from "~/lib/auth/viewer";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { loadMachineView } from "~/lib/machines/view/queries";
-import { lineupToReviewCount } from "~/lib/pinballmap/lineup-comparison";
-import { loadLineupData } from "~/lib/pinballmap/lineup-data";
 import { toListSearchParams } from "~/lib/list-view/url-state";
 import { loadMachineViewSavedViews } from "~/lib/machines/view/saved-views";
 import { getQueuedApronCardIds } from "~/app/(app)/m/apron-cards/_data";
@@ -39,7 +38,8 @@ export default async function MachinesPage({
     "machines.pinballmap.sync",
     accessLevel
   );
-  // Batch printing uses one card's export gate (apron-cards §12.1).
+  // Batch printing apron cards uses one card's export gate (apron-cards
+  // §12.1); settings sheets are open to everyone (settings-sheets §2.1).
   const canPrintApronCards = checkPermission(
     "machines.apron.export",
     accessLevel
@@ -50,80 +50,30 @@ export default async function MachinesPage({
     viewSearchParams
   );
   if (redirectTo) redirect(redirectTo);
-  const [result, lineupData, queuedApronCardIds] = await Promise.all([
+  const [result, queuedApronCardIds] = await Promise.all([
     loadMachineView({
       scope: { kind: "all" },
       preset: "machines",
       searchParams: viewSearchParams,
     }),
-    canViewLineup ? loadLineupData() : Promise.resolve(null),
     // The viewer's print queue count on Print apron cards (apron-cards §13.4).
     canPrintApronCards && viewer.userId !== undefined
       ? getQueuedApronCardIds(viewer.userId)
       : Promise.resolve([]),
   ]);
   const apronQueueCount = queuedApronCardIds.length;
-  // The "to review" count comes from the same stored-data comparison the
-  // lineup page renders, so the badge can never disagree with the page it links
-  // to (§4.1). It is zero until there is a lineup to compare (§2.4–§2.5).
-  const lineupToReview =
-    lineupData === null ? 0 : lineupToReviewCount(lineupData.comparison);
   // On phones the actions shrink to icon buttons that keep their accessible
   // names (list-views §7.2).
   const lineupButton = canViewLineup ? (
     <Button
       asChild
       variant="outline"
-      className="relative max-md:size-11 max-md:px-0"
+      className="max-md:size-11 max-md:px-0"
       data-testid="pinball-map-lineup-button"
     >
-      <Link
-        href="/m/pinball-map"
-        aria-label={
-          lineupToReview > 0
-            ? `Pinball Map, ${lineupToReview} to review`
-            : "Pinball Map"
-        }
-      >
+      <Link href="/m/pinball-map" aria-label="Pinball Map">
         <MapPin className="size-4 md:mr-2" aria-hidden="true" />
         <span className="max-md:hidden">Pinball Map</span>
-        {lineupToReview > 0 ? (
-          <span
-            aria-hidden="true"
-            className="inline-flex min-w-5 items-center justify-center rounded-full border border-error-container bg-error-container px-1.5 text-xs font-semibold tabular-nums text-on-error-container max-md:absolute max-md:-top-1.5 max-md:-right-1.5 md:ml-2 md:bg-error-container/50"
-            data-testid="pinball-map-lineup-to-review"
-          >
-            {lineupToReview}
-          </span>
-        ) : null}
-      </Link>
-    </Button>
-  ) : null;
-  const printApronCardsButton = canPrintApronCards ? (
-    <Button
-      asChild
-      variant="outline"
-      className="relative max-md:size-11 max-md:px-0"
-    >
-      <Link
-        href="/m/apron-cards"
-        aria-label={
-          apronQueueCount > 0
-            ? `Print apron cards, ${apronQueueCount} in your print queue`
-            : "Print apron cards"
-        }
-      >
-        <Printer className="size-4 md:mr-2" aria-hidden="true" />
-        <span className="max-md:hidden">Print apron cards</span>
-        {apronQueueCount > 0 ? (
-          <span
-            aria-hidden="true"
-            className="inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-semibold tabular-nums text-on-primary max-md:absolute max-md:-top-1.5 max-md:-right-1.5 md:ml-2"
-            data-testid="apron-print-queue-count"
-          >
-            {apronQueueCount}
-          </span>
-        ) : null}
       </Link>
     </Button>
   ) : null;
@@ -144,16 +94,16 @@ export default async function MachinesPage({
       </Link>
     </Button>
   ) : null;
-  const pageActions =
-    lineupButton === null &&
-    printApronCardsButton === null &&
-    addMachineButton === null ? undefined : (
-      <>
-        {lineupButton}
-        {printApronCardsButton}
-        {addMachineButton}
-      </>
-    );
+  const pageActions = (
+    <>
+      {lineupButton}
+      <MachinesPrintMenu
+        canPrintApronCards={canPrintApronCards}
+        apronQueueCount={apronQueueCount}
+      />
+      {addMachineButton}
+    </>
+  );
 
   if (result.scopeCount === 0) {
     return (

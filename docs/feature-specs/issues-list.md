@@ -45,7 +45,7 @@
 - **4.5** Machine searches machines by name and initials, leaving out Removed machines unless Machine Presence includes Removed, and offers a My machines shortcut (machines the person owns, other than Removed ones). A machine already selected stays listed.
 - **4.6** Assignee searches people by name and offers Me and Unassigned shortcuts.
 - **4.7** Machine Presence offers every presence state.
-- **4.8** Created and Updated are date ranges.
+- **4.8** Created and Updated are date ranges. A Created or Updated day is a calendar day on the collective's local clock, America/Chicago, daylight saving included: a range runs from local midnight starting its first day up to, but not including, local midnight after its last day.
 - **4.9** Me, My machines, Watching, and Machine collection appear only to signed-in people.
 - **4.10** Machine owner searches people by name and offers Me and Unassigned shortcuts; Unassigned matches machines with no owner. Reporter searches people by name and offers a Me shortcut.
 
@@ -96,6 +96,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-07 | Created and Updated days are the collective's local days, America/Chicago (4.8). |
 | 2026-10-05 | Machine tag and Machine collection Secondary Filters (4.3, 4.9) and their `tag` and `collection` parameters (7.1). |
 | 2026-10-04 | Search also matches description text (4.1). Machine owner offers Me and Unassigned shortcuts and Reporter offers Me (4.10). |
 | 2026-10-03 | Machine and My machines leave out Removed machines unless Machine Presence includes Removed (4.5). |

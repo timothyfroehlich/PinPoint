@@ -389,6 +389,49 @@ def test_setup_job_gates_on_code_or_deps(ci_workflow: dict) -> None:
     assert "needs.changes.outputs.deps == 'true'" in setup_if
 
 
+def test_push_change_detection_reaches_back_to_the_last_passing_main_run(
+    ci_workflow: dict,
+) -> None:
+    """A push to main diffs against the last main commit a CI run passed on.
+
+    Main runs one at a time and a newer merge cancels the waiting run, so a
+    push's own `before` can skip a merge whose run never started. Diffing from
+    `before` would let a docs-only merge's run skip E2E for the code merge it
+    superseded. The code filter takes the reached-back base; the deps filter
+    and push audit stay per push, because every lockfile change was already
+    audited on its PR.
+    (PP-yva7.7.)
+    """
+    changes = ci_workflow["jobs"]["changes"]
+    steps = {step.get("id"): step for step in changes["steps"]}
+
+    checkout = next(
+        s for s in changes["steps"] if "actions/checkout@" in s.get("uses", "")
+    )
+    assert checkout["with"]["fetch-depth"] == (
+        "${{ github.event_name == 'push' && '0' || '1' }}"
+    ), "push runs need full history to diff past `before`"
+
+    base = steps["base"]
+    assert base["if"] == "github.event_name == 'push'"
+    assert "status=success" in base["run"], (
+        "only a passing run covered its commits; a failure may have skipped E2E"
+    )
+    assert "git merge-base --is-ancestor" in base["run"]
+    assert 'select(.head_sha != \\"$GITHUB_SHA\\")' in base["run"], (
+        "a re-run of a green run must not diff against itself"
+    )
+    assert "force=true" in base["run"], "an unknown base must run every job"
+    assert "github.event.before" not in base["run"], (
+        "falling back to `before` can skip a superseded merge"
+    )
+
+    assert steps["filter"]["with"]["base"] == "${{ steps.base.outputs.sha }}"
+    assert "base" not in steps["deps-filter"]["with"], "deps stays per push"
+    assert "steps.base.outputs.force == 'true'" in changes["outputs"]["deps"]
+    assert steps["set-code"]["env"]["FORCE"] == "${{ steps.base.outputs.force }}"
+
+
 def test_mixed_changes_trigger_tests(paths_filter: PathsFilterSimulator) -> None:
     """A PR mixing non-code files with a website file must trigger tests."""
     mixed_files = [
