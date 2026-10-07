@@ -18,6 +18,7 @@ import {
   seededMember,
 } from "../support/constants.js";
 import { getProfileIdByEmail } from "../support/supabase-admin.js";
+import { STORAGE_STATE } from "../support/auth-state.js";
 
 // Build routes from seeded data so they don't break if seed data changes
 const machineInitials = seededMachines.addamsFamily.initials;
@@ -325,6 +326,30 @@ test.describe("Responsive: no horizontal overflow", () => {
         });
       });
     });
+  });
+
+  // The member-role `/m` entry above renders no header actions. An admin sees
+  // Pinball Map, Print apron cards, and Add Machine on the title row, which
+  // must stay inside the viewport down to the 320px floor (list-views §7.2).
+  test.describe("machines list header as admin", () => {
+    test.use({ storageState: STORAGE_STATE.admin });
+
+    for (const width of [320, 430]) {
+      test(`/m header actions fit at ${String(width)}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 800 });
+        await page.goto("/m");
+
+        const main = page.getByRole("main");
+        for (const action of [
+          main.getByRole("link", { name: "Pinball Map", exact: true }),
+          main.getByRole("link", { name: /^Print apron cards/ }),
+          main.getByRole("link", { name: "Add Machine", exact: true }),
+        ]) {
+          await expect(action).toBeInViewport({ ratio: 1 });
+        }
+        await assertNoHorizontalOverflow(page);
+      });
+    }
   });
 
   test.describe("public pages", () => {

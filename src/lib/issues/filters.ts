@@ -9,6 +9,7 @@ import type {
 } from "~/lib/types";
 import type { MachinePresenceStatus } from "~/lib/machines/presence";
 import { ME_PERSON_ID } from "~/lib/list-view/url-state";
+import { startOfNextSiteDay, startOfSiteDay } from "~/lib/time-zone";
 
 /**
  * What an issue query selects and how it orders them: the server-side form
@@ -34,19 +35,29 @@ export interface IssueFilters {
   watcherId?: string | undefined;
   /** Empty means every presence state. */
   presence?: MachinePresenceStatus[] | undefined;
+  /**
+   * Created and Updated ranges as instants: `From` is inclusive, `Before`
+   * exclusive. {@link issueFiltersFromState} turns a range's picked days
+   * into these bounds once, on the collective's local clock.
+   */
   createdFrom?: Date | undefined;
-  /** Inclusive: the whole of this day counts. */
-  createdTo?: Date | undefined;
+  createdBefore?: Date | undefined;
   updatedFrom?: Date | undefined;
-  updatedTo?: Date | undefined;
+  updatedBefore?: Date | undefined;
   sort?: IssueViewSortField | undefined;
   dir?: IssueViewSortDirection | undefined;
   page?: number | undefined;
   pageSize?: number | undefined;
 }
 
-function startOfDay(day: string | null): Date | undefined {
-  return day === null ? undefined : new Date(`${day}T00:00:00Z`);
+/** When a range's first day begins on the site clock. */
+function rangeStart(day: string | null): Date | undefined {
+  return day === null ? undefined : startOfSiteDay(day);
+}
+
+/** When a range's last day ends on the site clock: the next day's start. */
+function rangeEnd(day: string | null): Date | undefined {
+  return day === null ? undefined : startOfNextSiteDay(day);
 }
 
 /**
@@ -76,10 +87,10 @@ export function issueFiltersFromState(
     frequency: state.frequency,
     watcherId: state.watching && viewerId !== null ? viewerId : undefined,
     presence: state.presence,
-    createdFrom: startOfDay(state.created.from),
-    createdTo: startOfDay(state.created.to),
-    updatedFrom: startOfDay(state.updated.from),
-    updatedTo: startOfDay(state.updated.to),
+    createdFrom: rangeStart(state.created.from),
+    createdBefore: rangeEnd(state.created.to),
+    updatedFrom: rangeStart(state.updated.from),
+    updatedBefore: rangeEnd(state.updated.to),
     sort: state.sort,
     dir: state.dir,
     page: state.page,

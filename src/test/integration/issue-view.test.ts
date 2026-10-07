@@ -171,6 +171,39 @@ describe("loadIssueView", () => {
     expect(result.machineOptions).toEqual([]);
   });
 
+  it("reads Created and Updated days on the collective's clock, America/Chicago (issues-list §4.8, PP-qv6x)", async () => {
+    const db = await getTestDb();
+    await db
+      .insert(machines)
+      .values(createTestMachine({ initials: "CC", name: "Charlie" }));
+    const at = (iso: string): { createdAt: Date; updatedAt: Date } => ({
+      createdAt: new Date(iso),
+      updatedAt: new Date(iso),
+    });
+    await db.insert(issues).values([
+      // 8 PM CDT on Oct 4, already Oct 5 in UTC.
+      createTestIssue("CC", { issueNumber: 1, ...at("2026-10-05T01:00:00Z") }),
+      // 11:30 PM CDT on Oct 5, already Oct 6 in UTC.
+      createTestIssue("CC", { issueNumber: 2, ...at("2026-10-06T04:30:00Z") }),
+      // Midnight CDT starting Oct 5: the exclusive end of Oct 4.
+      createTestIssue("CC", { issueNumber: 3, ...at("2026-10-05T05:00:00Z") }),
+    ]);
+    const range = (query: string): Promise<IssueViewResult> =>
+      load(`machine=CC&sort=id&dir=asc&${query}`);
+
+    expect(ids(await range("created=2026-10-04..2026-10-04"))).toEqual([
+      "CC-01",
+    ]);
+    expect(ids(await range("created=2026-10-05..2026-10-05"))).toEqual([
+      "CC-02",
+      "CC-03",
+    ]);
+    expect(ids(await range("updated=2026-10-05..2026-10-05"))).toEqual([
+      "CC-02",
+      "CC-03",
+    ]);
+  });
+
   it("clamps a page past the end to the last page (list-views §6.3)", async () => {
     const result = await load("page=40");
     expect(result.state.page).toBe(1);
