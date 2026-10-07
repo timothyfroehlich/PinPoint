@@ -8,7 +8,7 @@ import { createIssueTool } from "./create-issue";
 import { createSettingsSetTool } from "./create-settings-set";
 import { getIssueTool } from "./get-issue";
 import { getMachineTool } from "./get-machine";
-import { registerToolDefinition, type AnyToolDefinition } from "./harness";
+import { type ToolDefinition } from "./harness";
 import { listIssuesTool } from "./list-issues";
 import { listMachinesTool } from "./list-machines";
 import { listSettingsSetsTool } from "./list-settings-sets";
@@ -21,8 +21,12 @@ import { updateSettingsSetTool } from "./update-settings-set";
  * The complete catalog of PinPoint MCP tools. Defined as an array so every tool
  * is registered by definition — a tool cannot exist in the array without being
  * registered on the server.
+ *
+ * A tool defined in `src/lib/mcp/tools/*.ts` that is not listed here is
+ * unreachable no matter how complete its handler is, which is what the
+ * "registers every tool in the catalog" integration test pins.
  */
-export const PINPOINT_TOOLS: readonly AnyToolDefinition[] = [
+export const PINPOINT_TOOLS: readonly ToolDefinition[] = [
   listMachinesTool,
   getMachineTool,
   listIssuesTool,
@@ -36,7 +40,7 @@ export const PINPOINT_TOOLS: readonly AnyToolDefinition[] = [
   listSettingsSetsTool,
   createSettingsSetTool,
   updateSettingsSetTool,
-] as const;
+];
 
 /**
  * Register the MCP tool catalog (spec §"Tool catalog") on an McpServer. Reads
@@ -52,6 +56,6 @@ export const PINPOINT_TOOLS: readonly AnyToolDefinition[] = [
  */
 export function registerPinpointTools(server: McpServer): void {
   for (const tool of PINPOINT_TOOLS) {
-    registerToolDefinition(server, tool);
+    tool.register(server);
   }
 }

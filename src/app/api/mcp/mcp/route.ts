@@ -6,11 +6,7 @@ import {
   MCP_RESOURCE_METADATA_PATH,
 } from "~/lib/mcp/config";
 import { registerPinpointTools } from "~/lib/mcp/tools";
-import {
-  defineTool,
-  READ_ONLY_TOOL_ANNOTATIONS,
-  registerToolDefinition,
-} from "~/lib/mcp/tools/shared";
+import { defineTool, READ_ONLY_TOOL_ANNOTATIONS } from "~/lib/mcp/tools/shared";
 import { requireMcpAuthContext, verifyToken } from "~/lib/mcp/verify-token";
 import { checkMcpRequestLimit } from "~/lib/rate-limit";
 
@@ -28,7 +24,7 @@ export const maxDuration = 60;
  * Tools: the PinPoint tool catalog ({@link registerPinpointTools}) plus a
  * `whoami` diagnostic used to validate the connection end-to-end.
  */
-const whoamiTool = defineTool({
+export const whoamiTool = defineTool({
   name: "whoami",
   title: "Who am I",
   description:
@@ -47,7 +43,7 @@ const whoamiTool = defineTool({
 
 const handler = createMcpHandler(
   (server) => {
-    registerToolDefinition(server, whoamiTool);
+    whoamiTool.register(server);
     registerPinpointTools(server);
   },
   {

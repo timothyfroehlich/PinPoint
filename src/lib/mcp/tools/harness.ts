@@ -141,49 +141,24 @@ export async function runTool(
 type McpToolConfig = NonNullable<Parameters<McpServer["registerTool"]>[1]>;
 export type ToolAnnotations = NonNullable<McpToolConfig["annotations"]>;
 
-/** A declarative MCP tool definition with an input schema. */
-export interface ToolWithSchemaDefinition<TSchema extends z.ZodTypeAny> {
+/** A registered tool definition with its name and registration callback. */
+export interface ToolDefinition {
   name: string;
-  title: string;
-  description: string;
-  inputSchema: TSchema;
-  annotations?: ToolAnnotations;
-  mutates?: boolean;
-  run: (args: z.infer<TSchema>, ctx: McpAuthContext) => Promise<ToolOutcome>;
-  register: (server: McpServer) => void;
-}
-
-/** A declarative MCP tool definition without an input schema. */
-export interface ToolWithoutSchemaDefinition {
-  name: string;
-  title: string;
-  description: string;
-  inputSchema?: undefined;
-  annotations?: ToolAnnotations;
-  mutates?: boolean;
-  run: (args: undefined, ctx: McpAuthContext) => Promise<ToolOutcome>;
-  register: (server: McpServer) => void;
-}
-
-/** Generic tool definition for collections such as the catalog. */
-export interface AnyToolDefinition {
-  name: string;
-  title: string;
-  description: string;
-  annotations?: ToolAnnotations;
-  mutates?: boolean;
   register: (server: McpServer) => void;
 }
 
 /** Input configuration passed to {@link defineTool}. */
-export interface DefineToolWithSchemaOptions<TSchema extends z.ZodTypeAny> {
+export interface DefineToolWithSchemaOptions<TShape extends z.ZodRawShape> {
   name: string;
   title: string;
   description: string;
-  inputSchema: TSchema;
+  inputSchema: z.ZodObject<TShape>;
   annotations?: ToolAnnotations;
   mutates?: boolean;
-  run: (args: z.infer<TSchema>, ctx: McpAuthContext) => Promise<ToolOutcome>;
+  run: (
+    args: z.infer<z.ZodObject<TShape>>,
+    ctx: McpAuthContext
+  ) => Promise<ToolOutcome>;
 }
 
 export interface DefineToolWithoutSchemaOptions {
@@ -196,56 +171,28 @@ export interface DefineToolWithoutSchemaOptions {
   run: (args: undefined, ctx: McpAuthContext) => Promise<ToolOutcome>;
 }
 
-function hasInputSchema<TSchema extends z.ZodTypeAny>(
-  options: DefineToolWithSchemaOptions<TSchema> | DefineToolWithoutSchemaOptions
-): options is DefineToolWithSchemaOptions<TSchema> {
-  return "inputSchema" in options && options.inputSchema !== undefined;
-}
-
-interface DynamicMcpServer {
-  registerTool(
-    name: string,
-    config: {
-      title: string;
-      description: string;
-      inputSchema?: unknown;
-      annotations?: ToolAnnotations;
-    },
-    cb: (args: unknown, extra: ServerContext) => Promise<CallToolResult>
-  ): void;
-}
-
 /**
  * Define a tool with typed args inferred from its inputSchema.
  */
-export function defineTool<TSchema extends z.ZodTypeAny>(
-  options: DefineToolWithSchemaOptions<TSchema>
-): ToolWithSchemaDefinition<TSchema>;
+export function defineTool<TShape extends z.ZodRawShape>(
+  options: DefineToolWithSchemaOptions<TShape>
+): ToolDefinition;
 export function defineTool(
   options: DefineToolWithoutSchemaOptions
-): ToolWithoutSchemaDefinition;
-export function defineTool<TSchema extends z.ZodTypeAny>(
-  options: DefineToolWithSchemaOptions<TSchema> | DefineToolWithoutSchemaOptions
-): ToolWithSchemaDefinition<TSchema> | ToolWithoutSchemaDefinition {
+): ToolDefinition;
+export function defineTool<TShape extends z.ZodRawShape>(
+  options: DefineToolWithSchemaOptions<TShape> | DefineToolWithoutSchemaOptions
+): ToolDefinition {
   const runOptions =
     options.mutates !== undefined ? { mutates: options.mutates } : {};
 
-  if (hasInputSchema(options)) {
-    const run = options.run;
+  if (options.inputSchema !== undefined) {
     const inputSchema = options.inputSchema;
-    const toolDef: ToolWithSchemaDefinition<TSchema> = {
+    const run = options.run;
+    return {
       name: options.name,
-      title: options.title,
-      description: options.description,
-      inputSchema,
-      ...(options.annotations !== undefined && {
-        annotations: options.annotations,
-      }),
-      ...(options.mutates !== undefined && { mutates: options.mutates }),
-      run,
       register: (server: McpServer) => {
-        const dynamicServer = server as never as DynamicMcpServer;
-        dynamicServer.registerTool(
+        server.registerTool(
           options.name,
           {
             title: options.title,
@@ -255,32 +202,23 @@ export function defineTool<TSchema extends z.ZodTypeAny>(
               annotations: options.annotations,
             }),
           },
-          (args, extra) =>
+          (args, ctx) =>
             runTool(
               options.name,
-              extra,
-              (ctx) => run(args as z.infer<TSchema>, ctx),
+              ctx,
+              (authCtx: McpAuthContext) => run(args, authCtx),
               runOptions
             )
         );
       },
     };
-    return toolDef;
   }
 
   const run = options.run;
-  const toolDef: ToolWithoutSchemaDefinition = {
+  return {
     name: options.name,
-    title: options.title,
-    description: options.description,
-    ...(options.annotations !== undefined && {
-      annotations: options.annotations,
-    }),
-    ...(options.mutates !== undefined && { mutates: options.mutates }),
-    run,
     register: (server: McpServer) => {
-      const dynamicServer = server as never as DynamicMcpServer;
-      dynamicServer.registerTool(
+      server.registerTool(
         options.name,
         {
           title: options.title,
@@ -289,25 +227,14 @@ export function defineTool<TSchema extends z.ZodTypeAny>(
             annotations: options.annotations,
           }),
         },
-        (_args, extra) =>
+        (ctx) =>
           runTool(
             options.name,
-            extra,
-            (authCtx) => run(undefined, authCtx),
+            ctx,
+            (authCtx: McpAuthContext) => run(undefined, authCtx),
             runOptions
           )
       );
     },
   };
-  return toolDef;
-}
-
-/**
- * Register a single {@link AnyToolDefinition} on an McpServer.
- */
-export function registerToolDefinition(
-  server: McpServer,
-  tool: AnyToolDefinition
-): void {
-  tool.register(server);
 }

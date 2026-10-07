@@ -29,7 +29,9 @@ vi.mock("~/lib/rate-limit", () => ({
   checkMcpRequestLimit: checkMcpRequestLimitMock,
 }));
 
-import { handleMcpRequest } from "./route";
+import type { McpServer } from "@modelcontextprotocol/server";
+
+import { handleMcpRequest, whoamiTool } from "./route";
 
 const AUTH = {
   token: "test-token",
@@ -123,5 +125,42 @@ describe("MCP route boundary", () => {
       29
     );
     expect(registerPinpointToolsMock).not.toHaveBeenCalled();
+  });
+
+  it("registers whoami tool and executes successfully without throwing", async () => {
+    let capturedHandler:
+      | ((ctx: { http?: { authInfo?: AuthInfo } }) => Promise<unknown>)
+      | undefined;
+
+    const fakeServer = {
+      registerTool: (
+        name: string,
+        _config: unknown,
+        handler: (ctx: { http?: { authInfo?: AuthInfo } }) => Promise<unknown>
+      ) => {
+        if (name === "whoami") {
+          capturedHandler = handler;
+        }
+      },
+    } as unknown as McpServer;
+
+    whoamiTool.register(fakeServer);
+    expect(capturedHandler).toBeDefined();
+
+    const result = (await capturedHandler?.({
+      http: { authInfo: AUTH },
+    })) as { content: [{ type: string; text: string }]; isError?: boolean };
+
+    expect(result).toBeDefined();
+    expect(result.isError).toBeFalsy();
+    const content = result.content[0];
+    expect(content.type).toBe("text");
+    const parsed = JSON.parse(content.text);
+    expect(parsed).toEqual({
+      userId: AUTH_CONTEXT.userId,
+      accessLevel: AUTH_CONTEXT.accessLevel,
+      clientId: AUTH_CONTEXT.clientId,
+      authMode: AUTH_CONTEXT.authMode,
+    });
   });
 });
