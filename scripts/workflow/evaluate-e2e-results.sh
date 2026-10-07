@@ -99,8 +99,8 @@ fail_no_verdict() {
     echo ''
     echo "${reason}"
     echo ''
-    echo 'The run did not produce a usable report, so the suite cannot be'
-    echo "called green. ${hint}"
+    echo 'The report cannot show this leg is green.'
+    echo "${hint}"
   } | summary
   exit 1
 }
@@ -219,14 +219,17 @@ fi
 
 # auth.setup.ts runs on every comprehensive leg whatever its --test-list says,
 # so a leg whose browser tests were all skipped still passes the two checks
-# above on auth-setup alone. Count executed tests outside the setup project.
+# above on auth-setup alone (or on non-gating Mobile Safari). Count executed
+# tests in the gating projects.
 # Checked last, after gating failures are named: a failed auth-setup skips
 # every browser test, and its failure is the useful message.
 # shellcheck disable=SC2016  # jq program, not shell.
-BROWSER_TESTS_RUN=$(jq -r '[.. | objects | select(has("specs")) | .specs[].tests[]
-  | select(.projectName != "auth-setup" and .status != "skipped")] | length' "$RESULTS")
+BROWSER_TESTS_RUN=$(jq -r --arg ng "$NON_GATING" '[.. | objects | select(has("specs")) | .specs[].tests[]
+  | select(.projectName != "auth-setup" and .projectName != $ng
+      and .status != "skipped")] | length' "$RESULTS")
 if [ "$BROWSER_TESTS_RUN" -eq 0 ]; then
-  fail_no_verdict "\`${RESULTS}\` executed no browser test — only auth-setup ran."
+  fail_no_verdict "\`${RESULTS}\` executed no gating browser test — every chromium and Mobile Chrome test was skipped." \
+    "Look for a skip or fixme that covers this leg's files on the gating browsers."
 fi
 
 echo "Gating browsers green (${LABEL}) across ${TOTAL_SPECS} specs, ${TESTS_RUN} tests executed."

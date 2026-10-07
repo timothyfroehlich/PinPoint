@@ -512,7 +512,26 @@ def test_leg_with_every_browser_test_skipped_is_not_green(tmp_path: Path) -> Non
     )
     code, _, written = run(tmp_path, payload, test_list=["a.spec.ts"])
     assert code == 1
-    assert "only auth-setup ran" in written
+    assert "executed no gating browser test" in written
+
+
+def test_leg_where_only_mobile_safari_ran_is_not_green(tmp_path: Path) -> None:
+    """Mobile Safari is non-gating, so its executed tests are not gating coverage."""
+    payload = report(
+        files=[
+            described(
+                "a.spec.ts",
+                "A",
+                [
+                    spec("chromium", "a", True, status="skipped"),
+                    spec("Mobile Safari", "a", True),
+                ],
+            )
+        ],
+    )
+    code, _, written = run(tmp_path, payload, test_list=["a.spec.ts"])
+    assert code == 1
+    assert "executed no gating browser test" in written
 
 
 def test_missing_test_list_file_explains_itself(tmp_path: Path) -> None:
