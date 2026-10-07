@@ -166,17 +166,14 @@ async function main() {
 
     console.log(`🔍 Found migration: ${migrationEntry.tag}`);
 
-    // Check if already marked as applied
     const record = migrationRecord(
-      migrationEntry,
-      readFileSync(
-        join(process.cwd(), "drizzle", `${migrationEntry.tag}.sql`),
-        "utf-8"
-      )
+      join(process.cwd(), "drizzle"),
+      migrationEntry.tag
     );
 
-    // Older runs of this script stored the tag as the hash.
-    const existingMigrations = await sql`
+    // Check if already marked as applied. Older runs of this script stored
+    // the tag as the hash and the time of marking as created_at.
+    const existingMigrations = await sql<{ created_at: string }[]>`
       SELECT hash, created_at
       FROM drizzle.__drizzle_migrations
       WHERE hash IN (${record.hash}, ${migrationEntry.tag})
@@ -187,11 +184,36 @@ async function main() {
       console.log(
         `✅ Migration ${migrationEntry.tag} is already marked as applied`
       );
-      const firstMigration = existingMigrations[0];
-      if (firstMigration && "created_at" in firstMigration) {
-        console.log(`   Applied at: ${firstMigration["created_at"]}`);
+      const [existing] = existingMigrations;
+      if (existing && Number(existing.created_at) !== record.createdAt) {
+        console.warn(
+          `⚠️  Its row was written by an older version of this script (created_at ${existing.created_at}, journal when ${record.createdAt}).\n` +
+            "   drizzle's migrator skips any pending migration whose `when` is older than the newest created_at."
+        );
       }
       return;
+    }
+
+    // drizzle's migrator applies only journal entries newer than the newest
+    // recorded created_at, so the row this script writes decides what runs next.
+    const [newest] = await sql<{ created_at: string | null }[]>`
+      SELECT max(created_at)::text AS created_at FROM drizzle.__drizzle_migrations
+    `;
+    const newestApplied = Number(newest?.created_at ?? 0);
+    const position = journal.entries.indexOf(migrationEntry);
+    const previous = position > 0 ? journal.entries[position - 1] : undefined;
+    if (previous && newestApplied < previous.when) {
+      console.error(
+        `❌ ${previous.tag} and possibly earlier migrations are not recorded as applied.\n` +
+          `   Marking ${migrationEntry.tag} would make drizzle's migrator skip them. Apply or mark them first.`
+      );
+      process.exit(1);
+    }
+    if (newestApplied > record.createdAt) {
+      console.warn(
+        `⚠️  A recorded migration is newer than ${migrationEntry.tag} (created_at ${newestApplied}).\n` +
+          `   drizzle's migrator would skip ${migrationEntry.tag} anyway; marking it changes nothing about what runs next.`
+      );
     }
 
     if (
