@@ -29,11 +29,20 @@ test.beforeEach(async ({ page }) => {
 async function addByInitials(page: Page, initials: string): Promise<void> {
   const search = page.getByRole("searchbox", { name: "Search machines" });
   await search.fill(initials);
-  const row = page
+  // The machine list renders as a table (role=row) on desktop and as a compact
+  // card list (role=listitem, MachineViewCompactList) on phones; the off-
+  // breakpoint layout is display:none, so only one is in the accessibility tree
+  // at a time. Match either so this helper works at every viewport. Scoped to
+  // the "Add machines" section so the mobile listitem branch can't collide with
+  // the print-run list's items.
+  const section = page.getByRole("region", { name: "Add machines" });
+  const hasInitials = { has: page.getByText(initials, { exact: true }) };
+  const entry = section
     .getByRole("row")
-    .filter({ has: page.getByText(initials, { exact: true }) });
-  await row.getByRole("button", { name: /^Add / }).click();
-  await expect(row.getByText("Added")).toBeVisible();
+    .filter(hasInitials)
+    .or(section.getByRole("listitem").filter(hasInitials));
+  await entry.getByRole("button", { name: /^Add / }).click();
+  await expect(entry.getByText("Added")).toBeVisible();
 }
 
 function printRunRow(page: Page, name: string) {

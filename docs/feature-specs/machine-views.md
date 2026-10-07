@@ -2,9 +2,9 @@
 
 **Status: approved.**
 
-**What this document is.** The requirements for PinPoint's shared machine-list experience on `/m`, standard Collections, and owner Collections. It describes the intended final state only; what the code does or used to do lives solely in the Known divergences table. Each requirement is numbered for citation. When code and spec disagree, either the code is wrong or this document gets amended — never silently neither.
+**What this document is.** The requirements for PinPoint's shared machine-list experience on `/m` and Collections. It describes the intended final state only; what the code does or used to do lives solely in the Known divergences table. Each requirement is numbered for citation. When code and spec disagree, either the code is wrong or this document gets amended — never silently neither.
 
-**Related records.** `docs/feature-specs/list-views.md` (the shared List View that Machine View is built on), `docs/feature-specs/collections-and-tags.md` (Collection, Owner Collection, and Tag membership and access), `docs/feature-specs/widgets.md` and `docs/feature-specs/machine-widgets.md` (the Summary Widgets on Machine View).
+**Related records.** `docs/feature-specs/list-views.md` (the shared List View that Machine View is built on), `docs/feature-specs/collections-and-tags.md` (Collection and Tag membership and access), `docs/feature-specs/widgets.md` and `docs/feature-specs/machine-widgets.md` (the Summary Widgets on Machine View).
 
 ---
 
@@ -81,7 +81,7 @@
 - **6.1** `/m` remains publicly viewable. Add Machine remains governed by `machines.create`.
 - **6.2** `/m` preserves useful search coverage, existing empty-state intent, and machine navigation while replacing the machine-card grid.
 - **6.3** Standard Collections preserve their header, tabs, edit and add-machine flows, share-token authorization, and exact membership scoping.
-- **6.4** Owner Collections preserve their header, tabs, and exact owner scoping.
+- **6.4** _Retired 2026-10-07._ Owner Collections were replaced by the Owner filter (collections-and-tags §6.4). Number kept so older citations don't dangle.
 - **6.5** Issues and Timeline Collection tabs continue to use the resolved Collection machine identities and may not widen their scope through URL parameters.
 
 ---
@@ -125,6 +125,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-07 | Retired Owner Collections (preamble, 6.4); a person's machines are Machines filtered by Owner (collections-and-tags §6). |
 | 2026-10-05 | Built-in Views no longer set displayed fields or page size (§9.3). Tag and Collection Primary Filters (§3.12) and their `tag` and `collection` parameters (§4.1). |
 | 2026-10-04 | Collections open to On the Floor members by default (§4.8), matching §9.2. |
 | 2026-10-03 | Collections' Page Preset becomes On the floor (§9.2). |
