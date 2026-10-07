@@ -16,14 +16,13 @@ interface ListSearchFieldProps {
    * changed while it waited.
    */
   onSearch: (query: string) => void;
-  /** Accessible name, such as "Search machines". */
+  /** Accessible name, such as "Search machines" (§4.2). */
   label: string;
-  /** Names what the search covers (§4.2). */
-  placeholder: string;
 }
 
 /**
- * The List View search field (list-views §4.1, §4.2). It keeps the person's
+ * The List View search field (list-views §4.1, §4.2). It shows no
+ * placeholder; its label names the list it searches. It keeps the person's
  * typing while an earlier search's results arrive, and takes a new value
  * only when the list's search changes from elsewhere. List View mounts it
  * afresh when a view is applied or changes are discarded, which drops a
@@ -34,7 +33,6 @@ export function ListSearchField({
   value,
   onSearch,
   label,
-  placeholder,
 }: ListSearchFieldProps): React.JSX.Element {
   const [text, setText] = React.useState(value);
   const submitted = React.useRef(value);
@@ -95,7 +93,6 @@ export function ListSearchField({
             submit(text);
           }
         }}
-        placeholder={placeholder}
         autoComplete="off"
         enterKeyHint="search"
         className="h-11 bg-background pl-9 text-base md:h-9 md:text-sm"

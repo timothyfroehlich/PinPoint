@@ -7,12 +7,12 @@ import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
 import { Button } from "~/components/ui/button";
 import { EmptyState } from "~/components/ui/empty-state";
-import { getViewer } from "~/lib/collections/viewer";
+import { getViewer } from "~/lib/auth/viewer";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { loadMachineView } from "~/lib/machines/view/queries";
 import { lineupToReviewCount } from "~/lib/pinballmap/lineup-comparison";
 import { loadLineupData } from "~/lib/pinballmap/lineup-data";
-import { toMachineViewSearchParams } from "~/lib/machines/view/state";
+import { toListSearchParams } from "~/lib/list-view/url-state";
 import { loadMachineViewSavedViews } from "~/lib/machines/view/saved-views";
 import { getQueuedApronCardIds } from "~/app/(app)/m/apron-cards/_data";
 
@@ -44,7 +44,7 @@ export default async function MachinesPage({
     "machines.apron.export",
     accessLevel
   );
-  const viewSearchParams = toMachineViewSearchParams(rawSearchParams);
+  const viewSearchParams = toListSearchParams(rawSearchParams);
   const { savedViews, redirectTo } = await loadMachineViewSavedViews(
     "machines",
     viewSearchParams

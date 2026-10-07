@@ -45,8 +45,8 @@ import type { PinballmapRuntimeState } from "~/lib/types";
  *
  * Deliberate properties:
  * - **No flood on bootstrap.** The first run for a region back-fills the whole
- *   region with `announcedAt` already stamped, so seeding a few thousand existing
- *   entries posts nothing.
+ *   region as present membership without queuing any event, so seeding a few
+ *   thousand existing entries posts nothing.
  * - **No side effects in a transaction** (CORE-ARCH-011). Transactions cover only
  *   membership and event-queue database work — never HTTP, Discord, or PBM reads.
  *   The region fetch happens before detection, and the Discord post strictly after
@@ -406,7 +406,6 @@ async function applySnapshot(
               lmxId: entry.lmxId,
               locationId: entry.locationId,
               pinballmapMachineId: entry.machineId,
-              announcedAt: now,
             }))
           )
           .onConflictDoNothing()
@@ -462,7 +461,6 @@ async function applySnapshot(
             lmxId: entry.lmxId,
             locationId: entry.locationId,
             pinballmapMachineId: entry.machineId,
-            announcedAt: rebootstrapped ? detectedAt : null,
           }))
         )
         .onConflictDoNothing()
@@ -1218,11 +1216,10 @@ export async function bootstrapRegion(
         .set({
           isPresent: false,
           missedRuns: 0,
-          announcedAt: sql`coalesce(${pinballmapRegionSeenMachines.announcedAt}, ${now})`,
         })
         .where(eq(pinballmapRegionSeenMachines.region, region));
 
-      // 2. Upsert observed machines: mark present, refresh locations and machines, and set announcedAt
+      // 2. Upsert observed machines: mark present, and refresh locations and machines
       for (let i = 0; i < observed.length; i += INSERT_CHUNK) {
         const inserted = await tx
           .insert(pinballmapRegionSeenMachines)
@@ -1232,7 +1229,6 @@ export async function bootstrapRegion(
               lmxId: entry.lmxId,
               locationId: entry.locationId,
               pinballmapMachineId: entry.machineId,
-              announcedAt: now,
               isPresent: true,
               missedRuns: 0,
             }))
@@ -1247,7 +1243,6 @@ export async function bootstrapRegion(
               pinballmapMachineId: sql`excluded.pinballmap_machine_id`,
               isPresent: true,
               missedRuns: 0,
-              announcedAt: sql`coalesce(${pinballmapRegionSeenMachines.announcedAt}, ${now})`,
             },
           })
           .returning({ lmxId: pinballmapRegionSeenMachines.lmxId });

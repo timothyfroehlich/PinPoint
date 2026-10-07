@@ -8,9 +8,10 @@ import type { TagConflictMachine } from "./types";
 
 /**
  * What blocks changing a hand-applied tag type's exclusivity (spec
- * collections-and-tags 11.7) or moving a tag between tag types (11.16). The
- * tag pages read these to open their dialogs already knowing; the Server
- * Actions read them again inside the write's transaction.
+ * collections-and-tags 11.7), moving a tag between tag types (11.16), or
+ * merging one tag into another (11.18). The tag pages read these to open
+ * their dialogs already knowing; the Server Actions read them again inside
+ * the write's transaction.
  *
  * Machines in every presence state count: the database's one-per-machine
  * index does not know about presence.
@@ -124,4 +125,20 @@ export async function typesWithTagName(
     )
     .where(ne(tags.id, tagId));
   return new Set(rows.map((row) => row.typeId));
+}
+
+/**
+ * The machines that block merging a tag into `target`, a tag of an exclusive
+ * tag type (spec 11.18): ones holding the merged tag and a different tag of
+ * that type. A machine already holding the target is not in the way. `byType`
+ * is {@link moveConflicts} for the merged tag; a tag type's tag names are
+ * unique, so the target is recognized by its name.
+ */
+export function mergeConflicts(
+  byType: ReadonlyMap<string, readonly TagConflictMachine[]>,
+  target: { typeId: string; name: string }
+): TagConflictMachine[] {
+  return (byType.get(target.typeId) ?? []).filter(
+    (machine) => !machine.tags.includes(target.name)
+  );
 }

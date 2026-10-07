@@ -61,16 +61,6 @@ const HAND_ROLLED = new Set([
   "src/app/(app)/c/tags/actions.ts#moveTagAction",
   "src/app/(app)/c/tags/actions.ts#setTagMachinesAction",
   "src/app/(app)/c/tags/actions.ts#setMachineTagAction",
-  "src/app/(app)/issues/actions.ts#updateIssueStatusAction",
-  "src/app/(app)/issues/actions.ts#updateIssueSeverityAction",
-  "src/app/(app)/issues/actions.ts#updateIssueFrequencyAction",
-  "src/app/(app)/issues/actions.ts#updateIssuePriorityAction",
-  "src/app/(app)/issues/actions.ts#assignIssueAction",
-  "src/app/(app)/issues/actions.ts#addCommentAction",
-  "src/app/(app)/issues/actions.ts#editCommentAction",
-  "src/app/(app)/issues/actions.ts#deleteCommentAction",
-  "src/app/(app)/issues/actions.ts#updateIssueTitleAction",
-  "src/app/(app)/issues/actions.ts#reassignIssueMachineAction",
   "src/app/(app)/issues/export-action.ts#exportIssuesAction",
   "src/app/(app)/m/[initials]/(tabs)/apron/actions.ts#saveApronCardsAction",
   "src/app/(app)/m/[initials]/(tabs)/settings/actions.ts#saveSettingsSetAction",
@@ -123,10 +113,23 @@ const HAND_ROLLED = new Set([
   "src/lib/blob/image-actions.ts#uploadIssueImage",
 ]);
 
+/**
+ * Factories that build several actions' handlers through the pipeline, by
+ * name and defining file. A `"use server"` export that returns one of a
+ * factory's handlers counts as pipeline-built; the last test checks that each
+ * factory builds every handler it returns with the pipeline, so listing a
+ * factory here cannot hide a hand-rolled action.
+ */
+const PIPELINE_FACTORIES: Record<string, string> = {
+  // The Saved View actions every List Host shares (list-views §10).
+  createSavedViewActionHandlers: "src/lib/list-view/saved-view-actions.ts",
+};
+
 const ROOT = process.cwd();
 const USE_SERVER = /^["']use server["'];?\s*$/m;
 const PIPELINE_CONST =
   /^(?:export\s+)?const\s+(\w+)\s*=\s*create(?:Protected|Public)Action\b/gm;
+const FACTORY_CONST = /^const\s+(\w+)\s*=\s*(\w+)\(/gm;
 const EXPORTED_ACTION =
   /^export\s+(?:async\s+function\s+(\w+)|const\s+(\w+)\s*=)/gm;
 
@@ -177,11 +180,55 @@ function functionBody(source: string, paramsOpen: number): string {
   return "";
 }
 
-/** A pipeline-built action's body is one statement: return the pipeline const's call. */
-function delegatesTo(body: string, pipelineConsts: string[]): boolean {
+/**
+ * A pipeline-built action's body is one statement: return the pipeline
+ * const's call, or a call to one handler of a pipeline factory's result.
+ */
+function delegatesTo(
+  body: string,
+  pipelineConsts: string[],
+  factoryConsts: string[] = []
+): boolean {
   const statement = body.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, "").trim();
-  const delegated = /^return\s+(?:await\s+)?(\w+)\([^;]*\);?$/.exec(statement);
-  return delegated?.[1] !== undefined && pipelineConsts.includes(delegated[1]);
+  const delegated = /^return\s+(?:await\s+)?(\w+)(?:\.(\w+))?\([^;]*\);?$/.exec(
+    statement
+  );
+  const [, target, handler] = delegated ?? [];
+  if (target === undefined) return false;
+  return handler === undefined
+    ? pipelineConsts.includes(target)
+    : factoryConsts.includes(target);
+}
+
+/**
+ * The handlers a pipeline factory returns that it did not build with
+ * `createProtectedAction` or `createPublicAction`: every name in the
+ * factory's returned object must be a pipeline const declared in its body.
+ */
+function handlersOffPipeline(source: string, name: string): string[] {
+  const declared = new RegExp(`export\\s+function\\s+${name}\\b`).exec(source);
+  if (!declared) return [`${name} (factory not found)`];
+  const body = functionBody(source, source.indexOf("(", declared.index));
+  const built = [
+    ...body.matchAll(/const\s+(\w+)\s*=\s*create(?:Protected|Public)Action\b/g),
+  ].map((match) => match[1]);
+  // The returned object must list its handlers by shorthand name; anything
+  // else (a renamed key, a spread, an inline function) counts as off it.
+  const returned = /return\s*\{([^}]*)\}\s*;?\s*$/.exec(body.trim());
+  if (!returned?.[1]) return [`${name} (no returned handlers)`];
+  return returned[1]
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .filter((handler) => !built.includes(handler))
+    .map((handler) => `${name}.${handler}`);
+}
+
+/** {@link handlersOffPipeline} for a listed factory's defining file. */
+function factoryHandlersOffPipeline(name: string, file: string): string[] {
+  return handlersOffPipeline(readFileSync(join(ROOT, file), "utf8"), name).map(
+    (entry) => `${file}#${entry}`
+  );
 }
 
 interface ServerAction {
@@ -198,6 +245,13 @@ function serverActions(): ServerAction[] {
     const pipelineConsts = [...source.matchAll(PIPELINE_CONST)].map(
       (match) => match[1]
     );
+    // Consts holding a listed pipeline factory's handlers.
+    const factoryConsts = [...source.matchAll(FACTORY_CONST)]
+      .filter(
+        ([, , factory]) =>
+          factory !== undefined && factory in PIPELINE_FACTORIES
+      )
+      .map((match) => match[1]);
 
     return [...source.matchAll(EXPORTED_ACTION)].map((match) => {
       const [, functionName, constName] = match;
@@ -211,7 +265,7 @@ function serverActions(): ServerAction[] {
       const body = functionBody(source, source.indexOf("(", match.index));
       return {
         key: `${file}#${functionName ?? ""}`,
-        builtWithPipeline: delegatesTo(body, pipelineConsts),
+        builtWithPipeline: delegatesTo(body, pipelineConsts, factoryConsts),
       };
     });
   });
@@ -238,6 +292,55 @@ describe("Server Actions go through the pipeline (CORE-ARCH-013)", () => {
     expect(
       delegatesTo("\n  // saveProtected\n  return ok(true);\n", consts)
     ).toBe(false);
+  });
+
+  it("counts a call to a listed factory's handler, and only to a listed factory's", () => {
+    const body = "\n  return handlers.create(input);\n";
+    expect(delegatesTo(body, [], ["handlers"])).toBe(true);
+    expect(delegatesTo(body, [], [])).toBe(false);
+    // A pipeline const's member is not a factory handler.
+    expect(delegatesTo(body, ["handlers"], [])).toBe(false);
+    // Only a single return statement counts, as for a pipeline const.
+    expect(
+      delegatesTo(
+        "\n  await db.delete(rows);\n  return handlers.remove(id);\n",
+        [],
+        ["handlers"]
+      )
+    ).toBe(false);
+  });
+
+  it("flags a factory handler built outside the pipeline", () => {
+    const factory = `
+export function buildHandlers(): Handlers {
+  const save = createProtectedAction({ permission: "views.save" });
+  const remove = async (id: string) => db.delete(rows).where(eq(rows.id, id));
+  const rename = createPublicAction({});
+  return { save, remove, rename };
+}
+`;
+    expect(handlersOffPipeline(factory, "buildHandlers")).toEqual([
+      "buildHandlers.remove",
+    ]);
+    // A handler under a renamed key or a spread is not provably built
+    // through the pipeline either.
+    const renamed = `
+export function buildHandlers(): Handlers {
+  const save = createProtectedAction({});
+  return { save, update: save, ...extra };
+}
+`;
+    expect(handlersOffPipeline(renamed, "buildHandlers")).toEqual([
+      "buildHandlers.update: save",
+      "buildHandlers....extra",
+    ]);
+  });
+
+  it("lists only factories that build every handler they return through the pipeline", () => {
+    const offPipeline = Object.entries(PIPELINE_FACTORIES).flatMap(
+      ([name, file]) => factoryHandlersOffPipeline(name, file)
+    );
+    expect(offPipeline).toEqual([]);
   });
 
   it("builds every new Server Action with createProtectedAction or createPublicAction", () => {

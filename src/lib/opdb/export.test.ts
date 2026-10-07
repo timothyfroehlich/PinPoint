@@ -53,6 +53,13 @@ describe("fetchOpdbExport", () => {
     await expect(fetchOpdbExport()).rejects.toThrow(/HTTP 503/);
   });
 
+  it("throws on a network failure", async () => {
+    globalThis.fetch = vi.fn(() =>
+      Promise.reject(new TypeError("fetch failed"))
+    );
+    await expect(fetchOpdbExport()).rejects.toThrow(/network error or timeout/);
+  });
+
   it("refuses an implausibly small export", async () => {
     mockFetch(
       new Response(JSON.stringify({ entries: entries(5) }), { status: 200 })

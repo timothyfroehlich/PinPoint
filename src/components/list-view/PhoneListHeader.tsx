@@ -130,29 +130,20 @@ function SavedViewsSheet({
                 <strong>{views.appliedName}</strong> · Edited
               </p>
               <div className="grid grid-cols-2 gap-2">
-                {views.canSave && views.appliedIsSaved ? (
-                  <button
-                    type="button"
-                    onClick={() => close(onSaveChanges)}
-                    className="min-h-11 rounded-lg bg-primary text-sm font-bold text-primary-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                  >
-                    Save changes
-                  </button>
-                ) : null}
-                {views.canSave ? (
-                  <button
-                    type="button"
-                    onClick={() => close(onSaveAsNew)}
-                    className={cn(
-                      "min-h-11 rounded-lg text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-                      views.appliedIsSaved
-                        ? "border border-outline-variant text-foreground"
-                        : "bg-primary font-bold text-primary-foreground"
-                    )}
-                  >
-                    Save as new…
-                  </button>
-                ) : null}
+                <button
+                  type="button"
+                  onClick={() => close(onSaveChanges)}
+                  className="min-h-11 rounded-lg bg-primary text-sm font-bold text-primary-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                >
+                  Save changes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => close(onSaveAsNew)}
+                  className="min-h-11 rounded-lg border border-outline-variant text-sm text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                >
+                  Save as new…
+                </button>
                 <button
                   type="button"
                   onClick={() => close(views.onDiscard)}
@@ -162,6 +153,15 @@ function SavedViewsSheet({
                 </button>
               </div>
             </div>
+          ) : null}
+          {views.appliedId === null && views.canSave ? (
+            <button
+              type="button"
+              onClick={() => close(onSaveAsNew)}
+              className="mt-3 min-h-11 w-full rounded-lg bg-primary text-sm font-bold text-primary-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            >
+              Save view
+            </button>
           ) : null}
           <h3 className={groupHeadingClass}>Built-in</h3>
           <ul>{views.builtInViews.map(entry)}</ul>
@@ -589,8 +589,9 @@ interface PhoneListHeaderProps {
 }
 
 /**
- * The phone List Header (list-views §7.3, §7.4): the Applied View's name as a
- * button opening the Saved Views sheet, with an amber marker announced as
+ * The phone List Header (list-views §7.3, §7.4): the Applied View's name, or
+ * "Views" when there is none, as a button opening the Saved Views sheet, with
+ * an amber marker announced as
  * "edited", and a Filters icon button showing how many filters differ from
  * the Page Preset. Every control is at least 44px (§7.9). Hidden at md+.
  */
@@ -610,19 +611,19 @@ export function PhoneListHeader({
   const [viewsOpen, setViewsOpen] = React.useState(false);
   const [filtersOpen, setFiltersOpen] = React.useState(false);
   const active = countActiveFilters([...primaryFilters, ...secondaryFilters]);
+  // With no Applied View the button reads "Views" (§7.3).
+  const viewsName = views.appliedName ?? "Views";
   const viewsTrigger = (
     <button
       type="button"
       aria-haspopup="dialog"
       // Explicit, because the computed name puts a space before the comma.
-      aria-label={
-        views.edited ? `${views.appliedName}, edited` : views.appliedName
-      }
+      aria-label={views.edited ? `${viewsName}, edited` : viewsName}
       data-testid="list-phone-views-trigger"
       className="inline-flex min-h-11 min-w-0 items-center gap-1.5 rounded-md px-2 text-sm font-semibold text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
     >
       <Bookmark aria-hidden="true" className="size-4 shrink-0" />
-      <span className="truncate">{views.appliedName}</span>
+      <span className="truncate">{viewsName}</span>
       {views.edited ? (
         <span
           aria-hidden="true"

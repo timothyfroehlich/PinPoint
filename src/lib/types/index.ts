@@ -58,11 +58,32 @@ export {
 
 export {
   LIST_HOSTS,
+  LIST_PAGE_SIZES,
   SAVED_VIEW_NAME_MAX,
   type DefaultViewTarget,
+  type ListBuiltInView,
   type ListHost,
+  type ListPageSize,
+  type ListSavedViews,
+  type ListSavedViewSummary,
   type SavedViewError,
   type StoredSavedView,
 } from "./list-view";
 
 export { type IssueListSummary } from "./summary-widget";
+
+export {
+  ISSUE_VIEW_SORT_FIELDS,
+  type IssueViewBuiltInView,
+  type IssueViewDateRange,
+  type IssueViewMachineOption,
+  type IssueViewPersonOption,
+  type IssueViewResult,
+  type IssueViewSavedState,
+  type IssueViewSavedViews,
+  type IssueViewSavedViewSummary,
+  type IssueViewSortDirection,
+  type IssueViewSortField,
+  type IssueViewState,
+  type IssueViewSurface,
+} from "./issue-view";

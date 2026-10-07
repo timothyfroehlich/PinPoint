@@ -2,6 +2,7 @@ import "server-only";
 import { DISCORD_API, DISCORD_TIMEOUT_MS } from "~/lib/discord/api";
 import { safeFetch } from "~/lib/http/external";
 import { log } from "~/lib/logger";
+import { reportError } from "~/lib/observability/report-error";
 import { assertNotInTransaction } from "~/server/db/transaction-context";
 
 /**
@@ -102,6 +103,7 @@ export async function checkDiscordChannel(
       { err, action: "checkDiscordChannel" },
       "Discord channel check failed"
     );
+    reportError(err, { action: "checkDiscordChannel", bestEffort: true });
     return { status: "couldnt_check", statusDetail: "Discord was unreachable" };
   }
 }

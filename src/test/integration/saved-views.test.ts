@@ -11,13 +11,13 @@ import {
 } from "~/server/db/schema";
 import type { ListHost, MachineViewSavedState } from "~/lib/types";
 import { isPgErrorCode } from "~/lib/db/postgres-errors";
-import { getViewer } from "~/lib/collections/viewer";
+import { getViewer } from "~/lib/auth/viewer";
 
 vi.mock("~/server/db", async () => {
   const { getTestDb } = await import("~/test/setup/pglite");
   return { db: await getTestDb() };
 });
-vi.mock("~/lib/collections/viewer", () => ({ getViewer: vi.fn() }));
+vi.mock("~/lib/auth/viewer", () => ({ getViewer: vi.fn() }));
 
 const {
   createSavedView,
@@ -34,7 +34,7 @@ const { loadMachineViewFromDatabase } =
   await import("~/lib/machines/view/queries");
 const {
   normalizeMachineViewSavedState,
-  savedMachineViewSearchParams,
+  serializeMachineViewState,
   toMachineViewSavedState,
 } = await import("~/lib/machines/view/state");
 
@@ -303,7 +303,16 @@ describe("machine Saved Views on each Surface (list-views §10.5, §10.10)", () 
   beforeEach(async () => {
     const db = await getTestDb();
     await db.insert(userProfiles).values(createTestUser({ id: userId }));
-    vi.mocked(getViewer).mockResolvedValue({ userId, role: "member" });
+    vi.mocked(getViewer).mockResolvedValue({
+      userId,
+      role: "member",
+      profile: {
+        name: "Test User",
+        role: "member",
+        mobileReportMode: "quick",
+        desktopReportMode: "detailed",
+      },
+    });
   });
 
   it("offers the same Saved Views everywhere and opens the default only on Machines", async () => {
@@ -453,8 +462,8 @@ describe("machine Saved Views on each Surface (list-views §10.5, §10.10)", () 
       scope: { kind: "collection", collectionId },
       preset: "collection",
       viewerId: null,
-      searchParams: savedMachineViewSearchParams(
-        offeredView.state,
+      searchParams: serializeMachineViewState(
+        { ...offeredView.state, page: 1 },
         "collection",
         id
       ),
@@ -493,6 +502,7 @@ describe("machine Saved Views on each Surface (list-views §10.5, §10.10)", () 
     vi.mocked(getViewer).mockResolvedValue({
       userId: undefined,
       role: null,
+      profile: null,
     });
 
     const { savedViews: offered, redirectTo } = await loadMachineViewSavedViews(

@@ -18,7 +18,7 @@ import {
   getMachineChoices,
   getOwnedMachineInitials,
 } from "~/lib/machines/queries";
-import type { IssueSort } from "~/lib/issues/filters";
+import type { IssueViewSortDirection, IssueViewSortField } from "~/lib/types";
 import { formatIssueId } from "~/lib/issues/utils";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 
@@ -100,9 +100,12 @@ describe("issue list page: sorting and comment counts", () => {
     ]);
   });
 
-  async function orderFor(sort: IssueSort): Promise<string[]> {
+  async function orderFor(
+    sort: IssueViewSortField,
+    dir: IssueViewSortDirection
+  ): Promise<string[]> {
     const { issuesList } = await loadIssueListPage(
-      { sort, pageSize: 50 },
+      { sort, dir, pageSize: 50 },
       { isAdmin: false }
     );
     return issuesList.map((i) =>
@@ -110,30 +113,66 @@ describe("issue list page: sorting and comment counts", () => {
     );
   }
 
-  it.each<[IssueSort, string[]]>([
-    ["updated_desc", ["AA-02", "AA-01", "BB-02", "AA-03", "BB-01"]],
-    ["updated_asc", ["AA-03", "BB-01", "AA-01", "BB-02", "AA-02"]],
-    ["created_desc", ["BB-02", "AA-02", "AA-03", "AA-01", "BB-01"]],
-    ["created_asc", ["AA-01", "BB-01", "AA-02", "AA-03", "BB-02"]],
-    ["issue_asc", ["AA-01", "AA-02", "AA-03", "BB-01", "BB-02"]],
-    ["issue_desc", ["BB-02", "BB-01", "AA-03", "AA-02", "AA-01"]],
+  it.each<[IssueViewSortField, IssueViewSortDirection, string[]]>([
+    ["updated", "desc", ["AA-02", "AA-01", "BB-02", "AA-03", "BB-01"]],
+    ["updated", "asc", ["AA-03", "BB-01", "AA-01", "BB-02", "AA-02"]],
+    ["created", "desc", ["BB-02", "AA-02", "AA-03", "AA-01", "BB-01"]],
+    ["created", "asc", ["AA-01", "BB-01", "AA-02", "AA-03", "BB-02"]],
+    ["id", "asc", ["AA-01", "AA-02", "AA-03", "BB-01", "BB-02"]],
+    ["id", "desc", ["BB-02", "BB-01", "AA-03", "AA-02", "AA-01"]],
     // By rank, not alphabet: alphabetical would put Minor above Major.
-    ["severity_desc", ["AA-01", "BB-01", "AA-03", "AA-02", "BB-02"]],
-    ["severity_asc", ["BB-02", "AA-02", "AA-03", "AA-01", "BB-01"]],
-    ["priority_desc", ["AA-02", "BB-01", "AA-03", "BB-02", "AA-01"]],
-    ["priority_asc", ["AA-01", "AA-03", "BB-02", "AA-02", "BB-01"]],
+    ["severity", "desc", ["AA-01", "BB-01", "AA-03", "AA-02", "BB-02"]],
+    ["severity", "asc", ["BB-02", "AA-02", "AA-03", "AA-01", "BB-01"]],
+    ["priority", "desc", ["AA-02", "BB-01", "AA-03", "BB-02", "AA-01"]],
+    ["priority", "asc", ["AA-01", "AA-03", "BB-02", "AA-02", "BB-01"]],
     // Name order, unassigned last in both directions; Bob's two issues tie
     // on Updated, so issue ID breaks the tie.
-    ["assignee_asc", ["BB-01", "AA-01", "BB-02", "AA-02", "AA-03"]],
-    ["assignee_desc", ["AA-01", "BB-02", "BB-01", "AA-02", "AA-03"]],
-  ])("sorts %s deterministically", async (sort, expected) => {
-    expect(await orderFor(sort)).toEqual(expected);
+    ["assignee", "asc", ["BB-01", "AA-01", "BB-02", "AA-02", "AA-03"]],
+    ["assignee", "desc", ["AA-01", "BB-02", "BB-01", "AA-02", "AA-03"]],
+  ])("sorts %s %s deterministically", async (sort, dir, expected) => {
+    expect(await orderFor(sort, dir)).toEqual(expected);
+  });
+
+  it("shows the last page for a page past the end (list-views §6.3)", async () => {
+    const result = await loadIssueListPage(
+      { sort: "id", dir: "asc", pageSize: 2, page: 9 },
+      { isAdmin: false }
+    );
+    expect(result.page).toBe(3);
+    expect(
+      result.issuesList.map((i) =>
+        formatIssueId(i.machineInitials, i.issueNumber)
+      )
+    ).toEqual(["BB-02"]);
+  });
+
+  it("bounds a tab to its machines whatever the Machine filter says, and an empty scope to nothing (issues-list §2.2)", async () => {
+    const ids = async (
+      machine: string[] | undefined,
+      scope: string[]
+    ): Promise<string[]> => {
+      const { issuesList, totalCount, summary } = await loadIssueListPage(
+        { machine, sort: "id", dir: "asc" },
+        { isAdmin: false, scopeMachineInitials: scope }
+      );
+      expect(totalCount).toBe(issuesList.length);
+      if (scope.length === 0) {
+        expect(summary.open).toBe(0);
+      }
+      return issuesList.map((i) =>
+        formatIssueId(i.machineInitials, i.issueNumber)
+      );
+    };
+    expect(await ids(undefined, ["BB"])).toEqual(["BB-01", "BB-02"]);
+    // A machine outside the scope matches nothing there.
+    expect(await ids(["AA"], ["BB"])).toEqual([]);
+    expect(await ids(undefined, [])).toEqual([]);
   });
 
   it("pages a tied sort without repeating or skipping issues", async () => {
     const page = async (n: number): Promise<string[]> => {
       const { issuesList } = await loadIssueListPage(
-        { sort: "severity_desc", pageSize: 2, page: n },
+        { sort: "severity", dir: "desc", pageSize: 2, page: n },
         { isAdmin: false }
       );
       return issuesList.map((i) =>
@@ -164,7 +203,7 @@ describe("issue list page: sorting and comment counts", () => {
     ]);
 
     const { issuesList } = await loadIssueListPage(
-      { sort: "issue_asc", pageSize: 50 },
+      { sort: "id", dir: "asc", pageSize: 50 },
       { isAdmin: false }
     );
     const counts = Object.fromEntries(
@@ -223,7 +262,7 @@ describe("issue list page: sorting and comment counts", () => {
 
     const search = async (q: string): Promise<string[]> => {
       const { issuesList } = await loadIssueListPage(
-        { q, sort: "issue_asc", pageSize: 50 },
+        { q, sort: "id", dir: "asc", pageSize: 50 },
         { isAdmin: false }
       );
       return issuesList.map((i) =>
