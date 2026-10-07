@@ -4,7 +4,7 @@ import {
   desc,
   asc,
   gte,
-  lte,
+  lt,
   or,
   ilike,
   eq,
@@ -338,20 +338,16 @@ export function buildWhereConditions(
     conditions.push(gte(issues.createdAt, filters.createdFrom));
   }
 
-  if (filters.createdTo) {
-    const endOfDay = new Date(filters.createdTo);
-    endOfDay.setUTCHours(23, 59, 59, 999);
-    conditions.push(lte(issues.createdAt, endOfDay));
+  if (filters.createdBefore) {
+    conditions.push(lt(issues.createdAt, filters.createdBefore));
   }
 
   if (filters.updatedFrom) {
     conditions.push(gte(issues.updatedAt, filters.updatedFrom));
   }
 
-  if (filters.updatedTo) {
-    const endOfDay = new Date(filters.updatedTo);
-    endOfDay.setUTCHours(23, 59, 59, 999);
-    conditions.push(lte(issues.updatedAt, endOfDay));
+  if (filters.updatedBefore) {
+    conditions.push(lt(issues.updatedAt, filters.updatedBefore));
   }
 
   // Machine Presence (issues-list §4.7): absent is the Page Preset's On the
