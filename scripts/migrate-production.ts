@@ -72,7 +72,14 @@ if (!connectionString) {
 // connects over the `:6543` transaction pooler. Mirrors src/server/db/index.ts
 // and scripts/lib/pg-client.mjs (the canonical PP-d8l8 setting). `max: 1` keeps
 // the migrator on a single connection so its transactions stay coherent.
-const sql = postgres(connectionString, { max: 1, prepare: false });
+// `max_lifetime: null`: postgres.js otherwise recycles a connection after a
+// random 30 to 60 minutes, and the replacement session would not hold the
+// migration lock below.
+const sql = postgres(connectionString, {
+  max: 1,
+  prepare: false,
+  max_lifetime: null,
+});
 const db = drizzle(sql);
 
 // Two merges close together start two production builds, and drizzle's migrator

@@ -147,6 +147,11 @@ def check_against_base(drizzle_dir: Path, base_drizzle_dir: Path) -> list[str]:
                 )
         sql = drizzle_dir / f"{base_tag}.sql"
         base_sql = base_drizzle_dir / f"{base_tag}.sql"
+        if base_sql.is_file() and not sql.is_file():
+            errors.append(
+                f"drizzle/{base_tag}.sql is on the base branch but deleted here. "
+                "Applied migrations stay; put a reversal in a new migration"
+            )
         if (
             sql.is_file()
             and base_sql.is_file()

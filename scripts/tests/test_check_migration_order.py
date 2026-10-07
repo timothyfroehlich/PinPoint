@@ -163,6 +163,16 @@ def test_editing_a_base_snapshot_fails(tmp_path: Path):
     assert any("0001_snapshot.json differs" in e for e in errors)
 
 
+def test_deleting_a_base_migration_fails(tmp_path: Path):
+    base = write_tree(tmp_path / "base", BASE)
+    head = write_tree(tmp_path / "head", BASE)
+    (head / "0001_users.sql").unlink()
+    errors = check_against_base(head, base)
+    assert any(
+        "0001_users.sql is on the base branch but deleted here" in e for e in errors
+    )
+
+
 def test_branch_behind_base_fails(tmp_path: Path):
     base = write_tree(tmp_path / "base", [*BASE, ("0002_tags", 3000)])
     head = write_tree(tmp_path / "head", BASE)

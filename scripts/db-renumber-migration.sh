@@ -21,8 +21,12 @@
 #   4. Runs scripts/check_migration_order.py against the base branch and stages
 #      drizzle/. You conclude the merge with `git commit`.
 #
-# One migration per branch. A branch with two needs the manual protocol in the
-# pinpoint-deployment skill ("Migration Conflicts").
+# One migration per branch, and nothing else changed under drizzle/. Anything
+# else needs the manual protocol in the pinpoint-deployment skill ("Migration
+# Conflicts").
+#
+# Run it in an interactive terminal: drizzle-kit asks whether a changed column
+# or table is a rename, and without a TTY that prompt fails.
 
 set -euo pipefail
 
@@ -66,6 +70,17 @@ Use the manual protocol in the pinpoint-deployment skill."
 old_tag=$branch_tags
 old_number=${old_tag%%_*}
 name=${old_tag#*_}
+
+# Taking the base branch's drizzle/ would silently drop any other branch edit
+# under drizzle/, so refuse unless the branch only added its migration.
+other_edits=$(git diff --name-only "$merge_base" HEAD -- drizzle/ |
+  grep -Fxv -e "drizzle/meta/_journal.json" -e "drizzle/${old_tag}.sql" \
+    -e "drizzle/meta/${old_number}_snapshot.json" || true)
+if [[ -n "$other_edits" ]]; then
+  die "this branch also changed these drizzle/ files, which renumbering would drop:
+$other_edits
+Use the manual protocol in the pinpoint-deployment skill."
+fi
 
 work_dir=$(mktemp -d)
 index_file=$(git rev-parse --git-path index)

@@ -103,7 +103,10 @@ def write_migrations(repo: Path, migrations: list[tuple[str, int, str]]) -> None
 
 
 def mid_merge_repo(
-    tmp_path: Path, reviewed_sql: str = REVIEWED, app_conflict: bool = False
+    tmp_path: Path,
+    reviewed_sql: str = REVIEWED,
+    app_conflict: bool = False,
+    edit_init: bool = False,
 ) -> Path:
     """Branch adds 0001_mine, main adds 0001_theirs, and `git merge main` has stopped."""
     repo = tmp_path / "repo"
@@ -123,6 +126,8 @@ def mid_merge_repo(
 
     git(repo, "checkout", "-qb", "feat")
     write_migrations(repo, [INIT, ("0001_mine", 2000, reviewed_sql)])
+    if edit_init:
+        (repo / "drizzle" / "0000_init.sql").write_text("CREATE TABLE a2 (id int);\n")
     if app_conflict:
         (repo / "app.txt").write_text("branch\n")
     git(repo, "add", "-A")
@@ -243,6 +248,16 @@ def test_refuses_while_a_conflict_outside_drizzle_is_unresolved(tmp_path: Path):
     assert "resolve and stage these conflicts first" in result.stderr
     assert "app.txt" in result.stderr
     # drizzle/ is untouched: the journal conflict is still there.
+    unmerged = git(repo, "diff", "--name-only", "--diff-filter=U").stdout
+    assert "drizzle/meta/_journal.json" in unmerged
+
+
+def test_refuses_when_the_branch_changed_other_drizzle_files(tmp_path: Path):
+    repo = mid_merge_repo(tmp_path, edit_init=True)
+    result = run_script(repo, tmp_path, GENERATED)
+
+    assert result.returncode == 1
+    assert "drizzle/0000_init.sql" in result.stderr
     unmerged = git(repo, "diff", "--name-only", "--diff-filter=U").stdout
     assert "drizzle/meta/_journal.json" in unmerged
 
