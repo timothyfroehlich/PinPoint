@@ -778,6 +778,13 @@
       "when": 1791336278357,
       "tag": "0110_drop-seen-machines-announced-at",
       "breakpoints": true
+    },
+    {
+      "idx": 111,
+      "version": "7",
+      "when": 1791343219113,
+      "tag": "0111_drop-legacy-saved-view-surface-columns",
+      "breakpoints": true
     }
   ]
 }
