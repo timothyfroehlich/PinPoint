@@ -189,13 +189,13 @@ a blank Full-E2E cell is often correct by design) is in the
 
 ## Shared UI primitives & utilities
 
-| Feature surface                           | Unit | Integration | Smoke | Full E2E | Representative tests                                                                                               |
-| ----------------------------------------- | :--: | :---------: | :---: | :------: | ------------------------------------------------------------------------------------------------------------------ |
-| UI primitives (button, input, selects…)   |  ✓   |             |       |          | `components/ui/button.test.tsx`, `components/ui/multi-select.test.tsx`, `components/ui/date-range-picker.test.tsx` |
-| Form scaffolding (save / cancel / revert) |  ✓   |             |       |          | `components/save-cancel-buttons.test.tsx`, `test/unit/components/InlineEditableFieldPresets.test.tsx`              |
-| Rich text / TipTap / markdown             |  ✓   |             |       |    ✓     | `lib/tiptap/render.test.ts`, `lib/markdown.test.ts`, `e2e/full/rich-text.spec.ts`                                  |
-| Pure utilities (dates, url, result…)      |  ✓   |             |       |          | `lib/dates.test.ts`, `lib/url.test.ts`, `lib/result.test.ts`, `lib/sanitize-html-config.test.ts`                   |
-| Rate limiting / DB errors                 |  ✓   |      ✓      |       |          | `lib/rate-limit.test.ts`, `lib/db/postgres-errors.test.ts`, `transaction-tripwire.test.ts`                         |
+| Feature surface                           | Unit | Integration | Smoke | Full E2E | Representative tests                                                                                  |
+| ----------------------------------------- | :--: | :---------: | :---: | :------: | ----------------------------------------------------------------------------------------------------- |
+| UI primitives (button, input, selects…)   |  ✓   |             |       |          | `components/ui/button.test.tsx`, `components/ui/multi-select.test.tsx`                                |
+| Form scaffolding (save / cancel / revert) |  ✓   |             |       |          | `components/save-cancel-buttons.test.tsx`, `test/unit/components/InlineEditableFieldPresets.test.tsx` |
+| Rich text / TipTap / markdown             |  ✓   |             |       |    ✓     | `lib/tiptap/render.test.ts`, `lib/markdown.test.ts`, `e2e/full/rich-text.spec.ts`                     |
+| Pure utilities (dates, url, result…)      |  ✓   |             |       |          | `lib/dates.test.ts`, `lib/url.test.ts`, `lib/result.test.ts`, `lib/sanitize-html-config.test.ts`      |
+| Rate limiting / DB errors                 |  ✓   |      ✓      |       |          | `lib/rate-limit.test.ts`, `lib/db/postgres-errors.test.ts`, `transaction-tripwire.test.ts`            |
 
 ## Observability, config & tooling
 

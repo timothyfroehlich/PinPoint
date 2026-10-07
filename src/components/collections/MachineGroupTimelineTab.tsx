@@ -1,12 +1,12 @@
 import type React from "react";
 import Link from "next/link";
-import { isToday } from "date-fns";
 
 import { CollectionMachineFilter } from "~/components/collections/CollectionMachineFilter";
 import { MachineTimelineFilter } from "~/components/machines/timeline/MachineTimelineFilter";
 import { TimelineBucketBanner } from "~/components/machines/timeline/TimelineBucketBanner";
 import { TimelineRow } from "~/components/machines/timeline/TimelineRow";
 import { bucketTimelineRows } from "~/lib/timeline/bucket-rows";
+import { isSiteToday } from "~/lib/dates";
 import { getMachineTimeline } from "~/lib/timeline/machine-events";
 import {
   DEFAULT_TIMELINE_TAGS,
@@ -143,7 +143,7 @@ export async function MachineGroupTimelineTab({
             const showRelativeTime =
               group.bucket.tier === "day" &&
               firstEntry !== undefined &&
-              isToday(firstEntry.row.createdAt);
+              isSiteToday(firstEntry.row.createdAt);
             return (
               <section key={group.bucket.key} className="pt-6 first:pt-0">
                 <TimelineBucketBanner bucket={group.bucket} />

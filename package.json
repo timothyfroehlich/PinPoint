@@ -165,7 +165,6 @@
     "postgres": "^3.4.9",
     "qrcode": "^1.5.4",
     "react": "^19.2.5",
-    "react-day-picker": "^10.0.0",
     "react-dom": "^19.2.5",
     "resend": "^6.10.0",
     "sanitize-html": "^2.17.4",

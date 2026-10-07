@@ -3,9 +3,10 @@
  * depends on it. Pure date logic with no IO, safe on server and client.
  *
  * Austin is on US Central time: UTC−6 (CST) in winter, UTC−5 (CDT) in
- * summer. Wherever PinPoint reads a calendar day as a span of time (the
- * Issues list's Created and Updated ranges, the Discord activity summary's
- * schedule), that day is a day on this clock, not a UTC day.
+ * summer. Every place PinPoint shows a date or clock time, groups by day, or
+ * reads a calendar day as a span of time uses this clock (PP-4v3i) — never
+ * the server's zone (UTC on Vercel) or the viewer's browser zone, so a server
+ * render and its hydration agree and an evening event lands on its own day.
  */
 export const SITE_TIME_ZONE = "America/Chicago";
 
@@ -77,4 +78,16 @@ export function startOfSiteDay(day: string): Date {
 export function startOfNextSiteDay(day: string): Date {
   const [year, month, date] = calendarDay(day);
   return siteMidnight(year, month, date + 1);
+}
+
+/**
+ * The site-local calendar day `YYYY-MM-DD` that contains `instant`: the date
+ * a member in Austin would read off a wall calendar at that moment, whatever
+ * zone the server or browser runs in.
+ */
+export function siteDayOf(instant: Date | number): string {
+  const parts = siteWallClock.formatToParts(instant);
+  const part = (type: Intl.DateTimeFormatPartTypes): string =>
+    parts.find((p) => p.type === type)?.value ?? "";
+  return `${part("year")}-${part("month").padStart(2, "0")}-${part("day").padStart(2, "0")}`;
 }

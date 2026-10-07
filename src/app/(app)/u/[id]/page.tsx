@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import type React from "react";
 import { getViewer } from "~/lib/auth/viewer";
+import { formatMonthYear } from "~/lib/dates";
 import { ownerMachinesHref } from "~/lib/machines/links";
 import {
   getProfileById,
@@ -37,10 +38,7 @@ export default async function ProfilePage({
     owned.machines.map((m) => m.initials)
   );
   const isOwn = userId === id;
-  const memberSince = profile.createdAt.toLocaleDateString("en-US", {
-    month: "short",
-    year: "numeric",
-  });
+  const memberSince = formatMonthYear(profile.createdAt);
 
   return (
     <div className="@container mx-auto w-full max-w-2xl space-y-6 p-4">
