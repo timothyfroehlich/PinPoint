@@ -9,7 +9,10 @@ import {
   isCloudDatabaseUrl,
   isForceProductionEnabled,
 } from "./lib/db-target.mjs";
-import { migrationRecord } from "./lib/migration-record";
+import {
+  earlierEntryHiddenByMarking,
+  migrationRecord,
+} from "./lib/migration-record";
 
 interface MigrationEntry {
   idx: number;
@@ -171,13 +174,13 @@ async function main() {
       migrationEntry.tag
     );
 
-    // Check if already marked as applied. Older runs of this script stored
-    // the tag as the hash and the time of marking as created_at.
+    // Check if already marked as applied: drizzle's rows carry the journal
+    // `when`; older runs of this script stored the tag as the hash. Matching on
+    // the content hash would confuse two migrations with identical files.
     const existingMigrations = await sql<{ created_at: string }[]>`
       SELECT hash, created_at
       FROM drizzle.__drizzle_migrations
-      WHERE hash IN (${record.hash}, ${migrationEntry.tag})
-         OR created_at = ${record.createdAt}
+      WHERE created_at = ${record.createdAt} OR hash = ${migrationEntry.tag}
     `;
 
     if (existingMigrations.length > 0) {
@@ -202,14 +205,18 @@ async function main() {
       SELECT max(created_at)::text AS created_at FROM drizzle.__drizzle_migrations
     `;
     const newestApplied = Number(newest?.created_at ?? 0);
-    const position = journal.entries.indexOf(migrationEntry);
-    const previous = position > 0 ? journal.entries[position - 1] : undefined;
-    if (previous && newestApplied < previous.when) {
+    const hidden = earlierEntryHiddenByMarking(
+      journal.entries,
+      journal.entries.indexOf(migrationEntry),
+      newestApplied
+    );
+    if (hidden) {
       console.error(
-        `❌ ${previous.tag} and possibly earlier migrations are not recorded as applied.\n` +
+        `❌ ${hidden.tag} and possibly other earlier migrations are not recorded as applied.\n` +
           `   Marking ${migrationEntry.tag} would make drizzle's migrator skip them. Apply or mark them first.`
       );
-      process.exit(1);
+      process.exitCode = 1;
+      return;
     }
     if (newestApplied > record.createdAt) {
       console.warn(

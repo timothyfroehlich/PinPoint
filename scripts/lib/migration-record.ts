@@ -34,3 +34,27 @@ export function migrationRecord(
   }
   return { hash: meta.hash, createdAt: meta.folderMillis };
 }
+
+/**
+ * The earlier journal entry that marking `entries[position]` would hide, or
+ * undefined when every earlier entry is already covered by `newestApplied`.
+ *
+ * Marking writes created_at = this entry's `when`; the migrator then skips any
+ * unapplied entry with an older `when`. The journal is not in `when` order
+ * everywhere (0012 predates 0011), so the bound is the newest `when` among all
+ * earlier entries, not the previous entry's.
+ */
+export function earlierEntryHiddenByMarking<T extends { when: number }>(
+  entries: readonly T[],
+  position: number,
+  newestApplied: number
+): T | undefined {
+  let newestEarlier: T | undefined;
+  for (const entry of entries.slice(0, Math.max(position, 0))) {
+    if (!newestEarlier || entry.when > newestEarlier.when)
+      newestEarlier = entry;
+  }
+  return newestEarlier && newestApplied < newestEarlier.when
+    ? newestEarlier
+    : undefined;
+}
