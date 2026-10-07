@@ -9,6 +9,7 @@ import {
   isCloudDatabaseUrl,
   isForceProductionEnabled,
 } from "./lib/db-target.mjs";
+import { migrationRecord } from "./lib/migration-record";
 
 interface MigrationEntry {
   idx: number;
@@ -166,10 +167,20 @@ async function main() {
     console.log(`🔍 Found migration: ${migrationEntry.tag}`);
 
     // Check if already marked as applied
+    const record = migrationRecord(
+      migrationEntry,
+      readFileSync(
+        join(process.cwd(), "drizzle", `${migrationEntry.tag}.sql`),
+        "utf-8"
+      )
+    );
+
+    // Older runs of this script stored the tag as the hash.
     const existingMigrations = await sql`
       SELECT hash, created_at
       FROM drizzle.__drizzle_migrations
-      WHERE hash = ${migrationEntry.tag}
+      WHERE hash IN (${record.hash}, ${migrationEntry.tag})
+         OR created_at = ${record.createdAt}
     `;
 
     if (existingMigrations.length > 0) {
@@ -194,12 +205,9 @@ async function main() {
     // Mark migration as applied
     console.log(`📝 Marking migration ${migrationEntry.tag} as applied...`);
 
-    // Drizzle uses bigint timestamps (milliseconds since epoch)
-    const timestamp = Date.now();
-
     await sql`
       INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
-      VALUES (${migrationEntry.tag}, ${timestamp})
+      VALUES (${record.hash}, ${record.createdAt})
     `;
 
     console.log(
