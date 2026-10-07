@@ -27,13 +27,14 @@
 #   4. The run failed outside any spec. A worker crash, an unhandled rejection
 #      in a fixture teardown, or a reporter error lands in top-level `.errors`
 #      while every spec that did run stays green.
-#   5. An assigned spec file never ran. A comprehensive leg runs the files its
-#      `--test-list` names, but auth.setup.ts runs on every leg regardless and
-#      `--test-list` turns off Playwright's "no tests found" error. A list
-#      whose paths match nothing, or whose files were all skipped, would still
-#      pass checks 2 and 3 on the strength of auth-setup alone. Given the list
-#      as a third argument, the script requires at least one executed test
-#      from every file on it.
+#   5. An assigned spec file never loaded. A comprehensive leg runs the files
+#      its `--test-list` names, but auth.setup.ts runs on every leg regardless
+#      and `--test-list` turns off Playwright's "no tests found" error. A list
+#      whose paths match nothing would still pass checks 2 and 3 on the
+#      strength of auth-setup alone. Given the list as a third argument, the
+#      script requires every file on it to appear in the report. A file whose
+#      tests are all skipped still appears: quarantining a whole file with
+#      `test.describe.fixme` is legitimate and must not turn main red.
 #
 # Usage:
 #   bash scripts/workflow/evaluate-e2e-results.sh <label> <results-json-path> [<test-list>]
@@ -42,8 +43,8 @@
 
 set -euo pipefail
 
-LABEL="${1:?usage: evaluate-e2e-results.sh <label> <results-json-path>}"
-RESULTS="${2:?usage: evaluate-e2e-results.sh <label> <results-json-path>}"
+LABEL="${1:?usage: evaluate-e2e-results.sh <label> <results-json-path> [<test-list>]}"
+RESULTS="${2:?usage: evaluate-e2e-results.sh <label> <results-json-path> [<test-list>]}"
 TEST_LIST="${3:-}"
 
 # The browser whose failures are reported but do not fail the job. WebKit
@@ -136,17 +137,19 @@ if [ "$RUN_ERRORS" -gt 0 ]; then
 fi
 
 if [ -n "$TEST_LIST" ]; then
-  if [ ! -s "$TEST_LIST" ]; then
-    fail_no_verdict "test list \`${TEST_LIST}\` is missing or empty."
+  # Read the list the way Playwright does: trimmed lines, skipping blanks and
+  # `#` comments.
+  ASSIGNED_FILES=$(sed -e 's/\r$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' "$TEST_LIST" 2>/dev/null \
+    | { grep -v -e '^$' -e '^#' || true; } | sort -u)
+  if [ -z "$ASSIGNED_FILES" ]; then
+    fail_no_verdict "test list \`${TEST_LIST}\` is missing or names no file."
   fi
-  # shellcheck disable=SC2016  # `$s` is a jq binding; the shell must not expand it.
-  EXECUTED_FILES=$(jq -r '[.. | objects | select(has("specs")) | .specs[] as $s
-    | $s.tests[] | select(.status != "skipped") | $s.file] | unique | .[]' "$RESULTS")
-  MISSING_FILES=$(grep -v '^[[:space:]]*$' "$TEST_LIST" | sort -u | comm -23 - <(printf '%s\n' "$EXECUTED_FILES" | sort -u))
+  REPORTED_FILES=$(jq -r '[.. | objects | select(has("specs")) | .specs[].file] | unique | .[]' "$RESULTS" | sort -u)
+  MISSING_FILES=$(comm -23 <(printf '%s\n' "$ASSIGNED_FILES") <(printf '%s\n' "$REPORTED_FILES"))
   if [ -n "$MISSING_FILES" ]; then
-    echo "Assigned spec files with no executed test (${LABEL}):"
+    echo "Assigned spec files absent from the report (${LABEL}):"
     echo "$MISSING_FILES"
-    fail_no_verdict "$(printf '%s\n' "$MISSING_FILES" | wc -l | tr -d ' ') file(s) from \`${TEST_LIST}\` executed no test — see the step log above."
+    fail_no_verdict "$(printf '%s\n' "$MISSING_FILES" | wc -l | tr -d ' ') file(s) from \`${TEST_LIST}\` are absent from the report — see the step log above."
   fi
 fi
 

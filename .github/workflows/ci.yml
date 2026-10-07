@@ -37,7 +37,8 @@ permissions: read-all  # zizmor: ignore[excessive-permissions]
 # merge run at once — up to 10 concurrent main runs in a day, each holding
 # runners under the account's 20-job cap while PR jobs queued. A main run takes
 # ~15-20 minutes (the comprehensive legs run in parallel, PP-yva7.3), so a
-# merge normally waits at most one run before a run covering it starts (a hung run holds the slot until its job timeouts end it).
+# merge normally waits at most one run before a run covering it starts (a
+# hung run holds the slot until its job timeouts end it).
 # (PP-yva7.7.)
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -738,13 +739,14 @@ jobs:
     # the comment there). Must stay above setup + that timeout, or a job
     # cancellation silently swallows the verdict again. (PP-jxhy.)
     #
-    # 30 minutes of step budget leaves 25 for setup. Sized for the COLD-cache
+    # 35 minutes of step budget (5 to select files, 30 to run) leaves 25 for
+    # setup. Sized for the COLD-cache
     # case, not the warm one: the node_modules cache keys on the lockfile, so
     # every dependency bump that lands on main — the most frequent push there
     # is — misses it and the leg pays `pnpm install --frozen-lockfile`, plus a
     # full chromium+webkit browser download whenever that bump moves
     # Playwright itself.
-    timeout-minutes: 55
+    timeout-minutes: 60
     strategy:
       # Every leg must report: one red leg must not cancel the others and
       # leave their parts of main's verdict unknown.
@@ -866,8 +868,8 @@ jobs:
             --test-list "$RUNNER_TEMP/e2e-shard.txt"
 
       # The only step that fails the leg on test results. A missing report, an
-      # empty or all-skipped run, run-level errors, and an assigned file that
-      # executed no test all fail it, not just red gating specs
+      # empty or all-skipped run, run-level errors, and an assigned file
+      # missing from the report all fail it, not just red gating specs
       # (evaluate-e2e-results.sh header).
       - name: Evaluate gating browser results
         env:

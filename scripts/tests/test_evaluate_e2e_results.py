@@ -419,7 +419,7 @@ def _with_file(entry: dict, file: str) -> dict:
 
 
 def _leg_report(*, skipped_file_status: str = "skipped") -> dict:
-    """A leg that ran a.spec.ts and auth-setup; b.spec.ts only has skipped tests."""
+    """A leg that ran a.spec.ts and auth-setup; b.spec.ts's test has `skipped_file_status`."""
     return report(
         files=[
             described("a.spec.ts", "A", [spec("chromium", "a works", True)]),
@@ -465,10 +465,28 @@ def test_assigned_file_absent_from_report_is_not_green(tmp_path: Path) -> None:
     assert "no verdict" in written
 
 
-def test_assigned_file_with_only_skipped_tests_is_not_green(tmp_path: Path) -> None:
-    code, stdout, _ = run(tmp_path, _leg_report(), test_list=["a.spec.ts", "b.spec.ts"])
+def test_assigned_file_with_only_skipped_tests_passes(tmp_path: Path) -> None:
+    """A file quarantined with `test.describe.fixme` loads and skips; that is not a failure."""
+    code, _, _ = run(tmp_path, _leg_report(), test_list=["a.spec.ts", "b.spec.ts"])
+    assert code == 0
+
+
+def test_test_list_is_read_the_way_playwright_reads_it(tmp_path: Path) -> None:
+    """Trimmed lines, CRLF endings, blanks, and `#` comments are not assigned files."""
+    code, _, _ = run(
+        tmp_path,
+        _leg_report(skipped_file_status="expected"),
+        test_list=["# leg 1", "  a.spec.ts\r", "", "b.spec.ts  "],
+    )
+    assert code == 0
+
+
+def test_blank_only_test_list_is_not_green(tmp_path: Path) -> None:
+    code, _, written = run(
+        tmp_path, _leg_report(skipped_file_status="expected"), test_list=["", "  "]
+    )
     assert code == 1
-    assert "b.spec.ts" in stdout
+    assert "names no file" in written
 
 
 def test_empty_test_list_is_not_green(tmp_path: Path) -> None:
