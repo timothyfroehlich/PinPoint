@@ -218,15 +218,15 @@ _codex_check() {
 # Migration renumber merge (spec §8.12, PP-ncxx.4): a merge of the base branch whose
 # only resolution renumbers the branch's Drizzle migrations after the base side's,
 # which is what scripts/db-renumber-migration.sh produces. Returns 0 when:
-# - the clean merge conflicts only under drizzle/, and every path outside drizzle/
+# - the clean merge conflicts, only under drizzle/, and every path outside drizzle/
 #   matches it (a schema.ts conflict is a resolution someone has to review)
 # - the branch changed nothing under drizzle/ but appending its own migrations
 #   (files and journal entries), so taking the base side's drizzle/ drops no
 #   reviewed change
 # - the base side's drizzle/ files are unchanged apart from the journal growing
 # - the journal is the base side's, followed in order by one entry per branch
-#   migration that matches the reviewed entry except for a later `when` and the
-#   next idx and number, and whose SQL is byte-identical
+#   migration that matches the reviewed entry except for a higher idx and number
+#   and a `when` later than every base-side entry, and whose SQL is byte-identical
 # - the only files added under drizzle/ are those entries' SQL and snapshots
 # The regenerated snapshots are not compared; they hold no SQL that runs.
 # Arguments: branch parent, base parent, merge commit, and the output of
@@ -238,7 +238,10 @@ _is_migration_renumber_merge() {
   clean_tree=$(head -n1 <<< "$out")
   # Conflicted paths run from line 2 to the first blank line; messages follow.
   conflicted=$(awk 'NR == 1 { next } /^$/ { exit } { print }' <<< "$out")
-  if [[ -n "$conflicted" ]] && grep -qv '^drizzle/' <<< "$conflicted"; then
+  # A renumber merge exists because the clean merge conflicted under drizzle/;
+  # a conflict-free merge that still differs from the clean merge is an edit.
+  [[ -n "$conflicted" ]] || return 1
+  if grep -qv '^drizzle/' <<< "$conflicted"; then
     return 1
   fi
   git diff --quiet "$clean_tree" "$merge" -- ':(top)' ':(top,exclude)drizzle' 2>/dev/null || return 1
@@ -272,6 +275,7 @@ _is_migration_renumber_merge() {
         | if ($a.tag | test("^[0-9]{4}_") | not)
              or ($a.tag[0:4] | tonumber) != $a.idx
              or $a.idx != $n + $i
+             or $a.idx <= $o.idx
              or ($a.tag | sub("^[0-9]+_"; "")) != ($o.tag | sub("^[0-9]+_"; ""))
              or ($a | del(.idx, .tag, .when)) != ($o | del(.idx, .tag, .when))
              or $a.when <= (if $i == 0 then $newest else $added[$i - 1].when end)

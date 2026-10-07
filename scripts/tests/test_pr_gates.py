@@ -1379,3 +1379,39 @@ def test_clean_merge_still_reports_pure_merge() -> None:
             summary = review_summary(env, cwd=repo)
 
     assert summary["coverage"]["inherited_via"] == "pure merge from main"
+
+
+def test_conflict_free_merge_that_edits_a_snapshot_stays_stale() -> None:
+    """No drizzle/ conflict means nothing to renumber; a changed snapshot is an edit."""
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = Path(tmp) / "repo"
+        repo.mkdir()
+        subprocess.run(["git", "init", "-q", "-b", "main", str(repo)], check=True)
+        write_migrations(repo, [INIT])
+        git_cmd("add", "-A", cwd=repo)
+        git_cmd("commit", "-qm", "initial commit", cwd=repo)
+        git_cmd("checkout", "-qb", "feat", cwd=repo)
+        write_migrations(repo, [INIT, ("0001_mine", 2000, MINE_SQL)])
+        git_cmd("add", "-A", cwd=repo)
+        git_cmd("commit", "-qm", "feature migration (reviewed)", cwd=repo)
+        reviewed_sha = git_cmd("rev-parse", "HEAD", cwd=repo)
+        git_cmd("checkout", "-q", "main", cwd=repo)
+        (repo / "later.txt").write_text("later\n")
+        git_cmd("add", "-A", cwd=repo)
+        git_cmd("commit", "-qm", "main advances", cwd=repo)
+        git_cmd("checkout", "-q", "feat", cwd=repo)
+        git_cmd("merge", "-q", "--no-ff", "--no-commit", "main", cwd=repo)
+        (repo / "drizzle" / "meta" / "0001_snapshot.json").write_text(
+            '{"edited": true}'
+        )
+        git_cmd("add", "-A", cwd=repo)
+        git_cmd("commit", "-qm", "Merge main, edit snapshot", cwd=repo)
+        head_sha = git_cmd("rev-parse", "HEAD", cwd=repo)
+
+        with gate_env(
+            comment_pages=[[claude_review_record(reviewed_sha)]],
+            head_sha=head_sha,
+        ) as env:
+            summary = review_summary(env, cwd=repo)
+
+    assert summary["label"] == "stale review"
