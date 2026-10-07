@@ -20,6 +20,7 @@
 - **Path aliases (CORE-TS-008):** import project code with `~/`, never deep relative paths.
 - **Rule of Three (CORE-ARCH-010):** do not abstract before the third real duplication, unless the code is load-bearing; reuse helpers that already exist.
 - **One write path (CORE-ARCH-014):** a mutation with more than one entry point (Server Action, MCP tool, cron) lives in `src/services`; entry points parse, authorize, and call it.
+- **Migrations go first (CORE-ARCH-017):** an additive migration merges in its own PR before the feature's implementation; a destructive one merges in its own PR after the code stops using the old shape.
 - **Email privacy (CORE-SEC-007):** user emails only in admin views and the user's own settings page; everywhere else use names, "Anonymous", or roles.
 
 ### 2.2 Process rules
