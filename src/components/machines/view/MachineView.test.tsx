@@ -121,7 +121,6 @@ function result(overrides: Partial<MachineViewResult> = {}): MachineViewResult {
     totalCount: 1,
     summary: {
       presence: {
-        total: 3,
         byPresence: {
           on_the_floor: 2,
           off_the_floor: 0,
@@ -226,6 +225,13 @@ describe("MachineView", () => {
     });
   });
 
+  it("searches without a placeholder, named for the list it searches (list-views §4.2)", () => {
+    renderView();
+    expect(
+      screen.getByRole("searchbox", { name: "Search machines" })
+    ).not.toHaveAttribute("placeholder");
+  });
+
   it("debounces search and resets to page one", () => {
     vi.useFakeTimers();
     navigation.searchParams = new URLSearchParams({ page: "3" });
@@ -284,14 +290,17 @@ describe("MachineView", () => {
     });
   });
 
-  it("returns an empty edited list to its Applied View (list-views §3.6)", async () => {
+  it("opens the Page Preset from an empty list with no Applied View, keeping its page size (list-views §1, §3.6)", async () => {
     const user = userEvent.setup();
-    navigation.searchParams = new URLSearchParams({ q: "missing" });
+    navigation.searchParams = new URLSearchParams({
+      q: "missing",
+      pageSize: "50",
+    });
     renderView({
       result: result({
         rows: [],
         totalCount: 0,
-        state: { ...presetState, q: "missing" },
+        state: { ...presetState, q: "missing", pageSize: 50 },
       }),
     });
 
@@ -299,8 +308,33 @@ describe("MachineView", () => {
     await user.click(
       screen.getByRole("button", { name: "Back to On the floor" })
     );
+    expect(navigation.replace).toHaveBeenLastCalledWith("/m?pageSize=50", {
+      scroll: false,
+    });
+  });
+
+  it("returns an empty edited list to its Saved View (list-views §3.6)", async () => {
+    const user = userEvent.setup();
+    navigation.searchParams = new URLSearchParams([
+      ["q", "missing"],
+      ["status", "unplayable"],
+      ["view", brokenView.id],
+    ]);
+    renderView({
+      result: result({
+        rows: [],
+        totalCount: 0,
+        state: { ...presetState, q: "missing", status: ["unplayable"] },
+      }),
+      views: savedViews({ activeViewId: brokenView.id }),
+    });
+
+    expect(screen.getByText("No machines match")).toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", { name: "Back to Broken machines" })
+    );
     expect(navigation.replace).toHaveBeenLastCalledWith(
-      "/m?view=on-the-floor",
+      `/m?status=unplayable&view=${brokenView.id}`,
       { scroll: false }
     );
   });
@@ -379,7 +413,7 @@ describe("MachineView", () => {
     );
   });
 
-  it("lists Segments in spec order and shows the Playability headline as the Summary Row", () => {
+  it("lists Segments in spec order and shows the playable figure as the Summary Row (machine-widgets §2.4)", () => {
     renderView();
     const names = (widget: string): (string | null)[] =>
       within(screen.getByRole("region", { name: widget }))
@@ -395,28 +429,34 @@ describe("MachineView", () => {
     ).toHaveAttribute("aria-controls");
   });
 
-  it("puts the phone Summary Row toggle in the title row on the Machines page (list-views §7.2)", async () => {
+  it("puts the Summary Row toggle in the title row whenever the widgets stack on the Machines page (list-views §7.2, §8.4)", async () => {
     const user = userEvent.setup();
     renderView({ title: "Machines" });
 
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Machines" })
-    ).toBeInTheDocument();
-    // The title row's toggle shows "2/2 playable" and reads "2 of 2"
-    // (machine-widgets §2.4).
-    const [toggle, groupToggle] = screen.getAllByRole("button", {
+    const heading = screen.getByRole("heading", {
+      level: 1,
+      name: "Machines",
+    });
+    // One toggle, in the title row: it shows "2/2 playable" and reads
+    // "2 of 2" (machine-widgets §2.4).
+    const toggles = screen.getAllByRole("button", {
       name: "Summary: 2 of 2 playable",
     });
-    if (!toggle || !groupToggle) throw new Error("Summary Row toggles missing");
+    expect(toggles).toHaveLength(1);
+    const [toggle] = toggles;
+    if (!toggle) throw new Error("Summary Row toggle missing");
+    expect(heading.parentElement).toContainElement(toggle);
     expect(within(toggle).getByText("2/2")).toHaveAttribute(
       "aria-hidden",
       "true"
     );
-    // Both control the same section; the group's own hides on phones.
-    expect(toggle.getAttribute("aria-controls")).toBe(
-      groupToggle.getAttribute("aria-controls")
-    );
-    expect(groupToggle).toHaveClass("max-md:hidden");
+    // It hides only when both widgets fit side by side, querying the title
+    // row, which is as wide as the widgets' group.
+    expect(toggle).toHaveClass("md:@min-[40rem]:hidden");
+    expect(heading.parentElement).toHaveClass("@container");
+    expect(
+      document.getElementById(toggle.getAttribute("aria-controls") ?? "")
+    ).toContainElement(screen.getByRole("region", { name: "Presence" }));
     await user.click(toggle);
     expect(toggle).toHaveAttribute("aria-expanded");
   });
@@ -477,7 +517,179 @@ describe("MachineView", () => {
     );
   });
 
-  it("offers only Save as new for an edited Built-in View, and applies the new view", async () => {
+  it("keeps a Built-in View's tab current when the page size or a field changes (list-views §1)", async () => {
+    const user = userEvent.setup();
+    const needsAttention = getMachineViewBuiltInViews("machines").find(
+      (view) => view.id === "needs-attention"
+    );
+    if (!needsAttention) throw new Error("Needs attention is missing");
+    navigation.searchParams = new URLSearchParams([
+      ["status", "needs_service,unplayable"],
+      ["sort", "playability"],
+      ["dir", "desc"],
+      ["view", "needs-attention"],
+    ]);
+    renderView({
+      result: result({ state: { ...needsAttention.state, page: 1 } }),
+      views: savedViews({ activeViewId: "needs-attention" }),
+    });
+    const tabs = screen.getByRole("navigation", { name: "Saved views" });
+    const current = (): HTMLElement =>
+      within(tabs).getByRole("link", { current: "page" });
+
+    await user.click(screen.getByRole("button", { name: "View options" }));
+    await user.click(screen.getByRole("menuitemcheckbox", { name: "Owner" }));
+    await user.click(screen.getByRole("menuitemradio", { name: "50" }));
+
+    expect(navigation.replace).toHaveBeenLastCalledWith(
+      "/m?status=needs_service%2Cunplayable&sort=playability&dir=desc&pageSize=50&columns=machine%2Cplayability%2Cpresence%2CopenIssues%2ClastServiced%2ClastActivity%2Cowner&view=needs-attention",
+      { scroll: false }
+    );
+    expect(current()).toHaveTextContent(/^Needs attention$/);
+    expect(
+      screen.queryByRole("button", { name: "Save view" })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("list-save-view")).not.toBeInTheDocument();
+    expect(screen.getByTestId("list-phone-views-trigger")).toHaveAccessibleName(
+      "Needs attention"
+    );
+  });
+
+  it("leaves every view on a search or filter change: no tab current, Save view, no Discard (list-views §1, §5.2, §7.3)", async () => {
+    const user = userEvent.setup();
+    renderView();
+
+    await user.click(screen.getByTestId("list-filter-status"));
+    await user.click(screen.getByRole("checkbox", { name: "Unplayable" }));
+
+    expect(navigation.replace).toHaveBeenLastCalledWith(
+      "/m?status=unplayable",
+      { scroll: false }
+    );
+    const tabs = screen.getByRole("navigation", { name: "Saved views" });
+    expect(
+      within(tabs).queryByRole("link", { current: "page" })
+    ).not.toBeInTheDocument();
+    expect(within(tabs).queryByText(/Edited/)).not.toBeInTheDocument();
+    expect(
+      within(tabs).getByRole("button", { name: "Save view" })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^Discard/ })
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("list-phone-views-trigger")).toHaveAccessibleName(
+      "Views"
+    );
+  });
+
+  it("applies a Built-in View tab keeping the fields and page size showing, adding Date Added for Recently added (list-views §1; machine-views §9.1)", async () => {
+    const user = userEvent.setup();
+    const columns = [...presetState.columns, "owner" as const];
+    navigation.searchParams = new URLSearchParams([
+      ["q", "mars"],
+      ["pageSize", "50"],
+      ["columns", columns.join(",")],
+    ]);
+    renderView({
+      result: result({
+        state: { ...presetState, q: "mars", pageSize: 50, columns, page: 2 },
+      }),
+    });
+    const tabs = screen.getByRole("navigation", { name: "Saved views" });
+    const recentlyAdded = within(tabs).getByRole("link", {
+      name: "Recently added",
+    });
+    const url = `/m?presence=on_the_floor%2Coff_the_floor%2Con_loan%2Cpending_arrival&sort=dateAdded&dir=desc&pageSize=50&columns=${[...columns, "dateAdded"].join("%2C")}&view=recently-added`;
+
+    expect(recentlyAdded).toHaveAttribute("href", url);
+    await user.click(recentlyAdded);
+    expect(navigation.replace).toHaveBeenLastCalledWith(url, {
+      scroll: false,
+    });
+    expect(
+      within(tabs).getByRole("link", { current: "page" })
+    ).toHaveTextContent(/^Recently added$/);
+
+    // The search is cleared; fields and page size stay.
+    await user.click(within(tabs).getByRole("link", { name: "On the floor" }));
+    expect(navigation.replace).toHaveBeenLastCalledWith(
+      `/m?pageSize=50&columns=${[...columns, "dateAdded"].join("%2C")}`,
+      { scroll: false }
+    );
+  });
+
+  it("drops a view reference the configuration has left when it rewrites the URL (list-views §9.6)", () => {
+    navigation.searchParams = new URLSearchParams([
+      ["q", "mars"],
+      ["view", "service-due"],
+    ]);
+    renderView({
+      result: result({ state: { ...presetState, q: "mars" } }),
+      views: savedViews({ activeViewId: "service-due" }),
+    });
+
+    expect(navigation.replace).toHaveBeenLastCalledWith("/m?q=mars", {
+      scroll: false,
+    });
+  });
+
+  it("names the Page Preset's view when its tab is applied while another Default View exists (list-views §10.10)", async () => {
+    const user = userEvent.setup();
+    navigation.searchParams = new URLSearchParams([
+      ["status", "unplayable"],
+      ["view", brokenView.id],
+    ]);
+    renderView({
+      result: result({ state: { ...brokenView.state, page: 1 } }),
+      views: savedViews({
+        activeViewId: brokenView.id,
+        defaultViewId: brokenView.id,
+      }),
+    });
+    const tab = within(
+      screen.getByRole("navigation", { name: "Saved views" })
+    ).getByRole("link", { name: "On the floor" });
+
+    expect(tab).toHaveAttribute("href", "/m?view=on-the-floor");
+    await user.click(tab);
+    expect(navigation.replace).toHaveBeenLastCalledWith(
+      "/m?view=on-the-floor",
+      { scroll: false }
+    );
+  });
+
+  it("marks a Saved View Edited when only its page size changes, and Discard restores it (list-views §5.2, §5.4)", async () => {
+    const user = userEvent.setup();
+    navigation.searchParams = new URLSearchParams([
+      ["status", "unplayable"],
+      ["view", brokenView.id],
+    ]);
+    renderView({
+      result: result({ state: { ...brokenView.state, page: 1 } }),
+      views: savedViews({ activeViewId: brokenView.id }),
+    });
+    const tabs = screen.getByRole("navigation", { name: "Saved views" });
+
+    await user.click(screen.getByRole("button", { name: "View options" }));
+    await user.click(screen.getByRole("menuitemradio", { name: "50" }));
+    expect(
+      within(tabs).getByRole("link", { current: "page" })
+    ).toHaveTextContent("Broken machines· Edited");
+    expect(screen.getByTestId("list-phone-views-trigger")).toHaveAccessibleName(
+      "Broken machines, edited"
+    );
+
+    await user.click(screen.getByRole("button", { name: "Discard changes" }));
+    expect(navigation.replace).toHaveBeenLastCalledWith(
+      `/m?status=unplayable&view=${brokenView.id}`,
+      { scroll: false }
+    );
+    expect(
+      within(tabs).getByRole("link", { current: "page" })
+    ).toHaveTextContent(/^Broken machines$/);
+  });
+
+  it("offers Save view once the configuration leaves every view, and applies the new view (list-views §5.3)", async () => {
     const user = userEvent.setup();
     actions.createSavedMachineViewAction.mockResolvedValue({
       ok: true,
@@ -485,11 +697,8 @@ describe("MachineView", () => {
     });
     renderView({ result: result({ state: { ...presetState, q: "mars" } }) });
 
-    await user.click(screen.getByTestId("list-save-view"));
-    expect(
-      screen.queryByRole("menuitem", { name: "Save changes" })
-    ).not.toBeInTheDocument();
-    await user.click(screen.getByRole("menuitem", { name: "Save as new…" }));
+    expect(screen.queryByTestId("list-save-view")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save view" }));
     await user.type(screen.getByRole("textbox", { name: /name/i }), "Mars");
     await user.click(screen.getByRole("checkbox", { name: /by default/i }));
     await user.click(screen.getByRole("button", { name: "Save" }));
@@ -548,9 +757,16 @@ describe("MachineView", () => {
 
   it("drops a waiting search when changes are discarded (list-views §5.4)", () => {
     vi.useFakeTimers();
-    navigation.searchParams = new URLSearchParams({ severity: "major" });
+    navigation.searchParams = new URLSearchParams([
+      ["status", "unplayable"],
+      ["severity", "major"],
+      ["view", brokenView.id],
+    ]);
     renderView({
-      result: result({ state: { ...presetState, severity: ["major"] } }),
+      result: result({
+        state: { ...presetState, status: ["unplayable"], severity: ["major"] },
+      }),
+      views: savedViews({ activeViewId: brokenView.id }),
     });
     const search = screen.getByRole("searchbox", { name: /search machines/i });
 
@@ -559,7 +775,7 @@ describe("MachineView", () => {
     act(() => vi.advanceTimersByTime(250));
 
     expect(navigation.replace).toHaveBeenLastCalledWith(
-      "/m?view=on-the-floor",
+      `/m?status=unplayable&view=${brokenView.id}`,
       { scroll: false }
     );
     // The field is mounted afresh with the Applied View's search.
@@ -736,8 +952,7 @@ describe("MachineView", () => {
     navigation.searchParams = new URLSearchParams({ q: "mars" });
     renderView({ result: result({ state: { ...presetState, q: "mars" } }) });
 
-    await user.click(screen.getByTestId("list-save-view"));
-    await user.click(screen.getByRole("menuitem", { name: "Save as new…" }));
+    await user.click(screen.getByRole("button", { name: "Save view" }));
     await user.type(
       screen.getByRole("textbox", { name: /name/i }),
       "Broken machines"
@@ -894,8 +1109,7 @@ describe("MachineView", () => {
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     await user.click(screen.getByRole("button", { name: "Done" }));
 
-    await user.click(screen.getByTestId("list-save-view"));
-    await user.click(screen.getByRole("menuitem", { name: "Save as new…" }));
+    await user.click(screen.getByRole("button", { name: "Save view" }));
     expect(
       screen.queryByLabelText("Open this view by default")
     ).not.toBeInTheDocument();
@@ -955,8 +1169,28 @@ describe("MachineView", () => {
     expect(
       screen.queryByRole("checkbox", { name: "Me" })
     ).not.toBeInTheDocument();
-    // Anonymous visitors apply Built-in Views but cannot save (§10.1).
+  });
+
+  it("offers anonymous visitors no Save view once they leave every view (list-views §5.2, §10.1)", async () => {
+    const user = userEvent.setup();
+    renderView({
+      result: result({ offersMe: false }),
+      views: savedViews({ canSave: false, offersDefault: false, views: [] }),
+    });
+
+    await user.click(screen.getByTestId("list-filter-status"));
+    await user.click(screen.getByRole("checkbox", { name: "Unplayable" }));
+
+    expect(
+      screen.queryByRole("button", { name: "Save view" })
+    ).not.toBeInTheDocument();
     expect(screen.queryByTestId("list-save-view")).not.toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    await user.click(screen.getByTestId("list-phone-views-trigger"));
+    const sheet = await screen.findByRole("dialog", { name: "Saved views" });
+    expect(
+      within(sheet).queryByRole("button", { name: /^Save/ })
+    ).not.toBeInTheDocument();
   });
 
   it("names the phone Filters button with its count of filters off their preset (list-views §7.3)", () => {
@@ -970,7 +1204,7 @@ describe("MachineView", () => {
       screen.getByRole("button", { name: "Filters, 2 active" })
     ).toBeInTheDocument();
     expect(screen.getByTestId("list-phone-views-trigger")).toHaveAccessibleName(
-      "On the floor, edited"
+      "Views"
     );
   });
 

@@ -1,70 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import {
-  getLastIssuesPath,
-  setLastIssuesPathCookie,
-  getChangelogSeen,
-} from "./preferences";
+import { getChangelogSeen } from "./preferences";
 
 // Mock next/headers
 const mockGet = vi.fn();
-const mockSet = vi.fn();
 
 vi.mock("next/headers", () => ({
-  cookies: vi.fn(() =>
-    Promise.resolve({
-      get: mockGet,
-      set: mockSet,
-    })
-  ),
+  cookies: vi.fn(() => Promise.resolve({ get: mockGet })),
 }));
 
 describe("server-side cookie preferences", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  describe("getLastIssuesPath", () => {
-    it("returns stored path when cookie exists", async () => {
-      mockGet.mockReturnValue({ value: "/issues?q=test&severity=major" });
-
-      const result = await getLastIssuesPath();
-
-      expect(mockGet).toHaveBeenCalledWith("lastIssuesPath");
-      expect(result).toBe("/issues?q=test&severity=major");
-    });
-
-    it("returns default /issues when cookie is missing", async () => {
-      mockGet.mockReturnValue(undefined);
-
-      const result = await getLastIssuesPath();
-
-      expect(result).toBe("/issues");
-    });
-
-    it("returns default /issues when cookie value is null", async () => {
-      mockGet.mockReturnValue({ value: null });
-
-      const result = await getLastIssuesPath();
-
-      expect(result).toBe("/issues");
-    });
-  });
-
-  describe("setLastIssuesPathCookie", () => {
-    it("sets cookie with correct options", async () => {
-      await setLastIssuesPathCookie("/issues?q=test");
-
-      expect(mockSet).toHaveBeenCalledWith(
-        "lastIssuesPath",
-        "/issues?q=test",
-        expect.objectContaining({
-          httpOnly: false,
-          sameSite: "lax",
-          path: "/",
-          maxAge: 31536000, // 1 year
-        })
-      );
-    });
   });
 
   describe("getChangelogSeen", () => {

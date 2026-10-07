@@ -97,7 +97,7 @@
 - **8.9** _Retired 2026-09-24._ CodeRabbit re-review requests. Number kept so older citations don't dangle.
 - **8.10** _Retired 2026-09-24._ Codex review requests. Number kept so older citations don't dangle.
 - **8.11** _Retired 2026-09-24._ Anchoring review requests to a head; the review record names its reviewed head instead (8.18). Number kept so older citations don't dangle.
-- **8.12** Pushing new commits to a pull request branch invalidates previous review coverage, and the updated head requires a new local review. The one exception: a head whose only new commits are clean merges of the base branch keeps the earlier coverage.
+- **8.12** Pushing new commits to a pull request branch invalidates previous review coverage, and the updated head requires a new local review. Two kinds of base-branch merge keep the earlier coverage, provided the head's other new commits are already on the base branch: a clean merge, and a merge whose only resolution renumbers the branch's migrations to follow the base branch's. In the second kind, every path outside the migrations folder matches the clean merge, the base branch's migrations are unchanged, and each renumbered migration's SQL is byte-identical to the reviewed version.
 - **8.13** The owning agent runs a local review after CI passes on the current head.
 - **8.14** The review level follows the weighted diff size: low below 50 lines, medium from 50 up to 1,500, and high from 1,500 through 3,000. Above 3,000, the owning agent asks the owner whether to review at xhigh or max, or to split the pull request.
 - **8.15** The weighted diff size counts added plus deleted lines against the base branch. It leaves out the lockfile, migration snapshots, test fixtures, binary files, and feature specs, and counts test code at half weight.
@@ -134,6 +134,7 @@
 | 2.1, 2.3 | Worktree and title launch parameters; corrupt-worktree rejection at launch | `pr-watch.py` takes the PR number, phase, and expected head. The worktree is the process's working directory; there is no title parameter and no worktree validation. Both lived only in the MCP wrapper, removed 2026-09-24 in the watcher simplification Tim approved (one CLI, no wrapper layers). | Amend 2.1 and 2.3 to the three-parameter CLI (requirement diff needs Tim's approval) |
 | 6.1–6.3 | Host coordination: concurrent watches coalesce under one polling leader | Removed 2026-09-24 in the watcher simplification: each watch polls GitHub on its own. The XDG lock, state-file, and leader/follower machinery cost more code than the duplicate polling it saved. | Delete §6 (requirement diff needs Tim's approval) |
 | 7.4 | Local execution telemetry (harness, model, wake count, elapsed duration) | Removed 2026-09-24 with the MCP wrapper and watcher agents, the only sources of harness, model, and wake data; nothing read the `tmp/gh-monitor/watcher-run-*.json` records. | Delete 7.4 (requirement diff needs Tim's approval) |
+| 8.12 | A base-branch merge whose only resolution renumbers the branch's migrations keeps coverage | `_is_pure_merge_from_main` in `scripts/workflow/_pr-gates.sh` accepts only merges whose tree equals the clean merge, so a renumber needs a new review | Extend the merge check (PP-ncxx.4) |
 | 8.3 | Only a review record provides coverage | The gate still accepts a Codex review on the exact head | Remove the Codex checker once its subscription ends |
 
 ---
@@ -142,6 +143,7 @@
 
 | Date | Amendment |
 | :-- | :-- |
+| 2026-10-06 | §8.12 also keeps coverage across a base-branch merge whose only resolution renumbers the branch's migrations with unchanged SQL. |
 | 2026-10-03 | Add xhigh and max review levels (Concepts, §8.14): above 3,000 weighted lines the owner chooses xhigh or max, or splits the pull request. |
 | 2026-09-27 | Retire CodeRabbit checker from review gates and handoff scripts; only review record and Codex remain during transition. |
 | 2026-09-24 | Replace CodeRabbit and Codex with a local Claude Code review (§1, §3.2, §8, §9–§11): the owning agent reviews at a level set by weighted diff size, re-reviews after fixes until clean, posts a review record pinned to the head, then promotes; a forced merge promotes a draft first; §8.12 keeps coverage across clean base-branch merges; §9–§11 retired. |

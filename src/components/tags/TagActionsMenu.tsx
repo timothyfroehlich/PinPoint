@@ -15,9 +15,10 @@ import {
   TagDeleteDialog,
   TagRenameDialog,
 } from "~/components/tags/TagManageDialogs";
+import { MergeTagDialog } from "~/components/tags/MergeTagDialog";
 import { MoveTagDialog } from "~/components/tags/MoveTagDialog";
 import { deleteTagAction, renameTagAction } from "~/app/(app)/c/tags/actions";
-import type { TagMove } from "~/app/(app)/c/tags/[type]/[slug]/_data";
+import type { TagMerge, TagMove } from "~/app/(app)/c/tags/[type]/[slug]/_data";
 
 interface TagActionsMenuProps {
   tagId: string;
@@ -27,11 +28,13 @@ interface TagActionsMenuProps {
   parentHref: string;
   /** What the Move dialog offers and what blocks each choice. */
   move: TagMove;
+  /** What the Merge dialog offers and what blocks each choice. */
+  merge: TagMerge;
 }
 
 /**
- * A hand-applied tag's ⋯ menu: Rename, Move to another tag type, and Delete
- * (spec 11.8–11.9, 11.16).
+ * A hand-applied tag's ⋯ menu: Rename, Move to another tag type, Merge into
+ * another tag, and Delete (spec 11.8–11.9, 11.16–11.17).
  */
 export function TagActionsMenu({
   tagId,
@@ -39,9 +42,11 @@ export function TagActionsMenu({
   machineCount,
   parentHref,
   move,
+  merge,
 }: TagActionsMenuProps): React.JSX.Element {
   const [renameOpen, setRenameOpen] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
+  const [mergeOpen, setMergeOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const machinesPhrase =
     machineCount === 0
@@ -63,6 +68,9 @@ export function TagActionsMenu({
           <DropdownMenuItem onSelect={() => setMoveOpen(true)}>
             Move to another tag type…
           </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setMergeOpen(true)}>
+            Merge into another tag…
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             variant="destructive"
@@ -80,6 +88,11 @@ export function TagActionsMenu({
         onRename={(next) => renameTagAction({ tagId, name: next })}
       />
       <MoveTagDialog open={moveOpen} onOpenChange={setMoveOpen} move={move} />
+      <MergeTagDialog
+        open={mergeOpen}
+        onOpenChange={setMergeOpen}
+        merge={merge}
+      />
       <TagDeleteDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}

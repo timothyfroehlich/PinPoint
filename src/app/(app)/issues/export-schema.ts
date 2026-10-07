@@ -1,11 +1,4 @@
 import { z } from "zod";
-import { ISSUE_STATUS_VALUES } from "~/lib/issues/status";
-import {
-  ISSUE_FREQUENCY_VALUES,
-  ISSUE_PRIORITY_VALUES,
-  ISSUE_SEVERITY_VALUES,
-} from "~/lib/types";
-import { isIssueSort, type IssueSort } from "~/lib/issues/filters";
 
 /**
  * The Surface an export comes from (issues-list §5.4). The server resolves
@@ -29,12 +22,13 @@ export type IssueExportScope = z.infer<typeof exportScopeSchema>;
 /**
  * Schema for CSV export action input.
  *
- * The client serializes the current filter state as JSON.
- * machineInitials is passed separately for machine-page exports.
+ * The client sends the list's URL query; the server parses and validates it
+ * exactly as the list does. machineInitials is passed separately for
+ * machine-page exports.
  */
 export const exportIssuesSchema = z.object({
-  /** JSON-serialized filter state from the issues list. Optional — omitted for machine exports. */
-  filtersJson: z.string().optional(),
+  /** The Issue View URL query (issues-list §7). Omitted for machine exports. */
+  query: z.string().max(4000).optional(),
 
   /** Machine initials for machine-page export (overrides any machine filter). */
   machineInitials: z
@@ -44,33 +38,4 @@ export const exportIssuesSchema = z.object({
 
   /** The Collection or Tag Issues tab the export comes from. */
   scope: exportScopeSchema.optional(),
-});
-
-/**
- * Schema for parsing the filters JSON string into typed filters.
- * Unknown fields are stripped; invalid values fail validation to prevent
- * widening the export unexpectedly.
- */
-export const exportFiltersSchema = z.object({
-  q: z.string().optional(),
-  status: z.array(z.enum(ISSUE_STATUS_VALUES)).optional(),
-  machine: z.array(z.string()).optional(),
-  severity: z.array(z.enum(ISSUE_SEVERITY_VALUES)).optional(),
-  priority: z.array(z.enum(ISSUE_PRIORITY_VALUES)).optional(),
-  frequency: z.array(z.enum(ISSUE_FREQUENCY_VALUES)).optional(),
-  assignee: z.array(z.string()).optional(),
-  owner: z.array(z.string()).optional(),
-  reporter: z.array(z.string()).optional(),
-  watching: z.boolean().optional(),
-  includeInactiveMachines: z.boolean().optional(),
-  createdFrom: z.coerce.date().optional().catch(undefined),
-  createdTo: z.coerce.date().optional().catch(undefined),
-  updatedFrom: z.coerce.date().optional().catch(undefined),
-  updatedTo: z.coerce.date().optional().catch(undefined),
-  sort: z
-    .custom<IssueSort>(
-      (value) => typeof value === "string" && isIssueSort(value)
-    )
-    .optional()
-    .catch(undefined),
 });

@@ -16,26 +16,65 @@ export interface ListOption {
   tag?: string | undefined;
   /** A semantic text color class for state values, from the host's config. */
   textClassName?: string | undefined;
+  /**
+   * The group a filter option belongs to. Options of one group are listed
+   * together under a heading that selects or clears the whole group.
+   */
+  group?: string | undefined;
+  /**
+   * The values a filter shortcut stands for, when it stands for several,
+   * such as the machines a person owns. Checking it adds them all; it shows
+   * as checked while every one is selected.
+   */
+  values?: readonly string[] | undefined;
 }
 
-/** A Primary or Secondary Filter (list-views §4). */
-export interface ListFilterModel {
+interface ListFilterBase {
   id: string;
   /** The filter's name, shown on its dropdown button (§4.3). */
   label: string;
+  /**
+   * What the control shows when set (§4.3, §4.6); null shows only the name,
+   * or a count when several values are selected.
+   */
+  valueLabel: string | null;
+  /** Whether the filter holds its Page Preset value (§7.3). */
+  atPreset: boolean;
+  /** Returns the filter to its Page Preset value. */
+  onReset: () => void;
+}
+
+/** A filter of options, any number of which can be selected (list-views §4). */
+export interface ListOptionsFilterModel extends ListFilterBase {
+  kind?: "options" | undefined;
   options: readonly ListOption[];
   /** Host shortcuts listed above the options, such as Me and Unassigned (§4.4). */
   shortcuts?: readonly ListOption[] | undefined;
   /** Placeholder of the type-to-search box for long lists (§4.4). */
   searchPlaceholder?: string | undefined;
   selected: readonly string[];
-  /** What the control shows when set (§4.3, §4.6); null shows only the name. */
-  valueLabel: string | null;
-  /** Whether the filter holds its Page Preset value (§7.3). */
-  atPreset: boolean;
   onChange: (values: string[]) => void;
-  /** Returns the filter to its Page Preset value. */
-  onReset: () => void;
+}
+
+/** A date range; each end is a calendar day (`YYYY-MM-DD`) or open. */
+export interface ListDateRange {
+  from: string | null;
+  to: string | null;
+}
+
+/** A filter on a date range, such as Created. */
+export interface ListDateRangeFilterModel extends ListFilterBase {
+  kind: "dateRange";
+  range: ListDateRange;
+  onRangeChange: (range: ListDateRange) => void;
+}
+
+/** A Primary or Secondary Filter (list-views §4). */
+export type ListFilterModel = ListOptionsFilterModel | ListDateRangeFilterModel;
+
+/** How many values a filter holds, for its count (§4.3, §7.3). */
+export function selectionCount(filter: ListFilterModel): number {
+  return filter.kind === "dateRange" ? 0 : filter.selected.length;
 }
 
 export type ActionOutcome = { ok: true } | { ok: false; message: string };
@@ -63,10 +102,15 @@ export interface ListViewEntry {
 export interface ListViewsModel {
   builtInViews: readonly ListViewEntry[];
   savedViews: readonly ListViewEntry[];
-  appliedId: string;
-  appliedName: string;
+  /**
+   * The Applied View (§1), or null once the configuration has left every
+   * view: no tab is current, and Save view is offered (§5.2, §7.3, §7.6).
+   */
+  appliedId: string | null;
+  appliedName: string | null;
   /** The Applied View is one of the account's own Saved Views (§5.3). */
   appliedIsSaved: boolean;
+  /** The Applied View is a Saved View the configuration differs from (§1). */
   edited: boolean;
   /**
    * The current View Configuration in a stable serialized form. A Save
@@ -86,6 +130,11 @@ export interface ListViewsModel {
   onApply: (id: string) => void;
   /** Returns to the Applied View's configuration at page 1 (§5.4). */
   onDiscard: () => void;
+  /**
+   * Applies the Page Preset's Built-in View, keeping the displayed fields
+   * and page size (§1, §3.6).
+   */
+  onOpenPagePreset: () => void;
   actions: SavedViewActions;
 }
 
@@ -159,16 +208,14 @@ export function describeSelection(
 }
 
 /**
- * What a filter's control says it holds (§4.3, §4.6): "3 selected", the one
- * value, or null when nothing is selected.
+ * What a filter's control says it holds (§4.3, §4.6): the host's label for
+ * it, such as the one value or "Open"; else "3 selected"; else null when
+ * nothing is selected.
  */
-export function filterSelectionText(
-  filter: Pick<ListFilterModel, "selected" | "valueLabel">
-): string | null {
-  if (filter.selected.length > 1) {
-    return `${filter.selected.length} selected`;
-  }
-  return filter.valueLabel;
+export function filterSelectionText(filter: ListFilterModel): string | null {
+  if (filter.valueLabel !== null) return filter.valueLabel;
+  const count = selectionCount(filter);
+  return count > 1 ? `${count} selected` : null;
 }
 
 /**

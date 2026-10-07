@@ -388,10 +388,6 @@ export async function selectOption(
     "issue-priority-select": (val) => `priority-option-${val}`,
     "issue-frequency-select": (val) => `frequency-option-${val}`,
     "machine-select": (val) => `machine-option-${val}`,
-    "filter-status": (val) => `status-option-${val}`,
-    "filter-machine": (val) => `machine-option-${val}`,
-    "filter-owner": (val) => `owner-option-${val}`,
-    "filter-sort": (val) => `sort-option-${val}`,
     "severity-select": (val) => `severity-option-${val}`,
     "priority-select": (val) => `priority-option-${val}`,
     "frequency-select": (val) => `frequency-option-${val}`,
@@ -442,6 +438,72 @@ export async function selectOption(
 
   // Wait for dropdown to close
   await expect(option).toBeHidden({ timeout: PORTAL_MOUNT_TIMEOUT });
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Checks (or, with `checked: false`, unchecks) options of one List View
+ * filter, at any width (list-views §4, §7.5). From md up the filter is a
+ * dropdown beside search, or under More when it does not fit; below md it is
+ * a row of the Filters sheet. Each option is a checkbox named by its label,
+ * so a shortcut such as "My machines" works the same way. The filter's
+ * controls are closed again before this returns.
+ */
+export async function setListFilterOptions(
+  page: Page,
+  filterLabel: string,
+  optionLabels: readonly string[],
+  { checked = true }: { checked?: boolean } = {}
+): Promise<void> {
+  const toolbar = page.getByRole("group", { name: "Filters" });
+  if (await toolbar.isVisible()) {
+    // The button's name is the label, then ": <value>" once one is set.
+    const trigger = toolbar.getByRole("button", {
+      name: new RegExp(`^${escapeRegExp(filterLabel)}(:|$)`),
+    });
+    let options: Locator;
+    if (await trigger.isVisible()) {
+      await openDropdownMenu(trigger);
+      options = page.getByRole("dialog", {
+        name: `Filter by ${filterLabel.toLowerCase()}`,
+      });
+    } else {
+      await openDropdownMenu(toolbar.getByRole("button", { name: /^More\b/ }));
+      options = page.getByRole("dialog", { name: "More filters" });
+      await options
+        .getByRole("button")
+        .filter({ has: page.getByText(filterLabel, { exact: true }) })
+        .click();
+    }
+    for (const label of optionLabels) {
+      await options
+        .getByRole("checkbox", { name: label, exact: true })
+        .setChecked(checked);
+    }
+    await page.keyboard.press("Escape");
+    await expect(options).toBeHidden();
+    return;
+  }
+
+  await openDropdownMenu(page.getByTestId("list-phone-filters-trigger"));
+  const sheet = page.getByRole("dialog", { name: "Filter & sort" });
+  // A sheet row reads "<label> <value>", so match the label's own text.
+  await sheet
+    .getByRole("button")
+    .filter({ has: page.getByText(filterLabel, { exact: true }) })
+    .click();
+  // The sheet's title becomes the filter's name while its options are open.
+  const panel = page.getByRole("dialog", { name: filterLabel, exact: true });
+  for (const label of optionLabels) {
+    await panel
+      .getByRole("checkbox", { name: label, exact: true })
+      .setChecked(checked);
+  }
+  await panel.getByRole("button", { name: /^Show \d+ / }).click();
+  await expect(panel).toBeHidden();
 }
 
 /**

@@ -240,7 +240,7 @@ export function applyMachineViewState(
   };
 }
 
-/** Removed machines are not counted (machine-widgets §3.1, §3.2). */
+/** Removed machines are not counted (machine-widgets §3.2). */
 function summarizePresence(
   rows: MachineViewCandidate[]
 ): MachineViewSummary["presence"] {
@@ -250,13 +250,11 @@ function summarizePresence(
     on_loan: 0,
     pending_arrival: 0,
   };
-  let total = 0;
   for (const row of rows) {
     if (row.presence === "removed") continue;
     byPresence[row.presence] += 1;
-    total += 1;
   }
-  return { total, byPresence };
+  return { byPresence };
 }
 
 function summarizePlayability(
