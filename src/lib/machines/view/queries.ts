@@ -22,7 +22,7 @@ import type { TimelineTag } from "~/lib/timeline/machine-tags";
 import { getCurrentManufacturer } from "~/lib/machines/manufacturer";
 import { getTag } from "~/lib/tags/tags";
 import { isTagTypeId } from "~/lib/tags/types";
-import { getViewer } from "~/lib/collections/viewer";
+import { getViewer } from "~/lib/auth/viewer";
 import {
   getMachineViewPreset,
   ME_OWNER_ID,
@@ -36,7 +36,7 @@ import {
   summarizeMachineView,
   type MachineViewCandidate,
 } from "./model";
-import { getExistingMachineViewOwners } from "./owners";
+import { getExistingPeople } from "~/lib/list-view/people";
 import { parseMachineViewState } from "./state";
 
 export const MACHINE_VIEW_SERVICE_TAGS = [
@@ -52,6 +52,8 @@ export interface LoadMachineViewArgs {
   scope: MachineViewScope;
   preset: MachineViewPresetId;
   searchParams: URLSearchParams;
+  /** Include `matchingIds` in the result. */
+  withMatchingIds?: boolean;
 }
 
 export interface LoadMachineViewFromDatabaseArgs extends LoadMachineViewArgs {
@@ -294,7 +296,7 @@ export async function loadMachineViewFromDatabase(
   // (machine-views §4.2).
   const [baseRows, selectedOwners] = await Promise.all([
     getMachineViewBaseRows(tx, scope),
-    getExistingMachineViewOwners(tx, parsedState.owner, viewerId),
+    getExistingPeople(tx, parsedState.owner, viewerId),
   ]);
   const validatedState = {
     ...parsedState,
@@ -377,6 +379,7 @@ export async function loadMachineViewFromDatabase(
       .sort((left, right) => left.name.localeCompare(right.name)),
     permittedFields: [...getMachineViewPreset(preset).permittedFields],
     offersMe: viewerId !== null,
+    matchingIds: applied.matchingIds,
   };
 }
 
@@ -444,13 +447,18 @@ export async function loadMachineView({
   scope,
   preset,
   searchParams,
+  withMatchingIds = false,
 }: LoadMachineViewArgs): Promise<MachineViewResult> {
   const viewer = await getViewer();
-  return loadMachineViewCached(
+  const { matchingIds, ...result } = await loadMachineViewCached(
     scope.kind,
     scopeId(scope),
     preset,
     searchParams.toString(),
     viewer.userId ?? null
   );
+  // Most Surfaces never need every id, so they stay off the page payload.
+  return withMatchingIds && matchingIds !== undefined
+    ? { ...result, matchingIds }
+    : result;
 }

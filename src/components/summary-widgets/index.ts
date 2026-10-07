@@ -1,8 +1,4 @@
-export {
-  SummaryWidget,
-  type SummaryWidgetHeadline,
-  type SummaryWidgetSegment,
-} from "./SummaryWidget";
+export { SummaryWidget, type SummaryWidgetSegment } from "./SummaryWidget";
 export {
   SummaryRowToggle,
   SummaryWidgetGroup,

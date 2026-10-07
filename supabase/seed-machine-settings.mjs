@@ -18,9 +18,12 @@
  *   5. "House standard" — community, House, not preferred.
  *   6. "New ruleset (draft)" — the owner's personal set, House.
  *
- * Godzilla and Medieval Madness (also in the seeded "APC Tournament Bank"
- * collection) each get a preferred House and a preferred Tournament set, so a
- * collection's settings sheet has several machines to compare.
+ * Every other seeded machine gets sets that together cover each case a
+ * settings sheet prints (SHEET_SETS below, docs/feature-specs/settings-sheets.md):
+ * different installs, DIP and table differences, one set preferred for both, a
+ * missing preferred House or Tournament set, no sets at all (The Addams
+ * Family), a machine on loan (Spider-Man), and a custom "Bat City 2025" tag
+ * that finds one set on one machine and two on another.
  *
  * The data shape mirrors the `SettingsSection` union in
  * src/lib/machines/settings-types.ts. Persisted rows do NOT carry the
@@ -32,7 +35,7 @@
  * A.1 01 Balls Per Game, A.1 02 Tilt Warnings, A.1 03 Maximum Extra Balls,
  * A.1 05 Replay System, A.1 14 Replay Award, A.1 26 Tournament Play).
  *
- * Deterministic: every run wipes AFM's existing sets and re-inserts these six,
+ * Deterministic: every run wipes each seeded machine's sets and re-inserts them,
  * so re-seeding never duplicates or leaves stale demo rows.
  *
  * Demo data for local and ephemeral preview databases. Never run it against
@@ -388,52 +391,282 @@ function buildSets(afmId, ownerId, techId) {
   ];
 }
 
-/**
- * A preferred House and a preferred Tournament set for a collection machine:
- * community sets with a few typical software differences.
- */
-function buildBankSets(machineId, techId) {
-  const software = (rows) => [
-    {
-      id: "sec-software",
-      kind: "software",
-      baseline: "Factory Install",
-      rows,
-    },
-  ];
-  return [
-    {
-      machineId,
-      name: "House",
-      isCommunity: true,
-      isPreferredHouse: true,
-      isPreferredTournament: false,
-      tags: ["house"],
-      createdBy: techId,
-      description: null,
-      sections: software([
-        { id: "A.1 01", name: "Balls Per Game", value: "3" },
-        { id: "A.1 03", name: "Maximum Extra Balls", value: "3" },
-        { id: "A.2 09", name: "Ball Saver", value: "On (8 seconds)" },
-      ]),
-    },
-    {
-      machineId,
-      name: "Tournament",
-      isCommunity: true,
-      isPreferredHouse: false,
-      isPreferredTournament: true,
-      tags: ["tournament"],
-      createdBy: techId,
-      description: null,
-      sections: software([
-        { id: "A.1 01", name: "Balls Per Game", value: "3" },
-        { id: "A.1 03", name: "Maximum Extra Balls", value: "0" },
-        { id: "A.2 09", name: "Ball Saver", value: "Off" },
-      ]),
-    },
-  ];
+// ---------------------------------------------------------------------------
+// Settings sheet coverage (PP-k3km, docs/feature-specs/settings-sheets.md).
+// Every other seeded machine gets sets chosen so a sheet of the whole floor
+// shows each case the spec covers. Keyed by machine initials.
+// ---------------------------------------------------------------------------
+
+const BAT_CITY_TAG = { slug: "bat-city-2025", name: "Bat City 2025" };
+
+function software(baseline, rows) {
+  return {
+    id: "sec-software",
+    kind: "software",
+    baseline,
+    rows: rows.map(([id, name, value]) => ({ id, name, value })),
+  };
 }
+
+function table(title, rows) {
+  return {
+    id: `sec-table-${title.toLowerCase().replaceAll(" ", "-")}`,
+    kind: "table",
+    title,
+    rows: rows.map(([id, name, value]) => ({ id, name, value })),
+  };
+}
+
+function dipBank(name, switches) {
+  return {
+    id: `sec-dip-${name.toLowerCase().replaceAll(" ", "-")}`,
+    kind: "dip",
+    name,
+    switches: switches.map(([sw, position, note]) => ({
+      switch: sw,
+      position,
+      note,
+    })),
+  };
+}
+
+function note(title, text) {
+  return {
+    id: `sec-note-${title.toLowerCase().replaceAll(" ", "-")}`,
+    kind: "note",
+    title,
+    customTitle: !["Post positions", "Rubbers"].includes(title),
+    body: doc(text),
+  };
+}
+
+/** A community set; `preferred` names the slots it fills. */
+function sheetSet(name, tags, sections, preferred = []) {
+  return {
+    name,
+    isCommunity: true,
+    isPreferredHouse: preferred.includes("house"),
+    isPreferredTournament: preferred.includes("tournament"),
+    tags,
+    description: null,
+    sections,
+  };
+}
+
+const WPC_HOUSE = [
+  ["A.1 01", "Balls Per Game", "3"],
+  ["A.1 02", "Tilt Warnings", "2"],
+  ["A.1 03", "Maximum Extra Balls", "3"],
+  ["A.1 05", "Replay System", "Auto"],
+  ["A.1 14", "Replay Award", "Extra Ball"],
+  ["A.1 26", "Tournament Play", "No"],
+  ["A.2 09", "Ball Saver", "On (8 seconds)"],
+  ["A.2 12", "Match Percentage", "7%"],
+];
+
+const WPC_TOURNAMENT = [
+  ["A.1 01", "Balls Per Game", "3"],
+  ["A.1 02", "Tilt Warnings", "1"],
+  ["A.1 03", "Maximum Extra Balls", "0"],
+  ["A.1 05", "Replay System", "Fixed"],
+  ["A.1 14", "Replay Award", "Audit (no award)"],
+  ["A.1 26", "Tournament Play", "Yes"],
+  ["A.2 09", "Ball Saver", "Off"],
+  ["A.2 12", "Match Percentage", "Off"],
+];
+
+const SPIKE_HOUSE = [
+  ["S-08", "Ball Save Time", "8 s"],
+  ["S-11", "Max Extra Balls", "5"],
+  ["S-14", "Game Pricing", "Free Play"],
+  ["S-19", "Match Percentage", "7%"],
+  ["S-31", "Tilt Warnings", "3"],
+];
+
+const SHEET_SETS = {
+  // Same install, software and note differences, plus a matching note.
+  MM: [
+    sheetSet(
+      "House",
+      ["house"],
+      [
+        software("Medium", WPC_HOUSE),
+        note("Rubbers", "White, factory sizes"),
+        note("Post positions", "Factory"),
+      ],
+      ["house"]
+    ),
+    sheetSet(
+      "Tournament",
+      ["tournament", BAT_CITY_TAG.slug],
+      [
+        software("Medium", [
+          ...WPC_TOURNAMENT,
+          ["A.2 13", "Castle Difficulty", "Hard"],
+        ]),
+        note("Rubbers", "White, factory sizes"),
+        note("Post positions", "Left outlane post in the tight position"),
+      ],
+      ["tournament"]
+    ),
+  ],
+  // Different installs: every row of the applied set prints.
+  GDZ: [
+    sheetSet(
+      "House",
+      ["house"],
+      [software("Factory Install", SPIKE_HOUSE)],
+      ["house"]
+    ),
+    sheetSet(
+      "Competition",
+      ["tournament"],
+      [
+        software("Competition Install", [
+          ["S-08", "Ball Save Time", "3 s"],
+          ["S-14", "Game Pricing", "Free Play"],
+          ["S-31", "Tilt Warnings", "1"],
+        ]),
+      ],
+      ["tournament"]
+    ),
+  ],
+  // A preferred Tournament set and no preferred House: record the originals.
+  GDZ2: [
+    sheetSet(
+      "League",
+      ["tournament"],
+      [
+        software("Factory Install", [
+          ["S-08", "Ball Save Time", "0 s"],
+          ["S-11", "Max Extra Balls", "0"],
+          ["S-19", "Match Percentage", "Off"],
+        ]),
+      ],
+      ["tournament"]
+    ),
+  ],
+  // A preferred House set and no preferred Tournament: blank rows only.
+  GDZ3: [
+    sheetSet(
+      "House",
+      ["house"],
+      [software("Factory Install", SPIKE_HOUSE)],
+      ["house"]
+    ),
+  ],
+  // Table differences on an electromechanical game (no software install).
+  HD: [
+    sheetSet(
+      "House",
+      ["house"],
+      [
+        table("Adjustment plugs", [
+          ["Plug J3", "Balls per game", "5-ball"],
+          ["Plug J5", "Award", "Replay"],
+          ["Plug J1", "Tilt bob", "Medium"],
+        ]),
+      ],
+      ["house"]
+    ),
+    sheetSet(
+      "Tournament",
+      ["tournament"],
+      [
+        table("Adjustment plugs", [
+          ["Plug J3", "Balls per game", "3-ball"],
+          ["Plug J5", "Award", "Novelty"],
+          ["Plug J1", "Tilt bob", "Medium"],
+        ]),
+      ],
+      ["tournament"]
+    ),
+    // Two non-preferred sets carrying Bat City 2025: the print run asks which.
+    sheetSet(
+      "Bat City qualifying",
+      [BAT_CITY_TAG.slug],
+      [table("Adjustment plugs", [["Plug J3", "Balls per game", "3-ball"]])]
+    ),
+    sheetSet(
+      "Bat City finals",
+      [BAT_CITY_TAG.slug],
+      [table("Adjustment plugs", [["Plug J3", "Balls per game", "1-ball"]])]
+    ),
+  ],
+  // DIP switch differences on an early solid-state game.
+  BK: [
+    sheetSet(
+      "House",
+      ["house"],
+      [
+        dipBank("Bank 1", [
+          ["SW 1", "ON", "Coin chute 1 credits"],
+          ["SW 13", "OFF", "Balls per game (ON = 3)"],
+          ["SW 23", "ON", "Extra ball award"],
+          ["SW 25", "OFF", "Match feature"],
+        ]),
+      ],
+      ["house"]
+    ),
+    sheetSet(
+      "Tournament",
+      ["tournament"],
+      [
+        dipBank("Bank 1", [
+          ["SW 1", "ON", "Coin chute 1 credits"],
+          ["SW 13", "ON", "Balls per game (ON = 3)"],
+          ["SW 23", "OFF", "Extra ball award"],
+          ["SW 25", "OFF", "Match feature"],
+        ]),
+      ],
+      ["tournament"]
+    ),
+  ],
+  // One set preferred for both House and Tournament (the same set), and one
+  // non-preferred set carrying Bat City 2025 that a tag default finds.
+  HB: [
+    sheetSet(
+      "House and tournament",
+      ["house", "tournament"],
+      [software("Factory", [["Adj 05", "Balls per game", "3"]])],
+      ["house", "tournament"]
+    ),
+    sheetSet(
+      "Bat City 2025",
+      [BAT_CITY_TAG.slug],
+      [
+        software("Factory", [
+          ["Adj 05", "Balls per game", "3"],
+          ["Adj 09", "Extra ball", "Off"],
+        ]),
+      ]
+    ),
+  ],
+  // On loan, so it can't be added; it is in the APC Tournament Bank collection.
+  SM: [
+    sheetSet(
+      "House",
+      ["house"],
+      [software("Factory Install", SPIKE_HOUSE)],
+      ["house"]
+    ),
+    sheetSet(
+      "Tournament",
+      ["tournament"],
+      [
+        software("Factory Install", [
+          ["S-08", "Ball Save Time", "0 s"],
+          ["S-11", "Max Extra Balls", "0"],
+          ["S-14", "Game Pricing", "Free Play"],
+          ["S-19", "Match Percentage", "Off"],
+          ["S-31", "Tilt Warnings", "1"],
+        ]),
+        note("Operator notes", "Turn the topper off for streamed games."),
+      ],
+      ["tournament"]
+    ),
+  ],
+};
 
 async function run() {
   const sql = createScriptClient(databaseUrl);
@@ -534,15 +767,18 @@ async function run() {
 
     const sets = buildSets(afm.id, ownerId, techId);
 
-    // Built-in House and Tournament tags. Migration 0105 inserts them, but the
+    // Built-in House and Tournament tags. Migration 0106 inserts them, but the
     // fast reset truncates tables without re-running migrations, so make sure.
+    // Bat City 2025 is a custom tag for printing settings sheets by tag.
     await sql`
       INSERT INTO settings_tags (slug, name, is_builtin)
-      VALUES ('house', 'House', true), ('tournament', 'Tournament', true)
+      VALUES ('house', 'House', true), ('tournament', 'Tournament', true),
+        (${BAT_CITY_TAG.slug}, ${BAT_CITY_TAG.name}, false)
       ON CONFLICT (slug) DO NOTHING
     `;
     const tagRows = await sql`
-      SELECT id, slug FROM settings_tags WHERE slug IN ('house', 'tournament')
+      SELECT id, slug FROM settings_tags
+      WHERE slug IN ('house', 'tournament', ${BAT_CITY_TAG.slug})
     `;
     const tagIdBySlug = new Map(tagRows.map((t) => [t.slug, t.id]));
 
@@ -580,17 +816,19 @@ async function run() {
     await sql`DELETE FROM machine_settings_sets WHERE machine_id = ${afm.id}`;
     for (const set of sets) await insertSet(set);
 
-    const bankMachines = await sql`
-      SELECT id, name FROM machines
-      WHERE name IN ('Godzilla', 'Medieval Madness')
+    const sheetMachines = await sql`
+      SELECT id, initials FROM machines
+      WHERE initials IN ${sql(Object.keys(SHEET_SETS))}
     `;
-    for (const machine of bankMachines) {
+    for (const machine of sheetMachines) {
       await sql`DELETE FROM machine_settings_sets WHERE machine_id = ${machine.id}`;
-      for (const set of buildBankSets(machine.id, techId)) await insertSet(set);
+      for (const set of SHEET_SETS[machine.initials]) {
+        await insertSet({ ...set, machineId: machine.id, createdBy: techId });
+      }
     }
 
     console.log(
-      `✅ Machine settings seeded: ${sets.length} sets on Attack from Mars (AFM) + owner requests + access instructions; preferred House and Tournament sets on ${String(bankMachines.length)} more machine(s).`
+      `✅ Machine settings seeded: ${sets.length} sets on Attack from Mars (AFM) + owner requests + access instructions; settings sheet sets on ${String(sheetMachines.length)} more machine(s).`
     );
   } finally {
     await sql.end();

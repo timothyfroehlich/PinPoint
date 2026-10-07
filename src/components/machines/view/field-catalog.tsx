@@ -21,6 +21,9 @@ import { cn } from "~/lib/utils";
 
 export type MachineSelectionHandler = (machineId: string) => void;
 
+/** Renders an action at the end of a machine row. */
+export type MachineRowAction = (row: MachineViewRow) => React.ReactNode;
+
 const STATUS_ICONS: Record<MachineStatus, LucideIcon> = {
   operational: CircleCheck,
   needs_service: Wrench,

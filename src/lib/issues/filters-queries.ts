@@ -4,7 +4,7 @@ import {
   desc,
   asc,
   gte,
-  lte,
+  lt,
   or,
   ilike,
   eq,
@@ -26,8 +26,29 @@ import {
   issueComments,
 } from "~/server/db/schema";
 import { OPEN_STATUSES } from "~/lib/issues/status";
+import { UNASSIGNED_PERSON_ID, UUID_PATTERN } from "~/lib/list-view/url-state";
 import { FORMER_USER_NAME } from "~/lib/timeline/resolve-person";
-import type { IssueFilters, IssueSort } from "./filters";
+import type { IssueViewSortDirection, IssueViewSortField } from "~/lib/types";
+import type { IssueFilters } from "./filters";
+
+/** A person filter's account ids and whether it includes Unassigned. */
+function personValues(values: readonly string[]): {
+  ids: string[];
+  unassigned: boolean;
+} {
+  return {
+    ids: values.filter((value) => UUID_PATTERN.test(value)),
+    unassigned: values.includes(UNASSIGNED_PERSON_ID),
+  };
+}
+
+/** Any of `conditions`, or a condition that matches nothing. */
+function anyOf(conditions: (SQL | undefined)[]): SQL {
+  const present = conditions.filter(
+    (condition): condition is SQL => condition !== undefined
+  );
+  return or(...present) ?? sql`false`;
+}
 
 /**
  * Whether a ProseMirror doc column reads, as displayed, like `search` (an
@@ -72,16 +93,25 @@ function proseMatches(doc: AnyPgColumn, search: string): SQL {
 }
 
 /**
- * Builds an array of Drizzle SQL conditions from filters
- * This should ONLY be called on the server.
+ * Builds an array of Drizzle SQL conditions from filters. A `scope` bounds
+ * the issues to those machines whatever the filters say (issues-list §2.2);
+ * an empty scope matches nothing. This should ONLY be called on the server.
  */
 export function buildWhereConditions(
   filters: IssueFilters,
   db: PostgresJsDatabase<Schema>,
-  options: { isAdmin?: boolean } = {}
+  options: { isAdmin?: boolean; scope?: readonly string[] | undefined } = {}
 ): SQL[] {
-  const { isAdmin = false } = options;
+  const { isAdmin = false, scope } = options;
   const conditions: SQL[] = [];
+
+  if (scope !== undefined) {
+    conditions.push(
+      scope.length > 0
+        ? inArray(issues.machineInitials, [...scope])
+        : sql`false`
+    );
+  }
 
   // Comprehensive search across all relevant text fields
   if (filters.q) {
@@ -243,44 +273,43 @@ export function buildWhereConditions(
   }
 
   if (filters.assignee && filters.assignee.length > 0) {
-    // Check if "UNASSIGNED" special value is included
-    const hasUnassigned = filters.assignee.includes("UNASSIGNED");
-    const actualAssignees = filters.assignee.filter((a) => a !== "UNASSIGNED");
-
-    if (hasUnassigned && actualAssignees.length > 0) {
-      // Both unassigned and specific users
-      const cond = or(
-        isNull(issues.assignedTo),
-        inArray(issues.assignedTo, actualAssignees)
-      );
-      if (cond) {
-        conditions.push(cond);
-      }
-    } else if (hasUnassigned) {
-      // Only unassigned
-      conditions.push(isNull(issues.assignedTo));
-    } else {
-      // Only specific assignees
-      conditions.push(inArray(issues.assignedTo, actualAssignees));
-    }
+    const { ids, unassigned } = personValues(filters.assignee);
+    conditions.push(
+      anyOf([
+        unassigned ? isNull(issues.assignedTo) : undefined,
+        ids.length > 0 ? inArray(issues.assignedTo, ids) : undefined,
+      ])
+    );
   }
 
+  // A reporter is an account or an invited person.
   if (filters.reporter && filters.reporter.length > 0) {
-    conditions.push(inArray(issues.reportedBy, filters.reporter));
+    const { ids } = personValues(filters.reporter);
+    conditions.push(
+      anyOf([
+        ids.length > 0 ? inArray(issues.reportedBy, ids) : undefined,
+        ids.length > 0 ? inArray(issues.invitedReportedBy, ids) : undefined,
+      ])
+    );
   }
 
+  // A machine owner is an account or an invited person; Unassigned is a
+  // machine with neither.
   if (filters.owner && filters.owner.length > 0) {
+    const { ids, unassigned } = personValues(filters.owner);
+    const owned = anyOf([
+      unassigned
+        ? and(isNull(machines.ownerId), isNull(machines.invitedOwnerId))
+        : undefined,
+      ids.length > 0 ? inArray(machines.ownerId, ids) : undefined,
+      ids.length > 0 ? inArray(machines.invitedOwnerId, ids) : undefined,
+    ]);
     conditions.push(
       exists(
         db
           .select()
           .from(machines)
-          .where(
-            and(
-              eq(machines.initials, issues.machineInitials),
-              inArray(machines.ownerId, filters.owner)
-            )
-          )
+          .where(and(eq(machines.initials, issues.machineInitials), owned))
       )
     );
   }
@@ -289,8 +318,7 @@ export function buildWhereConditions(
     conditions.push(inArray(issues.frequency, filters.frequency));
   }
 
-  // Watching filter requires current user ID to be passed in
-  if (filters.watching && filters.currentUserId) {
+  if (filters.watcherId) {
     conditions.push(
       exists(
         db
@@ -299,7 +327,7 @@ export function buildWhereConditions(
           .where(
             and(
               eq(issueWatchers.issueId, issues.id),
-              eq(issueWatchers.userId, filters.currentUserId)
+              eq(issueWatchers.userId, filters.watcherId)
             )
           )
       )
@@ -310,24 +338,22 @@ export function buildWhereConditions(
     conditions.push(gte(issues.createdAt, filters.createdFrom));
   }
 
-  if (filters.createdTo) {
-    const endOfDay = new Date(filters.createdTo);
-    endOfDay.setUTCHours(23, 59, 59, 999);
-    conditions.push(lte(issues.createdAt, endOfDay));
+  if (filters.createdBefore) {
+    conditions.push(lt(issues.createdAt, filters.createdBefore));
   }
 
   if (filters.updatedFrom) {
     conditions.push(gte(issues.updatedAt, filters.updatedFrom));
   }
 
-  if (filters.updatedTo) {
-    const endOfDay = new Date(filters.updatedTo);
-    endOfDay.setUTCHours(23, 59, 59, 999);
-    conditions.push(lte(issues.updatedAt, endOfDay));
+  if (filters.updatedBefore) {
+    conditions.push(lt(issues.updatedAt, filters.updatedBefore));
   }
 
-  // Default: exclude issues from machines not currently "on the floor"
-  if (!filters.includeInactiveMachines) {
+  // Machine Presence (issues-list §4.7): absent is the Page Preset's On the
+  // Floor; empty is every presence state.
+  const presence = filters.presence ?? ["on_the_floor"];
+  if (presence.length > 0) {
     conditions.push(
       exists(
         db
@@ -336,7 +362,7 @@ export function buildWhereConditions(
           .where(
             and(
               eq(machines.initials, issues.machineInitials),
-              eq(machines.presenceStatus, "on_the_floor")
+              inArray(machines.presenceStatus, presence)
             )
           )
       )
@@ -377,40 +403,31 @@ const ISSUE_ID_ORDER: SQL[] = [
  * then by Updated, newest first. An absent sort is the default, Updated
  * newest first. This should ONLY be called on the server.
  */
-export function buildOrderBy(sort: IssueSort | undefined): SQL[] {
+export function buildOrderBy(
+  sort: IssueViewSortField = "updated",
+  dir: IssueViewSortDirection = "desc"
+): SQL[] {
+  const order = dir === "asc" ? asc : desc;
   switch (sort) {
-    case "created_asc":
-      return [asc(issues.createdAt), ...ISSUE_ID_ORDER];
-    case "created_desc":
-      return [desc(issues.createdAt), ...ISSUE_ID_ORDER];
-    case "updated_asc":
-      return [asc(issues.updatedAt), ...ISSUE_ID_ORDER];
-    case "issue_asc":
-      return ISSUE_ID_ORDER;
-    case "issue_desc":
-      return [desc(issues.machineInitials), desc(issues.issueNumber)];
-    case "severity_asc":
-      return [asc(SEVERITY_RANK), ...ISSUE_ID_ORDER];
-    case "severity_desc":
-      return [desc(SEVERITY_RANK), ...ISSUE_ID_ORDER];
-    case "priority_asc":
-      return [asc(PRIORITY_RANK), ...ISSUE_ID_ORDER];
-    case "priority_desc":
-      return [desc(PRIORITY_RANK), ...ISSUE_ID_ORDER];
-    case "assignee_asc":
+    case "created":
+      return [order(issues.createdAt), ...ISSUE_ID_ORDER];
+    case "updated":
+      return [order(issues.updatedAt), ...ISSUE_ID_ORDER];
+    case "id":
+      return dir === "asc"
+        ? ISSUE_ID_ORDER
+        : [desc(issues.machineInitials), desc(issues.issueNumber)];
+    case "severity":
+      return [order(SEVERITY_RANK), ...ISSUE_ID_ORDER];
+    case "priority":
+      return [order(PRIORITY_RANK), ...ISSUE_ID_ORDER];
+    case "assignee":
       return [
-        sql`${ASSIGNEE_NAME} asc nulls last`,
+        dir === "asc"
+          ? sql`${ASSIGNEE_NAME} asc nulls last`
+          : sql`${ASSIGNEE_NAME} desc nulls last`,
         desc(issues.updatedAt),
         ...ISSUE_ID_ORDER,
       ];
-    case "assignee_desc":
-      return [
-        sql`${ASSIGNEE_NAME} desc nulls last`,
-        desc(issues.updatedAt),
-        ...ISSUE_ID_ORDER,
-      ];
-    case "updated_desc":
-    case undefined:
-      return [desc(issues.updatedAt), ...ISSUE_ID_ORDER];
   }
 }

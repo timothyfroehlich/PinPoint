@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { SearchX } from "lucide-react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   createSavedMachineViewAction,
   deleteSavedMachineViewAction,
@@ -17,47 +16,49 @@ import {
   type ListDisplayModel,
   type ListPaginationModel,
   type ListSortModel,
-  type ListViewsModel,
 } from "~/components/list-view";
+import { useListViewHost } from "~/components/list-view/use-list-view-host";
 import {
   SummaryRowToggle,
   useSummaryWidgetsController,
 } from "~/components/summary-widgets";
 import { Button } from "~/components/ui/button";
 import { EmptyState } from "~/components/ui/empty-state";
-import { rememberListUrl } from "~/lib/list-view/return-to-list";
+import { isListPageSize } from "~/lib/list-view/url-state";
 import {
   getMachineViewPreset,
   MACHINE_VIEW_FIELDS,
   MACHINE_VIEW_PAGE_PRESET_VIEW_ID,
 } from "~/lib/machines/view/config";
 import {
+  applyMachineBuiltInView,
   hasMachineViewConfiguration,
   isMachineViewField,
-  isMachineViewPageSize,
-  MACHINE_VIEW_PAGE_SIZES,
-  machineViewSavedStatesEqual,
   nextMachineViewSort,
-  savedMachineViewSearchParams,
   serializeMachineViewState,
   toMachineViewSavedState,
 } from "~/lib/machines/view/state";
-import type {
-  MachineViewFieldId,
-  MachineViewPresetId,
-  MachineViewResult,
-  MachineViewSavedState,
-  MachineViewSavedViews,
-  MachineViewState,
+import {
+  LIST_PAGE_SIZES,
+  type MachineViewFieldId,
+  type MachineViewPresetId,
+  type MachineViewResult,
+  type MachineViewSavedState,
+  type MachineViewSavedViews,
+  type MachineViewState,
 } from "~/lib/types";
 import {
   MACHINE_SUMMARY_STORAGE_KEY,
+  MACHINE_SUMMARY_WIDGET_COUNT,
   MachineSummaryRow,
   MachineSummaryWidgets,
 } from "./MachineSummaryWidgets";
 import { MachineViewCompactList } from "./MachineViewCompactList";
 import { MachineViewTable } from "./MachineViewTable";
-import type { MachineSelectionHandler } from "./field-catalog";
+import type {
+  MachineRowAction,
+  MachineSelectionHandler,
+} from "./field-catalog";
 import { buildMachineFilters } from "./machine-filters";
 
 const MOBILE_MODE_STORAGE_KEY = "pinpoint:machine-view:mobile-mode";
@@ -79,13 +80,17 @@ interface MachineViewProps {
   /** The page actions beside the title (list-views §3.2). */
   actions?: React.ReactNode;
   onMachineSelect?: MachineSelectionHandler | undefined;
-}
-
-interface AppliedView {
-  id: string;
-  name: string;
-  state: MachineViewSavedState;
-  isSaved: boolean;
+  /**
+   * An action at the end of each row, such as Add on Print settings sheets
+   * (settings-sheets §2.2).
+   */
+  rowAction?: MachineRowAction | undefined;
+  /** An action in the List Header that applies to the whole result. */
+  listAction?: React.ReactNode;
+  /** Whether the Summary Widgets show. A picker Surface leaves them out. */
+  showSummary?: boolean;
+  /** Told when a new result starts and finishes loading. */
+  onBusyChange?: ((busy: boolean) => void) | undefined;
 }
 
 /** How the sort control names a field, such as "Name" (machine-views §3.14). */
@@ -94,40 +99,19 @@ function sortFieldLabel(field: MachineViewFieldId): string {
   return definition.sortLabel ?? definition.label;
 }
 
-/** What decides a list URL's `view` reference on one Surface. */
-interface UrlSurface {
-  preset: MachineViewPresetId;
-  pagePresetId: string;
-  offersDefault: boolean;
-  defaultViewId: string | null;
-}
+const MACHINE_VIEW_ACTIONS = {
+  create: createSavedMachineViewAction,
+  update: updateSavedMachineViewAction,
+  rename: renameSavedMachineViewAction,
+  remove: deleteSavedMachineViewAction,
+  setDefault: setMachineViewDefaultAction,
+};
 
-/**
- * A list URL's query and the `view` reference it carries (list-views §9.6).
- * A URL with no view configuration opens the account's Default View on the
- * Machines page (§10.10), so while one exists a list at its Page Preset
- * names the Page Preset's view rather than send the person to their
- * default. When the default is the Page Preset's own view, the bare URL
- * already opens it, as the server keeps it.
- */
-function listUrl(
-  state: MachineViewState,
-  view: string | null,
-  surface: UrlSurface
-): { view: string | null; query: string } {
-  const params = serializeMachineViewState(state, surface.preset, view);
-  if (
-    view === null &&
-    surface.offersDefault &&
-    surface.defaultViewId !== null &&
-    surface.defaultViewId !== surface.pagePresetId &&
-    !hasMachineViewConfiguration(params)
-  ) {
-    // `view` is the last parameter the serializer writes.
-    params.set("view", surface.pagePresetId);
-    return { view: surface.pagePresetId, query: params.toString() };
-  }
-  return { view, query: params.toString() };
+function withPage(
+  saved: MachineViewSavedState,
+  page: number
+): MachineViewState {
+  return { ...saved, page };
 }
 
 /**
@@ -142,23 +126,45 @@ export function MachineView({
   title,
   actions,
   onMachineSelect,
+  rowAction,
+  listAction,
+  showSummary = true,
+  onBusyChange,
 }: MachineViewProps): React.JSX.Element {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const [isPending, startTransition] = React.useTransition();
   const rootRef = React.useRef<HTMLDivElement>(null);
-  const [state, setState] = React.useState(result.state);
   const [mobileMode, setMobileMode] = React.useState<MobileMode>("compact");
   const summaryController = useSummaryWidgetsController(
-    MACHINE_SUMMARY_STORAGE_KEY
+    MACHINE_SUMMARY_STORAGE_KEY,
+    MACHINE_SUMMARY_WIDGET_COUNT
   );
-  // The `view` URL reference (list-views §9.6). It runs ahead of the server's
-  // until the next result arrives.
-  const serverViewId = savedViews.activeViewId;
-  const [viewId, setViewId] = React.useState(serverViewId);
-  React.useEffect(() => setViewId(serverViewId), [serverViewId]);
-  React.useEffect(() => setState(result.state), [result.state]);
+  const defaults = getMachineViewPreset(preset).defaultState;
+  const serialize = React.useCallback(
+    (next: MachineViewState, view: string | null): URLSearchParams =>
+      serializeMachineViewState(next, preset, view),
+    [preset]
+  );
+  const applyBuiltIn = React.useCallback(
+    (
+      view: { id: string; state: MachineViewSavedState },
+      current: MachineViewSavedState
+    ): MachineViewSavedState => applyMachineBuiltInView(preset, view, current),
+    [preset]
+  );
+  const { state, applied, edited, pagePresetName, isPending, update, views } =
+    useListViewHost({
+      resultState: result.state,
+      savedViews,
+      pagePresetViewId: MACHINE_VIEW_PAGE_PRESET_VIEW_ID[preset],
+      pagePresetState: toMachineViewSavedState(defaults),
+      serialize,
+      hasConfiguration: hasMachineViewConfiguration,
+      toSaved: toMachineViewSavedState,
+      withPage,
+      applyBuiltIn,
+      defaultPageName: "Machines",
+      actions: MACHINE_VIEW_ACTIONS,
+    });
+  React.useEffect(() => onBusyChange?.(isPending), [isPending, onBusyChange]);
 
   React.useEffect(() => {
     try {
@@ -168,77 +174,6 @@ export function MachineView({
       // Storage can be unavailable; Compact list is the default.
     }
   }, []);
-
-  const defaults = getMachineViewPreset(preset).defaultState;
-  const pagePresetId = MACHINE_VIEW_PAGE_PRESET_VIEW_ID[preset];
-  const findView = (id: string | null): AppliedView | null => {
-    if (id === null) return null;
-    const saved = savedViews.views.find((view) => view.id === id);
-    if (saved) return { ...saved, isSaved: true };
-    const builtIn = savedViews.builtInViews.find((view) => view.id === id);
-    return builtIn ? { ...builtIn, isSaved: false } : null;
-  };
-  // No `view` reference means the Page Preset's configuration (§9.6).
-  const pagePresetView: AppliedView = findView(pagePresetId) ?? {
-    id: pagePresetId,
-    name: "Standard view",
-    state: toMachineViewSavedState(defaults),
-    isSaved: false,
-  };
-  const applied = findView(viewId) ?? pagePresetView;
-  const edited = !machineViewSavedStatesEqual(
-    toMachineViewSavedState(state),
-    applied.state,
-    preset
-  );
-
-  const { offersDefault, defaultViewId } = savedViews;
-  const surface = React.useMemo<UrlSurface>(
-    () => ({ preset, pagePresetId, offersDefault, defaultViewId }),
-    [defaultViewId, offersDefault, pagePresetId, preset]
-  );
-  // In place: no history entry per change and no scroll (§9.7).
-  const replaceQuery = React.useCallback(
-    (query: string): void => {
-      router.replace(query ? `${pathname}?${query}` : pathname, {
-        scroll: false,
-      });
-    },
-    [pathname, router]
-  );
-  const navigate = React.useCallback(
-    (next: MachineViewState, view: string | null): void => {
-      const url = listUrl(next, view, surface);
-      setViewId(url.view);
-      setState(next);
-      startTransition(() => replaceQuery(url.query));
-    },
-    [replaceQuery, surface]
-  );
-
-  const update = (partial: Partial<MachineViewState>, resetPage = true): void =>
-    navigate(
-      {
-        ...state,
-        ...partial,
-        page: resetPage ? 1 : (partial.page ?? state.page),
-      },
-      viewId
-    );
-
-  // Rewrites older or invalid parameters and out-of-range pages to the
-  // canonical URL (§9.3, §9.4), naming the view as navigation does.
-  React.useEffect(() => {
-    const { query } = listUrl(result.state, serverViewId, surface);
-    if (query === searchParams.toString()) return;
-    replaceQuery(query);
-  }, [replaceQuery, result.state, searchParams, serverViewId, surface]);
-
-  // Returning to this list within the tab session reopens this URL (§11.1).
-  React.useEffect(() => {
-    const query = searchParams.toString();
-    rememberListUrl(pathname, query ? `${pathname}?${query}` : pathname);
-  }, [pathname, searchParams]);
 
   function changeMobileMode(mode: MobileMode): void {
     setMobileMode(mode);
@@ -292,9 +227,9 @@ export function MachineView({
 
   const display: ListDisplayModel = {
     pageSize: state.pageSize,
-    pageSizes: MACHINE_VIEW_PAGE_SIZES,
+    pageSizes: LIST_PAGE_SIZES,
     onPageSizeChange: (pageSize) => {
-      if (isMachineViewPageSize(pageSize)) update({ pageSize });
+      if (isListPageSize(pageSize)) update({ pageSize });
     },
     fields: {
       options: result.permittedFields
@@ -337,90 +272,11 @@ export function MachineView({
     },
   };
 
-  const hrefFor = (id: string): string => {
-    const view = findView(id);
-    if (!view) return pathname;
-    return `${pathname}?${savedMachineViewSearchParams(view.state, preset, view.id).toString()}`;
-  };
-
-  const views: ListViewsModel = {
-    builtInViews: savedViews.builtInViews.map(({ id, name }) => ({ id, name })),
-    savedViews: savedViews.views.map(({ id, name }) => ({ id, name })),
-    appliedId: applied.id,
-    appliedName: applied.name,
-    appliedIsSaved: applied.isSaved,
-    edited,
-    configurationKey: serializeMachineViewState(
-      { ...state, page: 1 },
-      preset
-    ).toString(),
-    canSave: savedViews.canSave,
-    offersDefault,
-    defaultPageName: "Machines",
-    defaultViewId,
-    hrefFor,
-    // Applying a view opens it at page 1 (§10.6).
-    onApply: (id) => {
-      const view = findView(id);
-      if (view) navigate({ ...view.state, page: 1 }, view.id);
-    },
-    onDiscard: () => navigate({ ...applied.state, page: 1 }, applied.id),
-    actions: {
-      saveChanges: async () => {
-        if (!applied.isSaved) {
-          return { ok: false, message: "Not your view" };
-        }
-        const outcome = await updateSavedMachineViewAction({
-          id: applied.id,
-          state: toMachineViewSavedState(state),
-        });
-        if (outcome.ok) router.refresh();
-        return outcome;
-      },
-      saveAsNew: async ({ name, makeDefault }) => {
-        const outcome = await createSavedMachineViewAction({
-          name,
-          state: toMachineViewSavedState(state),
-          makeDefault,
-        });
-        if (outcome.ok) navigate(state, outcome.value.id);
-        return outcome;
-      },
-      rename: async (id, name) => {
-        const outcome = await renameSavedMachineViewAction({ id, name });
-        if (outcome.ok) router.refresh();
-        return outcome;
-      },
-      remove: async (id) => {
-        const outcome = await deleteSavedMachineViewAction(id);
-        if (outcome.ok) router.refresh();
-        return outcome;
-      },
-      setDefault: async (target) => {
-        const outcome = await setMachineViewDefaultAction({ target });
-        if (!outcome.ok) return outcome;
-        // The list stays as it is (§10.10): once the account has a default,
-        // a bare URL opens it, so a list at its Page Preset names that view
-        // before the refresh reaches the server.
-        const url = listUrl(state, viewId, {
-          ...surface,
-          defaultViewId: target?.id ?? null,
-        });
-        if (url.query !== searchParams.toString()) {
-          setViewId(url.view);
-          startTransition(() => replaceQuery(url.query));
-        }
-        router.refresh();
-        return outcome;
-      },
-    },
-  };
-
   const summary = (
     <MachineSummaryWidgets
       summary={result.summary}
       state={state}
-      onStateChange={(next) => navigate(next, viewId)}
+      onStateChange={(next) => update(next, false)}
       controller={title ? summaryController : undefined}
     />
   );
@@ -443,14 +299,13 @@ export function MachineView({
             />
           ) : undefined
         }
-        summary={summary}
+        summary={showSummary ? summary : undefined}
         search={
           <ListSearchField
             id="machine-view-search"
             value={state.q}
             onSearch={(q) => update({ q })}
             label="Search machines"
-            placeholder="Search names, initials, manufacturers"
           />
         }
         primaryFilters={filters}
@@ -458,24 +313,29 @@ export function MachineView({
         sort={sort}
         display={display}
         pagination={pagination}
+        exportControl={listAction}
         busy={isPending}
         onResetAll={resetFilters}
-        emptyState={(discard) =>
-          edited ? (
+        emptyState={({ discard, openPagePreset }) =>
+          applied && !edited ? (
+            <EmptyState
+              icon={SearchX}
+              title={`No machines in ${applied.name}`}
+            />
+          ) : (
             <EmptyState
               icon={SearchX}
               title="No machines match"
               description="Try removing a filter or using a broader search."
               action={
-                <Button type="button" variant="outline" onClick={discard}>
-                  Back to {applied.name}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={applied ? discard : openPagePreset}
+                >
+                  Back to {applied?.name ?? pagePresetName}
                 </Button>
               }
-            />
-          ) : (
-            <EmptyState
-              icon={SearchX}
-              title={`No machines in ${applied.name}`}
             />
           )
         }
@@ -484,6 +344,7 @@ export function MachineView({
           <MachineViewCompactList
             rows={result.rows}
             onMachineSelect={onMachineSelect}
+            rowAction={rowAction}
           />
         ) : null}
         <MachineViewTable
@@ -495,6 +356,7 @@ export function MachineView({
             update(nextSort);
           }}
           onMachineSelect={onMachineSelect}
+          rowAction={rowAction}
         />
       </ListView>
     </div>

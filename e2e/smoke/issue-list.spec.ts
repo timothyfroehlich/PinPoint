@@ -1,10 +1,16 @@
-import { test, expect } from "../support/fixtures.js";
+import { test, expect, type Page } from "../support/fixtures.js";
 import {
   assertNoHorizontalOverflow,
   assertNoA11yViolations,
+  setListFilterOptions,
 } from "../support/actions.js";
 import { seededIssue } from "../support/constants.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
+
+/** The List View's announced result count (list-views §12.4). */
+function resultCount(page: Page) {
+  return page.getByRole("status").filter({ hasText: /^(Showing|No) / });
+}
 
 test.describe("Issue List Features", () => {
   // Use Admin to ensure permissions for all operations
@@ -22,66 +28,53 @@ test.describe("Issue List Features", () => {
     const title2 = seededIssue("TAF", 1).title;
 
     await page.goto("/issues");
-    // Wait for hydration before interacting with the search form. In Mobile
-    // Safari/WebKit, pressing Enter before React has bound the onSubmit handler
-    // triggers a default browser form submit (the input has no `name` attr,
-    // so ?q is never set in the URL). Best-effort with timeout to handle
-    // Chromium HMR keeping the network busy indefinitely in dev.
+    // Wait for hydration before interacting with the search field: Enter
+    // before React binds its handler submits nothing. Best-effort with a
+    // timeout to handle Chromium HMR keeping the network busy in dev.
     await page
       .waitForLoadState("networkidle", { timeout: 5000 })
       .catch(() => undefined);
 
+    await expect(page.getByRole("heading", { name: "Issues" })).toBeVisible();
     await assertNoA11yViolations(page);
 
-    // 2. Test Searching
-    // Search for Issue 1
-    const searchInput = page.getByPlaceholder("Search issues...");
-    await searchInput.focus();
+    // 2. Search for Issue 1
+    const searchInput = page.getByRole("searchbox", { name: "Search issues" });
     await searchInput.fill("Thing flips the bird");
-    await page.keyboard.press("Enter");
+    await searchInput.press("Enter");
     await expect
       .poll(() => new URL(page.url()).searchParams.get("q"), { timeout: 60000 })
       .toBe("Thing flips the bird");
-    await expect(page.getByText("Showing 1 of 1 issues")).toBeVisible();
+    await expect(resultCount(page)).toHaveText("Showing 1 to 1 of 1 issue");
     const issues = page.getByRole("list", { name: "Issues" });
     await expect(issues.getByRole("link", { name: title1 })).toBeVisible();
     await expect(issues.getByRole("link", { name: title2 })).toBeHidden();
 
-    // Clear Search (Wait for search badge or clear button to be stable)
-    const clearProps = page.getByRole("button", { name: "Clear", exact: true });
-    await expect(clearProps).toBeVisible();
-    await clearProps.click();
+    // Clear the search
+    await searchInput.fill("");
+    await searchInput.press("Enter");
     await expect
-      .poll(
-        () => {
-          const query = new URL(page.url()).searchParams.get("q");
-          return query === null || query === "";
-        },
-        { timeout: 60000 }
-      )
-      .toBe(true);
-    await expect(page.getByText(/Showing \d+ of \d+ issues/)).toBeVisible();
-    await expect(page.getByText("Showing 1 of 1 issues")).toHaveCount(0);
+      .poll(() => new URL(page.url()).searchParams.get("q"), { timeout: 60000 })
+      .toBeNull();
+    await expect(resultCount(page)).toHaveText(
+      /^Showing 1 to \d+ of \d+ issues$/
+    );
 
-    // 3. Test Filtering
-    // Filter by Severity: Major (TAF-01 and TAF-02 are both Major)
-    await page.getByTestId("filter-severity").click();
-    await page.getByRole("option", { name: "Major" }).click();
-    await page.keyboard.press("Escape"); // Close popover
+    // 3. Filter by Severity: Major (TAF-01 and TAF-02 are both Major)
+    await setListFilterOptions(page, "Severity", ["Major"]);
+    await expect(page).toHaveURL(/[?&]severity=major(?:&|$)/);
+    await expect(issues.getByRole("link", { name: title1 })).toBeVisible();
+    await expect(issues.getByRole("link", { name: title2 })).toBeVisible();
+    // Every row left is Major.
+    await expect(
+      issues.getByRole("button", { name: /^Severity: (?!Major,)/ })
+    ).toHaveCount(0);
 
-    // Both TAF-01 and TAF-02 have major severity, so both should be visible
-    await expect(page.getByText(title1)).toBeVisible();
-    await expect(page.getByText(title2)).toBeVisible();
-
-    // Clear Severity Filter
-    // The clear button may disappear/reappear during state changes; wait for it to stabilize
-    const clearButton = page.getByRole("button", {
-      name: "Clear",
-      exact: true,
+    // Clear the Severity filter
+    await setListFilterOptions(page, "Severity", ["Major"], {
+      checked: false,
     });
-    await expect(clearButton).toBeVisible();
-    await clearButton.waitFor({ state: "visible" });
-    await clearButton.click();
+    await expect(page).not.toHaveURL(/[?&]severity=/);
 
     // Verify no horizontal overflow on issues list page
     await assertNoHorizontalOverflow(page);
@@ -91,54 +84,56 @@ test.describe("Issue List Features", () => {
     page,
   }) => {
     // Admin user owns: BK (Black Knight), GDZ (Godzilla), GDZ3 (Godzilla), HD (Humpty Dumpty), MM (Medieval Madness)
-    // Clicking "My machines" should filter to those owned machines (sorted alphabetically by initials)
+    // "My machines" selects all owned machines.
     await page.goto("/issues");
 
-    // Open the Machine filter dropdown
-    await page.getByTestId("filter-machine").click();
-
-    // Verify "My machines" quick-select toggle is visible
-    await expect(page.getByText("My machines")).toBeVisible();
-
-    // Click "My machines" to select all owned machines
-    await page.getByText("My machines").click();
-    await page.keyboard.press("Escape");
+    await setListFilterOptions(page, "Machine", ["My machines"]);
 
     // URL should contain the admin's owned machine initials
-    await page.waitForURL(/machine=/);
-    const url = new URL(page.url());
-    const machineParam = url.searchParams.get("machine") ?? "";
-    expect(machineParam).toContain("BK");
-    expect(machineParam).toContain("GDZ");
-    expect(machineParam).toContain("HD");
-    expect(machineParam).toContain("MM");
+    await page.waitForURL(/[?&]machine=/);
+    const machineParam =
+      new URL(page.url()).searchParams.get("machine")?.split(",") ?? [];
+    expect(machineParam).toEqual(
+      expect.arrayContaining(["BK", "GDZ", "HD", "MM"])
+    );
   });
 
-  test("should show bottom pagination on out-of-range page", async ({
-    page,
-  }) => {
-    // Regression test for PP-o9g: bottom pagination used issues.length > 0 instead of
-    // totalCount > 0, hiding navigation controls when landing on an empty out-of-range page.
+  test("an out-of-range page shows the last page", async ({ page }) => {
+    // A page past the end shows the last page (list-views §6.3), rather
+    // than an empty list with no way back.
     await page.goto("/issues?page=999");
 
-    // The page is empty (no issues on page 999), but totalCount > 0 in seeded data.
-    // Both top and bottom pagination controls must be visible so the user can navigate back.
-    const bottomPrevPage = page.getByTestId("bottom-prev-page");
-    await expect(bottomPrevPage).toHaveCount(1);
-    await expect(bottomPrevPage).toBeVisible();
+    await expect(
+      page.getByRole("list", { name: "Issues" }).getByRole("listitem").first()
+    ).toBeVisible();
+    // The last page ends at the total.
+    await expect
+      .poll(async () => {
+        const text = (await resultCount(page).textContent()) ?? "";
+        const match = /^Showing \d+ to (\d+) of (\d+) issues?$/.exec(text);
+        return match !== null && match[1] === match[2];
+      })
+      .toBe(true);
+    // The URL names the page shown, never the out-of-range one.
+    await expect
+      .poll(() => new URL(page.url()).searchParams.get("page"))
+      .not.toBe("999");
   });
 
-  test("should export issues to CSV", async ({ page }) => {
+  test("should export issues to CSV", async ({ page }, testInfo) => {
+    test.skip(
+      testInfo.project.name.includes("Mobile"),
+      "Export sits in the desktop List Header (list-views §5.5); the phone header has none (§7.3)"
+    );
     await page.goto("/issues");
 
     // Wait for issue list to load
-    await expect(page.getByText(/Showing \d+ of \d+ issues/)).toBeVisible();
+    await expect(resultCount(page)).toHaveText(/^Showing \d+ to \d+ of \d+ /);
 
     // Set up download listener before clicking
     const downloadPromise = page.waitForEvent("download");
 
-    // Click the export button
-    await page.getByTestId("export-csv-button").click();
+    await page.getByRole("button", { name: "Export to CSV" }).click();
 
     // Verify download was triggered
     const download = await downloadPromise;

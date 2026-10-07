@@ -2,6 +2,7 @@ import type React from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { MachineGroupShell } from "~/components/collections/MachineGroupShell";
+import { PrintSettingsSheetsLink } from "~/components/machines/settings/PrintSettingsSheetsLink";
 import { EditTagMachinesDialog } from "~/components/tags/EditTagMachinesDialog";
 import { TagActionsMenu } from "~/components/tags/TagActionsMenu";
 import { TagTrail } from "~/components/tags/TagTrail";
@@ -9,6 +10,7 @@ import type { ResolvedTag } from "~/lib/tags/tags";
 import {
   getTagEditor,
   getTagForLayout,
+  getTagMerge,
   getTagMove,
 } from "~/app/(app)/c/tags/[type]/[slug]/_data";
 
@@ -43,10 +45,11 @@ export default async function TagLayout({
   params,
 }: TagParams & { children: React.ReactNode }): Promise<React.JSX.Element> {
   const { type, slug } = await params;
-  const [resolved, editor, move] = await Promise.all([
+  const [resolved, editor, move, merge] = await Promise.all([
     getTagForLayout(type, slug),
     getTagEditor(type, slug),
     getTagMove(type, slug),
+    getTagMerge(type, slug),
   ]);
   if (!resolved) notFound();
   const { tag } = resolved;
@@ -58,18 +61,22 @@ export default async function TagLayout({
       machines={tag.machines}
       basePath={tag.href}
       action={
-        editor && move ? (
-          <div className="flex items-center gap-2">
-            <EditTagMachinesDialog {...editor} />
-            <TagActionsMenu
-              tagId={editor.tagId}
-              name={editor.tagName}
-              machineCount={editor.currentIds.length}
-              parentHref={editor.parentHref}
-              move={move}
-            />
-          </div>
-        ) : null
+        <div className="flex items-center gap-2">
+          <PrintSettingsSheetsLink machines={tag.machines} />
+          {editor && move && merge ? (
+            <>
+              <EditTagMachinesDialog {...editor} />
+              <TagActionsMenu
+                tagId={editor.tagId}
+                name={editor.tagName}
+                machineCount={editor.currentIds.length}
+                parentHref={editor.parentHref}
+                move={move}
+                merge={merge}
+              />
+            </>
+          ) : null}
+        </div>
       }
     >
       {children}

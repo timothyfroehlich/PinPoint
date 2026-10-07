@@ -1,12 +1,12 @@
 import type React from "react";
 import { redirect } from "next/navigation";
-import { createClient } from "~/lib/supabase/server";
+import { getViewer } from "~/lib/auth/viewer";
 import { getLoginUrl } from "~/lib/url";
 import { PageHeader } from "~/components/layout/PageHeader";
 import { CreateMachineForm } from "./create-machine-form";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { db } from "~/server/db";
-import { pinballmapCatalog, userProfiles } from "~/server/db/schema";
+import { pinballmapCatalog } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 import { Forbidden } from "~/components/errors/Forbidden";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
@@ -32,28 +32,19 @@ export default async function NewMachinePage({
   }>;
 }): Promise<React.JSX.Element> {
   // Auth guard - check if user is authenticated (CORE-SSR-002)
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { userId, role } = await getViewer();
 
-  if (!user) {
+  if (!userId) {
     redirect(getLoginUrl("/m/new"));
   }
 
-  // Fetch all users for owner selection (Admin and Technician)
-  const currentUserProfile = await db.query.userProfiles.findFirst({
-    where: eq(userProfiles.id, user.id),
-    columns: { role: true },
-  });
-
   const canCreateMachine = checkPermission(
     "machines.create",
-    getAccessLevel(currentUserProfile?.role)
+    getAccessLevel(role)
   );
 
   if (!canCreateMachine) {
-    return <Forbidden role={currentUserProfile?.role ?? null} backUrl="/m" />;
+    return <Forbidden role={role} backUrl="/m" />;
   }
 
   // CORE-SEC-006: Map to minimal shape before passing to client components
@@ -78,7 +69,7 @@ export default async function NewMachinePage({
         where: eq(pinballmapCatalog.pinballmapMachineId, pbmId),
       })
     : undefined;
-  const accessLevel = getAccessLevel(currentUserProfile?.role);
+  const accessLevel = getAccessLevel(role);
 
   // What the lineup choice needs (pinballmap 4.11). The creator owns no
   // machine yet, so these are the role-level capabilities — the same ones the
@@ -89,7 +80,7 @@ export default async function NewMachinePage({
     // The add runs as the creator's own linked account (8.2), read off the
     // link row without decrypting it — the Manage tab's test (CORE-ARCH-012).
     canPush
-      ? getPinballMapLinkStatus(user.id)
+      ? getPinballMapLinkStatus(userId)
       : Promise.resolve({ status: "not_linked" } as const),
   ]);
   const configured = pbmState?.locationId != null;

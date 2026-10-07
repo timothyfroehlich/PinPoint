@@ -16,6 +16,7 @@ import {
 } from "~/components/ui/dropdown-menu";
 import { planListHeader } from "~/lib/list-view/overflow";
 import { cn } from "~/lib/utils";
+import { listHeaderIconButtonClass } from "./classes";
 import { isPlainClick } from "./links";
 import { CompactPager, RangeTextFace } from "./ListPager";
 import {
@@ -37,8 +38,7 @@ const currentTabClass =
   "font-semibold text-foreground shadow-[inset_0_-2px_0_var(--color-primary)]";
 const ghostButtonClass =
   "inline-flex h-8 shrink-0 items-center gap-1 rounded-md px-1.5 text-sm whitespace-nowrap text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none data-[state=open]:bg-muted data-[state=open]:text-foreground motion-reduce:transition-none";
-const iconButtonClass =
-  "inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none data-[state=open]:bg-muted data-[state=open]:text-foreground motion-reduce:transition-none";
+const iconButtonClass = listHeaderIconButtonClass;
 
 function TabFace({
   name,
@@ -244,6 +244,10 @@ function MoreViewsMenu({
   );
 }
 
+const saveButtonClass =
+  "inline-flex h-7 items-center gap-1 rounded-md border border-primary bg-primary/10 px-2.5 text-sm font-semibold whitespace-nowrap text-primary hover:bg-primary/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none";
+
+/** Save and Discard changes beside an Edited Saved View (§5.2, §5.3). */
 function EditControls({
   views,
   compact,
@@ -259,28 +263,24 @@ function EditControls({
   return (
     <span className="inline-flex shrink-0 items-center gap-1">
       <span aria-hidden="true" className="mx-1.5 h-5 w-px bg-outline-variant" />
-      {views.canSave ? (
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            type="button"
-            className="inline-flex h-7 items-center gap-1 rounded-md border border-primary bg-primary/10 px-2.5 text-sm font-semibold text-primary hover:bg-primary/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-            data-testid="list-save-view"
-          >
-            Save
-            <ChevronDown aria-hidden="true" className="size-3.5" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-48">
-            {views.appliedIsSaved ? (
-              <DropdownMenuItem onSelect={onSaveChanges}>
-                Save changes
-              </DropdownMenuItem>
-            ) : null}
-            <DropdownMenuItem onSelect={onSaveAsNew}>
-              Save as new…
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ) : null}
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          type="button"
+          className={saveButtonClass}
+          data-testid="list-save-view"
+        >
+          Save
+          <ChevronDown aria-hidden="true" className="size-3.5" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-48">
+          <DropdownMenuItem onSelect={onSaveChanges}>
+            Save changes
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={onSaveAsNew}>
+            Save as new…
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
       <button
         type="button"
         onClick={views.onDiscard}
@@ -288,6 +288,27 @@ function EditControls({
         className="h-7 rounded-md px-2 text-sm whitespace-nowrap text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
       >
         {compact ? "Discard" : "Discard changes"}
+      </button>
+    </span>
+  );
+}
+
+/** Save view, once the configuration has left every view (§5.2, §5.3). */
+function SaveViewControl({
+  onSaveAsNew,
+}: {
+  onSaveAsNew: () => void;
+}): React.JSX.Element {
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1">
+      <span aria-hidden="true" className="mx-1.5 h-5 w-px bg-outline-variant" />
+      <button
+        type="button"
+        onClick={onSaveAsNew}
+        className={saveButtonClass}
+        data-testid="list-save-new-view"
+      >
+        Save view
       </button>
     </span>
   );
@@ -307,8 +328,9 @@ interface ListHeaderProps {
 
 /**
  * The desktop List Header (list-views §5, §8.2, §8.3): Built-in Views as
- * tabs in a "Saved views" navigation landmark (§12.3), More views, Edited
- * with Save and Discard changes, then the compact pager, sort, Export, and
+ * tabs in a "Saved views" navigation landmark (§12.3), More views, Save and
+ * Discard changes beside an Edited Saved View or Save view when there is no
+ * Applied View, then the compact pager, sort, Export, and
  * View options. Hidden below md, where the phone header takes over (§7.3).
  */
 export function ListHeader({
@@ -329,16 +351,16 @@ export function ListHeader({
   const tabs = appliedSaved
     ? [...views.builtInViews, appliedSaved]
     : [...views.builtInViews];
-  const appliedIndex = Math.max(
-    0,
-    tabs.findIndex((view) => view.id === views.appliedId)
-  );
+  const appliedTab = tabs.findIndex((view) => view.id === views.appliedId);
+  const appliedIndex = appliedTab === -1 ? null : appliedTab;
+  // With no Applied View, signed-in accounts can save what is showing.
+  const offersSaveView = views.appliedId === null && views.canSave;
   // More views always holds the Saved Views section once there is anything
   // to manage; otherwise it shows only for Built-in Views that do not fit.
   const moreViewsAlways = offersManageViews(views);
   const contentKey = [
     ...tabs.map((tab) => tab.name),
-    views.appliedId,
+    String(views.appliedId),
     String(views.edited),
     String(views.canSave),
     String(moreViewsAlways),
@@ -359,8 +381,16 @@ export function ListHeader({
           appliedIndex,
           moreViewsWidth: width("more-views"),
           moreViewsAlways,
-          editWidth: views.edited ? width("edit") : 0,
-          editCompactWidth: views.edited ? width("edit-compact") : 0,
+          editWidth: views.edited
+            ? width("edit")
+            : offersSaveView
+              ? width("save-view")
+              : 0,
+          editCompactWidth: views.edited
+            ? width("edit-compact")
+            : offersSaveView
+              ? width("save-view")
+              : 0,
           pagerWidths: {
             full: width("pager-full"),
             compact: width("pager-compact"),
@@ -439,6 +469,7 @@ export function ListHeader({
             onSaveAsNew={onSaveAsNew}
           />
         ) : null}
+        {offersSaveView ? <SaveViewControl onSaveAsNew={onSaveAsNew} /> : null}
       </nav>
       <div className="flex shrink-0 items-center">
         {plan.pager !== "hidden" ? (
@@ -492,12 +523,10 @@ export function ListHeader({
         </span>
         <span data-measure="edit" className="absolute flex w-max items-center">
           <span className="mx-1.5 h-5 w-px" />
-          {views.canSave ? (
-            <span className="inline-flex h-7 items-center gap-1 border px-2.5 text-sm font-semibold">
-              Save
-              <ChevronDown className="size-3.5" />
-            </span>
-          ) : null}
+          <span className="inline-flex h-7 items-center gap-1 border px-2.5 text-sm font-semibold">
+            Save
+            <ChevronDown className="size-3.5" />
+          </span>
           <span className="ml-1 px-2 text-sm">Discard changes</span>
         </span>
         <span
@@ -505,13 +534,20 @@ export function ListHeader({
           className="absolute flex w-max items-center"
         >
           <span className="mx-1.5 h-5 w-px" />
-          {views.canSave ? (
-            <span className="inline-flex h-7 items-center gap-1 border px-2.5 text-sm font-semibold">
-              Save
-              <ChevronDown className="size-3.5" />
-            </span>
-          ) : null}
+          <span className="inline-flex h-7 items-center gap-1 border px-2.5 text-sm font-semibold">
+            Save
+            <ChevronDown className="size-3.5" />
+          </span>
           <span className="ml-1 px-2 text-sm">Discard</span>
+        </span>
+        <span
+          data-measure="save-view"
+          className="absolute flex w-max items-center"
+        >
+          <span className="mx-1.5 h-5 w-px" />
+          <span className="inline-flex h-7 items-center border px-2.5 text-sm font-semibold">
+            Save view
+          </span>
         </span>
         <span data-measure="pager-full" className="absolute flex w-max">
           <span className="pr-1 pl-0.5">

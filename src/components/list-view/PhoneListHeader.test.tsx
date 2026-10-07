@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { PhoneListHeader } from "./PhoneListHeader";
 import type {
   ListDisplayModel,
-  ListFilterModel,
+  ListOptionsFilterModel,
   ListSortModel,
   ListViewsModel,
 } from "./types";
@@ -21,7 +21,9 @@ window.matchMedia = vi.fn().mockImplementation(() => ({
   dispatchEvent: vi.fn(),
 }));
 
-function filter(overrides: Partial<ListFilterModel> = {}): ListFilterModel {
+function filter(
+  overrides: Partial<ListOptionsFilterModel> = {}
+): ListOptionsFilterModel {
   return {
     id: "status",
     label: "Status",
@@ -57,6 +59,7 @@ function views(overrides: Partial<ListViewsModel> = {}): ListViewsModel {
     hrefFor: (id) => `/list?view=${id}`,
     onApply: vi.fn(),
     onDiscard: vi.fn(),
+    onOpenPagePreset: vi.fn(),
     actions: {
       saveChanges: vi.fn(),
       saveAsNew: vi.fn(),
@@ -90,8 +93,8 @@ const display: ListDisplayModel = {
 function renderHeader(
   options: {
     views?: ListViewsModel;
-    primary?: ListFilterModel[];
-    secondary?: ListFilterModel[];
+    primary?: ListOptionsFilterModel[];
+    secondary?: ListOptionsFilterModel[];
   } = {}
 ): {
   onSaveChanges: ReturnType<typeof vi.fn>;
@@ -151,15 +154,43 @@ describe("PhoneListHeader", () => {
     expect(onSaveChanges).toHaveBeenCalled();
   });
 
-  it("offers only Save as new for a Built-in View, and nothing to anonymous visitors", async () => {
+  it("reads Views and offers Save view first when there is no Applied View (§7.3, §7.6)", async () => {
+    const user = userEvent.setup();
+    const { onSaveAsNew } = renderHeader({
+      views: views({
+        appliedId: null,
+        appliedName: null,
+        appliedIsSaved: false,
+      }),
+    });
+
+    const trigger = screen.getByTestId("list-phone-views-trigger");
+    expect(trigger).toHaveAccessibleName("Views");
+    await user.click(trigger);
+    const sheet = await screen.findByRole("dialog", { name: "Saved views" });
+    expect(
+      within(sheet)
+        .getAllByRole("button")
+        .map((element) => element.textContent)
+    ).toEqual(["", "Save view", "Manage views…"]);
+    expect(
+      within(sheet).queryByRole("link", { current: "page" })
+    ).not.toBeInTheDocument();
+
+    await user.click(within(sheet).getByRole("button", { name: "Save view" }));
+    expect(onSaveAsNew).toHaveBeenCalled();
+  });
+
+  it("offers anonymous visitors no Save view (§10.1)", async () => {
     const user = userEvent.setup();
     renderHeader({
       views: views({
-        edited: true,
-        appliedId: "open",
-        appliedName: "Open issues",
+        appliedId: null,
+        appliedName: null,
         appliedIsSaved: false,
         canSave: false,
+        offersDefault: false,
+        defaultViewId: null,
         savedViews: [],
       }),
     });
@@ -170,8 +201,8 @@ describe("PhoneListHeader", () => {
       within(sheet).queryByRole("button", { name: /^Save/ })
     ).not.toBeInTheDocument();
     expect(
-      within(sheet).getByRole("button", { name: "Discard changes" })
-    ).toBeInTheDocument();
+      within(sheet).queryByRole("button", { name: /^Discard/ })
+    ).not.toBeInTheDocument();
     expect(
       within(sheet).queryByRole("button", { name: "Manage views…" })
     ).not.toBeInTheDocument();

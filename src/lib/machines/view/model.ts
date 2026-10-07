@@ -7,6 +7,7 @@ import type {
   MachineViewSummary,
 } from "~/lib/types";
 import { MACHINE_PRESENCE_RANK } from "~/lib/machines/presence";
+import { ISSUE_SEVERITY_VALUES } from "~/lib/types";
 import {
   MACHINE_STATUS_RANK,
   SEVERITY_RANK,
@@ -19,12 +20,7 @@ export interface MachineViewCandidate extends MachineViewRow {
   legacyModelName: string;
 }
 
-const ISSUE_SEVERITIES: IssueSeverity[] = [
-  "cosmetic",
-  "minor",
-  "major",
-  "unplayable",
-];
+const ISSUE_SEVERITIES: readonly IssueSeverity[] = ISSUE_SEVERITY_VALUES;
 
 const COLLATOR = new Intl.Collator(undefined, {
   numeric: true,
@@ -225,6 +221,8 @@ export function applyMachineViewState(
   rows: MachineViewCandidate[];
   totalCount: number;
   page: number;
+  /** Every matching machine's id, on all pages, in sort order. */
+  matchingIds: string[];
 } {
   const query = state.q.toLocaleLowerCase();
   const filteredRows = rows.filter((row) =>
@@ -241,10 +239,11 @@ export function applyMachineViewState(
     rows: sorted.slice(offset, offset + state.pageSize),
     totalCount: sorted.length,
     page,
+    matchingIds: sorted.map((row) => row.id),
   };
 }
 
-/** Removed machines are not counted (machine-widgets §3.1, §3.2). */
+/** Removed machines are not counted (machine-widgets §3.2). */
 function summarizePresence(
   rows: MachineViewCandidate[]
 ): MachineViewSummary["presence"] {
@@ -254,13 +253,11 @@ function summarizePresence(
     on_loan: 0,
     pending_arrival: 0,
   };
-  let total = 0;
   for (const row of rows) {
     if (row.presence === "removed") continue;
     byPresence[row.presence] += 1;
-    total += 1;
   }
-  return { total, byPresence };
+  return { byPresence };
 }
 
 function summarizePlayability(

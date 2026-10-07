@@ -14,11 +14,15 @@ import {
   createTestIssue,
 } from "~/test/helpers/factories";
 
-const { mockList, mockDel } = vi.hoisted(() => ({
+const { mockList, mockDel, mockReportError } = vi.hoisted(() => ({
   mockList: vi.fn(),
   mockDel: vi.fn(),
+  mockReportError: vi.fn(),
 }));
 vi.mock("@vercel/blob", () => ({ list: mockList, del: mockDel }));
+vi.mock("~/lib/observability/report-error", () => ({
+  reportError: mockReportError,
+}));
 vi.mock("~/server/db", async () => {
   const { getTestDb } = await import("~/test/setup/pglite");
   return { db: await getTestDb() };
@@ -175,11 +179,20 @@ describe("cleanupOrphanedBlobs", () => {
   it("handles deletion errors gracefully", async () => {
     const orphan = `${URL_PREFIX}orphan.jpg`;
     listBlobs([orphan]);
-    mockDel.mockRejectedValue(new Error("Network error"));
+    const failure = new Error("Network error");
+    mockDel.mockRejectedValue(failure);
     expect(await cleanupOrphanedBlobs()).toMatchObject({
       deletedBlobs: 0,
       errors: [orphan],
     });
+    // CORE-ARCH-015: the tolerated per-batch failure still reaches Sentry.
+    expect(mockReportError).toHaveBeenCalledExactlyOnceWith(
+      failure,
+      expect.objectContaining({
+        action: "blob.cleanup.deleteBatch",
+        bestEffort: true,
+      })
+    );
   });
 
   it("paginates through blob listing", async () => {

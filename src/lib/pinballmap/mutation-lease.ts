@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq, isNull, lt, or } from "drizzle-orm";
 import { db, type Tx } from "~/server/db";
 import { pinballmapState } from "~/server/db/schema";
+import { reportError } from "~/lib/observability/report-error";
 import { type Result, err } from "~/lib/result";
 import type { PinballmapRuntimeState } from "~/lib/types";
 
@@ -123,7 +124,8 @@ export async function mutationLeaseOwnsLocation(
 /**
  * Run one outbound lineup write under the mutation lease: claim it for the
  * location and generation the caller read, run `body`, and release the lease
- * however `body` ends. When another writer or a configuration change holds the
+ * however `body` ends. A failed release is reported and tolerated, never
+ * allowed to change `body`'s result or error. When another writer or a configuration change holds the
  * location, `body` never runs and the flow gets a `SERVER` error asking for a
  * reload.
  *
@@ -149,6 +151,17 @@ export async function withPinballMapMutationLease<T, C extends string = never>(
   try {
     return await body(lease);
   } finally {
-    await releasePinballMapMutationLease(lease.id);
+    try {
+      await releasePinballMapMutationLease(lease.id);
+    } catch (releaseError) {
+      // The flow's own outcome stands: a failed release must neither turn a
+      // landed Pinball Map write into an error nor replace the flow's thrown
+      // error. The lease then simply expires on its own.
+      reportError(releaseError, {
+        action: "pinballmap.releaseMutationLease",
+        bestEffort: true,
+        leaseId: lease.id,
+      });
+    }
   }
 }

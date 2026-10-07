@@ -10,7 +10,7 @@
  *   Export prints the chosen card;
  * - Export marks a saved card that does not fit and needs the override;
  * - a signed-out visitor gets no tab and cannot print;
- * - a member opens Print apron cards from the Machines list, picks a card,
+ * - a member opens Print apron cards from the Machines list's Print menu, picks a card,
  *   and downloads its size's print file; a card that does not fit needs the
  *   page's override (§12);
  * - a member queues a card from Export, the Machines list shows the count,
@@ -267,7 +267,8 @@ test.describe("Print apron cards", () => {
     page,
   }) => {
     await page.goto("/m");
-    await page.getByRole("link", { name: "Print apron cards" }).click();
+    await page.getByRole("button", { name: "Print" }).click();
+    await page.getByRole("menuitem", { name: "Apron cards" }).click();
     await expect(page).toHaveURL("/m/apron-cards");
 
     const search = page.getByRole("searchbox", { name: "Search machines" });
@@ -308,8 +309,13 @@ test.describe("Print apron cards", () => {
 
     await page.goto("/m");
     await page
-      .getByRole("link", {
-        name: /^Print apron cards, \d+ in your print queue$/,
+      .getByRole("button", {
+        name: /^Print, \d+ apron cards in your print queue$/,
+      })
+      .click();
+    await page
+      .getByRole("menuitem", {
+        name: /^Apron cards, \d+ in your print queue$/,
       })
       .click();
     await expect(page).toHaveURL("/m/apron-cards");

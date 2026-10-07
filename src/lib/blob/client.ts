@@ -3,6 +3,7 @@ import type { PutBlobResult } from "@vercel/blob";
 import path from "path";
 import fs from "fs/promises";
 import { log } from "~/lib/logger";
+import { reportError } from "~/lib/observability/report-error";
 import { errorMessage } from "~/lib/errors";
 import { assertNotInTransaction } from "~/server/db/transaction-context";
 import {
@@ -134,6 +135,11 @@ export async function deleteFromBlob(pathname: string): Promise<void> {
       pathname,
     };
     log.error(errorDetails, "Blob deletion failed");
+    reportError(err, {
+      action: "blob.delete",
+      bestEffort: true,
+      pathname,
+    });
     // Don't throw - deletion is idempotent and failures are non-blocking
   }
 }

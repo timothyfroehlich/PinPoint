@@ -23,7 +23,7 @@ export default async function TagTimelinePage({
   if (!resolved) notFound();
   const canonical = canonicalTagPath(
     resolved,
-    type,
+    { type, slug },
     "/timeline",
     rawSearchParams
   );

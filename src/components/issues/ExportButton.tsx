@@ -2,29 +2,25 @@
 
 import * as React from "react";
 import { Download, Loader2 } from "lucide-react";
-import { Button } from "~/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "~/components/ui/tooltip";
 import { toast } from "sonner";
+import { listHeaderIconButtonClass } from "~/components/list-view/classes";
 import { exportIssuesAction } from "~/app/(app)/issues/export-action";
-import type { IssueFilters } from "~/lib/issues/filters";
 import type { IssueExportScope } from "~/app/(app)/issues/export-schema";
 
 interface ExportButtonProps {
-  /** Current filter state — serialized and sent to the server action. */
-  filters?: IssueFilters;
-  /** Machine initials — for machine-page export (overrides filters). */
-  machineInitials?: string;
+  /** The list's URL query; the server reads it exactly as the list does. */
+  query: string;
   /** The Collection or Tag tab the list belongs to; the server resolves it. */
   scope?: IssueExportScope | undefined;
 }
 
+/**
+ * Export in the Issues List Header (issues-list §5.4): a CSV of every issue
+ * matching the current View Configuration across all pages, within the
+ * Surface's scope.
+ */
 export function ExportButton({
-  filters,
-  machineInitials,
+  query,
   scope,
 }: ExportButtonProps): React.JSX.Element {
   const [isExporting, setIsExporting] = React.useState(false);
@@ -33,8 +29,7 @@ export function ExportButton({
     setIsExporting(true);
     try {
       const result = await exportIssuesAction({
-        ...(filters !== undefined && { filtersJson: JSON.stringify(filters) }),
-        ...(machineInitials !== undefined && { machineInitials }),
+        query,
         ...(scope !== undefined && { scope }),
       });
 
@@ -67,27 +62,23 @@ export function ExportButton({
   }
 
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-8 w-8 p-0 shadow-sm"
-          onClick={handleExport}
-          disabled={isExporting}
-          aria-label="Export to CSV"
-          data-testid="export-csv-button"
-        >
-          {isExporting ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" />
-          ) : (
-            <Download className="h-3.5 w-3.5" />
-          )}
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>
-        <p>Export to CSV</p>
-      </TooltipContent>
-    </Tooltip>
+    <button
+      type="button"
+      className={listHeaderIconButtonClass}
+      onClick={handleExport}
+      disabled={isExporting}
+      aria-label="Export to CSV"
+      title="Export to CSV"
+      data-testid="export-csv-button"
+    >
+      {isExporting ? (
+        <Loader2
+          aria-hidden="true"
+          className="size-4 animate-spin motion-reduce:animate-none"
+        />
+      ) : (
+        <Download aria-hidden="true" className="size-4" />
+      )}
+    </button>
   );
 }
