@@ -286,15 +286,7 @@ Work isn't done at "git push" — it's done when the change is **merged, deploye
 
 ### 5.1 Main's CI verdict, and the deployment if the PR could break it
 
-**Main's CI verdict.** Main runs one CI run at a time (`ci.yml` concurrency, PP-yva7.7): a merge that lands during a main run waits, and a newer merge cancels the waiting run. A run-level `cancelled` therefore usually means superseded; one cancelled by hand or by a job timeout reads the same, so check its jobs before dismissing it. Every main run diffs from the last commit a main run passed on, so your changes still select the jobs that test them. Your verdict is the **oldest** completed main run whose head contains your commit and whose E2E jobs ran (for a code change, `E2E Comprehensive Tests` succeeded or failed rather than skipped); a run that stopped before them tested nothing, and the next run covers you.
-
-```bash
-git fetch origin main
-gh run list --branch main --workflow CI --event push --status completed --limit 50 --json headSha,conclusion,url
-git merge-base --is-ancestor <your-merge-sha> <run-headSha> && echo covered
-```
-
-A run tests every change since the last main commit a run passed on. On red, list those commits (`git log --oneline <last-green-headSha>..<red-headSha>`) and read the failing jobs before deciding the failure is yours. Re-run only the newest main run: a re-run joins the one-at-a-time queue and cancels the newest merge's waiting run.
+**Main's CI verdict.** Main runs one CI run at a time (`ci.yml` concurrency, PP-yva7.7): a merge that lands during a main run waits, and a newer merge cancels the waiting run, so your merge's own run may read `cancelled`. Each main run tests every change since the last main commit a run passed on, so a later run covers your merge. Find it in `gh run list --branch main --workflow CI --event push --limit 20`: the oldest non-cancelled run at or after your merge whose E2E jobs ran (`gh run view <id>`). On red, the suspects are the commits since the last green main run. Re-running a main run while a newer merge's run is waiting cancels that waiting run.
 
 **The deployment.** After Tim merges, consider watching the deployment — only if the PR could break it. A merge that breaks prod isn't done, so when the change actually reaches the deployed app, it's worth watching the production deploy land and confirming no build, migration, or runtime errors. That means: anything under `src/`, a migration, a dependency or `next.config.ts` change, an env-registry change, or anything on the `vercel-build` path. **Skip it otherwise** — docs, skills, beads, GitHub workflows, and dev-only scripts can't affect the deploy, and watching a run that was never at risk just burns time. This is a judgement call, not a mandate; if you're not present when Tim merges, it's his to do or to ask you to pick back up.
 

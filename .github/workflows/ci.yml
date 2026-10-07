@@ -30,8 +30,8 @@ permissions: read-all  # zizmor: ignore[excessive-permissions]
 # from any commit since the last passing one, and while main stays red every
 # main run repeats the jobs the red range selects.
 #
-# Re-run the newest main run, not an older one: a re-run joins this group as
-# the waiting run and cancels the newest merge's waiting run.
+# A re-run joins this group too: re-running a main run while a newer merge's
+# run is waiting cancels that waiting run.
 #
 # This replaces per-SHA groups (PP-tbhv), which never cancelled but let every
 # merge run at once — up to 10 concurrent main runs in a day, each holding

@@ -85,7 +85,7 @@ gh run list --branch main --status completed --limit 5 \
   --json status,conclusion,name,createdAt,url
 ```
 
-Flag any `conclusion == "failure"`. A `cancelled` main run usually means a newer merge superseded it (main runs one at a time; `pinpoint-pr-workflow` 5.1). If the newest CI run on main (`gh run list --branch main --workflow CI --limit 1`, any status) is `cancelled`, nothing has tested main's tip: flag it for Tim.
+Flag any `conclusion == "failure"`. A `cancelled` main run is usually one a newer merge superseded (main runs one at a time; `pinpoint-pr-workflow` 5.1). If the newest push run on main (`gh run list --branch main --workflow CI --event push --limit 1`) is `cancelled`, nothing has tested main's tip: flag it for Tim.
 
 ### Group D: New GitHub Issues (last 5 days)
 
