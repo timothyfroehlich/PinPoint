@@ -11,32 +11,38 @@ on:
 
 permissions: read-all  # zizmor: ignore[excessive-permissions]
 
-# Cancel superseded PR runs; never cancel a push to main.
+# PR runs: a new push cancels the run in progress. Main runs: one at a time,
+# never cancelled mid-run.
 #
 # A PR push supersedes the one before it — same branch, same question, and the
 # older answer is worthless — so cancelling saves runners with nothing lost.
-# A push to main is the opposite: each one is a distinct commit whose result is
-# the thing we want, and `test-e2e-comprehensive` takes ~30 minutes to produce
-# it. Under a shared `${{ github.ref }}` group every merge cancelled the
-# previous merge's run, so on any evening with more than one merge per half
-# hour that job was cancelled far more often than it finished — leaving the
-# same silent non-verdict PP-jxhy set out to remove, reached by a different
-# route. (Observed on run 31755670441: Smoke evaluated clean, then the Full
-# step was cancelled 30 minutes in by two later merges, and both the Full
-# evaluate and the gating step skipped.)
 #
-# Appending the SHA on `push` gives every main commit its own group, so main
-# runs neither cancel nor queue behind each other. Pull-request runs keep the
-# ref-based group and the old behaviour exactly.
+# Main shares one group with `cancel-in-progress: false`. A running main run
+# always finishes, so the post-merge comprehensive verdict is never cut off
+# mid-suite (run 31755670441 lost its Full verdict that way under PP-tbhv's
+# original shared group with cancel-in-progress). GitHub keeps at most one
+# more run waiting: a newer push to main cancels the waiting run before it
+# starts and waits in its place. Commits in a merge burst therefore get no run
+# of their own. The next run that executes covers them: the `changes` job's
+# code filter diffs against the last main commit a run passed on, not this
+# push's `before`, so their code still selects E2E. (Dependency changes are
+# audited on their PRs; the push audit stays per push.) A red result may come
+# from any commit since the last passing one, and while main stays red every
+# main run repeats the jobs the red range selects.
 #
-# Not job-level `concurrency` on that job: job-level groups govern queueing
-# between jobs, they do not exempt a job from the workflow-level cancel. Not
-# `cancel-in-progress: false` either — main runs would then serialize, so one
-# 30-minute comprehensive job delays the next main run by up to 30 minutes and
-# they pile up. (PP-tbhv.)
+# A re-run joins this group too: re-running a main run while a newer merge's
+# run is waiting cancels that waiting run.
+#
+# This replaces per-SHA groups (PP-tbhv), which never cancelled but let every
+# merge run at once — up to 10 concurrent main runs in a day, each holding
+# runners under the account's 20-job cap while PR jobs queued. A main run takes
+# ~45 minutes until the comprehensive job's legs run in parallel (PP-yva7.3),
+# then ~15, so a merge normally waits at most one run before a run covering it
+# starts (a hung run holds the slot until its job timeouts end it).
+# (PP-yva7.7.)
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'push' && github.sha || '' }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # Detect which files changed so non-website PRs skip the expensive jobs
@@ -65,7 +71,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       code: ${{ steps.set-code.outputs.code }}
-      deps: ${{ steps.deps-filter.outputs.deps }}
+      deps: ${{ steps.base.outputs.force == 'true' && 'true' || steps.deps-filter.outputs.deps }}
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
@@ -75,9 +81,51 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
         with:
           persist-credentials: false
+          # Push runs diff back past `before` (next step); PR runs use the API.
+          # Strings, because a bare 0 is falsy in an expression.
+          fetch-depth: ${{ github.event_name == 'push' && '0' || '1' }}
+
+      # Main runs one at a time and a newer merge cancels the waiting run (see
+      # the concurrency block), so this push's `before` can skip merges whose
+      # run never started. Diffing against the last main commit a run PASSED on
+      # makes every change since then select the jobs that test it: a merge
+      # whose run was cancelled while waiting, cancelled mid-run, or failed
+      # before E2E ran (in setup, say) is still covered by the next run. Each
+      # passing run covered everything since the one before it, so the chain
+      # holds. (PP-yva7.7.)
+      - name: Find the last main commit CI passed on
+        id: base
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # No narrower fallback: diffing from `before` could skip a superseded
+          # merge, and a run that passed that way would become the next base.
+          # When the base is unknown, every job runs instead.
+          # A run being re-run is in progress, so status=success already leaves
+          # it out; the select also ignores any other passing run of this same
+          # commit, so the diff is never empty against itself.
+          if ! sha=$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?branch=main&event=push&status=success&per_page=5" \
+            --jq "[.workflow_runs[] | select(.head_sha != \"$GITHUB_SHA\")][0].head_sha // empty"); then
+            echo "::warning::Could not list main's CI runs; running every job."
+            echo "force=true" >> "$GITHUB_OUTPUT"
+          elif [ -z "$sha" ]; then
+            echo "::warning::No passing main run found; running every job."
+            echo "force=true" >> "$GITHUB_OUTPUT"
+          elif ! git merge-base --is-ancestor "$sha" HEAD; then
+            echo "::warning::Last passing main run ($sha) is not an ancestor of this commit (a re-run of an older commit?); running every job."
+            echo "force=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Diffing against $sha, the last main commit CI passed on."
+            echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          fi
+
       - id: filter
         uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d  # ratchet:dorny/paths-filter@v4.0.3
         with:
+          base: ${{ steps.base.outputs.sha }}
           predicate-quantifier: "every"
           filters: |
             has_code:
@@ -117,6 +165,8 @@ jobs:
       # so deps=true when ANY changed file is a dependency file (not ALL).
       - id: deps-filter
         uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d  # ratchet:dorny/paths-filter@v4.0.3
+        # Per push, not reached back: the push audit compares against
+        # `before`, and every lockfile change was already audited on its PR.
         with:
           filters: |
             deps:
@@ -126,8 +176,9 @@ jobs:
         id: set-code
         env:
           HAS_CODE: ${{ steps.filter.outputs.has_code }}
+          FORCE: ${{ steps.base.outputs.force }}
         run: |
-          if [ "$HAS_CODE" = "true" ]; then
+          if [ "$HAS_CODE" = "true" ] || [ "$FORCE" = "true" ]; then
             echo "code=true" >> "$GITHUB_OUTPUT"
           else
             echo "code=false" >> "$GITHUB_OUTPUT"
