@@ -26,8 +26,8 @@ import type { LocationSnapshot, PbmLmx } from "./types";
  * Alert tier is `INVALID_WHEN_ON` — the same rules the listing control renders.
  * This module only folds cabinets into one verdict per title.
  *
- * Pure — no DB, no `server-only` — so the page, the `/m` header badge and the
- * unit tests all call it directly, and it never reaches pinballmap.com
+ * Pure — no DB, no `server-only` — so the stored-data loader and the unit
+ * tests both call it directly, and it never reaches pinballmap.com
  * (CORE-PBM-001, lineup spec §2.3).
  */
 
@@ -216,11 +216,6 @@ function inAvailabilityConflict(machine: LineupMachineInput): boolean {
     machine.intent === "on" &&
     machine.presenceStatus !== "on_the_floor"
   );
-}
-
-/** The "to review" count the page and the `/m` badge share (§4.1). */
-export function lineupToReviewCount(comparison: LineupComparison): number {
-  return comparison.status === "ready" ? comparison.toReview : 0;
 }
 
 /** "Premium" from "Jurassic Park (Premium)"; null when the name has none. */
