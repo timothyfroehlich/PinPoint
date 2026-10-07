@@ -124,7 +124,7 @@
 - **10.5** A public directory of Collections is deferred.
 - **10.6** Adding a machine to a Collection from the machine's own page is deferred.
 - **10.7** Writing notes from a Machine Group's Timeline is deferred.
-- **10.8** Merging one hand-applied tag into another is deferred.
+- **10.8** _Retired 2026-10-06._ Merging hand-applied tags is now 11.17–11.19. Number kept so older citations don't dangle.
 
 ---
 
@@ -146,6 +146,9 @@
 - **11.14** The tag browse and a machine's page list hand-applied tag types after the automatic ones, ordered by name, followed by tags with no tag type. Tags within each group are ordered by name, subject to 11.13.
 - **11.15** A technician or admin can create a tag from a machine's page while tagging that machine. The tag has no tag type unless they choose one, and it is applied to that machine.
 - **11.16** A technician or admin can move a hand-applied tag into a hand-applied tag type, from one tag type to another, or out of its tag type. A move is blocked if the tag's name is already taken where it is going, or if it would leave a machine holding two tags of an exclusive tag type.
+- **11.17** A technician or admin can merge a hand-applied tag into another hand-applied tag, in any tag type or none. Every machine holding the merged tag holds the target tag afterward, and the merged tag is deleted. The merge asks for confirmation and cannot be undone.
+- **11.18** A merge is blocked if it would leave a machine holding two tags of an exclusive tag type.
+- **11.19** Links to a merged tag's page, including its Issues and Timeline tabs, open the target tag's page.
 
 ---
 
@@ -155,7 +158,7 @@
 - **12.2** The Tag filter offers every tag, automatic and hand-applied, grouped by tag type in the tag browse's order (7.3, 11.14), with a search box that narrows the tags by name. Tag type headings label their group and cannot be selected. Hand-applied tags with no machines are offered too.
 - **12.3** A machine matches the Tag filter when, for every tag type with a selected tag, it holds at least one of that type's selected tags. Tags with no tag type count as one group. Selecting Front room, Back room, and Solid State matches machines in Front room or Back room that are also Solid State.
 - **12.4** The Collection filter offers the Collections listed in the viewer's My Collections (§5), with a search box that narrows them by name, and appears only to signed-in people. A machine matches when it belongs to any selected Collection.
-- **12.5** A filtered tag or Collection stays selected in links and Saved Views when it is renamed or, for a tag, moved to another tag type. A deleted tag or Collection, or a Collection the viewer can no longer open, drops out of the filter (list-views §9.3, §10.14).
+- **12.5** A filtered tag or Collection stays selected in links and Saved Views when it is renamed or, for a tag, moved to another tag type. A filtered tag that is merged is replaced by the tag it was merged into. A deleted tag or Collection, or a Collection the viewer can no longer open, drops out of the filter (list-views §9.3, §10.14).
 - **12.6** Tag and Collection are filters only; neither list gains a Tag or Collection field.
 
 ---
@@ -172,6 +175,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-06 | Added merging one hand-applied tag into another (11.17–11.19, 12.5); retired deferred item 10.8. |
 | 2026-10-05 | Added Collection descriptions, written by the owner and Editors and shown under the header on every tab (2.4, 2.8, 3.8, 4.7); retired deferred item 10.3. |
 | 2026-10-05 | Turning a View Link back on creates a new link instead of restoring the earlier one (3.4). |
 | 2026-10-05 | Added Tag and Collection filters on the Machines and Issues lists (§12). |

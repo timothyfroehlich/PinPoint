@@ -13,10 +13,7 @@ import {
   Shield,
   SlidersHorizontal,
 } from "lucide-react";
-import { createClient } from "~/lib/supabase/server";
-import { db } from "~/server/db";
-import { userProfiles } from "~/server/db/schema";
-import { eq } from "drizzle-orm";
+import { getViewer } from "~/lib/auth/viewer";
 import {
   Card,
   CardContent,
@@ -25,7 +22,6 @@ import {
   CardTitle,
 } from "~/components/ui/card";
 import { PageContainer } from "~/components/layout/PageContainer";
-import { reportAuthError } from "~/lib/observability/report-error";
 
 export const metadata = {
   title: "Help | PinPoint",
@@ -140,27 +136,8 @@ function HelpCardGrid({ cards }: { cards: HelpCard[] }): React.JSX.Element {
 }
 
 export default async function HelpPage(): Promise<React.JSX.Element> {
-  let isAdmin = false;
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError) {
-    reportAuthError(authError, {
-      action: "help-page.auth.getUser",
-      bestEffort: true,
-    });
-  }
-
-  if (user) {
-    const profile = await db.query.userProfiles.findFirst({
-      where: eq(userProfiles.id, user.id),
-      columns: { role: true },
-    });
-    isAdmin = profile?.role === "admin"; // permissions-audit-allow: isAdmin flag drives help page section rendering
-  }
+  const { role } = await getViewer();
+  const isAdmin = role === "admin"; // permissions-audit-allow: isAdmin flag drives help page section rendering
 
   return (
     <PageContainer size="narrow">

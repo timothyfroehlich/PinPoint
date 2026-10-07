@@ -32,17 +32,15 @@ const issueNum = seededIssue("TAF").num;
 // claims to overflow-check.
 const ownedMachineInitials = seededMachines.eightBallDeluxe.initials;
 
-// Filter-heavy query for surfaces that render <IssueFilters>. Overflow bugs
-// live in the loaded, many-chips state — not the empty default — so exercise a
-// route variant where a wide set of active-filter chips is rendered. This is
-// what surfaces content bleeding off the viewport (see PP collections chip
-// overflow: chips previously overlaid the search input and spilled off-screen
-// on narrow viewports once several filters were active).
-// Deliberately heavy: partial selections from each status group (so they render
-// as individual chips rather than collapsing to a single group chip) plus every
-// severity, priority, and frequency value. This produces ~19 chips — enough that
-// a non-wrapping chip row would overrun a 375px viewport, which is exactly the
-// regression this guards against.
+// Filter-heavy query for the Issues List View. Overflow bugs live in the
+// loaded, many-filters state — not the empty default — so exercise a route
+// variant where every filter button shows a selection: each reads its value
+// or a count, which widens the row beside search until filters move into More
+// (list-views §4.3, §8.1), and the phone Filters button shows its active count
+// (§7.3). Deliberately heavy: partial selections from each status group plus
+// every severity, priority, and frequency value (Frequency is a Secondary
+// Filter, so More carries a selection too), and the URL carries no view, so
+// the List Header adds Save view (§5.2).
 const filterHeavyQuery =
   `?status=new,in_progress,need_parts,need_help,fixed,wont_fix,wai,no_repro` +
   `&severity=cosmetic,minor,major,unplayable` +

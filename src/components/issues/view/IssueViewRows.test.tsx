@@ -9,15 +9,8 @@ import React from "react";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { IssueList, type IssueListViewer } from "./IssueList";
+import { IssueViewRows, type IssueRowsViewer } from "./IssueViewRows";
 import type { IssueListRow } from "~/lib/types";
-
-let mockSearch = "";
-vi.mock("next/navigation", () => ({
-  useSearchParams: () => new URLSearchParams(mockSearch),
-  useRouter: () => ({ push: vi.fn() }),
-  usePathname: () => "/issues",
-}));
 
 vi.mock("next/link", () => ({
   default: ({
@@ -40,16 +33,8 @@ vi.mock("~/app/(app)/issues/actions", () => ({
   assignIssueAction: vi.fn(),
 }));
 
-vi.mock("~/components/issues/ExportButton", () => ({
-  ExportButton: () => <button type="button">Export</button>,
-}));
-
 vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
-}));
-
-vi.mock("~/lib/cookies/client", () => ({
-  storeLastIssuesPath: vi.fn(),
 }));
 
 const REPORTER_ID = "11111111-1111-4111-8111-111111111111";
@@ -80,30 +65,27 @@ function makeIssue(overrides: Partial<IssueListRow> = {}): IssueListRow {
 
 function renderList(
   issues: IssueListRow[],
-  viewer: IssueListViewer
+  viewer: IssueRowsViewer,
+  listKey = ""
 ): ReturnType<typeof render> {
   return render(
-    <IssueList
-      issues={issues}
-      totalCount={issues.length}
-      sort="updated_desc"
-      page={1}
-      pageSize={15}
-      allUsers={[{ id: OTHER_ID, name: "Priya Shah" }]}
+    <IssueViewRows
+      rows={issues}
+      listKey={listKey}
+      users={[{ id: OTHER_ID, name: "Priya Shah" }]}
       viewer={viewer}
     />
   );
 }
 
-const ANONYMOUS: IssueListViewer = {
+const ANONYMOUS: IssueRowsViewer = {
   userId: undefined,
   accessLevel: "unauthenticated",
 };
 
-describe("IssueList rows", () => {
+describe("Issue rows", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockSearch = "";
   });
 
   it("shows both lines of a row: title, badges, ID, machine, status", () => {
@@ -176,10 +158,9 @@ describe("IssueList rows", () => {
   });
 });
 
-describe("IssueList row editing permissions (issues-list §3.5)", () => {
+describe("Issue row editing permissions (issues-list §3.5)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockSearch = "";
   });
 
   function editableFields(): string[] {
@@ -194,7 +175,7 @@ describe("IssueList row editing permissions (issues-list §3.5)", () => {
       .map(([field]) => String(field));
   }
 
-  it.each<[string, IssueListViewer, string | null, string[]]>([
+  it.each<[string, IssueRowsViewer, string | null, string[]]>([
     ["anonymous visitor", ANONYMOUS, REPORTER_ID, []],
     [
       "guest on their own issue",
@@ -264,10 +245,9 @@ describe("IssueList row editing permissions (issues-list §3.5)", () => {
   });
 });
 
-describe("IssueList stable rows (issues-list §3.6)", () => {
+describe("Issue rows keep their place (issues-list §3.6)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockSearch = "status=new";
   });
 
   const first = makeIssue({ id: "a", issueNumber: 1, title: "First" });
@@ -281,38 +261,39 @@ describe("IssueList stable rows (issues-list §3.6)", () => {
 
   function rerenderWith(
     rerender: ReturnType<typeof render>["rerender"],
-    issues: IssueListRow[]
+    issues: IssueListRow[],
+    listKey: string
   ): void {
     rerender(
-      <IssueList
-        issues={issues}
-        totalCount={issues.length}
-        sort="updated_desc"
-        page={1}
-        pageSize={15}
-        allUsers={[]}
+      <IssueViewRows
+        rows={issues}
+        listKey={listKey}
+        users={[]}
         viewer={ANONYMOUS}
       />
     );
   }
 
   it("keeps rows in place when the same list re-renders reordered or without a row", () => {
-    const { rerender } = renderList([first, second], ANONYMOUS);
+    const { rerender } = renderList([first, second], ANONYMOUS, "status=new");
 
     // The server re-renders after an edit: the edited row now sorts last.
-    rerenderWith(rerender, [{ ...second, title: "Second, edited" }, first]);
+    rerenderWith(
+      rerender,
+      [{ ...second, title: "Second, edited" }, first],
+      "status=new"
+    );
     expect(titles()).toEqual(["First", "Second, edited"]);
 
     // The edited row no longer matches the filters: it stays until reload.
-    rerenderWith(rerender, [second]);
+    rerenderWith(rerender, [second], "status=new");
     expect(titles()).toEqual(["First", "Second"]);
   });
 
-  it("takes the server's rows once the list reloads with a new URL", () => {
-    const { rerender } = renderList([first, second], ANONYMOUS);
+  it("takes the server's rows once the list reloads with a new configuration", () => {
+    const { rerender } = renderList([first, second], ANONYMOUS, "status=new");
 
-    mockSearch = "status=new&sort=created_desc";
-    rerenderWith(rerender, [second]);
+    rerenderWith(rerender, [second], "status=new&sort=created&dir=desc");
     expect(titles()).toEqual(["Second"]);
   });
 });

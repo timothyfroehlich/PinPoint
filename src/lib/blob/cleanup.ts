@@ -3,6 +3,7 @@ import { db } from "~/server/db";
 import { userProfiles, issueImages } from "~/server/db/schema";
 import { sql } from "drizzle-orm";
 import { log } from "~/lib/logger";
+import { reportError } from "~/lib/observability/report-error";
 import { errorMessage } from "~/lib/errors";
 import { BLOB_CONFIG } from "~/lib/blob/config";
 
@@ -139,6 +140,12 @@ export async function cleanupOrphanedBlobs(): Promise<CleanupResult> {
         { err: errorMessage(err), batchStart: i, batchSize: batch.length },
         "Failed to delete blob batch"
       );
+      reportError(err, {
+        action: "blob.cleanup.deleteBatch",
+        bestEffort: true,
+        batchStart: i,
+        batchSize: batch.length,
+      });
       result.errors.push(...batch);
     }
   }

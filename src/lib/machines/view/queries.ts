@@ -22,7 +22,7 @@ import type { TimelineTag } from "~/lib/timeline/machine-tags";
 import { getCurrentManufacturer } from "~/lib/machines/manufacturer";
 import { getTag } from "~/lib/tags/tags";
 import { isTagTypeId } from "~/lib/tags/types";
-import { getViewer } from "~/lib/collections/viewer";
+import { getViewer } from "~/lib/auth/viewer";
 import {
   getMachineViewPreset,
   ME_OWNER_ID,
@@ -36,7 +36,7 @@ import {
   summarizeMachineView,
   type MachineViewCandidate,
 } from "./model";
-import { getExistingMachineViewOwners } from "./owners";
+import { getExistingPeople } from "~/lib/list-view/people";
 import { parseMachineViewState } from "./state";
 
 export const MACHINE_VIEW_SERVICE_TAGS = [
@@ -296,7 +296,7 @@ export async function loadMachineViewFromDatabase(
   // (machine-views §4.2).
   const [baseRows, selectedOwners] = await Promise.all([
     getMachineViewBaseRows(tx, scope),
-    getExistingMachineViewOwners(tx, parsedState.owner, viewerId),
+    getExistingPeople(tx, parsedState.owner, viewerId),
   ]);
   const validatedState = {
     ...parsedState,

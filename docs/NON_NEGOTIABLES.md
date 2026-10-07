@@ -1,7 +1,7 @@
 # PinPoint Non‑Negotiables
 
 **Last Updated**: 2026-10-06
-**Version**: 2.10 (CORE-ARCH-016 added: third-party HTTP goes through `~/lib/http/external` with a per-request timeout — PP-az4d.11). Prior: 2.9 (CORE-ARCH-013 added: Server Actions go through `createProtectedAction` — PP-az4d.4). Prior: 2.8 (CORE-ARCH-015 added: a caught error not returned to the user goes to `reportError`; cron routes use `runCron` — PP-az4d.3). Prior: 2.7 (CORE-ARCH-014 added: one write path per mutation; CORE-ARCH-010 amended: share load-bearing code at two copies, reuse existing helpers — PP-az4d.1)
+**Version**: 2.11 (CORE-TS-002 amended: a `*_VALUES` array is the single source for zod, Drizzle and TS unions — PP-az4d.13). Prior: 2.10 (CORE-ARCH-016 added: third-party HTTP goes through `~/lib/http/external` with a per-request timeout — PP-az4d.11). Prior: 2.9 (CORE-ARCH-013 added: Server Actions go through `createProtectedAction` — PP-az4d.4). Prior: 2.8 (CORE-ARCH-015 added: a caught error not returned to the user goes to `reportError`; cron routes use `runCron` — PP-az4d.3). Prior: 2.7 (CORE-ARCH-014 added: one write path per mutation; CORE-ARCH-010 amended: share load-bearing code at two copies, reuse existing helpers — PP-az4d.1)
 
 > **Canonical catalog**: this document defines the canonical `CORE-*` rules for PinPoint. Portable skills (`.agents/skills/`) and agent context (`AGENTS.md`) cite rules by ID and provide domain/task-specific procedures.
 
@@ -59,8 +59,8 @@
 
 - **Severity:** High
 - **Why:** Divergent shapes cause bugs
-- **Do:** Reuse domain types from `~/lib/types`
-- **Don't:** Declare look‑alike types in multiple places
+- **Do:** Reuse domain types from `~/lib/types`. A value set with a `*_VALUES` array (`ISSUE_SEVERITY_VALUES`, `USER_ROLES`, `NOTIFICATION_TYPE_VALUES`, `ISSUE_STATUS_VALUES`) has that array as its single source: `z.enum(X_VALUES)`, Drizzle `text(..., { enum: X_VALUES })`, and `type X = (typeof X_VALUES)[number]` all derive from it. Give a new value set its array before a second site needs the list.
+- **Don't:** Declare look‑alike types in multiple places. Restate a value set's literals by hand in a union, `z.enum([...])`, or Drizzle `enum: [...]`, and cast an array (`as unknown as [T, ...T[]]`) to fit a Drizzle enum: pass the `as const` array as is.
 
 **CORE-TS-003:** DB vs App boundary
 
@@ -448,7 +448,7 @@
 
 - **Severity:** Required
 - **Why:** `fetch` has no deadline of its own. A third party that accepts the connection and never answers holds the request until the platform kills the function: a Server Action spins with no result, and a cron run dies without reporting. PinballMap and Discord had no timeout until PP-az4d.11, while iScored, OPDB and PinTips each set their own. Both clients had also copied the network-error fallback and the 429 retry, and copies drift.
-- **Do:** Send each server-side request to a third-party API through `safeFetch(url, init, { timeoutMs, networkErrorLog })` from `~/lib/http/external`, and wrap a send that may hit a 429 in `withRetryAfter`. Name each `timeoutMs` as a constant in the client, chosen per endpoint class; it bounds one attempt, headers and body together, so a retry gets a fresh budget. A timeout and a network failure both arrive as the synthetic 599 (`NETWORK_ERROR_STATUS`), so classify that one status. An integration guard such as `assertPinballMapNetworkAllowed` runs before the call, outside the 599 conversion. SDK clients (Supabase, Resend, Vercel Blob) own their transport and are out of scope. iScored, OPDB and PinTips predate the helper; move them onto it with their next change.
+- **Do:** Send each server-side request to a third-party API through `safeFetch(url, init, { timeoutMs, networkErrorLog })` from `~/lib/http/external`, and wrap a send that may hit a 429 in `withRetryAfter`. Name each `timeoutMs` as a constant in the client, chosen per endpoint class; it bounds one attempt, headers and body together, so a retry gets a fresh budget. A timeout and a network failure both arrive as the synthetic 599 (`NETWORK_ERROR_STATUS`), so classify that one status. An integration guard such as `assertPinballMapNetworkAllowed` runs before the call, outside the 599 conversion. SDK clients (Supabase, Resend, Vercel Blob) own their transport and are out of scope.
 - **Don't:** Call `fetch` directly for a third-party API, or send one without a timeout.
 
 ---

@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import type React from "react";
-import { createClient } from "~/lib/supabase/server";
+import { getViewer } from "~/lib/auth/viewer";
 import {
   getProfileById,
   getProfileActivityCounts,
@@ -23,10 +23,7 @@ export default async function ProfilePage({
   const { id } = await params;
   const { edit } = await searchParams;
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { userId } = await getViewer();
 
   const profile = await getProfileById(id);
   if (!profile) notFound();
@@ -38,7 +35,7 @@ export default async function ProfilePage({
   const openCounts = await getOpenIssueCountsByInitials(
     owned.machines.map((m) => m.initials)
   );
-  const isOwn = user?.id === id;
+  const isOwn = userId === id;
   const memberSince = profile.createdAt.toLocaleDateString("en-US", {
     month: "short",
     year: "numeric",

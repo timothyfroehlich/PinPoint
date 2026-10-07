@@ -147,8 +147,9 @@ test.describe("Member Dashboard", () => {
       /\/issues\?assignee=[a-f0-9-]+&status=new,confirmed,in_progress,need_parts,need_help,wait_owner/
     );
     await assignedCard.click();
-    await expect(page).toHaveURL(
-      /\/issues\?assignee=[a-f0-9-]+&status=new,confirmed,in_progress,need_parts,need_help,wait_owner/
-    );
+    // The Issues list rewrites the link to its canonical URL (list-views
+    // §9.3): the open statuses are its Page Preset, so only the assignee stays.
+    await expect(page).toHaveURL(/\/issues\?assignee=[a-f0-9-]+$/);
+    await expect(page.getByRole("heading", { name: "Issues" })).toBeVisible();
   });
 });

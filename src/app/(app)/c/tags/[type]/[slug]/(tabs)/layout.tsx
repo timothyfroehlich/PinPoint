@@ -10,6 +10,7 @@ import type { ResolvedTag } from "~/lib/tags/tags";
 import {
   getTagEditor,
   getTagForLayout,
+  getTagMerge,
   getTagMove,
 } from "~/app/(app)/c/tags/[type]/[slug]/_data";
 
@@ -44,10 +45,11 @@ export default async function TagLayout({
   params,
 }: TagParams & { children: React.ReactNode }): Promise<React.JSX.Element> {
   const { type, slug } = await params;
-  const [resolved, editor, move] = await Promise.all([
+  const [resolved, editor, move, merge] = await Promise.all([
     getTagForLayout(type, slug),
     getTagEditor(type, slug),
     getTagMove(type, slug),
+    getTagMerge(type, slug),
   ]);
   if (!resolved) notFound();
   const { tag } = resolved;
@@ -61,7 +63,7 @@ export default async function TagLayout({
       action={
         <div className="flex items-center gap-2">
           <PrintSettingsSheetsLink machines={tag.machines} />
-          {editor && move ? (
+          {editor && move && merge ? (
             <>
               <EditTagMachinesDialog {...editor} />
               <TagActionsMenu
@@ -70,6 +72,7 @@ export default async function TagLayout({
                 machineCount={editor.currentIds.length}
                 parentHref={editor.parentHref}
                 move={move}
+                merge={merge}
               />
             </>
           ) : null}

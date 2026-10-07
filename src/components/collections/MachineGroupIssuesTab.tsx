@@ -1,11 +1,10 @@
 import type React from "react";
-import { DEFAULT_ISSUE_SORT, parseIssueFilters } from "~/lib/issues/filters";
-import { loadIssueListPage } from "~/lib/issues/list-page";
-import { IssueFilters } from "~/components/issues/IssueFilters";
-import { IssueList } from "~/components/issues/IssueList";
-import { IssueSummaryWidgets } from "~/components/issues/IssueSummaryWidgets";
+import { IssueView } from "~/components/issues/view/IssueView";
 import type { CollectionMachine } from "~/lib/collections/owner";
-import type { Viewer } from "~/lib/collections/viewer";
+import type { Viewer } from "~/lib/auth/viewer";
+import { loadIssueView } from "~/lib/issues/view/queries";
+import { loadIssueViewSavedViews } from "~/lib/issues/view/saved-views";
+import { toListSearchParams } from "~/lib/list-view/url-state";
 import { getAccessLevel } from "~/lib/permissions/helpers";
 import type { IssueExportScope } from "~/app/(app)/issues/export-schema";
 
@@ -19,7 +18,10 @@ interface MachineGroupIssuesTabProps {
 
 /**
  * Machine group Issues tab, shared by Collections, Owner Collections, and
- * tags (spec collections-and-tags 4.4).
+ * tags (spec collections-and-tags 4.4): Issue View scoped to the group's
+ * machines (issues-list §2.2). A group with no machines, or a Machine filter
+ * that selects none of them, still shows the Summary Widgets, at zero, and
+ * the list's empty state (issue-widgets §2.1).
  */
 export async function MachineGroupIssuesTab({
   machines,
@@ -27,86 +29,23 @@ export async function MachineGroupIssuesTab({
   viewer,
   exportScope,
 }: MachineGroupIssuesTabProps): Promise<React.JSX.Element> {
-  const urlParams = new URLSearchParams();
-  Object.entries(rawParams).forEach(([key, value]) => {
-    if (Array.isArray(value)) urlParams.set(key, value.join(","));
-    else if (value !== undefined) urlParams.set(key, value);
-  });
-  const filters = parseIssueFilters(urlParams);
-
-  // Force-scope to the group. Requested machine filters narrow WITHIN
-  // the set; they can never widen it. Empty scope -> no query (an empty
-  // machine[] is dropped by buildWhereConditions, which would unscope).
-  const groupInitials = machines.map((m) => m.initials);
-  if (groupInitials.length === 0) {
-    return (
-      <p className="py-8 text-center text-sm text-muted-foreground">
-        This collection has no machines yet.
-      </p>
-    );
-  }
-
-  const requested = filters.machine ?? [];
-  const scoped =
-    requested.length > 0
-      ? requested.filter((i) => groupInitials.includes(i))
-      : groupInitials;
-
-  if (scoped.length === 0) {
-    // The group has machines, but the requested ?machine= filter selects
-    // none of them (a stale bookmark or hand-edited param — the filter UI only
-    // offers this group's machines). Name the cause rather than implying
-    // the group itself is empty.
-    return (
-      <p className="py-8 text-center text-sm text-muted-foreground">
-        No issues match the selected machine filter.
-      </p>
-    );
-  }
-  filters.machine = scoped;
-
-  filters.currentUserId = viewer.userId;
-  const {
-    issuesList,
-    totalCount,
-    filterUsers,
-    assigneeUsers,
-    page,
-    pageSize,
-    summary,
-  } = await loadIssueListPage(filters, {
-    isAdmin: viewer.role === "admin", // permissions-audit-allow: SQL visibility flag, mirrors /issues page
-    scopeMachineInitials: groupInitials,
-  });
-
+  const searchParams = toListSearchParams(rawParams);
+  const [{ savedViews }, result] = await Promise.all([
+    loadIssueViewSavedViews("tab", searchParams),
+    loadIssueView({
+      searchParams,
+      scope: machines.map((machine) => machine.initials),
+    }),
+  ]);
   return (
-    <div className="space-y-6">
-      <IssueSummaryWidgets summary={summary} />
-      <p className="text-sm text-muted-foreground">
-        Showing {issuesList.length} of {totalCount} issues
-      </p>
-      <IssueFilters
-        users={filterUsers}
-        machines={machines.map((m) => ({
-          initials: m.initials,
-          name: m.name,
-        }))}
-        filters={filters}
-        currentUserId={viewer.userId ?? null}
-      />
-      <IssueList
-        issues={issuesList}
-        totalCount={totalCount}
-        sort={filters.sort ?? DEFAULT_ISSUE_SORT}
-        page={page}
-        pageSize={pageSize}
-        allUsers={assigneeUsers}
-        viewer={{
-          userId: viewer.userId,
-          accessLevel: getAccessLevel(viewer.role),
-        }}
-        exportScope={exportScope}
-      />
-    </div>
+    <IssueView
+      result={result}
+      savedViews={savedViews}
+      exportScope={exportScope}
+      viewer={{
+        userId: viewer.userId,
+        accessLevel: getAccessLevel(viewer.role),
+      }}
+    />
   );
 }

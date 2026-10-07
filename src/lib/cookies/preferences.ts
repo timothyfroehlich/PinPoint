@@ -1,40 +1,5 @@
 import { cookies } from "next/headers";
-import {
-  LAST_ISSUES_PATH_KEY,
-  CHANGELOG_SEEN_KEY,
-  DEFAULT_ISSUES_PATH,
-  PREFERENCE_MAX_AGE_SECONDS,
-} from "./constants";
-
-/**
- * Cookie options for user preferences.
- * Non-httpOnly so they can be read on both server and client.
- */
-const PREFERENCE_COOKIE_OPTIONS = {
-  httpOnly: false,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "lax" as const,
-  path: "/",
-  maxAge: PREFERENCE_MAX_AGE_SECONDS,
-};
-
-/**
- * Reads the last issues path from cookies (server-side).
- * Returns the stored path or default "/issues".
- */
-export async function getLastIssuesPath(): Promise<string> {
-  const cookieStore = await cookies();
-  const stored = cookieStore.get(LAST_ISSUES_PATH_KEY);
-  return stored?.value ?? DEFAULT_ISSUES_PATH;
-}
-
-/**
- * Sets the last issues path cookie (server-side, for use in server actions).
- */
-export async function setLastIssuesPathCookie(path: string): Promise<void> {
-  const cookieStore = await cookies();
-  cookieStore.set(LAST_ISSUES_PATH_KEY, path, PREFERENCE_COOKIE_OPTIONS);
-}
+import { CHANGELOG_SEEN_KEY } from "./constants";
 
 /**
  * Reads the number of changelog entries the user has seen (server-side).

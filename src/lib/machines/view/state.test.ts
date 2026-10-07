@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { getMachineViewPreset } from "./config";
 import {
+  getMachineViewBuiltInViews,
+  getMachineViewPreset,
+  type MachineViewBuiltInViewDefinition,
+} from "./config";
+import {
+  applyMachineBuiltInView,
   nextMachineViewSort,
   normalizeMachineViewSavedState,
   parseMachineViewState,
@@ -215,5 +220,45 @@ describe("machine view sort cycling", () => {
       sort: "machine",
       dir: "asc",
     });
+  });
+});
+
+describe("applying a Built-in View (list-views §1; machine-views §9.1)", () => {
+  const preset = getMachineViewPreset("machines").defaultState;
+  const current = toMachineViewSavedState({
+    ...preset,
+    q: "mars",
+    status: ["unplayable"],
+    pageSize: 50,
+    columns: [...preset.columns, "owner"],
+  });
+  const view = (id: string): MachineViewBuiltInViewDefinition => {
+    const found = getMachineViewBuiltInViews("machines").find(
+      (builtIn) => builtIn.id === id
+    );
+    if (!found) throw new Error(`No Built-in View ${id}`);
+    return found;
+  };
+
+  it("takes the view's search, filters, and sorting and keeps the fields and page size showing", () => {
+    expect(
+      applyMachineBuiltInView("machines", view("service-due"), current)
+    ).toEqual({
+      ...view("service-due").state,
+      q: "",
+      pageSize: 50,
+      columns: [...preset.columns, "owner"],
+    });
+  });
+
+  it("adds the fields the view names, once", () => {
+    const recentlyAdded = view("recently-added");
+    expect(
+      applyMachineBuiltInView("machines", recentlyAdded, current).columns
+    ).toEqual([...preset.columns, "owner", "dateAdded"]);
+    expect(
+      applyMachineBuiltInView("machines", recentlyAdded, recentlyAdded.state)
+        .columns
+    ).toEqual([...preset.columns, "dateAdded"]);
   });
 });

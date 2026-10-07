@@ -15,7 +15,7 @@ import {
 } from "~/lib/machines/settings-sheet-run";
 import { loadMachineView } from "~/lib/machines/view/queries";
 import { loadMachineViewSavedViews } from "~/lib/machines/view/saved-views";
-import { toMachineViewSearchParams } from "~/lib/machines/view/state";
+import { toListSearchParams } from "~/lib/list-view/url-state";
 
 export const metadata: Metadata = { title: "Print settings sheets" };
 
@@ -33,7 +33,7 @@ export default async function PrintSettingsSheetsPage({
   searchParams,
 }: PageProps): Promise<React.JSX.Element> {
   const rawSearchParams = await searchParams;
-  const viewSearchParams = toMachineViewSearchParams(rawSearchParams);
+  const viewSearchParams = toListSearchParams(rawSearchParams);
   const query = parsePrintRunQuery(rawSearchParams);
   const [loadedViews, result, onFloor, tags, initialMachines] =
     await Promise.all([

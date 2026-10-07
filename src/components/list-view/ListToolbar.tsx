@@ -13,6 +13,7 @@ import { FilterPicker } from "./FilterPicker";
 import {
   filterSelectionText,
   resetFilter,
+  selectionCount,
   type ListFilterModel,
 } from "./types";
 import { useMeasuredWidths } from "./use-measured-widths";
@@ -62,16 +63,16 @@ function FilterButtonFace({
 }: {
   filter: ListFilterModel;
 }): React.JSX.Element {
-  const count = filter.selected.length;
+  const count = selectionCount(filter);
   return (
     <>
       <span>{filter.label}</span>
-      {count > 1 ? (
-        <CountPill count={count} active />
-      ) : filter.valueLabel ? (
+      {filter.valueLabel ? (
         <span className="max-w-40 truncate text-foreground">
           {filter.valueLabel}
         </span>
+      ) : count > 1 ? (
+        <CountPill count={count} active />
       ) : null}
       <ChevronDown aria-hidden="true" className="size-3.5 shrink-0" />
     </>
@@ -281,7 +282,7 @@ export function ListToolbar({
   const laneRef = React.useRef<HTMLDivElement>(null);
   const contentKey = primaryFilters
     .map(
-      (filter) => `${filter.id}:${filter.valueLabel}:${filter.selected.length}`
+      (filter) => `${filter.id}:${filter.valueLabel}:${selectionCount(filter)}`
     )
     .join("|");
   const measured = useMeasuredWidths(rowRef, laneRef, contentKey);

@@ -24,6 +24,8 @@
  *   member or above — guests cannot triage even their own issues.
  */
 
+import type { UserRole } from "~/lib/types";
+
 /**
  * Permission value types:
  * - true: Always allowed
@@ -56,21 +58,21 @@ export type PermissionValue = boolean | "own" | "owner" | "own_or_owner";
 /**
  * Access levels represent authentication + authorization state.
  *
- * This differs from UserRole ("guest" | "member" | "admin") because AccessLevel
+ * This differs from UserRole because AccessLevel
  * includes "unauthenticated" — a state, not a persisted role. UserRole is the
  * role stored in the database for authenticated users. Use getAccessLevel() from
  * helpers.ts to convert a UserRole (or null) into an AccessLevel.
  */
-export type AccessLevel =
-  "unauthenticated" | "guest" | "member" | "technician" | "admin";
+export type AccessLevel = "unauthenticated" | UserRole;
 
+/** Every access level in order of increasing privilege (display order). */
 export const ACCESS_LEVELS = [
   "unauthenticated",
   "guest",
   "member",
   "technician",
   "admin",
-] as const;
+] as const satisfies readonly AccessLevel[];
 
 /**
  * Human-readable labels for each access level
@@ -606,7 +608,7 @@ const PERMISSIONS_MATRIX_DEFINITION = [
         id: "views.save",
         label: "Save views",
         description:
-          "Save personal named views of the Machines list, and choose the view it opens with",
+          "Save personal named views of the Machines and Issues lists, and choose the view each opens with",
         access: {
           unauthenticated: false,
           guest: true,
