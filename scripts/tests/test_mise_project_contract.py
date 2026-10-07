@@ -1098,4 +1098,11 @@ def test_pr_e2e_shards_and_browser_cache_wiring() -> None:
 
     comprehensive = _workflow_job_block(workflow, "test-e2e-comprehensive")
     assert 'save-cache: "true"' in comprehensive
+    # Needing only `changes`, the explicit guard is all that keeps the
+    # all-browser suite off docs-only main pushes (PP-x0ke).
+    assert "\n    needs: changes\n" in comprehensive
+    assert (
+        "(needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true')"
+        in comprehensive
+    )
     assert workflow.count('save-cache: "true"') == 1
