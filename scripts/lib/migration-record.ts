@@ -36,25 +36,22 @@ export function migrationRecord(
 }
 
 /**
- * The earlier journal entry that marking `entries[position]` would hide, or
- * undefined when every earlier entry is already covered by `newestApplied`.
+ * A journal entry that marking `target` would hide, or undefined.
  *
- * Marking writes created_at = this entry's `when`; the migrator then skips any
- * unapplied entry with an older `when`. The journal is not in `when` order
- * everywhere (0012 predates 0011), so the bound is the newest `when` among all
- * earlier entries, not the previous entry's.
+ * Marking writes created_at = target.when, and the migrator then skips every
+ * unapplied entry with an older `when`. Entries with a `when` at or below
+ * `newestApplied` are already applied or already skipped; entries newer than
+ * the target still run. What marking hides is any other entry, wherever it
+ * sits in the journal, with newestApplied < when < target.when (the journal
+ * is not in `when` order everywhere: 0012 predates 0011).
  */
-export function earlierEntryHiddenByMarking<T extends { when: number }>(
+export function entryHiddenByMarking<T extends { when: number }>(
   entries: readonly T[],
-  position: number,
+  target: T,
   newestApplied: number
 ): T | undefined {
-  let newestEarlier: T | undefined;
-  for (const entry of entries.slice(0, Math.max(position, 0))) {
-    if (!newestEarlier || entry.when > newestEarlier.when)
-      newestEarlier = entry;
-  }
-  return newestEarlier && newestApplied < newestEarlier.when
-    ? newestEarlier
-    : undefined;
+  return entries.find(
+    (entry) =>
+      entry !== target && entry.when > newestApplied && entry.when < target.when
+  );
 }

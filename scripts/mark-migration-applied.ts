@@ -9,10 +9,7 @@ import {
   isCloudDatabaseUrl,
   isForceProductionEnabled,
 } from "./lib/db-target.mjs";
-import {
-  earlierEntryHiddenByMarking,
-  migrationRecord,
-} from "./lib/migration-record";
+import { entryHiddenByMarking, migrationRecord } from "./lib/migration-record";
 
 interface MigrationEntry {
   idx: number;
@@ -205,14 +202,14 @@ async function main() {
       SELECT max(created_at)::text AS created_at FROM drizzle.__drizzle_migrations
     `;
     const newestApplied = Number(newest?.created_at ?? 0);
-    const hidden = earlierEntryHiddenByMarking(
+    const hidden = entryHiddenByMarking(
       journal.entries,
-      journal.entries.indexOf(migrationEntry),
+      migrationEntry,
       newestApplied
     );
     if (hidden) {
       console.error(
-        `❌ ${hidden.tag} and possibly other earlier migrations are not recorded as applied.\n` +
+        `❌ ${hidden.tag} (and possibly others) is not recorded as applied and has an older journal \`when\`.\n` +
           `   Marking ${migrationEntry.tag} would make drizzle's migrator skip them. Apply or mark them first.`
       );
       process.exitCode = 1;
