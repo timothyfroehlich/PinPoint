@@ -1072,3 +1072,30 @@ def test_offline_python_and_ruff_resolution() -> None:
     assert ruff_proc.stdout.strip() == f"ruff {expected_versions['ruff']}", (
         f"Expected ruff {expected_versions['ruff']}, got {ruff_proc.stdout.strip()}"
     )
+
+
+def test_pr_e2e_shards_and_browser_cache_wiring() -> None:
+    """PR E2E jobs shard by the matrix and never save the shared browser cache.
+
+    A `--shard` denominator out of step with the matrix silently drops tests,
+    a shared artifact name makes the shards' uploads collide, and a PR-scoped
+    browser save would spread one cache entry per PR. Only main's comprehensive
+    job saves. (PP-yva7.2, PP-yva7.4.)
+    """
+    workflow = CI_WORKFLOW_PATH.read_text(encoding="utf-8")
+    for job_name in (
+        "test-e2e-smoke",
+        "test-e2e-smoke-mobile-chrome",
+        "test-e2e-full-chromium",
+    ):
+        job = _workflow_job_block(workflow, job_name)
+        assert "fail-fast: false" in job, job_name
+        assert "SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}" in job, job_name
+        assert '--shard="$SHARD"' in job, job_name
+        assert "-shard-${{ matrix.shard }}" in job, f"{job_name} artifact name"
+        assert "uses: $/.github/actions/setup-playwright" in job, job_name
+        assert "save-cache" not in job, f"{job_name} must not save the browser cache"
+
+    comprehensive = _workflow_job_block(workflow, "test-e2e-comprehensive")
+    assert 'save-cache: "true"' in comprehensive
+    assert workflow.count('save-cache: "true"') == 1
