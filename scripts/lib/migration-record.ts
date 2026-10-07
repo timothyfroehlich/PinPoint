@@ -25,8 +25,11 @@ export function migrationRecord(
     readFileSync(join(migrationsFolder, "meta", "_journal.json"), "utf-8")
   ) as { entries: { tag: string }[] };
   const position = journal.entries.findIndex((entry) => entry.tag === tag);
-  const meta = readMigrationFiles({ migrationsFolder })[position];
-  if (position === -1 || !meta) {
+  const meta =
+    position === -1
+      ? undefined
+      : readMigrationFiles({ migrationsFolder })[position];
+  if (!meta) {
     throw new Error(`Migration ${tag} is not in ${migrationsFolder}`);
   }
   return { hash: meta.hash, createdAt: meta.folderMillis };

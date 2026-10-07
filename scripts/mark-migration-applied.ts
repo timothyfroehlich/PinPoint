@@ -184,10 +184,12 @@ async function main() {
       console.log(
         `✅ Migration ${migrationEntry.tag} is already marked as applied`
       );
-      const [existing] = existingMigrations;
-      if (existing && Number(existing.created_at) !== record.createdAt) {
+      const legacy = existingMigrations.find(
+        (row) => Number(row.created_at) !== record.createdAt
+      );
+      if (legacy) {
         console.warn(
-          `⚠️  Its row was written by an older version of this script (created_at ${existing.created_at}, journal when ${record.createdAt}).\n` +
+          `⚠️  A row for it was written by an older version of this script (created_at ${legacy.created_at}, journal when ${record.createdAt}).\n` +
             "   drizzle's migrator skips any pending migration whose `when` is older than the newest created_at."
         );
       }
