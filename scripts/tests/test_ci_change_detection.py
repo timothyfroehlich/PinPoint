@@ -389,7 +389,7 @@ def test_setup_job_gates_on_code_or_deps(ci_workflow: dict) -> None:
     assert "needs.changes.outputs.deps == 'true'" in setup_if
 
 
-def test_push_change_detection_reaches_back_to_the_last_executed_main_run(
+def test_push_change_detection_reaches_back_to_the_last_passing_main_run(
     ci_workflow: dict,
 ) -> None:
     """A push to main diffs against the last main commit a CI run passed on.
@@ -397,7 +397,8 @@ def test_push_change_detection_reaches_back_to_the_last_executed_main_run(
     Main runs one at a time and a newer merge cancels the waiting run, so a
     push's own `before` can skip a merge whose run never started. Diffing from
     `before` would let a docs-only merge's run skip E2E for the code merge it
-    superseded. Both filters and the push audit take the reached-back base.
+    superseded. Both filters take the reached-back base; the push audit keeps
+    `before`, because the PR-level audit already gated every lockfile change.
     (PP-yva7.7.)
     """
     changes = ci_workflow["jobs"]["changes"]
@@ -416,6 +417,9 @@ def test_push_change_detection_reaches_back_to_the_last_executed_main_run(
         "only a passing run covered its commits; a failure may have skipped E2E"
     )
     assert "git merge-base --is-ancestor" in base["run"]
+    assert 'select(.head_sha != \\"$GITHUB_SHA\\")' in base["run"], (
+        "a re-run of a green run must not diff against itself"
+    )
     assert "force=true" in base["run"], "an unknown base must run every job"
     assert "github.event.before" not in base["run"], (
         "falling back to `before` can skip a superseded merge"

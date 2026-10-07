@@ -36,7 +36,8 @@ permissions: read-all  # zizmor: ignore[excessive-permissions]
 # merge run at once — up to 10 concurrent main runs in a day, each holding
 # runners under the account's 20-job cap while PR jobs queued. A main run takes
 # ~45 minutes until the comprehensive job's legs run in parallel (PP-yva7.3),
-# then ~15, so a merge waits at most one run before a run covering it starts.
+# then ~15, so a merge normally waits at most one run before a run covering it
+# starts (a hung run holds the slot until its job timeouts end it).
 # (PP-yva7.7.)
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -102,8 +103,10 @@ jobs:
           # No narrower fallback: diffing from `before` could skip a superseded
           # merge, and a run that passed that way would become the next base.
           # When the base is unknown, every job runs instead.
-          if ! sha=$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?branch=main&event=push&status=success&per_page=1" \
-            --jq '.workflow_runs[0].head_sha // empty'); then
+          # Skips this commit's own earlier pass, so re-running a green run
+          # re-tests its range instead of diffing against itself.
+          if ! sha=$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?branch=main&event=push&status=success&per_page=5" \
+            --jq "[.workflow_runs[] | select(.head_sha != \"$GITHUB_SHA\")][0].head_sha // empty"); then
             echo "::warning::Could not list main's CI runs; running every job."
             echo "force=true" >> "$GITHUB_OUTPUT"
           elif [ -z "$sha" ]; then

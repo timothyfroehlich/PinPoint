@@ -289,6 +289,7 @@ Work isn't done at "git push" — it's done when the change is **merged, deploye
 **Main's CI verdict.** Main runs one CI run at a time (`ci.yml` concurrency, PP-yva7.7): a merge that lands during a main run waits, and a newer merge cancels the waiting run. Your commit's own run can therefore read `cancelled`, which means superseded, not broken. Your verdict is the **oldest** completed main run that executed (`success` or `failure`) and whose head contains your commit. Every main run diffs from the last commit a main run passed on, so your changes still select the jobs that test them.
 
 ```bash
+git fetch origin main
 gh run list --branch main --workflow CI --status completed --limit 20 --json headSha,conclusion,url
 git merge-base --is-ancestor <your-merge-sha> <run-headSha> && echo covered
 ```
