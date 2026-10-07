@@ -434,24 +434,28 @@ def test_both_evaluate_steps_are_continue_on_error() -> None:
         assert "continue-on-error: true" in block, step_id
 
 
-def test_a_push_to_main_is_not_cancelled_by_the_next_push() -> None:
-    """Every main commit needs its own concurrency group.
+def test_main_runs_one_at_a_time_and_prs_cancel_superseded_runs() -> None:
+    """Main runs share one group and are never cancelled mid-run; PR runs cancel.
 
-    Under a group keyed only on `github.ref`, each merge cancelled the previous
-    merge's in-flight run. `test-e2e-comprehensive` takes ~30 minutes, so on any
-    evening with more than one merge per half hour it was cancelled more often
-    than it finished — a missing verdict, the class this gate exists to remove,
-    reached without ever hitting the timeout PP-jxhy fixed. (PP-tbhv.)
+    A shared group with cancel-in-progress cut the comprehensive suite off
+    mid-run (run 31755670441) — a missing verdict, the class this gate exists to
+    remove. Per-SHA groups (PP-tbhv) fixed that but ran every merge at once and
+    crowded the account's concurrent-job cap. One group per ref with
+    cancel-in-progress only for pull_request gives main one running run plus one
+    waiting, and keeps PR cancellation. (PP-yva7.7.)
     """
     ci = _ci_yml()
-    # Scope to the workflow-level block. Both assertions are satisfiable by a
-    # job-level `concurrency:` somewhere else in the file, which would govern
-    # only that one job — so a whole-file substring check would keep passing
-    # while the setting it claims to pin had moved or been flipped.
+    # Scope to the workflow-level block. A job-level `concurrency:` elsewhere
+    # would govern only that one job, so a whole-file substring check could keep
+    # passing while the setting it claims to pin had moved or been flipped.
     block = ci.split("\nconcurrency:\n", 1)[1].split("\njobs:", 1)[0]
-    assert "github.event_name == 'push' && github.sha" in block, block
-    # PR runs must keep cancelling — that is the whole point of the setting.
-    assert "cancel-in-progress: true" in block
+    assert "group: ${{ github.workflow }}-${{ github.ref }}\n" in block, block
+    assert "github.sha" not in block, (
+        "main runs must share one group, not one per commit"
+    )
+    assert "cancel-in-progress: ${{ github.event_name == 'pull_request' }}" in block, (
+        block
+    )
 
 
 def test_a_dedicated_step_gates_on_both_verdicts() -> None:
