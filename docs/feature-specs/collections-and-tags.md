@@ -2,7 +2,7 @@
 
 **Status: draft.**
 
-**What this document is.** The requirements for grouping machines in PinPoint: hand-curated Collections, ownership-derived Owner Collections, and public Tags. It describes the intended final state only; what the code does or used to do lives solely in the Known divergences table. Each requirement is numbered for citation. When code and spec disagree, either the code is wrong or this document gets amended — never silently neither.
+**What this document is.** The requirements for grouping machines in PinPoint: hand-curated Collections and public Tags. It describes the intended final state only; what the code does or used to do lives solely in the Known divergences table. Each requirement is numbered for citation. When code and spec disagree, either the code is wrong or this document gets amended — never silently neither.
 
 **Related records.** `docs/feature-specs/machine-views.md` (the shared machine listing every group's Overview uses), `docs/feature-specs/pinballmap.md` (catalog matching and uncataloged machines, which determine the current manufacturer), epic PP-wqit.
 
@@ -10,9 +10,9 @@
 
 ## 1. Concepts
 
-- **Machine Group** — any named set of machines PinPoint can show as one unit with Overview, Issues, and Timeline tabs. Collections, Owner Collections, and Tags are Machine Groups; each defines its own membership, visibility, and curation.
+- **Machine Group** — any named set of machines PinPoint can show as one unit with Overview, Issues, and Timeline tabs. Collections and Tags are Machine Groups; each defines its own membership, visibility, and curation.
 - **Collection** — a Machine Group a member creates and curates by hand. Membership is exactly the machines someone added. Private to its owner unless shared.
-- **Owner Collection** — the Machine Group of every machine one person owns. Membership follows machine ownership; nobody curates it and it cannot be edited or shared.
+- **Owner Collection** — _Retired 2026-10-07._ A person's machines are the Machines list filtered by Owner, and their machines' issues are the Issues list filtered by Machine owner (§6.4).
 - **Editor** — a signed-in account the owner has granted edit access to one Collection. Editor access belongs to the account, never to a link.
 - **View Link** — a Collection's secret, revocable URL that grants read-only access to anyone holding it, signed in or not.
 - **Tag** — a public Machine Group whose name describes something about its machines. A tag belongs to at most one tag type. Every automatic tag belongs to one.
@@ -65,17 +65,17 @@
 
 - **5.1** A signed-in person has a My Collections page listing Collections they own and Collections they are an Editor of, as separate groups ordered by name.
 - **5.2** Each listed Collection shows its machine count, leaving out Removed machines. Collections shared with the person also show the owner's name and their Editor access.
-- **5.3** When the person owns at least one machine, My Collections also links to their Owner Collection.
+- **5.3** When the person owns at least one machine, My Collections also links to their machines (§6.4).
 - **5.4** My Collections offers Collection creation and opens the new Collection once it is created.
 - **5.5** My Collections requires sign-in.
 
 ---
 
-## 6. Owner Collections
+## 6. A Person's Machines
 
-- **6.1** Every person who owns at least one machine has an Owner Collection named for them.
-- **6.2** An Owner Collection is public: anyone, including anonymous visitors, can open it.
-- **6.3** An Owner Collection has no edit, share, add-machine, or delete controls, and no action can change its membership except changing machine ownership.
+- **6.1–6.3** _Retired 2026-10-07._ Owner Collections were replaced by the Owner filter (6.4). Numbers kept so older citations don't dangle.
+- **6.4** A person's machines are the Machines list filtered to Owner = that person, and their machines' issues are the Issues list filtered to Machine owner = that person. Every link to a person's machines, from My Collections, the account menu, a profile, or a person's hover card, opens the Machines list filtered this way.
+- **6.5** An old Owner Collection link opens the matching filtered list: its Overview and Timeline tabs open Machines filtered to that owner, and its Issues tab opens Issues filtered to that machine owner.
 
 ---
 
@@ -165,9 +165,9 @@
 
 ## Known divergences (code vs spec)
 
-| Requirement | Divergence                         | Resolution |
-| :---------- | :--------------------------------- | :--------- |
-| 6.2         | Owner Collections require sign-in. | PP-jb9v.6  |
+| Requirement | Divergence | Resolution |
+| :-- | :-- | :-- |
+| 6.4–6.5 | Owner Collection pages still exist, and links to a person's machines open them. | PP-jb9v.6 |
 
 ---
 
@@ -175,6 +175,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-07 | Retired Owner Collections: a person's machines and their issues are the Machines and Issues lists filtered by owner, and old Owner Collection links open those lists (§1, 5.3, §6). |
 | 2026-10-06 | Added merging one hand-applied tag into another (11.17–11.19, 12.5); retired deferred item 10.8. |
 | 2026-10-05 | Added Collection descriptions, written by the owner and Editors and shown under the header on every tab (2.4, 2.8, 3.8, 4.7); retired deferred item 10.3. |
 | 2026-10-05 | Turning a View Link back on creates a new link instead of restoring the earlier one (3.4). |
