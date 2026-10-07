@@ -416,19 +416,17 @@ def test_push_change_detection_reaches_back_to_the_last_executed_main_run(
         "only a passing run covered its commits; a failure may have skipped E2E"
     )
     assert "git merge-base --is-ancestor" in base["run"]
+    assert "force=true" in base["run"], "an unknown base must run every job"
+    assert "github.event.before" not in base["run"], (
+        "falling back to `before` can skip a superseded merge"
+    )
 
     for step_id in ("filter", "deps-filter"):
         assert steps[step_id]["with"]["base"] == "${{ steps.base.outputs.sha }}", (
             step_id
         )
-    assert changes["outputs"]["base"] == "${{ steps.base.outputs.sha }}"
-
-    audit_env = next(
-        s["env"]
-        for s in ci_workflow["jobs"]["pnpm-audit"]["steps"]
-        if "BASE_SHA" in s.get("env", {})
-    )
-    assert "needs.changes.outputs.base" in audit_env["BASE_SHA"]
+    assert "steps.base.outputs.force == 'true'" in changes["outputs"]["deps"]
+    assert steps["set-code"]["env"]["FORCE"] == "${{ steps.base.outputs.force }}"
 
 
 def test_mixed_changes_trigger_tests(paths_filter: PathsFilterSimulator) -> None:

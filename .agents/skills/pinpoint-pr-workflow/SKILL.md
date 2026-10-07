@@ -293,7 +293,7 @@ gh run list --branch main --workflow CI --status completed --limit 20 --json hea
 git merge-base --is-ancestor <your-merge-sha> <run-headSha> && echo covered
 ```
 
-A run covers the commits between the previous executed run's head and its own. On red, list them (`git log --oneline <previous-run-headSha>..<red-headSha>`) and read the failing jobs before deciding the failure is yours.
+A run tests every change since the last main commit a run passed on. On red, list those commits (`git log --oneline <last-green-headSha>..<red-headSha>`) and read the failing jobs before deciding the failure is yours.
 
 **The deployment.** After Tim merges, consider watching the deployment — only if the PR could break it. A merge that breaks prod isn't done, so when the change actually reaches the deployed app, it's worth watching the production deploy land and confirming no build, migration, or runtime errors. That means: anything under `src/`, a migration, a dependency or `next.config.ts` change, an env-registry change, or anything on the `vercel-build` path. **Skip it otherwise** — docs, skills, beads, GitHub workflows, and dev-only scripts can't affect the deploy, and watching a run that was never at risk just burns time. This is a judgement call, not a mandate; if you're not present when Tim merges, it's his to do or to ask you to pick back up.
 
