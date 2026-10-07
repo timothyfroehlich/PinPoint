@@ -6,7 +6,7 @@ interface Props {
   /** Line above the title, e.g. a tag's breadcrumb. */
   eyebrow?: React.ReactNode;
   summary: CollectionSummary;
-  /** Owner-only action slot rendered to the right of the title/count block. */
+  /** Action slot rendered to the right of the title/count block. */
   action?: React.ReactNode;
 }
 

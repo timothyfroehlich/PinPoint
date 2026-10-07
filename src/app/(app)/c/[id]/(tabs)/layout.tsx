@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { MachineGroupShell } from "~/components/collections/MachineGroupShell";
 import { EditCollectionDialog } from "~/components/collections/EditCollectionDialog";
 import { CollectionShareDialog } from "~/components/collections/CollectionShareDialog";
+import { PrintSettingsSheetsLink } from "~/components/machines/settings/PrintSettingsSheetsLink";
 import { ClampedDescription } from "~/components/collections/ClampedDescription";
 import { RichTextDisplay } from "~/components/editor/RichTextDisplay";
 import { docIsEmpty, docToPlainText } from "~/lib/tiptap/types";
@@ -48,7 +49,7 @@ export default async function CollectionLayout({
   // and the owner-only Delete stay on the manage gate. The all-machines fetch
   // and token value are surfaced only to editors/managers, never to a plain
   // view-token or admin visitor.
-  let headerAction: React.ReactNode = null;
+  let editActions: React.ReactNode = null;
   if (data.viewerCanEdit) {
     const allMachines = await getPickerMachines(data.collection.id);
     let sharePanel: React.ReactNode = null;
@@ -67,8 +68,8 @@ export default async function CollectionLayout({
         />
       );
     }
-    headerAction = (
-      <div className="flex items-center gap-2">
+    editActions = (
+      <>
         {sharePanel}
         <EditCollectionDialog
           collectionId={data.collection.id}
@@ -78,9 +79,16 @@ export default async function CollectionLayout({
           currentIds={data.collection.machines.map((m) => m.id)}
           canDelete={data.viewerCanManage}
         />
-      </div>
+      </>
     );
   }
+  // Everyone can print settings sheets (settings-sheets §2.1, §2.6).
+  const headerAction = (
+    <div className="flex items-center gap-2">
+      <PrintSettingsSheetsLink machines={data.collection.machines} />
+      {editActions}
+    </div>
+  );
 
   // Saves store a blank description as null; the text check also covers an
   // empty doc written some other way, so the header never paints an empty block.

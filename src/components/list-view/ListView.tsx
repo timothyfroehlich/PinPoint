@@ -42,7 +42,8 @@ export function ListTitleRow({
   return (
     // The toggle's container: as wide as the Summary Widgets group beside it
     // in the List View, so the toggle shows exactly while the group stacks.
-    <div className="@container flex min-h-11 items-center gap-1.5 md:gap-3">
+    // Actions that still do not fit as icon buttons wrap below the title.
+    <div className="@container flex min-h-11 flex-wrap items-center gap-x-1.5 gap-y-2 md:gap-x-3">
       <h1 className="shrink-0 text-2xl font-bold tracking-tight md:text-3xl">
         {title}
       </h1>

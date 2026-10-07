@@ -65,9 +65,7 @@
 
 ## Known divergences (code vs spec)
 
-| Requirement | Divergence                | Resolution          |
-| :---------- | :------------------------ | :------------------ |
-| 1–6         | No settings sheet exists. | PP-k3km (sheets PR) |
+_None — the current implementation matches this spec._
 
 ## Changelog
 

@@ -52,6 +52,8 @@ export interface LoadMachineViewArgs {
   scope: MachineViewScope;
   preset: MachineViewPresetId;
   searchParams: URLSearchParams;
+  /** Include `matchingIds` in the result. */
+  withMatchingIds?: boolean;
 }
 
 export interface LoadMachineViewFromDatabaseArgs extends LoadMachineViewArgs {
@@ -377,6 +379,7 @@ export async function loadMachineViewFromDatabase(
       .sort((left, right) => left.name.localeCompare(right.name)),
     permittedFields: [...getMachineViewPreset(preset).permittedFields],
     offersMe: viewerId !== null,
+    matchingIds: applied.matchingIds,
   };
 }
 
@@ -444,13 +447,18 @@ export async function loadMachineView({
   scope,
   preset,
   searchParams,
+  withMatchingIds = false,
 }: LoadMachineViewArgs): Promise<MachineViewResult> {
   const viewer = await getViewer();
-  return loadMachineViewCached(
+  const { matchingIds, ...result } = await loadMachineViewCached(
     scope.kind,
     scopeId(scope),
     preset,
     searchParams.toString(),
     viewer.userId ?? null
   );
+  // Most Surfaces never need every id, so they stay off the page payload.
+  return withMatchingIds && matchingIds !== undefined
+    ? { ...result, matchingIds }
+    : result;
 }

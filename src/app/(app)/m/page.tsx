@@ -1,8 +1,9 @@
 import type React from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { MapPin, Plus, Printer } from "lucide-react";
+import { MapPin, Plus } from "lucide-react";
 import { MachineView } from "~/components/machines/view";
+import { MachinesPrintMenu } from "~/components/machines/MachinesPrintMenu";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
 import { Button } from "~/components/ui/button";
@@ -39,7 +40,8 @@ export default async function MachinesPage({
     "machines.pinballmap.sync",
     accessLevel
   );
-  // Batch printing uses one card's export gate (apron-cards §12.1).
+  // Batch printing apron cards uses one card's export gate (apron-cards
+  // §12.1); settings sheets are open to everyone (settings-sheets §2.1).
   const canPrintApronCards = checkPermission(
     "machines.apron.export",
     accessLevel
@@ -99,34 +101,6 @@ export default async function MachinesPage({
       </Link>
     </Button>
   ) : null;
-  const printApronCardsButton = canPrintApronCards ? (
-    <Button
-      asChild
-      variant="outline"
-      className="relative max-md:size-11 max-md:px-0"
-    >
-      <Link
-        href="/m/apron-cards"
-        aria-label={
-          apronQueueCount > 0
-            ? `Print apron cards, ${apronQueueCount} in your print queue`
-            : "Print apron cards"
-        }
-      >
-        <Printer className="size-4 md:mr-2" aria-hidden="true" />
-        <span className="max-md:hidden">Print apron cards</span>
-        {apronQueueCount > 0 ? (
-          <span
-            aria-hidden="true"
-            className="inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-semibold tabular-nums text-on-primary max-md:absolute max-md:-top-1.5 max-md:-right-1.5 md:ml-2"
-            data-testid="apron-print-queue-count"
-          >
-            {apronQueueCount}
-          </span>
-        ) : null}
-      </Link>
-    </Button>
-  ) : null;
   const addMachineButton = canCreateMachine ? (
     <Button
       asChild
@@ -144,16 +118,16 @@ export default async function MachinesPage({
       </Link>
     </Button>
   ) : null;
-  const pageActions =
-    lineupButton === null &&
-    printApronCardsButton === null &&
-    addMachineButton === null ? undefined : (
-      <>
-        {lineupButton}
-        {printApronCardsButton}
-        {addMachineButton}
-      </>
-    );
+  const pageActions = (
+    <>
+      {lineupButton}
+      <MachinesPrintMenu
+        canPrintApronCards={canPrintApronCards}
+        apronQueueCount={apronQueueCount}
+      />
+      {addMachineButton}
+    </>
+  );
 
   if (result.scopeCount === 0) {
     return (
