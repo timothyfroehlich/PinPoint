@@ -104,8 +104,9 @@ jobs:
           # No narrower fallback: diffing from `before` could skip a superseded
           # merge, and a run that passed that way would become the next base.
           # When the base is unknown, every job runs instead.
-          # Skips this commit's own earlier pass, so re-running a green run
-          # re-tests its range instead of diffing against itself.
+          # A run being re-run is in progress, so status=success already leaves
+          # it out; the select also ignores any other passing run of this same
+          # commit, so the diff is never empty against itself.
           if ! sha=$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?branch=main&event=push&status=success&per_page=5" \
             --jq "[.workflow_runs[] | select(.head_sha != \"$GITHUB_SHA\")][0].head_sha // empty"); then
             echo "::warning::Could not list main's CI runs; running every job."

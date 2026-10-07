@@ -286,7 +286,7 @@ Work isn't done at "git push" — it's done when the change is **merged, deploye
 
 ### 5.1 Main's CI verdict, and the deployment if the PR could break it
 
-**Main's CI verdict.** Main runs one CI run at a time (`ci.yml` concurrency, PP-yva7.7): a merge that lands during a main run waits, and a newer merge cancels the waiting run. A run-level `cancelled` therefore means superseded or cancelled by hand, not broken (a job timeout fails the run instead). Every main run diffs from the last commit a main run passed on, so your changes still select the jobs that test them. Your verdict is the **oldest** completed main run whose head contains your commit and whose E2E jobs ran (for a code change, `E2E Comprehensive Tests` succeeded or failed rather than skipped); a run that stopped before them tested nothing, and the next run covers you.
+**Main's CI verdict.** Main runs one CI run at a time (`ci.yml` concurrency, PP-yva7.7): a merge that lands during a main run waits, and a newer merge cancels the waiting run. A run-level `cancelled` therefore usually means superseded; one cancelled by hand or by a job timeout reads the same, so check its jobs before dismissing it. Every main run diffs from the last commit a main run passed on, so your changes still select the jobs that test them. Your verdict is the **oldest** completed main run whose head contains your commit and whose E2E jobs ran (for a code change, `E2E Comprehensive Tests` succeeded or failed rather than skipped); a run that stopped before them tested nothing, and the next run covers you.
 
 ```bash
 git fetch origin main
