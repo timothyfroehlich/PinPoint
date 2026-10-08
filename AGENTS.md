@@ -214,7 +214,7 @@ How Tim wants agents to behave. (§1 has the one-line version; this is the detai
 
 ### Preview deployments (on-demand, TTL'd Supabase branches)
 
-Native Supabase auto-branching is **disabled** — no PR gets a preview by default. Previews are created on demand via the `/preview` PR-comment command and torn down on a TTL by an hourly reaper. Full control-surface reference and implementation pointers: `pinpoint-deployment` skill.
+Native Supabase auto-branching is **disabled** and `vercel.json` limits automatic Vercel deployments to `main` — no PR gets a preview by default, and a push to a branch builds nothing on Vercel. Previews are created on demand via the `/preview` PR-comment command and torn down on a TTL by an hourly reaper. Full control-surface reference and implementation pointers: `pinpoint-deployment` skill.
 
 ### pnpm audit gate
 
