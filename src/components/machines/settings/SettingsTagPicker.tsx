@@ -182,7 +182,10 @@ function PickerPanel({
     const inputId = `${id}-tag-${tag.slug}`;
     const hintId = `${inputId}-hint`;
     return (
-      <div key={tag.slug} className="flex min-h-11 items-center gap-2 px-1">
+      <div
+        key={tag.slug}
+        className="flex min-h-13 items-center gap-2 px-1 md:min-h-11"
+      >
         <label
           htmlFor={inputId}
           className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-3 text-sm text-foreground has-disabled:cursor-default"
@@ -353,7 +356,9 @@ function DefaultPill({
       }
       title={disabled ? `Tag the set ${tagName} first` : undefined}
       className={cn(
-        "inline-flex h-11 shrink-0 items-center gap-1 rounded-full border px-3 text-xs font-medium transition-colors motion-reduce:transition-none md:h-7 md:px-2.5",
+        "inline-flex h-9 shrink-0 items-center gap-1 rounded-full border px-3 text-xs font-medium transition-colors motion-reduce:transition-none md:h-7 md:px-2.5",
+        // A 44px tap target on phones without a taller pill.
+        "relative before:absolute before:inset-x-0 before:-inset-y-1 before:content-[''] md:before:hidden",
         "disabled:cursor-not-allowed disabled:opacity-50",
         isDefault
           ? slot === "house"
