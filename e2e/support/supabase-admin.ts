@@ -411,6 +411,20 @@ export async function deleteTestTagType(name: string) {
 }
 
 /**
+ * Delete settings tags (machine-settings §3) by exact name. Their set
+ * memberships go with them (ON DELETE CASCADE). A safety net for specs that
+ * create a settings tag through the UI and may fail before deleting it there.
+ */
+export async function deleteTestSettingsTags(names: string[]) {
+  const { error } = await supabaseAdmin
+    .from("settings_tags")
+    .delete()
+    .in("name", names)
+    .eq("is_builtin", false);
+  if (error) throw error;
+}
+
+/**
  * Generate an unsubscribe token for E2E tests.
  * Uses the same HMAC-SHA256 algorithm and signing secret as
  * src/lib/notifications/unsubscribe-token.ts. The test client must

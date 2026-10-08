@@ -78,6 +78,10 @@ const authenticatedRoutes = [
   "/c/tags",
   "/c/tags/location",
   "/c/tags/location/front-room",
+  // Settings tags (machine-settings §3.6–§3.7), from seed-machine-settings.mjs:
+  // the list, and a custom tag that finds sets on several machines.
+  "/c/settings-tags",
+  "/c/settings-tags/bat-city-2025",
 ];
 
 const publicRoutes = [
