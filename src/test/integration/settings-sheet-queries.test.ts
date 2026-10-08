@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { asDbOrTx, getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { createTestMachine } from "~/test/helpers/factories";
@@ -13,8 +14,12 @@ import {
   getPrintRunMachines,
   getSettingsTagOptions,
 } from "~/lib/machines/settings-sheet-queries";
+import {
+  getSettingsTagPage,
+  listSettingsTagSummaries,
+} from "~/lib/machines/settings-tag-queries";
 
-describe("settings sheet queries", () => {
+describe("settings sheet and settings tag queries", () => {
   setupTestDb();
 
   const floorId = randomUUID();
@@ -96,5 +101,51 @@ describe("settings sheet queries", () => {
       "tournament",
       "bat-city",
     ]);
+  });
+
+  it("counts each tag's sets and machines, built-ins first (machine-settings §3.7)", async () => {
+    const db = asDbOrTx(await getTestDb());
+    expect(
+      (await listSettingsTagSummaries(db)).map((t) => [
+        t.slug,
+        t.setCount,
+        t.machineCount,
+      ])
+    ).toEqual([
+      ["house", 1, 1],
+      ["tournament", 0, 0],
+      ["bat-city", 1, 1],
+    ]);
+  });
+
+  it("a tag's page lists its sets by machine name, machines off the floor too (§3.6)", async () => {
+    const db = asDbOrTx(await getTestDb());
+    const raw = await getTestDb();
+    const [batCity] = await raw
+      .select({ id: settingsTags.id })
+      .from(settingsTags)
+      .where(eq(settingsTags.slug, "bat-city"));
+    if (!batCity) throw new Error("missing tag");
+    const loanSetId = randomUUID();
+    await raw
+      .insert(machineSettingsSets)
+      .values({ id: loanSetId, machineId: loanId, name: "Loan finals" });
+    await raw
+      .insert(machineSettingsSetTags)
+      .values({ setId: loanSetId, tagId: batCity.id });
+
+    const page = await getSettingsTagPage(db, "bat-city");
+    expect(page).toMatchObject({ name: "Bat City", isBuiltin: false });
+    expect(
+      page?.machines.map((m) => [
+        m.name,
+        m.onTheFloor,
+        m.sets.map((set) => set.name),
+      ])
+    ).toEqual([
+      ["Attack", true, ["Bat City"]],
+      ["Spider-Man", false, ["Loan finals"]],
+    ]);
+    expect(await getSettingsTagPage(db, "no-such-tag")).toBeNull();
   });
 });

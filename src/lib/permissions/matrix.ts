@@ -534,7 +534,7 @@ const PERMISSIONS_MATRIX_DEFINITION = [
         label: "Manage machine settings",
         description:
           "Create settings sets, edit and delete community sets, apply " +
-          "settings tags, and choose a machine's preferred House and " +
+          "settings tags, and choose a machine's default House and " +
           "Tournament sets (owners on their own machines; technicians and " +
           "admins on any). A personal set is edited only by its author. " +
           "(Viewing settings is public, via machines.view.)",
@@ -542,6 +542,19 @@ const PERMISSIONS_MATRIX_DEFINITION = [
           unauthenticated: false,
           guest: false,
           member: "owner",
+          technician: true,
+          admin: true,
+        },
+      },
+      {
+        id: "machines.settings.tags.manage",
+        label: "Manage settings tags",
+        description:
+          "Create, rename, and delete settings tags such as a tournament's name. House and Tournament are built in and cannot be changed. Anyone can view a settings tag's page.",
+        access: {
+          unauthenticated: false,
+          guest: false,
+          member: false,
           technician: true,
           admin: true,
         },

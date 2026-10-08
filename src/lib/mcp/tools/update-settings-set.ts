@@ -79,13 +79,13 @@ export const updateSettingsSetSchema = z
       .boolean()
       .optional()
       .describe(
-        "Make this the machine's preferred House set (true) or clear it (false). Setting it preferred also turns a personal set into a community set."
+        "Make this the machine's default House set (true) or clear it (false). Making it the default also turns a personal set into a community set."
       ),
     preferredTournament: z
       .boolean()
       .optional()
       .describe(
-        "Make this the machine's preferred Tournament set (true) or clear it (false). Setting it preferred also turns a personal set into a community set."
+        "Make this the machine's default Tournament set (true) or clear it (false). Making it the default also turns a personal set into a community set."
       ),
   })
   .refine(
@@ -171,7 +171,7 @@ export async function runUpdateSettingsSet(
   ) {
     throw new McpToolError(
       "denied",
-      "Only technicians, admins, and the machine owner can tag its settings sets or choose preferred sets."
+      "Only technicians, admins, and the machine owner can tag its settings sets or choose default sets."
     );
   }
 
@@ -188,7 +188,7 @@ export async function runUpdateSettingsSet(
       const slot = BUILTIN_SETTINGS_TAG_NAMES[tag];
       throw new McpToolError(
         "invalid",
-        `This is the machine's preferred ${slot} set, so it keeps the ${slot} tag. Unset it as preferred first.`
+        `This is the machine's default ${slot} set, so it keeps the ${slot} tag. Clear it as the default first.`
       );
     }
   }
@@ -202,7 +202,7 @@ export async function runUpdateSettingsSet(
         const slotName = BUILTIN_SETTINGS_TAG_NAMES[slot];
         throw new McpToolError(
           "invalid",
-          `Only a set tagged ${slotName} can be the preferred ${slotName} set.`
+          `Only a set tagged ${slotName} can be the default ${slotName} set.`
         );
       }
     }
@@ -292,7 +292,7 @@ export async function runUpdateSettingsSet(
       throw new McpToolError(
         res.code,
         res.code === "denied"
-          ? "Only technicians, admins, and the machine owner can choose preferred sets."
+          ? "Only technicians, admins, and the machine owner can choose default sets."
           : res.message
       );
     }
@@ -340,7 +340,7 @@ export function registerUpdateSettingsSet(server: McpServer): void {
     {
       title: "Update a settings set",
       description:
-        "Change a settings set's name, description, or sections, make your personal set a community set, apply or remove its House and Tournament tags, or set/clear it as the machine's preferred House or Tournament set. Making a set preferred also turns it into a community set and adds a timeline event. Supply machine and set id (from list_settings_sets) plus at least one field. sections replaces every section, so send the full list read from list_settings_sets with your edits applied. Content edits need edit rights: a personal set's author, or for a community set technicians, the owner and admins. Each change adds a timeline entry on the machine.",
+        "Change a settings set's name, description, or sections, make your personal set a community set, apply or remove its House and Tournament tags, or set/clear it as the machine's default House or Tournament set. Making a set the default also turns it into a community set and adds a timeline event. Supply machine and set id (from list_settings_sets) plus at least one field. sections replaces every section, so send the full list read from list_settings_sets with your edits applied. Content edits need edit rights: a personal set's author, or for a community set technicians, the owner and admins. Each change adds a timeline entry on the machine.",
       inputSchema: updateSettingsSetSchema,
       annotations: WRITE_TOOL_ANNOTATIONS,
     },

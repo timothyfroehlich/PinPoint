@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getMachineForLayout } from "~/app/(app)/m/[initials]/_data";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { getMachineSettingsSets } from "~/lib/machines/settings-queries";
+import { getSettingsTagOptions } from "~/lib/machines/settings-sheet-queries";
 import { getViewer } from "~/lib/auth/viewer";
 import { db } from "~/server/db";
 import { SettingsTab } from "~/components/machines/settings/SettingsTab";
@@ -42,11 +43,14 @@ export default async function MachineSettingsTab({
     machineOwnerId,
   });
 
-  const sets = await getMachineSettingsSets(db, machine.id, {
-    viewerId: userId ?? null,
-    access,
-    machineOwnerId,
-  });
+  const [sets, allTags] = await Promise.all([
+    getMachineSettingsSets(db, machine.id, {
+      viewerId: userId ?? null,
+      access,
+      machineOwnerId,
+    }),
+    getSettingsTagOptions(db),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -58,6 +62,8 @@ export default async function MachineSettingsTab({
         initialSets={sets}
         settingsRequests={machine.settingsRequests ?? null}
         settingsInstructions={machine.settingsInstructions ?? null}
+        allTags={allTags}
+        canManageTags={checkPermission("machines.settings.tags.manage", access)}
       />
     </div>
   );

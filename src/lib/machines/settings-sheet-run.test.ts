@@ -196,7 +196,7 @@ describe("sheetLabels", () => {
         { slug: "bat-city", name: "Bat City 2025" },
       ])
     ).toEqual({
-      fromDefault: "Preferred House",
+      fromDefault: "Default House",
       toDefault: "Tag: Bat City 2025",
       from: "House",
       to: "Bat City 2025",

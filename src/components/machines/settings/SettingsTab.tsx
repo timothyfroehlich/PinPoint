@@ -2,6 +2,7 @@
 
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Plus, Info, Wrench, Check } from "lucide-react";
 import { toast } from "sonner";
 import { arrayMove } from "@dnd-kit/sortable";
@@ -27,6 +28,11 @@ import {
   type SettingsSetData,
   type SettingsTagRef,
 } from "~/lib/machines/settings-types";
+import {
+  builtinSlotOf,
+  compareSettingsTags,
+  SETTINGS_TAGS_HREF,
+} from "~/lib/machines/settings-tags";
 import { type ProseMirrorDoc } from "~/lib/tiptap/types";
 import { siteDayOf } from "~/lib/time-zone";
 import { cn } from "~/lib/utils";
@@ -40,6 +46,7 @@ import {
   updateMachineSettingsInstructionsAction,
   updateMachineSettingsRequestsAction,
 } from "~/app/(app)/m/[initials]/(tabs)/settings/actions";
+import { createSettingsTagAction } from "~/app/(app)/c/settings-tags/actions";
 
 // Collision-free client keys (render keys + section ids + temp set ids).
 function makeKey(): string {
@@ -255,6 +262,10 @@ interface SettingsTabProps {
   /** Machine-level "How to change settings" (coin-door buttons, DIP locations,
    *  menu navigation). Shared by every set; edited via its own inline save. */
   settingsInstructions: ProseMirrorDoc | null;
+  /** Every settings tag, House and Tournament first (spec §3.7 order). */
+  allTags: SettingsTagRef[];
+  /** The viewer may create settings tags from a set's picker (spec §3.3). */
+  canManageTags: boolean;
 }
 
 export function SettingsTab({
@@ -265,8 +276,16 @@ export function SettingsTab({
   initialSets,
   settingsRequests,
   settingsInstructions,
+  allTags,
+  canManageTags,
 }: SettingsTabProps): React.JSX.Element {
   const [sets, setSets] = useState<SettingsSetData[]>(initialSets);
+  // Tags created from a picker this session join the server's list at once.
+  const [createdTags, setCreatedTags] = useState<SettingsTagRef[]>([]);
+  const knownTags = [
+    ...allTags,
+    ...createdTags.filter((c) => !allTags.some((t) => t.slug === c.slug)),
+  ].sort(compareSettingsTags);
   // Sets render COLLAPSED by default so every set can be scanned at once; the
   // user expands the ones they want to read.
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
@@ -275,18 +294,20 @@ export function SettingsTab({
   // Preferred/Duplicate target a persisted row, so they're gated on this.
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
 
-  // Category is single-select (All / Mine / Community); the House and
-  // Tournament tag toggles are independent and AND with the category.
+  // Category is single-select (All / Mine / Community); the tag toggles
+  // (House, Tournament, then the machine's other tags) are independent and AND
+  // with the category.
   //  · Mine       — created by the viewer
   //  · Community  — community sets (co-edited)
   // Other people's personal sets are hidden unless preferred, until the viewer
   // turns on "Others' personal" (machine-settings spec §2.5).
   const [category, setCategory] = useState<"all" | "mine" | "community">("all");
-  const [tagFilters, setTagFilters] = useState<
-    Record<SettingsPreferredSlot, boolean>
-  >({ house: false, tournament: false });
+  // Slugs of the tags the list is narrowed to.
+  const [tagFilters, setTagFilters] = useState<ReadonlySet<string>>(
+    () => new Set()
+  );
   const [showOthersPersonal, setShowOthersPersonal] = useState(false);
-  const anyTagFilter = tagFilters.house || tagFilters.tournament;
+  const anyTagFilter = tagFilters.size > 0;
 
   // -- Dirty explicit-save machine-level drafts (PP-8a5r) ----------------------
   // The two machine-level InlineEditableField sections ("Before you change
@@ -643,8 +664,8 @@ export function SettingsTab({
     !isMine(s) &&
     !s.isPreferredHouse &&
     !s.isPreferredTournament;
-  const hasTag = (s: SettingsSetData, slot: SettingsPreferredSlot): boolean =>
-    s.tags.some((t) => t.slug === slot);
+  const hasTag = (s: SettingsSetData, slug: string): boolean =>
+    s.tags.some((t) => t.slug === slug);
   // The pool every chip counts and filters over: all sets, less other people's
   // personal sets unless the viewer asked for them.
   const pool = orderedSets.filter(
@@ -661,15 +682,27 @@ export function SettingsTab({
     }
   };
   const matchesFilter = (s: SettingsSetData): boolean =>
-    matchesCategory(s) &&
-    BUILTIN_SETTINGS_TAGS.every((slot) => !tagFilters[slot] || hasTag(s, slot));
+    matchesCategory(s) && [...tagFilters].every((slug) => hasTag(s, slug));
   const visibleSets = pool.filter(matchesFilter);
   const mineCount = pool.filter(isMine).length;
   const communityCount = pool.filter((s) => s.isCommunity).length;
-  const tagCounts: Record<SettingsPreferredSlot, number> = {
-    house: pool.filter((s) => hasTag(s, "house")).length,
-    tournament: pool.filter((s) => hasTag(s, "tournament")).length,
-  };
+  // House and Tournament always, then any other tag a listed set carries (or
+  // one still lit after its last set left), by name.
+  const filterTags: SettingsTagRef[] = [
+    ...BUILTIN_SETTINGS_TAGS.map(builtinTagRef),
+    ...new Map(
+      [...pool, ...sets]
+        .flatMap((s) => s.tags)
+        .filter(
+          (t) =>
+            builtinSlotOf(t.slug) === null &&
+            (pool.some((s) => hasTag(s, t.slug)) || tagFilters.has(t.slug))
+        )
+        .map((t) => [t.slug, t] as const)
+    ).values(),
+  ].sort(compareSettingsTags);
+  const tagCount = (slug: string): number =>
+    pool.filter((s) => hasTag(s, slug)).length;
   const othersPersonalCount = sets.filter(isOthersPersonal).length;
 
   function removeLocal(id: string): void {
@@ -751,31 +784,53 @@ export function SettingsTab({
 
   async function toggleTag(
     id: string,
-    slot: SettingsPreferredSlot
+    tag: SettingsTagRef,
+    applied: boolean
   ): Promise<void> {
     if (newIds.has(id)) return;
     const set = sets.find((s) => s.id === id);
-    if (!set) return;
-    const applied = !hasTag(set, slot);
-    const ref = builtinTagRef(slot);
+    if (!set || hasTag(set, tag.slug) === applied) return;
     const write = (on: boolean): void => {
       applyRowChange((s) =>
         s.id !== id
           ? s
           : {
               ...s,
-              tags: on
-                ? [...s.tags.filter((t) => t.slug !== slot), ref]
-                : s.tags.filter((t) => t.slug !== slot),
+              tags: (on
+                ? [...s.tags.filter((t) => t.slug !== tag.slug), tag]
+                : s.tags.filter((t) => t.slug !== tag.slug)
+              ).sort(compareSettingsTags),
             }
       );
     };
     write(applied);
-    const result = await setSettingsSetTagAction({ id, tag: slot, applied });
+    const slot = builtinSlotOf(tag.slug);
+    const result = await setSettingsSetTagAction({
+      id,
+      tag: slot ?? { tagId: tag.id },
+      applied,
+    });
     if (!result.success) {
       toast.error(result.error);
       write(!applied);
     }
+  }
+
+  /** Create a settings tag from a set's picker and apply it to that set. */
+  async function createTag(id: string, name: string): Promise<string | null> {
+    if (newIds.has(id)) return "Save the set first";
+    let created: Awaited<ReturnType<typeof createSettingsTagAction>>;
+    try {
+      created = await createSettingsTagAction({ name });
+    } catch (error) {
+      console.error("Settings tag create failed", error);
+      return "Could not create the tag. Try again.";
+    }
+    if (!created.ok) return created.message;
+    const tag: SettingsTagRef = created.value;
+    setCreatedTags((prev) => [...prev, tag]);
+    await toggleTag(id, tag, true);
+    return null;
   }
 
   async function makeCommunity(id: string): Promise<void> {
@@ -1285,6 +1340,15 @@ export function SettingsTab({
         />
       </div>
 
+      <div className="-mb-3 flex justify-end max-md:-mb-2">
+        <Link
+          href={SETTINGS_TAGS_HREF}
+          className="inline-flex min-h-11 items-center text-xs font-medium text-primary underline-offset-4 hover:underline md:min-h-6"
+        >
+          All settings tags
+        </Link>
+      </div>
+
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div
           className="flex flex-wrap items-center gap-1.5"
@@ -1331,7 +1395,7 @@ export function SettingsTab({
                   onClick={() => {
                     if (chip.key === "all") {
                       setCategory("all");
-                      setTagFilters({ house: false, tournament: false });
+                      setTagFilters(new Set());
                       return;
                     }
                     setCategory((c) => (c === chip.key ? "all" : chip.key));
@@ -1350,28 +1414,31 @@ export function SettingsTab({
             className="mx-1 h-4 w-px shrink-0 bg-outline-variant"
             aria-hidden
           />
-          {BUILTIN_SETTINGS_TAGS.map((slot) => (
-            <button
-              key={slot}
-              type="button"
-              aria-pressed={tagFilters[slot]}
-              onClick={() => {
-                setTagFilters((f) => ({ ...f, [slot]: !f[slot] }));
-              }}
-              className={cn(
-                chipClass,
-                tagFilters[slot] ? chipToggleActive : chipIdle
-              )}
-            >
-              {tagFilters[slot] && (
-                <Check className="size-3" aria-hidden="true" />
-              )}
-              {BUILTIN_SETTINGS_TAG_NAMES[slot]}{" "}
-              <span className={tagFilters[slot] ? "opacity-80" : "opacity-60"}>
-                {String(tagCounts[slot])}
-              </span>
-            </button>
-          ))}
+          {filterTags.map((tag) => {
+            const on = tagFilters.has(tag.slug);
+            return (
+              <button
+                key={tag.slug}
+                type="button"
+                aria-pressed={on}
+                onClick={() => {
+                  setTagFilters((f) => {
+                    const next = new Set(f);
+                    if (on) next.delete(tag.slug);
+                    else next.add(tag.slug);
+                    return next;
+                  });
+                }}
+                className={cn(chipClass, on ? chipToggleActive : chipIdle)}
+              >
+                {on && <Check className="size-3" aria-hidden="true" />}
+                {tag.name}{" "}
+                <span className={on ? "opacity-80" : "opacity-60"}>
+                  {String(tagCount(tag.slug))}
+                </span>
+              </button>
+            );
+          })}
           {/* Other people's personal sets: hidden by default (spec §2.5). */}
           {(othersPersonalCount > 0 || showOthersPersonal) && (
             <button
@@ -1445,9 +1512,12 @@ export function SettingsTab({
               onTogglePreferred={(slot) => {
                 void togglePreferred(set.id, slot);
               }}
-              onToggleTag={(slot) => {
-                void toggleTag(set.id, slot);
+              allTags={knownTags}
+              canCreateTags={canManageTags}
+              onToggleTag={(tag, applied) => {
+                void toggleTag(set.id, tag, applied);
               }}
+              onCreateTag={(name) => createTag(set.id, name)}
               onMakeCommunity={() => {
                 void makeCommunity(set.id);
               }}
