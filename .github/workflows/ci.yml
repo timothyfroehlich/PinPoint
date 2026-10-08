@@ -557,6 +557,10 @@ jobs:
         env:
           SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
           MOCK_BLOB_STORAGE: "true"
+          # Production server: the webServer runs `next build && next start`
+          # inside this step, after Setup Supabase exported the NEXT_PUBLIC_*
+          # values the build inlines. See playwright.config.ts (PP-izj5).
+          PLAYWRIGHT_WEB_SERVER: "start"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
           UNSUBSCRIBE_SIGNING_SECRET: "ci-test-only-not-a-real-secret-0000000000000000000000000000000000"
@@ -625,6 +629,10 @@ jobs:
         env:
           SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
           MOCK_BLOB_STORAGE: "true"
+          # Production server: the webServer runs `next build && next start`
+          # inside this step, after Setup Supabase exported the NEXT_PUBLIC_*
+          # values the build inlines. See playwright.config.ts (PP-izj5).
+          PLAYWRIGHT_WEB_SERVER: "start"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
           UNSUBSCRIBE_SIGNING_SECRET: "ci-test-only-not-a-real-secret-0000000000000000000000000000000000"
@@ -693,6 +701,10 @@ jobs:
         env:
           SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
           MOCK_BLOB_STORAGE: "true"
+          # Production server: the webServer runs `next build && next start`
+          # inside this step, after Setup Supabase exported the NEXT_PUBLIC_*
+          # values the build inlines. See playwright.config.ts (PP-izj5).
+          PLAYWRIGHT_WEB_SERVER: "start"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
           UNSUBSCRIBE_SIGNING_SECRET: "ci-test-only-not-a-real-secret-0000000000000000000000000000000000"
@@ -867,6 +879,10 @@ jobs:
         continue-on-error: true
         timeout-minutes: 30
         env:
+          # Production server: the webServer runs `next build && next start`
+          # inside this step, after Setup Supabase exported the NEXT_PUBLIC_*
+          # values the build inlines. See playwright.config.ts (PP-izj5).
+          PLAYWRIGHT_WEB_SERVER: "start"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
           PLAYWRIGHT_JSON_OUTPUT_NAME: playwright-report/results.json
