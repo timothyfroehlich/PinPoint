@@ -1,7 +1,7 @@
 import type React from "react";
 import { notFound } from "next/navigation";
 import { MachineGroupIssuesTab } from "~/components/collections/MachineGroupIssuesTab";
-import { getViewer } from "~/lib/collections/viewer";
+import { getViewer } from "~/lib/auth/viewer";
 import { getOwnerCollectionForLayout } from "~/app/(app)/c/owner/[userId]/_data";
 
 interface PageProps {

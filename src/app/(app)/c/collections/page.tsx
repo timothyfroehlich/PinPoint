@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { Gamepad2 } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "~/lib/supabase/server";
+import { getViewer } from "~/lib/auth/viewer";
 import { db } from "~/server/db";
 import { getLoginUrl } from "~/lib/url";
 import {
@@ -21,19 +21,16 @@ export const metadata: Metadata = {
 };
 
 export default async function MyCollectionsPage(): Promise<React.JSX.Element> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
+  const { userId } = await getViewer();
+  if (!userId) {
     redirect(getLoginUrl("/c/collections"));
   }
 
   const [owned, shared, allMachines, ownedMachineCount] = await Promise.all([
-    getMyCollections(undefined, user.id),
-    getSharedWithMe(undefined, user.id),
+    getMyCollections(undefined, userId),
+    getSharedWithMe(undefined, userId),
     getCollectionPickerMachines(db, null),
-    getOwnedMachineCount(undefined, user.id),
+    getOwnedMachineCount(undefined, userId),
   ]);
 
   return (
@@ -66,7 +63,7 @@ export default async function MyCollectionsPage(): Promise<React.JSX.Element> {
                   {ownedMachineCount > 0 && (
                     <li>
                       <Link
-                        href={`/c/owner/${user.id}`}
+                        href={`/c/owner/${userId}`}
                         data-testid="my-machines-collection-link"
                         className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-surface-variant"
                       >

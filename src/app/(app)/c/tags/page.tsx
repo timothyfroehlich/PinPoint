@@ -4,7 +4,7 @@ import { PageContainer } from "~/components/layout/PageContainer";
 import { AddTagDialog } from "~/components/tags/AddTagDialog";
 import { AddTagTypeDialog } from "~/components/tags/AddTagTypeDialog";
 import { TagGroupCard, tagGroupKey } from "~/components/tags/TagGroupCard";
-import { getViewer } from "~/lib/collections/viewer";
+import { getViewer } from "~/lib/auth/viewer";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { listTags } from "~/lib/tags/tags";
 
