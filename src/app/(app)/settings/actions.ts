@@ -148,8 +148,17 @@ export async function deleteAccountAction(
       });
     }
 
-    // Sign out the current session
-    await supabase.auth.signOut();
+    // Sign out the current session. supabase-js already swallows the expected
+    // 401/403/404 from a session the admin signOut above revoked, so any error
+    // returned here is unexpected. Best-effort: the account is already gone.
+    const { error: sessionSignOutError } = await supabase.auth.signOut();
+    if (sessionSignOutError) {
+      reportError(sessionSignOutError, {
+        action: "deleteAccountSessionSignOut",
+        bestEffort: true,
+        userId,
+      });
+    }
 
     log.info({ userId }, "Account deleted successfully");
   } catch (error) {

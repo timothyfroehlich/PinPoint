@@ -628,6 +628,41 @@ describe("deleteAccountAction — DB integration (PGlite)", () => {
     expect(redirect).toHaveBeenCalledWith("/");
   });
 
+  it("reports a session signOut error but still redirects", async () => {
+    const { deleteAccountAction } =
+      await import("~/app/(app)/settings/actions");
+    const { redirect } = await import("next/navigation");
+    const { reportError } = await import("~/lib/observability/report-error");
+    const db = await getTestDb();
+    const userId = randomUUID();
+
+    mockGetUser.mockResolvedValue({ data: { user: { id: userId } } });
+    await db.insert(userProfiles).values(
+      createTestUser({
+        id: userId,
+        email: "deleter-session-signout-err@example.com",
+        role: "member",
+      })
+    );
+
+    const signOutErr = { message: "session signOut failed" };
+    mockSignOut.mockResolvedValue({ error: signOutErr });
+
+    const fd = new FormData();
+    fd.set("confirmation", "DELETE");
+
+    await expect(deleteAccountAction(undefined, fd)).rejects.toThrow(
+      "NEXT_REDIRECT"
+    );
+
+    expect(reportError).toHaveBeenCalledWith(signOutErr, {
+      action: "deleteAccountSessionSignOut",
+      bestEffort: true,
+      userId,
+    });
+    expect(redirect).toHaveBeenCalledWith("/");
+  });
+
   it("reports admin signOut errors but still proceeds with deletion", async () => {
     const { deleteAccountAction } =
       await import("~/app/(app)/settings/actions");
