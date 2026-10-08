@@ -1,10 +1,10 @@
 import React from "react";
-import { isToday } from "date-fns";
 import { Activity } from "lucide-react";
 
 import { EmptyState } from "~/components/ui/empty-state";
 import { TimelineRow } from "~/components/machines/timeline/TimelineRow";
 import { bucketTimelineRows } from "~/lib/timeline/bucket-rows";
+import { isSiteToday } from "~/lib/dates";
 import {
   getUserTimeline,
   resolveFeedMachineLabels,
@@ -49,7 +49,7 @@ export async function ProfileActivityFeed({
             const showRelativeTime =
               group.bucket.tier === "day" &&
               first !== undefined &&
-              isToday(first.row.createdAt);
+              isSiteToday(first.row.createdAt);
             return (
               <div key={group.bucket.key}>
                 {group.entries.map((entry) => {

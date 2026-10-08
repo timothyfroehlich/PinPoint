@@ -74,4 +74,18 @@ describe("convertedIssueDescription", () => {
       "https://pinballmap.com/map/?by_location_id=26454"
     );
   });
+
+  it("dates the attribution on the site calendar, not the server's UTC day", () => {
+    const doc = convertedIssueDescription({
+      comment: "Ball stuck",
+      username: "flipperfan",
+      // 9:30 PM CST on Mar 4 — already Mar 5 in UTC.
+      commentedAt: new Date("2026-03-05T03:30:00Z"),
+      locationId: 26454,
+    });
+
+    expect(JSON.stringify(doc.content[1])).toContain(
+      "Pinball Map comment by flipperfan, Mar 4, 2026"
+    );
+  });
 });

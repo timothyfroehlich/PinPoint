@@ -1431,10 +1431,9 @@ export const machineSettingsSetTags = pgTable(
  * wrote it; the host re-validates it whenever it is read (§10.14).
  *
  * The SQL table keeps its original Machine View name; renaming it would break
- * the deployment that still serves while a new one migrates. The three
- * `legacy*` columns are that deployment's per-Surface ownership. The expand
- * migration (0098) merged every row onto the Machines Surface and pins them
- * there; nothing in this runtime reads them, and PP-jb9v.5 drops them.
+ * the deployment that still serves while a new one migrates. Rows were owned
+ * per Surface until 0098 merged them onto List Hosts; 0111 dropped those
+ * per-Surface columns.
  */
 export const savedViews = pgTable(
   "machine_view_saved_views",
@@ -1443,7 +1442,7 @@ export const savedViews = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => userProfiles.id, { onDelete: "cascade" }),
-    host: text("host", { enum: LIST_HOSTS }).notNull().default("machines"),
+    host: text("host", { enum: LIST_HOSTS }).notNull(),
     name: text("name").notNull(),
     state: jsonb("state").$type<unknown>().notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -1453,27 +1452,11 @@ export const savedViews = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
-    legacySurface: text("surface", {
-      enum: ["machines", "collection", "owner"],
-    })
-      .notNull()
-      .default("machines"),
-    legacyCollectionId: uuid("collection_id").references(() => collections.id, {
-      onDelete: "cascade",
-    }),
-    legacyOwnerCollectionUserId: uuid("owner_collection_user_id").references(
-      () => userProfiles.id,
-      { onDelete: "cascade" }
-    ),
   },
   (t) => ({
     hostCheck: check(
       "machine_view_saved_views_host_check",
       sql`${t.host} IN ('machines', 'issues')`
-    ),
-    legacySurfaceCheck: check(
-      "machine_view_saved_views_legacy_surface_check",
-      sql`${t.legacySurface} = 'machines' AND ${t.legacyCollectionId} IS NULL AND ${t.legacyOwnerCollectionUserId} IS NULL`
     ),
     nameNotBlank: check(
       "machine_view_saved_views_name_not_blank",
@@ -1492,8 +1475,8 @@ export const savedViews = pgTable(
  * An account's Default View on one List Host (spec list-views.md §10.9): one
  * of its Saved Views of that host or a Built-in View id. Only the host's main
  * page opens it (§10.10). Deleting the Saved View deletes the row, leaving the
- * host without a default (§10.13). Like {@link savedViews}, the SQL name and
- * the `legacy*` columns predate List Hosts; PP-jb9v.5 drops the columns.
+ * host without a default (§10.13). Like {@link savedViews}, the SQL name
+ * predates List Hosts.
  */
 export const savedViewDefaults = pgTable(
   "machine_view_defaults",
@@ -1501,7 +1484,7 @@ export const savedViewDefaults = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => userProfiles.id, { onDelete: "cascade" }),
-    host: text("host", { enum: LIST_HOSTS }).notNull().default("machines"),
+    host: text("host", { enum: LIST_HOSTS }).notNull(),
     savedViewId: uuid("saved_view_id").references(() => savedViews.id, {
       onDelete: "cascade",
     }),
@@ -1509,27 +1492,11 @@ export const savedViewDefaults = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
-    legacySurface: text("surface", {
-      enum: ["machines", "collection", "owner"],
-    })
-      .notNull()
-      .default("machines"),
-    legacyCollectionId: uuid("collection_id").references(() => collections.id, {
-      onDelete: "cascade",
-    }),
-    legacyOwnerCollectionUserId: uuid("owner_collection_user_id").references(
-      () => userProfiles.id,
-      { onDelete: "cascade" }
-    ),
   },
   (t) => ({
     hostCheck: check(
       "machine_view_defaults_host_check",
       sql`${t.host} IN ('machines', 'issues')`
-    ),
-    legacySurfaceCheck: check(
-      "machine_view_defaults_legacy_surface_check",
-      sql`${t.legacySurface} = 'machines' AND ${t.legacyCollectionId} IS NULL AND ${t.legacyOwnerCollectionUserId} IS NULL`
     ),
     targetCheck: check(
       "machine_view_defaults_target_check",

@@ -1,4 +1,5 @@
 import path from "path";
+import { isProductionBuild } from "~/lib/runtime-env";
 
 /**
  * Local stand-in for Vercel Blob, used when no blob token is configured
@@ -21,10 +22,7 @@ export function shouldUseMockBlobStorage(): boolean {
     return true;
   }
 
-  return (
-    process.env.NODE_ENV !== "production" &&
-    !process.env["BLOB_READ_WRITE_TOKEN"]
-  );
+  return !isProductionBuild() && !process.env["BLOB_READ_WRITE_TOKEN"];
 }
 
 /** Absolute directory that mock uploads are stored in. */

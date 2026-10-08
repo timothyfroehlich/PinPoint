@@ -9,6 +9,7 @@ The date-formatting vocabulary and the lucide-react icon sizing rules.
 The rules, which the file can't tell you:
 
 - **Never call `formatDistanceToNow` or `toLocaleDateString` directly from a component.** Every rendered date goes through the vocabulary.
+- **Every date, clock time, and day grouping is on the site clock, America/Chicago (`SITE_TIME_ZONE` in `src/lib/time-zone.ts`), daylight saving included** — never the server's zone (UTC on Vercel) or the viewer's browser zone. The vocabulary's formatters pin the zone and the `en-US` locale, so a server render and its hydration print the same text. For a calendar-day key or "is it today", use `siteDayOf` / `isSiteToday`, not date-fns `isToday` or `toISOString().slice(0, 10)`. A day that already carries no zone (`YYYY-MM-DD`, iScored's venue-local timestamps) prints as written via `formatCalendarDay`.
 - **If no helper fits, add one to `dates.ts` — don't inline a variant at the call site.** The vocabulary is meant to grow; what it must not do is fragment.
 - **Null-guard at the call site.** The helpers take a real date; deciding what an absent date looks like — hidden, `"—"`, `"never"` — is a per-context choice, and pushing a default into the helper makes every caller inherit someone else's copy.
 

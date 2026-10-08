@@ -1,6 +1,7 @@
 import type React from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { isProductionBuild, isVercelProduction } from "~/lib/runtime-env";
 
 export const metadata: Metadata = {
   robots: {
@@ -14,10 +15,7 @@ export default function PrototypeLayout({
 }: {
   children: React.ReactNode;
 }): React.JSX.Element {
-  if (
-    process.env["VERCEL_ENV"] === "production" ||
-    process.env.NODE_ENV === "production"
-  ) {
+  if (isVercelProduction() || isProductionBuild()) {
     notFound();
   }
 

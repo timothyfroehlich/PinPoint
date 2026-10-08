@@ -11,6 +11,7 @@ import {
   type SheetSetRef,
   type SheetValue,
 } from "~/lib/machines/settings-sheet";
+import { SITE_TIME_ZONE } from "~/lib/time-zone";
 import { cn } from "~/lib/utils";
 import "./settings-sheet.css";
 
@@ -25,17 +26,16 @@ export const SHEET_COVERAGE_LABELS: Record<SheetCoverage, string> = {
   full: "Full sets",
 };
 
-// Fixed to the venue's zone so the server render and the browser agree, and
+// Fixed to the site zone so the server render and the browser agree, and
 // "printed" and "edited" dates read on the same calendar.
-const VENUE_TIME_ZONE = "America/Chicago";
 const SHORT_DATE = new Intl.DateTimeFormat("en-US", {
   month: "short",
   day: "numeric",
-  timeZone: VENUE_TIME_ZONE,
+  timeZone: SITE_TIME_ZONE,
 });
 const MEDIUM_DATE = new Intl.DateTimeFormat("en-US", {
   dateStyle: "medium",
-  timeZone: VENUE_TIME_ZONE,
+  timeZone: SITE_TIME_ZONE,
 });
 
 /** How the sheet names each side: the default's short name, e.g. "House". */

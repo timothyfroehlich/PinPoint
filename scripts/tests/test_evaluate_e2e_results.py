@@ -1,8 +1,8 @@
 """Unit tests for scripts/workflow/evaluate-e2e-results.sh.
 
 This script is the ONLY thing that can turn a red comprehensive E2E suite into a red
-job — its two Playwright steps carry `continue-on-error: true` so that non-gating
-Mobile Safari failures don't fail the job. Everything it gets wrong is silent.
+job — each comprehensive leg's Playwright step carries `continue-on-error: true` so
+that non-gating Mobile Safari failures don't fail the job. Everything it gets wrong is silent.
 
 Three ways it was silent before PP-jxhy, each pinned by tests below:
 
@@ -30,7 +30,7 @@ import re
 import subprocess
 from pathlib import Path
 
-import pytest
+import yaml
 
 SCRIPT_PATH = Path(__file__).parent.parent / "workflow" / "evaluate-e2e-results.sh"
 
@@ -129,15 +129,27 @@ def described(file_title: str, describe_title: str, specs: list[dict]) -> dict:
 
 
 def run(
-    tmp_path: Path, payload: object | None, *, label: str = "Full"
+    tmp_path: Path,
+    payload: object | None,
+    *,
+    label: str = "Full",
+    test_list: list[str] | None = None,
 ) -> tuple[int, str, str]:
-    """Run the script against `payload`; `None` means write no file at all."""
+    """Run the script against `payload`; `None` means write no file at all.
+
+    `test_list` writes a leg's --test-list file and passes it as the third argument.
+    """
     results = tmp_path / "results.json"
     if payload is not None:
         results.write_text(payload if isinstance(payload, str) else json.dumps(payload))
     summary = tmp_path / "step-summary.md"
+    args = ["bash", str(SCRIPT_PATH), label, str(results)]
+    if test_list is not None:
+        listing = tmp_path / "e2e-shard.txt"
+        listing.write_text("".join(f"{line}\n" for line in test_list))
+        args.append(str(listing))
     proc = subprocess.run(
-        ["bash", str(SCRIPT_PATH), label, str(results)],
+        args,
         capture_output=True,
         text=True,
         env={
@@ -399,19 +411,189 @@ def test_missing_arguments_fail(tmp_path: Path) -> None:
     assert "usage:" in proc.stderr
 
 
-@pytest.mark.parametrize("workflow_label", ["Smoke", "Full"])
-def test_workflow_invokes_script_with_matching_paths(workflow_label: str) -> None:
-    """The workflow must pass a per-run results path, not a shared results.json.
+# --- 5. a leg's assigned files ---------------------------------------------------------
 
-    Both steps writing one file is what let a dead full run inherit the smoke run's
-    green report, so the distinct filenames are load-bearing rather than cosmetic.
+
+def _with_file(entry: dict, file: str) -> dict:
+    return {**entry, "file": file}
+
+
+def _leg_report(*, skipped_file_status: str = "skipped") -> dict:
+    """A leg that ran a.spec.ts and auth-setup; b.spec.ts's test has `skipped_file_status`."""
+    return report(
+        files=[
+            described("a.spec.ts", "A", [spec("chromium", "a works", True)]),
+            described(
+                "b.spec.ts",
+                "B",
+                [
+                    _with_file(
+                        spec("chromium", "b works", True, status=skipped_file_status),
+                        "b.spec.ts",
+                    )
+                ],
+            ),
+        ],
+        root_specs=[
+            _with_file(spec("auth-setup", "authenticate", True), "auth.setup.ts")
+        ],
+    )
+
+
+def test_every_assigned_file_ran_passes(tmp_path: Path) -> None:
+    code, _, _ = run(
+        tmp_path,
+        _leg_report(skipped_file_status="expected"),
+        test_list=["a.spec.ts", "b.spec.ts"],
+    )
+    assert code == 0
+
+
+def test_assigned_file_absent_from_report_is_not_green(tmp_path: Path) -> None:
+    """A --test-list path that matches nothing still leaves auth-setup green.
+
+    --test-list turns off Playwright's "no tests found" error, and the dependency
+    project runs regardless, so only this comparison notices the file never ran.
     """
+    code, stdout, written = run(
+        tmp_path,
+        _leg_report(skipped_file_status="expected"),
+        test_list=["a.spec.ts", "b.spec.ts", "renamed/c.spec.ts"],
+    )
+    assert code == 1
+    assert "renamed/c.spec.ts" in stdout
+    assert "no verdict" in written
+    assert "compare the list's paths" in written
+    assert "timeout or a crash" not in written
+
+
+def test_red_leg_names_its_failures_even_with_a_missing_file(tmp_path: Path) -> None:
+    payload = report(
+        files=[described("a.spec.ts", "A", [spec("chromium", "a breaks", False)])]
+    )
+    code, stdout, _ = run(tmp_path, payload, test_list=["a.spec.ts", "gone.spec.ts"])
+    assert code == 1
+    assert "a breaks" in stdout
+
+
+def test_assigned_file_with_only_skipped_tests_passes(tmp_path: Path) -> None:
+    """A file quarantined with `test.describe.fixme` loads and skips; that is not a failure."""
+    code, _, _ = run(tmp_path, _leg_report(), test_list=["a.spec.ts", "b.spec.ts"])
+    assert code == 0
+
+
+def test_test_list_is_read_the_way_playwright_reads_it(tmp_path: Path) -> None:
+    """Trimmed lines, CRLF endings, blanks, and `#` comments are not assigned files."""
+    code, _, _ = run(
+        tmp_path,
+        _leg_report(skipped_file_status="expected"),
+        test_list=["# leg 1", "  a.spec.ts\r", "", "b.spec.ts  "],
+    )
+    assert code == 0
+
+
+def test_blank_only_test_list_is_not_green(tmp_path: Path) -> None:
+    code, _, written = run(
+        tmp_path, _leg_report(skipped_file_status="expected"), test_list=["", "  "]
+    )
+    assert code == 1
+    assert "names no file" in written
+
+
+def test_leg_with_every_browser_test_skipped_is_not_green(tmp_path: Path) -> None:
+    """auth-setup always runs, so the stats-based checks alone would call this green."""
+    payload = report(
+        files=[
+            described("a.spec.ts", "A", [spec("chromium", "a", True, status="skipped")])
+        ],
+        root_specs=[
+            _with_file(spec("auth-setup", "authenticate", True), "auth.setup.ts")
+        ],
+    )
+    code, _, written = run(tmp_path, payload, test_list=["a.spec.ts"])
+    assert code == 1
+    assert "executed no gating browser test" in written
+
+
+def test_leg_where_only_mobile_safari_ran_is_not_green(tmp_path: Path) -> None:
+    """Mobile Safari is non-gating, so its executed tests are not gating coverage."""
+    payload = report(
+        files=[
+            described(
+                "a.spec.ts",
+                "A",
+                [
+                    spec("chromium", "a", True, status="skipped"),
+                    spec("Mobile Safari", "a", True),
+                ],
+            )
+        ],
+    )
+    code, _, written = run(tmp_path, payload, test_list=["a.spec.ts"])
+    assert code == 1
+    assert "executed no gating browser test" in written
+
+
+def test_missing_test_list_file_explains_itself(tmp_path: Path) -> None:
+    results = tmp_path / "results.json"
+    results.write_text(json.dumps(_leg_report(skipped_file_status="expected")))
+    summary = tmp_path / "step-summary.md"
+    proc = subprocess.run(
+        ["bash", str(SCRIPT_PATH), "x", str(results), str(tmp_path / "absent.txt")],
+        capture_output=True,
+        text=True,
+        env={
+            "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin",
+            "GITHUB_STEP_SUMMARY": str(summary),
+        },
+        check=False,
+    )
+    assert proc.returncode == 1
+    assert "did not write it" in summary.read_text()
+
+
+def test_empty_test_list_is_not_green(tmp_path: Path) -> None:
+    code, _, written = run(
+        tmp_path, _leg_report(skipped_file_status="expected"), test_list=[]
+    )
+    assert code == 1
+    assert "no verdict" in written
+
+
+def _comprehensive_job() -> str:
     ci = _ci_yml()
-    suffix = workflow_label.lower()
-    assert f"PLAYWRIGHT_JSON_OUTPUT_NAME: playwright-report/results-{suffix}.json" in ci
+    return ci.split("\n  test-e2e-comprehensive:\n", 1)[1].split("\n  gitleaks:", 1)[0]
+
+
+def _step(job: str, name_prefix: str) -> str:
+    """One step's YAML, without comments, from its `- name:` line to the next step.
+
+    Comments are dropped because the comment block above the NEXT step sits
+    between the two `- name:` lines and talks about continue-on-error itself.
+    """
+    block = job.split(f"      - name: {name_prefix}", 1)[1]
+    block = block.split("\n      - name: ", 1)[0]
+    return "\n".join(
+        line for line in block.splitlines() if not line.lstrip().startswith("#")
+    )
+
+
+def test_workflow_evaluates_the_report_its_run_wrote() -> None:
+    """The evaluate step must read the path the run step writes, after clearing it.
+
+    A report left by anything earlier, read as this run's verdict, is the false
+    green PP-jxhy found: the reporter writes once, at the end, so a run that
+    dies leaves the old file in place.
+    """
+    job = _comprehensive_job()
+    run_step = _step(job, "Run Comprehensive")
+    evaluate = _step(job, "Evaluate gating browser results")
+    path = "playwright-report/results.json"
+    assert f"PLAYWRIGHT_JSON_OUTPUT_NAME: {path}" in run_step
+    assert f"rm -f {path}" in run_step
     assert (
-        f"bash scripts/workflow/evaluate-e2e-results.sh {workflow_label} "
-        f"playwright-report/results-{suffix}.json" in ci
+        f'evaluate-e2e-results.sh "$LABEL" {path} "$RUNNER_TEMP/e2e-shard.txt"'
+        in evaluate
     )
 
 
@@ -421,17 +603,54 @@ def _ci_yml() -> str:
     ).read_text()
 
 
-def test_both_evaluate_steps_are_continue_on_error() -> None:
-    """A red Smoke must not abort the job before Full ever runs.
+def test_the_evaluate_step_is_the_gate() -> None:
+    """The run step must not fail the leg; the evaluate step must.
 
-    If the Smoke evaluate step's `exit 1` ended the job, one red smoke spec
-    would leave main's full-suite health unknown for that commit — a missing
-    verdict, which is the class this whole gate exists to remove.
+    The run step is continue-on-error because Mobile Safari is non-gating: a red
+    WebKit spec fails Playwright but must not fail the leg. That leaves the
+    evaluate step as the only thing that turns a red gating browser, a missing
+    report, or an empty run into a red leg, so it must NOT be continue-on-error.
     """
-    ci = _ci_yml()
-    for step_id in ("verdict-smoke", "verdict-full"):
-        block = ci.split(f"id: {step_id}", 1)[1][:200]
-        assert "continue-on-error: true" in block, step_id
+    job = _comprehensive_job()
+    assert "continue-on-error: true" in _step(job, "Run Comprehensive")
+    assert "continue-on-error" not in _step(job, "Evaluate gating browser results")
+    assert "continue-on-error" not in _step(job, "Select this shard's spec files")
+
+
+def test_shard_selection_has_its_own_timeout() -> None:
+    """A hung `--list` must fail its step, not run out the job and read as cancelled."""
+    assert "timeout-minutes:" in _step(
+        _comprehensive_job(), "Select this shard's spec files"
+    )
+
+
+def test_matrix_legs_partition_each_suite() -> None:
+    """Each suite's legs are shards 1..total exactly once, with one shared total.
+
+    e2e-shard-files.py partitions a suite into `total` shards, so a leg whose
+    `total` disagrees with its siblings, or a missing or duplicated shard
+    number, runs some spec files twice or not at all while every leg stays
+    green.
+    """
+    workflow = yaml.safe_load(_ci_yml())
+    legs = workflow["jobs"]["test-e2e-comprehensive"]["strategy"]["matrix"]["include"]
+    suites: dict[str, list[dict]] = {}
+    for leg in legs:
+        suites.setdefault(leg["suite"], []).append(leg)
+    assert set(suites) == {"smoke", "full"}
+    for suite, entries in suites.items():
+        totals = {leg["total"] for leg in entries}
+        assert len(totals) == 1, f"{suite} legs disagree on total: {totals}"
+        (total,) = totals
+        assert sorted(leg["shard"] for leg in entries) == list(range(1, total + 1)), (
+            suite
+        )
+
+
+def test_one_red_leg_does_not_cancel_the_others() -> None:
+    """fail-fast would cancel the sibling legs and leave their verdicts unknown."""
+    job = _comprehensive_job()
+    assert "fail-fast: false" in job.split("steps:", 1)[0]
 
 
 def test_main_runs_one_at_a_time_and_prs_cancel_superseded_runs() -> None:
@@ -458,15 +677,8 @@ def test_main_runs_one_at_a_time_and_prs_cancel_superseded_runs() -> None:
     )
 
 
-def test_a_dedicated_step_gates_on_both_verdicts() -> None:
-    """Something still has to fail the job once both suites have reported."""
-    ci = _ci_yml()
-    assert "steps.verdict-smoke.outcome == 'failure'" in ci
-    assert "steps.verdict-full.outcome == 'failure'" in ci
-
-
 def test_job_timeout_exceeds_the_sum_of_step_budgets() -> None:
-    """The backstop must clear both step budgets plus a COLD-cache setup.
+    """The backstop must clear the step budget plus a COLD-cache setup.
 
     The node_modules cache keys on the lockfile hash, so every dependency bump
     that lands on main misses it and pays a full install.

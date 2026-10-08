@@ -71,6 +71,7 @@ import { type Result, ok, err } from "~/lib/result";
 import type { PinballmapRuntimeState } from "~/lib/types";
 import { setMachineIcIntent, updateMachinePbmLink } from "~/services/machines";
 import { loadLineupData } from "~/lib/pinballmap/lineup-data";
+import { siteDayOf } from "~/lib/time-zone";
 
 export type { CatalogEdition, CatalogFamily } from "~/lib/pinballmap/catalog";
 
@@ -1039,12 +1040,7 @@ export type CheckConfirmLineupResult = Result<
 
 export type ConfirmLineupResult = Result<
   Record<string, never>,
-  | "UNAUTHORIZED"
-  | "VALIDATION"
-  | "NOT_LINKED"
-  | "PBM_REJECTED"
-  | "PBM_AUTH_FAILED"
-  | "SERVER"
+  "UNAUTHORIZED" | "NOT_LINKED" | "PBM_REJECTED" | "PBM_AUTH_FAILED" | "SERVER"
 >;
 
 async function authorizeConfirmLineup(): Promise<
@@ -1147,38 +1143,21 @@ export async function checkConfirmLineupAction(): Promise<CheckConfirmLineupResu
   });
 }
 
-/** `YYYY-MM-DD` within a day of the server's UTC date. */
-function isPlausibleToday(value: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const parsed = Date.parse(`${value}T12:00:00Z`);
-  return (
-    !Number.isNaN(parsed) &&
-    Math.abs(parsed - Date.now()) <= 36 * 60 * 60 * 1000
-  );
-}
-
 /**
  * Tell Pinball Map the tracked location's whole lineup is accurate as of today
  * (spec 3.7). A venue-level statement: it adds, removes, and refreshes nothing.
  *
- * On success the stored snapshot's last-updated date moves to `today`, the
- * confirming person's local date, so the header reflects the confirmation
- * before the next refresh reads Pinball Map's own value.
+ * On success the stored snapshot's last-updated date moves to today's site
+ * day (America/Chicago), so the header reflects the confirmation before the
+ * next refresh reads Pinball Map's own value.
  */
-export async function confirmPinballmapLineupAction(
-  _prev: ConfirmLineupResult | undefined,
-  formData: FormData
-): Promise<ConfirmLineupResult> {
+export async function confirmPinballmapLineupAction(): Promise<ConfirmLineupResult> {
   const authed = await authorizeConfirmLineup();
   if (!authed.ok) return authed.result;
 
-  const todayRaw = formData.get("today");
-  const today = typeof todayRaw === "string" ? todayRaw : "";
-  if (!isPlausibleToday(today)) return err("VALIDATION", "Invalid date");
-
   const confirmed = await confirmLocationLineup({
     userId: authed.userId,
-    today,
+    today: siteDayOf(new Date()),
   });
   if (!confirmed.ok) {
     revalidateIfLinkFailed(confirmed);

@@ -536,7 +536,7 @@ export type ConfirmLocationLineupResult = Result<
  * nothing.
  *
  * On success the stored snapshot's last-updated date moves to `today`, the
- * confirming person's local date, so the header reflects the confirmation
+ * site's current calendar day, so the header reflects the confirmation
  * before the next refresh reads Pinball Map's own value.
  */
 export async function confirmLocationLineup(args: {
