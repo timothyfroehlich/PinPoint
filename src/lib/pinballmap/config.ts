@@ -36,11 +36,13 @@
  * and everywhere else is `mock`.
  */
 
+import { isVercelProduction } from "~/lib/runtime-env";
+
 export type PinballMapMode = "live" | "mock";
 
 /** The one place that decides whether this process may reach PinballMap. */
 export function isPinballMapProduction(): boolean {
-  return process.env["VERCEL_ENV"] === "production";
+  return isVercelProduction();
 }
 
 export function getPinballMapMode(): PinballMapMode {

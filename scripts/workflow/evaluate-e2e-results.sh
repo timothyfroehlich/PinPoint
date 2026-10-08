@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
 # evaluate-e2e-results.sh — turn a Playwright JSON report into a job verdict.
 #
-# The comprehensive post-merge E2E job runs its Playwright steps with
+# Each leg of the comprehensive post-merge E2E job runs its Playwright step with
 # `continue-on-error: true`, because Mobile Safari is non-gating and its
 # failures must not fail the job. That makes THIS script the only thing that
 # can turn a red suite into a red job — so it has to be loud about every way
 # the suite can fail to produce a verdict, not just about failed specs.
 #
-# Two silent-failure paths it exists to close (PP-jxhy):
+# The silent-failure paths it exists to close (PP-jxhy, PP-yva7.3):
 #
 #   1. The run never finished. Playwright's JSON reporter writes the file once,
-#      at the end. A step that hits its timeout leaves no file — and if a
-#      previous step in the same job wrote to the same path, leaves a STALE
-#      one. A stale green report read as this run's verdict is the worst
-#      outcome available, so the caller passes a per-run path and this script
-#      treats a missing or unparseable file as a hard failure.
+#      at the end. A step that hits its timeout leaves no file — and if
+#      anything earlier wrote the same path, leaves a STALE one. A stale green
+#      report read as this run's verdict is the worst outcome available, so the
+#      caller deletes the path before the run (`rm -f`) and this script treats
+#      a missing or unparseable file as a hard failure.
 #   2. Zero specs ran. A crash in global setup, a bad --project name, or a
 #      grep that matches nothing all yield a well-formed report with an empty
 #      spec list, which "no failures" would happily call green.
@@ -27,16 +27,28 @@
 #   4. The run failed outside any spec. A worker crash, an unhandled rejection
 #      in a fixture teardown, or a reporter error lands in top-level `.errors`
 #      while every spec that did run stays green.
+#   5. An assigned spec file never loaded. A comprehensive leg runs the files
+#      its `--test-list` names, but auth.setup.ts runs on every leg regardless
+#      and `--test-list` turns off Playwright's "no tests found" error. A list
+#      whose paths match nothing would still pass checks 2 and 3 on the
+#      strength of auth-setup alone. Given the list as a third argument, the
+#      script requires every file on it to appear in the report. A file whose
+#      tests are all skipped still appears: quarantining a whole file with
+#      `test.describe.fixme` is legitimate and must not turn main red. A leg
+#      whose browser tests were ALL skipped fails, though: auth-setup alone
+#      would otherwise satisfy checks 2 and 3, so the script also requires an
+#      executed test outside the auth-setup project.
 #
 # Usage:
-#   bash scripts/workflow/evaluate-e2e-results.sh <label> <results-json-path>
+#   bash scripts/workflow/evaluate-e2e-results.sh <label> <results-json-path> [<test-list>]
 #
 # Exit 0 = gating browsers green. Exit 1 = anything else.
 
 set -euo pipefail
 
-LABEL="${1:?usage: evaluate-e2e-results.sh <label> <results-json-path>}"
-RESULTS="${2:?usage: evaluate-e2e-results.sh <label> <results-json-path>}"
+LABEL="${1:?usage: evaluate-e2e-results.sh <label> <results-json-path> [<test-list>]}"
+RESULTS="${2:?usage: evaluate-e2e-results.sh <label> <results-json-path> [<test-list>]}"
+TEST_LIST="${3:-}"
 
 # The browser whose failures are reported but do not fail the job. WebKit
 # failures are non-gating (PP-jvow), so CI post-merge reports them as
@@ -80,14 +92,15 @@ summary() {
 
 fail_no_verdict() {
   local reason="$1"
+  local hint="${2:-Check the test step above for a timeout or a crash.}"
   echo "::error::E2E ${LABEL}: no verdict — ${reason}"
   {
     echo "## E2E ${LABEL}: no verdict"
     echo ''
     echo "${reason}"
     echo ''
-    echo 'The run did not produce a usable report, so the suite cannot be'
-    echo 'called green. Check the test step above for a timeout or a crash.'
+    echo 'The report cannot show this leg is green.'
+    echo "${hint}"
   } | summary
   exit 1
 }
@@ -179,6 +192,44 @@ if [ "$GATING_FAILS" -gt 0 ]; then
     emit_non_gating_summary
   } | summary
   exit 1
+fi
+
+# Checked after gating failures are named, so a red leg still lists its red
+# specs when an assigned file is also missing.
+if [ -n "$TEST_LIST" ]; then
+  # Read the list the way Playwright does: trimmed lines, skipping blanks and
+  # `#` comments.
+  if [ ! -r "$TEST_LIST" ]; then
+    fail_no_verdict "test list \`${TEST_LIST}\` is missing — the shard selection step did not write it."
+  fi
+  ASSIGNED_FILES=$(sed -e 's/\r$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' "$TEST_LIST" \
+    | { grep -v -e '^$' -e '^#' || true; } | sort -u)
+  if [ -z "$ASSIGNED_FILES" ]; then
+    fail_no_verdict "test list \`${TEST_LIST}\` names no file."
+  fi
+  REPORTED_FILES=$(jq -r '[.. | objects | select(has("specs")) | .specs[].file] | unique | .[]' "$RESULTS" | sort -u)
+  MISSING_FILES=$(comm -23 <(printf '%s\n' "$ASSIGNED_FILES") <(printf '%s\n' "$REPORTED_FILES"))
+  if [ -n "$MISSING_FILES" ]; then
+    echo "Assigned spec files absent from the report (${LABEL}):"
+    echo "$MISSING_FILES"
+    fail_no_verdict "$(printf '%s\n' "$MISSING_FILES" | wc -l | tr -d ' ') file(s) from \`${TEST_LIST}\` are absent from the report — see the step log above." \
+      "The run finished; compare the list's paths with the spec file paths in the report, or look for a filter that dropped the file."
+  fi
+fi
+
+# auth.setup.ts runs on every comprehensive leg whatever its --test-list says,
+# so a leg whose browser tests were all skipped still passes the two checks
+# above on auth-setup alone (or on non-gating Mobile Safari). Count executed
+# tests in the gating projects.
+# Checked last, after gating failures are named: a failed auth-setup skips
+# every browser test, and its failure is the useful message.
+# shellcheck disable=SC2016  # jq program, not shell.
+BROWSER_TESTS_RUN=$(jq -r --arg ng "$NON_GATING" '[.. | objects | select(has("specs")) | .specs[].tests[]
+  | select(.projectName != "auth-setup" and .projectName != $ng
+      and .status != "skipped")] | length' "$RESULTS")
+if [ "$BROWSER_TESTS_RUN" -eq 0 ]; then
+  fail_no_verdict "\`${RESULTS}\` executed no gating browser test — every chromium and Mobile Chrome test was skipped." \
+    "Look for a skip or fixme that covers this leg's files on the gating browsers."
 fi
 
 echo "Gating browsers green (${LABEL}) across ${TOTAL_SPECS} specs, ${TESTS_RUN} tests executed."

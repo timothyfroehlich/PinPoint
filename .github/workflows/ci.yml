@@ -36,9 +36,9 @@ permissions: read-all  # zizmor: ignore[excessive-permissions]
 # This replaces per-SHA groups (PP-tbhv), which never cancelled but let every
 # merge run at once — up to 10 concurrent main runs in a day, each holding
 # runners under the account's 20-job cap while PR jobs queued. A main run takes
-# ~45 minutes until the comprehensive job's legs run in parallel (PP-yva7.3),
-# then ~15, so a merge normally waits at most one run before a run covering it
-# starts (a hung run holds the slot until its job timeouts end it).
+# ~15-20 minutes (the comprehensive legs run in parallel, PP-yva7.3), so a
+# merge normally waits at most one run before a run covering it starts (a
+# hung run holds the slot until its job timeouts end it).
 # (PP-yva7.7.)
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -557,6 +557,10 @@ jobs:
         env:
           SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
           MOCK_BLOB_STORAGE: "true"
+          # Production server: the webServer runs `next build && next start`
+          # inside this step, after Setup Supabase exported the NEXT_PUBLIC_*
+          # values the build inlines. See playwright.config.ts (PP-izj5).
+          PLAYWRIGHT_WEB_SERVER: "start"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
           UNSUBSCRIBE_SIGNING_SECRET: "ci-test-only-not-a-real-secret-0000000000000000000000000000000000"
@@ -625,6 +629,10 @@ jobs:
         env:
           SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
           MOCK_BLOB_STORAGE: "true"
+          # Production server: the webServer runs `next build && next start`
+          # inside this step, after Setup Supabase exported the NEXT_PUBLIC_*
+          # values the build inlines. See playwright.config.ts (PP-izj5).
+          PLAYWRIGHT_WEB_SERVER: "start"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
           UNSUBSCRIBE_SIGNING_SECRET: "ci-test-only-not-a-real-secret-0000000000000000000000000000000000"
@@ -693,6 +701,10 @@ jobs:
         env:
           SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
           MOCK_BLOB_STORAGE: "true"
+          # Production server: the webServer runs `next build && next start`
+          # inside this step, after Setup Supabase exported the NEXT_PUBLIC_*
+          # values the build inlines. See playwright.config.ts (PP-izj5).
+          PLAYWRIGHT_WEB_SERVER: "start"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
           UNSUBSCRIBE_SIGNING_SECRET: "ci-test-only-not-a-real-secret-0000000000000000000000000000000000"
@@ -712,7 +724,22 @@ jobs:
     #
     # Runs the full E2E suite across all browsers after merging to main.
     # Not a required check for PR merge — runs only on push to main.
+    #
+    # Six parallel legs: Smoke in 2 shards, Full in 4. Each leg runs chromium,
+    # Mobile Chrome and Mobile Safari together, in one Playwright process
+    # against its own database, for the spec files
+    # scripts/workflow/e2e-shard-files.py assigns it. Sharding by file, not
+    # with Playwright's --shard, keeps all three browsers of a spec on one
+    # database — the cross-project seeded-state check this job exists for
+    # (pinpoint-e2e skill, PP-168u). --shard splits in project order and would
+    # put each browser on a different leg. Before the split one runner ran
+    # Smoke then Full serially, ~35 minutes of tests; the validation run on
+    # #2421 took 7-13 minutes of tests per leg, and Smoke 1/2 is the long pole
+    # because responsive-overflow.spec.ts is one file of 117 tests. (PP-yva7.3.)
     # ==============================================================================
+    # A plain name: GitHub appends the matrix values ("(smoke, 1, 2)"), and this
+    # job is skipped on every PR, where a matrix expression in the name would
+    # show unexpanded.
     name: E2E Comprehensive Tests (Post-Merge)
     runs-on: ubuntu-latest
     # Explicit code/deps guard mirrors the three PR E2E siblings. It is the
@@ -720,17 +747,49 @@ jobs:
     # needs only `changes`, so no skipped upstream job cascades a skip. (PP-x0ke.)
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
     needs: changes
-    # Backstop only — the real limits are per-step (see the comment above the
-    # Playwright steps). Must stay above setup + both step timeouts, or a job
+    # Backstop only — the real limit is the Playwright step's own timeout (see
+    # the comment there). Must stay above setup + that timeout, or a job
     # cancellation silently swallows the verdict again. (PP-jxhy.)
     #
-    # 25 + 40 of step budget = 65, so this leaves 25 minutes for setup. Sized
-    # for the COLD-cache case, not the warm one: the node_modules cache keys on
-    # the lockfile, so every dependency bump that lands on main — the most
-    # frequent push there is — misses it and the job pays
-    # `pnpm install --frozen-lockfile`, plus a full chromium+webkit browser
-    # download whenever that bump moves Playwright itself.
-    timeout-minutes: 90
+    # 35 minutes of step budget (5 to select files, 30 to run) leaves 25 for
+    # setup. Sized for the COLD-cache
+    # case, not the warm one: the node_modules cache keys on the lockfile, so
+    # every dependency bump that lands on main — the most frequent push there
+    # is — misses it and the leg pays `pnpm install --frozen-lockfile`, plus a
+    # full chromium+webkit browser download whenever that bump moves
+    # Playwright itself.
+    timeout-minutes: 60
+    # Job-level so the shard-selection `--list` loads the suite with the same
+    # environment as the run; a spec that reads one of these at load time
+    # would otherwise be weighed, or listed, differently from how it runs.
+    env:
+      CONFIG: playwright.config.${{ matrix.suite }}.ts
+      MOCK_BLOB_STORAGE: "true"
+      UNSUBSCRIBE_SIGNING_SECRET: "ci-test-only-not-a-real-secret-0000000000000000000000000000000000"
+    strategy:
+      # Every leg must report: one red leg must not cancel the others and
+      # leave their parts of main's verdict unknown.
+      fail-fast: false
+      matrix:
+        include:
+          - suite: smoke
+            shard: 1
+            total: 2
+          - suite: smoke
+            shard: 2
+            total: 2
+          - suite: full
+            shard: 1
+            total: 4
+          - suite: full
+            shard: 2
+            total: 4
+          - suite: full
+            shard: 3
+            total: 4
+          - suite: full
+            shard: 4
+            total: 4
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
@@ -770,136 +829,85 @@ jobs:
         with:
           browsers: chromium webkit
           with-deps: "false"
-          save-cache: "true"
+          # One leg saves; the others would race to upload the same key.
+          save-cache: ${{ matrix.suite == 'full' && matrix.shard == 1 }}
 
       - name: Setup Supabase
         uses: $/.github/actions/setup-supabase
 
-      # Each Playwright step carries its OWN timeout-minutes, deliberately.
+      # Lists the suite with the same config and projects the run uses, so the
+      # assignment covers exactly the files the run would load. Every leg
+      # computes the same assignment, so the legs partition the suite. Not
+      # continue-on-error: a leg that cannot pick its files has no verdict and
+      # must fail. After Setup Supabase because spec support modules read its
+      # environment at import (e2e/support/supabase-admin.ts throws without it).
+      - name: Select this shard's spec files
+        timeout-minutes: 5
+        env:
+          SHARD: ${{ matrix.shard }}/${{ matrix.total }}
+          PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ runner.temp }}/e2e-list.json
+        run: |
+          # --list exits non-zero on a spec load error; the shard script prints
+          # those errors from the report, so run it before failing on status.
+          list_status=0
+          pnpm exec playwright test --config="$CONFIG" \
+            --project=chromium --project="Mobile Chrome" \
+            --project="Mobile Safari" --list --reporter=json >/dev/null || list_status=$?
+          python3 scripts/workflow/e2e-shard-files.py \
+            "$RUNNER_TEMP/e2e-list.json" "$SHARD" >"$RUNNER_TEMP/e2e-shard.txt"
+          if [ "$list_status" -ne 0 ]; then
+            echo "::error::playwright --list exited $list_status"
+            exit "$list_status"
+          fi
+          cat "$RUNNER_TEMP/e2e-shard.txt"
+
+      # The Playwright step carries its OWN timeout-minutes, deliberately.
       # A job-level timeout cancels the job outright: the evaluate step never
       # runs, and the run reports `cancelled` — which reads as "superseded by a
       # newer push" rather than "main is broken". That is exactly how run
       # 31430839981 hid ten real failures. A step-level timeout paired with
       # `continue-on-error: true` instead marks the step failed and lets the
-      # job carry on to its verdict. The job timeout below is only a backstop
-      # and must stay comfortably above the sum of these. (PP-jxhy.)
+      # job carry on to its verdict. The job timeout above is only a backstop
+      # and must stay comfortably above this one. (PP-jxhy.) 30 minutes, not
+      # the ~13 a green leg takes: on a red main every failure costs a locator
+      # timeout plus retries (120s and 3 retries on Mobile Safari), and a leg
+      # that times out reports no verdict at all.
       #
-      # Budget, measured on run 31430839981: setup ~2.5m, smoke ~13m,
-      # full ~24m on a green main (it burned 30m unfinished on a red one,
-      # because each failure costs a 30s locator timeout plus retries).
-      - name: Run Comprehensive Smoke Tests (all browsers)
+      # continue-on-error is also what keeps Mobile Safari non-gating: a red
+      # WebKit spec fails this step, and the evaluate step below decides.
+      - name: Run Comprehensive ${{ matrix.suite }} Tests (all browsers)
         continue-on-error: true
-        timeout-minutes: 25
+        timeout-minutes: 30
         env:
-          MOCK_BLOB_STORAGE: "true"
+          # Production server: the webServer runs `next build && next start`
+          # inside this step, after Setup Supabase exported the NEXT_PUBLIC_*
+          # values the build inlines. See playwright.config.ts (PP-izj5).
+          PLAYWRIGHT_WEB_SERVER: "start"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
-          # Per-run filename, NOT a shared results.json. The reporter writes
-          # once at the end, so a run that dies leaves the PREVIOUS run's file
-          # in place and the next evaluate step reads it as its own verdict —
-          # a false green. Distinct paths make "missing" unambiguous.
-          PLAYWRIGHT_JSON_OUTPUT_NAME: playwright-report/results-smoke.json
-          UNSUBSCRIBE_SIGNING_SECRET: "ci-test-only-not-a-real-secret-0000000000000000000000000000000000"
+          PLAYWRIGHT_JSON_OUTPUT_NAME: playwright-report/results.json
         run: |
-          rm -f playwright-report/results-smoke.json
-          pnpm exec playwright test --config=playwright.config.smoke.ts \
+          rm -f playwright-report/results.json
+          pnpm exec playwright test --config="$CONFIG" \
             --project=chromium --project="Mobile Chrome" \
-            --project="Mobile Safari" --workers=3
+            --project="Mobile Safari" --workers=3 \
+            --test-list "$RUNNER_TEMP/e2e-shard.txt"
 
-      # Copied out because the Full run's HTML reporter calls removeFolders()
-      # on `playwright-report/` in its own onEnd, wiping everything the Smoke
-      # run left there. The verdict itself is unaffected — Smoke is evaluated
-      # below, before Full starts — but without this the uploaded artifact
-      # would contain no trace of the Smoke run at all.
-      - name: Preserve Smoke report
-        if: always()
-        run: |
-          mkdir -p e2e-verdicts
-          cp playwright-report/results-smoke.json e2e-verdicts/ 2>/dev/null || \
-            echo "no smoke report to preserve"
-
-      # When the Smoke step hits its timeout-minutes, GitHub kills the
-      # Playwright runner but not its webServer: `next dev` is spawned in its
-      # own process group and survives, still bound to :3000. Full's webServer
-      # then refuses to start ("http://localhost:3000/api/health is already
-      # used") and reports zero specs, so one systemic Smoke failure hid the
-      # entire Full verdict (run 36071532799, PP-2fuv). A clean Smoke run tears
-      # its own server down, which makes this a no-op on the green path.
-      #
-      # Scoped to whatever is LISTENING on the port — not a process-name kill.
-      # continue-on-error so a cleanup problem cannot skip Full: if the port is
-      # still held, Full fails on its own and the Full evaluate reports it.
-      # Smoke's verdict is untouched either way: a timed-out Smoke leaves no
-      # results-smoke.json, which its evaluate step already treats as a failure.
-      - name: Free the Smoke web server port
-        if: always()
-        continue-on-error: true
-        run: |
-          port="${PORT:-3000}"
-          for attempt in 1 2 3 4 5; do
-            # iproute2's `ss` ships on every Ubuntu runner (lsof is not guaranteed).
-            pids=$(ss -Hltnp "sport = :$port" | grep -o 'pid=[0-9]*' | cut -d= -f2 | sort -u || true)
-            if [ -z "$pids" ]; then
-              echo "port $port is free"
-              exit 0
-            fi
-            echo "attempt $attempt: stopping listener(s) on :$port: $pids"
-            # shellcheck disable=SC2086  # word-split the PID list on purpose
-            if [ "$attempt" -lt 3 ]; then kill $pids || true; else kill -9 $pids || true; fi
-            sleep 2
-          done
-          echo "::error::port $port is still held after cleanup; the Full run will not get a clean web server."
-          ss -Hltnp "sport = :$port" || true
-          exit 1
-
-      # Both evaluate steps are continue-on-error so that a gating Smoke
-      # failure does not abort the job before Full ever runs. Letting the
-      # script's `exit 1` end the step here would mean one red smoke spec
-      # leaves main's full-suite health unknown for that commit — the same
-      # class of missing verdict this PR exists to remove. The dedicated gate
-      # step after both suites is what actually fails the job.
-      - name: Evaluate gating browser results (Smoke)
-        id: verdict-smoke
-        continue-on-error: true
-        run: bash scripts/workflow/evaluate-e2e-results.sh Smoke playwright-report/results-smoke.json
-
-      - name: Run Comprehensive Full Tests (all browsers)
-        continue-on-error: true
-        timeout-minutes: 40
+      # The only step that fails the leg on test results. A missing report, an
+      # empty or all-skipped run, run-level errors, and an assigned file
+      # missing from the report all fail it, not just red gating specs
+      # (evaluate-e2e-results.sh header).
+      - name: Evaluate gating browser results
         env:
-          MOCK_BLOB_STORAGE: "true"
-          PLAYWRIGHT_STDOUT: "pipe"
-          PLAYWRIGHT_STDERR: "pipe"
-          PLAYWRIGHT_JSON_OUTPUT_NAME: playwright-report/results-full.json
-          UNSUBSCRIBE_SIGNING_SECRET: "ci-test-only-not-a-real-secret-0000000000000000000000000000000000"
-        run: |
-          rm -f playwright-report/results-full.json
-          pnpm exec playwright test --config=playwright.config.full.ts \
-            --project=chromium --project="Mobile Chrome" \
-            --project="Mobile Safari" --workers=3
-
-      - name: Evaluate gating browser results (Full)
-        id: verdict-full
-        continue-on-error: true
-        run: bash scripts/workflow/evaluate-e2e-results.sh Full playwright-report/results-full.json
-
-      # The only step that fails the job. Both suites have produced a verdict
-      # by now, so a red Smoke and a red Full are both visible on the same run
-      # instead of the first one hiding the second.
-      - name: Gate on E2E verdicts
-        if: steps.verdict-smoke.outcome == 'failure' || steps.verdict-full.outcome == 'failure'
-        run: |
-          echo "::error::E2E comprehensive: Smoke=${{ steps.verdict-smoke.outcome }} Full=${{ steps.verdict-full.outcome }} — see the evaluate steps above."
-          exit 1
+          LABEL: ${{ matrix.suite }} ${{ matrix.shard }}/${{ matrix.total }}
+        run: bash scripts/workflow/evaluate-e2e-results.sh "$LABEL" playwright-report/results.json "$RUNNER_TEMP/e2e-shard.txt"
 
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # ratchet:actions/upload-artifact@v7.0.1
         with:
-          name: playwright-report-comprehensive
-          path: |
-            playwright-report/
-            e2e-verdicts/
+          name: playwright-report-comprehensive-${{ matrix.suite }}-${{ matrix.shard }}
+          path: playwright-report/
           retention-days: 7
 
   gitleaks:
