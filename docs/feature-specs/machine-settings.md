@@ -58,6 +58,7 @@
 | :-- | :-- | :-- |
 | 3.1, 3.3, 3.4, 3.6, 3.7 | Only the built-in House and Tournament tags exist; there are no custom settings tags or tag pages. | PP-k3km.2 |
 | 4.6 | Changing a default set notifies no one. | PP-k3km.3 |
+| 4.7 | The Settings tab labels default sets "Preferred House" and "Preferred Tournament". | PP-k3km.2 |
 
 ## Changelog
 

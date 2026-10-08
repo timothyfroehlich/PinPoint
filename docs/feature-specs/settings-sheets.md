@@ -65,7 +65,10 @@
 
 ## Known divergences (code vs spec)
 
-_None — the current implementation matches this spec._
+| Requirement | Divergence | Resolution |
+| :-- | :-- | :-- |
+| 2.4, 3.3 | The page and the sheet header label the starting sets "Preferred House" and "Preferred Tournament". | PP-k3km.2 |
+| 2.6 | Settings tag pages do not exist, so nothing links here from one. | PP-k3km.2 |
 
 ## Changelog
 
