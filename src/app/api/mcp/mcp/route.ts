@@ -24,7 +24,7 @@ export const maxDuration = 60;
  * Tools: the PinPoint tool catalog ({@link registerPinpointTools}) plus a
  * `whoami` diagnostic used to validate the connection end-to-end.
  */
-export const whoamiTool = defineTool({
+const whoamiTool = defineTool({
   name: "whoami",
   title: "Who am I",
   description:

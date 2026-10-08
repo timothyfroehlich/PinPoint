@@ -29,9 +29,7 @@ vi.mock("~/lib/rate-limit", () => ({
   checkMcpRequestLimit: checkMcpRequestLimitMock,
 }));
 
-import type { McpServer } from "@modelcontextprotocol/server";
-
-import { handleMcpRequest, whoamiTool } from "./route";
+import { handleMcpRequest } from "./route";
 
 const AUTH = {
   token: "test-token",
@@ -127,40 +125,55 @@ describe("MCP route boundary", () => {
     expect(registerPinpointToolsMock).not.toHaveBeenCalled();
   });
 
-  it("registers whoami tool and executes successfully without throwing", async () => {
-    let capturedHandler:
-      | ((ctx: { http?: { authInfo?: AuthInfo } }) => Promise<unknown>)
-      | undefined;
+  it("answers whoami through the MCP transport", async () => {
+    verifyTokenMock.mockResolvedValue(AUTH);
 
-    const fakeServer = {
-      registerTool: (
-        name: string,
-        _config: unknown,
-        handler: (ctx: { http?: { authInfo?: AuthInfo } }) => Promise<unknown>
-      ) => {
-        if (name === "whoami") {
-          capturedHandler = handler;
-        }
-      },
-    } as unknown as McpServer;
+    const response = await handleMcpRequest(
+      new Request("https://pinpoint.test/api/mcp/mcp", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${AUTH.token}`,
+          "Content-Type": "application/json",
+          Accept: "application/json, text/event-stream",
+          "mcp-protocol-version": "2025-06-18",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/call",
+          params: { name: "whoami", arguments: {} },
+        }),
+      })
+    );
 
-    whoamiTool.register(fakeServer);
-    expect(capturedHandler).toBeDefined();
+    expect(response.status).toBe(200);
+    const text = await response.text();
+    const dataLine = text.split("\n").find((line) => line.startsWith("data: "));
+    expect(dataLine).toBeDefined();
 
-    const result = (await capturedHandler?.({
-      http: { authInfo: AUTH },
-    })) as { content: [{ type: string; text: string }]; isError?: boolean };
+    if (dataLine) {
+      const message = JSON.parse(dataLine.slice(6)) as {
+        jsonrpc: string;
+        id: number;
+        result?: {
+          content: [{ type: string; text: string }];
+          isError?: boolean;
+        };
+      };
 
-    expect(result).toBeDefined();
-    expect(result.isError).toBeFalsy();
-    const content = result.content[0];
-    expect(content.type).toBe("text");
-    const parsed = JSON.parse(content.text);
-    expect(parsed).toEqual({
-      userId: AUTH_CONTEXT.userId,
-      accessLevel: AUTH_CONTEXT.accessLevel,
-      clientId: AUTH_CONTEXT.clientId,
-      authMode: AUTH_CONTEXT.authMode,
-    });
+      expect(message.result).toBeDefined();
+      expect(message.result?.isError).toBeFalsy();
+      const content = message.result?.content[0];
+      expect(content?.type).toBe("text");
+      if (content?.type === "text") {
+        const payload = JSON.parse(content.text);
+        expect(payload).toEqual({
+          userId: AUTH_CONTEXT.userId,
+          accessLevel: AUTH_CONTEXT.accessLevel,
+          clientId: AUTH_CONTEXT.clientId,
+          authMode: AUTH_CONTEXT.authMode,
+        });
+      }
+    }
   });
 });
