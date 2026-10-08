@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { type DbTransaction } from "~/server/db";
 import { machineSettingsSets } from "~/server/db/schema";
 import { type AccessLevel } from "~/lib/permissions/matrix";
+import { siteDayOf } from "~/lib/time-zone";
 import {
   canDeleteSet,
   canEditSet,
@@ -139,7 +140,7 @@ export async function getMachineSettingsSets(
       sections: withRenderKeys(row.sections),
       updatedBy: row.updatedByUser?.name ?? "Unknown",
       updatedById: row.updatedBy,
-      updatedAt: row.updatedAt.toISOString().slice(0, 10),
+      updatedAt: siteDayOf(row.updatedAt),
     };
   });
 }

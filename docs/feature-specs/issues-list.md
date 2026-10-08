@@ -18,7 +18,7 @@
 
 ## 2. Hosts and Scope
 
-- **2.1** Issue View appears on `/issues` and on the Issues tab of every standard Collection, owner Collection, and Tag.
+- **2.1** Issue View appears on `/issues` and on the Issues tab of every Collection and Tag.
 - **2.2** On an Issues tab the scope is the issues on that Collection's or Tag's machines; a Machine filter can narrow it but never widen it.
 - **2.3** The page title is "Issues". Issue View adds no page action; reporting an issue stays in the app header and tab bar.
 
@@ -96,6 +96,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-07 | Owner Collections retired; the Issues tab appears on every Collection and Tag (2.1). |
 | 2026-10-07 | Created and Updated days are the collective's local days, America/Chicago (4.8). |
 | 2026-10-05 | Machine tag and Machine collection Secondary Filters (4.3, 4.9) and their `tag` and `collection` parameters (7.1). |
 | 2026-10-04 | Search also matches description text (4.1). Machine owner offers Me and Unassigned shortcuts and Reporter offers Me (4.10). |

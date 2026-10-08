@@ -1,8 +1,8 @@
 "use server";
 
 import { and, eq } from "drizzle-orm";
-import { format } from "date-fns";
 import { createClient } from "~/lib/supabase/server";
+import { siteDayOf } from "~/lib/time-zone";
 import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
 import { serverActionError } from "~/lib/observability/report-error";
@@ -50,7 +50,7 @@ const CSV_HEADERS = [
 
 function formatDate(date: Date | null): string {
   if (!date) return "";
-  return format(date, "yyyy-MM-dd");
+  return siteDayOf(date);
 }
 
 /**
@@ -173,7 +173,7 @@ export async function exportIssuesAction(input: {
 
     // 6. Generate CSV
     const csv = generateCsv(CSV_HEADERS, rows);
-    const dateStr = format(new Date(), "yyyy-MM-dd");
+    const dateStr = siteDayOf(new Date());
     const fileName = machineInitials
       ? `pinpoint-${machineInitials.toUpperCase()}-issues-${dateStr}.csv`
       : `pinpoint-issues-${dateStr}.csv`;

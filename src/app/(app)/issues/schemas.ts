@@ -13,6 +13,7 @@ import {
   ISSUE_SEVERITY_VALUES,
 } from "~/lib/types";
 import { ISSUE_STATUS_VALUES } from "~/lib/issues/status";
+import { isProductionBuild } from "~/lib/runtime-env";
 
 const uuidish = z
   .string()
@@ -86,8 +87,7 @@ export const imageMetadataSchema = z.object({
         );
         const allowLocalhostBlob =
           process.env["MOCK_BLOB_STORAGE"] === "true" ||
-          (process.env.NODE_ENV !== "production" &&
-            !process.env["BLOB_READ_WRITE_TOKEN"]);
+          (!isProductionBuild() && !process.env["BLOB_READ_WRITE_TOKEN"]);
         const isLocalhost =
           allowLocalhostBlob && parsedUrl.hostname === "localhost";
         return isVercelBlob || isLocalhost;
