@@ -51,9 +51,10 @@ test.describe("Cookie Consent Banner", () => {
     const learnMore = banner.getByRole("link", { name: /learn more/i });
     await expect(learnMore).toHaveAttribute("href", "/privacy");
 
-    // Remove Next.js dev overlay that intercepts pointer events on mobile
-    // viewports. CI runs against `next dev`, so the <nextjs-portal> overlay
-    // blocks clicks on fixed-position elements on small screens.
+    // Remove the Next.js dev overlay that intercepts pointer events on mobile
+    // viewports. Under `next dev` (local runs) the <nextjs-portal> overlay
+    // blocks clicks on fixed-position elements on small screens; CI's
+    // production build has none, so this is a no-op there.
     await page.evaluate(() => {
       document.querySelectorAll("nextjs-portal").forEach((el) => el.remove());
     });
