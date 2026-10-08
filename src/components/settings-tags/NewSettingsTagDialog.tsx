@@ -95,7 +95,6 @@ function NewSettingsTagForm({
             setName(event.target.value);
             setError(null);
           }}
-          maxLength={TAG_NAME_MAX}
           required
           autoComplete="off"
           enterKeyHint="done"

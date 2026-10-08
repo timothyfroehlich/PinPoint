@@ -19,6 +19,7 @@ import {
   type SettingsSection,
   type SettingsSetPayload,
 } from "~/lib/machines/settings-types";
+import { builtinSlotOf } from "~/lib/machines/settings-tags";
 import { type Result, err, ok } from "~/lib/result";
 import { type ProseMirrorDoc } from "~/lib/tiptap/types";
 import { emitSettingsSetEvent } from "~/lib/timeline/machine-events";
@@ -537,12 +538,7 @@ async function resolveTag(
     .where(eq(settingsTags.id, tag.tagId))
     .for("share");
   if (!row) return null;
-  const slot =
-    row.isBuiltin && row.slug === "house"
-      ? "house"
-      : row.isBuiltin && row.slug === "tournament"
-        ? "tournament"
-        : null;
+  const slot = row.isBuiltin ? builtinSlotOf(row.slug) : null;
   return { id: row.id, name: row.name, slot };
 }
 

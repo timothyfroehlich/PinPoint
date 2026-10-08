@@ -162,6 +162,7 @@ function PickerPanel({
   const custom = shown.filter((tag) => builtinSlotOf(tag.slug) === null);
 
   function create(): void {
+    if (creating) return;
     const typed = query;
     setCreating(true);
     setCreateError(null);
@@ -245,14 +246,18 @@ function PickerPanel({
             id={`${id}-search`}
             type="text"
             autoComplete="off"
-            maxLength={TAG_NAME_MAX}
             value={query}
             onChange={(event) => {
               setQuery(event.target.value);
               setCreateError(null);
             }}
             onKeyDown={(event) => {
-              if (event.key === "Enter" && offerCreate && !tooLong) {
+              if (
+                event.key === "Enter" &&
+                offerCreate &&
+                !tooLong &&
+                !creating
+              ) {
                 event.preventDefault();
                 create();
               }
