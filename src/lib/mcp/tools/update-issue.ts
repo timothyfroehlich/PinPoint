@@ -1,6 +1,5 @@
 import "server-only";
 
-import type { McpServer } from "@modelcontextprotocol/server";
 import { after } from "next/server";
 import { z } from "zod";
 import { ISSUE_TITLE_MAX, issueTitleSchema } from "~/lib/issues/title";
@@ -25,11 +24,11 @@ import {
 } from "~/lib/types";
 
 import {
+  defineTool,
   issueUrl,
   McpToolError,
   resolveAssignee,
   resolveIssue,
-  runTool,
   type ToolOutcome,
   WRITE_TOOL_ANNOTATIONS,
 } from "./shared";
@@ -338,19 +337,13 @@ export async function runUpdateIssue(
   return outcome;
 }
 
-export function registerUpdateIssue(server: McpServer): void {
-  server.registerTool(
-    "update_issue",
-    {
-      title: "Update an issue",
-      description:
-        "Update one or more fields on an issue: title, status, severity, frequency, priority, or assignee. Supply machine (initials or UUID), issue number, and at least one field to change. Returns applied changes.",
-      inputSchema: updateIssueSchema,
-      annotations: WRITE_TOOL_ANNOTATIONS,
-    },
-    (args, extra) =>
-      runTool("update_issue", extra, (ctx) => runUpdateIssue(args, ctx), {
-        mutates: true,
-      })
-  );
-}
+export const updateIssueTool = defineTool({
+  name: "update_issue",
+  title: "Update an issue",
+  description:
+    "Update one or more fields on an issue: title, status, severity, frequency, priority, or assignee. Supply machine (initials or UUID), issue number, and at least one field to change. Returns applied changes.",
+  inputSchema: updateIssueSchema,
+  annotations: WRITE_TOOL_ANNOTATIONS,
+  mutates: true,
+  run: runUpdateIssue,
+});

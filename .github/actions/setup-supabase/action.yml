@@ -78,6 +78,38 @@ runs:
         echo "::error::supabase start failed after 3 attempts"
         exit 1
 
+    - name: Let the auth container reuse TIME_WAIT ports
+      shell: bash
+      run: |
+        # GoTrue opens a fresh Postgres connection for most queries, and the
+        # Supabase CLI exposes no pool or idle setting for it. Under a
+        # production build (`next start`, PP-izj5) every prefetch runs the
+        # middleware's getUser(), so GoTrue's network namespace fills its
+        # whole ephemeral range with TIME_WAIT sockets to Postgres and
+        # /user starts failing with "cannot assign requested address". The
+        # app then sees no user: forms submit anonymously and logins bounce.
+        # tcp_tw_reuse=1 lets new outgoing connections reuse those ports.
+        #
+        # The setting lives in the container's network namespace, so it does
+        # NOT survive an auth-container restart. E2E global setup's normal
+        # path (db:fast-reset) keeps the container; its full-reset fallback
+        # (`supabase db reset`, or db:reset on a remote backend) restarts it
+        # and drops the setting. Global setup warns when that happens.
+        auth="supabase_auth_pinpoint"
+        image=$(docker inspect --format '{{.Config.Image}}' "$auth") || {
+          echo "::error::auth container $auth not found; cannot set tcp_tw_reuse"
+          exit 1
+        }
+        # Reuses the auth image already on the runner, so nothing is pulled.
+        docker run --rm --privileged --network "container:$auth" --user 0 \
+          --entrypoint sh "$image" -c 'echo 1 > /proc/sys/net/ipv4/tcp_tw_reuse'
+        value=$(docker exec "$auth" cat /proc/sys/net/ipv4/tcp_tw_reuse)
+        if [ "$value" != "1" ]; then
+          echo "::error::tcp_tw_reuse in $auth reads '$value', expected 1"
+          exit 1
+        fi
+        echo "::notice::tcp_tw_reuse=1 in $auth"
+
     - name: Export Supabase env vars
       shell: bash
       run: |

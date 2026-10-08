@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isProductionBuild, isVercelProduction } from "~/lib/runtime-env";
 import { getSupabaseEnv } from "~/lib/supabase/env";
 
 /**
@@ -18,13 +19,8 @@ export async function updateSession(
     request,
   });
 
-  const {
-    VERCEL_ENV,
-    NODE_ENV,
-    DEV_AUTOLOGIN_ENABLED,
-    DEV_AUTOLOGIN_EMAIL,
-    DEV_AUTOLOGIN_PASSWORD,
-  } = process.env;
+  const { DEV_AUTOLOGIN_ENABLED, DEV_AUTOLOGIN_EMAIL, DEV_AUTOLOGIN_PASSWORD } =
+    process.env;
 
   const { url: supabaseUrl, publishableKey: supabaseKey } = getSupabaseEnv();
 
@@ -66,8 +62,9 @@ export async function updateSession(
     return isTruthy(header) || isTruthy(cookie) || isOff(query);
   };
 
-  const isProductionEnv =
-    VERCEL_ENV === "production" || NODE_ENV === "production";
+  // Any production build is off-limits, Vercel previews and the E2E
+  // production build included.
+  const isProductionEnv = isVercelProduction() || isProductionBuild();
   const autologinEnv = DEV_AUTOLOGIN_ENABLED;
   const autologinEnabled =
     !isProductionEnv &&

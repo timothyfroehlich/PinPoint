@@ -2,6 +2,8 @@
  * Configuration and URL helpers for the iScored integration.
  */
 
+import { isVercelProduction } from "~/lib/runtime-env";
+
 /** Upstream iScored service base URL. */
 export const ISCORED_BASE_URL = "https://www.iscored.info";
 
@@ -40,9 +42,7 @@ function getConfiguredUser(): string | null {
  * `NODE_ENV=production`, and CI E2E runs a production build off-Vercel.
  */
 export function isIscoredFixtureMode(): boolean {
-  return (
-    getConfiguredUser() === null && process.env["VERCEL_ENV"] !== "production"
-  );
+  return getConfiguredUser() === null && !isVercelProduction();
 }
 
 /**

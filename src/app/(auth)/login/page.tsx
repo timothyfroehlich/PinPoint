@@ -1,6 +1,7 @@
 import type React from "react";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { isLocalDevelopment } from "~/lib/runtime-env";
 import { createClient } from "~/lib/supabase/server";
 import { getSafeRedirect } from "~/lib/url";
 import { OAuthButtonList } from "../oauth-button-list";
@@ -40,14 +41,7 @@ export default async function LoginPage({
         <OAuthButtonList />
 
         {/* Preview users have random passwords; the fixed test login is local-only. */}
-        <LoginForm
-          enableTestAdmin={
-            process.env.NODE_ENV === "development" &&
-            process.env["VERCEL_ENV"] !== "preview" &&
-            process.env["VERCEL_ENV"] !== "production"
-          }
-          next={next}
-        />
+        <LoginForm enableTestAdmin={isLocalDevelopment()} next={next} />
       </CardContent>
     </Card>
   );
