@@ -1340,7 +1340,7 @@ export function SettingsTab({
         />
       </div>
 
-      <div className="-mb-3 flex justify-end max-md:-mb-2">
+      <div className="-mb-1 flex justify-end">
         <Link
           href={SETTINGS_TAGS_HREF}
           className="inline-flex min-h-11 items-center text-xs font-medium text-primary underline-offset-4 hover:underline md:min-h-6"
