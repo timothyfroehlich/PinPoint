@@ -430,10 +430,9 @@ export async function logoutAction(): Promise<void> {
     const { error } = await supabase.auth.signOut({ scope: "local" });
 
     if (error) {
-      log.error(
-        { userId: user?.id, err: error.message, action: "logout" },
-        "Logout failed"
-      );
+      // supabase-js filters the expected no-session/expired-JWT responses, so
+      // an error here is unexpected.
+      reportError(error, { action: "logout", userId: user?.id });
 
       return; // Early exit without redirect
     }
@@ -615,7 +614,16 @@ export async function resetPasswordAction(
       { userId: user.id, action: "reset-password" },
       "Password updated successfully"
     );
-    await supabase.auth.signOut();
+    // Best-effort: the password is already changed. supabase-js filters the
+    // expected no-session responses, so a returned error is unexpected.
+    const { error: signOutError } = await supabase.auth.signOut();
+    if (signOutError) {
+      reportError(signOutError, {
+        action: "reset-password.signOut",
+        bestEffort: true,
+        userId: user.id,
+      });
+    }
     redirect("/login");
   } catch (error) {
     // If redirect was thrown, re-throw it
