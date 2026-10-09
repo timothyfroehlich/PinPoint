@@ -4,7 +4,7 @@ import { db, type DbTransaction } from "~/server/db";
 import { collections, collectionMachines, machines } from "~/server/db/schema";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 import { machineNotRemoved } from "~/lib/machines/queries";
-import type { CollectionMachine } from "./owner";
+import type { CollectionMachine } from "./types";
 
 export interface UserCollection {
   id: string;

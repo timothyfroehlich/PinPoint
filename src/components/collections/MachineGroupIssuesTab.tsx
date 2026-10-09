@@ -1,6 +1,6 @@
 import type React from "react";
 import { IssueView } from "~/components/issues/view/IssueView";
-import type { CollectionMachine } from "~/lib/collections/owner";
+import type { CollectionMachine } from "~/lib/collections/types";
 import type { Viewer } from "~/lib/auth/viewer";
 import { loadIssueView } from "~/lib/issues/view/queries";
 import { loadIssueViewSavedViews } from "~/lib/issues/view/saved-views";
@@ -17,7 +17,7 @@ interface MachineGroupIssuesTabProps {
 }
 
 /**
- * Machine group Issues tab, shared by Collections, Owner Collections, and
+ * Machine group Issues tab, shared by Collections and
  * tags (spec collections-and-tags 4.4): Issue View scoped to the group's
  * machines (issues-list §2.2). A group with no machines, or a Machine filter
  * that selects none of them, still shows the Summary Widgets, at zero, and

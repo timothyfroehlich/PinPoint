@@ -650,7 +650,7 @@ describe("IssueView", () => {
   });
 
   it("shows the Summary Widgets even when a tab's scope has no issues (issue-widgets §2.1)", () => {
-    navigation.pathname = "/c/owner/x/issues";
+    navigation.pathname = "/c/c1/issues";
     renderView({
       result: result({ rows: [], totalCount: 0 }),
       views: savedViews({ offersDefault: false }),

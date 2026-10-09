@@ -139,6 +139,26 @@ const nextConfig: NextConfig = {
         destination: "/report/quick",
         permanent: false,
       },
+      // Retired Owner Collections (spec collections-and-tags 6.5). A person's
+      // machines are Machines filtered by Owner, and their issues are Issues
+      // filtered by Machine owner. The Timeline tab had no successor, so it
+      // opens Machines. These run before the proxy, so anonymous visitors
+      // follow them too.
+      {
+        source: "/c/owner/:userId",
+        destination: "/m?owner=:userId",
+        permanent: true,
+      },
+      {
+        source: "/c/owner/:userId/timeline",
+        destination: "/m?owner=:userId",
+        permanent: true,
+      },
+      {
+        source: "/c/owner/:userId/issues",
+        destination: "/issues?owner=:userId",
+        permanent: true,
+      },
     ];
   },
   async headers() {

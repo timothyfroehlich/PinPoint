@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { summarizeCollection } from "./summary";
-import type { CollectionMachine } from "./owner";
+import type { CollectionMachine } from "./types";
 import { healthFromSeverityCounts } from "~/lib/machines/view/model";
 
 function machine(
