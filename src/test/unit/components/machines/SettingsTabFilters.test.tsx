@@ -30,6 +30,9 @@ vi.mock("~/components/editor/RichTextEditorDynamic", () => ({
 vi.mock("~/components/editor/RichTextDisplay", () => ({
   RichTextDisplay: () => <div data-testid="mock-display" />,
 }));
+vi.mock("~/app/(app)/c/settings-tags/actions", () => ({
+  createSettingsTagAction: vi.fn(),
+}));
 vi.mock("~/app/(app)/m/[initials]/(tabs)/settings/actions", () => ({
   saveSettingsSetAction: vi.fn(),
   deleteSettingsSetAction: vi.fn(),
@@ -79,6 +82,7 @@ const TOURNAMENT = {
   slug: "tournament",
   name: "Tournament",
 };
+const ALL_TAGS = [HOUSE, TOURNAMENT];
 
 /** Names are the fixture's identity — assertions compare these. */
 const SET = {
@@ -154,6 +158,8 @@ function renderTab(
       initialSets={sets}
       settingsRequests={null}
       settingsInstructions={null}
+      allTags={ALL_TAGS}
+      canManageTags={false}
     />
   );
 }
@@ -585,5 +591,36 @@ describe("SettingsTab filters — empty intersection", () => {
     expect(
       screen.getByText(/no settings sets recorded yet/i)
     ).toBeInTheDocument();
+  });
+});
+
+describe("SettingsTab filters — custom settings tags", () => {
+  const BAT_CITY = {
+    id: "tag-bat",
+    slug: "bat-city-2025",
+    name: "Bat City 2025",
+  };
+
+  it("offers a chip for a custom tag a listed set carries, and it narrows the list", async () => {
+    const user = userEvent.setup();
+    const sets = corpus().map((set) =>
+      set.name === SET.communityHouse || set.name === SET.techPersonal
+        ? { ...set, tags: [...set.tags, BAT_CITY] }
+        : set
+    );
+    renderTab(STRANGER, sets);
+
+    // The technician's personal set is hidden, so only one listed set counts.
+    expect(chip("Bat City 2025")).toHaveTextContent("Bat City 2025 1");
+    await user.click(chip("Bat City 2025"));
+    expect(visibleSetNames()).toEqual([SET.communityHouse]);
+
+    await user.click(chip(OTHERS));
+    expect(visibleSetNames()).toEqual([SET.techPersonal, SET.communityHouse]);
+  });
+
+  it("offers no chip for a tag no set on the machine carries", () => {
+    renderTab(STRANGER);
+    expect(screen.queryByRole("button", { name: /^Bat City 2025/ })).toBeNull();
   });
 });

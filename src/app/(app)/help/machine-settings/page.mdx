@@ -8,13 +8,14 @@ export const metadata = {
 
 ## Choosing a set
 
-Each machine can have one **★ Preferred House** set — how it runs day to day —
-and one **Preferred Tournament** set for competition. Both sort first. One set
-can be both.
+Each machine can have one **Default House** set — how it runs day to day — and
+one **Default Tournament** set for competition. Both sort first. One set can be
+both.
 
-Sets also carry **tags**. **House** and **Tournament** are built in: only a set
-tagged House can be the preferred House set, and only a set tagged Tournament
-can be the preferred Tournament set. A set can carry both tags.
+Sets also carry **settings tags**. **House** and **Tournament** are built in:
+only a set tagged House can be the default House set, and only a set tagged
+Tournament can be the default Tournament set. A set can carry any number of
+tags.
 
 ## Who can edit a set
 
@@ -60,24 +61,36 @@ the **owner**, **technician**, or **admin** role — see
 [Roles & Permissions](/help/permissions).
 
 Everyone can see every set. Other people's personal sets are hidden until you
-turn on **Others' personal** above the list, unless one is a preferred set.
+turn on **Others' personal** above the list, unless one is a default set.
 
-## Tags and preferred sets
+## Tags and default sets
 
 Technicians, admins, and the machine's owner can tag any set on the machine and
-choose its preferred sets, even sets they can't edit. Choosing a new preferred
-set replaces the old one.
+choose its default sets, even sets they can't edit. Open **Edit tags…** from a
+set's ⋮ menu: check a tag to apply it, and use **Make default** beside House or
+Tournament. Choosing a new default set replaces the old one.
 
-- A preferred set is always a community set: making someone's personal set
-  preferred turns it into a community set.
-- A preferred set keeps its tag. Unset it before removing the tag.
-- If a machine has no preferred House set, the next set created on it becomes
-  the preferred House set.
+- A default set is always a community set: making someone's personal set the
+  default turns it into a community set.
+- A default set keeps its tag. Clear the default before removing the tag.
+- If a machine has no default House set, the next set created on it becomes
+  the default House set.
+
+## Settings tags
+
+Settings tags are shared across every machine. Name one after an event, such as
+"Bat City 2025", and tag each machine's set for it. **All settings tags** lists
+every tag and how many sets carry it; a tag's page shows those sets by machine
+and links to **Print settings sheets** with them already added.
+
+Technicians and admins can create a tag (from a set's tag picker or the
+Settings tags page), rename it, or delete it. A name is at most 20 characters.
+Deleting a tag takes it off every set; the sets themselves stay.
 
 ## Duplicating a set
 
-A duplicate is a personal set of yours with the same tags. It is never
-preferred.
+A duplicate is a personal set of yours with the same tags. It is never a
+default set.
 
 ## Saving
 
@@ -91,7 +104,7 @@ stop typing, so there is no Save button.
 - Software settings, Post positions, and Rubbers are limited to one per set,
   and leave the **Add section** menu once used. DIP banks, tables, and notes
   can repeat.
-- The machine's Timeline shows sets being created and deleted and preferred
+- The machine's Timeline shows sets being created and deleted and default
   sets changing. Edits, tags, and sets made community are recorded under
   **Settings edits**, a Timeline filter that is off by default.
 

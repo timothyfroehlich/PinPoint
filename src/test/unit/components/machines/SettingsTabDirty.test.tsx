@@ -15,6 +15,7 @@ import {
   fireEvent,
   waitFor,
   act,
+  within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { type ReactNode } from "react";
@@ -26,10 +27,18 @@ import {
   makeCommunitySettingsSetAction,
   saveSettingsSetAction,
   setPreferredSettingsSetAction,
+  setSettingsSetTagAction,
   updateMachineSettingsRequestsAction,
 } from "~/app/(app)/m/[initials]/(tabs)/settings/actions";
+import { createSettingsTagAction } from "~/app/(app)/c/settings-tags/actions";
 import type { SettingsSetData } from "~/lib/machines/settings-types";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
+
+const ALL_TAGS = [
+  { id: "tag-house", slug: "house", name: "House" },
+  { id: "tag-tournament", slug: "tournament", name: "Tournament" },
+  { id: "tag-bat-city", slug: "bat-city-2025", name: "Bat City 2025" },
+];
 
 // Stub the rich-text editor/display so the auto-save wiring is testable without
 // Tiptap (the dynamic editor doesn't render synchronously in jsdom).
@@ -76,6 +85,9 @@ vi.mock("~/components/editor/RichTextDisplay", () => ({
   RichTextDisplay: () => <div data-testid="mock-display" />,
 }));
 
+vi.mock("~/app/(app)/c/settings-tags/actions", () => ({
+  createSettingsTagAction: vi.fn(),
+}));
 vi.mock("~/app/(app)/m/[initials]/(tabs)/settings/actions", () => ({
   saveSettingsSetAction: vi.fn(),
   deleteSettingsSetAction: vi.fn(),
@@ -247,6 +259,8 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
         initialSets={[oneSet()]}
         settingsRequests={null}
         settingsInstructions={null}
+        allTags={ALL_TAGS}
+        canManageTags={false}
       />
     );
 
@@ -269,6 +283,8 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
         initialSets={[oneSet()]}
         settingsRequests={null}
         settingsInstructions={null}
+        allTags={ALL_TAGS}
+        canManageTags={false}
       />
     );
 
@@ -299,6 +315,8 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
           initialSets={[oneSet()]}
           settingsRequests={null}
           settingsInstructions={null}
+          allTags={ALL_TAGS}
+          canManageTags={false}
         />
       );
 
@@ -341,6 +359,8 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
         initialSets={[oneSet()]}
         settingsRequests={null}
         settingsInstructions={null}
+        allTags={ALL_TAGS}
+        canManageTags={false}
       />
     );
 
@@ -372,6 +392,8 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
         initialSets={[oneSet({ canEdit: false })]}
         settingsRequests={null}
         settingsInstructions={null}
+        allTags={ALL_TAGS}
+        canManageTags={false}
       />
     );
 
@@ -392,6 +414,8 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
         initialSets={[oneSet({ canEdit: false })]}
         settingsRequests={null}
         settingsInstructions={null}
+        allTags={ALL_TAGS}
+        canManageTags={false}
       />
     );
 
@@ -422,6 +446,8 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
         initialSets={[setWithDesc]}
         settingsRequests={null}
         settingsInstructions={null}
+        allTags={ALL_TAGS}
+        canManageTags={false}
       />
     );
 
@@ -440,6 +466,8 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
         initialSets={[dipSet({ canEdit: false })]}
         settingsRequests={null}
         settingsInstructions={null}
+        allTags={ALL_TAGS}
+        canManageTags={false}
       />
     );
 
@@ -464,6 +492,8 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
         initialSets={[oneSet({ canEdit: false })]}
         settingsRequests={null}
         settingsInstructions={null}
+        allTags={ALL_TAGS}
+        canManageTags={false}
       />
     );
 
@@ -495,6 +525,8 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
         initialSets={[oneSet()]}
         settingsRequests={null}
         settingsInstructions={null}
+        allTags={ALL_TAGS}
+        canManageTags={false}
       />
     );
 
@@ -530,6 +562,8 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
         ]}
         settingsRequests={null}
         settingsInstructions={null}
+        allTags={ALL_TAGS}
+        canManageTags={false}
       />
     );
 
@@ -582,6 +616,8 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
         initialSets={[twoNoteSet()]}
         settingsRequests={null}
         settingsInstructions={null}
+        allTags={ALL_TAGS}
+        canManageTags={false}
       />
     );
 
@@ -618,6 +654,8 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
         initialSets={[]}
         settingsRequests={null}
         settingsInstructions={null}
+        allTags={ALL_TAGS}
+        canManageTags={false}
       />
     );
 
@@ -662,6 +700,8 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
         initialSets={[]}
         settingsRequests={null}
         settingsInstructions={null}
+        allTags={ALL_TAGS}
+        canManageTags={false}
       />
     );
 
@@ -699,6 +739,8 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
           initialSets={[]}
           settingsRequests={null}
           settingsInstructions={null}
+          allTags={ALL_TAGS}
+          canManageTags={false}
         />
       );
 
@@ -752,6 +794,8 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
           initialSets={[]}
           settingsRequests={null}
           settingsInstructions={null}
+          allTags={ALL_TAGS}
+          canManageTags={false}
         />
       );
 
@@ -779,7 +823,7 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
   // Set preferred / Duplicate disabled for unsaved set
   // ---------------------------------------------------------------------------
 
-  it("Set preferred / Duplicate are disabled for an unsaved (temp-id) set", async () => {
+  it("Edit tags / Duplicate are disabled for an unsaved (temp-id) set", async () => {
     const user = userEvent.setup();
     render(
       <SettingsTab
@@ -790,6 +834,8 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
         initialSets={[]}
         settingsRequests={null}
         settingsInstructions={null}
+        allTags={ALL_TAGS}
+        canManageTags={false}
       />
     );
 
@@ -798,18 +844,17 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
       screen.getByRole("button", { name: "More options for this set" })
     );
 
-    // The machine has no preferred House set, so the new set is optimistically
-    // the preferred House set (spec §4.4) — the menu item reads "Unset
-    // preferred House". Both it and Duplicate act on a persisted row, so
+    // Tagging, choosing a default, and duplicating act on a persisted row, so
     // they're disabled until first save.
-    const preferred = await screen.findByRole("menuitem", {
-      name: "Unset preferred House",
+    const editTags = await screen.findByRole("menuitem", {
+      name: "Edit tags…",
     });
     const duplicate = screen.getByRole("menuitem", { name: "Duplicate" });
-    expect(preferred).toHaveAttribute("aria-disabled", "true");
+    expect(editTags).toHaveAttribute("aria-disabled", "true");
     expect(duplicate).toHaveAttribute("aria-disabled", "true");
 
-    await user.click(preferred);
+    await user.click(editTags);
+    expect(screen.queryByRole("dialog")).toBeNull();
     expect(vi.mocked(setPreferredSettingsSetAction)).not.toHaveBeenCalled();
     expect(vi.mocked(duplicateSettingsSetAction)).not.toHaveBeenCalled();
   });
@@ -831,6 +876,8 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
           initialSets={[oneSet()]}
           settingsRequests={null}
           settingsInstructions={null}
+          allTags={ALL_TAGS}
+          canManageTags={false}
         />
       );
 
@@ -885,6 +932,8 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
           initialSets={[oneSet()]}
           settingsRequests={null}
           settingsInstructions={null}
+          allTags={ALL_TAGS}
+          canManageTags={false}
         />
       );
 
@@ -941,6 +990,8 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
           initialSets={[oneSet()]}
           settingsRequests={null}
           settingsInstructions={null}
+          allTags={ALL_TAGS}
+          canManageTags={false}
         />
       );
 
@@ -995,6 +1046,8 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
           initialSets={[oneSet()]}
           settingsRequests={null}
           settingsInstructions={null}
+          allTags={ALL_TAGS}
+          canManageTags={false}
         />
       );
 
@@ -1052,6 +1105,8 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
           initialSets={[oneSet()]}
           settingsRequests={null}
           settingsInstructions={null}
+          allTags={ALL_TAGS}
+          canManageTags={false}
         />
       );
 
@@ -1113,6 +1168,8 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
           initialSets={[oneSet()]}
           settingsRequests={null}
           settingsInstructions={null}
+          allTags={ALL_TAGS}
+          canManageTags={false}
         />
       );
 
@@ -1171,6 +1228,8 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
           initialSets={[oneSet()]}
           settingsRequests={null}
           settingsInstructions={null}
+          allTags={ALL_TAGS}
+          canManageTags={false}
         />
       );
 
@@ -1232,6 +1291,8 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
           initialSets={[oneSet()]}
           settingsRequests={null}
           settingsInstructions={null}
+          allTags={ALL_TAGS}
+          canManageTags={false}
         />
       );
 
@@ -1273,6 +1334,8 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
         initialSets={[oneSet()]}
         settingsRequests={null}
         settingsInstructions={null}
+        allTags={ALL_TAGS}
+        canManageTags={false}
       />
     );
 
@@ -1310,6 +1373,8 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
         initialSets={[setWithDescOpen]}
         settingsRequests={null}
         settingsInstructions={null}
+        allTags={ALL_TAGS}
+        canManageTags={false}
       />
     );
 
@@ -1351,6 +1416,8 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
           initialSets={[oneSet()]}
           settingsRequests={null}
           settingsInstructions={null}
+          allTags={ALL_TAGS}
+          canManageTags={false}
         />
       );
 
@@ -1398,6 +1465,8 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
         initialSets={[oneSet()]}
         settingsRequests={null}
         settingsInstructions={null}
+        allTags={ALL_TAGS}
+        canManageTags={false}
       />
     );
 
@@ -1477,6 +1546,8 @@ describe("SettingsTab — data-loss regression (A1, 🔴)", () => {
         initialSets={[]}
         settingsRequests={null}
         settingsInstructions={null}
+        allTags={ALL_TAGS}
+        canManageTags={false}
       />
     );
 
@@ -1533,83 +1604,194 @@ describe("SettingsTab — data-loss regression (A1, 🔴)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Set ⋮ menu — preferred slots (machine-settings spec §4.2–§4.3)
+// Set ⋮ menu → tag picker (machine-settings spec §3.4, §4.2–§4.3)
 // ---------------------------------------------------------------------------
 
-describe("SettingsTab — set menu offers a preferred slot only where it applies", () => {
-  it("offers 'Set as preferred Tournament' only on a Tournament-tagged set a curator views, and it calls the action", async () => {
-    const user = userEvent.setup();
-    const setPreferred = vi.mocked(setPreferredSettingsSetAction);
-    setPreferred.mockReset();
-    setPreferred.mockResolvedValue({ success: true });
-    const house = { id: "tag-house", slug: "house", name: "House" };
-    const tournament = {
-      id: "tag-tournament",
-      slug: "tournament",
-      name: "Tournament",
-    };
-    // Insertion order is DOM order (none is preferred, so nothing is pinned).
-    const sets = [
-      oneSet({
-        id: "tagged",
-        name: "Tagged",
-        tags: [house, tournament],
-        canCurate: true,
-      }),
-      oneSet({
-        id: "untagged",
-        name: "Untagged",
-        tags: [house],
-        canCurate: true,
-      }),
-      // Its author's set on a machine where they can no longer curate.
-      oneSet({
-        id: "no-curate",
-        name: "No curate",
-        tags: [tournament],
-        canCurate: false,
-        canDelete: true,
-      }),
-    ];
+describe("SettingsTab — the tag picker", () => {
+  const house = { id: "tag-house", slug: "house", name: "House" };
+  const tournament = {
+    id: "tag-tournament",
+    slug: "tournament",
+    name: "Tournament",
+  };
+  // Insertion order is DOM order (none is a default, so nothing is pinned).
+  const sets = (): SettingsSetData[] => [
+    oneSet({
+      id: "tagged",
+      name: "Tagged",
+      tags: [house, tournament],
+      canCurate: true,
+    }),
+    oneSet({
+      id: "untagged",
+      name: "Untagged",
+      tags: [house],
+      canCurate: true,
+    }),
+    // Its author's set on a machine where they can no longer curate.
+    oneSet({
+      id: "no-curate",
+      name: "No curate",
+      tags: [tournament],
+      canCurate: false,
+      canDelete: true,
+    }),
+  ];
+
+  function renderTab(canManageTags: boolean): void {
     render(
       <SettingsTab
         canCreate
         viewerId="u1"
         machineOwnerId="u9"
         machineId="m1"
-        initialSets={sets}
+        initialSets={sets()}
         settingsRequests={null}
         settingsInstructions={null}
+        allTags={ALL_TAGS}
+        canManageTags={canManageTags}
       />
     );
-    const menuButton = (i: number): HTMLElement => {
-      const button = screen.getAllByRole("button", {
-        name: "More options for this set",
-      })[i];
-      if (!button) throw new Error(`no menu button ${String(i)}`);
-      return button;
-    };
-    const SET_TOURNAMENT = "Set as preferred Tournament";
+  }
 
-    for (const i of [1, 2]) {
-      await user.click(menuButton(i));
-      await screen.findAllByRole("menuitem");
-      expect(
-        screen.queryByRole("menuitem", { name: SET_TOURNAMENT })
-      ).toBeNull();
-      await user.keyboard("{Escape}");
-    }
-    expect(setPreferred).not.toHaveBeenCalled();
-
-    await user.click(menuButton(0));
+  async function openPicker(
+    user: ReturnType<typeof userEvent.setup>,
+    index: number
+  ): Promise<HTMLElement> {
+    const button = screen.getAllByRole("button", {
+      name: "More options for this set",
+    })[index];
+    if (!button) throw new Error(`no menu button ${String(index)}`);
+    await user.click(button);
     await user.click(
-      await screen.findByRole("menuitem", { name: SET_TOURNAMENT })
+      await screen.findByRole("menuitem", { name: "Edit tags…" })
+    );
+    return await screen.findByRole("dialog");
+  }
+
+  it("offers Edit tags only to curators", async () => {
+    const user = userEvent.setup();
+    renderTab(false);
+    const noCurate = screen.getAllByRole("button", {
+      name: "More options for this set",
+    })[2];
+    if (!noCurate) throw new Error("no menu button");
+    await user.click(noCurate);
+    await screen.findAllByRole("menuitem");
+    expect(screen.queryByRole("menuitem", { name: "Edit tags…" })).toBeNull();
+  });
+
+  it("enables Make default only on a tagged slot, and calls the action", async () => {
+    const user = userEvent.setup();
+    const setPreferred = vi.mocked(setPreferredSettingsSetAction);
+    setPreferred.mockReset();
+    setPreferred.mockResolvedValue({ success: true });
+    renderTab(false);
+
+    const untagged = await openPicker(user, 1);
+    expect(
+      within(untagged).getByRole("button", {
+        name: "Make default Tournament set",
+      })
+    ).toBeDisabled();
+    await user.keyboard("{Escape}");
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
+
+    const tagged = await openPicker(user, 0);
+    await user.click(
+      within(tagged).getByRole("button", {
+        name: "Make default Tournament set",
+      })
     );
     expect(setPreferred).toHaveBeenCalledWith({
       id: "tagged",
       slot: "tournament",
       preferred: true,
     });
+    // A default set keeps its tag (§4.2): the checkbox locks.
+    expect(
+      await within(tagged).findByRole("checkbox", { name: /Tournament/ })
+    ).toBeDisabled();
+    expect(within(tagged).getByText("Kept while default")).toBeVisible();
+  });
+
+  it("applies a custom tag by id and a built-in tag by slot", async () => {
+    const user = userEvent.setup();
+    const setTag = vi.mocked(setSettingsSetTagAction);
+    setTag.mockReset();
+    setTag.mockResolvedValue({ success: true });
+    renderTab(false);
+
+    const picker = await openPicker(user, 1);
+    await user.click(
+      within(picker).getByRole("checkbox", { name: "Bat City 2025" })
+    );
+    await user.click(
+      within(picker).getByRole("checkbox", { name: "Tournament" })
+    );
+    expect(setTag).toHaveBeenNthCalledWith(1, {
+      id: "untagged",
+      tag: { tagId: "tag-bat-city" },
+      applied: true,
+    });
+    expect(setTag).toHaveBeenNthCalledWith(2, {
+      id: "untagged",
+      tag: "tournament",
+      applied: true,
+    });
+    // Once the picker closes, the card shows the custom tag as a link to its
+    // page.
+    await user.click(within(picker).getByRole("button", { name: "Done" }));
+    expect(
+      await screen.findByRole("link", { name: "Bat City 2025" })
+    ).toHaveAttribute("href", "/c/settings-tags/bat-city-2025");
+  });
+
+  it("offers to create an unmatched name only to tag managers", async () => {
+    const user = userEvent.setup();
+    renderTab(false);
+    const picker = await openPicker(user, 0);
+    await user.type(within(picker).getByLabelText("Find a tag"), "Free play");
+    expect(within(picker).queryByRole("button", { name: /Create/ })).toBeNull();
+    expect(within(picker).getByText("No matching tags")).toBeVisible();
+  });
+
+  it("creates a tag from the filter and applies it", async () => {
+    const user = userEvent.setup();
+    const create = vi.mocked(createSettingsTagAction);
+    create.mockReset();
+    create.mockResolvedValue({
+      ok: true,
+      value: { id: "tag-free", slug: "free-play", name: "Free play" },
+    });
+    const setTag = vi.mocked(setSettingsSetTagAction);
+    setTag.mockReset();
+    setTag.mockResolvedValue({ success: true });
+    renderTab(true);
+
+    const picker = await openPicker(user, 0);
+    const filter = within(picker).getByLabelText("Find or create a tag");
+    // An exact match (ignoring case) offers no create row.
+    await user.type(filter, "bat city 2025");
+    expect(within(picker).queryByRole("button", { name: /Create/ })).toBeNull();
+    await user.clear(filter);
+    await user.type(filter, "Free  play");
+    await user.click(
+      within(picker).getByRole("button", { name: "Create “Free play”" })
+    );
+    expect(create).toHaveBeenCalledWith({ name: "Free play" });
+    await waitFor(() => {
+      expect(setTag).toHaveBeenCalledWith({
+        id: "tagged",
+        tag: { tagId: "tag-free" },
+        applied: true,
+      });
+    });
+    expect(
+      await within(picker).findByRole("checkbox", { name: "Free play" })
+    ).toBeChecked();
   });
 });
 
@@ -1637,6 +1819,8 @@ describe("SettingsTab — making a set community (spec §2.3)", () => {
         ]}
         settingsRequests={null}
         settingsInstructions={null}
+        allTags={ALL_TAGS}
+        canManageTags={false}
       />
     );
 
@@ -1680,6 +1864,8 @@ describe("SettingsTab — audit line credits the machine owner", () => {
         ]}
         settingsRequests={null}
         settingsInstructions={null}
+        allTags={ALL_TAGS}
+        canManageTags={false}
       />
     );
 
@@ -1704,6 +1890,8 @@ describe("SettingsTab — audit line credits the machine owner", () => {
         ]}
         settingsRequests={null}
         settingsInstructions={null}
+        allTags={ALL_TAGS}
+        canManageTags={false}
       />
     );
 
@@ -1728,6 +1916,8 @@ describe("SettingsTab — audit line credits the machine owner", () => {
         ]}
         settingsRequests={null}
         settingsInstructions={null}
+        allTags={ALL_TAGS}
+        canManageTags={false}
       />
     );
 
@@ -1744,6 +1934,8 @@ describe("SettingsTab — audit line credits the machine owner", () => {
         initialSets={[oneSet()]}
         settingsRequests={null}
         settingsInstructions={null}
+        allTags={ALL_TAGS}
+        canManageTags={false}
       />
     );
 

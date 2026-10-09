@@ -11,11 +11,10 @@ import {
   canManageMachineSettings,
 } from "~/lib/permissions";
 import {
-  BUILTIN_SETTINGS_TAGS,
   type SettingsSection,
   type SettingsSetData,
-  type SettingsTagRef,
 } from "~/lib/machines/settings-types";
+import { compareSettingsTags } from "~/lib/machines/settings-tags";
 
 /**
  * Re-derive the client-only `_key` render keys that were stripped before
@@ -55,21 +54,10 @@ export interface SettingsSetsViewer {
   machineOwnerId: string | null;
 }
 
-/** Built-in tags first (House, Tournament), then custom tags by name. */
-function sortTags(tags: SettingsTagRef[]): SettingsTagRef[] {
-  const rank = (t: SettingsTagRef): number => {
-    const i = (BUILTIN_SETTINGS_TAGS as readonly string[]).indexOf(t.slug);
-    return i === -1 ? BUILTIN_SETTINGS_TAGS.length : i;
-  };
-  return [...tags].sort(
-    (a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name)
-  );
-}
-
 /**
  * Load every settings set on a machine as the client view-model (spec §2.5:
- * every set is visible to everyone who can open the machine). Preferred House
- * first, then preferred Tournament, then oldest-created. Each row carries the
+ * every set is visible to everyone who can open the machine). Default House
+ * first, then default Tournament, then oldest-created. Each row carries the
  * viewer's rights. `updatedBy` resolves to the editor's display NAME
  * (CORE-SEC-007: never an email).
  */
@@ -120,7 +108,7 @@ export async function getMachineSettingsSets(
       isPreferredHouse: row.isPreferredHouse,
       isPreferredTournament: row.isPreferredTournament,
       isCommunity: row.isCommunity,
-      tags: sortTags(row.tags.map((t) => t.tag)),
+      tags: row.tags.map((t) => t.tag).sort(compareSettingsTags),
       createdById: row.createdBy,
       canEdit: canEditSet(
         auth,

@@ -46,4 +46,5 @@ export {
   canEditSet,
   canDeleteSet,
   canMakeCommunity,
+  canManageSettingsTags,
 } from "./settings";

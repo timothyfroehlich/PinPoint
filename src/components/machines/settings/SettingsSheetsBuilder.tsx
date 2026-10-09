@@ -380,8 +380,8 @@ export function SettingsSheetsBuilder({
   );
 
   const defaultOptions = [
-    { value: "house", label: "Preferred House" },
-    { value: "tournament", label: "Preferred Tournament" },
+    { value: "house", label: "Default House" },
+    { value: "tournament", label: "Default Tournament" },
     ...tags
       .filter((tag) => tag.slug !== "house" && tag.slug !== "tournament")
       .map((tag) => ({ value: `tag:${tag.slug}`, label: `Tag: ${tag.name}` })),
@@ -770,10 +770,10 @@ function PrintRunList({
 
 function setOptionLabel(set: PrintRunMachine["sets"][number]): string {
   if (set.isPreferredHouse && set.isPreferredTournament) {
-    return `${set.name} · pref. House, Tournament`;
+    return `${set.name} · default House, Tournament`;
   }
-  if (set.isPreferredHouse) return `${set.name} · pref. House`;
-  if (set.isPreferredTournament) return `${set.name} · pref. Tournament`;
+  if (set.isPreferredHouse) return `${set.name} · default House`;
+  if (set.isPreferredTournament) return `${set.name} · default Tournament`;
   return set.name;
 }
 

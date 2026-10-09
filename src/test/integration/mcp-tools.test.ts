@@ -4758,7 +4758,7 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       ).rejects.toMatchObject({
         reason: "invalid",
         message: expect.stringMatching(
-          /Only a set tagged Tournament can be the preferred Tournament set/i
+          /Only a set tagged Tournament can be the default Tournament set/i
         ),
       });
 
