@@ -26,10 +26,10 @@
 ## 3. Sections
 
 - **3.1** Model Details and Integrations each render as a bordered box, with the section title above the box.
-- **3.2** Model Details starts with the Source choice, followed by that source's fields: Model and Edition for a catalog title; model name, manufacturer, year, type, display, player count, designers, and artists for Manual Entry.
+- **3.2** Model Details starts with the Source choice, followed by that source's fields: Model and Edition for a catalog title; model name, manufacturer, year, type, display, player count, designers, artists, and programmers for Manual Entry.
 - **3.3** Manual Entry fields sit on a shared column grid so their edges line up from row to row. On a phone the grid has half as many columns.
 - **3.4** Type and Display are chosen from their tag vocabularies (collections-and-tags §9.3–9.4), each with a not-set choice. Player count accepts only a positive whole number.
-- **3.5** Designers and artists are each entered as an ordered list of names, added one name at a time and removable one at a time. PinPoint never splits an entered name on punctuation.
+- **3.5** Designers, artists, and programmers are each entered as an ordered list of names, added one name at a time and removable one at a time. PinPoint never splits an entered name on punctuation.
 - **3.6** Integrations holds the iScored game (iscored §2) and the machine's Pinball Map controls (pinballmap §4, §4.11). For an uncataloged machine, the Pinball Map entry reads as unavailable and says why.
 - **3.7** Apron card settings are not part of the machine form; they have their own tab (apron-cards §3.1).
 
@@ -53,7 +53,9 @@
 
 ## Known divergences
 
-_None — the current implementation matches this spec._
+| Requirement | Current implementation gap                      |
+| :---------- | :---------------------------------------------- |
+| §3.2, §3.5  | Manual Entry has no programmers list (PP-j6wh). |
 
 ---
 
@@ -61,6 +63,7 @@ _None — the current implementation matches this spec._
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-08 | Manual Entry adds a programmers list, entered like designers and artists (§3.2, §3.5). |
 | 2026-10-02 | Apron card leaves the machine form for its own tab (Section, §2.3, §2.5, §3.1, §3.7, §6.1). |
 | 2026-09-30 | Renamed listing intent to lineup setting (and Insider Connected intent to Insider Connected setting) throughout; `pinballmap.md` §4.8 bans "intent" in user-facing copy. No behavior change. |
 | 2026-09-27 | Created: one machine form shared by the New Machine page and the Manage tab, with Model Details, Integrations, and Apron card sections, one Save on the Manage tab, pinned phone buttons, and a section list. |
