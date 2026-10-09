@@ -16,7 +16,7 @@
 - **Template** — which layout a card face uses: Standard, Side rail, or Header band. Stored per saved card, independent of apron size and content; every template renders at every supported apron size. Side rail and Header band give the description and tip more room than Standard.
 - **Card description** — an optional override of the card's description text, distinct from the machine's main description. A saved card keeps at most one. It is rich text limited to bold, italic, and lists.
 - **Tip** — an optional second block of card text, shown under Description. Carries its own enabled/disabled toggle, independent of whether it has content. It is rich text limited to bold, italic, and lists.
-- **Credits** — the people credited for a machine's game, in two roles: design and art. They come from the Open Pinball Database (OPDB), or are entered by hand for an uncataloged machine. Each role has its own per-card display setting.
+- **Credits** — the people credited for a machine's game, in three roles: design, art, and code. They come from the Open Pinball Database (OPDB), or are entered by hand for an uncataloged machine. Each role has its own per-card display setting.
 - **Edition** — the "<X> Edition" line shown under the title. Sourced only from Pinball Map's grouped-family data (PP-esta.1); PinPoint never derives an edition by parsing an ungrouped Pinball Map name.
 - **Scan target** — the URL the card's QR code encodes: the machine's scan hub, tagged with an `apron` source so that traffic is distinguishable from other QR sources.
 - **Print queue** — a member's own list of saved cards waiting to be printed. Each member has one; no one else sees or changes it.
@@ -24,7 +24,7 @@
 
 ## 2. Data inputs
 
-- **2.1** A card face renders one machine, drawing on: name, manufacturer, year, owner display name, apron size, an edition line when one applies (§7), design and art credits (§10), a description, and a tip when enabled.
+- **2.1** A card face renders one machine, drawing on: name, manufacturer, year, owner display name, apron size, an edition line when one applies (§7), design, art, and code credits (§10), a description, and a tip when enabled.
 - **2.2** A card uses the card description when one is set, and falls back to the machine's main description when it is not.
 - **2.3** Apron size and template affect only how a card is laid out — content (title, edition, owner, description, tip) is identical across them. Only the Standard template shows credits (§10.2).
 
@@ -47,7 +47,7 @@
 
 ## 5. Layout
 
-- **5.1** On the Standard template, a card face is two regions side by side: a dark identity panel (title, edition, manufacturer · year, design and art credits, owner, APC logo) and a light action-and-description column.
+- **5.1** On the Standard template, a card face is two regions side by side: a dark identity panel (title, edition, manufacturer · year, design, art, and code credits, owner, APC logo) and a light action-and-description column.
 - **5.2** On the Standard template, the action column's top portion holds a "Scan this machine" header and up to three action rows (report a problem, post a score, playing tips) on the left, with the QR code to their right. A divider separates this from the description (and tip, when enabled) below.
 - **5.3** In every template, card copy names every destination reachable through the QR: reporting an issue, posting a score via iScored, and reading playing tips — in that order.
 - **5.4** The playing tips row appears only when the machine has tips (pintips §3.6).
@@ -83,11 +83,11 @@
 
 ## 10. Credits
 
-- **10.1** A machine linked to a Pinball Map catalog title takes its credits from that title's OPDB record, read from the copy of OPDB's published data that PinPoint stores and refreshes on a schedule (collections-and-tags §9.1). A machine declared uncataloged uses its hand-entered designers and artists (pinballmap §2.4). Rendering a card never contacts OPDB.
-- **10.2** On the Standard template, the card shows credits as two rows in the identity panel, Design then Art, below manufacturer · year and above the owner line.
+- **10.1** A machine linked to a Pinball Map catalog title takes its credits from that title's OPDB record, read from the copy of OPDB's published data that PinPoint stores and refreshes on a schedule (collections-and-tags §9.1). A machine declared uncataloged uses its hand-entered designers, artists, and programmers (pinballmap §2.4). Rendering a card never contacts OPDB.
+- **10.2** On the Standard template, the card shows credits as up to three rows in the identity panel, Design, Art, then Code, below manufacturer · year and above the owner line.
 - **10.3** A row lists the role's names in their source's order, comma-separated. When a role has more than two names, the row shows the first two followed by a count of the rest.
-- **10.4** A role with no credits shows "Unknown". This includes both roles for a machine that is neither linked nor uncataloged, or whose catalog title has no OPDB record.
-- **10.5** Each role's row has its own per-card display setting, on by default for every machine, including machines with no credits. Turning a setting off removes that row from the card. The Side rail and Header band templates show no credits; a card keeps its display settings while it uses one of them, and the Apron card tab hides those settings there.
+- **10.4** A role with no credits shows "Unknown". This includes every role for a machine that is neither linked nor uncataloged, or whose catalog title has no OPDB record.
+- **10.5** Each role's row has its own per-card display setting. Design and Art are on by default for every machine, including machines with no credits; Code is off by default. Turning a setting off removes that row from the card. The Side rail and Header band templates show no credits; a card keeps its display settings while it uses one of them, and the Apron card tab hides those settings there.
 - **10.6** While any credit row shows, the APC logo renders smaller to give the identity panel room.
 
 ## 11. Saved cards
@@ -127,11 +127,13 @@
 | Requirement | Current implementation gap |
 | :-- | :-- |
 | §4.2 | Automatic apron-size fill from a Pinball Map match is intentionally deferred. Editors choose a size manually for now; unmatched machines still have no default. |
+| §1, §10.1–§10.5 | Cards show only Design and Art rows; the Code role, its display setting, and hand-entered programmers are not built (PP-j6wh). |
 
 ## Changelog
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-08 | Credits gain a third role, code, shown as a Code row after Design and Art; its per-card display setting is off by default. Uncataloged machines use hand-entered programmers (§1, §2.1, §5.1, §10.1, §10.2, §10.4, §10.5). |
 | 2026-10-05 | Added §13 Print queue: each member queues saved cards from Export, and the Print apron cards page opens with them selected and offers Mark as printed. Export applies to one chosen card shown in a preview (§1, §9.5, §9.6). |
 | 2026-10-04 | Added §12 Batch printing: a Print apron cards page selects saved cards across machines and downloads one N-up print file per apron size, plus an order sheet for the print shop. |
 | 2026-10-04 | Apron sizes: Stern/SPIKE becomes Stern / Data East / Sega and WPC becomes Williams / WPC; adds Bally solid state, Bally EM, Gottlieb EM, and Williams EM (§1, §4.1). |
