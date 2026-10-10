@@ -145,6 +145,7 @@ const baseProps: MachineDetailsFormProps = {
   playerCount: null,
   designers: null,
   artists: null,
+  programmers: null,
   iscoredGameId: null,
   ownerRequirements: null,
   canViewOwnerRequirements: true,

@@ -127,7 +127,6 @@
 | Requirement | Current implementation gap |
 | :-- | :-- |
 | §4.2 | Automatic apron-size fill from a Pinball Map match is intentionally deferred. Editors choose a size manually for now; unmatched machines still have no default. |
-| §1, §10.1–§10.5 | Cards show only Design and Art rows; the Code role, its display setting, and hand-entered programmers are not built (PP-j6wh). |
 
 ## Changelog
 

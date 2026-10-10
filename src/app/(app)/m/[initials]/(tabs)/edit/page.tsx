@@ -394,6 +394,7 @@ export default async function MachineEditPage({
               playerCount={machine.playerCount}
               designers={machine.designers}
               artists={machine.artists}
+              programmers={machine.programmers}
               iscoredGameId={machine.iscoredGameId}
               pinballmap={pinballmapBlock}
             />

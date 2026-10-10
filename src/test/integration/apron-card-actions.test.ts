@@ -54,6 +54,7 @@ describe("saveApronCardsAction (PP-o23o)", () => {
       tipEnabled: true,
       designEnabled: false,
       artEnabled: true,
+      codeEnabled: true,
       ...patch,
     };
   }
@@ -94,6 +95,7 @@ describe("saveApronCardsAction (PP-o23o)", () => {
       tipEnabled: true,
       designEnabled: false,
       artEnabled: true,
+      codeEnabled: true,
     });
     expect(docToPlainText(stored?.description)).toBe("Shoot the ramps.");
     expect(docToPlainText(stored?.tip)).toBe("Extra ball at 3 modes.");
