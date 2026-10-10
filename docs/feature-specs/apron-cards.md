@@ -30,12 +30,12 @@
 
 ## 3. Authoring card content
 
-- **3.1** Saved cards and their settings (apron size, template, credit display settings, card description, tip) are edited on the machine's Apron card tab, which has its own Save. There is no other card editor, and the New Machine page has none: cards are added once the machine exists.
-- **3.2** The Apron card tab offers an explicit choice for the card text: the machine's main description (edited on the Manage tab; the card uses its saved value), or a card description just for the card. Switching back to the main description discards nothing — the card description is kept, only unused.
+- **3.1** Saved cards and their settings (apron size, template, credit display settings, card description, tip) are edited on the machine's Apron card tab, which has its own Save. There is no other card editor, and the New Machine page has none: cards are added once the machine exists. The tab can also edit the machine's main description (§3.2).
+- **3.2** The Apron card tab offers an explicit choice for the card text: the machine's main description, or a card description just for the card. With the main description chosen, the tab edits it in place with the same formatting the Manage tab offers; the change applies to the machine everywhere, including every saved card that uses it. Switching back to the main description discards nothing — the card description is kept, only unused.
 - **3.3** Tip has an enabled/disabled toggle, independent of its saved text. When disabled, the card shows a single Description block and no Tip heading, regardless of saved tip content.
 - **3.4** Preview shows the card face rendered from the tab's current values, including unsaved ones. Description and tip share one flowing region on the card rather than two independently sized boxes: growing one narrows the room available to the other in the preview, matching what the printed card will do.
 - **3.5** Description and tip are checked as one combined region, not measured line by line: PinPoint knows only whether the combined content still fits the card, not how many lines over it runs. While it does not fit, the Apron card tab shows one card-level notice rather than a per-field message, and exporting it requires the override in §9.5. The card can still be saved.
-- **3.6** Changing apron size, template, card description, tip, or a credit display setting requires the machine-management capability: machine owner, technician, or administrator.
+- **3.6** Changing apron size, template, card description, tip, a credit display setting, or the machine's main description requires the machine-management capability: machine owner, technician, or administrator.
 - **3.7** The card description and tip offer bold, italic, bulleted lists, and numbered lists, and the card prints that formatting. When the card uses the machine's main description, it prints bold, italic, and lists, and prints headings and links as plain text.
 - **3.8** Every signed-in member sees the Apron card tab. A member without the machine-management capability sees each saved card's Preview and Export and no editing controls.
 
@@ -126,12 +126,14 @@
 
 | Requirement | Current implementation gap |
 | :-- | :-- |
+| §3.1, §3.2, §3.6 | The Apron card tab shows the machine's main description read-only and points to the Manage tab; editing it in place is not built yet. |
 | §4.2 | Automatic apron-size fill from a Pinball Map match is intentionally deferred. Editors choose a size manually for now; unmatched machines still have no default. |
 
 ## Changelog
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-10 | The Apron card tab edits the machine's main description in place when a card uses it (§3.1, §3.2, §3.6). |
 | 2026-10-05 | Added §13 Print queue: each member queues saved cards from Export, and the Print apron cards page opens with them selected and offers Mark as printed. Export applies to one chosen card shown in a preview (§1, §9.5, §9.6). |
 | 2026-10-04 | Added §12 Batch printing: a Print apron cards page selects saved cards across machines and downloads one N-up print file per apron size, plus an order sheet for the print shop. |
 | 2026-10-04 | Apron sizes: Stern/SPIKE becomes Stern / Data East / Sega and WPC becomes Williams / WPC; adds Bally solid state, Bally EM, Gottlieb EM, and Williams EM (§1, §4.1). |
