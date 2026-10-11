@@ -128,7 +128,6 @@
 | :-- | :-- |
 | §3.1, §3.2, §3.6 | The Apron card tab shows the machine's main description read-only and points to the Manage tab; editing it in place is not built yet. |
 | §4.2 | Automatic apron-size fill from a Pinball Map match is intentionally deferred. Editors choose a size manually for now; unmatched machines still have no default. |
-| §1, §10.1–§10.5 | Cards show only Design and Art rows; the Code role, its display setting, and hand-entered programmers are not built (PP-j6wh). |
 
 ## Changelog
 
