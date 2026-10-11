@@ -44,10 +44,13 @@ interface InfoRailProps {
   manufacturer: string | null;
   year: number | null;
   /**
-   * Design and art credits from the machine's OPDB record, rendered under
-   * Year with the same rule: only alongside a model, and a role with no
-   * credits reads **Unknown** (PP-tv2u). Every name shows here; only the
-   * apron card limits the list.
+   * Design, art, and code credits from the machine's OPDB record, rendered
+   * under Year with the same rule: only alongside a model, and a role with no
+   * credits reads **Unknown** (PP-tv2u). Code is the exception: its row shows
+   * only when someone is credited, because EMs had no software and most
+   * pre-DMD games carry no code credit in OPDB, so "Unknown" there would
+   * usually be wrong rather than missing (PP-j6wh). Every name shows here;
+   * only the apron card limits the list.
    */
   credits: MachineCredits;
   /** Every tag the machine belongs to, in tag type order (spec 7.4). */
@@ -231,6 +234,9 @@ export function InfoRail({
               </p>
               <CreditRow label="Design" names={credits.design} />
               <CreditRow label="Art" names={credits.art} />
+              {credits.code.length > 0 && (
+                <CreditRow label="Code" names={credits.code} />
+              )}
             </>
           )}
 

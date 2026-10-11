@@ -53,9 +53,7 @@
 
 ## Known divergences
 
-| Requirement | Current implementation gap                      |
-| :---------- | :---------------------------------------------- |
-| §3.2, §3.5  | Manual Entry has no programmers list (PP-j6wh). |
+_None — the current implementation matches this spec._
 
 ---
 

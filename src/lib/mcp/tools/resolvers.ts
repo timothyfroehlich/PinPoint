@@ -75,6 +75,7 @@ export async function resolveMachine(ref: string): Promise<MachineRef> {
       playerCount: true,
       designers: true,
       artists: true,
+      programmers: true,
       opdbId: true,
       ipdbId: true,
       iscoredGameId: true,

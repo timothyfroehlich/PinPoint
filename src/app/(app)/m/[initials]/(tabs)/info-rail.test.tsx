@@ -29,7 +29,11 @@ function renderRail(overrides: Partial<RailProps> = {}): void {
       modelName="Medieval Madness"
       manufacturer="Williams"
       year={1997}
-      credits={{ design: ["Brian Eddy"], art: ["John Youssi", "Greg Freres"] }}
+      credits={{
+        design: ["Brian Eddy"],
+        art: ["John Youssi", "Greg Freres"],
+        code: [],
+      }}
       tags={[]}
       pinballmap={{
         locationUrl: LOCATION_URL,
@@ -155,10 +159,15 @@ describe("InfoRail", () => {
         credits: {
           design: ["Steve Ritchie"],
           art: ["Kevin O'Connor", "Dave Link", "Harrison Drake"],
+          code: ["Lyman F. Sheats Jr."],
         },
       });
       const block = screen.getByTestId("machine-model-block");
       expect(within(block).getByText("Steve Ritchie")).toBeInTheDocument();
+      expect(within(block).getByText("Code")).toBeInTheDocument();
+      expect(
+        within(block).getByText("Lyman F. Sheats Jr.")
+      ).toBeInTheDocument();
       // The apron card's two-name limit does not apply here.
       expect(
         within(block).getByText("Kevin O'Connor, Dave Link, Harrison Drake")
@@ -166,11 +175,18 @@ describe("InfoRail", () => {
     });
 
     it("reads 'Unknown' for a role with no credits", () => {
-      renderRail({ credits: { design: [], art: [] } });
+      renderRail({ credits: { design: [], art: [], code: [] } });
       const block = screen.getByTestId("machine-model-block");
       expect(within(block).getByText("Design")).toBeInTheDocument();
       expect(within(block).getByText("Art")).toBeInTheDocument();
       expect(within(block).getAllByText("Unknown")).toHaveLength(2);
+    });
+
+    it("omits the Code row when no one is credited", () => {
+      // EMs had no software, so "Code Unknown" would be wrong, not missing.
+      renderRail({ credits: { design: ["Steve Kordek"], art: [], code: [] } });
+      const block = screen.getByTestId("machine-model-block");
+      expect(within(block).queryByText("Code")).not.toBeInTheDocument();
     });
   });
 
