@@ -1,6 +1,6 @@
 /**
- * Design, art, and code credits for a machine, taken from its stored OPDB record
- * (PP-tv2u), or for an uncataloged machine from its hand-entered lists
+ * Design, art, and code credits for a machine, taken from its stored OPDB
+ * record (PP-tv2u), or for an uncataloged machine from its hand-entered lists
  * (PP-wqit.14). Shown on the Info tab's Details card and on the apron card
  * (spec apron-cards §10).
  */

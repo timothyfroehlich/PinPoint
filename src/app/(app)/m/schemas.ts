@@ -11,10 +11,10 @@ import { OPDB_DISPLAY_TYPES, OPDB_MACHINE_TYPES } from "~/lib/opdb/types";
 
 /**
  * One hand-entered credit list (designers, artists, or programmers,
- * PP-wqit.14). The form
- * posts one FormData entry per name, in order. Names are trimmed but never
- * split on punctuation (machine-editing spec 3.5); blank entries are dropped
- * later by `normalizeCreditNames`, which also stores an empty list as null.
+ * PP-wqit.14). The form posts one FormData entry per name, in order. Names
+ * are trimmed but never split on punctuation (machine-editing spec 3.5);
+ * blank entries are dropped later by `normalizeCreditNames`, which also
+ * stores an empty list as null.
  */
 const creditNamesField = z
   .array(z.string().trim().max(100, "Names must be less than 100 characters"))
