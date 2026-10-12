@@ -30,7 +30,8 @@ process.title = process.env.FAKE_LAUNCHER_TITLE;
 const { spawn } = require("child_process");
 const path = require("path");
 const cli = path.join(process.env.FAKE_ROOT, "node_modules/next/dist/bin/next");
-const child = spawn(process.execPath, [cli, "dev", "--port", process.env.PORT], {
+const flags = process.env.FAKE_NODE_FLAGS ? process.env.FAKE_NODE_FLAGS.split(" ") : [];
+const child = spawn(process.execPath, [...flags, cli, "dev", "--port", process.env.PORT], {
   stdio: "inherit",
 });
 child.on("exit", (code) => process.exit(code ?? 1));
@@ -113,6 +114,7 @@ class Worktree:
         cwd: Path | None = None,
         launcher_title: str = "pnpm run dev",
         ignore_term: bool = False,
+        node_flags: str = "",
     ) -> dict[str, int]:
         env = os.environ.copy()
         env.update(
@@ -120,6 +122,7 @@ class Worktree:
             FAKE_PIDS=str(self.pids_dir),
             FAKE_LAUNCHER_TITLE=launcher_title,
             FAKE_IGNORE_TERM="1" if ignore_term else "0",
+            FAKE_NODE_FLAGS=node_flags,
             PORT=str(self.port),
         )
         proc = subprocess.Popen(
@@ -203,6 +206,18 @@ def test_escalates_to_sigkill_and_leaves_no_orphaned_server(
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert "needed SIGKILL" in result.stdout
+    assert _wait_dead(list(pids.values())) == []
+
+
+def test_climbs_through_a_next_cli_started_with_node_flags(
+    worktree: Worktree,
+) -> None:
+    pids = worktree.start(node_flags="--max-old-space-size=256")
+
+    result = worktree.stop()
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.stdout.startswith("PASS: dev stop — stopped 4 process(es)")
     assert _wait_dead(list(pids.values())) == []
 
 

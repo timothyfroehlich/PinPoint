@@ -1,7 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
-# Stop this worktree's Next.js dev server and every process under it.
+# Stop this worktree's Next.js server and every process under it. That is
+# normally `pnpm run dev`; a `next start` on the same PORT counts too, since it
+# is also this worktree's server.
 #
 # Safe by construction: the only process it will signal is the one listening on
 # this worktree's own PORT (from .env.local), and only when that listener is a
@@ -64,7 +66,7 @@ PORT="$(sed -n -E 's/^(export[[:space:]]+)?PORT=["'\'']?([0-9]+)["'\'']?[[:space
 # The listener: Next.js titles its forked server `next-server (vX.Y.Z)`, and the
 # `next dev` CLI itself can hold the port during startup.
 NEXT_SERVER_RE='^next-server( |$)'
-NEXT_CLI_RE='^([^ ]*/)?node [^ ]*next/dist/bin/next dev( |$)'
+NEXT_CLI_RE='^([^ ]*/)?node( -[^ ]+)* [^ ]*next/dist/bin/next dev( |$)'
 # The launchers that may sit above `next dev` when started with `pnpm run dev`.
 PNPM_RE='^([^ ]*/)?(node [^ ]*/)?pnpm(\.c?js)? (run )?dev( |$)'
 MISE_RE='^([^ ]*/)?mise exec( [^ ]+)* -- pnpm (run )?dev( |$)'
@@ -209,7 +211,11 @@ for i in "${!targets[@]}"; do
 done
 
 if [ "$killed" -gt 0 ]; then
-  sleep 0.5
+  # A process blocked in uninterruptible I/O can take a moment to act on SIGKILL.
+  deadline=$((SECONDS + 5))
+  while alive && [ "$SECONDS" -lt "$deadline" ]; do
+    sleep 0.2
+  done
   if alive; then
     fail "processes for :$PORT survived SIGKILL: ${targets[*]}"
   fi
