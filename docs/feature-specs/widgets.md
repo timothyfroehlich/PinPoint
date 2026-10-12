@@ -14,7 +14,7 @@
 - **Widget Host** — a searchable, filterable, paginated list whose view state lives in the URL, such as Machine View or the Issues list. The host's widgets spec names the widgets it shows, their URL parameters, and the filters their Segments set.
 - **Widget Population** — the records one Summary Widget summarizes: the host's complete authoritative scope, whatever search and filters are set. The Filtered population was retired 2026-10-02.
 - **Segment** — one category in a widget's bar and breakdown, with one count.
-- **Summary Row** — the single line that stands in for a host's Summary Widgets when their stacked section is collapsed.
+- **Summary Row** — _Retired 2026-10-11._ Summary Widgets never stack or collapse (§2.3), so no line stands in for them.
 
 ---
 
@@ -22,10 +22,11 @@
 
 - **2.1** Each host's widgets spec defines which Summary Widgets appear and in what order. A person cannot add, remove, hide, or reorder them.
 - **2.2** Summary Widgets appear between the page heading and the list, to everyone who can view the host.
-- **2.3** Wider layouts place a host's Summary Widgets side by side in one row when they fit, always expanded, with no collapse control.
-- **2.4** When a host's Summary Widgets do not fit side by side, on phones or on wider layouts, they stack full-width inside one collapsible section. It starts open on screens at least 390px wide and collapsed, as the Summary Row, on narrower ones.
-- **2.5** The Summary Row shows the short figures its host's widgets spec defines, and expands the section when selected.
-- **2.6** The browser remembers each person's expanded or collapsed choice per host. That choice is never URL state and never part of a saved view.
+- **2.3** A host's Summary Widgets sit side by side in one row at every width, each at least 240px wide, always expanded, with no collapse control.
+- **2.4** _Retired 2026-10-11._ Summary Widgets no longer stack into a collapsible section; whole widgets drop instead (§2.7). Number kept so older citations don't dangle.
+- **2.5** _Retired 2026-10-11_ with the Summary Row (§1). Number kept so older citations don't dangle.
+- **2.6** _Retired 2026-10-11._ Summary Widgets cannot be collapsed, so there is no expanded or collapsed choice to remember. Number kept so older citations don't dangle.
+- **2.7** When a host's Summary Widgets do not all fit side by side at 240px each, whole widgets drop from the right, last in the host's order first, until the rest fit; a widget never shrinks below 240px, stacks, or wraps to a second row. When not even one widget fits at 240px, the Summary Widgets are not shown.
 
 ---
 
@@ -54,7 +55,7 @@
 - **5.4** Every count appears as text, so color is never the only signal.
 - **5.5** The breakdown lists only Segments with a nonzero count; a Segment with a zero count is left out of the breakdown and of "N other".
 - **5.6** The breakdown lists Segments in the order the host's widgets spec defines, worst first. When the line cannot fit every Segment, it shows whole count-and-label pairs from the start while they fit and rolls the rest into one "N other" entry; the bar still shows every Segment.
-- **5.7** The breakdown sits on the widget's label line, with nothing beneath the bar; when the widgets stack, it also drops the color swatches.
+- **5.7** The breakdown sits on the widget's label line, with nothing beneath the bar. It shows no color swatches at any width; each count is shown in its Segment's category color.
 
 ---
 
@@ -71,7 +72,10 @@
 ## Known divergences (code vs spec)
 
 | Requirement | Divergence | Resolution |
-| :---------- | :--------- | :--------- |
+| :-- | :-- | :-- |
+| §2.3 | Widgets sit side by side only at md+ when the group's container fits about 320px each; at other widths they stack full-width in a collapsible section headed by the Summary Row, and the browser remembers each person's expanded or collapsed choice per host. | PP-jb9v.14 |
+| §2.7 | When the widgets do not fit side by side, all of them stack instead of whole widgets dropping from the right. | PP-jb9v.14 |
+| §5.7 | Side-by-side breakdowns show a color swatch beside each count, and every count is shown in the default text color rather than its Segment's category color. | PP-jb9v.14 |
 
 ---
 
@@ -80,6 +84,7 @@
 | Date | Change |
 | :-- | :-- |
 | 2026-10-11 | Summary Widgets sit between the page heading and the list, since phones have no search row (§2.2). |
+| 2026-10-11 | Summary Widgets sit side by side at every width, each at least 240px wide, and whole widgets drop from the right when they do not fit, leaving no summary when not even one fits (§2.3, §2.7). Retired the collapsible stacked section, the Summary Row, and the remembered expanded or collapsed choice (§1, §2.4–§2.6). Breakdowns show no color swatches at any width, and each count is shown in its Segment's category color (§5.7). |
 | 2026-10-05 | Stacked breakdowns drop the color swatches at every width (§5.7). |
 | 2026-10-04 | Summary Widgets no longer show a headline (§1, §5.1); the breakdown sits on the label line at every width (§5.7). |
 | 2026-10-03 | Zero-count Segments are left out of the breakdown and of "N other" (§5.5). Stacked widgets collapse at every width (§2.3, §2.4); headlines show only when widgets sit side by side (§5.1); stacked breakdowns sit on the label line above the bar (§5.7). The Summary Row stands in for any collapsed stacked section, not only on phones (§1). |
