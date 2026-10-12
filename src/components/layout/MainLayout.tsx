@@ -20,7 +20,6 @@ import {
   resolveDefaultReportMode,
 } from "~/lib/report/default-mode";
 import type { ReportMode } from "~/lib/types/user";
-import { LIST_PAGER_SLOT_ID } from "~/components/list-view/pager-slot";
 import { QuickSearchProvider } from "./QuickSearch";
 
 export async function MainLayout({
@@ -179,7 +178,8 @@ export async function MainLayout({
 
         {/* Main Content */}
         {/* scroll-pt-14: reserves space for the 56px sticky AppHeader so
-            browser scroll-into-view doesn't place interactive elements under it.
+            browser scroll-into-view doesn't place interactive elements under it
+            (a pinned phone List Header adds its height; globals.css).
             Mobile scroll-pb: the same for the fixed bottom tab bar, plus a
             floating action's clearance when a page shows one (WCAG 2.4.11;
             globals.css defines it).
@@ -196,9 +196,6 @@ export async function MainLayout({
           <div className="@container px-4 sm:px-8 lg:px-10 pb-[calc(88px+env(safe-area-inset-bottom))] [&:has([data-machine-scan-hub])]:pb-0 md:pb-0">
             {children}
           </div>
-          {/* A List View's phone pager renders here, outside the size
-              container above (list-views §7.8; see LIST_PAGER_SLOT_ID). */}
-          <div id={LIST_PAGER_SLOT_ID} />
         </main>
 
         {/* Fixed bottom tab bar — mobile only (md:hidden is applied inside the component) */}

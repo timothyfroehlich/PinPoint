@@ -210,14 +210,18 @@ export function IssueView({
           ) : undefined
         }
         summary={summary}
-        search={
+        search={(placement) => (
           <ListSearchField
-            id="issue-view-search"
+            id={
+              placement === "phone"
+                ? "issue-view-search-phone"
+                : "issue-view-search"
+            }
             value={state.q}
             onSearch={(q) => update({ q })}
             label="Search issues"
           />
-        }
+        )}
         primaryFilters={filters.primary}
         secondaryFilters={filters.secondary}
         views={views}

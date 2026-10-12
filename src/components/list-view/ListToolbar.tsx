@@ -263,7 +263,8 @@ interface ListToolbarProps {
 
 /**
  * Search with the Primary Filters beside it (list-views §3.1, §4). Below md
- * the filters leave this row for the phone Filters sheet (§7.1, §7.5).
+ * the row is hidden: search moves into the phone List Header and the filters
+ * into its Filters sheet (§7.1, §7.3, §7.5).
  * Between phone and desktop, Primary Filters that do not fit move into More
  * from the right, one at a time (§8.1). While a filter's options are open the
  * row keeps its arrangement, so a choice that widens the filter never moves
@@ -366,7 +367,7 @@ export function ListToolbar({
     };
 
   return (
-    <div ref={rowRef} className="relative flex items-center gap-2">
+    <div ref={rowRef} className="relative hidden items-center gap-2 md:flex">
       <div className="min-w-0 flex-1 md:min-w-60">{search}</div>
       <div
         role="group"

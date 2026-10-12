@@ -582,6 +582,8 @@ interface PhoneListHeaderProps {
   display: ListDisplayModel;
   totalCount: number;
   noun: ListNoun;
+  /** The phone search field (§7.3), between the views button and Filters. */
+  search: React.ReactNode;
   onResetAll: () => void;
   onSaveChanges: () => void;
   onSaveAsNew: () => void;
@@ -589,11 +591,15 @@ interface PhoneListHeaderProps {
 }
 
 /**
- * The phone List Header (list-views §7.3, §7.4): the Applied View's name, or
- * "Views" when there is none, as a button opening the Saved Views sheet, with
- * an amber marker announced as
- * "edited", and a Filters icon button showing how many filters differ from
- * the Page Preset. Every control is at least 44px (§7.9). Hidden at md+.
+ * The phone List Header (list-views §7.3, §7.4, §7.10): the Applied View's
+ * name, or "Views" when there is none, as a button opening the Saved Views
+ * sheet, with an amber marker announced as "edited"; the search field; and a
+ * Filters icon button showing how many filters differ from the Page Preset.
+ * The views button truncates before the search field drops below 96px. It
+ * stays pinned under the app header while the rows scroll beneath it; the
+ * `data-list-phone-header` marker lets the scroller's top scroll padding
+ * cover it (§12.5, globals.css). Every control is at least 44px (§7.9).
+ * Hidden at md+.
  */
 export function PhoneListHeader({
   views,
@@ -603,6 +609,7 @@ export function PhoneListHeader({
   display,
   totalCount,
   noun,
+  search,
   onResetAll,
   onSaveChanges,
   onSaveAsNew,
@@ -620,7 +627,7 @@ export function PhoneListHeader({
       // Explicit, because the computed name puts a space before the comma.
       aria-label={views.edited ? `${viewsName}, edited` : viewsName}
       data-testid="list-phone-views-trigger"
-      className="inline-flex min-h-11 min-w-0 items-center gap-1.5 rounded-md px-2 text-sm font-semibold text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+      className="inline-flex min-h-11 min-w-0 shrink items-center gap-1.5 rounded-md px-2 text-sm font-semibold text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
     >
       <Bookmark aria-hidden="true" className="size-4 shrink-0" />
       <span className="truncate">{viewsName}</span>
@@ -653,7 +660,10 @@ export function PhoneListHeader({
     </button>
   );
   return (
-    <div className="flex min-h-12 items-center gap-0.5 border-b border-outline-variant bg-muted/40 px-2 md:hidden">
+    <div
+      data-list-phone-header=""
+      className="sticky top-0 z-20 flex min-h-12 items-center gap-1 border-b border-outline-variant bg-card px-2 md:hidden"
+    >
       <SavedViewsSheet
         open={viewsOpen}
         onOpenChange={setViewsOpen}
@@ -663,6 +673,7 @@ export function PhoneListHeader({
         onSaveAsNew={onSaveAsNew}
         onManage={onManage}
       />
+      <div className="min-w-24 flex-[1_1_96px]">{search}</div>
       <FiltersSheet
         open={filtersOpen}
         onOpenChange={setFiltersOpen}
