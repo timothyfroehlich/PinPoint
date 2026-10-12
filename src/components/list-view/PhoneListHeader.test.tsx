@@ -115,6 +115,7 @@ function renderHeader(
       display={display}
       totalCount={12}
       noun={{ one: "issue", other: "issues" }}
+      search={<input type="search" aria-label="Search issues" />}
       onResetAll={vi.fn()}
       {...handlers}
     />
@@ -237,6 +238,20 @@ describe("PhoneListHeader", () => {
 
     await user.click(link);
     expect(model.onApply).toHaveBeenCalledWith("open");
+  });
+
+  it("holds the views button, the search field, then Filters (§7.3)", () => {
+    renderHeader({});
+
+    const views = screen.getByTestId("list-phone-views-trigger");
+    const search = screen.getByRole("searchbox", { name: "Search issues" });
+    const filters = screen.getByTestId("list-phone-filters-trigger");
+    expect(views.compareDocumentPosition(search)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+    expect(search.compareDocumentPosition(filters)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
   });
 
   it("announces the Edited marker and the count of filters off their preset (§7.3, §7.4)", () => {

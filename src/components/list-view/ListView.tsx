@@ -71,9 +71,11 @@ interface ListViewProps {
   /**
    * The search field (§4.1, §4.2). It is mounted afresh whenever a view is
    * applied or changes are discarded, so a search still waiting to run is
-   * dropped and never undoes that move.
+   * dropped and never undoes that move. Rendered once per placement: the
+   * toolbar at md+ and the phone List Header below md (§7.3). CSS shows one,
+   * so each needs its own field id.
    */
-  search: React.ReactNode;
+  search: (placement: "toolbar" | "phone") => React.ReactNode;
   primaryFilters: readonly ListFilterModel[];
   secondaryFilters?: readonly ListFilterModel[] | undefined;
   views: ListViewsModel;
@@ -104,8 +106,8 @@ interface ListViewProps {
  * Summary Widgets, search with the Primary Filters, then one list box
  * holding the List Header and the rows, then the pager. Below md the list
  * box runs edge to edge (§7.7), the List Header becomes the phone header
- * with its sheets (§7.3–§7.6), and the pager is pinned above the tab bar
- * (§7.8). Hosts supply models; List View knows nothing about their records.
+ * with its sheets and the search field (§7.1, §7.3–§7.6), pinned under the
+ * app header (§7.10), and the pager follows the list box (§7.8). Hosts supply models; List View knows nothing about their records.
  */
 export function ListView({
   label,
@@ -183,20 +185,24 @@ export function ListView({
   const openManage = (): void => setManageOpen(true);
 
   return (
-    <div className="space-y-3 max-md:pb-11">
+    <div className="space-y-3">
       {/* Full-width siblings: the title row's Summary Row toggle and the
           Summary Widgets switch on equal container widths (§8.4). */}
       {titleRow}
       {summary}
       <ListToolbar
-        search={<React.Fragment key={searchEpoch}>{search}</React.Fragment>}
+        search={
+          <React.Fragment key={searchEpoch}>{search("toolbar")}</React.Fragment>
+        }
         primaryFilters={primaryFilters}
         secondaryFilters={secondaryFilters}
       />
+      {/* Below md the phone List Header draws the box's top edge, so it
+          keeps one when pinned, and the pager follows with no gap (§7.8). */}
       <section
         aria-label={label}
         aria-busy={busy}
-        className="border-y border-outline-variant bg-card max-md:-mx-4 sm:max-md:-mx-8 md:overflow-hidden md:rounded-lg md:border"
+        className="border-y border-outline-variant bg-card max-md:-mx-4 max-md:mb-0 max-md:border-t-0 sm:max-md:-mx-8 md:overflow-hidden md:rounded-lg md:border"
       >
         <ListHeader
           views={listViews}
@@ -216,6 +222,9 @@ export function ListView({
           display={display}
           totalCount={pagination.totalCount}
           noun={noun}
+          search={
+            <React.Fragment key={searchEpoch}>{search("phone")}</React.Fragment>
+          }
           onResetAll={onResetAll}
           onSaveChanges={saveChanges}
           onSaveAsNew={openSaveAsNew}

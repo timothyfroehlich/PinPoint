@@ -9,6 +9,7 @@
   /* Card & Surface - Slightly lighter charcoal */
   --color-card: #18151b;
   --color-card-foreground: #f8fafc;
+  --color-card-raised: #1c191f; /* a step above card: a List Header bar */
   --color-popover: #18151b;
   --color-popover-foreground: #f8fafc;
 
@@ -163,11 +164,14 @@
   );
 }
 
-/* A List View's phone pager (list-views §7.8) is a 44px bar pinned directly
-   above the tab bar. It renders into the scroller's pager slot, so the
-   scroller reserves its height the same way (§12.5). */
-#main-content:has([data-list-pager]) {
-  --floating-action-clearance: 2.75rem;
+/* A List View's phone List Header (list-views §7.10) is a 48px bar pinned to
+   the top of the scroller; the app header sits above the scroller, outside
+   it. The scroller's top scroll padding covers the List Header, so a focused
+   row never lands beneath it (§12.5). */
+@media (width < 48rem) {
+  #main-content:has([data-list-phone-header]) {
+    scroll-padding-top: 49px;
+  }
 }
 
 @utility glow-primary {

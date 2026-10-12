@@ -164,10 +164,7 @@
 
 | Requirement | Divergence | Resolution |
 | :-- | :-- | :-- |
-| §7.1, §7.3 | On phones search still has its own row above the list box; the phone List Header has no search field. | PP-jb9v.15 |
 | §7.2 | While the Summary Widgets stack, the title row holds a Summary Row toggle; on a Collection or Tag tab it sits on its own row between the page's tabs and search. | PP-jb9v.14 |
-| §7.8, §7.11 | The phone pager is a 44px full-width bar pinned above the tab bar, and the scroller reserves its height. | PP-jb9v.15 |
-| §7.10, §12.5 | The phone List Header scrolls away with the page, and the page's top scroll padding covers only the app header, not a pinned List Header. | PP-jb9v.15 |
 
 ---
 

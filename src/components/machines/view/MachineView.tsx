@@ -300,14 +300,18 @@ export function MachineView({
           ) : undefined
         }
         summary={showSummary ? summary : undefined}
-        search={
+        search={(placement) => (
           <ListSearchField
-            id="machine-view-search"
+            id={
+              placement === "phone"
+                ? "machine-view-search-phone"
+                : "machine-view-search"
+            }
             value={state.q}
             onSearch={(q) => update({ q })}
             label="Search machines"
           />
-        }
+        )}
         primaryFilters={filters}
         views={views}
         sort={sort}
