@@ -11,8 +11,11 @@ import { SentryInitializer } from "~/components/SentryInitializer";
 import { ClientProviders } from "~/components/layout/ClientProviders";
 import { DEV_SHOW_COOKIE_BANNER_KEY } from "~/lib/cookies/constants";
 import { isProductionRuntime } from "~/lib/runtime-env";
+import { getSiteUrl } from "~/lib/url";
 
 export const metadata: Metadata = {
+  // Resolves the link-preview image (app/opengraph-image.png) to an absolute URL.
+  metadataBase: new URL(getSiteUrl()),
   title: "PinPoint - Pinball Machine Issue Tracking",
   description:
     "Issue tracking for pinball machines at Austin Pinball Collective",
@@ -23,6 +26,9 @@ export const metadata: Metadata = {
     ],
     apple: "/apple-touch-icon.png",
   },
+  // No og:title here, so link previews use each page's own <title>.
+  openGraph: { siteName: "PinPoint", type: "website" },
+  twitter: { card: "summary_large_image" },
 };
 
 /**
@@ -46,6 +52,8 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   interactiveWidget: "resizes-content",
+  // Android Chrome tints its address bar to match the header.
+  themeColor: "#0f0f11",
 };
 
 /**
