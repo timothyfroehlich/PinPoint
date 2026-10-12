@@ -1,5 +1,42 @@
 {/* This file is auto-updated by the weekly changelog workflow. Newest entries at top. */}
 
+## October 5, 2026
+
+### New Features
+
+- **Machine Settings Sets, Reworked** — A machine's settings sets are now either personal (only you edit them) or community (technicians, the owner, and admins). Private drafts and owner sets are gone — every set is visible, and the Settings tab keeps other people's personal sets out of the way unless one is a default. Each machine can have one default House set and one default Tournament set, chosen by technicians, admins, or the machine's owner
+- **Settings Tags** — Settings sets carry tags, starting with House and Tournament, and technicians can add tags of their own. Each tag gets a page listing every set that carries it, grouped by machine, with a warning for machines that haven't picked one yet
+- **Printable Settings Sheets** — A new Print settings sheets page, next to Print apron cards on the machine list, prints the paper reference volunteers carry to a tournament: for each machine you add, the settings that differ between two of its sets. Pick which two sets to compare, whether the sheet is for setting up or restoring afterward, and whether to list only the differences or every setting
+- **Your Own Machine Tags** — Beyond the automatic type, display, player-count, and manufacturer tags, technicians and admins can now create tag groups and tags of their own and apply them by hand. Owners can tag their own machines. A tag group can be limited to one tag per machine, tags can be moved between groups, and two tags can be merged into one — old links then open the merged tag
+- **Edit a Machine's Tags From Its Page** — The Tags card moves to the top of the machine Info tab's side rail and gains an Edit tags button for anyone who can tag that machine, opening a picker on desktop or a bottom sheet on a phone
+- **Batch Printing Apron Cards** — A Print apron cards page lists every saved card on every machine still on the floor, grouped by apron size. Tick the cards you want, pick the paper (11×17 or 8.5×11) and your printer's edge margin, and download one print file per size plus an order sheet showing where to cut. Cards sit edge to edge and share one grid per size, so a stack cuts together
+- **Your Own Apron Card Print Queue** — Export on the Apron card tab is now a dialog: pick a saved card, check the preview, then download it, print it, or add it to your print queue. Print apron cards opens with your queued cards already ticked and offers Mark as printed with an Undo, and the machine list's Print apron cards button shows how many you have waiting
+- **Two New Apron Card Templates** — Alongside Standard, a saved card can use Side rail or Header band. Both give the description and tip roughly twice the room — useful for tournament settings — and label the QR code with where it goes
+- **Apron Cards for Older Games** — New sizes for Bally solid state, Bally EM, Gottlieb EM, and Williams EM machines, plus a 7×5in Glass corner card for machines with no card holder at all. The existing sizes are now named Stern / Data East / Sega and Williams / WPC
+- **Discord Activity Summary** — Discord can now get a scheduled post rounding up what changed in PinPoint — issues, machines, and the Pinball Map lineup. Admins pick the channel, how often it posts (every 1 to 24 hours), what hour of the day the schedule starts, and which kinds of change it mentions. It replaces the old weekly sync report
+- **One Shared List for Machines and Issues** — The issue list now runs on the same list as machines: the same search, filters, sorting, columns, paging, and saved views, with built-in view tabs across the top. Issues add filters the machine list didn't need, including date ranges for when an issue was created or last updated and shortcuts like My machines
+- **Removed Machines Are Archived** — A machine marked Removed now stays out of machine lists, counts, pickers, and search unless you ask for Removed machines. A sold machine no longer pads its old owner's profile or the collective's counts
+- **Every Machine Is Matched or Marked Manual** — Adding or editing a machine now requires either a Pinball Map catalog match or Manual Entry; leaving it as neither is no longer possible, so the Pinball Map lineup can be trusted
+- **Machine Search Results as You Type** — Quick search now matches machines in the browser on every keystroke instead of waiting for the server. Issue results still come from the server and show placeholder rows while they load
+- **Collection Descriptions** — A collection can carry a formatted description — bold, italic, headings, lists, and links — written in the Create and Edit dialogs and shown under the collection's header on every tab, clamped to three lines with a Show more toggle
+- **A Person's Machines Are Now a Filter** — Owner pages are gone; a person's machines are the machine list filtered by owner, and their machines' issues are the issue list filtered by machine owner. Old owner-page links redirect to those lists
+
+### Bug Fixes
+
+- People's names are now current everywhere they appear: assignment events on an issue, @mentions in comments, issue search by @mention, and a guest who later signs up now shows as the reporter on the machine's timeline instead of the name they typed at the time
+- Dates were a day off after about 7 PM Central, because the site rendered them in UTC while your browser used its own time zone. Every date and day grouping now reads on the collective's clock — America/Chicago, daylight saving included — including CSV exports, settings-set dates, and Member since
+- The issue list's Created and Updated date filters cut the day at UTC midnight, so "Created Oct 5" included Oct 4 evening and missed Oct 5 evening. They now use Austin days
+- Notification emails about an issue whose title contained a line break were silently failing to send. Subject lines now collapse to one line before sending
+- Issue titles are now kept to one line on every way of creating or editing one, instead of being rejected
+- A machine's timeline rows no longer overflow on a 320px-wide phone: the time shortens to "3m ago" and the severity badge shrinks to fit, and the Recent activity buttons wrap instead of running off the edge
+- An issue URL with trailing characters — `/i/1abc` or `/i/1.5` — quietly showed issue 1. Those now show Issue not found
+- Saving a new machine could fail outright if the form reset while an edition was being read, which sent an invalid value to Pinball Map's eligibility check
+- Changing an issue's severity, priority, or frequency now writes the change and its timeline entry together, so a failure can no longer leave the new value with no record of who set it
+- The Cmd/Ctrl+K search shortcut crashed on form pages when a browser autofilled a field
+- The machine list's Pinball Map button no longer carries a to-review count, so the page stops loading the whole lineup comparison just to show a number, and the header buttons fit on a phone
+
+---
+
 ## September 28, 2026
 
 ### New Features
