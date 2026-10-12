@@ -13,7 +13,6 @@ import { reportError } from "~/lib/observability/report-error";
 import { db } from "~/server/db";
 import { authorizeIntegrationsAdmin } from "../authorize";
 import { pinballmapState } from "~/server/db/schema";
-import { log } from "~/lib/logger";
 import { getDiscordBotToken } from "~/lib/discord/config";
 import { postChannelMessage } from "~/lib/discord/client";
 import {
@@ -304,14 +303,12 @@ export async function saveRegionAlertConfigAction(
       try {
         await bootstrapRegion(normalizedRegion);
       } catch (err) {
-        log.error(
-          {
-            err,
-            region: normalizedRegion,
-            action: "saveRegionAlertConfigAction.bootstrapRegion",
-          },
-          "Failed to bootstrap region"
-        );
+        // Tolerated: the config is saved, and the next hourly run bootstraps.
+        reportError(err, {
+          region: normalizedRegion,
+          action: "saveRegionAlertConfigAction.bootstrapRegion",
+          bestEffort: true,
+        });
       }
     }
 

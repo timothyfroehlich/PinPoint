@@ -28,10 +28,18 @@ import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import type { PbmRegionLmx, PbmRegionLocation } from "~/lib/pinballmap/types";
 import type { DiscordSendResult } from "~/lib/discord/client";
 import type * as CatalogModule from "~/lib/pinballmap/catalog";
+import type * as ReportErrorModule from "~/lib/observability/report-error";
+import { reportError } from "~/lib/observability/report-error";
 
 vi.mock("~/lib/logger", () => ({
   log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
+
+// Spy on reportError without dropping the module's other exports.
+vi.mock("~/lib/observability/report-error", async (importOriginal) => {
+  const actual = await importOriginal<typeof ReportErrorModule>();
+  return { ...actual, reportError: vi.fn() };
+});
 
 // Route the production db import to the PGlite worker instance.
 vi.mock("~/server/db", async () => {
@@ -280,6 +288,7 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
     discord.hasToken = true;
     discord.result = { ok: true };
     discord.posts = [];
+    vi.mocked(reportError).mockClear();
   });
 
   it("bootstraps the seen-set on the first run without announcing anything", async () => {
@@ -487,6 +496,13 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
     const run = await runRegionMachineAlerts();
 
     expect(run).toMatchObject({ discovered: 1, announced: 0, pending: 1 });
+    expect(reportError).toHaveBeenCalledWith(
+      pbm.locationsError,
+      expect.objectContaining({
+        step: "fetchRegionLocations",
+        bestEffort: true,
+      })
+    );
     expect(discord.posts).toEqual([]);
     expect(await seenRows()).toContainEqual(
       expect.objectContaining({ lmxId: 2, isPresent: true })
@@ -617,6 +633,10 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
 
     expect(catalog.refreshCalls).toBe(1);
     expect(run).toMatchObject({ announced: 0, pending: 1 });
+    expect(reportError).toHaveBeenCalledWith(
+      catalog.error,
+      expect.objectContaining({ step: "refreshCatalog", bestEffort: true })
+    );
     expect(discord.posts).toEqual([]);
   });
 
@@ -1181,6 +1201,10 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
       discovered: 0,
       announced: 0,
     });
+    expect(reportError).toHaveBeenCalledWith(
+      expect.any(RegionPayloadTooLargeError),
+      expect.objectContaining({ observedAtLeast: MAX_REGION_ENTRIES + 1 })
+    );
     expect(await seenRows()).toEqual([]);
     expect(discord.posts).toEqual([]);
   });

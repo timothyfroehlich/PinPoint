@@ -32,7 +32,10 @@ import { importPinballMapCommentsAfterCoverageChange } from "~/lib/pinballmap/co
 import { listSurfacingAbandonedForMachine } from "~/lib/pinballmap/abandoned-listings";
 import { getPinballMapLinkStatus } from "~/lib/pinballmap/user-credentials";
 import type { PbmLmx } from "~/lib/pinballmap/types";
-import { log } from "~/lib/logger";
+import {
+  reportError,
+  serverActionError,
+} from "~/lib/observability/report-error";
 import {
   searchCatalogFamilies,
   listGroupEditions,
@@ -1010,8 +1013,12 @@ export async function refreshPinballmapLineupAction(
     revalidatePath("/m", "layout");
     return ok({ machineCount: result.machineCount, abandonmentsCleared });
   } catch (error: unknown) {
-    log.error({ err: error }, "Manual PinballMap refresh failed");
-    return err("SERVER", "Pinball Map refresh failed. Please try again.");
+    return serverActionError(
+      error,
+      "SERVER",
+      "Pinball Map refresh failed. Please try again.",
+      { action: "refreshPinballmapLineupAction" }
+    );
   }
 }
 
@@ -1117,7 +1124,10 @@ export async function checkConfirmLineupAction(): Promise<CheckConfirmLineupResu
         refreshFailed = true;
       }
     } catch (error: unknown) {
-      log.error({ err: error }, "Pre-confirm PinballMap refresh failed");
+      reportError(error, {
+        action: "checkConfirmLineupAction.refresh",
+        bestEffort: true,
+      });
       revalidatePath("/m", "layout");
       refreshFailed = true;
     }
