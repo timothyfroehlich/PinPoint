@@ -8,6 +8,7 @@ import {
   formatDateTime,
   formatMonthYear,
   formatRelative,
+  formatSpokenAgeAgo,
   formatTimelineBucket,
   isSiteToday,
 } from "./dates";
@@ -173,6 +174,32 @@ describe("formatCompactAgeAgo", () => {
     );
     expect(formatCompactAgeAgo("2026-09-21T09:00:00.000Z", now)).toBe("3h ago");
     expect(formatCompactAgeAgo(now, now)).toBe("just now");
+  });
+});
+
+describe("formatSpokenAgeAgo", () => {
+  const now = new Date("2026-09-21T12:00:00.000Z");
+
+  it("spells out the compact age's units", () => {
+    expect(formatSpokenAgeAgo("2026-09-19T12:00:00.000Z", now)).toBe(
+      "2 days ago"
+    );
+    expect(formatSpokenAgeAgo("2026-09-20T12:00:00.000Z", now)).toBe(
+      "1 day ago"
+    );
+    expect(formatSpokenAgeAgo("2026-08-19T12:00:00.000Z", now)).toBe(
+      "1 month 2 days ago"
+    );
+    expect(formatSpokenAgeAgo("2024-08-19T12:00:00.000Z", now)).toBe(
+      "2 years 1 month ago"
+    );
+    expect(formatSpokenAgeAgo("2026-09-21T11:48:00.000Z", now)).toBe(
+      "12 minutes ago"
+    );
+    expect(formatSpokenAgeAgo("2026-09-21T11:00:00.000Z", now)).toBe(
+      "1 hour ago"
+    );
+    expect(formatSpokenAgeAgo(now, now)).toBe("just now");
   });
 });
 

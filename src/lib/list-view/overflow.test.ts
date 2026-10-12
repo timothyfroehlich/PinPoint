@@ -1,5 +1,52 @@
 import { describe, expect, it } from "vitest";
-import { fitPrimaryFilters, planListHeader } from "./overflow";
+import {
+  fitLineParts,
+  fitPrimaryFilters,
+  LINE_FIT_TOLERANCE,
+  planListHeader,
+} from "./overflow";
+
+describe("fitLineParts (issues-list §3.9)", () => {
+  // ID 60 · machine 120 · priority 50 · assignee 30 · comments 40 · age 90,
+  // gap 6.
+  const base = {
+    keptWidths: [60, 120],
+    partWidths: { priority: 50, assignee: 30, comments: 40, age: 90 },
+    dropOrder: ["age", "comments", "priority", "assignee"] as const,
+    gap: 6,
+  };
+  const shown = (available: number): string[] =>
+    [...fitLineParts({ ...base, available })].sort();
+
+  it("keeps every part when the line fits with the tolerance to spare", () => {
+    // 60+120+50+30+40+90 + 5 gaps = 420.
+    expect(shown(420 + LINE_FIT_TOLERANCE)).toEqual([
+      "age",
+      "assignee",
+      "comments",
+      "priority",
+    ]);
+    expect(shown(420)).toEqual(["assignee", "comments", "priority"]);
+  });
+
+  it("drops age, then comments, then priority, then assignee", () => {
+    expect(shown(419 + LINE_FIT_TOLERANCE)).toEqual([
+      "assignee",
+      "comments",
+      "priority",
+    ]);
+    // 60+120+50+30+40 + 4 gaps = 324.
+    expect(shown(323 + LINE_FIT_TOLERANCE)).toEqual(["assignee", "priority"]);
+    // 60+120+50+30 + 3 gaps = 278.
+    expect(shown(277 + LINE_FIT_TOLERANCE)).toEqual(["assignee"]);
+    // 60+120+30 + 2 gaps = 222.
+    expect(shown(221 + LINE_FIT_TOLERANCE)).toEqual([]);
+  });
+
+  it("leaves nothing droppable when the kept parts alone overflow", () => {
+    expect(shown(100)).toEqual([]);
+  });
+});
 
 describe("fitPrimaryFilters (list-views §8.1)", () => {
   const filterWidths = [120, 100, 110, 80];
