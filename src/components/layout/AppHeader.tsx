@@ -81,7 +81,7 @@ export function AppHeader({
           aria-label="PinPoint"
         >
           <Image
-            src="/logo-pinpoint-transparent.png"
+            src="/logo-pinpoint.svg"
             alt=""
             aria-hidden="true"
             width={32}
