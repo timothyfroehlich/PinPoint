@@ -18,7 +18,7 @@ export const metadata: Metadata = {
     "Issue tracking for pinball machines at Austin Pinball Collective",
   icons: {
     icon: [
-      { url: "/logo-pinpoint.svg", type: "image/svg+xml" },
+      { url: "/favicon.svg", type: "image/svg+xml" },
       { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
     ],
     apple: "/apple-touch-icon.png",

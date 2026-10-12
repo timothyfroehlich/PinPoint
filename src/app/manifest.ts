@@ -8,8 +8,8 @@ import type { MetadataRoute } from "next";
  * squircle, ...); the mark sits inside the central safe zone. iOS ignores
  * the manifest and uses apple-touch-icon.png from the layout metadata.
  *
- * Sources: public/logo-pinpoint.svg (mark) and public/logo-pinpoint-tile.svg
- * (tile).
+ * Sources: public/favicon.svg (rounded dark tile, the "any" icons) and
+ * public/logo-pinpoint-tile.svg (full-bleed tile, the maskable icons).
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
