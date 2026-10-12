@@ -1,8 +1,19 @@
 import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { RelativeTimeProvider } from "~/components/issues/RelativeTimeProvider";
 import { SEVERITY_CONFIG } from "~/lib/issues/status";
-import type { MachineViewRow } from "~/lib/types";
+import { MACHINE_STATUS_COLORS } from "~/lib/machines/status";
+import type { MachineViewFieldId, MachineViewRow } from "~/lib/types";
 import { MachineViewCompactList } from "./MachineViewCompactList";
+
+const DEFAULT_COLUMNS: MachineViewFieldId[] = [
+  "machine",
+  "playability",
+  "presence",
+  "openIssues",
+  "lastServiced",
+  "lastActivity",
+];
 
 function machine(overrides: Partial<MachineViewRow> = {}): MachineViewRow {
   return {
@@ -27,9 +38,50 @@ function machine(overrides: Partial<MachineViewRow> = {}): MachineViewRow {
   };
 }
 
+function renderList(
+  rows: MachineViewRow[],
+  columns: MachineViewFieldId[] = DEFAULT_COLUMNS
+): void {
+  render(
+    <RelativeTimeProvider>
+      <MachineViewCompactList rows={rows} columns={columns} />
+    </RelativeTimeProvider>
+  );
+}
+
+/** A row's second line; jsdom has no layout, so it is found by its tag. */
+function detailLine(row: HTMLElement): HTMLElement {
+  const line = row.querySelector("p");
+  if (!line) throw new Error("No detail line");
+  return line;
+}
+
+/**
+ * jsdom lays nothing out, so the detail line gets `lineWidth` and each
+ * measured part 6px per character, separator included.
+ */
+function stubLayout(lineWidth: number): void {
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
+    function (this: HTMLElement) {
+      const width =
+        this.tagName === "P"
+          ? lineWidth
+          : this.hasAttribute("data-measure")
+            ? (this.textContent?.length ?? 0) * 6
+            : 0;
+      return DOMRect.fromRect({ width, height: 16 });
+    }
+  );
+}
+
 describe("MachineViewCompactList", () => {
-  it("shows one line of Playability, identity, and open-issue count, and no other fields", () => {
-    render(<MachineViewCompactList rows={[machine()]} />);
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  it("puts the Playability dot, identity, and open-issue count on line 1", () => {
+    renderList([machine()]);
 
     const row = screen.getByRole("listitem");
     expect(
@@ -48,94 +100,124 @@ describe("MachineViewCompactList", () => {
     const count = within(row).getByRole("link", {
       name: "View 2 open issues for Elvira's House of Horrors (Blood Red Kiss Edition), worst Unplayable",
     });
+    // Colored text alone, with no severity icon before it (§5.3).
     expect(count).toHaveTextContent(/^2 open$/);
     expect(count).toHaveClass(SEVERITY_CONFIG.unplayable.iconColor);
+    expect(count.querySelector("svg")).toBeNull();
     expect(count.getAttribute("href")).toBe(
       "/issues?machine=EHOH&presence=all"
     );
-
-    // Owner, Manufacturer, Year, and service age appear only in Table mode.
-    expect(row).not.toHaveTextContent("Alex");
-    expect(row).not.toHaveTextContent("Stern");
-    expect(row).not.toHaveTextContent("2019");
     expect(within(row).queryAllByRole("link")).toHaveLength(2);
   });
 
-  it("names each Playability state so color is not the only signal", () => {
-    render(
-      <MachineViewCompactList
-        rows={[
-          machine({
-            id: "machine-2",
-            initials: "TZ",
-            title: "Twilight Zone",
-            health: {
-              openIssues: 0,
-              bySeverity: { cosmetic: 0, minor: 0, major: 0, unplayable: 0 },
-              worstSeverity: null,
-              oldestOpenIssueAt: null,
-              playability: "operational",
-            },
-          }),
-          machine({
-            id: "machine-3",
-            initials: "MM",
-            title: "Medieval Madness",
-            health: {
-              openIssues: 1,
-              bySeverity: { cosmetic: 0, minor: 0, major: 1, unplayable: 0 },
-              worstSeverity: "major",
-              oldestOpenIssueAt: null,
-              playability: "needs_service",
-            },
-          }),
-        ]}
-      />
-    );
+  it("shows the Playability label, manufacturer, year, owner, and service age on line 2", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-01-06T00:00:00.000Z"));
+    renderList([machine()]);
 
-    const [operational, needsService] = screen.getAllByRole("listitem");
-    expect(
-      within(operational ?? document.body).getByRole("img", {
-        name: "Operational",
-      })
-    ).toBeInTheDocument();
-    expect(
-      within(needsService ?? document.body).getByRole("img", {
-        name: "Needs Service",
-      })
-    ).toBeInTheDocument();
+    const line = detailLine(screen.getByRole("listitem"));
+    expect(line).toHaveTextContent(
+      /^Unplayable · Stern · 2019 · Alex · serviced 3d$/
+    );
+    expect(line).toHaveClass("truncate");
+    expect(within(line).getByText("Unplayable")).toHaveClass(
+      MACHINE_STATUS_COLORS.unplayable.text
+    );
+    expect(within(line).getByText("Alex")).toHaveClass("text-foreground");
   });
 
-  it("names the worst open severity, since every severity shares one icon", () => {
-    render(
-      <MachineViewCompactList
-        rows={[
-          machine({
-            id: "machine-3",
-            initials: "MM",
-            title: "Medieval Madness",
-            health: {
-              openIssues: 1,
-              bySeverity: { cosmetic: 0, minor: 0, major: 1, unplayable: 0 },
-              worstSeverity: "major",
-              oldestOpenIssueAt: null,
-              playability: "needs_service",
-            },
-          }),
-        ]}
-      />
+  it("leaves the Playability label and service age out when those fields are not displayed", () => {
+    renderList([machine({ year: null })], ["machine", "presence"]);
+
+    expect(detailLine(screen.getByRole("listitem"))).toHaveTextContent(
+      /^Stern · Unknown · Alex$/
     );
+  });
+
+  it("says “never serviced” for a machine without service history", () => {
+    renderList([machine({ lastServicedAt: null })]);
+
+    expect(detailLine(screen.getByRole("listitem"))).toHaveTextContent(
+      /^Unplayable · Stern · 2019 · Alex · never serviced$/
+    );
+  });
+
+  it("drops year, then manufacturer, then service age, then owner, keeping the Playability label", () => {
+    // Unplayable 60, · Stern 48, · 2019 42, · Alex 42, · never serviced 102:
+    // 294 in all.
+    const row = machine({ lastServicedAt: null });
+    const cases: [number, RegExp][] = [
+      [294, /^Unplayable · Stern · 2019 · Alex · never serviced$/],
+      [293, /^Unplayable · Stern · Alex · never serviced$/],
+      [251, /^Unplayable · Alex · never serviced$/],
+      [203, /^Unplayable · Alex$/],
+      [40, /^Unplayable$/],
+    ];
+    for (const [width, expected] of cases) {
+      stubLayout(width);
+      const { unmount } = render(
+        <RelativeTimeProvider>
+          <MachineViewCompactList rows={[row]} columns={DEFAULT_COLUMNS} />
+        </RelativeTimeProvider>
+      );
+      expect(detailLine(screen.getByRole("listitem"))).toHaveTextContent(
+        expected
+      );
+      unmount();
+      vi.restoreAllMocks();
+    }
+  });
+
+  it("gives each Playability its own dot shape and name, so color is not the only signal", () => {
+    const health = (
+      playability: "operational" | "needs_service" | "unplayable"
+    ): MachineViewRow["health"] => ({
+      openIssues: 0,
+      bySeverity: { cosmetic: 0, minor: 0, major: 0, unplayable: 0 },
+      worstSeverity: null,
+      oldestOpenIssueAt: null,
+      playability,
+    });
+    renderList([
+      machine({ id: "a", health: health("operational") }),
+      machine({ id: "b", health: health("needs_service") }),
+      machine({ id: "c", health: health("unplayable") }),
+    ]);
+
+    const dots = ["Operational", "Needs Service", "Unplayable"].map((name) =>
+      screen.getByRole("img", { name })
+    );
+    const shapes = dots.map(
+      (dot) => dot.querySelector("span")?.className ?? ""
+    );
+    expect(new Set(shapes).size).toBe(3);
+  });
+
+  it("names the worst open severity in the count's accessible name and tooltip", () => {
+    renderList([
+      machine({
+        id: "machine-3",
+        initials: "MM",
+        title: "Medieval Madness",
+        health: {
+          openIssues: 1,
+          bySeverity: { cosmetic: 0, minor: 0, major: 1, unplayable: 0 },
+          worstSeverity: "major",
+          oldestOpenIssueAt: null,
+          playability: "needs_service",
+        },
+      }),
+    ]);
 
     const count = screen.getByRole("link", {
       name: "View 1 open issue for Medieval Madness, worst Major",
     });
-    // Sighted users get the severity as a tooltip; the text stays compact.
     expect(count).toHaveAttribute("title", "Worst severity: Major");
     expect(count).toHaveTextContent(/^1 open$/);
   });
 
   it("gives the count a 44px-tall hit area that stays clear of the title", () => {
-    render(<MachineViewCompactList rows={[machine()]} />);
+    renderList([machine()]);
 
     const count = screen.getByRole("link", { name: /^View 2 open issues/ });
     // A 16px link plus 14px above and below is 44px (list-views §7.9).
@@ -154,21 +236,17 @@ describe("MachineViewCompactList", () => {
   });
 
   it("keeps a machine with no open issues neutral and unlinked", () => {
-    render(
-      <MachineViewCompactList
-        rows={[
-          machine({
-            health: {
-              openIssues: 0,
-              bySeverity: { cosmetic: 0, minor: 0, major: 0, unplayable: 0 },
-              worstSeverity: null,
-              oldestOpenIssueAt: null,
-              playability: "operational",
-            },
-          }),
-        ]}
-      />
-    );
+    renderList([
+      machine({
+        health: {
+          openIssues: 0,
+          bySeverity: { cosmetic: 0, minor: 0, major: 0, unplayable: 0 },
+          worstSeverity: null,
+          oldestOpenIssueAt: null,
+          playability: "operational",
+        },
+      }),
+    ]);
 
     expect(screen.getByText("None open")).toHaveClass("text-muted-foreground");
     expect(

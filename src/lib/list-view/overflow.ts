@@ -149,3 +149,41 @@ export function planListHeader(input: ListHeaderFitInput): ListHeaderPlan {
     compactEdit: true,
   };
 }
+
+export interface LineDropInput<K extends string> {
+  /** The line's width. */
+  available: number;
+  /** Width of the part that never drops, or 0 when there is none. */
+  keptWidth: number;
+  /**
+   * Each droppable segment's width with its separator. A segment the row
+   * does not show at all is left out.
+   */
+  segmentWidths: Partial<Record<K, number>>;
+  /** The segments in the order they drop, first to drop first. */
+  dropOrder: readonly K[];
+}
+
+/**
+ * Which segments a one-line row drops so the rest fit (machine-views §5.10):
+ * segments drop one at a time in `dropOrder` until the line fits. The line
+ * keeps at least one thing, so with nothing kept the last segment to drop
+ * stays and truncates instead. Truncation is the backstop either way.
+ */
+export function planLineDrops<K extends string>({
+  available,
+  keptWidth,
+  segmentWidths,
+  dropOrder,
+}: LineDropInput<K>): ReadonlySet<K> {
+  const present = dropOrder.filter((key) => segmentWidths[key] !== undefined);
+  let total = keptWidth + sum(present.map((key) => segmentWidths[key] ?? 0));
+  const dropped = new Set<K>();
+  for (const key of present) {
+    if (total <= available) break;
+    if (keptWidth === 0 && dropped.size === present.length - 1) break;
+    dropped.add(key);
+    total -= segmentWidths[key] ?? 0;
+  }
+  return dropped;
+}

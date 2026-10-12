@@ -30,11 +30,16 @@ const STATUS_ICONS: Record<MachineStatus, LucideIcon> = {
   unplayable: TriangleAlert,
 };
 
+/** A machine's year, or "Unknown" when it has none (machine-views §3.3). */
+export function machineYearLabel(row: Pick<MachineViewRow, "year">): string {
+  return row.year === null ? "Unknown" : String(row.year);
+}
+
 interface MachineIdentityProps {
   row: MachineViewRow;
   /**
    * The table shows a second line of manufacturer, year, and owner; the phone
-   * Compact row keeps identity to one line (machine-views §3.2, §5.3).
+   * Compact row lays out its own second line (machine-views §3.2, §5.9).
    */
   variant: "table" | "compact";
   onMachineSelect?: MachineSelectionHandler | undefined;
@@ -78,7 +83,7 @@ export function MachineIdentity({
   );
   if (variant === "compact") return nameLine;
 
-  const year = row.year === null ? "Unknown" : String(row.year);
+  const year = machineYearLabel(row);
   return (
     <div className="min-w-0">
       {nameLine}
@@ -96,8 +101,20 @@ export function MachineIdentity({
 }
 
 /**
- * The phone Compact row's Playability dot. Color is never the only signal:
- * the dot is an image named by its Playability label.
+ * Each Playability's dot shape, so color is never the only visual cue
+ * (machine-views §5.11): a filled circle, a ring, and a diamond.
+ */
+const PLAYABILITY_DOT_SHAPES: Record<MachineStatus, string> = {
+  operational: "size-2.5 rounded-full bg-playability-operational",
+  needs_service:
+    "size-2.5 rounded-full border-2 border-playability-needs-service",
+  unplayable: "size-1.75 rotate-45 rounded-[1px] bg-playability-unplayable",
+};
+
+/**
+ * The phone Compact row's Playability dot. Each Playability has its own shape
+ * as well as color (machine-views §5.11), and the dot is an image named by its
+ * Playability label. Every shape sits in the same 10px box.
  */
 export function PlayabilityDot({
   status,
@@ -110,11 +127,10 @@ export function PlayabilityDot({
       role="img"
       aria-label={label}
       title={label}
-      className={cn(
-        "size-2.5 shrink-0 rounded-full",
-        MACHINE_STATUS_COLORS[status].dot
-      )}
-    />
+      className="inline-flex size-2.5 shrink-0 items-center justify-center"
+    >
+      <span aria-hidden="true" className={PLAYABILITY_DOT_SHAPES[status]} />
+    </span>
   );
 }
 
@@ -144,10 +160,11 @@ function Playability({ status }: { status: MachineStatus }): React.JSX.Element {
  * A machine's open-issue count (machine-views §5.6). A nonzero count takes the
  * color of the machine's worst open severity and links to its issues in every
  * presence state (issues-list §7.4); zero stays neutral and unlinked. The
- * table shows the number; the phone Compact row shows "N open".
+ * table shows the number after a severity icon; the phone Compact row shows
+ * "N open" with no icon (§5.3).
  *
- * Every severity shares one icon, so color is never the only cue: the link's
- * accessible name and its tooltip both name the worst severity.
+ * Color is never the only cue: the link's accessible name and its tooltip
+ * both name the worst severity.
  *
  * On the phone Compact row the link stays visually compact but an invisible
  * `::before` grows its hit area to 44px tall (list-views §7.9). The hit area
@@ -171,7 +188,8 @@ export function OpenIssueCount({
   const worst = row.health?.worstSeverity;
   const severity =
     worst === null || worst === undefined ? null : SEVERITY_CONFIG[worst];
-  const Icon = severity?.icon;
+  // The phone Compact row's count is text alone (machine-views §5.3).
+  const Icon = variant === "table" ? severity?.icon : undefined;
   const issues = `${count} open ${count === 1 ? "issue" : "issues"}`;
   const worstLabel = severity === null ? "" : `, worst ${severity.label}`;
 
@@ -190,7 +208,7 @@ export function OpenIssueCount({
           "relative before:absolute before:inset-x-0 before:-inset-y-3.5"
       )}
     >
-      {Icon ? (
+      {Icon && severity ? (
         <Icon aria-hidden="true" className={cn("size-4", severity.iconColor)} />
       ) : null}
       {variant === "table" ? count : `${count} open`}
