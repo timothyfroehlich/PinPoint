@@ -632,7 +632,7 @@
 - **Severity:** Required
 - **Why:** `:user-invalid` (Baseline Widely available) flips a CSS pseudo-class on form controls only **after** the user has interacted with them — no premature red rings on page load, no JS state mirroring, no event listeners. The shared `<Input>` already has `aria-invalid:` styling; pair it with `:user-invalid:` and the browser does the rest.
 - **Do:** `src/components/ui/input.tsx` and `textarea.tsx` carry the equivalent of `[&:user-invalid]:border-destructive [&:user-invalid]:ring-destructive/40` so every input automatically picks up post-interaction invalid styling. Add to the primitive once — don't copy this per form. (`select.tsx` is a Radix trigger, not a native form control, so the `:user-invalid` pseudo-class does not apply to it — it uses `aria-invalid:` styling only.)
-- **Don't:** Hand-roll `useState` + `onBlur` to mirror invalid state. Don't paint inputs red on initial render.
+- **Don't:** Hand-roll `useState` + `onBlur` to mirror invalid state. Don't paint inputs red on initial render. Don't reach for Tailwind's `peer-invalid` variant — it matches from first render, painting the premature red rings `:user-invalid` exists to avoid; it is the obvious Tailwind-native choice and the wrong one.
 - **Reference:** modern-web-guidance `validate-input-after-interaction`.
 - **Status:** Implemented in `input.tsx` and `textarea.tsx` (PP-kqbk.2). `select.tsx` is out of scope — see the Do note.
 
