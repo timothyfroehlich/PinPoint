@@ -71,11 +71,12 @@
 - **5.4** Phones offer an optional Table mode with a visible horizontal-overflow cue and pinned Machine identity. Compact/Table mode is stored as a browser preference and is not URL state.
 - **5.5** Sortable headers are keyboard-operable and expose `scope` and `aria-sort`; the table has an accessible name and preserves native table semantics.
 - **5.6** Open Issues values are right-aligned. A nonzero count is colored by the machine's worst open severity and links to that machine's issues (issues-list §7.4); zero remains neutral.
-- **5.7** Last Serviced displays a compact relative age and links populated values to `/m/{initials}/maintenance`. A machine without qualifying service history displays “Never”.
+- **5.7** Last Serviced displays a compact relative age. In the table, populated values link to `/m/{initials}/maintenance`. A machine without qualifying service history displays “Never”.
 - **5.8** Machine View exposes a stable machine-selection callback for a future inspection drawer without implementing drawer state or UI in this delivery.
 - **5.9** The second line of a Compact row spans the row's full width and never wraps: the Playability label in its Playability color, then manufacturer, year, owner, and the Last Serviced age. The Playability label and the Last Serviced age appear only when Playability and Last Serviced are among the displayed fields, so their data is loaded (§3.4); otherwise line 2 leaves them out. A machine with no qualifying service history shows “never serviced” in place of the age (§5.7).
-- **5.10** When the Compact row's second line does not fit, it drops year, then manufacturer, then Last Serviced, then owner. The Playability label never drops.
+- **5.10** When the Compact row's second line does not fit, it drops year, then manufacturer, then Last Serviced, then owner. The Playability label never drops. When the Playability label is hidden and only the owner is left, the owner truncates instead of leaving the line empty.
 - **5.11** The Compact row's Playability dot differs by shape as well as color for each Playability.
+- **5.12** On phones the whole Compact row is a link to the machine. The open-issue count keeps its own link to the machine's issues (5.6), and the Last Serviced age on a Compact row is plain text.
 
 ---
 
@@ -135,6 +136,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-12 | Last Serviced links only in the table (§5.7); with the Playability label hidden, the owner truncates rather than leaving a Compact row's second line empty (§5.10); the whole Compact row links to the machine and its Last Serviced age is plain text (§5.12). |
 | 2026-10-11 | `/m`'s page actions are Pinball Map, Add Machine, and ⋯, which holds the Print settings sheets and Print apron cards entries; Pinball Map folds first and Add Machine last (§6.6–§6.8). |
 | 2026-10-11 | Phone Compact rows become two lines: Playability dot, name, initials, and open-issue count first, then the Playability label, manufacturer, year, owner, and Last Serviced, dropping year, manufacturer, Last Serviced, then owner when crowded (§3.2, §5.3, §5.9, §5.10); the Playability label and Last Serviced age appear only when those fields are displayed, and no service history reads “never serviced” (§5.9); the count is colored “N open” text with no icon, or a muted “None open” (§5.3); the Playability dot differs by shape (§5.11). |
 | 2026-10-07 | Retired Owner Collections (preamble, 6.4); a person's machines are Machines filtered by Owner (collections-and-tags §6). |
