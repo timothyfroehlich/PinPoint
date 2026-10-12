@@ -2,14 +2,16 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { MessageSquare } from "lucide-react";
+import { Activity, MessageSquare } from "lucide-react";
 import { useRelativeNow } from "~/components/issues/RelativeTimeProvider";
 import { useMeasuredWidths } from "~/components/list-view/use-measured-widths";
-import { formatCompactAge, formatCompactAgeAgo } from "~/lib/dates";
+import { formatCompactAgeAgo, formatSpokenAgeAgo } from "~/lib/dates";
 import {
   PRIORITY_CONFIG,
   SEVERITY_CONFIG,
   STATUS_CONFIG,
+  STATUS_GROUPS,
+  type IssueStatus,
 } from "~/lib/issues/status";
 import { formatIssueId } from "~/lib/issues/utils";
 import { fitLineParts } from "~/lib/list-view/overflow";
@@ -19,6 +21,7 @@ import { cn } from "~/lib/utils";
 /** Line 2's parts that give way for room, in drop order (issues-list §3.9). */
 const DROP_ORDER = ["age", "comments", "priority", "assignee"] as const;
 type DroppablePart = (typeof DROP_ORDER)[number];
+type StatusGroup = keyof typeof STATUS_GROUPS;
 
 /** Line 2's column gap (`gap-1.5`); every part after the first leads with "·". */
 const LINE_GAP = 6;
@@ -85,16 +88,66 @@ function RowPill({
   className,
   testId,
 }: {
-  name: "Status" | "Severity" | "Priority";
+  /** Announced before the label; null hides a pill another element announces. */
+  name: "Severity" | "Priority" | null;
   label: string;
   styles: string;
   className?: string | undefined;
   testId?: string | undefined;
 }): React.JSX.Element {
   return (
-    <span className={cn(PILL_CLASSES, styles, className)} data-testid={testId}>
-      <span className="sr-only">{name}: </span>
+    <span
+      className={cn(PILL_CLASSES, styles, className)}
+      aria-hidden={name === null ? true : undefined}
+      data-testid={testId}
+    >
+      {name === null ? null : <span className="sr-only">{name}: </span>}
       {label}
+    </span>
+  );
+}
+
+/*
+ * Each status group's dot shape, so color is never the only cue (issues-list
+ * §3.8), matching the machine rows' Playability dots: a ring for New, a
+ * filled circle for In Progress, a diamond for Closed. Every shape sits in
+ * the same 10px box and draws in the status color.
+ */
+const STATUS_DOT_SHAPES: Record<StatusGroup, string> = {
+  new: "size-2.5 rounded-full border-2 border-current",
+  in_progress: "size-2.5 rounded-full bg-current",
+  closed: "size-1.75 rotate-45 rounded-[1px] bg-current",
+};
+
+function statusGroupOf(status: IssueStatus): StatusGroup {
+  if (STATUS_GROUPS.new.some((s) => s === status)) return "new";
+  if (STATUS_GROUPS.in_progress.some((s) => s === status)) return "in_progress";
+  return "closed";
+}
+
+/**
+ * The row's leading status dot (issues-list §3.2, §3.8), an image named
+ * "Status: <status>". The status pill beside the title stays visible but
+ * silent, so the status is announced once.
+ */
+function StatusDot({ status }: { status: IssueStatus }): React.JSX.Element {
+  const config = STATUS_CONFIG[status];
+  const name = `Status: ${config.label}`;
+  return (
+    <span
+      role="img"
+      aria-label={name}
+      title={name}
+      className={cn(
+        "mt-1.5 inline-flex size-2.5 shrink-0 items-center justify-center",
+        config.iconColor
+      )}
+      data-testid="issue-status-dot"
+    >
+      <span
+        aria-hidden="true"
+        className={STATUS_DOT_SHAPES[statusGroupOf(status)]}
+      />
     </span>
   );
 }
@@ -154,8 +207,8 @@ function CommentCount({
 }
 
 /**
- * How long ago the issue was updated: "2d" on phones, "updated 2d ago" on
- * desktop (issues-list §3.3). Phones announce the long form too.
+ * How long ago the issue was updated: an activity icon and "2d ago" at every
+ * width (issues-list §3.3), announced as "Updated 2 days ago".
  */
 function UpdatedAge({
   updatedAt,
@@ -167,14 +220,17 @@ function UpdatedAge({
   // Null during SSR and before the shared ticker's first tick.
   const now = useRelativeNow();
   const date = new Date(updatedAt);
-  const short = now === null ? "" : formatCompactAge(date, now);
-  const long = now === null ? "" : formatCompactAgeAgo(date, now);
+  const shown = now === null ? "" : formatCompactAgeAgo(date, now);
+  const spoken = now === null ? "" : formatSpokenAgeAgo(date, now);
   return (
-    <time dateTime={date.toISOString()} data-testid={testId}>
-      <span aria-hidden="true" className="md:hidden">
-        {short}
-      </span>
-      <span className="max-md:sr-only">updated {long}</span>
+    <time
+      dateTime={date.toISOString()}
+      className="inline-flex items-center gap-1"
+      data-testid={testId}
+    >
+      <Activity className="size-3.5 shrink-0" aria-hidden="true" />
+      <span aria-hidden="true">{shown}</span>
+      <span className="sr-only">Updated {spoken}</span>
     </time>
   );
 }
@@ -350,10 +406,12 @@ function IssueRowDetails({
 
 /**
  * One issue row (issues-list §3), the same two lines at every width. Line 1:
- * the full title, wrapping, then the status and severity pills flowing after
- * it as a pair (both move to the next line when they do not both fit). Line 2: see `IssueRowDetails`. The row is read-only (§3.11). The whole
- * row links to the issue through the title link's `::after` overlay; the
- * machine name is its own link, raised above the overlay (§3.12).
+ * the status dot, then the full title, wrapping, with the status and
+ * severity pills flowing after it as a pair (both move to the next line when
+ * they do not both fit). Line 2 lines up under the title, beside the dot's
+ * column: see `IssueRowDetails`. The row is read-only (§3.11). The whole row
+ * links to the issue through the title link's `::after` overlay; the machine
+ * name is its own link, raised above the overlay (§3.12).
  */
 export function IssueListEntry({
   issue,
@@ -369,33 +427,41 @@ export function IssueListEntry({
       data-issue-id={issue.id}
       className="group/row relative isolate px-4 py-2.5 transition-colors duration-150 hover:bg-muted/40 max-md:border-b max-md:border-border sm:max-md:px-8"
     >
-      <div className="text-[15px] leading-[1.45]">
-        <Link
-          href={`/m/${issue.machineInitials}/i/${issue.issueNumber}`}
-          className="mr-1.5 font-semibold break-words text-foreground transition-colors duration-150 group-hover/row:text-primary after:absolute after:inset-0 focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-ring focus-visible:after:ring-inset"
-          data-testid="issue-title"
-        >
-          <span className={VISIBLE_LAYER}>{issue.title}</span>
-        </Link>
-        {/* One unbreakable box, so the pills wrap below the title together
-            or not at all. Its baseline is the pills' text, 2px above the
-            title's. */}
-        <span className="inline-flex gap-1 align-[2px]">
-          <RowPill
-            name="Status"
-            label={status.label}
-            styles={status.styles}
-            testId="issue-status"
-          />
-          <RowPill
-            name="Severity"
-            label={severity.label}
-            styles={severity.styles}
-            testId="issue-severity"
-          />
-        </span>
+      {/* The dot keeps its own column; the title and line 2 share the
+          content column beside it. */}
+      <div className="flex items-start gap-2.5">
+        <StatusDot status={issue.status} />
+        <div className="min-w-0 flex-1">
+          <div className="text-[15px] leading-[1.45]">
+            <Link
+              href={`/m/${issue.machineInitials}/i/${issue.issueNumber}`}
+              className="mr-1.5 font-semibold break-words text-foreground transition-colors duration-150 group-hover/row:text-primary after:absolute after:inset-0 focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-ring focus-visible:after:ring-inset"
+              data-testid="issue-title"
+            >
+              <span className={VISIBLE_LAYER}>{issue.title}</span>
+            </Link>
+            {/* One unbreakable box, so the pills wrap below the title
+                together or not at all. Its baseline is the pills' text, 2px
+                above the title's. The status pill is silent: the dot
+                announces the status. */}
+            <span className="inline-flex gap-1 align-[2px]">
+              <RowPill
+                name={null}
+                label={status.label}
+                styles={status.styles}
+                testId="issue-status"
+              />
+              <RowPill
+                name="Severity"
+                label={severity.label}
+                styles={severity.styles}
+                testId="issue-severity"
+              />
+            </span>
+          </div>
+          <IssueRowDetails issue={issue} />
+        </div>
       </div>
-      <IssueRowDetails issue={issue} />
     </li>
   );
 }

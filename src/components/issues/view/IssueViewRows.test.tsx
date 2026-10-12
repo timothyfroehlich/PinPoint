@@ -80,7 +80,7 @@ describe("Issue rows", () => {
     vi.restoreAllMocks();
   });
 
-  it("shows the title and the status and severity pills on line 1", () => {
+  it("shows the status dot, the title, and the status and severity pills on line 1", () => {
     renderRows([makeIssue()]);
     const row = within(screen.getByRole("listitem"));
 
@@ -89,12 +89,31 @@ describe("Issue rows", () => {
         name: "Left flipper weak after the second multiball",
       })
     ).toHaveAttribute("href", "/m/AFM/i/12");
-    expect(row.getByTestId("issue-status")).toHaveTextContent(
-      "Status: In Progress"
+    // The dot announces the status; the pill shows it without repeating it.
+    expect(row.getByRole("img", { name: "Status: In Progress" })).toBe(
+      row.getByTestId("issue-status-dot")
     );
+    const statusPill = row.getByTestId("issue-status");
+    expect(statusPill).toHaveTextContent(/^In Progress$/);
+    expect(statusPill).toHaveAttribute("aria-hidden", "true");
     expect(row.getByTestId("issue-severity")).toHaveTextContent(
       "Severity: Major"
     );
+  });
+
+  it.each<[IssueListRow["status"], string]>([
+    ["new", "border-2"],
+    ["confirmed", "border-2"],
+    ["in_progress", "bg-current"],
+    ["wait_owner", "bg-current"],
+    ["fixed", "rotate-45"],
+    ["duplicate", "rotate-45"],
+  ])("draws a %s status dot by its group's shape (%s)", (status, shape) => {
+    renderRows([makeIssue({ status })]);
+    const dot = within(screen.getByRole("listitem")).getByTestId(
+      "issue-status-dot"
+    );
+    expect(dot.firstElementChild).toHaveClass(shape);
   });
 
   it("shows the ID, machine, priority, assignee, comment count, and age on line 2", () => {
@@ -122,10 +141,10 @@ describe("Issue rows", () => {
     expect(row.getByTestId("issue-comment-count")).toHaveTextContent(
       "33 comments"
     );
-    // Phones show "2d"; desktop and screen readers get the long form.
+    // "2d ago" at every width; screen readers hear the spelled-out form.
     const age = row.getByTestId("issue-age");
     expect(age).toHaveAttribute("datetime", "2026-01-02T00:00:00.000Z");
-    expect(age).toHaveTextContent("2dupdated 2d ago");
+    expect(age).toHaveTextContent(/^2d agoUpdated 2 days ago$/);
   });
 
   it("shows the comment count only when there are comments", () => {
