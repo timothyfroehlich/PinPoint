@@ -20,8 +20,9 @@ import pytest
 SCRIPT_PATH = Path(__file__).parent.parent / "dev-stop.sh"
 
 pytestmark = pytest.mark.skipif(
-    shutil.which("node") is None or shutil.which("lsof") is None,
-    reason="needs node and lsof",
+    shutil.which("node") is None
+    or (shutil.which("lsof") is None and shutil.which("ss") is None),
+    reason="needs node and lsof or ss",
 )
 
 LAUNCHER_JS = """

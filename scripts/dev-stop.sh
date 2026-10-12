@@ -41,7 +41,15 @@ fail() {
   exit 1
 }
 
-command -v lsof >/dev/null 2>&1 || fail "lsof is not installed"
+# Linux: lsof skips a process whose name holds spaces and parentheses, which is
+# exactly how Next.js titles its server (`next-server (vX.Y.Z)`), so use ss.
+if [ -d /proc/self ] && command -v ss >/dev/null 2>&1; then
+  LISTENER_TOOL=ss
+elif command -v lsof >/dev/null 2>&1; then
+  LISTENER_TOOL=lsof
+else
+  fail "neither ss nor lsof is installed"
+fi
 
 toplevel="$(git rev-parse --show-toplevel 2>/dev/null)" || fail "not inside a git worktree"
 ROOT="$(cd "$toplevel" && pwd -P)"
@@ -90,7 +98,15 @@ owned_by_worktree() {
   [ "$(proc_cwd "$1")" = "$ROOT" ]
 }
 
-listeners="$(lsof -nP -iTCP:"$PORT" -sTCP:LISTEN -t 2>/dev/null | sort -u || true)"
+listener_pids() {
+  if [ "$LISTENER_TOOL" = ss ]; then
+    ss -Hltnp "sport = :$PORT" 2>/dev/null | grep -oE 'pid=[0-9]+' | cut -d= -f2
+  else
+    lsof -nP -iTCP:"$PORT" -sTCP:LISTEN -t 2>/dev/null
+  fi
+}
+
+listeners="$(listener_pids | sort -u || true)"
 if [ -z "$listeners" ]; then
   printf 'PASS: dev stop — nothing listening on :%s for %s\n' "$PORT" "$ROOT"
   exit 0
