@@ -27,14 +27,14 @@
 
 ## 3. Rows
 
-- **3.1** Every issue row uses one two-line layout at every screen size. The full title is always shown, wrapping rather than truncating; line 2 always stays on one line.
-- **3.2** Line 1 shows the title, then the status pill and the severity pill, which flow inline after the title text. The two pills wrap as a pair: when both don't fit after the title, both move to the next line together.
-- **3.3** Line 2 shows, in order, the issue ID, the machine name, the priority pill, the assignee's initials, the comment count, and how long ago the issue was updated (abbreviated on phones). The issue ID shows at every screen size and never drops.
+- **3.1** Every issue row uses one two-line layout at every screen size. The full title is always shown, wrapping rather than truncating; line 2 always stays on one line, starting under the status dot and spanning the row's full width.
+- **3.2** Line 1 shows the status dot, the title, then the status pill and the severity pill, which flow inline after the title text. The two pills wrap as a pair: when both don't fit after the title, both move to the next line together.
+- **3.3** Line 2 shows, in order, the issue ID, the machine name, the priority pill, the assignee's initials, the comment count, and how long ago the issue was updated, shown as an activity icon and a short age such as “2d ago” at every screen size. The issue ID shows at every screen size and never drops.
 - **3.4** The comment count shows only when the issue has at least one comment, and the assignee appears only on line 2.
 - **3.5** _Retired 2026-10-11._ Rows offered inline editing of status, severity, priority, and assignee; 3.11 now forbids it. Number kept so older citations don't dangle.
 - **3.6** _Retired 2026-10-11._ Rows kept their place after an inline change; with no inline editing (3.11) there is nothing to keep in place. Number kept so older citations don't dangle.
 - **3.7** An unassigned issue shows an empty avatar announced as "Unassigned". Assignee names never show email addresses.
-- **3.8** Rows show no status icon; status appears only as the status pill.
+- **3.8** Rows lead with a status dot in the status color whose shape marks the status group, as Playability dots do on machine rows: a ring for New, a filled circle for In Progress, a diamond for Closed. The status pill still shows the status by name.
 - **3.9** When line 2 does not fit, it drops the age first, then the comment count, then the priority pill, then the assignee's initials; the machine name truncates only after all four are gone.
 - **3.10** Row fields rank, most to least important: title, machine, status, severity, assignee, priority, comment count, age, issue ID. A field that gives way for room gives way in reverse of this order, except the issue ID, which never gives way (3.3).
 - **3.11** Rows never change an issue; status, severity, priority, and assignee are read-only values on the row for everyone.
@@ -112,7 +112,7 @@
 
 | Date | Change |
 | :-- | :-- |
-| 2026-10-12 | Issue rows: the status and severity pills wrap as a pair (3.2); the issue ID shows at every screen size, phones included (3.3, 3.10); the comment count returns on line 2 when above zero, dropping right after the age (3.3, 3.4, 3.9, 3.10). |
+| 2026-10-12 | Issue rows: a leading status dot shaped by status group, with the status pill kept (3.2, 3.8); line 2 starts under the dot at full width (3.1); the age shows as an activity icon and “2d ago” at every width (3.3); the status and severity pills wrap as a pair (3.2); the issue ID shows at every screen size, phones included (3.3, 3.10); the comment count returns on line 2 when above zero, dropping right after the age (3.3, 3.4, 3.9, 3.10). |
 | 2026-10-11 | Primary Filters reordered by field importance: Machine, Status, Severity, Assignee, Priority, Machine Presence (4.2). Issue View's only page action is ⋯, holding Export, on `/issues` and in the Collection's or Tag's ⋯ on an Issues tab, at every width (2.3, 2.4); Export is offered only to signed-in people (5.4). |
 | 2026-10-11 | Issue rows redesigned: one layout at every width with a one-line line 2 and a drop order (3.1, 3.9), status and severity pills on line 1 and no status icon (3.2, 3.8), line 2 order with the issue ID desktop only (3.3), no comment count (3.4), field importance (3.10), no inline editing (3.11; 3.5 and 3.6 retired), whole-row link (3.12), borderless pills on List View pages (3.13). |
 | 2026-10-07 | Owner Collections retired; the Issues tab appears on every Collection and Tag (2.1). |
