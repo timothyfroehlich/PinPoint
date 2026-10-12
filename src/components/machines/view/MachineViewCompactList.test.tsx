@@ -123,7 +123,28 @@ describe("MachineViewCompactList", () => {
     expect(within(line).getByText("Unplayable")).toHaveClass(
       MACHINE_STATUS_COLORS.unplayable.text
     );
-    expect(within(line).getByText("Alex")).toHaveClass("text-foreground");
+    // Only the Playability label is colored; the owner stays muted.
+    expect(line).toHaveClass("text-muted-foreground");
+    expect(line.querySelectorAll("span")).toHaveLength(1);
+  });
+
+  it("makes the whole row a link to the machine, under the count's own link", () => {
+    renderList([machine()]);
+
+    expect(
+      screen.getByRole("list", { name: "Machines list" })
+    ).toBeInTheDocument();
+    const row = screen.getByRole("listitem");
+    const title = within(row).getByRole("link", {
+      name: "Elvira's House of Horrors (Blood Red Kiss Edition)",
+    });
+    // The title's overlay fills the row, which is its containing block.
+    expect(row).toHaveClass("relative");
+    expect(title).toHaveClass("after:absolute", "after:inset-0");
+    // The count is positioned and later in the row, so it stays on top.
+    expect(
+      within(row).getByRole("link", { name: /^View 2 open issues/ })
+    ).toHaveClass("relative");
   });
 
   it("leaves the Playability label and service age out when those fields are not displayed", () => {
@@ -216,18 +237,21 @@ describe("MachineViewCompactList", () => {
     expect(count).toHaveTextContent(/^1 open$/);
   });
 
-  it("gives the count a 44px-tall hit area that stays clear of the title", () => {
+  it("gives the count a 44px-wide hit area that stays clear of the title and line 2", () => {
     renderList([machine()]);
 
     const count = screen.getByRole("link", { name: /^View 2 open issues/ });
-    // A 16px link plus 14px above and below is 44px (list-views §7.9).
+    // At least 44px wide (list-views §7.9), growing leftward from the
+    // link's right edge into the gap before it.
     expect(count).toHaveClass(
       "relative",
       "before:absolute",
-      "before:-inset-y-3.5"
+      "before:right-0",
+      "before:w-full",
+      "before:min-w-11"
     );
-    // The hit area keeps the link's width, so it never reaches the title.
-    expect(count).toHaveClass("before:inset-x-0");
+    // It ends at the link's bottom, so line 2 stays the row link.
+    expect(count).toHaveClass("before:bottom-0");
     expect(count).not.toContainElement(
       screen.getByRole("link", {
         name: "Elvira's House of Horrors (Blood Red Kiss Edition)",

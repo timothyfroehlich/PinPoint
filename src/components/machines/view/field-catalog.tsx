@@ -56,8 +56,11 @@ export function MachineIdentity({
   variant,
   onMachineSelect,
 }: MachineIdentityProps): React.JSX.Element {
+  const compact = variant === "compact";
   const nameLine = (
-    <div className="flex min-w-0 items-center gap-2">
+    <div
+      className={cn("flex min-w-0 items-center", compact ? "gap-2.5" : "gap-2")}
+    >
       <Link
         href={`/m/${row.initials}`}
         title={row.title}
@@ -69,19 +72,31 @@ export function MachineIdentity({
                 onMachineSelect(row.id);
               },
             })}
-        className="min-w-0 truncate rounded-sm text-sm font-semibold text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className={cn(
+          "min-w-0 truncate rounded-sm font-semibold text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          // On the phone row an `::after` overlay makes the whole row this
+          // link; the row is its containing block.
+          compact
+            ? "text-[15px] leading-[22px] after:absolute after:inset-0"
+            : "text-sm"
+        )}
       >
         {row.title}
       </Link>
       <Badge
         variant="outline"
-        className="rounded-sm border-outline-variant px-1.5 py-0 text-xs font-medium uppercase text-muted-foreground"
+        className={cn(
+          "border-outline-variant px-1.5 py-0 uppercase text-muted-foreground",
+          compact
+            ? "rounded-[5px] text-[11px] leading-4 font-semibold"
+            : "rounded-sm text-xs font-medium"
+        )}
       >
         {row.initials}
       </Badge>
     </div>
   );
-  if (variant === "compact") return nameLine;
+  if (compact) return nameLine;
 
   const year = machineYearLabel(row);
   return (
@@ -166,9 +181,11 @@ function Playability({ status }: { status: MachineStatus }): React.JSX.Element {
  * Color is never the only cue: the link's accessible name and its tooltip
  * both name the worst severity.
  *
- * On the phone Compact row the link stays visually compact but an invisible
- * `::before` grows its hit area to 44px tall (list-views §7.9). The hit area
- * keeps the link's own width, so it never reaches under the title beside it.
+ * On the phone Compact row the whole row links to the machine, and the count
+ * sits above that link. An invisible `::before` makes the count's hit area at
+ * least 44px wide (list-views §7.9), growing leftward into the gap before it,
+ * and reaches up to the row's top edge. It stops at line 2, so a tap on line 2
+ * always opens the machine.
  */
 export function OpenIssueCount({
   row,
@@ -179,10 +196,10 @@ export function OpenIssueCount({
 }): React.JSX.Element {
   const count = row.health?.openIssues ?? 0;
   if (count === 0) {
-    return (
-      <span className="text-xs font-medium text-muted-foreground">
-        {variant === "table" ? "0" : "None open"}
-      </span>
+    return variant === "table" ? (
+      <span className="text-xs font-medium text-muted-foreground">0</span>
+    ) : (
+      <span className="text-[13px] text-muted-foreground">None open</span>
     );
   }
   const worst = row.health?.worstSeverity;
@@ -201,11 +218,14 @@ export function OpenIssueCount({
         ? {}
         : { title: `Worst severity: ${severity.label}` })}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-sm text-xs font-medium whitespace-nowrap underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "inline-flex items-center gap-1.5 rounded-sm whitespace-nowrap underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         severity?.iconColor ?? "text-foreground",
-        // 16px link → 44px tall hit area; its width already exceeds 44px.
-        variant === "compact" &&
-          "relative before:absolute before:inset-x-0 before:-inset-y-3.5"
+        variant === "table"
+          ? "text-xs font-medium"
+          : // Positioned and later in the row, so it sits above the row link's
+            // overlay. The hit area is the link's width or 44px, anchored
+            // right, and reaches up through the row's top padding.
+            "relative text-[13px] before:absolute before:right-0 before:-top-3 before:bottom-0 before:w-full before:min-w-11"
       )}
     >
       {Icon && severity ? (

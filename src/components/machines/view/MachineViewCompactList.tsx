@@ -10,7 +10,6 @@ import {
   MACHINE_STATUS_COLORS,
 } from "~/lib/machines/status";
 import type { MachineViewFieldId, MachineViewRow } from "~/lib/types";
-import { cn } from "~/lib/utils";
 import {
   MachineIdentity,
   machineYearLabel,
@@ -104,31 +103,20 @@ function DetailLine({
       : new Set<DetailSegment>();
   const visible = present.filter((key) => !dropped.has(key));
 
-  function segmentText(key: DetailSegment): React.ReactNode {
-    const text = segments[key];
-    if (key === "owner" && row.hasOwner) {
-      return <span className="text-foreground">{text}</span>;
-    }
-    return text;
-  }
-
   return (
-    <div className="relative mt-0.5 min-w-0">
-      <p ref={lineRef} className="truncate text-xs text-muted-foreground">
+    // Not positioned: a positioned line would sit above the row link's
+    // overlay and swallow taps on it. The lane anchors to the row instead.
+    <div className="mt-0.5 min-w-0">
+      <p ref={lineRef} className="truncate text-[13px] text-muted-foreground">
         {playability !== null ? (
-          <span
-            className={cn(
-              "font-medium",
-              MACHINE_STATUS_COLORS[playability].text
-            )}
-          >
+          <span className={MACHINE_STATUS_COLORS[playability].text}>
             {playabilityLabel}
           </span>
         ) : null}
         {visible.map((key, index) => (
           <React.Fragment key={key}>
             {playabilityLabel !== null || index > 0 ? SEPARATOR : null}
-            {segmentText(key)}
+            {segments[key]}
           </React.Fragment>
         ))}
       </p>
@@ -136,13 +124,10 @@ function DetailLine({
       <div
         ref={laneRef}
         aria-hidden="true"
-        className="pointer-events-none invisible absolute inset-x-0 top-0 h-0 overflow-hidden text-xs"
+        className="pointer-events-none invisible absolute inset-x-0 top-0 h-0 overflow-hidden text-[13px]"
       >
         {playabilityLabel !== null ? (
-          <span
-            data-measure="playability"
-            className="absolute whitespace-pre font-medium"
-          >
+          <span data-measure="playability" className="absolute whitespace-pre">
             {playabilityLabel}
           </span>
         ) : null}
@@ -168,7 +153,8 @@ function DetailLine({
  * screen. Line 2 spans the row and never wraps: the Playability label, then
  * manufacturer, year, owner, and Last Serviced, dropping year, manufacturer,
  * Last Serviced, then owner when they do not fit (§5.10). Other selected
- * fields show only in Table mode.
+ * fields show only in Table mode. The whole row links to the machine; the
+ * open-issue count and any row action stay their own targets above it.
  */
 export function MachineViewCompactList({
   rows,
@@ -180,14 +166,19 @@ export function MachineViewCompactList({
   const showServiced = columns.includes("lastServiced");
   return (
     // Rows align with the page's horizontal padding (list-views §7.7).
-    <ul className="divide-y divide-outline-variant md:hidden">
+    <ul
+      aria-label="Machines list"
+      className="divide-y divide-outline-variant md:hidden"
+    >
       {rows.map((row) => (
+        // The row is the containing block for the name link's overlay, which
+        // makes the whole row a link to the machine.
         <li
           key={row.id}
-          className="flex min-h-11 items-center gap-2 px-4 py-2.5 sm:px-8"
+          className="relative flex min-h-11 items-center gap-2 px-4 py-2.5 sm:px-8"
         >
           <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 items-center gap-2">
+            <div className="flex min-w-0 items-center gap-2.5">
               {row.health ? (
                 <PlayabilityDot status={row.health.playability} />
               ) : null}
@@ -208,7 +199,10 @@ export function MachineViewCompactList({
               showServiced={showServiced}
             />
           </div>
-          {rowAction ? <div className="shrink-0">{rowAction(row)}</div> : null}
+          {/* Positioned, so the action sits above the row link's overlay. */}
+          {rowAction ? (
+            <div className="relative shrink-0">{rowAction(row)}</div>
+          ) : null}
         </li>
       ))}
     </ul>
