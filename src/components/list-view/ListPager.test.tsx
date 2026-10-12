@@ -51,4 +51,16 @@ describe("PhonePager", () => {
     expect(onPage).toHaveBeenCalledWith(3, true);
     expect(container.firstElementChild).toContainElement(nav);
   });
+
+  it("shows the range alone when the list has one page (list-views §8.3)", () => {
+    render(
+      <PhonePager
+        pagination={{ page: 1, pageSize: 25, totalCount: 9, onPage: vi.fn() }}
+      />
+    );
+
+    const nav = screen.getByRole("navigation", { name: "Pagination" });
+    expect(nav).toHaveTextContent("1–9 of 9");
+    expect(within(nav).queryByRole("button")).not.toBeInTheDocument();
+  });
 });

@@ -197,10 +197,12 @@ export function ListView({
         primaryFilters={primaryFilters}
         secondaryFilters={secondaryFilters}
       />
+      {/* Below md the phone List Header draws the box's top edge, so it
+          keeps one when pinned, and the pager follows with no gap (§7.8). */}
       <section
         aria-label={label}
         aria-busy={busy}
-        className="border-y border-outline-variant bg-card max-md:-mx-4 sm:max-md:-mx-8 md:overflow-hidden md:rounded-lg md:border"
+        className="border-y border-outline-variant bg-card max-md:-mx-4 max-md:mb-0 max-md:border-t-0 sm:max-md:-mx-8 md:overflow-hidden md:rounded-lg md:border"
       >
         <ListHeader
           views={listViews}

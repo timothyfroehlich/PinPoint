@@ -26,7 +26,9 @@ interface ListSearchFieldProps {
  * typing while an earlier search's results arrive, and takes a new value
  * only when the list's search changes from elsewhere. List View mounts it
  * afresh when a view is applied or changes are discarded, which drops a
- * search still waiting to run.
+ * search still waiting to run. Below md it only shows in the phone List
+ * Header, so its base styles are the phone field's (§7.3) and its md styles
+ * the toolbar's.
  */
 export function ListSearchField({
   id,
@@ -80,7 +82,7 @@ export function ListSearchField({
       </label>
       <Search
         aria-hidden="true"
-        className="pointer-events-none absolute left-3 size-4 text-muted-foreground"
+        className="pointer-events-none absolute left-2.5 size-4 text-muted-foreground md:left-3"
       />
       <Input
         id={id}
@@ -95,7 +97,7 @@ export function ListSearchField({
         }}
         autoComplete="off"
         enterKeyHint="search"
-        className="h-11 bg-background pl-9 text-base md:h-9 md:text-sm"
+        className="h-9 rounded-[10px] border-outline bg-background pr-2.5 pl-8 text-base md:rounded-md md:border-input md:pr-3 md:pl-9 md:text-sm"
       />
     </search>
   );

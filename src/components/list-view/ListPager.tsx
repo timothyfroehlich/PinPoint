@@ -190,8 +190,11 @@ function PageControls({
 
 /**
  * The phone pager (list-views §7.8, §7.11): the last thing after the list
- * box, scrolling with the page, with Previous, the range, and Next. Nothing
- * full-width is pinned above the tab bar (design-bible §3).
+ * box, directly beneath it and scrolling with the page, with Previous, the
+ * range, and Next. On a single page the range shows alone, centred (§8.3).
+ * Nothing full-width is pinned above the tab bar (design-bible §3). The
+ * `data-list-phone-pager` marker lets the page end at the tab bar
+ * (MainLayout).
  */
 export function PhonePager({
   pagination,
@@ -203,30 +206,43 @@ export function PhonePager({
     pagination.pageSize,
     pagination.totalCount
   );
+  const multiPage = range.pageCount > 1;
+  const buttonClass = cn(
+    iconButtonClass,
+    "size-11 disabled:text-outline-variant"
+  );
   return (
     <nav
       aria-label="Pagination"
-      className="flex h-11 items-center justify-between md:hidden"
+      data-list-phone-pager=""
+      className={cn(
+        "-mx-4 mb-0 flex h-14 items-center px-1 text-sm text-muted-foreground sm:-mx-8 md:hidden",
+        multiPage ? "justify-between" : "justify-center"
+      )}
     >
-      <button
-        type="button"
-        aria-label="Previous page"
-        disabled={range.page <= 1}
-        onClick={() => pagination.onPage(range.page - 1, true)}
-        className={cn(iconButtonClass, "h-11 w-14 text-primary")}
-      >
-        <ChevronLeft aria-hidden="true" className="size-5" />
-      </button>
+      {multiPage ? (
+        <button
+          type="button"
+          aria-label="Previous page"
+          disabled={range.page <= 1}
+          onClick={() => pagination.onPage(range.page - 1, true)}
+          className={buttonClass}
+        >
+          <ChevronLeft aria-hidden="true" className="size-[18px]" />
+        </button>
+      ) : null}
       <RangeTextFace pagination={pagination} />
-      <button
-        type="button"
-        aria-label="Next page"
-        disabled={range.page >= range.pageCount}
-        onClick={() => pagination.onPage(range.page + 1, true)}
-        className={cn(iconButtonClass, "h-11 w-14 text-primary")}
-      >
-        <ChevronRight aria-hidden="true" className="size-5" />
-      </button>
+      {multiPage ? (
+        <button
+          type="button"
+          aria-label="Next page"
+          disabled={range.page >= range.pageCount}
+          onClick={() => pagination.onPage(range.page + 1, true)}
+          className={buttonClass}
+        >
+          <ChevronRight aria-hidden="true" className="size-[18px]" />
+        </button>
+      ) : null}
     </nav>
   );
 }

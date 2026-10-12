@@ -627,7 +627,7 @@ export function PhoneListHeader({
       // Explicit, because the computed name puts a space before the comma.
       aria-label={views.edited ? `${viewsName}, edited` : viewsName}
       data-testid="list-phone-views-trigger"
-      className="inline-flex min-h-11 min-w-0 shrink items-center gap-1.5 rounded-md px-2 text-sm font-semibold text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+      className="inline-flex min-h-11 min-w-0 shrink items-center gap-2 rounded-md text-[15px] font-bold text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
     >
       <Bookmark aria-hidden="true" className="size-4 shrink-0" />
       <span className="truncate">{viewsName}</span>
@@ -652,7 +652,7 @@ export function PhoneListHeader({
       {active > 0 ? (
         <span
           aria-hidden="true"
-          className="absolute top-1 right-0.5 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[11px] font-bold text-primary-foreground"
+          className="absolute top-1.5 right-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[11px] font-bold text-primary-foreground"
         >
           {active}
         </span>
@@ -662,7 +662,7 @@ export function PhoneListHeader({
   return (
     <div
       data-list-phone-header=""
-      className="sticky top-0 z-20 flex min-h-12 items-center gap-1 border-b border-outline-variant bg-card px-2 md:hidden"
+      className="sticky top-0 z-20 flex h-12 items-center gap-2 border-y border-outline bg-card-raised pr-1.5 pl-4 sm:pl-8 md:hidden"
     >
       <SavedViewsSheet
         open={viewsOpen}
