@@ -21,6 +21,7 @@
   --color-secondary-foreground: #042f2e; /* teal-950 */
   --color-muted: #27272a;
   --color-muted-foreground: #a1a1aa;
+  --color-foreground-secondary: #d4d4d8; /* zinc-300: secondary text, between foreground and muted-foreground */
 
   /* Accents & Status */
   --color-accent: #27272a;

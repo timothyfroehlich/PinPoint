@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { summaryRowMinWidth } from "./layout";
+import { SUMMARY_WIDGET_GAP_PX, summaryRowMinWidth } from "./layout";
 import { SummaryWidget, type SummaryWidgetSegment } from "./SummaryWidget";
 import { SummaryWidgetGroup } from "./SummaryWidgetGroup";
 
@@ -77,15 +77,19 @@ describe.each([2, 3] as const)(
     it("drops whole widgets from the right as the row narrows, never below 240px each (widgets §2.7)", () => {
       renderGroup(widgetCount);
 
-      for (let i = 1; i <= widgetCount; i += 1) {
+      expect(slotOf(1)).toHaveClass("hidden", "@min-[240px]:block", "basis-60");
+      for (let i = 2; i <= widgetCount; i += 1) {
         // Widget i shows only while the row holds i widgets at 240px plus
-        // the gaps between them, so the last widget drops first.
+        // the gaps between them, so the last widget drops first. The gap,
+        // and so the threshold, is narrower on phones.
         expect(slotOf(i)).toHaveClass(
           "hidden",
-          `@min-[${summaryRowMinWidth(i)}px]:block`,
+          `max-md:@min-[${summaryRowMinWidth(i, SUMMARY_WIDGET_GAP_PX.phone)}px]:block`,
+          `md:@min-[${summaryRowMinWidth(i, SUMMARY_WIDGET_GAP_PX.desktop)}px]:block`,
           "basis-60"
         );
       }
+      expect(slotOf(1).parentElement).toHaveClass("gap-4", "md:gap-6");
       // Every slot measures the same row container.
       const row = slotOf(1).parentElement;
       expect(row?.parentElement).toHaveClass("@container");
@@ -124,7 +128,15 @@ describe.each([2, 3] as const)(
 );
 
 describe("summaryRowMinWidth", () => {
-  it("is 240px per widget plus a 24px gap between neighbors", () => {
-    expect([1, 2, 3].map(summaryRowMinWidth)).toEqual([240, 504, 768]);
+  it("is 240px per widget plus a 16px gap between neighbors on phones", () => {
+    expect(
+      [1, 2, 3].map((n) => summaryRowMinWidth(n, SUMMARY_WIDGET_GAP_PX.phone))
+    ).toEqual([240, 496, 752]);
+  });
+
+  it("is 240px per widget plus a 24px gap between neighbors at md+", () => {
+    expect(
+      [1, 2, 3].map((n) => summaryRowMinWidth(n, SUMMARY_WIDGET_GAP_PX.desktop))
+    ).toEqual([240, 504, 768]);
   });
 });

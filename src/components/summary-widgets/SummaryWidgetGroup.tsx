@@ -24,9 +24,9 @@ export function SummaryWidgetGroup({
     // measure, so the card's padding stays out of their thresholds. (Phones
     // have no card, so there both widths are the same.)
     <div className="@container">
-      <div className="hidden @min-[240px]:block md:rounded-lg md:border md:border-border md:bg-card md:px-4 md:py-2">
+      <div className="hidden @min-[240px]:block md:rounded-lg md:border md:border-outline-variant md:bg-card md:px-4 md:py-3">
         <div className="@container">
-          <div className="flex gap-6">
+          <div className="flex gap-4 md:gap-6">
             {widgets.map((widget, index) => (
               <div
                 key={React.isValidElement(widget) ? widget.key : index}

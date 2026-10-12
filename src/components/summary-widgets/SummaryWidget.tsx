@@ -30,14 +30,30 @@ interface SummaryWidgetProps<T extends string> {
 }
 
 /**
- * One breakdown entry. The measuring copy shares these classes, so its width
- * is the width the entry takes on the line.
+ * One breakdown entry: one 13px text line at every width. The measuring copy
+ * shares these classes, so its width is the width the entry takes on the
+ * line.
  */
 const ENTRY_CLASS =
-  "inline-flex min-h-8 shrink-0 items-center gap-1 rounded-md border border-transparent px-1 text-xs whitespace-nowrap md:text-sm";
+  "inline-flex shrink-0 items-baseline gap-1 rounded-md px-1 text-[13px] leading-4.5 whitespace-nowrap";
 const SEGMENT_BUTTON_CLASS =
   "transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50";
-const LINE_GAP_CLASS = "gap-x-1.5 md:gap-x-2";
+/**
+ * The selected Segment's outline. An outline takes no layout space, so
+ * selecting a Segment never moves the line.
+ */
+const SELECTED_CLASS = "outline outline-1 -outline-offset-1";
+/**
+ * An entry on the line is one text line tall; this keeps its touch target
+ * 32px tall without making the widget taller.
+ */
+const LINE_HIT_AREA_CLASS =
+  "relative before:absolute before:inset-x-0 before:-inset-y-[7px] before:content-['']";
+/**
+ * 12px between neighboring pairs' text: this gap plus each entry's 4px side
+ * padding.
+ */
+const LINE_GAP_CLASS = "gap-x-1";
 
 /**
  * A "count label" pair. It shows no swatch at any width; the count takes its
@@ -50,10 +66,10 @@ function SegmentEntryContent<T extends string>({
 }): React.JSX.Element {
   return (
     <>
-      <span className={cn("font-semibold tabular-nums", segment.textClassName)}>
+      <span className={cn("font-bold tabular-nums", segment.textClassName)}>
         {segment.count}
       </span>
-      <span className="text-muted-foreground">{segment.label}</span>
+      <span className="text-foreground-secondary">{segment.label}</span>
     </>
   );
 }
@@ -61,10 +77,10 @@ function SegmentEntryContent<T extends string>({
 function OtherEntryContent({ count }: { count: number }): React.JSX.Element {
   return (
     <>
-      <span className="font-semibold text-foreground tabular-nums">
+      <span className="font-bold text-muted-foreground tabular-nums">
         {count}
       </span>
-      <span className="text-muted-foreground">other</span>
+      <span className="text-foreground-secondary">other</span>
     </>
   );
 }
@@ -89,9 +105,10 @@ function SegmentButton<T extends string>({
       className={cn(
         ENTRY_CLASS,
         SEGMENT_BUTTON_CLASS,
-        // The selected border takes the Segment's color through currentColor.
+        // The selected outline takes the Segment's color through
+        // currentColor.
         segment.textClassName,
-        selected && "border-current",
+        selected && cn(SELECTED_CLASS, "outline-current"),
         className
       )}
     >
@@ -198,11 +215,11 @@ function SummaryWidgetBreakdown<T extends string>({
     <div
       ref={lineRef}
       className={cn(
-        "relative flex min-w-0 items-center",
+        "relative flex min-w-0 items-baseline",
         // Unmeasured, pairs that do not fit wrap onto a second row the
         // one-entry-high line hides, so no pair ever shows cut in half.
         // Measured, every entry shown fits; clip only sub-pixel overflow.
-        measured ? "overflow-x-clip" : "max-h-8 flex-wrap overflow-hidden",
+        measured ? "overflow-x-clip" : "max-h-4.5 flex-wrap overflow-hidden",
         LINE_GAP_CLASS,
         className
       )}
@@ -213,6 +230,7 @@ function SummaryWidgetBreakdown<T extends string>({
           segment={segment}
           selected={segment.value === selectedValue}
           onSelect={onSegmentSelect}
+          className={LINE_HIT_AREA_CLASS}
         />
       ))}
       {rolledUp.length > 0 ? (
@@ -230,7 +248,8 @@ function SummaryWidgetBreakdown<T extends string>({
               className={cn(
                 ENTRY_CLASS,
                 SEGMENT_BUTTON_CLASS,
-                rolledUpSelected && "border-foreground"
+                LINE_HIT_AREA_CLASS,
+                rolledUpSelected && cn(SELECTED_CLASS, "outline-foreground")
               )}
             >
               <OtherEntryContent count={rolledUpCount} />
@@ -247,7 +266,7 @@ function SummaryWidgetBreakdown<T extends string>({
                       setOtherOpen(false);
                       onSegmentSelect(value);
                     }}
-                    className="min-h-11 w-full px-2 md:min-h-9"
+                    className="min-h-11 w-full items-center px-2 md:min-h-9"
                   />
                 </li>
               ))}
@@ -304,11 +323,14 @@ export function SummaryWidget<T extends string>({
       aria-labelledby={labelId}
       // Flex order, not DOM order, puts the bar beneath the label line: DOM
       // order stays label, bar, breakdown for screen readers.
-      className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 py-1"
+      className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1.5"
     >
+      {/* A fixed-width label column, so breakdowns line up across widgets.
+          A label longer than the column widens it rather than overlapping
+          the first pair. */}
       <h2
         id={labelId}
-        className="shrink-0 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase"
+        className="min-w-20 shrink-0 text-[11px] font-bold tracking-[0.06em] text-muted-foreground uppercase md:min-w-21"
       >
         {label}
       </h2>
@@ -332,7 +354,9 @@ export function SummaryWidget<T extends string>({
         segments={nonzeroSegments}
         selectedValue={selectedValue}
         onSegmentSelect={onSegmentSelect}
-        className="order-2 flex-1 basis-0"
+        // The first pair's text, not its padding, starts 12px after the
+        // label.
+        className="order-2 -ml-1 flex-1 basis-0"
       />
     </section>
   );

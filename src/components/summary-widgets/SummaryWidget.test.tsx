@@ -177,7 +177,11 @@ describe("SummaryWidget", () => {
     );
     expect(within(down).getByText("1")).toHaveClass("text-destructive-text");
 
-    await user.click(screen.getByRole("button", { name: "6 other" }));
+    // "N other" has no single category, so its count stays muted.
+    const other = screen.getByRole("button", { name: "6 other" });
+    expect(within(other).getByText("6")).toHaveClass("text-muted-foreground");
+
+    await user.click(other);
     const up = within(
       screen.getByRole("list", { name: "Other Status" })
     ).getByRole("button", { name: "4 Up" });
@@ -202,7 +206,7 @@ describe("SummaryWidget", () => {
     // than clipping it mid-pair. jsdom has no layout, so the classes are
     // the observable contract here.
     const line = pairs[0]?.parentElement;
-    expect(line).toHaveClass("flex-wrap", "max-h-8", "overflow-hidden");
+    expect(line).toHaveClass("flex-wrap", "max-h-4.5", "overflow-hidden");
   });
 
   it("stops wrapping once measured, so a shown entry is never hidden whole", () => {

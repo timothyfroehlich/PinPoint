@@ -71,8 +71,7 @@
 
 ## Known divergences (code vs spec)
 
-| Requirement | Divergence | Resolution |
-| :---------- | :--------- | :--------- |
+_None — the current implementation matches this spec._
 
 ---
 
