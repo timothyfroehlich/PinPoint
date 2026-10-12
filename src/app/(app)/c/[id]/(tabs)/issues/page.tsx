@@ -1,7 +1,6 @@
 import type React from "react";
 import { notFound } from "next/navigation";
 import { MachineGroupIssuesTab } from "~/components/collections/MachineGroupIssuesTab";
-import { getViewer } from "~/lib/collections/viewer";
 import { getCollectionForLayout } from "~/app/(app)/c/[id]/_data";
 
 interface PageProps {
@@ -17,13 +16,10 @@ export default async function CollectionIssuesPage({
   const data = await getCollectionForLayout(id);
   if (!data) notFound();
 
-  // Request-deduped with the layout/resolver — one getUser() + role read.
-  const viewer = await getViewer();
   return (
     <MachineGroupIssuesTab
       machines={data.collection.machines}
       searchParams={await searchParams}
-      viewer={viewer}
       exportScope={{ kind: "collection", handle: id }}
     />
   );

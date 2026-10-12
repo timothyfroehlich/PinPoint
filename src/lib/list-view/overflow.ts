@@ -149,3 +149,42 @@ export function planListHeader(input: ListHeaderFitInput): ListHeaderPlan {
     compactEdit: true,
   };
 }
+
+export interface LineFitInput<Part extends string> {
+  /** The line's inner width. */
+  available: number;
+  /**
+   * Widths of the parts that never drop, at their full width. A part that is
+   * not laid out at this size measures zero and takes no gap.
+   */
+  keptWidths: readonly number[];
+  /** Each droppable part's width, its leading separator included. */
+  partWidths: Readonly<Record<Part, number>>;
+  /** The droppable parts, the first to drop first. */
+  dropOrder: readonly Part[];
+  gap: number;
+}
+
+/**
+ * Which droppable parts of a one-line row stay shown (issues-list §3.9):
+ * parts drop one at a time in `dropOrder` until the line fits. When the kept
+ * parts alone still do not fit, every droppable part is gone and the
+ * component truncates what remains.
+ */
+export function fitLineParts<Part extends string>({
+  available,
+  keptWidths,
+  partWidths,
+  dropOrder,
+  gap,
+}: LineFitInput<Part>): ReadonlySet<Part> {
+  const shown = new Set(dropOrder);
+  const kept = keptWidths.filter((width) => width > 0);
+  const lineWidth = (): number =>
+    rowWidth([...kept, ...[...shown].map((part) => partWidths[part])], gap);
+  for (const part of dropOrder) {
+    if (lineWidth() <= available) break;
+    shown.delete(part);
+  }
+  return shown;
+}

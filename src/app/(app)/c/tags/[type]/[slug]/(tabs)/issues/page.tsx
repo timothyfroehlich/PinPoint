@@ -1,7 +1,6 @@
 import type React from "react";
 import { notFound, redirect } from "next/navigation";
 import { MachineGroupIssuesTab } from "~/components/collections/MachineGroupIssuesTab";
-import { getViewer } from "~/lib/collections/viewer";
 import {
   canonicalTagPath,
   getTagForLayout,
@@ -30,12 +29,10 @@ export default async function TagIssuesPage({
   );
   if (canonical !== null) redirect(canonical);
 
-  const viewer = await getViewer();
   return (
     <MachineGroupIssuesTab
       machines={resolved.tag.machines}
       searchParams={rawSearchParams}
-      viewer={viewer}
       exportScope={{ kind: "tag", type, slug }}
     />
   );

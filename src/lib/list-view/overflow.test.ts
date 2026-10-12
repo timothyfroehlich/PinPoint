@@ -1,5 +1,40 @@
 import { describe, expect, it } from "vitest";
-import { fitPrimaryFilters, planListHeader } from "./overflow";
+import { fitLineParts, fitPrimaryFilters, planListHeader } from "./overflow";
+
+describe("fitLineParts (issues-list §3.9)", () => {
+  // ID 60 · machine 120 · priority 50 · assignee 30 · age 90, gap 6.
+  const base = {
+    keptWidths: [60, 120],
+    partWidths: { priority: 50, assignee: 30, age: 90 },
+    dropOrder: ["age", "priority", "assignee"] as const,
+    gap: 6,
+  };
+  const shown = (available: number, keptWidths = base.keptWidths): string[] =>
+    [...fitLineParts({ ...base, available, keptWidths })].sort();
+
+  it("keeps every part when the line fits", () => {
+    // 60+120+50+30+90 + 4 gaps = 374.
+    expect(shown(374)).toEqual(["age", "assignee", "priority"]);
+  });
+
+  it("drops age, then priority, then assignee", () => {
+    expect(shown(373)).toEqual(["assignee", "priority"]);
+    // 60+120+50+30 + 3 gaps = 278.
+    expect(shown(277)).toEqual(["assignee"]);
+    // 60+120+30 + 2 gaps = 222.
+    expect(shown(221)).toEqual([]);
+  });
+
+  it("leaves nothing droppable when the kept parts alone overflow", () => {
+    expect(shown(100)).toEqual([]);
+  });
+
+  it("gives a kept part that is not laid out no width and no gap", () => {
+    // Phones show no issue ID: 120+50+30+90 + 3 gaps = 308.
+    expect(shown(308, [0, 120])).toEqual(["age", "assignee", "priority"]);
+    expect(shown(307, [0, 120])).toEqual(["assignee", "priority"]);
+  });
+});
 
 describe("fitPrimaryFilters (list-views §8.1)", () => {
   const filterWidths = [120, 100, 110, 80];

@@ -1,15 +1,14 @@
 /**
- * RTL tests for the two-line issue rows (issues-list §3): what each row
- * shows, which fields each viewer may change from the row (mirroring the
- * `issues.update.reporting` / `issues.update.triage` matrix rows the server
- * actions enforce), and rows holding their place after an edit (§3.6).
+ * RTL tests for the issue rows (issues-list §3): what each row shows, that
+ * rows are read-only, the whole-row link, and line 2 dropping parts in order
+ * when it does not fit.
  */
 
 import React from "react";
 import { render, screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { IssueViewRows, type IssueRowsViewer } from "./IssueViewRows";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { RelativeTimeProvider } from "~/components/issues/RelativeTimeProvider";
+import { IssueViewRows } from "./IssueViewRows";
 import type { IssueListRow } from "~/lib/types";
 
 vi.mock("next/link", () => ({
@@ -24,21 +23,8 @@ vi.mock("next/link", () => ({
   ),
 }));
 
-const mockUpdatePriority = vi.fn();
-vi.mock("~/app/(app)/issues/actions", () => ({
-  updateIssueStatusAction: vi.fn(),
-  updateIssueSeverityAction: vi.fn(),
-  updateIssuePriorityAction: (state: unknown, formData: FormData) =>
-    mockUpdatePriority(state, formData),
-  assignIssueAction: vi.fn(),
-}));
-
-vi.mock("sonner", () => ({
-  toast: { success: vi.fn(), error: vi.fn() },
-}));
-
-const REPORTER_ID = "11111111-1111-4111-8111-111111111111";
-const OTHER_ID = "22222222-2222-4222-8222-222222222222";
+const NOW = new Date("2026-01-04T00:00:00.000Z");
+const ASSIGNEE_ID = "22222222-2222-4222-8222-222222222222";
 
 function makeIssue(overrides: Partial<IssueListRow> = {}): IssueListRow {
   return {
@@ -54,42 +40,47 @@ function makeIssue(overrides: Partial<IssueListRow> = {}): IssueListRow {
     machineInitials: "AFM",
     reporterName: null,
     assignedTo: null,
-    machine: { id: "machine-1", name: "Attack from Mars", ownerId: null },
-    reportedByUser: { id: REPORTER_ID, name: "Rhea Porter" },
-    invitedReporter: null,
+    machine: { id: "machine-1", name: "Attack from Mars" },
     assignedToUser: null,
-    commentCount: 0,
     ...overrides,
   };
 }
 
-function renderList(
-  issues: IssueListRow[],
-  viewer: IssueRowsViewer,
-  listKey = ""
-): ReturnType<typeof render> {
+function renderRows(issues: IssueListRow[]): ReturnType<typeof render> {
   return render(
-    <IssueViewRows
-      rows={issues}
-      listKey={listKey}
-      users={[{ id: OTHER_ID, name: "Priya Shah" }]}
-      viewer={viewer}
-    />
+    <RelativeTimeProvider>
+      <IssueViewRows rows={issues} />
+    </RelativeTimeProvider>
   );
 }
 
-const ANONYMOUS: IssueRowsViewer = {
-  userId: undefined,
-  accessLevel: "unauthenticated",
-};
+/** Line 2's text as shown, its screen-reader-only parts left out. */
+function line2Parts(row: HTMLElement): string[] {
+  const line = within(row).getByTestId("issue-machine").closest("div");
+  if (!line) throw new Error("expected line 2");
+  return Array.from(line.children)
+    .filter((part) => !part.classList.contains("sr-only"))
+    .map((part) => {
+      const testId = part
+        .querySelector("[data-testid]")
+        ?.getAttribute("data-testid");
+      return testId ?? part.getAttribute("data-testid") ?? "";
+    });
+}
 
 describe("Issue rows", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(NOW);
   });
 
-  it("shows both lines of a row: title, badges, ID, machine, status", () => {
-    renderList([makeIssue()], ANONYMOUS);
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it("shows the title and the status and severity pills on line 1", () => {
+    renderRows([makeIssue()]);
     const row = within(screen.getByRole("listitem"));
 
     expect(
@@ -97,203 +88,125 @@ describe("Issue rows", () => {
         name: "Left flipper weak after the second multiball",
       })
     ).toHaveAttribute("href", "/m/AFM/i/12");
+    expect(row.getByTestId("issue-status")).toHaveTextContent(
+      "Status: In Progress"
+    );
     expect(row.getByTestId("issue-severity")).toHaveTextContent(
       "Severity: Major"
     );
-    expect(row.getByTestId("issue-priority")).toHaveTextContent(
-      "Priority: High"
-    );
+  });
+
+  it("shows the ID, machine, priority, assignee, and age on line 2", () => {
+    renderRows([makeIssue()]);
+    const row = within(screen.getByRole("listitem"));
+
     expect(row.getByTestId("issue-id")).toHaveTextContent("AFM-12");
     expect(row.getByRole("link", { name: "Attack from Mars" })).toHaveAttribute(
       "href",
       "/m/AFM"
     );
-    expect(row.getByText("In Progress")).toBeInTheDocument();
+    expect(row.getByTestId("issue-priority")).toHaveTextContent(
+      "Priority: High"
+    );
+    // Phones show "2d"; desktop and screen readers get the long form.
+    const age = row.getByTestId("issue-age");
+    expect(age).toHaveAttribute("datetime", "2026-01-02T00:00:00.000Z");
+    expect(age).toHaveTextContent("2dupdated 2d ago");
   });
 
-  it("shows the comment count only when there are comments", () => {
-    renderList(
-      [
-        makeIssue({ id: "a", commentCount: 3 }),
-        makeIssue({ id: "b", issueNumber: 13, commentCount: 0 }),
-      ],
-      ANONYMOUS
-    );
-    const [withComments, withoutComments] = screen.getAllByRole("listitem");
-    if (!withComments || !withoutComments) throw new Error("expected 2 rows");
+  it("is read-only: no buttons and no comment count", () => {
+    renderRows([makeIssue()]);
+    const row = within(screen.getByRole("listitem"));
 
-    expect(
-      within(withComments).getByTestId("issue-comment-count")
-    ).toHaveTextContent("3 comments");
-    expect(
-      within(withoutComments).queryByTestId("issue-comment-count")
-    ).toBeNull();
+    expect(row.queryByRole("button")).toBeNull();
+    expect(row.queryByTestId("issue-comment-count")).toBeNull();
+    // Two links: the issue (the whole row) and the machine.
+    expect(row.getAllByRole("link")).toHaveLength(2);
   });
 
   it("announces an unassigned issue as Unassigned and an assignee by name and initials", () => {
-    renderList(
-      [
-        makeIssue({ id: "a" }),
-        makeIssue({
-          id: "b",
-          issueNumber: 13,
-          assignedTo: OTHER_ID,
-          assignedToUser: { id: OTHER_ID, name: "Priya Shah" },
-        }),
-      ],
-      ANONYMOUS
-    );
+    renderRows([
+      makeIssue({ id: "a" }),
+      makeIssue({
+        id: "b",
+        issueNumber: 13,
+        assignedTo: ASSIGNEE_ID,
+        assignedToUser: { id: ASSIGNEE_ID, name: "Priya Shah" },
+      }),
+    ]);
     const [unassigned, assigned] = screen.getAllByRole("listitem");
     if (!unassigned || !assigned) throw new Error("expected 2 rows");
 
-    // Desktop avatar and phone initials are both in the DOM; CSS shows one.
+    expect(within(unassigned).getByRole("img", { name: "Unassigned" })).toBe(
+      within(unassigned).getByTestId("issue-assignee")
+    );
     expect(
-      within(unassigned).getAllByRole("img", { name: "Unassigned" })
-    ).toHaveLength(2);
-    const avatars = within(assigned).getAllByRole("img", {
-      name: "Assigned to Priya Shah",
-    });
-    expect(avatars).toHaveLength(2);
-    for (const avatar of avatars) expect(avatar).toHaveTextContent("PS");
+      within(assigned).getByRole("img", { name: "Assigned to Priya Shah" })
+    ).toHaveTextContent("PS");
   });
 });
 
-describe("Issue row editing permissions (issues-list §3.5)", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+describe("Issue row line 2 fit (issues-list §3.9)", () => {
+  /**
+   * jsdom lays nothing out, so line 2 and each measured part get widths:
+   * ID 60, machine 120, priority 50, assignee 30, age 90, with 6px gaps.
+   */
+  const PART_WIDTHS: Record<string, number> = {
+    id: 60,
+    machine: 120,
+    priority: 50,
+    assignee: 30,
+    age: 90,
+  };
 
-  function editableFields(): string[] {
-    const row = within(screen.getByRole("listitem"));
-    return [
-      ["Status", /^Status: .*, change$/],
-      ["Severity", /^Severity: .*, change$/],
-      ["Priority", /^Priority: .*, change$/],
-      ["Assignee", /, change assignee$/],
-    ]
-      .filter(([, name]) => row.queryAllByRole("button", { name }).length > 0)
-      .map(([field]) => String(field));
+  function stubLayout(lineWidth: number): void {
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
+      function (this: HTMLElement) {
+        const isLine =
+          this.querySelector(
+            ':scope > span > [data-testid="issue-machine"]'
+          ) !== null;
+        const width = isLine
+          ? lineWidth
+          : (PART_WIDTHS[this.getAttribute("data-measure") ?? ""] ?? 0);
+        return DOMRect.fromRect({ width, height: 20 });
+      }
+    );
   }
 
-  it.each<[string, IssueRowsViewer, string | null, string[]]>([
-    ["anonymous visitor", ANONYMOUS, REPORTER_ID, []],
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it.each<[number, string[]]>([
+    // 60+120+50+30+90 + 4 gaps = 374.
     [
-      "guest on their own issue",
-      { userId: REPORTER_ID, accessLevel: "guest" },
-      REPORTER_ID,
-      ["Status", "Severity"],
-    ],
-    [
-      "guest on someone else's issue",
-      { userId: REPORTER_ID, accessLevel: "guest" },
-      OTHER_ID,
-      [],
-    ],
-    [
-      "member",
-      { userId: REPORTER_ID, accessLevel: "member" },
-      OTHER_ID,
-      ["Status", "Severity", "Priority", "Assignee"],
-    ],
-    [
-      "technician",
-      { userId: REPORTER_ID, accessLevel: "technician" },
-      OTHER_ID,
-      ["Status", "Severity", "Priority", "Assignee"],
-    ],
-  ])("%s", (_label, viewer, reporterId, expected) => {
-    renderList(
+      374,
       [
-        makeIssue({
-          reportedByUser:
-            reporterId === null ? null : { id: reporterId, name: "Rhea" },
-        }),
+        "issue-id",
+        "issue-machine",
+        "issue-priority",
+        "issue-assignee",
+        "issue-age",
       ],
-      viewer
-    );
-    expect(editableFields()).toEqual(expected);
+    ],
+    [373, ["issue-id", "issue-machine", "issue-priority", "issue-assignee"]],
+    [277, ["issue-id", "issue-machine", "issue-assignee"]],
+    [221, ["issue-id", "issue-machine"]],
+  ])("at %ipx shows %j", (lineWidth, expected) => {
+    stubLayout(lineWidth);
+    renderRows([makeIssue()]);
+    expect(line2Parts(screen.getByRole("listitem"))).toEqual(expected);
   });
 
-  it("shows plain values, not buttons, to a viewer who may not edit", () => {
-    renderList([makeIssue()], ANONYMOUS);
+  it("keeps a dropped part readable to screen readers", () => {
+    stubLayout(221);
+    renderRows([makeIssue()]);
     const row = within(screen.getByRole("listitem"));
-    expect(row.queryByRole("button")).toBeNull();
-    expect(row.getByTestId("issue-priority").tagName).toBe("SPAN");
-  });
 
-  it("saves a priority picked from the row's menu", async () => {
-    mockUpdatePriority.mockResolvedValue({ ok: true, value: undefined });
-    const user = userEvent.setup();
-    renderList([makeIssue({ priority: "low" })], {
-      userId: OTHER_ID,
-      accessLevel: "member",
-    });
-
-    await user.click(
-      screen.getByRole("button", { name: "Priority: Low, change" })
+    expect(row.getByTestId("issue-priority")).toHaveTextContent(
+      "Priority: High"
     );
-    await user.click(screen.getByRole("menuitemradio", { name: "High" }));
-
-    expect(mockUpdatePriority).toHaveBeenCalledOnce();
-    const formData = mockUpdatePriority.mock.calls[0]?.[1];
-    if (!(formData instanceof FormData)) throw new Error("expected FormData");
-    expect(formData.get("issueId")).toBe("issue-1");
-    expect(formData.get("priority")).toBe("high");
-    expect(
-      await screen.findByRole("button", { name: "Priority: High, change" })
-    ).toBeInTheDocument();
-  });
-});
-
-describe("Issue rows keep their place (issues-list §3.6)", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  const first = makeIssue({ id: "a", issueNumber: 1, title: "First" });
-  const second = makeIssue({ id: "b", issueNumber: 2, title: "Second" });
-
-  function titles(): string[] {
-    return screen
-      .getAllByTestId("issue-title")
-      .map((link) => link.textContent ?? "");
-  }
-
-  function rerenderWith(
-    rerender: ReturnType<typeof render>["rerender"],
-    issues: IssueListRow[],
-    listKey: string
-  ): void {
-    rerender(
-      <IssueViewRows
-        rows={issues}
-        listKey={listKey}
-        users={[]}
-        viewer={ANONYMOUS}
-      />
-    );
-  }
-
-  it("keeps rows in place when the same list re-renders reordered or without a row", () => {
-    const { rerender } = renderList([first, second], ANONYMOUS, "status=new");
-
-    // The server re-renders after an edit: the edited row now sorts last.
-    rerenderWith(
-      rerender,
-      [{ ...second, title: "Second, edited" }, first],
-      "status=new"
-    );
-    expect(titles()).toEqual(["First", "Second, edited"]);
-
-    // The edited row no longer matches the filters: it stays until reload.
-    rerenderWith(rerender, [second], "status=new");
-    expect(titles()).toEqual(["First", "Second"]);
-  });
-
-  it("takes the server's rows once the list reloads with a new configuration", () => {
-    const { rerender } = renderList([first, second], ANONYMOUS, "status=new");
-
-    rerenderWith(rerender, [second], "status=new&sort=created&dir=desc");
-    expect(titles()).toEqual(["Second"]);
+    expect(row.getByRole("img", { name: "Unassigned" })).toBeInTheDocument();
   });
 });

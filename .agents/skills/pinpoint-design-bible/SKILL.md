@@ -81,7 +81,8 @@ use it anywhere else.
 changing together by level: severity warm (yellow → amber → orange → red),
 New/Confirmed cyan, In Progress pink, Fixed green, priority blue, playability
 green/yellow/red. Unplayable is the same red for severity and playability. A
-chip is the text color with a 15% background and a 45% border. Text clears
+chip is the text color with a 15% background and a 45% border; List View
+rows are the one exception and drop the border (issues-list §3.13). Text clears
 4.5:1 on `bg-card` and on its own tint; bar segments clear 3:1.
 
 **Rules:**
