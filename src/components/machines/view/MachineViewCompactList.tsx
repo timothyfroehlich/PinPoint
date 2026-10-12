@@ -166,16 +166,13 @@ export function MachineViewCompactList({
   const showServiced = columns.includes("lastServiced");
   return (
     // Rows align with the page's horizontal padding (list-views §7.7).
-    <ul
-      aria-label="Machines list"
-      className="divide-y divide-outline-variant md:hidden"
-    >
+    <ul aria-label="Machines list" className="md:hidden">
       {rows.map((row) => (
         // The row is the containing block for the name link's overlay, which
         // makes the whole row a link to the machine.
         <li
           key={row.id}
-          className="relative flex min-h-11 items-center gap-2 px-4 py-2.5 sm:px-8"
+          className="relative flex min-h-11 items-center gap-2 border-b border-border px-4 py-2.5 sm:px-8"
         >
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-2.5">
