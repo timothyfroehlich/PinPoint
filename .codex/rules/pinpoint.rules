@@ -18,6 +18,13 @@ prefix_rule(
         "bash scripts/workflow/codex-git.sh merge-main",
     ],
 )
+# Stop this worktree's own Next.js server; the script refuses any other process.
+prefix_rule(
+    pattern=["pnpm", "run", "dev:stop"],
+    decision="allow",
+    justification="Stop only the Next.js server on this worktree's PORT whose cwd is this worktree",
+    match=["pnpm run dev:stop", "pnpm run dev:stop --dry-run"],
+)
 prefix_rule(pattern=["git", "stash", "push"], decision="allow", justification="Temporarily preserve PinPoint working-tree changes")
 prefix_rule(pattern=["git", "stash", "apply"], decision="allow", justification="Restore preserved PinPoint changes without deleting the stash")
 prefix_rule(pattern=["git", "stash", "pop"], decision="allow", justification="Restore preserved PinPoint changes")

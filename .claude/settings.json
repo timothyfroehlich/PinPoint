@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(bash scripts/workflow/record-claude-review.sh:*)",
-      "Bash(node scripts/workflow/pr-screenshots.mjs *)"
+      "Bash(node scripts/workflow/pr-screenshots.mjs *)",
+      "Bash(pnpm run dev:stop)",
+      "Bash(pnpm run dev:stop --dry-run)"
     ],
     "deny": [
       "Bash(supabase db push:*)",
