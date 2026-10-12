@@ -205,7 +205,7 @@ describe("planLineDrops (machine-views §5.10)", () => {
     ).toEqual(new Set(["year"]));
   });
 
-  it("keeps the last segment to drop when nothing is kept", () => {
+  it("drops every segment that does not fit when nothing is kept", () => {
     expect(
       planLineDrops({
         available: 10,
@@ -213,6 +213,6 @@ describe("planLineDrops (machine-views §5.10)", () => {
         segmentWidths,
         dropOrder,
       })
-    ).toEqual(new Set(["year", "manufacturer", "serviced"]));
+    ).toEqual(new Set(["year", "manufacturer", "serviced", "owner"]));
   });
 });

@@ -49,26 +49,41 @@ function renderList(
   );
 }
 
-/** A row's second line; jsdom has no layout, so it is found by its tag. */
+/** A row's second line. */
 function detailLine(row: HTMLElement): HTMLElement {
-  const line = row.querySelector("p");
-  if (!line) throw new Error("No detail line");
-  return line;
+  return within(row).getByTestId("machine-row-detail");
+}
+
+/** Line 2's left group: Playability label, manufacturer, year, owner. */
+function leftGroup(row: HTMLElement): HTMLElement {
+  const group = detailLine(row).querySelector("p");
+  if (!group) throw new Error("No left group");
+  return group;
+}
+
+/** What line 2 shows, as "left group | spoken service age". */
+function lineSummary(row: HTMLElement): string {
+  const service = within(detailLine(row)).queryByText(/serviced/i);
+  return `${leftGroup(row).textContent ?? ""} | ${service?.textContent ?? "-"}`;
 }
 
 /**
  * jsdom lays nothing out, so the detail line gets `lineWidth` and each
- * measured part 6px per character, separator included.
+ * measured part its width from `widths`.
  */
-function stubLayout(lineWidth: number): void {
+function stubLayout(
+  lineWidth: number,
+  widths: Readonly<Record<string, number>>
+): void {
   vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
     function (this: HTMLElement) {
+      const key = this.getAttribute("data-measure");
       const width =
-        this.tagName === "P"
+        this.getAttribute("data-testid") === "machine-row-detail"
           ? lineWidth
-          : this.hasAttribute("data-measure")
-            ? (this.textContent?.length ?? 0) * 6
-            : 0;
+          : key === null
+            ? 0
+            : (widths[key] ?? 0);
       return DOMRect.fromRect({ width, height: 16 });
     }
   );
@@ -115,17 +130,60 @@ describe("MachineViewCompactList", () => {
     vi.setSystemTime(new Date("2026-01-06T00:00:00.000Z"));
     renderList([machine()]);
 
-    const line = detailLine(screen.getByRole("listitem"));
-    expect(line).toHaveTextContent(
-      /^Unplayable · Stern · 2019 · Alex · serviced 3d$/
-    );
-    expect(line).toHaveClass("truncate");
-    expect(within(line).getByText("Unplayable")).toHaveClass(
+    const row = screen.getByRole("listitem");
+    const line = detailLine(row);
+    const left = leftGroup(row);
+    expect(left).toHaveTextContent(/^Unplayable · Stern · 2019 · A$/);
+    expect(left).toHaveClass("truncate");
+    expect(within(left).getByText("Unplayable")).toHaveClass(
       MACHINE_STATUS_COLORS.unplayable.text
     );
-    // Only the Playability label is colored; the owner stays muted.
-    expect(line).toHaveClass("text-muted-foreground");
-    expect(line.querySelectorAll("span")).toHaveLength(1);
+    expect(line).toHaveClass("text-muted-foreground", "text-[13px]");
+
+    // The owner is an initials avatar, filled like the issue row's assignee.
+    const owner = within(left).getByRole("img", { name: "Owner: Alex" });
+    expect(owner).toHaveTextContent(/^A$/);
+    expect(owner).toHaveClass("size-5", "text-[9px]", "bg-outline");
+
+    // The service age sits after the left group, a wrench and a short age.
+    const age = within(line).getByText("3d ago");
+    expect(age).toHaveAttribute("aria-hidden", "true");
+    expect(left).not.toContainElement(age);
+    expect(within(line).getByText("Serviced 3 days ago")).toHaveClass(
+      "sr-only"
+    );
+    const service = age.parentElement;
+    expect(service).toHaveClass("ml-auto", "shrink-0");
+    expect(service?.querySelector("svg.lucide-wrench")).toHaveAttribute(
+      "aria-hidden",
+      "true"
+    );
+    // At least 12px from the left group.
+    expect(line).toHaveClass("gap-3");
+    // Plain text: the row still has only its title and count links.
+    expect(within(row).queryAllByRole("link")).toHaveLength(2);
+  });
+
+  it("reads hour-old service in hours", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-01-03T02:30:00.000Z"));
+    renderList([machine()]);
+
+    const line = detailLine(screen.getByRole("listitem"));
+    expect(within(line).getByText("2h ago")).toBeInTheDocument();
+    expect(within(line).getByText("Serviced 2 hours ago")).toBeInTheDocument();
+  });
+
+  it("shows an empty dashed avatar for a machine with no owner", () => {
+    renderList([machine({ ownerName: "Unassigned", hasOwner: false })]);
+
+    const owner = within(leftGroup(screen.getByRole("listitem"))).getByRole(
+      "img",
+      { name: "No owner" }
+    );
+    expect(owner).toBeEmptyDOMElement();
+    expect(owner).toHaveClass("border-dashed");
+    expect(owner).not.toHaveClass("bg-outline");
   });
 
   it("makes the whole row a link to the machine, under the count's own link", () => {
@@ -150,40 +208,50 @@ describe("MachineViewCompactList", () => {
   it("leaves the Playability label and service age out when those fields are not displayed", () => {
     renderList([machine({ year: null })], ["machine", "presence"]);
 
-    expect(detailLine(screen.getByRole("listitem"))).toHaveTextContent(
-      /^Stern · Unknown · Alex$/
+    expect(lineSummary(screen.getByRole("listitem"))).toBe(
+      "Stern · Unknown · A | -"
     );
   });
 
-  it("says “never serviced” for a machine without service history", () => {
+  it("says “never” for a machine without service history", () => {
     renderList([machine({ lastServicedAt: null })]);
 
-    expect(detailLine(screen.getByRole("listitem"))).toHaveTextContent(
-      /^Unplayable · Stern · 2019 · Alex · never serviced$/
+    const line = detailLine(screen.getByRole("listitem"));
+    expect(within(line).getByText("never")).toHaveAttribute(
+      "aria-hidden",
+      "true"
     );
+    expect(within(line).getByText("Never serviced")).toHaveClass("sr-only");
   });
 
   it("drops year, then manufacturer, then service age, then owner, keeping the Playability label", () => {
-    // Unplayable 60, · Stern 48, · 2019 42, · Alex 42, · never serviced 102:
-    // 294 in all.
+    // Unplayable 60, · Stern 48, · 2019 42, · avatar 32, gap and service
+    // age 60: 242 in all.
+    const widths = {
+      playability: 60,
+      manufacturer: 48,
+      year: 42,
+      owner: 32,
+      lastServiced: 60,
+    };
     const row = machine({ lastServicedAt: null });
-    const cases: [number, RegExp][] = [
-      [294, /^Unplayable · Stern · 2019 · Alex · never serviced$/],
-      [293, /^Unplayable · Stern · Alex · never serviced$/],
-      [251, /^Unplayable · Alex · never serviced$/],
-      [203, /^Unplayable · Alex$/],
-      [40, /^Unplayable$/],
+    const cases: [number, string][] = [
+      [242, "Unplayable · Stern · 2019 · A | Never serviced"],
+      [241, "Unplayable · Stern · A | Never serviced"],
+      [199, "Unplayable · A | Never serviced"],
+      // Without the service age the left group has the whole line.
+      [151, "Unplayable · A | -"],
+      [91, "Unplayable | -"],
+      [40, "Unplayable | -"],
     ];
     for (const [width, expected] of cases) {
-      stubLayout(width);
+      stubLayout(width, widths);
       const { unmount } = render(
         <RelativeTimeProvider>
           <MachineViewCompactList rows={[row]} columns={DEFAULT_COLUMNS} />
         </RelativeTimeProvider>
       );
-      expect(detailLine(screen.getByRole("listitem"))).toHaveTextContent(
-        expected
-      );
+      expect(lineSummary(screen.getByRole("listitem"))).toBe(expected);
       unmount();
       vi.restoreAllMocks();
     }

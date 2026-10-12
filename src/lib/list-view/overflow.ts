@@ -166,9 +166,8 @@ export interface LineDropInput<K extends string> {
 
 /**
  * Which segments a one-line row drops so the rest fit (machine-views §5.10):
- * segments drop one at a time in `dropOrder` until the line fits. The line
- * keeps at least one thing, so with nothing kept the last segment to drop
- * stays and truncates instead. Truncation is the backstop either way.
+ * segments drop one at a time in `dropOrder` until the line fits. The kept
+ * part never drops; if it alone does not fit, the line truncates.
  */
 export function planLineDrops<K extends string>({
   available,
@@ -181,7 +180,6 @@ export function planLineDrops<K extends string>({
   const dropped = new Set<K>();
   for (const key of present) {
     if (total <= available) break;
-    if (keptWidth === 0 && dropped.size === present.length - 1) break;
     dropped.add(key);
     total -= segmentWidths[key] ?? 0;
   }
