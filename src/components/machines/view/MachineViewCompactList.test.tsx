@@ -61,10 +61,24 @@ function leftGroup(row: HTMLElement): HTMLElement {
   return group;
 }
 
-/** What line 2 shows, as "left group | spoken service age". */
+/** An element's text without the parts hidden visually (`sr-only`). */
+function shownText(element: HTMLElement): string {
+  const copy = element.cloneNode(true);
+  if (!(copy instanceof HTMLElement)) return "";
+  for (const hidden of copy.querySelectorAll(".sr-only")) hidden.remove();
+  return copy.textContent ?? "";
+}
+
+/** What line 2 shows, as "left group | short service age". */
 function lineSummary(row: HTMLElement): string {
-  const service = within(detailLine(row)).queryByText(/serviced/i);
-  return `${leftGroup(row).textContent ?? ""} | ${service?.textContent ?? "-"}`;
+  const service = within(detailLine(row)).queryByTestId(
+    "machine-row-service-age"
+  );
+  const age =
+    service === null || service.classList.contains("sr-only")
+      ? "-"
+      : shownText(service);
+  return `${shownText(leftGroup(row))} | ${age}`;
 }
 
 /**
@@ -236,9 +250,9 @@ describe("MachineViewCompactList", () => {
     };
     const row = machine({ lastServicedAt: null });
     const cases: [number, string][] = [
-      [242, "Unplayable · Stern · 2019 · A | Never serviced"],
-      [241, "Unplayable · Stern · A | Never serviced"],
-      [199, "Unplayable · A | Never serviced"],
+      [242, "Unplayable · Stern · 2019 · A | never"],
+      [241, "Unplayable · Stern · A | never"],
+      [199, "Unplayable · A | never"],
       // Without the service age the left group has the whole line.
       [151, "Unplayable · A | -"],
       [91, "Unplayable | -"],
@@ -255,6 +269,53 @@ describe("MachineViewCompactList", () => {
       unmount();
       vi.restoreAllMocks();
     }
+  });
+
+  it("keeps dropped parts readable to screen readers", () => {
+    stubLayout(40, {
+      playability: 60,
+      manufacturer: 48,
+      year: 42,
+      owner: 32,
+      lastServiced: 60,
+    });
+    renderList([machine({ lastServicedAt: null })]);
+
+    const row = screen.getByRole("listitem");
+    const line = detailLine(row);
+    expect(lineSummary(row)).toBe("Unplayable | -");
+    // Hidden visually, still in the accessibility tree.
+    expect(within(line).getByText("Stern", { exact: false })).toHaveClass(
+      "sr-only"
+    );
+    expect(within(line).getByText("2019", { exact: false })).toHaveClass(
+      "sr-only"
+    );
+    expect(
+      within(line).getByRole("img", { name: "Owner: Alex" }).parentElement
+    ).toHaveClass("sr-only");
+    expect(within(line).getByTestId("machine-row-service-age")).toHaveClass(
+      "sr-only"
+    );
+    expect(within(line).getByText("Never serviced")).toBeInTheDocument();
+  });
+
+  it("shows a two- or three-capital owner name whole in the avatar", () => {
+    renderList([
+      machine({ id: "a", ownerName: "APC" }),
+      machine({ id: "b", ownerName: "TJ" }),
+      machine({ id: "c", ownerName: "Priya Shah" }),
+      machine({ id: "d", ownerName: "Apc" }),
+      machine({ id: "e", ownerName: "ABCD" }),
+    ]);
+
+    const initials = (name: string): string | null =>
+      screen.getByRole("img", { name: `Owner: ${name}` }).textContent;
+    expect(initials("APC")).toBe("APC");
+    expect(initials("TJ")).toBe("TJ");
+    expect(initials("Priya Shah")).toBe("PS");
+    expect(initials("Apc")).toBe("A");
+    expect(initials("ABCD")).toBe("A");
   });
 
   it("gives each Playability its own dot shape and name, so color is not the only signal", () => {

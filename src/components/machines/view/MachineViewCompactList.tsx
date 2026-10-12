@@ -46,9 +46,15 @@ interface MachineViewCompactListProps {
   rowAction?: MachineRowAction | undefined;
 }
 
-/** Up to two initials from a display name: "Priya Shah" → "PS". */
+/**
+ * A display name's initials: "Priya Shah" → "PS", "Priya" → "P". A name
+ * that is a single word of two or three capitals is already initials, so
+ * it shows whole: "APC" → "APC".
+ */
 function nameInitials(name: string): string {
-  const words = name.trim().split(/\s+/).filter(Boolean);
+  const trimmed = name.trim();
+  if (/^[A-Z]{2,3}$/.test(trimmed)) return trimmed;
+  const words = trimmed.split(/\s+/).filter(Boolean);
   const first = words[0]?.charAt(0) ?? "";
   const last = words.length > 1 ? (words.at(-1)?.charAt(0) ?? "") : "";
   return `${first}${last}`.toUpperCase();
@@ -172,10 +178,30 @@ function DetailLine({
           dropOrder: DROP_ORDER,
         })
       : new Set<DetailSegment>();
-  const visibleText = TEXT_ORDER.filter((key) => !dropped.has(key));
-  const showOwner = !dropped.has("owner");
-  // Every part of the left group after the first follows a separator.
-  const leadCount = playabilityLabel === null ? 0 : 1;
+  // Each left-group part with its separator. A part dropped for width is
+  // hidden visually but stays readable to screen readers, separator and
+  // all, so they hear the whole line; the first part shown has no separator.
+  let shownBefore = playabilityLabel !== null;
+  const leftParts = (["manufacturer", "year", "owner"] as const).map((key) => {
+    const content =
+      key === "owner" ? <OwnerAvatar name={ownerName} /> : text[key];
+    if (dropped.has(key)) {
+      return (
+        <span key={key} className="sr-only">
+          {SEPARATOR}
+          {content}
+        </span>
+      );
+    }
+    const separator = shownBefore ? SEPARATOR : null;
+    shownBefore = true;
+    return (
+      <span key={key}>
+        {separator}
+        {content}
+      </span>
+    );
+  });
 
   return (
     // Not positioned: a positioned line would sit above the row link's
@@ -192,23 +218,20 @@ function DetailLine({
               {playabilityLabel}
             </span>
           ) : null}
-          {visibleText.map((key, index) => (
-            <React.Fragment key={key}>
-              {leadCount + index > 0 ? SEPARATOR : null}
-              {text[key]}
-            </React.Fragment>
-          ))}
-          {showOwner ? (
-            <>
-              {leadCount + visibleText.length > 0 ? SEPARATOR : null}
-              <OwnerAvatar name={ownerName} />
-            </>
-          ) : null}
+          {leftParts}
         </p>
         {/* Right-anchored under the open-issue count, at least 12px from the
-            left group; once it drops, the left group has the whole line. */}
-        {serviced !== null && !dropped.has("lastServiced") ? (
-          <span className="ml-auto inline-flex shrink-0 items-center gap-1 whitespace-nowrap">
+            left group; once it drops, the left group has the whole line and
+            only screen readers still read the age. */}
+        {serviced !== null ? (
+          <span
+            data-testid="machine-row-service-age"
+            className={
+              dropped.has("lastServiced")
+                ? "sr-only"
+                : "ml-auto inline-flex shrink-0 items-center gap-1 whitespace-nowrap"
+            }
+          >
             <ServiceAge text={serviced} />
           </span>
         ) : null}
@@ -260,7 +283,8 @@ function DetailLine({
  * manufacturer, year, and the owner's initials avatar on the left, and the
  * service age (a wrench and "2h ago") right-anchored under the count. When
  * they do not fit it drops year, manufacturer, the service age, then the
- * owner (§5.10). Other selected fields show only in Table mode. The whole
+ * owner (§5.10); a dropped part stays readable to screen readers. Other
+ * selected fields show only in Table mode. The whole
  * row links to the machine; the open-issue count and any row action stay
  * their own targets above it.
  */
