@@ -130,7 +130,9 @@ for pid in $listeners; do
   top="$pid"
   while true; do
     parent="$(proc_ppid "$top")"
-    [[ "$parent" =~ ^[0-9]+$ ]] && [ "$parent" -gt 1 ] || break
+    if ! [[ "$parent" =~ ^[0-9]+$ ]] || [ "$parent" -le 1 ]; then
+      break
+    fi
     parent_cmd="$(proc_cmd "$parent")"
     if [[ "$parent_cmd" =~ $NEXT_CLI_RE || "$parent_cmd" =~ $PNPM_RE || "$parent_cmd" =~ $MISE_RE ]] &&
       owned_by_worktree "$parent"; then
@@ -180,7 +182,9 @@ if [ "$DRY_RUN" = true ]; then
 fi
 
 for i in "${!targets[@]}"; do
-  same_process "$i" && kill -TERM "${targets[$i]}" 2>/dev/null || true
+  if same_process "$i"; then
+    kill -TERM "${targets[$i]}" 2>/dev/null || true
+  fi
 done
 
 alive() {
