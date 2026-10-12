@@ -82,15 +82,17 @@
 
 ## 7. Phones
 
-- **7.1** Below the md breakpoint a List View uses the phone layout: title row, Summary Widgets, search on its own row, then the list box.
+- **7.1** Below the md breakpoint a List View uses the phone layout: title row, Summary Widgets, the list box, then the pager. Search has no row of its own; it sits in the phone List Header (§7.3).
 - **7.2** The title row holds the title, the Summary Row toggle (widgets §2.5), and the host's page actions; actions that do not fit become icon buttons with accessible names. On a Collection or Tag tab, whose title row belongs to the Collection or Tag page, the Summary Row toggle sits on its own row between the page's tabs and the search field.
-- **7.3** The phone List Header holds the Applied View's name, or "Views" when there is none, as a button that opens the Saved Views sheet, and a Filters icon button showing a count of filters not at their Page Preset value.
+- **7.3** The phone List Header holds, in order, the Applied View's name, or "Views" when there is none, as a button that opens the Saved Views sheet; the search field; and a Filters icon button showing a count of filters not at their Page Preset value.
 - **7.4** When the List View is Edited, the Applied View's name carries a marker that is announced as "edited".
 - **7.5** The Filters button opens one sheet holding Sort, the Primary Filters, the Secondary Filters under More filters, and Display (page size). Selecting a filter opens its options inside the sheet; the sheet's footer offers Reset all, which returns every filter to the Page Preset's values and keeps search, sort, and page size, and a button that shows the result count and closes the sheet.
 - **7.6** The Saved Views sheet offers, when Edited, Save changes, Save as new, and Discard changes, and when there is no Applied View, Save view; then the Built-in Views, then the account's Saved Views, then Manage views.
 - **7.7** The list box runs edge to edge with no card border; rows align with the page's horizontal padding.
-- **7.8** The pager is a 44px bar pinned above the tab bar, with Previous, the range ("1–25 of 84"), and Next. The list leaves room so its last row can scroll clear of the pager.
+- **7.8** The pager is the last thing after the list box and scrolls with the page, with Previous, the range ("1–25 of 84"), and Next.
 - **7.9** Every phone control is at least 44px tall or wide.
+- **7.10** The phone List Header stays at the top of the screen, directly under the app header, while the title row and Summary Widgets scroll away and the rows scroll beneath it.
+- **7.11** A List View follows design-bible §3: nothing full-width is pinned above the tab bar.
 
 ---
 
@@ -161,7 +163,10 @@
 ## Known divergences (code vs spec)
 
 | Requirement | Divergence | Resolution |
-| :---------- | :--------- | :--------- |
+| :-- | :-- | :-- |
+| §7.1, §7.3 | On phones search still has its own row above the list box; the phone List Header has no search field. | PP-jb9v.15 |
+| §7.8, §7.11 | The phone pager is a 44px full-width bar pinned above the tab bar, and the scroller reserves its height. | PP-jb9v.15 |
+| §7.10, §12.5 | The phone List Header scrolls away with the page, and the page's top scroll padding covers only the app header, not a pinned List Header. | PP-jb9v.15 |
 
 ---
 
@@ -169,6 +174,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-11 | Phone list chrome: search moves into the phone List Header with no search row (§7.1, §7.3); the pager follows the list instead of being pinned (§7.8); the phone List Header stays under the app header while the page above it scrolls away (§7.10); nothing full-width is pinned above the tab bar, per the site-wide design-bible §3 rule (§7.11). |
 | 2026-10-05 | Built-in Views are starting points: they set filters and sorting only, leaving one leaves no Applied View and offers Save view, and only a changed Saved View is Edited (§1, §3.6, §5.2, §5.3, §7.3, §7.6). The Summary Row toggle moves to the title row whenever the Summary Widgets stack (§8.4). |
 | 2026-10-04 | Reset all returns filters to the Page Preset (§7.5); Built-in Views stay reachable as tabs or in More views (§10.12); the List Header's crowding order and the single-page result range (§8.3); per-filter Reset (§4.9); a Page Preset URL names its Built-in View when the account's Default View is another view (§10.10); empty-state action only when Edited (§3.6). The search field shows no placeholder (§4.2). |
 | 2026-10-03 | On a Collection or Tag tab the Summary Row toggle sits on its own row between the page's tabs and search (§7.2). |
