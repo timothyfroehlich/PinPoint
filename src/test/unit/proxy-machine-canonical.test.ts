@@ -37,6 +37,7 @@ describe("request proxy", () => {
       "/_next/static/chunk.js",
       "/_next/image?url=logo.png",
       "/favicon.ico",
+      "/manifest.webmanifest",
       "/logo.svg",
       "/api/health",
     ]) {
