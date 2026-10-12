@@ -44,6 +44,7 @@ describe("request proxy", () => {
       expect(matcher.test(path), path).toBe(false);
     }
     expect(matcher.test("/login")).toBe(true);
+    expect(matcher.test("/manifestXwebmanifest")).toBe(true);
     expect(matcher.test("/m/afm")).toBe(true);
   });
 

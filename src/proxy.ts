@@ -143,6 +143,6 @@ export const config = {
      * - Assets with extensions (.svg, .png, .jpg, .jpeg, .gif, .webp)
      * - /api/health (health check endpoint)
      */
-    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|api/health|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon\\.ico|manifest\\.webmanifest|api/health|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
