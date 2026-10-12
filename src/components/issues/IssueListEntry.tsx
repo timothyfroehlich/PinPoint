@@ -40,8 +40,7 @@ const PILL_CLASSES =
  */
 const MACHINE_LINK_CLASSES =
   "relative flex min-w-0 max-md:min-w-11 before:absolute before:inset-x-0 before:-inset-y-3 before:z-[1] md:before:hidden";
-const MACHINE_NAME_CLASSES =
-  "truncate text-foreground/85 underline decoration-primary/30 underline-offset-2";
+const MACHINE_NAME_CLASSES = "truncate text-foreground/85 underline";
 /** Lifts a link's visible text above the machine link's hit area. */
 const VISIBLE_LAYER = "relative z-[2]";
 
@@ -109,7 +108,7 @@ function AssigneeAvatar({
         "inline-flex size-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold",
         name === null
           ? "border border-dashed border-muted-foreground/60"
-          : "bg-muted text-foreground"
+          : "bg-outline text-foreground"
       )}
       data-testid={testId}
     >
@@ -145,10 +144,11 @@ function UpdatedAge({
 }
 
 /**
- * Line 2 (issues-list §3.3, §3.9): the issue ID (desktop only), the machine,
- * the priority pill, the assignee's initials, and the age, on one line. When
- * the line does not fit it drops the age, then the priority, then the
- * assignee; the machine name truncates only after all three are gone. The
+ * Line 2 (issues-list §3.3, §3.9): the issue ID, the machine, the priority
+ * pill, the assignee's initials, and the age, on one line at every width.
+ * When the line does not fit it drops the age, then the priority, then the
+ * assignee; the ID never drops, and the machine name truncates only after
+ * all three are gone. The
  * component measures each part in a hidden lane and plans which stay with
  * the pure `fitLineParts`. A dropped part stays readable to screen readers.
  */
@@ -168,7 +168,6 @@ function IssueRowDetails({
     measured && measured.available > 0
       ? fitLineParts({
           available: measured.available,
-          // The ID is not laid out on phones, so it measures zero there.
           keptWidths: [
             measured.widths["id"] ?? 0,
             measured.widths["machine"] ?? 0,
@@ -198,14 +197,14 @@ function IssueRowDetails({
         ref={lineRef}
         className={cn(
           LINE_CLASSES,
-          "mt-0.5 min-w-0 overflow-x-clip text-[13px] whitespace-nowrap text-muted-foreground"
+          "mt-0.5 min-w-0 overflow-x-clip text-[13px] leading-[1.4] whitespace-nowrap text-muted-foreground"
         )}
       >
-        <span className="hidden shrink-0 md:inline" data-testid="issue-id">
+        <span className="shrink-0" data-testid="issue-id">
           {idText}
         </span>
         <span className={cn(LINE_CLASSES, "min-w-0")}>
-          <Separator className="hidden md:inline" />
+          <Separator />
           <Link
             href={`/m/${issue.machineInitials}`}
             className={cn(
@@ -245,14 +244,14 @@ function IssueRowDetails({
         aria-hidden="true"
         className="pointer-events-none invisible absolute inset-x-0 top-0 h-0 overflow-hidden text-[13px] whitespace-nowrap"
       >
-        <span data-measure="id" className="absolute hidden w-max md:inline">
+        <span data-measure="id" className="absolute w-max">
           {idText}
         </span>
         <span
           data-measure="machine"
           className={cn(LINE_CLASSES, "absolute w-max")}
         >
-          <Separator className="hidden md:inline" />
+          <Separator />
           <span className={MACHINE_LINK_CLASSES}>
             <span className={MACHINE_NAME_CLASSES}>{issue.machine.name}</span>
           </span>
@@ -287,7 +286,7 @@ function IssueRowDetails({
 /**
  * One issue row (issues-list §3), the same two lines at every width. Line 1:
  * the full title, wrapping, then the status and severity pills flowing after
- * it. Line 2: see `IssueRowDetails`. The row is read-only (§3.11). The whole
+ * it as a pair (both move to the next line when they do not both fit). Line 2: see `IssueRowDetails`. The row is read-only (§3.11). The whole
  * row links to the issue through the title link's `::after` overlay; the
  * machine name is its own link, raised above the overlay (§3.12).
  */
@@ -303,29 +302,33 @@ export function IssueListEntry({
     <li
       data-testid="issue-row"
       data-issue-id={issue.id}
-      className="group/row relative isolate px-4 py-2.5 transition-colors duration-150 hover:bg-muted/40 sm:max-md:px-8"
+      className="group/row relative isolate px-4 py-2.5 transition-colors duration-150 hover:bg-muted/40 max-md:border-b max-md:border-border sm:max-md:px-8"
     >
-      <div className="leading-snug">
+      <div className="text-[15px] leading-[1.45]">
         <Link
           href={`/m/${issue.machineInitials}/i/${issue.issueNumber}`}
-          className="mr-1.5 align-middle text-[15px] font-semibold break-words text-foreground transition-colors duration-150 group-hover/row:text-primary after:absolute after:inset-0 focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-ring focus-visible:after:ring-inset"
+          className="mr-1.5 font-semibold break-words text-foreground transition-colors duration-150 group-hover/row:text-primary after:absolute after:inset-0 focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-ring focus-visible:after:ring-inset"
           data-testid="issue-title"
         >
           <span className={VISIBLE_LAYER}>{issue.title}</span>
         </Link>
-        <RowPill
-          name="Status"
-          label={status.label}
-          styles={status.styles}
-          className="mr-1"
-          testId="issue-status"
-        />
-        <RowPill
-          name="Severity"
-          label={severity.label}
-          styles={severity.styles}
-          testId="issue-severity"
-        />
+        {/* One unbreakable box, so the pills wrap below the title together
+            or not at all. Its baseline is the pills' text, 2px above the
+            title's. */}
+        <span className="inline-flex gap-1 align-[2px]">
+          <RowPill
+            name="Status"
+            label={status.label}
+            styles={status.styles}
+            testId="issue-status"
+          />
+          <RowPill
+            name="Severity"
+            label={severity.label}
+            styles={severity.styles}
+            testId="issue-severity"
+          />
+        </span>
       </div>
       <IssueRowDetails issue={issue} />
     </li>

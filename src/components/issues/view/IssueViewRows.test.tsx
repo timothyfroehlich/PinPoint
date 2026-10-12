@@ -178,10 +178,11 @@ describe("Issue row line 2 fit (issues-list §3.9)", () => {
     vi.restoreAllMocks();
   });
 
+  // Each width is the parts' total plus the 16px fit tolerance.
   it.each<[number, string[]]>([
     // 60+120+50+30+90 + 4 gaps = 374.
     [
-      374,
+      390,
       [
         "issue-id",
         "issue-machine",
@@ -190,9 +191,12 @@ describe("Issue row line 2 fit (issues-list §3.9)", () => {
         "issue-age",
       ],
     ],
-    [373, ["issue-id", "issue-machine", "issue-priority", "issue-assignee"]],
-    [277, ["issue-id", "issue-machine", "issue-assignee"]],
-    [221, ["issue-id", "issue-machine"]],
+    [389, ["issue-id", "issue-machine", "issue-priority", "issue-assignee"]],
+    // 60+120+50+30 + 3 gaps = 278.
+    [293, ["issue-id", "issue-machine", "issue-assignee"]],
+    // 60+120+30 + 2 gaps = 222. The ID never drops.
+    [237, ["issue-id", "issue-machine"]],
+    [120, ["issue-id", "issue-machine"]],
   ])("at %ipx shows %j", (lineWidth, expected) => {
     stubLayout(lineWidth);
     renderRows([makeIssue()]);
@@ -200,7 +204,7 @@ describe("Issue row line 2 fit (issues-list §3.9)", () => {
   });
 
   it("keeps a dropped part readable to screen readers", () => {
-    stubLayout(221);
+    stubLayout(237);
     renderRows([makeIssue()]);
     const row = within(screen.getByRole("listitem"));
 

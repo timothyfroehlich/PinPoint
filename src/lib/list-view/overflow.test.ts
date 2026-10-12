@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { fitLineParts, fitPrimaryFilters, planListHeader } from "./overflow";
+import {
+  fitLineParts,
+  fitPrimaryFilters,
+  LINE_FIT_TOLERANCE,
+  planListHeader,
+} from "./overflow";
 
 describe("fitLineParts (issues-list §3.9)", () => {
   // ID 60 · machine 120 · priority 50 · assignee 30 · age 90, gap 6.
@@ -9,30 +14,29 @@ describe("fitLineParts (issues-list §3.9)", () => {
     dropOrder: ["age", "priority", "assignee"] as const,
     gap: 6,
   };
-  const shown = (available: number, keptWidths = base.keptWidths): string[] =>
-    [...fitLineParts({ ...base, available, keptWidths })].sort();
+  const shown = (available: number): string[] =>
+    [...fitLineParts({ ...base, available })].sort();
 
-  it("keeps every part when the line fits", () => {
+  it("keeps every part when the line fits with the tolerance to spare", () => {
     // 60+120+50+30+90 + 4 gaps = 374.
-    expect(shown(374)).toEqual(["age", "assignee", "priority"]);
+    expect(shown(374 + LINE_FIT_TOLERANCE)).toEqual([
+      "age",
+      "assignee",
+      "priority",
+    ]);
+    expect(shown(374)).toEqual(["assignee", "priority"]);
   });
 
   it("drops age, then priority, then assignee", () => {
-    expect(shown(373)).toEqual(["assignee", "priority"]);
+    expect(shown(373 + LINE_FIT_TOLERANCE)).toEqual(["assignee", "priority"]);
     // 60+120+50+30 + 3 gaps = 278.
-    expect(shown(277)).toEqual(["assignee"]);
+    expect(shown(277 + LINE_FIT_TOLERANCE)).toEqual(["assignee"]);
     // 60+120+30 + 2 gaps = 222.
-    expect(shown(221)).toEqual([]);
+    expect(shown(221 + LINE_FIT_TOLERANCE)).toEqual([]);
   });
 
   it("leaves nothing droppable when the kept parts alone overflow", () => {
     expect(shown(100)).toEqual([]);
-  });
-
-  it("gives a kept part that is not laid out no width and no gap", () => {
-    // Phones show no issue ID: 120+50+30+90 + 3 gaps = 308.
-    expect(shown(308, [0, 120])).toEqual(["age", "assignee", "priority"]);
-    expect(shown(307, [0, 120])).toEqual(["assignee", "priority"]);
   });
 });
 

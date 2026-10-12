@@ -12,7 +12,8 @@ export function IssueViewRows({
   rows: readonly IssueListRow[];
 }): React.JSX.Element {
   return (
-    <ul aria-label="Issues" className="divide-y divide-outline-variant">
+    // Desktop draws a line between rows; phones draw one under every row.
+    <ul aria-label="Issues" className="md:divide-y md:divide-border">
       {rows.map((issue) => (
         <IssueListEntry key={issue.id} issue={issue} />
       ))}

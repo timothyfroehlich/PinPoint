@@ -150,13 +150,16 @@ export function planListHeader(input: ListHeaderFitInput): ListHeaderPlan {
   };
 }
 
+/**
+ * Room a line fit leaves spare, so a part drops a little before the line is
+ * exactly full and real glyphs never crowd the line's end.
+ */
+export const LINE_FIT_TOLERANCE = 16;
+
 export interface LineFitInput<Part extends string> {
   /** The line's inner width. */
   available: number;
-  /**
-   * Widths of the parts that never drop, at their full width. A part that is
-   * not laid out at this size measures zero and takes no gap.
-   */
+  /** Widths of the parts that never drop, at their full width. */
   keptWidths: readonly number[];
   /** Each droppable part's width, its leading separator included. */
   partWidths: Readonly<Record<Part, number>>;
@@ -167,9 +170,9 @@ export interface LineFitInput<Part extends string> {
 
 /**
  * Which droppable parts of a one-line row stay shown (issues-list §3.9):
- * parts drop one at a time in `dropOrder` until the line fits. When the kept
- * parts alone still do not fit, every droppable part is gone and the
- * component truncates what remains.
+ * parts drop one at a time in `dropOrder` until the line fits with
+ * `LINE_FIT_TOLERANCE` to spare. When the kept parts alone still do not fit,
+ * every droppable part is gone and the component truncates what remains.
  */
 export function fitLineParts<Part extends string>({
   available,
@@ -179,11 +182,14 @@ export function fitLineParts<Part extends string>({
   gap,
 }: LineFitInput<Part>): ReadonlySet<Part> {
   const shown = new Set(dropOrder);
-  const kept = keptWidths.filter((width) => width > 0);
+  const room = available - LINE_FIT_TOLERANCE;
   const lineWidth = (): number =>
-    rowWidth([...kept, ...[...shown].map((part) => partWidths[part])], gap);
+    rowWidth(
+      [...keptWidths, ...[...shown].map((part) => partWidths[part])],
+      gap
+    );
   for (const part of dropOrder) {
-    if (lineWidth() <= available) break;
+    if (lineWidth() <= room) break;
     shown.delete(part);
   }
   return shown;
