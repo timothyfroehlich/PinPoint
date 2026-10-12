@@ -133,6 +133,19 @@ function loadIssueRows(
       assignedToUser: { columns: { id: true, name: true } },
     },
     columns: ISSUE_LIST_COLUMNS,
+    // Comments people wrote (issues-list §3.3, §3.4); system rows are
+    // timeline events. The relational builder qualifies every column inside
+    // `extras` with the root table's alias, so the subquery names its own
+    // alias in plain SQL rather than through the schema objects.
+    extras: (table) => ({
+      commentCount: sql<number>`(
+        select count(*)::int from "issue_comments" "comment"
+        where "comment"."issue_id" = ${table.id}
+          and not "comment"."is_system"
+      )`
+        .mapWith(Number)
+        .as("comment_count"),
+    }),
     limit: pageSize,
     offset: (page - 1) * pageSize,
   });

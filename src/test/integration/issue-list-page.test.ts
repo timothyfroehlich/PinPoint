@@ -28,12 +28,12 @@ vi.mock("~/server/db", async () => {
 });
 
 /**
- * Issue list sorting and search (issues-list §5.1–§5.3), run through the
- * real list loader against PGlite: Severity and Priority sort by rank,
+ * Issue list sorting and row data (issues-list §3.4, §5.1–§5.3), run through
+ * the real list loader against PGlite: Severity and Priority sort by rank,
  * Assignee by display name with unassigned last, and every sort ends in
  * issue ID order.
  */
-describe("issue list page: sorting and search", () => {
+describe("issue list page: sorting and comment counts", () => {
   setupTestDb();
 
   // Account ids sort opposite to their names, so an id sort cannot pass for
@@ -181,6 +181,44 @@ describe("issue list page: sorting and search", () => {
     };
     const all = [...(await page(1)), ...(await page(2)), ...(await page(3))];
     expect(all).toEqual(["AA-01", "BB-01", "AA-03", "AA-02", "BB-02"]);
+  });
+
+  it("counts people's comments on each row, not system timeline entries", async () => {
+    const db = await getTestDb();
+    const rows = await db.query.issues.findMany({
+      columns: { id: true, machineInitials: true, issueNumber: true },
+    });
+    const aa1 = rows.find(
+      (r) => r.machineInitials === "AA" && r.issueNumber === 1
+    );
+    if (!aa1) throw new Error("seed missing AA-01");
+    await db.insert(issueComments).values([
+      createTestComment(aa1.id, { authorId: ALICE }),
+      createTestComment(aa1.id, { authorId: BOB }),
+      createTestComment(aa1.id, {
+        isSystem: true,
+        content: null,
+        eventData: { type: "status_changed", from: "new", to: "confirmed" },
+      }),
+    ]);
+
+    const { issuesList } = await loadIssueListPage(
+      { sort: "id", dir: "asc", pageSize: 50 },
+      { isAdmin: false }
+    );
+    const counts = Object.fromEntries(
+      issuesList.map((i) => [
+        formatIssueId(i.machineInitials, i.issueNumber),
+        i.commentCount,
+      ])
+    );
+    expect(counts).toEqual({
+      "AA-01": 2,
+      "AA-02": 0,
+      "AA-03": 0,
+      "BB-01": 0,
+      "BB-02": 0,
+    });
   });
 
   // The list loader runs search through the relational query API, which

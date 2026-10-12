@@ -86,6 +86,7 @@ function row(overrides: Partial<IssueListRow> = {}): IssueListRow {
     assignedTo: null,
     machine: { id: "machine-1", name: "Attack from Mars" },
     assignedToUser: null,
+    commentCount: 0,
     ...overrides,
   };
 }

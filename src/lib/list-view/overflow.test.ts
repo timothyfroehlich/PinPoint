@@ -7,28 +7,36 @@ import {
 } from "./overflow";
 
 describe("fitLineParts (issues-list §3.9)", () => {
-  // ID 60 · machine 120 · priority 50 · assignee 30 · age 90, gap 6.
+  // ID 60 · machine 120 · priority 50 · assignee 30 · comments 40 · age 90,
+  // gap 6.
   const base = {
     keptWidths: [60, 120],
-    partWidths: { priority: 50, assignee: 30, age: 90 },
-    dropOrder: ["age", "priority", "assignee"] as const,
+    partWidths: { priority: 50, assignee: 30, comments: 40, age: 90 },
+    dropOrder: ["age", "comments", "priority", "assignee"] as const,
     gap: 6,
   };
   const shown = (available: number): string[] =>
     [...fitLineParts({ ...base, available })].sort();
 
   it("keeps every part when the line fits with the tolerance to spare", () => {
-    // 60+120+50+30+90 + 4 gaps = 374.
-    expect(shown(374 + LINE_FIT_TOLERANCE)).toEqual([
+    // 60+120+50+30+40+90 + 5 gaps = 420.
+    expect(shown(420 + LINE_FIT_TOLERANCE)).toEqual([
       "age",
       "assignee",
+      "comments",
       "priority",
     ]);
-    expect(shown(374)).toEqual(["assignee", "priority"]);
+    expect(shown(420)).toEqual(["assignee", "comments", "priority"]);
   });
 
-  it("drops age, then priority, then assignee", () => {
-    expect(shown(373 + LINE_FIT_TOLERANCE)).toEqual(["assignee", "priority"]);
+  it("drops age, then comments, then priority, then assignee", () => {
+    expect(shown(419 + LINE_FIT_TOLERANCE)).toEqual([
+      "assignee",
+      "comments",
+      "priority",
+    ]);
+    // 60+120+50+30+40 + 4 gaps = 324.
+    expect(shown(323 + LINE_FIT_TOLERANCE)).toEqual(["assignee", "priority"]);
     // 60+120+50+30 + 3 gaps = 278.
     expect(shown(277 + LINE_FIT_TOLERANCE)).toEqual(["assignee"]);
     // 60+120+30 + 2 gaps = 222.

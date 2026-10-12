@@ -5,7 +5,7 @@
  */
 
 import React from "react";
-import { render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RelativeTimeProvider } from "~/components/issues/RelativeTimeProvider";
 import { IssueViewRows } from "./IssueViewRows";
@@ -42,6 +42,7 @@ function makeIssue(overrides: Partial<IssueListRow> = {}): IssueListRow {
     assignedTo: null,
     machine: { id: "machine-1", name: "Attack from Mars" },
     assignedToUser: null,
+    commentCount: 0,
     ...overrides,
   };
 }
@@ -96,10 +97,19 @@ describe("Issue rows", () => {
     );
   });
 
-  it("shows the ID, machine, priority, assignee, and age on line 2", () => {
-    renderRows([makeIssue()]);
-    const row = within(screen.getByRole("listitem"));
+  it("shows the ID, machine, priority, assignee, comment count, and age on line 2", () => {
+    renderRows([makeIssue({ commentCount: 3 })]);
+    const listItem = screen.getByRole("listitem");
+    const row = within(listItem);
 
+    expect(line2Parts(listItem)).toEqual([
+      "issue-id",
+      "issue-machine",
+      "issue-priority",
+      "issue-assignee",
+      "issue-comment-count",
+      "issue-age",
+    ]);
     expect(row.getByTestId("issue-id")).toHaveTextContent("AFM-12");
     expect(row.getByRole("link", { name: "Attack from Mars" })).toHaveAttribute(
       "href",
@@ -108,18 +118,37 @@ describe("Issue rows", () => {
     expect(row.getByTestId("issue-priority")).toHaveTextContent(
       "Priority: High"
     );
+    // The number shows; screen readers hear "3 comments".
+    expect(row.getByTestId("issue-comment-count")).toHaveTextContent(
+      "33 comments"
+    );
     // Phones show "2d"; desktop and screen readers get the long form.
     const age = row.getByTestId("issue-age");
     expect(age).toHaveAttribute("datetime", "2026-01-02T00:00:00.000Z");
     expect(age).toHaveTextContent("2dupdated 2d ago");
   });
 
-  it("is read-only: no buttons and no comment count", () => {
-    renderRows([makeIssue()]);
+  it("shows the comment count only when there are comments", () => {
+    renderRows([
+      makeIssue({ id: "a", commentCount: 0 }),
+      makeIssue({ id: "b", issueNumber: 13, commentCount: 1 }),
+    ]);
+    const [withoutComments, withComment] = screen.getAllByRole("listitem");
+    if (!withoutComments || !withComment) throw new Error("expected 2 rows");
+
+    expect(
+      within(withoutComments).queryByTestId("issue-comment-count")
+    ).toBeNull();
+    expect(
+      within(withComment).getByTestId("issue-comment-count")
+    ).toHaveTextContent(/^11 comment$/);
+  });
+
+  it("is read-only: no buttons", () => {
+    renderRows([makeIssue({ commentCount: 2 })]);
     const row = within(screen.getByRole("listitem"));
 
     expect(row.queryByRole("button")).toBeNull();
-    expect(row.queryByTestId("issue-comment-count")).toBeNull();
     // Two links: the issue (the whole row) and the machine.
     expect(row.getAllByRole("link")).toHaveLength(2);
   });
@@ -149,13 +178,15 @@ describe("Issue rows", () => {
 describe("Issue row line 2 fit (issues-list §3.9)", () => {
   /**
    * jsdom lays nothing out, so line 2 and each measured part get widths:
-   * ID 60, machine 120, priority 50, assignee 30, age 90, with 6px gaps.
+   * ID 60, machine 120, priority 50, assignee 30, comments 40, age 90, with
+   * 6px gaps.
    */
   const PART_WIDTHS: Record<string, number> = {
     id: 60,
     machine: 120,
     priority: 50,
     assignee: 30,
+    comments: 40,
     age: 90,
   };
 
@@ -180,37 +211,76 @@ describe("Issue row line 2 fit (issues-list §3.9)", () => {
 
   // Each width is the parts' total plus the 16px fit tolerance.
   it.each<[number, string[]]>([
-    // 60+120+50+30+90 + 4 gaps = 374.
+    // 60+120+50+30+40+90 + 5 gaps = 420.
     [
-      390,
+      436,
       [
         "issue-id",
         "issue-machine",
         "issue-priority",
         "issue-assignee",
+        "issue-comment-count",
         "issue-age",
       ],
     ],
-    [389, ["issue-id", "issue-machine", "issue-priority", "issue-assignee"]],
-    // 60+120+50+30 + 3 gaps = 278.
+    // The age drops first.
+    [
+      435,
+      [
+        "issue-id",
+        "issue-machine",
+        "issue-priority",
+        "issue-assignee",
+        "issue-comment-count",
+      ],
+    ],
+    // 60+120+50+30+40 + 4 gaps = 324; then the comment count.
+    [339, ["issue-id", "issue-machine", "issue-priority", "issue-assignee"]],
+    // 60+120+50+30 + 3 gaps = 278; then the priority.
     [293, ["issue-id", "issue-machine", "issue-assignee"]],
-    // 60+120+30 + 2 gaps = 222. The ID never drops.
+    // 60+120+30 + 2 gaps = 222; the assignee goes last. The ID never drops.
     [237, ["issue-id", "issue-machine"]],
     [120, ["issue-id", "issue-machine"]],
-  ])("at %ipx shows %j", (lineWidth, expected) => {
+  ])("with comments, at %ipx shows %j", (lineWidth, expected) => {
     stubLayout(lineWidth);
-    renderRows([makeIssue()]);
+    renderRows([makeIssue({ commentCount: 3 })]);
     expect(line2Parts(screen.getByRole("listitem"))).toEqual(expected);
+  });
+
+  it("without comments, drops the priority right after the age", () => {
+    // 60+120+50+30+90 + 4 gaps = 374: no comment part takes room.
+    stubLayout(390);
+    renderRows([makeIssue()]);
+    expect(line2Parts(screen.getByRole("listitem"))).toEqual([
+      "issue-id",
+      "issue-machine",
+      "issue-priority",
+      "issue-assignee",
+      "issue-age",
+    ]);
+    cleanup();
+
+    // 60+120+50+30 + 3 gaps = 278.
+    stubLayout(293);
+    renderRows([makeIssue()]);
+    expect(line2Parts(screen.getByRole("listitem"))).toEqual([
+      "issue-id",
+      "issue-machine",
+      "issue-assignee",
+    ]);
   });
 
   it("keeps a dropped part readable to screen readers", () => {
     stubLayout(237);
-    renderRows([makeIssue()]);
+    renderRows([makeIssue({ commentCount: 3 })]);
     const row = within(screen.getByRole("listitem"));
 
     expect(row.getByTestId("issue-priority")).toHaveTextContent(
       "Priority: High"
     );
     expect(row.getByRole("img", { name: "Unassigned" })).toBeInTheDocument();
+    expect(row.getByTestId("issue-comment-count")).toHaveTextContent(
+      "3 comments"
+    );
   });
 });

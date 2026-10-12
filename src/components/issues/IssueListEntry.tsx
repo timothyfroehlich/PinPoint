@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { MessageSquare } from "lucide-react";
 import { useRelativeNow } from "~/components/issues/RelativeTimeProvider";
 import { useMeasuredWidths } from "~/components/list-view/use-measured-widths";
 import { formatCompactAge, formatCompactAgeAgo } from "~/lib/dates";
@@ -16,12 +17,24 @@ import type { IssueListRow } from "~/lib/types";
 import { cn } from "~/lib/utils";
 
 /** Line 2's parts that give way for room, in drop order (issues-list §3.9). */
-const DROP_ORDER = ["age", "priority", "assignee"] as const;
+const DROP_ORDER = ["age", "comments", "priority", "assignee"] as const;
 type DroppablePart = (typeof DROP_ORDER)[number];
 
 /** Line 2's column gap (`gap-1.5`); every part after the first leads with "·". */
 const LINE_GAP = 6;
-const LINE_CLASSES = "flex items-center gap-1.5";
+/*
+ * Line 2 lines its parts up on one text baseline. Centering them instead
+ * puts the monospace issue ID about a pixel above the rest: SF Mono's
+ * ascent and descent differ from the sans font's, so the ID's line box is a
+ * fraction taller and centers off the shared baseline.
+ */
+const LINE_CLASSES = "flex items-baseline gap-1.5";
+/*
+ * One part: its "·" and its value. A part's baseline is its separator's, so
+ * its text sits on line 2's baseline while a pill or avatar centers on the
+ * separator.
+ */
+const PART_CLASSES = "flex items-center gap-1.5";
 
 /*
  * Pills on List View rows have no border (issues-list §3.13), a scoped
@@ -118,6 +131,29 @@ function AssigneeAvatar({
 }
 
 /**
+ * How many comments people wrote: a speech-bubble icon and the number,
+ * announced as "3 comments" (issues-list §3.3, §3.4). The row leaves it out
+ * at zero.
+ */
+function CommentCount({
+  count,
+  testId,
+}: {
+  count: number;
+  testId?: string | undefined;
+}): React.JSX.Element {
+  return (
+    <span className="inline-flex items-center gap-[3px]" data-testid={testId}>
+      <MessageSquare className="size-3.5 shrink-0" aria-hidden="true" />
+      <span aria-hidden="true">{count}</span>
+      <span className="sr-only">
+        {count} {count === 1 ? "comment" : "comments"}
+      </span>
+    </span>
+  );
+}
+
+/**
  * How long ago the issue was updated: "2d" on phones, "updated 2d ago" on
  * desktop (issues-list §3.3). Phones announce the long form too.
  */
@@ -145,24 +181,34 @@ function UpdatedAge({
 
 /**
  * Line 2 (issues-list §3.3, §3.9): the issue ID, the machine, the priority
- * pill, the assignee's initials, and the age, on one line at every width.
- * When the line does not fit it drops the age, then the priority, then the
- * assignee; the ID never drops, and the machine name truncates only after
- * all three are gone. The
- * component measures each part in a hidden lane and plans which stay with
- * the pure `fitLineParts`. A dropped part stays readable to screen readers.
+ * pill, the assignee's initials, the comment count (when above zero), and
+ * the age, on one line at every width. When the line does not fit it drops
+ * the age, then the comment count, then the priority, then the assignee; the
+ * ID never drops, and the machine name truncates only after all four are
+ * gone. The component measures each part in a hidden lane and plans which
+ * stay with the pure `fitLineParts`. A dropped part stays readable to screen
+ * readers.
  */
 function IssueRowDetails({
   issue,
 }: {
   issue: IssueListRow;
 }): React.JSX.Element {
+  const hasComments = issue.commentCount > 0;
   const lineRef = React.useRef<HTMLDivElement>(null);
   const laneRef = React.useRef<HTMLDivElement>(null);
-  const measured = useMeasuredWidths(lineRef, laneRef, issue.id);
+  const measured = useMeasuredWidths(
+    lineRef,
+    laneRef,
+    `${issue.id}:${hasComments}`
+  );
   const priority = PRIORITY_CONFIG[issue.priority];
   const assigneeName = issue.assignedToUser?.name ?? null;
   const issueId = formatIssueId(issue.machineInitials, issue.issueNumber);
+  // A row without comments has no comment part to drop.
+  const dropOrder = hasComments
+    ? DROP_ORDER
+    : DROP_ORDER.filter((part) => part !== "comments");
 
   const shown: ReadonlySet<DroppablePart> =
     measured && measured.available > 0
@@ -175,14 +221,15 @@ function IssueRowDetails({
           partWidths: {
             priority: measured.widths["priority"] ?? 0,
             assignee: measured.widths["assignee"] ?? 0,
+            comments: measured.widths["comments"] ?? 0,
             age: measured.widths["age"] ?? 0,
           },
-          dropOrder: DROP_ORDER,
+          dropOrder,
           gap: LINE_GAP,
         })
-      : new Set(DROP_ORDER);
+      : new Set(dropOrder);
   const partClass = (part: DroppablePart): string =>
-    shown.has(part) ? cn(LINE_CLASSES, "shrink-0") : "sr-only";
+    shown.has(part) ? cn(PART_CLASSES, "shrink-0") : "sr-only";
 
   const idText = (
     <span className="font-mono text-foreground/85">{issueId}</span>
@@ -203,7 +250,7 @@ function IssueRowDetails({
         <span className="shrink-0" data-testid="issue-id">
           {idText}
         </span>
-        <span className={cn(LINE_CLASSES, "min-w-0")}>
+        <span className={cn(PART_CLASSES, "min-w-0")}>
           <Separator />
           <Link
             href={`/m/${issue.machineInitials}`}
@@ -231,6 +278,15 @@ function IssueRowDetails({
           <Separator />
           <AssigneeAvatar name={assigneeName} testId="issue-assignee" />
         </span>
+        {hasComments && (
+          <span className={partClass("comments")}>
+            <Separator />
+            <CommentCount
+              count={issue.commentCount}
+              testId="issue-comment-count"
+            />
+          </span>
+        )}
         <span className={partClass("age")}>
           <Separator />
           <UpdatedAge updatedAt={issue.updatedAt} testId="issue-age" />
@@ -249,7 +305,7 @@ function IssueRowDetails({
         </span>
         <span
           data-measure="machine"
-          className={cn(LINE_CLASSES, "absolute w-max")}
+          className={cn(PART_CLASSES, "absolute w-max")}
         >
           <Separator />
           <span className={MACHINE_LINK_CLASSES}>
@@ -258,7 +314,7 @@ function IssueRowDetails({
         </span>
         <span
           data-measure="priority"
-          className={cn(LINE_CLASSES, "absolute w-max")}
+          className={cn(PART_CLASSES, "absolute w-max")}
         >
           <Separator />
           <RowPill
@@ -269,12 +325,21 @@ function IssueRowDetails({
         </span>
         <span
           data-measure="assignee"
-          className={cn(LINE_CLASSES, "absolute w-max")}
+          className={cn(PART_CLASSES, "absolute w-max")}
         >
           <Separator />
           <AssigneeAvatar name={assigneeName} />
         </span>
-        <span data-measure="age" className={cn(LINE_CLASSES, "absolute w-max")}>
+        {hasComments && (
+          <span
+            data-measure="comments"
+            className={cn(PART_CLASSES, "absolute w-max")}
+          >
+            <Separator />
+            <CommentCount count={issue.commentCount} />
+          </span>
+        )}
+        <span data-measure="age" className={cn(PART_CLASSES, "absolute w-max")}>
           <Separator />
           <UpdatedAge updatedAt={issue.updatedAt} />
         </span>

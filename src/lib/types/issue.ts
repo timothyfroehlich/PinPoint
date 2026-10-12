@@ -17,7 +17,7 @@ export type IssueCommentWithAuthor = Pick<
   images: IssueImage[];
 };
 
-/** One row of an issue list page (issues-list §3). */
+/** One row of an issue list page (issues-list §3), with its comment count. */
 export type IssueListRow = Pick<
   Issue,
   | "id"
@@ -35,6 +35,8 @@ export type IssueListRow = Pick<
 > & {
   machine: Pick<Machine, "id" | "name">;
   assignedToUser: Pick<UserProfile, "id" | "name"> | null;
+  /** Comments people wrote; system timeline entries are not counted. */
+  commentCount: number;
 };
 
 // reporterEmail is intentionally excluded: the only query that produces this
