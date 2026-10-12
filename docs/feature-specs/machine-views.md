@@ -86,6 +86,9 @@
 - **6.3** Standard Collections preserve their header, tabs, edit and add-machine flows, share-token authorization, and exact membership scoping.
 - **6.4** _Retired 2026-10-07._ Owner Collections were replaced by the Owner filter (collections-and-tags §6.4). Number kept so older citations don't dangle.
 - **6.5** Issues and Timeline Collection tabs continue to use the resolved Collection machine identities and may not widen their scope through URL parameters.
+- **6.6** `/m`'s page actions are, in order, Pinball Map, Add Machine, and ⋯ (list-views §3.7). Pinball Map appears only to people who can open the Pinball Map lineup page (pinballmap-lineup §2.2), and Add Machine only to people 6.1 allows.
+- **6.7** `/m`'s ⋯ holds Print settings sheets (settings-sheets §2.1) and, for people who can print apron cards, Print apron cards (apron-cards §12.1), at every width; the print-queue count shows only on that entry (apron-cards §13.4).
+- **6.8** On `/m`, Pinball Map folds into ⋯ first and Add Machine last (list-views §3.9).
 
 ---
 
@@ -124,6 +127,7 @@
 | §3.2, §5.3, §5.9, §5.10 | Phone Compact rows are one line; the second line (Playability label, manufacturer, year, owner, Last Serviced) and its drop order are not built. | List View redesign, phone machine rows (PP-jb9v.13). |
 | §5.3 | The Compact row's open-issue count shows a severity icon before “N open”. | List View redesign, phone machine rows (PP-jb9v.13). |
 | §5.11 | The Compact row's Playability dot is the same round dot for every Playability, distinguished by color only. | List View redesign, phone machine rows (PP-jb9v.13). |
+| §6.6–§6.8 | `/m` shows Pinball Map, a Print menu, and a filled Add Machine as separate buttons with no ⋯; nothing folds. | PP-jb9v.17 |
 
 ---
 
@@ -131,6 +135,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-11 | `/m`'s page actions are Pinball Map, Add Machine, and ⋯, which holds the Print settings sheets and Print apron cards entries; Pinball Map folds first and Add Machine last (§6.6–§6.8). |
 | 2026-10-11 | Phone Compact rows become two lines: Playability dot, name, initials, and open-issue count first, then the Playability label, manufacturer, year, owner, and Last Serviced, dropping year, manufacturer, Last Serviced, then owner when crowded (§3.2, §5.3, §5.9, §5.10); the Playability label and Last Serviced age appear only when those fields are displayed, and no service history reads “never serviced” (§5.9); the count is colored “N open” text with no icon, or a muted “None open” (§5.3); the Playability dot differs by shape (§5.11). |
 | 2026-10-07 | Retired Owner Collections (preamble, 6.4); a person's machines are Machines filtered by Owner (collections-and-tags §6). |
 | 2026-10-05 | Built-in Views no longer set displayed fields or page size (§9.3). Tag and Collection Primary Filters (§3.12) and their `tag` and `collection` parameters (§4.1). |
