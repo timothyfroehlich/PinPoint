@@ -72,10 +72,7 @@
 ## Known divergences (code vs spec)
 
 | Requirement | Divergence | Resolution |
-| :-- | :-- | :-- |
-| §2.3 | Widgets sit side by side only at md+ when the group's container fits about 320px each; at other widths they stack full-width in a collapsible section headed by the Summary Row, and the browser remembers each person's expanded or collapsed choice per host. | PP-jb9v.14 |
-| §2.7 | When the widgets do not fit side by side, all of them stack instead of whole widgets dropping from the right. | PP-jb9v.14 |
-| §5.7 | Side-by-side breakdowns show a color swatch beside each count, and every count is shown in the default text color rather than its Segment's category color. | PP-jb9v.14 |
+| :---------- | :--------- | :--------- |
 
 ---
 

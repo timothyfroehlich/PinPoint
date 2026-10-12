@@ -38,8 +38,8 @@ export default async function IssuesPage({
   if (redirectTo) redirect(redirectTo);
   const result = await loadIssueView({ searchParams: viewSearchParams });
 
-  // Issue View draws the title row so the phone Summary Row toggle can sit
-  // in it (list-views §3.1, §7.2).
+  // Issue View draws the title row, above its Summary Widgets
+  // (list-views §3.1, §7.2).
   return (
     <PageContainer size="wide" className="max-md:pt-3">
       <IssueView

@@ -49,9 +49,7 @@
 
 ## Known divergences (code vs spec)
 
-| Requirement | Divergence | Resolution |
-| :-- | :-- | :-- |
-| §2.4 (retired) | Machine View still shows a Summary Row with the playable figure while its widgets stack. | PP-jb9v.14 |
+_None — the current implementation matches this spec._
 
 ---
 

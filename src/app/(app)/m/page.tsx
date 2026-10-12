@@ -135,8 +135,8 @@ export default async function MachinesPage({
     );
   }
 
-  // Machine View draws the title row so the phone Summary Row toggle can sit
-  // in it (list-views §3.1, §7.2).
+  // Machine View draws the title row, above its Summary Widgets
+  // (list-views §3.1, §7.2).
   return (
     <PageContainer size="wide" className="max-md:pt-3">
       <MachineView

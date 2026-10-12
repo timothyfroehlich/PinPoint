@@ -129,7 +129,6 @@ function result(overrides: Partial<MachineViewResult> = {}): MachineViewResult {
         },
       },
       playability: {
-        onTheFloor: 2,
         byStatus: { operational: 1, needs_service: 1, unplayable: 0 },
       },
     },
@@ -165,6 +164,7 @@ function renderView(
     views?: MachineViewSavedViews;
     preset?: MachineViewPresetId;
     title?: string;
+    actions?: React.ReactNode;
   } = {}
 ): ReturnType<typeof render> {
   const preset = options.preset ?? "machines";
@@ -174,6 +174,7 @@ function renderView(
       preset={preset}
       savedViews={options.views ?? savedViews({}, preset)}
       title={options.title}
+      actions={options.actions}
     />
   );
 }
@@ -413,7 +414,7 @@ describe("MachineView", () => {
     );
   });
 
-  it("lists Segments in spec order and shows the playable figure as the Summary Row (machine-widgets §2.4)", () => {
+  it("lists Segments in spec order (machine-widgets §3.2, §4.2)", () => {
     renderView();
     const names = (widget: string): (string | null)[] =>
       within(screen.getByRole("region", { name: widget }))
@@ -424,41 +425,26 @@ describe("MachineView", () => {
     // Playability runs worst first (§4.2). Zero Segments are left out (widgets §5.5).
     expect(names("Presence")).toEqual(["2 On the Floor", "1 Pending Arrival"]);
     expect(names("Playability")).toEqual(["1 Needs Service", "1 Operational"]);
-    expect(
-      screen.getByRole("button", { name: "Summary: 2 of 2 playable" })
-    ).toHaveAttribute("aria-controls");
   });
 
-  it("puts the Summary Row toggle in the title row whenever the widgets stack on the Machines page (list-views §7.2, §8.4)", async () => {
-    const user = userEvent.setup();
-    renderView({ title: "Machines" });
+  it("holds only the title and page actions in the title row, with the widgets always shown beneath (list-views §7.2, widgets §2.3)", () => {
+    renderView({
+      title: "Machines",
+      actions: <button type="button">Add Machine</button>,
+    });
 
-    const heading = screen.getByRole("heading", {
+    const titleRow = screen.getByRole("heading", {
       level: 1,
       name: "Machines",
-    });
-    // One toggle, in the title row: it shows "2/2 playable" and reads
-    // "2 of 2" (machine-widgets §2.4).
-    const toggles = screen.getAllByRole("button", {
-      name: "Summary: 2 of 2 playable",
-    });
-    expect(toggles).toHaveLength(1);
-    const [toggle] = toggles;
-    if (!toggle) throw new Error("Summary Row toggle missing");
-    expect(heading.parentElement).toContainElement(toggle);
-    expect(within(toggle).getByText("2/2")).toHaveAttribute(
-      "aria-hidden",
-      "true"
-    );
-    // It hides only when both widgets fit side by side, querying the title
-    // row, which is as wide as the widgets' group.
-    expect(toggle).toHaveClass("md:@min-[40rem]:hidden");
-    expect(heading.parentElement).toHaveClass("@container");
+    }).parentElement;
     expect(
-      document.getElementById(toggle.getAttribute("aria-controls") ?? "")
-    ).toContainElement(screen.getByRole("region", { name: "Presence" }));
-    await user.click(toggle);
-    expect(toggle).toHaveAttribute("aria-expanded");
+      within(titleRow ?? document.body)
+        .getAllByRole("button")
+        .map((button) => button.textContent)
+    ).toEqual(["Add Machine"]);
+    // Nothing collapses the widgets anywhere on the page.
+    expect(screen.queryByRole("button", { name: /^Summary/ })).toBeNull();
+    expect(screen.getByRole("region", { name: "Presence" })).toBeVisible();
   });
 
   it("applies a Built-in View tab at page 1 with its canonical URL (list-views §5.1, §10.6)", async () => {
