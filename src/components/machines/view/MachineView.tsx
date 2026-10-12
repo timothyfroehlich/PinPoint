@@ -18,10 +18,6 @@ import {
   type ListSortModel,
 } from "~/components/list-view";
 import { useListViewHost } from "~/components/list-view/use-list-view-host";
-import {
-  SummaryRowToggle,
-  useSummaryWidgetsController,
-} from "~/components/summary-widgets";
 import { Button } from "~/components/ui/button";
 import { EmptyState } from "~/components/ui/empty-state";
 import { isListPageSize } from "~/lib/list-view/url-state";
@@ -47,12 +43,7 @@ import {
   type MachineViewSavedViews,
   type MachineViewState,
 } from "~/lib/types";
-import {
-  MACHINE_SUMMARY_STORAGE_KEY,
-  MACHINE_SUMMARY_WIDGET_COUNT,
-  MachineSummaryRow,
-  MachineSummaryWidgets,
-} from "./MachineSummaryWidgets";
+import { MachineSummaryWidgets } from "./MachineSummaryWidgets";
 import { MachineViewCompactList } from "./MachineViewCompactList";
 import { MachineViewTable } from "./MachineViewTable";
 import type {
@@ -73,8 +64,7 @@ interface MachineViewProps {
   savedViews: MachineViewSavedViews;
   /**
    * The page title row, when Machine View owns its page (the Machines page).
-   * A Collection or Tag tab's title row belongs to its own page, so the
-   * Summary Row toggle then sits on its own row (list-views §7.2).
+   * A Collection or Tag tab's title row belongs to its own page.
    */
   title?: string | undefined;
   /** The page actions beside the title (list-views §3.2). */
@@ -133,10 +123,6 @@ export function MachineView({
 }: MachineViewProps): React.JSX.Element {
   const rootRef = React.useRef<HTMLDivElement>(null);
   const [mobileMode, setMobileMode] = React.useState<MobileMode>("compact");
-  const summaryController = useSummaryWidgetsController(
-    MACHINE_SUMMARY_STORAGE_KEY,
-    MACHINE_SUMMARY_WIDGET_COUNT
-  );
   const defaults = getMachineViewPreset(preset).defaultState;
   const serialize = React.useCallback(
     (next: MachineViewState, view: string | null): URLSearchParams =>
@@ -277,7 +263,6 @@ export function MachineView({
       summary={result.summary}
       state={state}
       onStateChange={(next) => update(next, false)}
-      controller={title ? summaryController : undefined}
     />
   );
 
@@ -287,17 +272,7 @@ export function MachineView({
         label="Machines list"
         noun={NOUN}
         titleRow={
-          title ? (
-            <ListTitleRow
-              title={title}
-              actions={actions}
-              summaryToggle={
-                <SummaryRowToggle controller={summaryController}>
-                  <MachineSummaryRow summary={result.summary} compact />
-                </SummaryRowToggle>
-              }
-            />
-          ) : undefined
+          title ? <ListTitleRow title={title} actions={actions} /> : undefined
         }
         summary={showSummary ? summary : undefined}
         search={

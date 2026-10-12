@@ -8,7 +8,6 @@ import {
 } from "~/components/ui/popover";
 import { cn } from "~/lib/utils";
 import { fitBreakdown } from "./fit-breakdown";
-import { SIDE_BY_SIDE_LAYOUT, SummaryWidgetCountContext } from "./layout";
 
 export interface SummaryWidgetSegment<T extends string> {
   value: T;
@@ -16,7 +15,7 @@ export interface SummaryWidgetSegment<T extends string> {
   count: number;
   /** Semantic text color for the count; the selected border uses it too. */
   textClassName: string;
-  /** Solid fill for the bar segment and the breakdown swatch. */
+  /** Solid fill for the Segment's share of the bar. */
   fillClassName: string;
 }
 
@@ -40,26 +39,20 @@ const SEGMENT_BUTTON_CLASS =
   "transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50";
 const LINE_GAP_CLASS = "gap-x-1.5 md:gap-x-2";
 
+/**
+ * A "count label" pair. It shows no swatch at any width; the count takes its
+ * Segment's category color (widgets §5.7).
+ */
 function SegmentEntryContent<T extends string>({
   segment,
-  swatchClassName,
 }: {
   segment: SummaryWidgetSegment<T>;
-  /** Shows the swatch, which stacked widgets drop (widgets §5.7). */
-  swatchClassName: string | undefined;
 }): React.JSX.Element {
   return (
     <>
-      <span
-        aria-hidden="true"
-        data-swatch
-        className={cn(
-          "hidden size-2 shrink-0 rounded-[2px]",
-          swatchClassName,
-          segment.fillClassName
-        )}
-      />
-      <span className="font-semibold tabular-nums">{segment.count}</span>
+      <span className={cn("font-semibold tabular-nums", segment.textClassName)}>
+        {segment.count}
+      </span>
       <span className="text-muted-foreground">{segment.label}</span>
     </>
   );
@@ -80,13 +73,11 @@ function SegmentButton<T extends string>({
   segment,
   selected,
   onSelect,
-  swatchClassName,
   className,
 }: {
   segment: SummaryWidgetSegment<T>;
   selected: boolean;
   onSelect: (value: T) => void;
-  swatchClassName: string | undefined;
   className?: string;
 }): React.JSX.Element {
   return (
@@ -98,15 +89,13 @@ function SegmentButton<T extends string>({
       className={cn(
         ENTRY_CLASS,
         SEGMENT_BUTTON_CLASS,
+        // The selected border takes the Segment's color through currentColor.
         segment.textClassName,
         selected && "border-current",
         className
       )}
     >
-      <SegmentEntryContent
-        segment={segment}
-        swatchClassName={swatchClassName}
-      />
+      <SegmentEntryContent segment={segment} />
     </button>
   );
 }
@@ -158,13 +147,6 @@ function SummaryWidgetBreakdown<T extends string>({
   const [measurements, setMeasurements] =
     React.useState<BreakdownMeasurements | null>(null);
   const [otherOpen, setOtherOpen] = React.useState(false);
-  // The "N other" list renders in a portal, outside the group's container
-  // query, so it copies whether the line's swatches show when it opens
-  // (CORE-RESP-002 boundary).
-  const [otherSwatches, setOtherSwatches] = React.useState(false);
-  const widgetCount = React.useContext(SummaryWidgetCountContext);
-  const swatchClassName =
-    widgetCount === null ? undefined : SIDE_BY_SIDE_LAYOUT[widgetCount].swatch;
   const total = segments.reduce((sum, segment) => sum + segment.count, 0);
   // Re-measure only when what the entries say changes, not on every render.
   const entriesKey = segments
@@ -196,8 +178,8 @@ function SummaryWidgetBreakdown<T extends string>({
     };
 
     measure();
-    // The line resizes with the widget, stacked or side by side (§5.7); the
-    // lane resizes when fonts load or the breakpoint changes entry sizes.
+    // The line resizes with the widget; the lane resizes when fonts load or
+    // the breakpoint changes entry sizes.
     const observer = new ResizeObserver(measure);
     observer.observe(line);
     observer.observe(lane);
@@ -231,25 +213,10 @@ function SummaryWidgetBreakdown<T extends string>({
           segment={segment}
           selected={segment.value === selectedValue}
           onSelect={onSegmentSelect}
-          swatchClassName={swatchClassName}
         />
       ))}
       {rolledUp.length > 0 ? (
-        <Popover
-          open={otherOpen}
-          onOpenChange={(open) => {
-            if (open) {
-              const swatch =
-                laneRef.current?.querySelector<HTMLElement>("[data-swatch]");
-              setOtherSwatches(
-                swatch !== null &&
-                  swatch !== undefined &&
-                  getComputedStyle(swatch).display !== "none"
-              );
-            }
-            setOtherOpen(open);
-          }}
-        >
+        <Popover open={otherOpen} onOpenChange={setOtherOpen}>
           <PopoverTrigger asChild>
             <button
               type="button"
@@ -280,7 +247,6 @@ function SummaryWidgetBreakdown<T extends string>({
                       setOtherOpen(false);
                       onSegmentSelect(value);
                     }}
-                    swatchClassName={otherSwatches ? "inline-block" : undefined}
                     className="min-h-11 w-full px-2 md:min-h-9"
                   />
                 </li>
@@ -303,10 +269,7 @@ function SummaryWidgetBreakdown<T extends string>({
             data-measure-segment
             className={ENTRY_CLASS}
           >
-            <SegmentEntryContent
-              segment={segment}
-              swatchClassName={swatchClassName}
-            />
+            <SegmentEntryContent segment={segment} />
           </span>
         ))}
         {/* The widest "N other" can get: every Segment rolled up. */}
@@ -321,10 +284,8 @@ function SummaryWidgetBreakdown<T extends string>({
 /**
  * One Summary Widget (widgets spec §5): a group label, one segmented bar, and
  * a breakdown of every Segment. The breakdown sits on the label line and the
- * bar beneath it, with nothing under the bar, whether the widgets stack or
- * sit side by side (§5.1, §5.7); stacked widgets also drop the swatches and
- * the card's padding, at every width. Host-neutral; a host maps its counts
- * and filters onto these props.
+ * bar beneath it, with nothing under the bar (§5.1, §5.7). Host-neutral; a
+ * host maps its counts and filters onto these props.
  */
 export function SummaryWidget<T extends string>({
   id,
@@ -337,19 +298,13 @@ export function SummaryWidget<T extends string>({
   // Zero-count Segments take no bar width and are left out of the breakdown
   // and "N other" (widgets §5.5), so they can never be selected (§6.4).
   const nonzeroSegments = segments.filter((segment) => segment.count > 0);
-  const widgetCount = React.useContext(SummaryWidgetCountContext);
 
   return (
     <section
       aria-labelledby={labelId}
       // Flex order, not DOM order, puts the bar beneath the label line: DOM
       // order stays label, bar, breakdown for screen readers.
-      className={cn(
-        "flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 py-1.5",
-        widgetCount === null
-          ? undefined
-          : SIDE_BY_SIDE_LAYOUT[widgetCount].widget
-      )}
+      className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 py-1"
     >
       <h2
         id={labelId}

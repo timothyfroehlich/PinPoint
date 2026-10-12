@@ -1,55 +1,32 @@
-import { createContext } from "react";
+/** The narrowest a Summary Widget may be, in px (widgets §2.3). */
+export const SUMMARY_WIDGET_MIN_WIDTH_PX = 240;
 
-/** How many widgets a host shows (its widgets spec §2.1). */
-export type SummaryWidgetCount = 2 | 3;
-
-/**
- * Side by side or stacked (widgets §2.3, §2.4). A host's widgets sit side by
- * side only at md+ when the group's container fits them, about 20rem each;
- * everywhere else they stack, in the phone presentation at every width: no
- * card, no rules between widgets, no breakdown swatches (§5.7), and the
- * Summary Row toggle in the page title row when the host puts one there
- * (list-views §8.4). Every class below overrides a stacked default, so
- * stacked is the base layout and the server HTML needs no script. Static
- * class names, so Tailwind generates them.
- */
-export const SIDE_BY_SIDE_LAYOUT = {
-  2: {
-    /** The group's grid: one column per widget, ruled between. */
-    grid: "md:@min-[40rem]:grid-cols-2 md:@min-[40rem]:divide-x",
-    /** Side-by-side widgets always show, whatever was remembered (§2.3). */
-    shown: "md:@min-[40rem]:grid",
-    /**
-     * The collapse control exists only while stacked (§2.3, §2.4). A toggle
-     * outside the group queries a container exactly as wide as the group's.
-     */
-    toggleHidden: "md:@min-[40rem]:hidden",
-    /** Side-by-side widgets sit in one card. */
-    card: "md:@min-[40rem]:rounded-lg md:@min-[40rem]:border md:@min-[40rem]:bg-card",
-    /** The card replaces the stacked section's bottom space. */
-    content: "md:@min-[40rem]:pb-0",
-    /** Each widget's padding inside the card. */
-    widget:
-      "md:@min-[40rem]:gap-y-1.5 md:@min-[40rem]:px-4 md:@min-[40rem]:py-3",
-    /** Breakdown swatches show only side by side (§5.7). */
-    swatch: "md:@min-[40rem]:inline-block",
-  },
-  3: {
-    grid: "md:@min-[60rem]:grid-cols-3 md:@min-[60rem]:divide-x",
-    shown: "md:@min-[60rem]:grid",
-    toggleHidden: "md:@min-[60rem]:hidden",
-    card: "md:@min-[60rem]:rounded-lg md:@min-[60rem]:border md:@min-[60rem]:bg-card",
-    content: "md:@min-[60rem]:pb-0",
-    widget:
-      "md:@min-[60rem]:gap-y-1.5 md:@min-[60rem]:px-4 md:@min-[60rem]:py-3",
-    swatch: "md:@min-[60rem]:inline-block",
-  },
-} as const satisfies Record<SummaryWidgetCount, Record<string, string>>;
+/** The space between neighboring Summary Widgets, in px (`gap-6`). */
+export const SUMMARY_WIDGET_GAP_PX = 24;
 
 /**
- * The widget count of the group a Summary Widget sits in, so the widget
- * switches with the group's layout; null outside a group, where it stays
- * stacked.
+ * The narrowest row, in px, that holds `count` Summary Widgets side by side
+ * at their minimum width (widgets §2.3, §2.7).
  */
-export const SummaryWidgetCountContext =
-  createContext<SummaryWidgetCount | null>(null);
+export function summaryRowMinWidth(count: number): number {
+  return (
+    count * SUMMARY_WIDGET_MIN_WIDTH_PX +
+    Math.max(0, count - 1) * SUMMARY_WIDGET_GAP_PX
+  );
+}
+
+/**
+ * Each widget's slot in the group's row, in the host's order. A slot shows
+ * only while its container query says the row holds that many widgets, so
+ * whole widgets drop from the right, last first, and never shrink below
+ * 240px, stack, or wrap (widgets §2.7). The row is the query container, so
+ * the thresholds are `summaryRowMinWidth(n)`: 240, 504, and 768px. Container
+ * queries, not measurement: the rule is fixed widths, which CSS expresses
+ * on the first paint with no script (CORE-RESP-002). Static class names, so
+ * Tailwind generates them.
+ */
+export const SUMMARY_WIDGET_SLOT_CLASSES = [
+  "hidden @min-[240px]:block",
+  "hidden @min-[504px]:block",
+  "hidden @min-[768px]:block",
+] as const;

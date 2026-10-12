@@ -157,7 +157,7 @@ describe("issue list page: sorting and comment counts", () => {
       );
       expect(totalCount).toBe(issuesList.length);
       if (scope.length === 0) {
-        expect(summary.open).toBe(0);
+        expect(summary.byStatusGroup).toEqual({ new: 0, in_progress: 0 });
       }
       return issuesList.map((i) =>
         formatIssueId(i.machineInitials, i.issueNumber)

@@ -5,9 +5,7 @@ import {
   SummaryWidget,
   SummaryWidgetGroup,
   type SummaryWidgetSegment,
-  type SummaryWidgetsController,
 } from "~/components/summary-widgets";
-import { cn } from "~/lib/utils";
 import {
   OPEN_STATUS_GROUPS,
   PRIORITY_CONFIG,
@@ -24,12 +22,6 @@ import type {
   IssueSeverity,
   IssueViewState,
 } from "~/lib/types";
-
-/** Browser storage key for the Issues widgets' expanded choice (widgets §2.6). */
-export const ISSUE_SUMMARY_STORAGE_KEY = "pinpoint:summary-widgets:issues";
-
-/** Status, Severity, and Priority (issue-widgets §2.1). */
-export const ISSUE_SUMMARY_WIDGET_COUNT = 3;
 
 /**
  * Segment order: Status runs New then In Progress (issue-widgets §3.2);
@@ -48,8 +40,6 @@ interface IssueSummaryWidgetsProps {
   state: IssueViewState;
   /** Shows a new configuration; a Segment keeps every other filter (widgets §6.2). */
   onStateChange: (next: IssueViewState) => void;
-  /** Shares the expanded state with a Summary Row toggle in the title row. */
-  controller?: SummaryWidgetsController | undefined;
 }
 
 /** The value a filter holds when it holds exactly one value, else null. */
@@ -68,31 +58,6 @@ function selectedStatusGroup(
   );
 }
 
-/** The Summary Row: the open total and the Unplayable count (issue-widgets §2.4). */
-export function IssueSummaryRow({
-  summary,
-}: {
-  summary: IssueListSummary;
-}): React.JSX.Element {
-  return (
-    <>
-      <span className="font-semibold text-foreground tabular-nums">
-        {summary.open}
-      </span>{" "}
-      open ·{" "}
-      <span
-        className={cn(
-          "font-semibold tabular-nums",
-          SEVERITY_CONFIG.unplayable.iconColor
-        )}
-      >
-        {summary.bySeverity.unplayable}
-      </span>{" "}
-      unplayable
-    </>
-  );
-}
-
 /**
  * The Status, Severity, and Priority widgets on Issue View (issue-widgets
  * spec). Every widget counts the host's whole scope (§2.2), whatever the
@@ -104,7 +69,6 @@ export function IssueSummaryWidgets({
   summary,
   state,
   onStateChange,
-  controller,
 }: IssueSummaryWidgetsProps): React.JSX.Element {
   // No status group has a colour of its own; each takes its namesake status's.
   const statusSegments: SummaryWidgetSegment<OpenStatusGroup>[] =
@@ -133,12 +97,7 @@ export function IssueSummaryWidgets({
     }));
 
   return (
-    <SummaryWidgetGroup
-      storageKey={ISSUE_SUMMARY_STORAGE_KEY}
-      summaryRow={<IssueSummaryRow summary={summary} />}
-      widgetCount={ISSUE_SUMMARY_WIDGET_COUNT}
-      controller={controller}
-    >
+    <SummaryWidgetGroup>
       <SummaryWidget
         id="issue-widget-status"
         label="Status"

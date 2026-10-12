@@ -6,7 +6,6 @@ import type { IssueListSummary, IssueViewState } from "~/lib/types";
 import { IssueSummaryWidgets } from "./IssueSummaryWidgets";
 
 const summary: IssueListSummary = {
-  open: 7,
   byStatusGroup: { new: 2, in_progress: 5 },
   bySeverity: { cosmetic: 2, minor: 1, major: 1, unplayable: 3 },
   byPriority: { low: 1, medium: 4, high: 2 },
@@ -44,22 +43,6 @@ describe("IssueSummaryWidgets", () => {
       "2 Cosmetic",
     ]);
     expect(segmentNames("Priority")).toEqual(["2 High", "4 Medium", "1 Low"]);
-  });
-
-  it("shows the open total and the Unplayable count in the Summary Row (§2.4)", () => {
-    renderWidgets();
-
-    expect(
-      screen.getByRole("button", { name: "Summary: 7 open · 3 unplayable" })
-    ).toHaveAttribute("aria-controls");
-  });
-
-  it("offers the collapse control until all three widgets fit side by side (widgets §2.3)", () => {
-    renderWidgets();
-
-    expect(
-      screen.getByRole("button", { name: "Summary: 7 open · 3 unplayable" })
-    ).toHaveClass("md:@min-[60rem]:hidden");
   });
 
   it("sets only that widget's filter from a Segment and returns to page 1 (widgets §6.1, §6.2)", async () => {

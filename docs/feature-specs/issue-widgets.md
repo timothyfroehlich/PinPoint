@@ -52,8 +52,7 @@
 ## Known divergences (code vs spec)
 
 | Requirement | Divergence | Resolution |
-| :-- | :-- | :-- |
-| §2.4 (retired) | Issue View still shows a Summary Row with the open-issue total and Unplayable count while its widgets stack. | PP-jb9v.14 |
+| :---------- | :--------- | :--------- |
 
 ---
 
