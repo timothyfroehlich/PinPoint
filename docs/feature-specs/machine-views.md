@@ -88,7 +88,7 @@
 - **6.4** _Retired 2026-10-07._ Owner Collections were replaced by the Owner filter (collections-and-tags §6.4). Number kept so older citations don't dangle.
 - **6.5** Issues and Timeline Collection tabs continue to use the resolved Collection machine identities and may not widen their scope through URL parameters.
 - **6.6** `/m`'s page actions are, in order, Pinball Map, Add Machine, and ⋯ (list-views §3.7). Pinball Map appears only to people who can open the Pinball Map lineup page (pinballmap-lineup §2.2), and Add Machine only to people 6.1 allows.
-- **6.7** `/m`'s ⋯ holds Print settings sheets (settings-sheets §2.1) and, for people who can print apron cards, Print apron cards (apron-cards §12.1), at every width; the print-queue count shows only on that entry (apron-cards §13.4).
+- **6.7** `/m`'s ⋯ holds Export (§3.15), Print settings sheets (settings-sheets §2.1) and, for people who can print apron cards, Print apron cards (apron-cards §12.1), at every width; the print-queue count shows only on that entry (apron-cards §13.4).
 - **6.8** On `/m`, Pinball Map folds into ⋯ first and Add Machine last (list-views §3.9).
 
 ---
@@ -136,6 +136,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-13 | `/m`'s ⋯ holds Export (§6.7). |
 | 2026-10-12 | Compact rows show the owner as an initials avatar and the Last Serviced age at the right end of line 2 as a wrench icon and “2h ago” (§5.9); Last Serviced links only in the table (§5.7); the whole Compact row links to the machine and its Last Serviced age is plain text (§5.12). |
 | 2026-10-11 | `/m`'s page actions are Pinball Map, Add Machine, and ⋯, which holds the Print settings sheets and Print apron cards entries; Pinball Map folds first and Add Machine last (§6.6–§6.8). |
 | 2026-10-11 | Phone Compact rows become two lines: Playability dot, name, initials, and open-issue count first, then the Playability label, manufacturer, year, owner, and Last Serviced, dropping year, manufacturer, Last Serviced, then owner when crowded (§3.2, §5.3, §5.9, §5.10); the Playability label and Last Serviced age appear only when those fields are displayed, and no service history reads “never serviced” (§5.9); the count is colored “N open” text with no icon, or a muted “None open” (§5.3); the Playability dot differs by shape (§5.11). |

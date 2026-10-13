@@ -67,7 +67,7 @@
 - **4.14** A Machine Group page's actions are, in order, Share, Print, and ⋯ (list-views §3.7), the same on every tab.
 - **4.15** On a Collection, Share opens the sharing controls for its View Link and Editors (3.3–3.7) and appears only to the owner (3.8); other viewers see Print and ⋯. On a tag, Share copies the tag page's address, for everyone.
 - **4.16** Print is a menu holding Settings sheets, which opens Print settings sheets with the group's machines On the Floor already added (settings-sheets §2.6). It holds no apron cards entry.
-- **4.17** ⋯ holds the editing actions the viewer holds: on a Collection, Edit collection, for the owner and Editors (3.8); on a hand-applied tag, Edit machines, Rename, Move to another tag type, Merge into another tag, and Delete, for technicians and admins (11.8, 11.9, 11.11, 11.16, 11.17). On the Issues tab it also holds Export (issues-list 2.4).
+- **4.17** ⋯ holds the editing actions the viewer holds: on a Collection, Edit collection, for the owner and Editors (3.8); on a hand-applied tag, Edit machines, Rename, Move to another tag type, Merge into another tag, and Delete, for technicians and admins (11.8, 11.9, 11.11, 11.16, 11.17). On the Issues tab it also holds Export (issues-list 2.4), and on the Machines tab, Export (machine-views §3.15).
 - **4.18** When the actions do not fit (list-views §3.9), Share and Print fold into ⋯ together.
 
 ---
@@ -193,6 +193,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-13 | On the Machines tab, ⋯ also holds Export (4.17). |
 | 2026-10-11 | Machine Group header: the summary counts line is gone at every width, and the open-issue count stays on the Issues tab (4.2); a breadcrumb, Tags and the tag type on tags and Collections on Collections, sits inline before the title and is first to move above it (4.8, 4.9, 7.7); the page actions sit at the right end of the tab row (4.10); a Collection's description sits beside the title in a 280–560px column on wider screens and under it on phones, clamped to three lines or two on phones with an inline Show more (4.7, 4.11, 4.12); the header's spacing tightens below 390px (4.13). Collections shows in the breadcrumb only to signed-in viewers who can open My Collections, with "›" separators and no tag icon (4.8). Page actions: Share, Print, and ⋯ on every tab (4.14); Share opens a Collection's sharing controls for its owner and copies a tag's address for everyone (4.15); Print holds Settings sheets only (4.16); ⋯ holds the viewer's editing actions, and Export on the Issues tab (4.17); Share and Print fold into ⋯ together (4.18). |
 | 2026-10-07 | Retired Owner Collections: a person's machines and their issues are the Machines and Issues lists filtered by owner, and old Owner Collection links open those lists (§1, 5.3, §6). |
 | 2026-10-06 | Added merging one hand-applied tag into another (11.17–11.19, 12.5); retired deferred item 10.8. |
