@@ -448,8 +448,8 @@ export async function loadMachineExportRows(
     return [
       {
         id: base.initials,
-        // The catalog title carries the edition, such as "Godzilla (Premium)".
         name: base.title,
+        // The catalog title carries the edition, such as "Godzilla (Premium)".
         model: base.canonicalModelName,
         manufacturer: base.hasManufacturer ? base.manufacturer : null,
         year: base.year,
