@@ -52,12 +52,23 @@
 ## 4. Machine Group Pages
 
 - **4.1** Every Machine Group page has Overview, Issues, and Timeline tabs under one header.
-- **4.2** The header shows the group's name, its machine count, and how many machines are operational, need service, or are unplayable, plus the open-issue count. None of these counts include Removed machines or their issues.
+- **4.2** The header shows the group's breadcrumb (4.8), its name, and a Collection's description (4.7), and no machine or issue counts. The Issues tab shows the group's open-issue count, which leaves out Removed machines' issues.
 - **4.3** Overview is the shared Machine View (machine-views.md) scoped to the group's machines, using the Collections Page Preset.
 - **4.4** The Issues tab shows only issues on the group's machines. Its filters can narrow that set but never widen it.
 - **4.5** The Timeline tab shows one chronological feed across the group's machines, each entry labeled with its machine. Its filters can narrow that set but never widen it. The feed is read-only.
 - **4.6** An empty Collection shows people who can edit it a way to add machines, and shows everyone else that the Collection has no machines yet.
-- **4.7** A Collection's description appears under its header on every tab, to everyone who can open the Collection, including through its View Link. A description longer than three lines shows its first three with a Show more control. A Collection without a description shows nothing there.
+- **4.7** A Collection's description appears in its header on every tab, to everyone who can open the Collection, including through its View Link. A Collection without a description shows nothing there.
+- **4.8** The header's breadcrumb names where the group lives: on a tag's page, Tags and then the tag's tag type when it has one (7.7); on a Collection, Collections, linking to My Collections (§5), shown only to signed-in viewers who can open My Collections; anonymous visitors and View Link viewers see the title with no breadcrumb. Crumbs are separated by "›", and the breadcrumb shows no tag icon.
+- **4.9** The breadcrumb sits inline before the title, aligned with the title's top. When the breadcrumb, the title, and a Collection description's 280px column beside them (4.11) do not fit on one line, the breadcrumb moves above the title; it moves before the description leaves its column.
+- **4.10** The page actions sit at the right end of the row holding the Overview, Issues, and Timeline tabs, on every tab and at every width.
+- **4.11** At and above the md breakpoint a Collection's description sits beside the title in a column 280px to 560px wide, and moves under the title when that column cannot get 280px. Below the md breakpoint it always sits under the title.
+- **4.12** A description shows at most three lines, or two below the md breakpoint. Longer text ends its last shown line with an inline "… Show more" control that shows the rest, and Show less then returns it to its clamped length.
+- **4.13** Below 390px wide the header's spacing above the title and below the tabs tightens from 12px to 4px.
+- **4.14** A Machine Group page's actions are, in order, Share, Print, and ⋯ (list-views §3.7), the same on every tab.
+- **4.15** On a Collection, Share opens the sharing controls for its View Link and Editors (3.3–3.7) and appears only to the owner (3.8); other viewers see Print and ⋯. On a tag, Share copies the tag page's address, for everyone.
+- **4.16** Print is a menu holding Settings sheets, which opens Print settings sheets with the group's machines On the Floor already added (settings-sheets §2.6). It holds no apron cards entry.
+- **4.17** ⋯ holds the editing actions the viewer holds: on a Collection, Edit collection, for the owner and Editors (3.8); on a hand-applied tag, Edit machines, Rename, Move to another tag type, Merge into another tag, and Delete, for technicians and admins (11.8, 11.9, 11.11, 11.16, 11.17). On the Issues tab it also holds Export (issues-list 2.4), and on the Machines tab, Export (machine-views §3.15).
+- **4.18** When the actions do not fit (list-views §3.9), Share and Print fold into ⋯ together.
 
 ---
 
@@ -87,7 +98,7 @@
 - **7.4** A machine's page links to each tag the machine belongs to.
 - **7.5** A tag's page and address stay the same while its membership changes.
 - **7.6** Tag membership is computed from data PinPoint already stores. Showing a tag, a tag page, or the tag browse never calls an external service.
-- **7.7** Each tag type has a public page listing its tags. A tag's page identifies it as a tag and links to its tag type's page when it has one. The tag browse links each tag type's section to that page.
+- **7.7** Each tag type has a public page listing its tags. A tag's page identifies it as a tag with its breadcrumb (4.8), which links to the tag browse and, when the tag has a tag type, to that tag type's page. The tag browse links each tag type's section to that page.
 - **7.8** A tag type whose membership PinPoint derives from machine data, rather than people assigning it, is marked automatic on its page and in the tag browse.
 - **7.9** Machine counts shown for tags in the tag browse and on tag type pages leave out Removed machines.
 
@@ -165,7 +176,16 @@
 
 ## Known divergences (code vs spec)
 
-_None — the current implementation matches this spec._
+| Requirement | Divergence | Resolution |
+| :-- | :-- | :-- |
+| §4.2 | The header still shows a summary line under the title: machine count, operational, need service, and unplayable counts, and open issues. | PP-jb9v.18 |
+| §4.8 | A Collection's header has no breadcrumb. | PP-jb9v.18 |
+| §4.9 | A tag's breadcrumb always sits on its own line above the title, never inline before it. | PP-jb9v.18 |
+| §4.10 | The page actions sit in the title row, wrapping onto their own row when they do not fit beside the title, not at the right end of the tab row. | PP-jb9v.18 |
+| §4.11 | The description always sits between the title and the tabs, never beside the title. | PP-jb9v.18 |
+| §4.12 | The description clamps to three lines at every width, and Show more is a separate control below the text rather than inline at the end of its last line. | PP-jb9v.18 |
+| §4.13 | The header's spacing does not tighten below 390px. | PP-jb9v.18 |
+| 4.14–4.18 | A Collection shows a Settings sheets link, Share (owner), and Edit collection as separate buttons; a tag shows a Settings sheets link, Edit machines, and a ⋯ of Rename, Move, Merge, and Delete; tags have no Share, neither page has a Print menu, the Issues tab's Export sits in the List Header, and nothing folds. | PP-jb9v.17 |
 
 ---
 
@@ -173,6 +193,8 @@ _None — the current implementation matches this spec._
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-13 | On the Machines tab, ⋯ also holds Export (4.17). |
+| 2026-10-11 | Machine Group header: the summary counts line is gone at every width, and the open-issue count stays on the Issues tab (4.2); a breadcrumb, Tags and the tag type on tags and Collections on Collections, sits inline before the title and is first to move above it (4.8, 4.9, 7.7); the page actions sit at the right end of the tab row (4.10); a Collection's description sits beside the title in a 280–560px column on wider screens and under it on phones, clamped to three lines or two on phones with an inline Show more (4.7, 4.11, 4.12); the header's spacing tightens below 390px (4.13). Collections shows in the breadcrumb only to signed-in viewers who can open My Collections, with "›" separators and no tag icon (4.8). Page actions: Share, Print, and ⋯ on every tab (4.14); Share opens a Collection's sharing controls for its owner and copies a tag's address for everyone (4.15); Print holds Settings sheets only (4.16); ⋯ holds the viewer's editing actions, and Export on the Issues tab (4.17); Share and Print fold into ⋯ together (4.18). |
 | 2026-10-07 | Retired Owner Collections: a person's machines and their issues are the Machines and Issues lists filtered by owner, and old Owner Collection links open those lists (§1, 5.3, §6). |
 | 2026-10-06 | Added merging one hand-applied tag into another (11.17–11.19, 12.5); retired deferred item 10.8. |
 | 2026-10-05 | Added Collection descriptions, written by the owner and Editors and shown under the header on every tab (2.4, 2.8, 3.8, 4.7); retired deferred item 10.3. |
