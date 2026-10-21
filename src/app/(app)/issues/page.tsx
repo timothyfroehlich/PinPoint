@@ -3,11 +3,9 @@ import { type Metadata } from "next";
 import { redirect } from "next/navigation";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { IssueView } from "~/components/issues/view/IssueView";
-import { getViewer } from "~/lib/auth/viewer";
 import { loadIssueView } from "~/lib/issues/view/queries";
 import { loadIssueViewSavedViews } from "~/lib/issues/view/saved-views";
 import { toListSearchParams } from "~/lib/list-view/url-state";
-import { getAccessLevel } from "~/lib/permissions/helpers";
 
 export const metadata: Metadata = {
   title: "Issues | PinPoint",
@@ -26,11 +24,7 @@ interface IssuesPageProps {
 export default async function IssuesPage({
   searchParams,
 }: IssuesPageProps): Promise<React.JSX.Element> {
-  const [viewer, rawSearchParams] = await Promise.all([
-    getViewer(),
-    searchParams,
-  ]);
-  const viewSearchParams = toListSearchParams(rawSearchParams);
+  const viewSearchParams = toListSearchParams(await searchParams);
   const { savedViews, redirectTo } = await loadIssueViewSavedViews(
     "issues",
     viewSearchParams
@@ -42,15 +36,7 @@ export default async function IssuesPage({
   // in it (list-views §3.1, §7.2).
   return (
     <PageContainer size="wide" className="max-md:pt-3">
-      <IssueView
-        result={result}
-        savedViews={savedViews}
-        title="Issues"
-        viewer={{
-          userId: viewer.userId,
-          accessLevel: getAccessLevel(viewer.role),
-        }}
-      />
+      <IssueView result={result} savedViews={savedViews} title="Issues" />
     </PageContainer>
   );
 }

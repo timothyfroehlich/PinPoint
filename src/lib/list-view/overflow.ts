@@ -149,3 +149,48 @@ export function planListHeader(input: ListHeaderFitInput): ListHeaderPlan {
     compactEdit: true,
   };
 }
+
+/**
+ * Room a line fit leaves spare, so a part drops a little before the line is
+ * exactly full and real glyphs never crowd the line's end.
+ */
+export const LINE_FIT_TOLERANCE = 16;
+
+export interface LineFitInput<Part extends string> {
+  /** The line's inner width. */
+  available: number;
+  /** Widths of the parts that never drop, at their full width. */
+  keptWidths: readonly number[];
+  /** Each droppable part's width, its leading separator included. */
+  partWidths: Readonly<Record<Part, number>>;
+  /** The droppable parts, the first to drop first. */
+  dropOrder: readonly Part[];
+  gap: number;
+}
+
+/**
+ * Which droppable parts of a one-line row stay shown (issues-list §3.9):
+ * parts drop one at a time in `dropOrder` until the line fits with
+ * `LINE_FIT_TOLERANCE` to spare. When the kept parts alone still do not fit,
+ * every droppable part is gone and the component truncates what remains.
+ */
+export function fitLineParts<Part extends string>({
+  available,
+  keptWidths,
+  partWidths,
+  dropOrder,
+  gap,
+}: LineFitInput<Part>): ReadonlySet<Part> {
+  const shown = new Set(dropOrder);
+  const room = available - LINE_FIT_TOLERANCE;
+  const lineWidth = (): number =>
+    rowWidth(
+      [...keptWidths, ...[...shown].map((part) => partWidths[part])],
+      gap
+    );
+  for (const part of dropOrder) {
+    if (lineWidth() <= room) break;
+    shown.delete(part);
+  }
+  return shown;
+}

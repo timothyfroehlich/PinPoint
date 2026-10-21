@@ -1,17 +1,14 @@
 import type React from "react";
 import { IssueView } from "~/components/issues/view/IssueView";
 import type { CollectionMachine } from "~/lib/collections/types";
-import type { Viewer } from "~/lib/auth/viewer";
 import { loadIssueView } from "~/lib/issues/view/queries";
 import { loadIssueViewSavedViews } from "~/lib/issues/view/saved-views";
 import { toListSearchParams } from "~/lib/list-view/url-state";
-import { getAccessLevel } from "~/lib/permissions/helpers";
 import type { IssueExportScope } from "~/app/(app)/issues/export-schema";
 
 interface MachineGroupIssuesTabProps {
   machines: CollectionMachine[];
   searchParams: Record<string, string | string[] | undefined>;
-  viewer: Viewer;
   /** Names this tab's Surface so Export can resolve its scope on the server. */
   exportScope: IssueExportScope;
 }
@@ -26,7 +23,6 @@ interface MachineGroupIssuesTabProps {
 export async function MachineGroupIssuesTab({
   machines,
   searchParams: rawParams,
-  viewer,
   exportScope,
 }: MachineGroupIssuesTabProps): Promise<React.JSX.Element> {
   const searchParams = toListSearchParams(rawParams);
@@ -42,10 +38,6 @@ export async function MachineGroupIssuesTab({
       result={result}
       savedViews={savedViews}
       exportScope={exportScope}
-      viewer={{
-        userId: viewer.userId,
-        accessLevel: getAccessLevel(viewer.role),
-      }}
     />
   );
 }
