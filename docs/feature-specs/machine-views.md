@@ -119,11 +119,7 @@
 
 ## Known divergences (code vs spec)
 
-| Requirement | Divergence | Resolution |
-| :-- | :-- | :-- |
-| §3.2, §5.3, §5.9, §5.10 | Phone Compact rows are one line; the second line (Playability label, manufacturer, year, owner, Last Serviced) and its drop order are not built. | List View redesign, phone machine rows (PP-jb9v.13). |
-| §5.3 | The Compact row's open-issue count shows a severity icon before “N open”. | List View redesign, phone machine rows (PP-jb9v.13). |
-| §5.11 | The Compact row's Playability dot is the same round dot for every Playability, distinguished by color only. | List View redesign, phone machine rows (PP-jb9v.13). |
+_None — the current implementation matches this spec._
 
 ---
 
