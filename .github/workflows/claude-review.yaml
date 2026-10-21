@@ -1,0 +1,113 @@
+# Claude Review: a Claude Code review of every ready pull request, run in CI on
+# Tim's Claude subscription (PP-zxlq.1). The first run reviews the whole PR; later
+# runs review only the commits added since the last successful run, with main's
+# changes left out, and pass without a review when those commits add nothing
+# beyond main (scripts/workflow/claude-review-range.sh). Findings arrive as inline
+# review comments.
+#
+# Trial: this check is not required yet. The local /code-review and its review
+# record remain the merge gate until PP-zxlq makes this job the required check.
+#
+# Security boundary: `pull_request` from this repository's own branches only. Fork
+# PRs get no secrets and are skipped. Claude may read the checkout, run read-only
+# git and gh commands, and post comments; it cannot edit, commit, or push.
+
+name: Claude Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions: {}
+
+concurrency:
+  # A newer push supersedes the review in progress; the next run's range covers
+  # the cancelled head's commits too.
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: Claude Review
+    if: >-
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      checks: read
+      pull-requests: write
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
+        with:
+          egress-policy: audit
+
+      - name: Require the Claude token
+        env:
+          HAS_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
+        run: |
+          if [ "$HAS_TOKEN" != "true" ]; then
+            echo "::error::CLAUDE_CODE_OAUTH_TOKEN is not set. Create it with 'claude setup-token'" \
+              "and add it as an Actions secret (and as a Dependabot secret for Dependabot PRs)."
+            exit 1
+          fi
+
+      - name: Check out the PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Plan the review range
+        id: range
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          bash scripts/workflow/claude-review-range.sh "$PR_NUMBER" "$HEAD_SHA"
+
+      - name: Summarize the range
+        env:
+          MODE: ${{ steps.range.outputs.mode }}
+          LEVEL: ${{ steps.range.outputs.level }}
+          DETAIL: ${{ steps.range.outputs.detail }}
+        run: |
+          {
+            echo "### Claude Review"
+            echo "- mode: \`${MODE}\`"
+            echo "- level: \`${LEVEL}\`"
+            echo "- ${DETAIL}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Review
+        if: steps.range.outputs.mode != 'skip'
+        uses: anthropics/claude-code-action@58985842b834ed26087302ba27d07bc24ca8697a  # ratchet:anthropics/claude-code-action@v1.0.244
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          allowed_bots: "renovate[bot],dependabot[bot]"
+          classify_inline_comments: "false"
+          prompt: |
+            You are reviewing pull request ${{ github.repository }}#${{ github.event.pull_request.number }}
+            in GitHub Actions. Its head commit ${{ github.event.pull_request.head.sha }} is checked out.
+
+            1. Run the /code-review skill at level ${{ steps.range.outputs.level }}. The target is the
+               changes shown by `git diff ${{ steps.range.outputs.base }} ${{ github.event.pull_request.head.sha }}`
+               (${{ steps.range.outputs.detail }}). Review only those changes, reading surrounding code as
+               needed. REVIEW.md at the repository root is the review rubric.
+            2. Post each finding as an inline comment with mcp__github_inline_comment__create_inline_comment,
+               passing confirmed: true. Anchor it on the line it concerns, which must be a line in the pull
+               request's diff against main (`gh pr diff`). Begin the comment with the one-sentence finding,
+               then the concrete failure scenario. A finding whose line is not in that diff goes in one
+               `gh pr comment` instead.
+            3. Post nothing when there are no findings. Do not edit files, commit, push, approve, or
+               request changes.
+          claude_args: >-
+            --allowedTools "Skill" "Agent" "Task" "Read" "Grep" "Glob"
+            "Bash(git diff:*)" "Bash(git log:*)" "Bash(git show:*)" "Bash(git blame:*)"
+            "Bash(gh pr view:*)" "Bash(gh pr diff:*)" "Bash(gh pr comment:*)"
+            "mcp__github_inline_comment__create_inline_comment"
