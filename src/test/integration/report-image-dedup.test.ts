@@ -316,19 +316,18 @@ describe("report action — idempotent retry image handling (PP-u0v1)", () => {
 
   it("a failed image link does not delete the blobs it named (PP-ysk3)", async () => {
     const db = await getTestDb();
-    // Make every issue_images insert fail so the action takes its
-    // link-failure branch.
-    await db.execute(sql`
-      CREATE OR REPLACE FUNCTION pp_ysk3_fail_image_link() RETURNS trigger
-      LANGUAGE plpgsql AS $$
-      BEGIN RAISE EXCEPTION 'simulated link failure'; END $$
-    `);
-    await db.execute(sql`
-      CREATE TRIGGER pp_ysk3_fail_image_link BEFORE INSERT ON issue_images
-      FOR EACH ROW EXECUTE FUNCTION pp_ysk3_fail_image_link()
-    `);
-
     try {
+      // Make every issue_images insert fail so the action takes its
+      // link-failure branch.
+      await db.execute(sql`
+        CREATE OR REPLACE FUNCTION pp_ysk3_fail_image_link() RETURNS trigger
+        LANGUAGE plpgsql AS $$
+        BEGIN RAISE EXCEPTION 'simulated link failure'; END $$
+      `);
+      await db.execute(sql`
+        CREATE TRIGGER pp_ysk3_fail_image_link BEFORE INSERT ON issue_images
+        FOR EACH ROW EXECUTE FUNCTION pp_ysk3_fail_image_link()
+      `);
       await submitPublicIssueAction(
         { error: "" },
         makeFormData({
@@ -339,9 +338,9 @@ describe("report action — idempotent retry image handling (PP-u0v1)", () => {
       );
     } finally {
       await db.execute(
-        sql`DROP TRIGGER pp_ysk3_fail_image_link ON issue_images`
+        sql`DROP TRIGGER IF EXISTS pp_ysk3_fail_image_link ON issue_images`
       );
-      await db.execute(sql`DROP FUNCTION pp_ysk3_fail_image_link()`);
+      await db.execute(sql`DROP FUNCTION IF EXISTS pp_ysk3_fail_image_link()`);
     }
 
     // The issue was created; the link failed; nothing was deleted.
