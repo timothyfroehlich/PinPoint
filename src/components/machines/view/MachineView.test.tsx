@@ -14,6 +14,17 @@ import type {
 } from "~/lib/types";
 import { MachineView } from "./MachineView";
 
+/**
+ * The toolbar's search field. List View renders search twice, in the toolbar
+ * and in the phone List Header, and CSS shows one (list-views §7.3); jsdom
+ * applies no CSS, so both are in the tree and the toolbar's comes first.
+ */
+function toolbarSearch(name: string | RegExp): HTMLElement {
+  const [field] = screen.getAllByRole("searchbox", { name });
+  if (!field) throw new Error("no search field");
+  return field;
+}
+
 window.matchMedia = vi.fn().mockImplementation(() => ({
   matches: false,
   media: "",
@@ -227,9 +238,7 @@ describe("MachineView", () => {
 
   it("searches without a placeholder, named for the list it searches (list-views §4.2)", () => {
     renderView();
-    expect(
-      screen.getByRole("searchbox", { name: "Search machines" })
-    ).not.toHaveAttribute("placeholder");
+    expect(toolbarSearch("Search machines")).not.toHaveAttribute("placeholder");
   });
 
   it("debounces search and resets to page one", () => {
@@ -237,10 +246,9 @@ describe("MachineView", () => {
     navigation.searchParams = new URLSearchParams({ page: "3" });
     renderView({ result: result({ state: { ...presetState, page: 3 } }) });
 
-    fireEvent.change(
-      screen.getByRole("searchbox", { name: /search machines/i }),
-      { target: { value: "  mars  " } }
-    );
+    fireEvent.change(toolbarSearch(/search machines/i), {
+      target: { value: "  mars  " },
+    });
     act(() => vi.advanceTimersByTime(249));
     expect(navigation.replace).not.toHaveBeenCalled();
     act(() => vi.advanceTimersByTime(1));
@@ -253,7 +261,7 @@ describe("MachineView", () => {
   it("searches at once on Enter (list-views §4.1)", () => {
     vi.useFakeTimers();
     renderView();
-    const search = screen.getByRole("searchbox", { name: /search machines/i });
+    const search = toolbarSearch(/search machines/i);
 
     fireEvent.change(search, { target: { value: "mars" } });
     fireEvent.keyDown(search, { key: "Enter" });
@@ -268,7 +276,7 @@ describe("MachineView", () => {
   it("preserves new typing when an earlier search result arrives", () => {
     vi.useFakeTimers();
     const { rerender } = renderView();
-    const search = screen.getByRole("searchbox", { name: /search machines/i });
+    const search = toolbarSearch(/search machines/i);
 
     fireEvent.change(search, { target: { value: "mars" } });
     act(() => vi.advanceTimersByTime(250));
@@ -724,7 +732,7 @@ describe("MachineView", () => {
       views: savedViews({ defaultViewId: brokenView.id }),
     });
 
-    await user.clear(screen.getByRole("searchbox", { name: /search/i }));
+    await user.clear(toolbarSearch(/search/i));
     await user.keyboard("{Enter}");
     // A bare /m would open the Default View instead of the cleared list.
     expect(navigation.replace).toHaveBeenLastCalledWith(
@@ -737,10 +745,9 @@ describe("MachineView", () => {
     vi.useFakeTimers();
     renderView();
 
-    fireEvent.change(
-      screen.getByRole("searchbox", { name: /search machines/i }),
-      { target: { value: "stern" } }
-    );
+    fireEvent.change(toolbarSearch(/search machines/i), {
+      target: { value: "stern" },
+    });
     fireEvent.click(
       within(screen.getByRole("region", { name: "Playability" })).getByRole(
         "button",
@@ -768,7 +775,7 @@ describe("MachineView", () => {
       }),
       views: savedViews({ activeViewId: brokenView.id }),
     });
-    const search = screen.getByRole("searchbox", { name: /search machines/i });
+    const search = toolbarSearch(/search machines/i);
 
     fireEvent.change(search, { target: { value: "stern" } });
     fireEvent.click(screen.getByRole("button", { name: "Discard changes" }));
@@ -779,9 +786,7 @@ describe("MachineView", () => {
       { scroll: false }
     );
     // The field is mounted afresh with the Applied View's search.
-    expect(
-      screen.getByRole("searchbox", { name: /search machines/i })
-    ).toHaveValue("");
+    expect(toolbarSearch(/search machines/i)).toHaveValue("");
   });
 
   it("names the Page Preset's view when it rewrites a URL to its canonical form while a Default View exists (list-views §9.3, §10.10)", () => {
@@ -1026,7 +1031,7 @@ describe("MachineView", () => {
       views: savedViews({ defaultViewId: "on-the-floor" }),
     });
 
-    await user.clear(screen.getByRole("searchbox", { name: /search/i }));
+    await user.clear(toolbarSearch(/search/i));
     await user.keyboard("{Enter}");
     // The server opens a bare /m at the Page Preset already.
     expect(navigation.replace).toHaveBeenLastCalledWith("/m", {

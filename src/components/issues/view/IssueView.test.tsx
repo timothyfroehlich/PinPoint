@@ -15,6 +15,17 @@ import type {
 } from "~/lib/types";
 import { IssueView } from "./IssueView";
 
+/**
+ * The toolbar's search field. List View renders search twice, in the toolbar
+ * and in the phone List Header, and CSS shows one (list-views §7.3); jsdom
+ * applies no CSS, so both are in the tree and the toolbar's comes first.
+ */
+function toolbarSearch(name: string | RegExp): HTMLElement {
+  const [field] = screen.getAllByRole("searchbox", { name });
+  if (!field) throw new Error("no search field");
+  return field;
+}
+
 window.matchMedia = vi.fn().mockImplementation(() => ({
   matches: false,
   media: "",
@@ -410,9 +421,7 @@ describe("IssueView", () => {
 
   it("searches without a placeholder, named for the list it searches (list-views §4.2)", () => {
     renderView();
-    expect(
-      screen.getByRole("searchbox", { name: "Search issues" })
-    ).not.toHaveAttribute("placeholder");
+    expect(toolbarSearch("Search issues")).not.toHaveAttribute("placeholder");
   });
 
   it("lists the Secondary Filters under More, in order (issues-list §4.3)", async () => {
@@ -611,10 +620,7 @@ describe("IssueView", () => {
     const user = userEvent.setup();
     renderView();
 
-    await user.type(
-      screen.getByRole("searchbox", { name: "Search issues" }),
-      "flipper{Enter}"
-    );
+    await user.type(toolbarSearch("Search issues"), "flipper{Enter}");
 
     expect(navigation.replace).toHaveBeenLastCalledWith("/issues?q=flipper", {
       scroll: false,

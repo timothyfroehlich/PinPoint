@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
   formatPageSpan,
@@ -9,7 +8,6 @@ import {
   getPagerItems,
 } from "~/lib/list-view/pagination";
 import { cn } from "~/lib/utils";
-import { LIST_PAGER_SLOT_ID } from "./pager-slot";
 import type { ListPaginationModel } from "./types";
 
 function rangeLabel(pagination: ListPaginationModel): string {
@@ -191,32 +189,14 @@ function PageControls({
 }
 
 /**
- * The phone pager (list-views §7.8): a 44px bar pinned above the tab bar and
- * the device safe area (§12.6), with Previous, the range, and Next. The
- * `data-list-pager` marker lets the app's scroller reserve its height, so a
- * focused row never lands under it (§12.5). It renders into the app shell's
- * pager slot, still inside the page's main landmark and after the list in
- * focus order, where no ancestor can become its containing block (see
- * LIST_PAGER_SLOT_ID). Without the shell it renders in place. It appears
- * once mounted, since the slot is found in the document.
+ * The phone pager (list-views §7.8, §7.11): the last thing after the list
+ * box, directly beneath it and scrolling with the page, with Previous, the
+ * range, and Next. On a single page the range shows alone, centred (§8.3).
+ * Nothing full-width is pinned above the tab bar (design-bible §3). The
+ * `data-list-phone-pager` marker lets the page end at the tab bar
+ * (MainLayout).
  */
 export function PhonePager({
-  pagination,
-}: {
-  pagination: ListPaginationModel;
-}): React.JSX.Element | null {
-  const [target, setTarget] = React.useState<{
-    slot: HTMLElement | null;
-  } | null>(null);
-  React.useEffect(() => {
-    setTarget({ slot: document.getElementById(LIST_PAGER_SLOT_ID) });
-  }, []);
-  if (!target) return null;
-  const bar = <PhonePagerBar pagination={pagination} />;
-  return target.slot ? createPortal(bar, target.slot) : bar;
-}
-
-function PhonePagerBar({
   pagination,
 }: {
   pagination: ListPaginationModel;
@@ -226,31 +206,43 @@ function PhonePagerBar({
     pagination.pageSize,
     pagination.totalCount
   );
+  const multiPage = range.pageCount > 1;
+  const buttonClass = cn(
+    iconButtonClass,
+    "size-11 disabled:text-outline-variant"
+  );
   return (
     <nav
       aria-label="Pagination"
-      data-list-pager=""
-      className="fixed inset-x-0 bottom-[calc(57px+env(safe-area-inset-bottom))] z-40 flex h-11 items-center justify-between border-t border-border bg-card/95 backdrop-blur-sm md:hidden"
+      data-list-phone-pager=""
+      className={cn(
+        "-mx-4 mb-0 flex h-14 items-center px-1 text-sm text-muted-foreground sm:-mx-8 md:hidden",
+        multiPage ? "justify-between" : "justify-center"
+      )}
     >
-      <button
-        type="button"
-        aria-label="Previous page"
-        disabled={range.page <= 1}
-        onClick={() => pagination.onPage(range.page - 1, true)}
-        className={cn(iconButtonClass, "h-11 w-14 text-primary")}
-      >
-        <ChevronLeft aria-hidden="true" className="size-5" />
-      </button>
+      {multiPage ? (
+        <button
+          type="button"
+          aria-label="Previous page"
+          disabled={range.page <= 1}
+          onClick={() => pagination.onPage(range.page - 1, true)}
+          className={buttonClass}
+        >
+          <ChevronLeft aria-hidden="true" className="size-[18px]" />
+        </button>
+      ) : null}
       <RangeTextFace pagination={pagination} />
-      <button
-        type="button"
-        aria-label="Next page"
-        disabled={range.page >= range.pageCount}
-        onClick={() => pagination.onPage(range.page + 1, true)}
-        className={cn(iconButtonClass, "h-11 w-14 text-primary")}
-      >
-        <ChevronRight aria-hidden="true" className="size-5" />
-      </button>
+      {multiPage ? (
+        <button
+          type="button"
+          aria-label="Next page"
+          disabled={range.page >= range.pageCount}
+          onClick={() => pagination.onPage(range.page + 1, true)}
+          className={buttonClass}
+        >
+          <ChevronRight aria-hidden="true" className="size-[18px]" />
+        </button>
+      ) : null}
     </nav>
   );
 }
