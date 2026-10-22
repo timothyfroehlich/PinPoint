@@ -75,14 +75,20 @@ def plan(tmp_path: Path, repo: Path, reviewed: list[str]) -> tuple[dict[str, str
     gh = tmp_path / "gh"
     gh.write_text(
         "#!/usr/bin/env python3\n"
-        "import os, sys\n"
+        "import json, os, subprocess, sys\n"
         "args = sys.argv[1:]\n"
         "path = next(a for a in args if a.startswith('repos/'))\n"
         "if '/pulls/7/commits' in path:\n"
         "    print(os.environ['STUB_COMMITS'])\n"
         "elif '/check-runs' in path:\n"
         "    sha = path.split('/commits/')[1].split('/')[0]\n"
-        "    print(1 if sha in os.environ['STUB_REVIEWED'].split(',') else 0)\n"
+        "    runs = [{'conclusion': 'success', 'app': {'slug': app}}\n"
+        "            for entry in os.environ['STUB_REVIEWED'].split(',') if entry\n"
+        "            for app_sha, _, app in [entry.partition(':')] if app_sha == sha]\n"
+        "    jq = args[args.index('--jq') + 1]\n"
+        "    out = subprocess.run(['jq', '-r', jq], input=json.dumps({'check_runs': runs}),\n"
+        "                         capture_output=True, text=True, check=True).stdout\n"
+        "    print(out, end='')\n"
         "else:\n"
         "    raise SystemExit(f'unexpected gh call: {args}')\n"
     )
@@ -102,7 +108,9 @@ def plan(tmp_path: Path, repo: Path, reviewed: list[str]) -> tuple[dict[str, str
             "GITHUB_OUTPUT": str(output),
             "CLAUDE_REVIEW_MAIN_REF": "main",
             "STUB_COMMITS": "\n".join(pr_commits(repo)),
-            "STUB_REVIEWED": ",".join(reviewed),
+            "STUB_REVIEWED": ",".join(
+                r if ":" in r else f"{r}:github-actions" for r in reviewed
+            ),
         },
     )
     assert result.returncode == 0, result.stderr
@@ -201,3 +209,11 @@ def test_level_from_sizes_the_exact_diff(repo: Path) -> None:
     )
     assert result.returncode == 0, result.stderr
     assert result.stdout.splitlines()[0] == "low"
+
+
+def test_check_runs_from_other_apps_do_not_count(tmp_path: Path, repo: Path) -> None:
+    other = commit_file(repo, "src/a.ts", "a\n")
+    commit_file(repo, "src/b.ts", "b\n")
+    outputs, _ = plan(tmp_path, repo, reviewed=[f"{other}:some-other-app"])
+    assert outputs["mode"] == "full"
+    assert outputs["last_reviewed"] == ""
