@@ -91,8 +91,6 @@ jobs:
       - name: Prepare the review inputs
         if: steps.range.outputs.mode != 'skip'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
           BASE: ${{ steps.range.outputs.base }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
@@ -101,7 +99,9 @@ jobs:
           mkdir .claude-review
           git diff "$BASE" "$HEAD_SHA" > .claude-review/range.patch
           git log --format='%h %s' "$BASE..$HEAD_SHA" > .claude-review/commits.txt
-          gh pr diff "$PR_NUMBER" > .claude-review/pr.diff
+          # The PR's diff against main, built locally: `gh pr diff` refuses PRs over
+          # GitHub's diff size limit.
+          git diff "$(git merge-base origin/main "$HEAD_SHA")" "$HEAD_SHA" > .claude-review/pr.diff
           wc -l .claude-review/*
 
       - name: Review
