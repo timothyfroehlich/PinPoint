@@ -639,7 +639,8 @@ const PERMISSIONS_MATRIX_DEFINITION = [
       {
         id: "notifications.manage_own",
         label: "Manage own notifications",
-        description: "Mark notifications as read or dismiss them",
+        description:
+          "Mark notifications as read or dismiss them, and manage your own notification preferences",
         access: {
           unauthenticated: false,
           guest: true,

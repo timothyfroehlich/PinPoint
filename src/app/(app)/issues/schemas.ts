@@ -14,6 +14,7 @@ import {
 } from "~/lib/types";
 import { ISSUE_STATUS_VALUES } from "~/lib/issues/status";
 import { isProductionBuild } from "~/lib/runtime-env";
+import { BLOB_CONFIG } from "~/lib/blob/config";
 
 const uuidish = z
   .string()
@@ -99,7 +100,11 @@ export const imageMetadataSchema = z.object({
     ),
   blobPathname: z.string().min(1),
   originalFilename: z.string().min(1),
-  fileSizeBytes: z.number().positive(),
+  fileSizeBytes: z
+    .number()
+    .int()
+    .positive()
+    .max(BLOB_CONFIG.MAX_FILE_SIZE_BYTES),
   mimeType: z.string().startsWith("image/"),
 });
 
