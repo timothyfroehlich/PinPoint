@@ -152,23 +152,27 @@ jobs:
                you.
             range.patch can be longer than one Read call returns; read it with offset until its last line.
 
-            4. Report `reviewed: true` only if the review read range.patch to its last line and finished, and
-               `findings_posted` as the number of inline comments you posted.
+            4. End your final message with exactly one line of the form
+               `REVIEW-RESULT: reviewed=<true|false> findings_posted=<n>`. Write reviewed=true only if the
+               code-review skill returned its findings for the whole of range.patch.
           claude_args: >-
             --allowedTools "Skill" "Agent" "Task" "Read(./**)"
             "mcp__github_inline_comment__create_inline_comment"
-            --json-schema '{"type":"object","properties":{"reviewed":{"type":"boolean"},
-            "findings_posted":{"type":"integer"}},"required":["reviewed","findings_posted"]}'
 
       # A passing job is what marks this head reviewed for the next run's range, so it
       # must mean a review finished, not just that the action exited 0.
       - name: Require a finished review
         if: steps.range.outputs.mode != 'skip'
         env:
-          RESULT: ${{ steps.review.outputs.structured_output }}
+          EXECUTION_FILE: ${{ steps.review.outputs.execution_file }}
         run: |
-          echo "Review result: ${RESULT:-<none>}"
-          if [ "$(jq -r '.reviewed // false' <<< "${RESULT:-null}")" != "true" ]; then
+          # A JSON-schema result would force the code-review skill's own subagent into
+          # that schema too, and its findings never reach the session; read the final
+          # message's result line from the execution log instead.
+          result=$(jq -r '[.[] | select(.type == "result")][-1].result // ""' "$EXECUTION_FILE" \
+            | grep -oE 'REVIEW-RESULT: reviewed=(true|false) findings_posted=[0-9]+' | tail -1 || true)
+          echo "Review result: ${result:-<none>}"
+          if [[ "$result" != "REVIEW-RESULT: reviewed=true "* ]]; then
             echo "::error::Claude did not report a finished review."
             exit 1
           fi
