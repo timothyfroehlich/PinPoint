@@ -54,7 +54,7 @@ pr_commits=$(gh api --paginate "repos/${repo}/pulls/${pr}/commits?per_page=100" 
 while read -r sha; do
   [[ -z "$sha" || "$sha" == "$head" ]] && continue
   passed=$(gh api "repos/${repo}/commits/${sha}/check-runs?check_name=${CHECK_NAME// /%20}&filter=all" \
-    --jq '[.check_runs[] | select(.conclusion == "success")] | length')
+    --jq '[.check_runs[] | select(.conclusion == "success" and .app.slug == "github-actions")] | length')
   if [[ "$passed" -gt 0 ]]; then
     last_reviewed=$sha
     break
