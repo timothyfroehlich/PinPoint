@@ -251,10 +251,11 @@ async function main() {
   // `.env.local` by default, so the documented invocations work in a checkout
   // without anyone having to remember `--env`; absent, it is skipped rather than
   // fatal. An exported variable wins over the file (dotenv precedence, see
-  // scripts/lib/env-file.mjs), so an operator who exported a prod URL and happens to run from
-  // a worktree gets prod, not the worktree's local stack silently swapped in. The
-  // resolved variables then feed resolveUrl, which refuses a production default
-  // when a non-production URL is also configured (PP-4yc8).
+  // scripts/lib/env-file.mjs), so an operator who exported a prod URL and runs
+  // from a worktree still has it in play, never silently swapped for the
+  // worktree's local stack. The resolved variables then feed resolveUrl, which
+  // refuses to default to production when a non-production URL is also
+  // configured, so that operator must pass `--prod` or `--local` (PP-4yc8).
   loadConnectionStrings(args.envFile ?? ".env.local", {
     required: args.envFile !== null,
   });

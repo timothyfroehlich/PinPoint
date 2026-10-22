@@ -318,6 +318,10 @@ describe("query-readonly.mjs — forces an explicit choice before prod (PP-4yc8)
     );
     expect(stderr).toContain("PRODUCTION");
     expect(stderr).not.toContain("Refusing to default");
+    // The prod URL here IS the read-only one, so the dedicated role is chosen
+    // and the can-write warning must not appear.
+    expect(stderr).toContain("read-only role");
+    expect(stderr).not.toContain("CAN write");
   });
 
   it("--local runs against the non-production database in that ambiguous config", () => {
