@@ -136,10 +136,10 @@ jobs:
             - .claude-review/commits.txt: the commits in that range
             - .claude-review/pr.diff: the whole pull request's diff against main
 
-            1. Run the /code-review skill at level ${{ steps.range.outputs.level }} with the target
-               ".claude-review/range.patch is the complete diff to review; do not run git". Review only
-               those changes, reading surrounding code as needed. REVIEW.md at the repository root is the
-               review rubric.
+            1. Your first action is a Skill tool call: skill "code-review", args
+               "${{ steps.range.outputs.level }} .claude-review/range.patch is the complete diff to review; do not run git".
+               Do not review the diff yourself instead of running the skill. The review covers only those
+               changes, reading surrounding code as needed; REVIEW.md at the repository root is the rubric.
             2. Post each finding as an inline comment with mcp__github_inline_comment__create_inline_comment,
                passing confirmed: true. Anchor it on the line it concerns, which must be a line in
                .claude-review/pr.diff; when that line is not in it, anchor on the nearest changed line and
