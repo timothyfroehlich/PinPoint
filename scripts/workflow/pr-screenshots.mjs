@@ -57,7 +57,7 @@
 import { chromium, firefox } from "@playwright/test";
 import nextEnv from "@next/env";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -323,12 +323,33 @@ async function main() {
   // pictures filed under a commit that lacks them; Tim's approval is recorded
   // against a commit (approve-ui.sh --head), so the directory says so.
   const dirty =
-    git(["status", "--porcelain", "--untracked-files=no"], {
+    git(["status", "--porcelain", "--untracked-files=normal"], {
       cwd: REPO_ROOT,
     }) !== "";
   if (dirty) {
     console.error(
       "⚠️  Uncommitted changes: these screenshots match no commit. Commit and push before showing Tim."
+    );
+  }
+  // approve-ui.sh checks the commit against the PR's pushed head, so a capture of
+  // an unpushed commit cannot be approved either.
+  const pushed = (() => {
+    try {
+      return (
+        git(["rev-parse", "HEAD"], { cwd: REPO_ROOT }) ===
+        git(["rev-parse", "@{upstream}"], {
+          cwd: REPO_ROOT,
+          stdio: ["ignore", "pipe", "ignore"],
+        })
+      );
+    } catch {
+      // No upstream configured: nothing is pushed.
+      return false;
+    }
+  })();
+  if (!dirty && !pushed) {
+    console.error(
+      "⚠️  HEAD is not pushed to its upstream: Tim's approval of these screenshots cannot be recorded until it is."
     );
   }
   const shortSha = dirty ? `${headSha}-dirty` : headSha;
@@ -350,6 +371,9 @@ async function main() {
   const rolesNeeded = [...new Set(pages.map((p) => p.authRole))];
   ensureAuthStorageState(rolesNeeded, forceAuth);
 
+  // Start from an empty default directory so a page that fails on a rerun cannot
+  // leave its old picture beside the new ones. A caller's --out is left alone.
+  if (!outDir) rmSync(workDir, { recursive: true, force: true });
   mkdirSync(workDir, { recursive: true });
   const captured = await captureWithFallback(baseUrl, pages, workDir);
   if (captured.length === 0) {

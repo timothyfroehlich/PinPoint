@@ -331,7 +331,7 @@ fi
 
 # The one UI path list, shared with the UI Approval check and the reminder hook.
 ui_changed=no
-if grep -qE -f "${SCRIPT_DIR}/ui-paths.txt" <<< "$changed_paths"; then
+if grep -qEi -f "${SCRIPT_DIR}/ui-paths.txt" <<< "$changed_paths"; then
   ui_changed=yes
 fi
 
@@ -349,6 +349,7 @@ ui_state=$(gh api --paginate "repos/$(_repo_slug)/commits/${head_sha}/check-runs
             | if $gate != null then
                 (if $gate.status == "completed" then ($gate.conclusion // "unknown") else "pending" end)
               elif $wait != null and $wait.status != "completed" then "waiting for Tim'"'"'s sign-off"
+              elif $wait != null and $wait.conclusion == "success" then "pending"
               else empty end') || ui_state="unavailable"
 if [[ -z "$ui_state" ]]; then
   ui_approval="no UI Approval run"

@@ -69,7 +69,7 @@ process.stdin.on("end", () => {
     UI_GLOBS = readFileSync(join(__dirname, "..", "..", "scripts", "workflow", "ui-paths.txt"), "utf8")
       .split("\n")
       .filter(Boolean)
-      .map((line) => new RegExp(line));
+      .map((line) => new RegExp(line, "i"));
   } catch {
     process.exit(0);
   }

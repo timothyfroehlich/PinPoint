@@ -8,6 +8,8 @@
 #   GH_TOKEN                 read access to pull requests and checks
 #   GITHUB_OUTPUT            when set, the outputs are appended to it
 #   CLAUDE_REVIEW_MAIN_REF   the base branch ref (default: origin/main)
+#   CLAUDE_REVIEW_SKIP_LEVEL set to 1 to skip the review-level computation
+#                            (level is then empty; ui-approval-scope.sh sets it)
 #   CLAUDE_REVIEW_CHECK_NAME the check run that marks a head covered (default:
 #                            "Claude Review"; ui-approval-scope.sh passes
 #                            "UI Approval" to reuse the same range)
@@ -96,7 +98,9 @@ if [[ -n "$last_reviewed" ]]; then
 fi
 
 level=low
-if [[ "$mode" != "skip" ]]; then
+if [[ "${CLAUDE_REVIEW_SKIP_LEVEL:-}" == "1" ]]; then
+  level=""
+elif [[ "$mode" != "skip" ]]; then
   level=$(bash "${script_dir}/claude-review-level.sh" --from "$base" | head -1)
   # Above 3,000 weighted lines a local review asks Tim for xhigh or max. CI cannot
   # ask, so it reviews at high and says so.

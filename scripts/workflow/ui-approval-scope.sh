@@ -16,7 +16,8 @@
 # is claude-review-range.sh's, keyed on the "UI Approval" check instead of
 # "Claude Review": the commits since the newest earlier head whose UI Approval
 # passed, with main's changes left out. UI paths are the extended regexes in
-# ui-paths.txt, which the ui-screenshot-reminder hook reads too.
+# ui-paths.txt, matched case-insensitively here, in merge-handoff.sh, and in the
+# ui-screenshot-reminder hook.
 set -euo pipefail
 
 if [[ $# -ne 2 ]]; then
@@ -34,7 +35,7 @@ emit() {
   fi
 }
 
-range=$(CLAUDE_REVIEW_CHECK_NAME="UI Approval" GITHUB_OUTPUT="" \
+range=$(CLAUDE_REVIEW_CHECK_NAME="UI Approval" CLAUDE_REVIEW_SKIP_LEVEL=1 GITHUB_OUTPUT="" \
   bash "${script_dir}/claude-review-range.sh" "$pr" "$head")
 mode=$(sed -n 's/^mode=//p' <<< "$range")
 base=$(sed -n 's/^base=//p' <<< "$range")
@@ -43,7 +44,7 @@ last_approved=$(sed -n 's/^last_reviewed=//p' <<< "$range")
 files=""
 if [[ "$mode" != "skip" ]]; then
   files=$(git -c core.quotePath=false diff --name-only --no-renames "$base" "$head" \
-    | grep -E -f "${script_dir}/ui-paths.txt" || true)
+    | grep -E -i -f "${script_dir}/ui-paths.txt" || true)
 fi
 
 if [[ -n "${UI_APPROVAL_FILES:-}" ]]; then
