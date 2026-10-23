@@ -37,9 +37,9 @@ jobs:
     timeout-minutes: 5
     permissions:
       actions: write
-      # PR conversation comments go through the issues API.
-      issues: write
-      pull-requests: read
+      # `gh pr comment` posts through GraphQL addComment, which needs
+      # pull-requests: write (issues: write alone is refused).
+      pull-requests: write
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GH_REPO: ${{ github.repository }}
