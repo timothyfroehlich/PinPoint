@@ -35,6 +35,15 @@
  *   node scripts/query-readonly.mjs --file query.sql
  *   node scripts/query-readonly.mjs --json "select ..."
  *   node scripts/query-readonly.mjs --env other.env "select ..."
+ *   node scripts/query-readonly.mjs --prod "select ..."   # force production
+ *   node scripts/query-readonly.mjs --local "select ..."  # force non-production
+ *
+ * `POSTGRES_URL_READONLY` is preferred over `POSTGRES_URL`. When that preference
+ * would default to PinPoint PRODUCTION but a non-production URL is ALSO
+ * configured — a worktree whose `.env.local` carries the prod read-only URL
+ * next to its local stack — the tool refuses and makes you choose: `--prod` for
+ * production, `--local` for the non-production database. The guard only trips on
+ * a production default; defaulting to a non-production database is never ambiguous.
  *
  * Reading auth data: the role cannot select from `auth.users` directly — query
  * `readonly_auth.users` / `readonly_auth.identities` instead. The reason is a
@@ -70,7 +79,14 @@ class UsageError extends Error {}
  * flag as its value are all hard errors.
  */
 function parseArgs(argv) {
-  const args = { json: false, file: null, sql: null, envFile: null };
+  const args = {
+    json: false,
+    file: null,
+    sql: null,
+    envFile: null,
+    prod: false,
+    local: false,
+  };
 
   const takeValue = (flag, next) => {
     if (next === undefined || next.startsWith("--")) {
@@ -83,6 +99,10 @@ function parseArgs(argv) {
     const arg = argv[i];
     if (arg === "--json") {
       args.json = true;
+    } else if (arg === "--prod") {
+      args.prod = true;
+    } else if (arg === "--local") {
+      args.local = true;
     } else if (arg === "--file") {
       args.file = takeValue(arg, argv[++i]);
     } else if (arg === "--env") {
@@ -107,6 +127,15 @@ function parseArgs(argv) {
     );
   }
 
+  // `--prod` and `--local` each NAME the database to run against; together they
+  // name two, so the choice they exist to make is undefined. Refuse rather than
+  // letting one silently win.
+  if (args.prod && args.local) {
+    throw new UsageError(
+      "give --prod OR --local, not both — they name opposite databases"
+    );
+  }
+
   return args;
 }
 
@@ -126,18 +155,78 @@ function loadConnectionStrings(path, { required }) {
   }
 }
 
-function resolveUrl() {
+/**
+ * Choose which configured database to query, and refuse to SILENTLY pick
+ * production when a non-production database is also configured (PP-4yc8).
+ *
+ * `POSTGRES_URL_READONLY` (the dedicated read-only role) is preferred over
+ * `POSTGRES_URL` (a role that can write). That preference is safe when the two
+ * agree on environment, but a worktree whose `.env.local` carries a prod
+ * read-only URL alongside its local stack makes them DISAGREE: the preference
+ * would default to production while the operator is sitting in a local
+ * checkout. So when the preferred target is production AND a non-production URL
+ * is also configured, require the operator to say which they meant — `--prod`
+ * takes production, `--local` takes the non-production URL. A non-production
+ * default is never ambiguous (reading a non-production database is harmless), so
+ * only a production default is gated.
+ *
+ * `dedicated` tracks the ROLE of the chosen URL (read-only vs. can-write), not
+ * its environment, because that is what the banner has to be honest about.
+ */
+function resolveUrl({ prod, local }) {
+  // Preference order: the dedicated read-only role first, then the can-write
+  // fallback. `isPinPointProductionTarget` treats preview branches as
+  // non-production, which is correct here — only the one live project is gated.
+  const candidates = [];
   const readonly = process.env.POSTGRES_URL_READONLY;
-  if (readonly) return { url: readonly, dedicated: true };
-
   const fallback = process.env.POSTGRES_URL;
-  if (!fallback) {
+  if (readonly) candidates.push({ url: readonly, dedicated: true });
+  if (fallback) candidates.push({ url: fallback, dedicated: false });
+
+  if (candidates.length === 0) {
     throw new UsageError(
       "Neither POSTGRES_URL_READONLY nor POSTGRES_URL is defined.\n" +
         "   Set up the read-only role: scripts/sql/readonly-role.sql"
     );
   }
-  return { url: fallback, dedicated: false };
+
+  const production = candidates.filter((c) =>
+    isPinPointProductionTarget(c.url)
+  );
+  const nonProduction = candidates.filter(
+    (c) => !isPinPointProductionTarget(c.url)
+  );
+
+  if (prod) {
+    if (production.length === 0) {
+      throw new UsageError(
+        "--prod: no production database is configured.\n" +
+          "   Neither POSTGRES_URL_READONLY nor POSTGRES_URL targets PinPoint production."
+      );
+    }
+    return production[0];
+  }
+
+  if (local) {
+    if (nonProduction.length === 0) {
+      throw new UsageError(
+        "--local: no non-production database is configured.\n" +
+          "   Every configured connection string targets PinPoint production."
+      );
+    }
+    return nonProduction[0];
+  }
+
+  const chosen = candidates[0];
+  if (isPinPointProductionTarget(chosen.url) && nonProduction.length > 0) {
+    throw new UsageError(
+      "Refusing to default to PRODUCTION when a non-production database is also configured.\n" +
+        `   production:     ${describeTarget(production[0].url)}\n` +
+        `   non-production: ${describeTarget(nonProduction[0].url)}\n` +
+        "   Pass --prod to query production, or --local to query the non-production database."
+    );
+  }
+  return chosen;
 }
 
 /**
@@ -162,8 +251,11 @@ async function main() {
   // `.env.local` by default, so the documented invocations work in a checkout
   // without anyone having to remember `--env`; absent, it is skipped rather than
   // fatal. An exported variable wins over the file (dotenv precedence, see
-  // scripts/lib/env-file.mjs), so an operator who exported a prod URL and happens to run from
-  // a worktree gets prod, not the worktree's local stack silently swapped in.
+  // scripts/lib/env-file.mjs), so an operator who exported a prod URL and runs
+  // from a worktree still has it in play, never silently swapped for the
+  // worktree's local stack. The resolved variables then feed resolveUrl, which
+  // refuses to default to production when a non-production URL is also
+  // configured, so that operator must pass `--prod` or `--local` (PP-4yc8).
   loadConnectionStrings(args.envFile ?? ".env.local", {
     required: args.envFile !== null,
   });
@@ -177,7 +269,7 @@ async function main() {
     );
   }
 
-  const { url, dedicated } = resolveUrl();
+  const { url, dedicated } = resolveUrl(args);
 
   // Say plainly which database this is and how it is protected. A read against
   // prod is legitimate; a read against prod that the operator THOUGHT was local
@@ -186,13 +278,25 @@ async function main() {
     ? "PRODUCTION"
     : "non-production";
   console.error(`→ ${target}: ${describeTarget(url)}`);
-  console.error(
-    dedicated
-      ? "→ read-only role: writes have no privilege to run (the real guarantee)"
-      : "→ NO read-only role (POSTGRES_URL_READONLY unset): the connecting role " +
-          "CAN write. A single-statement write is refused, but a multi-statement " +
-          "query is NOT safely contained here — set up the role."
-  );
+  if (dedicated) {
+    console.error(
+      "→ read-only role: writes have no privilege to run (the real guarantee)"
+    );
+  } else {
+    // The connecting role CAN write either way, but say WHY honestly: a genuinely
+    // absent read-only role is a "set it up" nudge, whereas `--local` (or a
+    // read-only URL that points at a different environment) left a configured
+    // POSTGRES_URL_READONLY deliberately unused — claiming it is "unset" there
+    // would be a lie on the one surface this tool exists to be honest about.
+    const reason = process.env.POSTGRES_URL_READONLY
+      ? "POSTGRES_URL_READONLY is set but was not the chosen target, so this is POSTGRES_URL"
+      : "POSTGRES_URL_READONLY unset, so this is POSTGRES_URL";
+    console.error(
+      `→ NO read-only role (${reason}): the connecting role CAN write. A ` +
+        "single-statement write is refused, but a multi-statement query is NOT " +
+        "safely contained here — use the read-only role for untrusted SQL."
+    );
+  }
 
   // Delegate the pooler-safe client construction (prepare:false applied last, so
   // these options cannot re-enable prepared statements). `max: 1` so BEGIN and
