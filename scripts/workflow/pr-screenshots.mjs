@@ -57,8 +57,8 @@
 import { chromium, firefox } from "@playwright/test";
 import nextEnv from "@next/env";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, readFileSync, rmSync } from "node:fs";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { mkdirSync, readFileSync, renameSync, rmSync } from "node:fs";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { evaluateStorageState } from "./auth-storage-state.mjs";
@@ -333,21 +333,21 @@ async function main() {
   }
   // approve-ui.sh checks the commit against the PR's pushed head, so a capture of
   // an unpushed commit cannot be approved either.
-  const pushed = (() => {
+  // Warns only when HEAD is known to be ahead of its upstream; a branch with no
+  // upstream configured gets no warning rather than a false one.
+  const unpushed = (() => {
     try {
       return (
-        git(["rev-parse", "HEAD"], { cwd: REPO_ROOT }) ===
-        git(["rev-parse", "@{upstream}"], {
+        git(["rev-list", "--count", "@{upstream}..HEAD"], {
           cwd: REPO_ROOT,
           stdio: ["ignore", "pipe", "ignore"],
-        })
+        }) !== "0"
       );
     } catch {
-      // No upstream configured: nothing is pushed.
       return false;
     }
   })();
-  if (!dirty && !pushed) {
+  if (!dirty && unpushed) {
     console.error(
       "⚠️  HEAD is not pushed to its upstream: Tim's approval of these screenshots cannot be recorded until it is."
     );
@@ -371,21 +371,29 @@ async function main() {
   const rolesNeeded = [...new Set(pages.map((p) => p.authRole))];
   ensureAuthStorageState(rolesNeeded, forceAuth);
 
-  // Start from an empty default directory so a page that fails on a rerun cannot
-  // leave its old picture beside the new ones. A caller's --out is left alone.
-  if (!outDir) rmSync(workDir, { recursive: true, force: true });
-  mkdirSync(workDir, { recursive: true });
-  const captured = await captureWithFallback(baseUrl, pages, workDir);
+  // The default directory is replaced only after a capture succeeds: shots go to a
+  // fresh staging directory first, so a page that fails on a rerun cannot leave its
+  // old picture beside the new ones, and a failed rerun keeps the last good set. A
+  // caller's --out is written in place.
+  const captureDir = outDir ? workDir : `${workDir}.partial`;
+  if (!outDir) rmSync(captureDir, { recursive: true, force: true });
+  mkdirSync(captureDir, { recursive: true });
+  const captured = await captureWithFallback(baseUrl, pages, captureDir);
   if (captured.length === 0) {
+    if (!outDir) rmSync(captureDir, { recursive: true, force: true });
     throw new Error(
       "No screenshots captured — every page failed. See errors above."
     );
+  }
+  if (!outDir) {
+    rmSync(workDir, { recursive: true, force: true });
+    renameSync(captureDir, workDir);
   }
 
   console.error(`✅ Captured ${captured.length} screenshot(s) in ${workDir}`);
   // stdout contract: one absolute path per PNG, nothing else.
   for (const shot of captured) {
-    process.stdout.write(`${shot.outPath}\n`);
+    process.stdout.write(`${join(workDir, basename(shot.outPath))}\n`);
   }
 }
 
