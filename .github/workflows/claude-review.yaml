@@ -148,7 +148,8 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          allowed_bots: "renovate[bot],dependabot[bot]"
+          # github-actions[bot] is the triggering actor of a /claude-review re-run.
+          allowed_bots: "renovate[bot],dependabot[bot],github-actions[bot]"
           classify_inline_comments: "false"
           # Tool boundary: no Bash at all, so no git or gh option can write a file, run
           # a program, or read outside the repository, and no read-only command such as
