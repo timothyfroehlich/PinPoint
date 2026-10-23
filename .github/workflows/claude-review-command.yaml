@@ -1,6 +1,6 @@
 # /claude-review: re-run Claude Review on a pull request's current head (PP-zxlq.3).
 #
-# A comment whose first line starts with `/claude-review`, from someone with write
+# A comment whose first word is `/claude-review`, from someone with write
 # access, re-runs the latest Claude Review workflow run for the PR's head commit.
 # A re-run keeps the original pull_request event, so its check run lands on that
 # head under the same required-check name, and the review range is recomputed from
@@ -54,6 +54,13 @@ jobs:
 
       - name: Re-run the head's Claude Review
         run: |
+          # The job's `if` is a coarse prefix match; the command must be the whole
+          # first word, so `/claude-reviewer` or `/claude-review-later` do nothing.
+          first_line=$(jq -r '.comment.body | split("\n")[0] | rtrimstr("\r")' "$GITHUB_EVENT_PATH")
+          if [[ ! "$first_line" =~ ^/claude-review([[:space:]]|$) ]]; then
+            echo "Not a /claude-review command: ignoring."
+            exit 0
+          fi
           pr=$(gh pr view "$PR_NUMBER" --json headRefOid,isDraft)
           head=$(jq -r .headRefOid <<< "$pr")
           if [ "$(jq -r .isDraft <<< "$pr")" = "true" ]; then
