@@ -1,0 +1,5 @@
+^src/app/.*\.tsx$
+^src/components/
+\.css$
+(^|/)[Tt]ailwind[^/]*$
+(^|/)[Dd]esign-[Tt]okens?[^/]*$

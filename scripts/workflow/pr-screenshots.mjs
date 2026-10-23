@@ -1,35 +1,28 @@
 #!/usr/bin/env node
-// scripts/workflow/pr-screenshots.mjs — desktop + two mobile screenshots for a PR.
+// scripts/workflow/pr-screenshots.mjs — local desktop + two mobile screenshots.
 //
-// PP-wi85: UI-touching PRs must have screenshots posted before handoff to Tim
-// so he can eyeball them before the merge (which is his decision — he approves
-// the merge-pr.sh prompt, PP-wi85). This script
-// shoots a manifest of key pages at three viewports, pushes the PNGs to a
-// dedicated orphan `pr-screenshots` branch (repo is public, so raw.githubusercontent.com
-// URLs render inline in the PR comment), and posts/updates one sticky PR comment.
+// Captures the pages in ui-screenshot-manifest.json at the three review
+// viewports so the agent can show them to Tim in Claude Code Desktop chat
+// (send the PNGs with the file-sending tool) BEFORE the PR's "UI Approval"
+// check can pass. Nothing is uploaded to GitHub: no screenshot branch, no PR
+// comment. The PNGs stay on this machine under tmp/.
 //
 // Usage:
-//   node scripts/workflow/pr-screenshots.mjs <PR> [--pages=a,b,c] [--force-auth]
-//   node scripts/workflow/pr-screenshots.mjs <PR> --files=a.png,b.png
+//   node scripts/workflow/pr-screenshots.mjs [--pages=a,b,c] [--out=<dir>] [--force-auth]
 //
-//   <PR>          Required. GitHub PR number — used for the screenshot storage
-//                 path and the sticky comment target.
 //   --pages=a,b,c Optional comma-separated list of manifest page ids to shoot.
 //                 Default: every page in ui-screenshot-manifest.json.
 //                 Must use the EQUALS form — `--pages machine-edit` (space)
-//                 fails with "Unrecognized argument". Note a filtered run
-//                 REBUILDS the sticky comment from only the pages it shot,
-//                 dropping the rest, so finish with an unfiltered run.
+//                 fails with "Unrecognized argument".
+//   --out=<dir>   Output directory (created if missing). Default:
+//                 tmp/pr-screenshots/<current git short SHA>/ under the repo root.
 //   --force-auth  Regenerate e2e/.auth/*.json storage state even if present
 //                 (use when a previous session looks stale/expired).
-//   --files=a,b   Publish PNGs you already captured instead of shooting the
-//                 manifest — for UI states no manifest route reaches. Name
-//                 each `<viewport>-<id>.png` (viewport: desktop, mobile-large,
-//                 mobile-small); a page's viewports share a comment row.
-//                 Skips the dev-server check and auth setup. Like --pages, it
-//                 rebuilds the sticky comment from only these files. Use this
-//                 instead of pushing to pr-screenshots by hand. See
-//                 pr-screenshot-files.mjs.
+//
+// Output: files are named `<viewport>-<page-id>.png` (viewports: desktop,
+// mobile-large, mobile-small). On success stdout is exactly one absolute path
+// per PNG written and nothing else, so the list can be handed straight to the
+// agent's file-sending tool. All progress and warnings go to stderr.
 //
 // Browser selection (env var):
 //   PR_SHOTS_BROWSER=chromium|firefox  Force a specific renderer. When unset,
@@ -45,7 +38,6 @@
 //     PORT is read from .env.local the same way playwright.config.ts does —
 //     worktree-aware, always localhost (CORE-SEC-008).
 //   - Supabase running (`pnpm supabase:start`).
-//   - `gh` CLI authenticated.
 //
 // First run (or any run with missing/stale storage state) invokes
 // `pnpm exec playwright test --project=auth-setup`, which — via
@@ -59,28 +51,17 @@
 // unparseable session is regenerated just like a missing file (PP-chhn.1). See
 // ensureAuthStorageState + auth-storage-state.mjs.
 //
-// Hardening follow-ups (deferred — see PR description / spec doc):
+// Hardening follow-ups (deferred):
 //   - No retry/backoff on flaky navigation (single attempt per page).
-//   - The pr-screenshots branch has no pruning/TTL (unlike the preview-deployment
-//     reaper) — it will grow unbounded over time.
-//   - PR-number/branch mismatch is a warning, not a hard failure.
 
 import { chromium, firefox } from "@playwright/test";
 import nextEnv from "@next/env";
 import { execFileSync, spawnSync } from "node:child_process";
-import {
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { mkdirSync, readFileSync } from "node:fs";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { evaluateStorageState } from "./auth-storage-state.mjs";
-import { parseShotFiles } from "./pr-screenshot-files.mjs";
 
 const { loadEnvConfig } = nextEnv;
 
@@ -105,47 +86,32 @@ const VIEWPORTS = {
   "mobile-small": { width: 320, height: 568, label: "Small mobile (320×568)" },
 };
 
-const SCREENSHOTS_BRANCH = "pr-screenshots";
-const COMMENT_MARKER = "<!-- pr-screenshots -->";
-
 function parseArgs(argv) {
-  let pr;
   let pagesFilter;
+  let outDir;
   let forceAuth = false;
-  let files;
 
   for (const arg of argv) {
     if (arg === "--force-auth") {
       forceAuth = true;
-    } else if (arg.startsWith("--files=")) {
-      files = arg
-        .slice("--files=".length)
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
+    } else if (arg.startsWith("--out=")) {
+      outDir = arg.slice("--out=".length).trim();
+      if (!outDir) throw new Error("--out requires a directory");
     } else if (arg.startsWith("--pages")) {
       const value = arg.includes("=") ? arg.split("=")[1] : "";
       pagesFilter = value
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean);
-    } else if (!arg.startsWith("--") && pr === undefined) {
-      pr = arg;
     } else {
-      throw new Error(`Unrecognized argument: ${arg}`);
+      throw new Error(
+        `Unrecognized argument: ${arg}\n` +
+          "Usage: node scripts/workflow/pr-screenshots.mjs [--pages=a,b,c] [--out=<dir>] [--force-auth]"
+      );
     }
   }
 
-  if (!pr || !/^\d+$/.test(pr)) {
-    throw new Error(
-      "Usage: node scripts/workflow/pr-screenshots.mjs <PR> [--pages=a,b,c] [--force-auth] | <PR> --files=a.png,b.png"
-    );
-  }
-  if (files && (pagesFilter || forceAuth)) {
-    throw new Error("--files cannot be combined with --pages or --force-auth");
-  }
-
-  return { pr, pagesFilter, forceAuth, files };
+  return { pagesFilter, outDir, forceAuth };
 }
 
 function loadManifest(pagesFilter) {
@@ -208,13 +174,13 @@ function ensureAuthStorageState(rolesNeeded, forceAuth) {
   }
 
   if (needsRegen.length === 0) {
-    console.log(
+    console.error(
       `✅ Auth storage state present and unexpired for: ${rolesNeeded.join(", ")}`
     );
     return;
   }
 
-  console.log(
+  console.error(
     "🔐 Auth storage state needs regeneration:\n" +
       needsRegen
         .map(({ role, reason }) => `   • ${role} — ${reason}`)
@@ -225,7 +191,7 @@ function ensureAuthStorageState(rolesNeeded, forceAuth) {
   const result = spawnSync(
     "pnpm",
     ["exec", "playwright", "test", "--project=auth-setup"],
-    { cwd: REPO_ROOT, stdio: "inherit", env: process.env }
+    { cwd: REPO_ROOT, stdio: ["ignore", 2, 2], env: process.env }
   );
   if (result.status !== 0) {
     throw new Error(
@@ -271,7 +237,7 @@ async function captureScreenshots(browserType, baseUrl, pages, workDir) {
         pw.on("crash", () => {
           crashed = true;
         });
-        console.log(`📸 ${vpName} — ${page.label} (${page.route})`);
+        console.error(`📸 ${vpName} — ${page.label} (${page.route})`);
         try {
           await pw.goto(page.route, {
             waitUntil: "networkidle",
@@ -325,7 +291,7 @@ async function captureWithFallback(baseUrl, pages, workDir) {
 
   for (let i = 0; i < order.length; i++) {
     const name = order[i];
-    console.log(`🖥️  Capturing with ${name}${forced ? " (forced)" : ""}`);
+    console.error(`🖥️  Capturing with ${name}${forced ? " (forced)" : ""}`);
     const { captured, crashed } = await captureScreenshots(
       BROWSERS[name],
       baseUrl,
@@ -334,7 +300,7 @@ async function captureWithFallback(baseUrl, pages, workDir) {
     );
     const hasNext = i < order.length - 1;
     if (crashed && hasNext) {
-      console.warn(
+      console.error(
         `⚠️  ${name} renderer crashed (known on OSes Playwright doesn't officially ` +
           `support, e.g. Fedora Atomic / Bazzite) — retrying with ${order[i + 1]}.`
       );
@@ -349,254 +315,40 @@ function git(args, opts = {}) {
   return execFileSync("git", args, { encoding: "utf8", ...opts }).trim();
 }
 
-// `gh api --jq <filter>` prints the filter's result as raw text, not JSON — a
-// string result comes back bare (no surrounding quotes), so feeding it to
-// JSON.parse throws even though the request itself succeeded. (PP-5hxi: that
-// threw *after* the sticky comment had already been posted/updated, so the
-// script exited 1 on a run that had in fact done its job.)
-function ghText(args) {
-  return execFileSync("gh", args, { encoding: "utf8" }).trim();
-}
-
-/**
- * Push captured PNGs to the orphan `pr-screenshots` branch under
- * pr-<N>/<shortsha>/<file>. Runs entirely inside a throwaway temp dir with
- * its own fresh `git init` (NOT `git worktree add` against the main repo) so
- * it never touches the working tree and never trips the repo's Husky
- * post-checkout hook (which would otherwise allocate a worktree port slot
- * for a directory that only exists to hold PNGs for a few seconds).
- *
- * Returns `{ remotePaths, pushed }`: the branch-relative paths for the captured
- * images (present on the branch either way), and whether this run committed and
- * pushed. `pushed` is false on a no-op re-shoot (byte-identical images already
- * on the branch), which is a clean success, not a failure.
- */
-function publishScreenshots(pr, shortSha, captured) {
-  const remoteUrl = git(["remote", "get-url", "origin"], { cwd: REPO_ROOT });
-  const tmpDir = mkdtempSync(join(tmpdir(), "pr-screenshots-"));
-
-  try {
-    git(["init", "-q", "-b", SCREENSHOTS_BRANCH], { cwd: tmpDir });
-    git(["config", "user.email", "pinpoint-bot@users.noreply.github.com"], {
-      cwd: tmpDir,
-    });
-    git(["config", "user.name", "PinPoint Screenshot Bot"], { cwd: tmpDir });
-    git(["remote", "add", "origin", remoteUrl], { cwd: tmpDir });
-
-    try {
-      git(["fetch", "-q", "--depth", "1", "origin", SCREENSHOTS_BRANCH], {
-        cwd: tmpDir,
-      });
-      git(["checkout", "-q", "-B", SCREENSHOTS_BRANCH, "FETCH_HEAD"], {
-        cwd: tmpDir,
-      });
-    } catch {
-      console.log(
-        `ℹ️  Remote branch "${SCREENSHOTS_BRANCH}" doesn't exist yet — creating it.`
-      );
-    }
-
-    const destDir = join(tmpDir, `pr-${pr}`, shortSha);
-    mkdirSync(destDir, { recursive: true });
-    const remotePaths = [];
-    for (const shot of captured) {
-      const dest = join(destDir, shot.fileName);
-      writeFileSync(dest, readFileSync(shot.outPath));
-      remotePaths.push(`pr-${pr}/${shortSha}/${shot.fileName}`);
-    }
-
-    git(["add", "-A"], { cwd: tmpDir });
-
-    // A re-shoot whose PNGs are byte-identical to what's already on the branch
-    // (same PR + SHA, unchanged pages) stages nothing. `git commit` would then
-    // abort with "nothing to commit" and crash the whole script with a raw
-    // "Command failed: git commit" — which reads as a git/tooling failure and,
-    // worse, masks the real cause of the identical images (e.g. expired auth).
-    // A no-op re-shoot is a clean success: skip the commit+push and still return
-    // the remote paths so the sticky comment is refreshed. `git diff --cached
-    // --quiet` exits 0 when the index is clean, non-zero when it has changes;
-    // run it through spawnSync so a clean index is a status check, not a throw.
-    const hasStagedChanges =
-      spawnSync("git", ["diff", "--cached", "--quiet"], { cwd: tmpDir })
-        .status !== 0;
-
-    if (hasStagedChanges) {
-      git(["commit", "-q", "-m", `screenshots: PR #${pr} @ ${shortSha}`], {
-        cwd: tmpDir,
-      });
-      git(["push", "-q", "origin", `HEAD:${SCREENSHOTS_BRANCH}`], {
-        cwd: tmpDir,
-      });
-    } else {
-      console.log(
-        "ℹ️  No image changes since the last shoot — skipping commit/push."
-      );
-    }
-
-    return { remotePaths, pushed: hasStagedChanges };
-  } finally {
-    rmSync(tmpDir, { recursive: true, force: true });
-  }
-}
-
-function buildCommentBody(repoSlug, pr, shortSha, captured) {
-  const byPage = new Map();
-  for (const shot of captured) {
-    if (!byPage.has(shot.id))
-      byPage.set(shot.id, { label: shot.label, files: {} });
-    byPage.get(shot.id).files[shot.vpName] = shot.fileName;
-  }
-
-  const rawBase = `https://raw.githubusercontent.com/${repoSlug}/${SCREENSHOTS_BRANCH}/pr-${pr}/${shortSha}`;
-  const vpNames = Object.keys(VIEWPORTS);
-
-  const sections = [...byPage.values()].map(({ label, files }) => {
-    const cells = vpNames.map((vpName) =>
-      files[vpName]
-        ? `![${vpName}](${rawBase}/${files[vpName]})`
-        : "_capture failed_"
-    );
-    return [
-      `### ${label}`,
-      "",
-      `| ${vpNames.map((vpName) => VIEWPORTS[vpName].label).join(" | ")} |`,
-      `| ${vpNames.map(() => "---").join(" | ")} |`,
-      `| ${cells.join(" | ")} |`,
-      "",
-    ].join("\n");
-  });
-
-  return [
-    COMMENT_MARKER,
-    `## UI Screenshots — head \`${shortSha}\``,
-    "",
-    ...sections,
-  ].join("\n");
-}
-
-function postOrUpdateStickyComment(repoSlug, pr, body) {
-  // `--paginate` concatenates one JSON array per page back-to-back, which isn't
-  // valid single-document JSON — slurp+flatten via jq (same approach as
-  // _pr-gates.sh) so a marker comment on page 2+ of a busy PR isn't missed.
-  const raw = execFileSync(
-    "gh",
-    ["api", "--paginate", `repos/${repoSlug}/issues/${pr}/comments`],
-    { encoding: "utf8" }
-  );
-  const flattened = execFileSync("jq", ["-s", "add"], {
-    input: raw,
-    encoding: "utf8",
-  });
-  const list = JSON.parse(flattened);
-  const stickyComment = list.find((c) => c.body?.startsWith(COMMENT_MARKER));
-
-  if (stickyComment) {
-    console.log(
-      `✏️  Updating sticky screenshot comment (id=${stickyComment.id})`
-    );
-    return ghText([
-      "api",
-      "--method",
-      "PATCH",
-      `repos/${repoSlug}/issues/comments/${stickyComment.id}`,
-      "-f",
-      `body=${body}`,
-      "--jq",
-      ".html_url",
-    ]);
-  }
-
-  console.log("📝 Posting new sticky screenshot comment");
-  return ghText([
-    "api",
-    "--method",
-    "POST",
-    `repos/${repoSlug}/issues/${pr}/comments`,
-    "-f",
-    `body=${body}`,
-    "--jq",
-    ".html_url",
-  ]);
-}
-
 async function main() {
-  const { pr, pagesFilter, forceAuth, files } = parseArgs(
-    process.argv.slice(2)
-  );
-  // Validate --files before any network call, so a bad name fails fast.
-  const preCaptured = files
-    ? parseShotFiles(files, Object.keys(VIEWPORTS))
-    : undefined;
+  const { pagesFilter, outDir, forceAuth } = parseArgs(process.argv.slice(2));
 
   const shortSha = git(["rev-parse", "--short", "HEAD"], { cwd: REPO_ROOT });
+  const workDir = outDir
+    ? isAbsolute(outDir)
+      ? outDir
+      : resolve(process.cwd(), outDir)
+    : join(REPO_ROOT, "tmp", "pr-screenshots", shortSha);
 
-  // Best-effort sanity check — warn, don't fail, if local HEAD doesn't match
-  // the PR's head on GitHub (e.g. forgot to push, or wrong branch checked out).
-  try {
-    const prHead = execFileSync(
-      "gh",
-      ["pr", "view", pr, "--json", "headRefOid", "--jq", ".headRefOid"],
-      { cwd: REPO_ROOT, encoding: "utf8" }
-    ).trim();
-    if (
-      !prHead.startsWith(shortSha) &&
-      !shortSha.startsWith(prHead.slice(0, shortSha.length))
-    ) {
-      console.warn(
-        `⚠️  Local HEAD (${shortSha}) doesn't match PR #${pr}'s remote head (${prHead.slice(0, 7)}). ` +
-          "Screenshots will be taken of local HEAD, not the PR's pushed head — push first if they should match."
-      );
-    }
-  } catch {
-    console.warn(
-      `⚠️  Could not verify PR #${pr}'s head via gh — continuing anyway.`
+  const pages = loadManifest(pagesFilter);
+  const baseUrl = resolveBaseUrl();
+  const healthy = await checkServerReachable(baseUrl);
+  if (!healthy) {
+    throw new Error(
+      `Dev server not reachable at ${baseUrl}/api/health. Start it first: pnpm run dev`
     );
   }
 
-  const workDir = mkdtempSync(join(tmpdir(), "pr-screenshots-capture-"));
-  let captured;
-  try {
-    if (preCaptured) {
-      captured = preCaptured;
-    } else {
-      const pages = loadManifest(pagesFilter);
-      const baseUrl = resolveBaseUrl();
-      const healthy = await checkServerReachable(baseUrl);
-      if (!healthy) {
-        throw new Error(
-          `Dev server not reachable at ${baseUrl}/api/health. Start it first: pnpm run dev`
-        );
-      }
+  const rolesNeeded = [...new Set(pages.map((p) => p.authRole))];
+  ensureAuthStorageState(rolesNeeded, forceAuth);
 
-      const rolesNeeded = [...new Set(pages.map((p) => p.authRole))];
-      ensureAuthStorageState(rolesNeeded, forceAuth);
-
-      captured = await captureWithFallback(baseUrl, pages, workDir);
-      if (captured.length === 0) {
-        throw new Error(
-          "No screenshots captured — every page failed. See errors above."
-        );
-      }
-    }
-
-    const { remotePaths, pushed } = publishScreenshots(pr, shortSha, captured);
-    console.log(
-      pushed
-        ? `✅ Pushed ${remotePaths.length} screenshot(s) to ${SCREENSHOTS_BRANCH}`
-        : `✅ ${remotePaths.length} screenshot(s) already up to date on ${SCREENSHOTS_BRANCH}`
+  mkdirSync(workDir, { recursive: true });
+  const captured = await captureWithFallback(baseUrl, pages, workDir);
+  if (captured.length === 0) {
+    throw new Error(
+      "No screenshots captured — every page failed. See errors above."
     );
+  }
 
-    const repoSlug = execFileSync(
-      "gh",
-      ["repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"],
-      { cwd: REPO_ROOT, encoding: "utf8" }
-    ).trim();
-
-    const body = buildCommentBody(repoSlug, pr, shortSha, captured);
-    const commentUrl = postOrUpdateStickyComment(repoSlug, pr, body);
-    console.log(`✅ Sticky comment: ${commentUrl}`);
-  } finally {
-    rmSync(workDir, { recursive: true, force: true });
+  console.error(`✅ Captured ${captured.length} screenshot(s) in ${workDir}`);
+  // stdout contract: one absolute path per PNG, nothing else.
+  for (const shot of captured) {
+    process.stdout.write(`${shot.outPath}\n`);
   }
 }
 

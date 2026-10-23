@@ -96,6 +96,10 @@ class Scenario:
     title: str = "feat(thing): do the thing (PP-abcd)"
     branch: str = BRANCH
     body: str = ""
+    # State of the head's "UI Approval" check run from the github-actions app:
+    # None = no run reported, "pending" = in progress, else the conclusion.
+    ui_approval: str | None = None
+    ui_approval_app: str = "github-actions"
 
 
 @dataclass(frozen=True)
@@ -113,20 +117,6 @@ def codex_review(sha: str, state: str = "APPROVED") -> dict:
         "state": state,
         "submitted_at": "2026-08-02T20:43:19Z",
         "user": {"login": "chatgpt-codex-connector[bot]"},
-    }
-
-
-# Fixed timestamps, not "now": the staleness check compares the screenshot comment's
-# time against the last UI commit's, and the fixture's commits happen at run time. A
-# real clock would make one of these two tests pass or fail depending on the hour.
-SHOTS_AFTER_COMMITS = "2099-01-01T00:00:00Z"
-SHOTS_BEFORE_COMMITS = "2000-01-01T00:00:00Z"
-
-
-def screenshot_comment(at: str = SHOTS_AFTER_COMMITS) -> dict:
-    return {
-        "body": "<!-- pr-screenshots -->\n| desktop | mobile |",
-        "updated_at": at,
     }
 
 
@@ -286,6 +276,29 @@ def repo_with_pr(
         (tmp_path / "rollup.json").write_text(rollup)
         (tmp_path / "threads.json").write_text(json.dumps(threads_payload))
         (tmp_path / "comments.json").write_text(json.dumps(comments))
+        check_runs: list[dict] = [
+            {
+                "name": "CI Gate",
+                "status": "completed",
+                "conclusion": "success",
+                "app": {"slug": "github-actions"},
+                "started_at": "2026-08-02T20:00:00Z",
+            }
+        ]
+        if scenario.ui_approval is not None:
+            pending = scenario.ui_approval == "pending"
+            check_runs.append(
+                {
+                    "name": "UI Approval",
+                    "status": "in_progress" if pending else "completed",
+                    "conclusion": None if pending else scenario.ui_approval,
+                    "app": {"slug": scenario.ui_approval_app},
+                    "started_at": "2026-08-02T20:01:00Z",
+                }
+            )
+        (tmp_path / "check-runs.json").write_text(
+            json.dumps({"total_count": len(check_runs), "check_runs": check_runs})
+        )
         (tmp_path / "reviews.json").write_text(json.dumps(reviews))
 
         # Dispatches on the joined argument string, most specific first: `gh pr view`
@@ -302,6 +315,7 @@ def repo_with_pr(
             '  *"pr view"*) cat "$STUB_META" ;;\n'
             '  *"api graphql"*) cat "$STUB_THREADS" ;;\n'
             '  *"/reviews"*) cat "$STUB_REVIEWS" ;;\n'
+            '  *"/check-runs"*) cat "$STUB_CHECK_RUNS" ;;\n'
             '  *"/comments"*) cat "$STUB_COMMENTS" ;;\n'
             '  *) printf "UNEXPECTED gh call: %s\\n" "$args" >&2; exit 1 ;;\n'
             "esac\n"
@@ -318,6 +332,7 @@ def repo_with_pr(
             "STUB_ROLLUP": str(tmp_path / "rollup.json"),
             "STUB_THREADS": str(tmp_path / "threads.json"),
             "STUB_COMMENTS": str(tmp_path / "comments.json"),
+            "STUB_CHECK_RUNS": str(tmp_path / "check-runs.json"),
             "STUB_REVIEWS": str(tmp_path / "reviews.json"),
             "STUB_MERGEABLE": scenario.mergeable,
         }
@@ -422,6 +437,7 @@ def run_concurrent_reports() -> ConcurrentReports:
             f'  *"pr view {OTHER_PR}"*) cat "$STUB_ROOT/meta-{OTHER_PR}.json" ;;\n'
             '  *"api graphql"*) cat "$STUB_ROOT/threads.json" ;;\n'
             '  *"/reviews"*) printf "[]\\n" ;;\n'
+            '  *"/check-runs"*) printf "{\\"check_runs\\":[]}\\n" ;;\n'
             '  *"/comments"*) printf "[]\\n" ;;\n'
             '  *) printf "UNEXPECTED gh call: %s\\n" "$args" >&2; exit 1 ;;\n'
             "esac\n"
@@ -739,12 +755,12 @@ def test_no_migration_and_no_env_var_reads_as_none() -> None:
         assert "new env vars  none" in run.stdout
 
 
-def test_ui_changes_without_screenshots_say_so() -> None:
-    """A UI-touching PR needs screenshots posted; silence reads as "not applicable"."""
+def test_ui_changes_without_a_ui_approval_run_say_so() -> None:
+    """A UI-touching PR with no "UI Approval" run reports that; silence reads as "n/a"."""
     with repo_with_pr(
         branch_changes={"src/components/Thing.tsx": "export const T = () => null;\n"}
     ) as (_head, run):
-        assert "UI file(s) changed · NO screenshots posted" in run.stdout, run.stdout
+        assert "UI file(s) changed · no UI Approval run" in run.stdout, run.stdout
 
 
 def test_the_ui_line_claims_only_the_path_fact_not_a_visual_change() -> None:
@@ -760,7 +776,7 @@ def test_the_ui_line_claims_only_the_path_fact_not_a_visual_change() -> None:
         assert "UI file(s) changed" in run.stdout, run.stdout
         # The bare over-claiming value must be gone (anchored on the value, not the
         # label gutter, so a future re-alignment of the report does not break this).
-        assert "yes · NO screenshots posted" not in run.stdout, run.stdout
+        assert "yes · no UI Approval run" not in run.stdout, run.stdout
 
 
 def test_no_ui_file_change_reads_as_no_ui_files() -> None:
@@ -770,67 +786,34 @@ def test_no_ui_file_change_reads_as_no_ui_files() -> None:
         assert "no UI files changed" in run.stdout, run.stdout
 
 
-def test_a_no_visual_change_marker_clears_the_screenshot_nudge() -> None:
-    """A UI FILE changed but nothing renders differently (a refactor, a non-null-! removal).
-
-    Two identical screenshots would satisfy the old nudge without conveying anything, so
-    the PR records the claim in its body with a marker instead, and the report drops the
-    "NO screenshots posted" nudge in favor of stating the recorded claim (PP-lhjg).
-    """
+@pytest.mark.parametrize("conclusion", ["success", "failure", "neutral"])
+def test_a_concluded_ui_approval_run_is_reported_with_its_conclusion(
+    conclusion: str,
+) -> None:
     with repo_with_pr(
         branch_changes={"src/components/Thing.tsx": "export const T = () => null;\n"},
-        scenario=Scenario(
-            body="Refactor, no rendered change.\n\n<!-- no-visual-change -->\n"
-        ),
+        scenario=Scenario(ui_approval=conclusion),
     ) as (_head, run):
-        assert "UI file(s) changed · marked no-visual-change" in run.stdout, run.stdout
-        assert "NO screenshots posted" not in run.stdout, run.stdout
+        assert f"UI Approval {conclusion}" in run.stdout, run.stdout
+        assert "no UI Approval run" not in run.stdout, run.stdout
 
 
-def test_the_marker_does_not_suppress_a_genuine_missing_screenshot_nudge() -> None:
-    """The opt-out is a body marker, not any mention of the words — no marker, no clearing."""
+def test_an_unconcluded_ui_approval_run_reads_as_pending() -> None:
     with repo_with_pr(
         branch_changes={"src/components/Thing.tsx": "export const T = () => null;\n"},
-        scenario=Scenario(body="This PR changes the button color.\n"),
+        scenario=Scenario(ui_approval="pending"),
     ) as (_head, run):
-        assert "UI file(s) changed · NO screenshots posted" in run.stdout, run.stdout
+        assert "UI Approval pending" in run.stdout, run.stdout
 
 
-def test_posted_screenshots_win_over_the_marker() -> None:
-    """Real screenshots are reported even if the body also carries the opt-out marker —
-    the marker only clears the *absence* nudge, it never hides posted evidence."""
+def test_a_ui_approval_run_from_another_app_is_ignored() -> None:
+    """Anyone can create a check named "UI Approval"; only the Actions app's counts."""
     with repo_with_pr(
         branch_changes={"src/components/Thing.tsx": "export const T = () => null;\n"},
-        scenario=Scenario(
-            comments=[screenshot_comment()],
-            body="<!-- no-visual-change -->\n",
-        ),
+        scenario=Scenario(ui_approval="success", ui_approval_app="some-other-app"),
     ) as (_head, run):
-        assert f"screenshots posted {SHOTS_AFTER_COMMITS}" in run.stdout, run.stdout
-        assert "marked no-visual-change" not in run.stdout, run.stdout
-
-
-def test_posted_screenshots_are_reported_with_their_timestamp() -> None:
-    with repo_with_pr(
-        branch_changes={"src/components/Thing.tsx": "export const T = () => null;\n"},
-        scenario=Scenario(comments=[screenshot_comment()]),
-    ) as (_head, run):
-        assert f"screenshots posted {SHOTS_AFTER_COMMITS}" in run.stdout, run.stdout
-        assert "STALE" not in run.stdout
-
-
-def test_screenshots_older_than_the_last_ui_commit_are_flagged_stale() -> None:
-    """ "Screenshots exist" is not "screenshots of this".
-
-    The sticky comment survives every later push, so a UI commit landing after it leaves
-    the report vouching for pictures of an older tree — the one field that was still
-    "trust me" while every other claim is pinned to a commit.
-    """
-    with repo_with_pr(
-        branch_changes={"src/components/Thing.tsx": "export const T = () => null;\n"},
-        scenario=Scenario(comments=[screenshot_comment(SHOTS_BEFORE_COMMITS)]),
-    ) as (_head, run):
-        assert "STALE: UI changed at" in run.stdout, run.stdout
+        assert "no UI Approval run" in run.stdout, run.stdout
+        assert "UI Approval success" not in run.stdout, run.stdout
 
 
 # --- Review distance ----------------------------------------------------------------

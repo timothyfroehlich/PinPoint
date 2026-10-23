@@ -1,0 +1,135 @@
+# UI Approval: Tim's visual sign-off on every UI change (PP-zxlq.4).
+#
+# A required check (ruleset 6326455). It passes on its own when no UI path
+# (scripts/workflow/ui-paths.txt) changed since the newest earlier commit whose UI
+# Approval passed, with main's changes left out. Otherwise the `sign-off` job waits
+# on the `ui-approval` environment, whose only required reviewer is Tim. The
+# approval carries across later commits that leave UI paths alone, so E2E updates
+# made after sign-off do not ask again; a later UI change waits again.
+#
+# Runs on drafts too: UI is approved while the PR is a draft, before E2E tests are
+# updated and before the PR is marked ready for Claude Review.
+#
+# How Tim approves: on GitHub (the run's "Review deployments"), or by telling the
+# owning session in Claude Code Desktop, or by clicking Approve in the orchestrator
+# artifact; in the last two the session runs scripts/workflow/approve-ui.sh.
+#
+# The required check is the `UI Approval` job, never `sign-off` itself: a skipped
+# job counts as passing, so the final job decides from both results.
+#
+# Trust: the scope scripts come from main, as in claude-review.yaml.
+
+name: UI Approval
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions: {}
+
+concurrency:
+  # A newer push supersedes a run still waiting for sign-off.
+  group: ui-approval-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  scope:
+    name: UI changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      checks: read
+      pull-requests: read
+    outputs:
+      ui_changed: ${{ steps.scope.outputs.ui_changed }}
+      detail: ${{ steps.scope.outputs.detail }}
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
+        with:
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+
+      - name: Refuse fork pull requests
+        if: github.event.pull_request.head.repo.full_name != github.repository
+        run: |
+          echo "::error::UI Approval does not run for fork pull requests. A maintainer reviews the UI locally."
+          exit 1
+
+      - name: Check out the PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Find UI changes since the last approval
+        id: scope
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          trusted="$RUNNER_TEMP/ui-approval-trusted"
+          mkdir -p "$trusted"
+          files=(claude-review-range.sh claude-review-level.sh ui-approval-scope.sh ui-paths.txt)
+          if git cat-file -e origin/main:scripts/workflow/ui-approval-scope.sh 2>/dev/null; then
+            for file in "${files[@]}"; do
+              git show "origin/main:scripts/workflow/$file" > "$trusted/$file"
+            done
+          else
+            # Bootstrap only: before this workflow's first merge, main has no scope
+            # script, so the PR's copy runs.
+            echo "::warning::main has no ui-approval-scope.sh yet; using the PR's copy."
+            for file in "${files[@]}"; do
+              cp "scripts/workflow/$file" "$trusted/$file"
+            done
+          fi
+          export UI_APPROVAL_FILES="$RUNNER_TEMP/ui-files.txt"
+          bash "$trusted/ui-approval-scope.sh" "$PR_NUMBER" "$HEAD_SHA"
+          {
+            echo "### UI Approval"
+            sed -n 's/^detail=//p' "$GITHUB_OUTPUT"
+            while IFS= read -r path; do printf -- '- %s\n' "$path"; done < "$UI_APPROVAL_FILES"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  sign-off:
+    name: Tim's UI sign-off
+    needs: scope
+    if: needs.scope.outputs.ui_changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: ui-approval
+    permissions: {}
+    steps:
+      - name: Record the approval
+        run: echo "Tim approved the UI on this head."
+
+  ui-approval:
+    name: UI Approval
+    needs: [scope, sign-off]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Decide
+        env:
+          SCOPE: ${{ needs.scope.result }}
+          UI_CHANGED: ${{ needs.scope.outputs.ui_changed }}
+          SIGN_OFF: ${{ needs.sign-off.result }}
+          DETAIL: ${{ needs.scope.outputs.detail }}
+        run: |
+          echo "$DETAIL"
+          if [ "$SCOPE" != "success" ]; then
+            echo "::error::Could not determine the UI changes on this head."
+            exit 1
+          fi
+          if [ "$UI_CHANGED" = "true" ] && [ "$SIGN_OFF" != "success" ]; then
+            echo "::error::UI changed and Tim's sign-off is ${SIGN_OFF}."
+            exit 1
+          fi
+          echo "UI Approval passes."

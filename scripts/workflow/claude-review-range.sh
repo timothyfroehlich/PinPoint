@@ -8,6 +8,9 @@
 #   GH_TOKEN                 read access to pull requests and checks
 #   GITHUB_OUTPUT            when set, the outputs are appended to it
 #   CLAUDE_REVIEW_MAIN_REF   the base branch ref (default: origin/main)
+#   CLAUDE_REVIEW_CHECK_NAME the check run that marks a head covered (default:
+#                            "Claude Review"; ui-approval-scope.sh passes
+#                            "UI Approval" to reuse the same range)
 #
 # Outputs, one key=value per line (stdout, and $GITHUB_OUTPUT when set):
 #   mode           full | incremental | skip
@@ -27,7 +30,7 @@
 # reviewed commits a force-push removed.
 set -euo pipefail
 
-CHECK_NAME="Claude Review"
+CHECK_NAME=${CLAUDE_REVIEW_CHECK_NAME:-Claude Review}
 
 if [[ $# -ne 2 ]]; then
   echo "Usage: $0 <PR> <HEAD_SHA>" >&2

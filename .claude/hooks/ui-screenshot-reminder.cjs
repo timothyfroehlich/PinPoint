@@ -1,16 +1,19 @@
 #!/usr/bin/env node
 // .claude/hooks/ui-screenshot-reminder.cjs
-// PostToolUse hook (Bash): non-blocking reminder to post UI screenshots.
+// PostToolUse hook (Bash): non-blocking reminder to get Tim's UI approval.
 //
 // Fires on `git commit`. If the branch's cumulative diff vs origin/main touches
 // a UI glob, returns one reminder as additionalContext. Always exits 0 — this is a
 // nudge, not a gate. No network calls beyond the already-local `git diff`
 // (which reads git's local knowledge of origin/main — it does not fetch).
 //
-// PP-wi85: UI-touching PRs must have desktop+mobile screenshots posted before
-// handoff to Tim (see pinpoint-pr-workflow skill Phase 2/3).
+// UI-touching changes need Tim's visual sign-off before E2E work: capture local
+// screenshots, send them to him in chat, and the PR's "UI Approval" check waits
+// for his approval (see pinpoint-pr-workflow skill).
 
 const { execFileSync } = require("node:child_process");
+const { readFileSync } = require("node:fs");
+const { join } = require("node:path");
 
 let input = "";
 process.stdin.on("data", (c) => (input += c));
@@ -59,14 +62,17 @@ process.stdin.on("end", () => {
     process.exit(0);
   }
 
-  const UI_GLOBS = [
-    /^src\/app\/.*\.tsx$/,
-    /^src\/app\/.*\.css$/,
-    /^src\/components\//,
-    /\.css$/,
-    /(^|\/)tailwind[^/]*$/i,
-    /(^|\/)design-tokens?[^/]*$/i,
-  ];
+  // The UI path list is shared with the UI Approval check
+  // (scripts/workflow/ui-paths.txt, one extended regex per line).
+  let UI_GLOBS = [];
+  try {
+    UI_GLOBS = readFileSync(join(__dirname, "..", "..", "scripts", "workflow", "ui-paths.txt"), "utf8")
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => new RegExp(line));
+  } catch {
+    process.exit(0);
+  }
 
   const touchesUi = changedFiles.some((f) =>
     UI_GLOBS.some((re) => re.test(f))
@@ -82,8 +88,10 @@ process.stdin.on("end", () => {
       hookSpecificOutput: {
         hookEventName: "PostToolUse",
         additionalContext:
-          "UI-touching change — before handing this PR to Tim, post screenshots: " +
-          "scripts/workflow/pr-screenshots.mjs <PR> (desktop+mobile).",
+          "UI-touching change — before updating E2E tests, capture screenshots with " +
+          "`node scripts/workflow/pr-screenshots.mjs`, send the PNGs to Tim in chat " +
+          "(and offer to start the dev server so he can look live), and get his UI " +
+          "approval. The PR's \"UI Approval\" check waits for it.",
       },
     })
   );
