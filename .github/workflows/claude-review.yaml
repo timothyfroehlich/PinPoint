@@ -5,15 +5,17 @@
 # beyond main (scripts/workflow/claude-review-range.sh). Findings arrive as inline
 # review comments.
 #
-# Trial: this check is not required yet. The local /code-review and its review
-# record remain the merge gate until PP-zxlq makes this job the required check.
+# Required check (ruleset 6326455, PP-zxlq.2), alongside conversation resolution:
+# every finding is fixed or declined and its thread resolved before merge. A draft
+# is skipped; marking it ready runs the review on the same head.
 #
 # Security boundary: `pull_request` from this repository's own branches only. Fork
-# PRs get no secrets and are skipped. Claude may read the checkout, including the
+# PRs get no secrets, so the job fails for them rather than skipping (a skipped
+# required check counts as passing). Claude may read the checkout, including the
 # review inputs the job prepares, and post inline comments on this PR; it has no
 # shell and cannot edit, commit, or push (tool boundary on the Review step).
-# Harden-runner audits egress during the trial; the endpoints it records become a
-# block-mode allowlist before PP-zxlq makes this check required.
+# Outbound traffic is blocked outside the allowlist on Harden Runner, taken from
+# the trial runs' audit logs.
 
 name: Claude Review
 
@@ -32,9 +34,7 @@ concurrency:
 jobs:
   review:
     name: Claude Review
-    if: >-
-      github.event.pull_request.draft == false &&
-      github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -45,7 +45,26 @@ jobs:
       - name: Harden Runner
         uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
         with:
-          egress-policy: audit
+          egress-policy: block
+          # GitHub's own endpoints are allowed by Harden Runner itself. Anthropic's
+          # are the API, the Claude Code download, and claude.ai for the OAuth
+          # token; registry.npmjs.org and release-assets serve the action's
+          # Claude Code and Bun installs.
+          allowed-endpoints: >
+            api.anthropic.com:443
+            claude.ai:443
+            downloads.claude.ai:443
+            registry.npmjs.org:443
+            release-assets.githubusercontent.com:443
+            github.com:443
+            api.github.com:443
+            results-receiver.actions.githubusercontent.com:443
+
+      - name: Refuse fork pull requests
+        if: github.event.pull_request.head.repo.full_name != github.repository
+        run: |
+          echo "::error::Fork pull requests get no secrets, so Claude Review cannot run. A maintainer reviews the PR locally."
+          exit 1
 
       - name: Require the Claude token
         env:
@@ -108,14 +127,14 @@ jobs:
         id: review
         if: steps.range.outputs.mode != 'skip'
         uses: anthropics/claude-code-action@58985842b834ed26087302ba27d07bc24ca8697a  # ratchet:anthropics/claude-code-action@v1.0.244
+        env:
+          # Telemetry and error reporting stay off; the egress allowlist blocks them.
+          CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           allowed_bots: "renovate[bot],dependabot[bot]"
           classify_inline_comments: "false"
-          # Trial only: print Claude's transcript so the run log shows what the review
-          # did. Turned off before PP-zxlq makes this check required.
-          show_full_output: "true"
           # Tool boundary: no Bash at all, so no git or gh option can write a file, run
           # a program, or read outside the repository, and no read-only command such as
           # `cat` (which Claude Code runs without an allow rule) can reach /proc, where
@@ -156,6 +175,7 @@ jobs:
                `REVIEW-RESULT: reviewed=<true|false> findings_posted=<n>`. Write reviewed=true only if the
                code-review skill returned its findings for the whole of range.patch.
           claude_args: >-
+            --model claude-sonnet-5-5
             --allowedTools "Skill" "Agent" "Task" "Read(./**)"
             "mcp__github_inline_comment__create_inline_comment"
 
