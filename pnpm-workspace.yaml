@@ -4,6 +4,15 @@
 # bump (PP-w0eq: pnpm 10.x hit the retired npm audit endpoint; only pnpm 11
 # uses the bulk advisory endpoint).
 
+# pnpm self-switching is off by design. mise and package.json#packageManager
+# pin pnpm for local machines and CI; Vercel installs from the frozen lockfile
+# with its own bundled pnpm 12.x (Corepack is deliberately off there). With
+# `ignore`, pnpm also stops writing its environment document to the top of
+# pnpm-lock.yaml; GitHub's dependency graph reads only that first document, so
+# the two-document lockfile hid every npm package from Dependabot alerts
+# (PP-o961). `warn` still writes the document.
+pmOnFail: ignore
+
 # Dependency build/postinstall scripts. `false` = intentionally not run,
 # matching the pnpm 10 default here (main had no build allowlist, so these were
 # already skipped and the app/prod build relied on their prebuilt binaries).
