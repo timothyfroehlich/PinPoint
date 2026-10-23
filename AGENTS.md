@@ -150,7 +150,7 @@ Always try local first — seconds vs minutes, full devtools. If a single-test r
 ### CI
 
 - **Check for conflicts first**: `gh pr view <PR> --json mergeable,mergeStateStatus`. `DIRTY`/`CONFLICTING` means GitHub silently skips workflow runs until you resolve. `pnpm run check` includes a `check:behind-main` warning.
-- **Required check**: only `CI Gate` (ruleset `6326455`). Vercel is not required. `BLOCKED` while E2E is still running is normal.
+- **Required checks** (ruleset `6326455`): `CI Gate` and `Claude Review`, plus resolved conversations. Vercel is not required. `BLOCKED` while E2E is still running is normal.
 
 ### Migration conflicts
 
@@ -159,6 +159,8 @@ Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like
 ### Getting a PR reviewed
 
 **The reviewer is a local Claude Code `/code-review` run by the owning agent.** Open every agent-created PR as a GitHub draft. After current-head `CI Gate` succeeds, run `/code-review <level> <PR>` at the level `bash scripts/workflow/claude-review-level.sh` prints (`ask` means ask Tim first; level before PR number, and never omit the PR number, or the review diffs against a possibly stale local `main`), fix or decline every finding, and re-review each new head until a round raises nothing new. Then `bash scripts/workflow/record-claude-review.sh <PR> --level <level> --findings <file>` posts the SHA-pinned review record the merge gate counts and promotes the draft. Any push other than a clean merge of `main` needs a new round and a new record. Spec: `docs/feature-specs/pr-lifecycle-monitoring.md` §8.
+
+GitHub also runs **`Claude Review`** (`.github/workflows/claude-review.yaml`) on every ready PR: an automated CI review of the whole PR first, then of each push's new commits. It posts findings as inline comments; adjudicate them like any review thread (fix, or decline with a signed reply, then resolve), since the ruleset requires every conversation resolved. A PR with no run on its head (opened before the check existed, or a draft) gets one when it is marked ready or pushed.
 
 Request and state-transition rules: `pinpoint-pr-workflow` skill Phase 3.
 
