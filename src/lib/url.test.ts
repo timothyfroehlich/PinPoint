@@ -124,11 +124,19 @@ describe("isInternalUrl", () => {
     expect(isInternalUrl(url)).toBe(false);
   });
 
-  it.each(["/ /dashboard", "/\u0000/dashboard", "/\u3000/dashboard"])(
-    "returns false for a path with whitespace or control characters %j",
+  it.each(["/\u0000/dashboard", "/\u007F/dashboard", "/\u0085/dashboard"])(
+    "returns false for a path with control characters %j",
     async (url) => {
       const { isInternalUrl } = await import("./url");
       expect(isInternalUrl(url)).toBe(false);
+    }
+  );
+
+  it.each(["/issues?q=left flipper", "/\u3000/dashboard"])(
+    "accepts a same-origin path with a space %j",
+    async (url) => {
+      const { isInternalUrl } = await import("./url");
+      expect(isInternalUrl(url)).toBe(true);
     }
   );
 

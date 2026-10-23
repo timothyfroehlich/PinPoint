@@ -79,14 +79,16 @@ export function requireSiteUrl(action: string): string {
 const INTERNAL_URL_BASE = "http://pinpoint.invalid";
 
 // URL parsers treat "\" as "/" and strip tabs and newlines, so "/\host" and
-// "/<tab>/host" resolve as protocol-relative URLs to another host.
-const UNSAFE_URL_CHARS = /[\\\s\p{Cc}]/u;
+// "/<tab>/host" resolve as protocol-relative URLs to another host. Other
+// control characters are refused too; a plain space is percent-encoded and
+// stays in the path.
+const UNSAFE_URL_CHARS = /[\\\p{Cc}]/u;
 
 /**
  * Validates that a redirect URL is safe (internal to the application).
  * Prevents open redirect vulnerabilities: the URL must be a root-relative path
- * with no backslash, whitespace, or control characters, and must resolve to
- * the same origin it was resolved against.
+ * with no backslash or control characters, and must resolve to the same origin
+ * it was resolved against.
  */
 export function isInternalUrl(url: string | null | undefined): url is string {
   if (!url) return false;
