@@ -27,3 +27,5 @@ or domain language, such as formatting, a dependency pin, or CI-only plumbing.
 Use the glossary's vocabulary rather than synonyms. If proposed behavior
 contradicts a feature spec or ADR, surface the conflict for a decision instead
 of silently overriding it.
+
+Trial note: non-UI commit after sign-off.
