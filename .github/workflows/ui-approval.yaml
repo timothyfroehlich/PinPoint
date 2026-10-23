@@ -17,7 +17,11 @@
 # The required check is the `UI Approval` job, never `sign-off` itself: a skipped
 # job counts as passing, so the final job decides from both results.
 #
-# Trust: the scope scripts come from main, as in claude-review.yaml.
+# Trust: the scope scripts come from main, as in claude-review.yaml. This workflow
+# file itself runs from the PR, as every `pull_request` workflow does, so a PR that
+# edits it (or adds a job named UI Approval) can change this check; Claude Review of
+# that diff and Tim's merge decision cover it. Agents approve only through
+# approve-ui.sh, on Tim's own approval, and never through the raw API.
 
 name: UI Approval
 
