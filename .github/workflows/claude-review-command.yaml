@@ -1,0 +1,84 @@
+# /claude-review: re-run Claude Review on a pull request's current head (PP-zxlq.3).
+#
+# A comment whose first word is `/claude-review`, from someone with write
+# access, re-runs the latest Claude Review workflow run for the PR's head commit.
+# A re-run keeps the original pull_request event, so its check run lands on that
+# head under the same required-check name, and the review range is recomputed from
+# the check runs as they stand now.
+#
+# Security boundary: `issue_comment` loads this workflow from main, never from the
+# PR branch, and nothing here executes PR content. The comment body is used only
+# by the job's `if` expression. A head with no Claude Review run (pushed before
+# the workflow existed) gets a reply instead, since there is no run to re-run; so
+# does a draft, which Claude Review skips.
+
+name: Claude Review Command
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions: {}
+
+concurrency:
+  # Every comment gets its own group: an unrelated comment still creates a skipped
+  # run, and concurrency is evaluated before the job filter.
+  group: claude-review-command-${{ github.event.issue.number }}-${{ github.event.comment.id }}
+  cancel-in-progress: false
+
+jobs:
+  rerun:
+    name: Re-run Claude Review
+    if: >-
+      github.event.issue.pull_request &&
+      startsWith(github.event.comment.body, '/claude-review') &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      # PR conversation comments go through the issues API.
+      issues: write
+      pull-requests: read
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      PR_NUMBER: ${{ github.event.issue.number }}
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
+        with:
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+
+      - name: Re-run the head's Claude Review
+        run: |
+          # The job's `if` is a coarse prefix match; the command must be the whole
+          # first word, so `/claude-reviewer` or `/claude-review-later` do nothing.
+          first_line=$(jq -r '.comment.body | split("\n")[0] | rtrimstr("\r")' "$GITHUB_EVENT_PATH")
+          if [[ ! "$first_line" =~ ^/claude-review([[:space:]]|$) ]]; then
+            echo "Not a /claude-review command: ignoring."
+            exit 0
+          fi
+          pr=$(gh pr view "$PR_NUMBER" --json headRefOid,isDraft)
+          head=$(jq -r .headRefOid <<< "$pr")
+          if [ "$(jq -r .isDraft <<< "$pr")" = "true" ]; then
+            gh pr comment "$PR_NUMBER" --body "Claude Review skips drafts; mark the pull request ready to review ${head:0:7}."
+            exit 0
+          fi
+          run=$(gh run list --workflow claude-review.yaml --commit "$head" --limit 1 \
+            --json databaseId,status --jq '.[0] // empty')
+          if [ -z "$run" ]; then
+            msg="No Claude Review run exists on ${head:0:7} to re-run."
+            msg="$msg Push a commit (a clean merge of main is enough) to start one."
+            gh pr comment "$PR_NUMBER" --body "$msg"
+            exit 0
+          fi
+          id=$(jq -r .databaseId <<< "$run")
+          if [ "$(jq -r .status <<< "$run")" != "completed" ]; then
+            gh pr comment "$PR_NUMBER" --body "Claude Review is already running on ${head:0:7}."
+            exit 0
+          fi
+          gh run rerun "$id"
+          gh pr comment "$PR_NUMBER" --body "Re-running Claude Review on ${head:0:7}."
