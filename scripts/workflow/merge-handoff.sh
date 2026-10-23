@@ -45,7 +45,7 @@ fi
 # Facts from GitHub
 # ---------------------------------------------------------------------------------
 
-meta=$(gh pr view "$pr" --json number,title,url,headRefName,headRefOid,baseRefName,isDraft,state,body)
+meta=$(gh pr view "$pr" --json number,title,url,headRefName,headRefOid,baseRefName,isDraft,state)
 title=$(jq -r '.title' <<< "$meta")
 url=$(jq -r '.url' <<< "$meta")
 head_ref=$(jq -r '.headRefName' <<< "$meta")
@@ -329,9 +329,9 @@ if [[ -z "$env_added" ]]; then
   env_added="none"
 fi
 
-UI_PATHS='(^src/app/.*\.tsx$|^src/components/|\.css$)'
+# The one UI path list, shared with the UI Approval check and the reminder hook.
 ui_changed=no
-if grep -qE "$UI_PATHS" <<< "$changed_paths"; then
+if grep -qE -f "${SCRIPT_DIR}/ui-paths.txt" <<< "$changed_paths"; then
   ui_changed=yes
 fi
 
@@ -340,11 +340,16 @@ fi
 # Tim's approval is reported for what it is rather than vouched for by an older picture.
 # One head can carry several runs (re-runs, draft promotion), so the newest by start time
 # wins. A run that has not concluded is "pending" — Tim has not approved yet.
+# While Tim's sign-off is pending, the final UI Approval job has not started and has
+# no check run of its own; the waiting "Tim's UI sign-off" run says so instead.
 ui_state=$(gh api --paginate "repos/$(_repo_slug)/commits/${head_sha}/check-runs?per_page=100" \
-  | jq -rs '[ .[] | .check_runs[]?
-              | select(.name == "UI Approval" and .app.slug == "github-actions") ]
-            | sort_by(.started_at // "") | last // empty
-            | if .status == "completed" then (.conclusion // "unknown") else "pending" end') || ui_state="unavailable"
+  | jq -rs '[ .[] | .check_runs[]? | select(.app.slug == "github-actions") ] as $runs
+            | ($runs | map(select(.name == "UI Approval")) | sort_by(.started_at // "") | last) as $gate
+            | ($runs | map(select(.name == "Tim'"'"'s UI sign-off")) | sort_by(.started_at // "") | last) as $wait
+            | if $gate != null then
+                (if $gate.status == "completed" then ($gate.conclusion // "unknown") else "pending" end)
+              elif $wait != null and $wait.status != "completed" then "waiting for Tim'"'"'s sign-off"
+              else empty end') || ui_state="unavailable"
 if [[ -z "$ui_state" ]]; then
   ui_approval="no UI Approval run"
 else

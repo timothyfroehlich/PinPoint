@@ -318,7 +318,20 @@ function git(args, opts = {}) {
 async function main() {
   const { pagesFilter, outDir, forceAuth } = parseArgs(process.argv.slice(2));
 
-  const shortSha = git(["rev-parse", "--short", "HEAD"], { cwd: REPO_ROOT });
+  const headSha = git(["rev-parse", "--short", "HEAD"], { cwd: REPO_ROOT });
+  // The dev server renders the working tree, so uncommitted edits would appear in
+  // pictures filed under a commit that lacks them; Tim's approval is recorded
+  // against a commit (approve-ui.sh --head), so the directory says so.
+  const dirty =
+    git(["status", "--porcelain", "--untracked-files=no"], {
+      cwd: REPO_ROOT,
+    }) !== "";
+  if (dirty) {
+    console.error(
+      "⚠️  Uncommitted changes: these screenshots match no commit. Commit and push before showing Tim."
+    );
+  }
+  const shortSha = dirty ? `${headSha}-dirty` : headSha;
   const workDir = outDir
     ? isAbsolute(outDir)
       ? outDir

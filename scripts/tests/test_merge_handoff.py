@@ -285,7 +285,18 @@ def repo_with_pr(
                 "started_at": "2026-08-02T20:00:00Z",
             }
         ]
-        if scenario.ui_approval is not None:
+        if scenario.ui_approval == "waiting":
+            # Tim has not signed off: only the sign-off job exists, still waiting.
+            check_runs.append(
+                {
+                    "name": "Tim's UI sign-off",
+                    "status": "waiting",
+                    "conclusion": None,
+                    "app": {"slug": "github-actions"},
+                    "started_at": "2026-08-02T20:01:00Z",
+                }
+            )
+        elif scenario.ui_approval is not None:
             pending = scenario.ui_approval == "pending"
             check_runs.append(
                 {
@@ -804,6 +815,25 @@ def test_an_unconcluded_ui_approval_run_reads_as_pending() -> None:
         scenario=Scenario(ui_approval="pending"),
     ) as (_head, run):
         assert "UI Approval pending" in run.stdout, run.stdout
+
+
+def test_a_waiting_sign_off_is_reported_as_waiting() -> None:
+    with repo_with_pr(
+        branch_changes={"src/components/Thing.tsx": "export const T = () => null;\n"},
+        scenario=Scenario(ui_approval="waiting"),
+    ) as (_head, run):
+        assert "UI Approval waiting for Tim's sign-off" in run.stdout, run.stdout
+
+
+def test_tailwind_config_counts_as_a_ui_change() -> None:
+    """The handoff reads ui-paths.txt, the same list the UI Approval check uses."""
+    with repo_with_pr(
+        branch_changes={"tailwind.config.ts": "export default {};\n"}
+    ) as (
+        _head,
+        run,
+    ):
+        assert "UI file(s) changed" in run.stdout, run.stdout
 
 
 def test_a_ui_approval_run_from_another_app_is_ignored() -> None:
