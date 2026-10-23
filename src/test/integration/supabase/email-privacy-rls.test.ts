@@ -223,6 +223,15 @@ describe("Email Privacy RLS Integration", () => {
       expect(error).toBeNull();
       expect(data).toHaveLength(0);
     });
+
+    it("user with user_metadata.role='admin' but user_profiles.role='member' sees only their own row in public_profiles_view", async () => {
+      const { data, error } = await spoofedClient
+        .from("public_profiles_view")
+        .select("id, email");
+
+      expect(error).toBeNull();
+      expect(data).toEqual([{ id: spoofedUser.id, email: spoofedUser.email }]);
+    });
   });
 
   describe("Direct Drizzle Queries with Session Context", () => {
