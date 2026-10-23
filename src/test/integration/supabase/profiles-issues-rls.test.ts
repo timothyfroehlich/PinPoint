@@ -21,8 +21,10 @@ if (!supabaseUrl || !supabaseAnonKey || !serviceRoleKey) {
   );
 }
 
-const serviceClient = createClient(supabaseUrl, serviceRoleKey);
-const anonClient = createClient(supabaseUrl, supabaseAnonKey);
+const url = supabaseUrl;
+const anonKey = supabaseAnonKey;
+const serviceClient = createClient(url, serviceRoleKey);
+const anonClient = createClient(url, anonKey);
 
 interface TestUser {
   id: string;
@@ -52,7 +54,7 @@ async function createSignedInUser(
     .eq("id", id);
   if (roleError) throw new Error(roleError.message);
 
-  const client = createClient(supabaseUrl ?? "", supabaseAnonKey ?? "");
+  const client = createClient(url, anonKey);
   const { error: signInError } = await client.auth.signInWithPassword({
     email,
     password: "TestPassword123",
@@ -78,15 +80,19 @@ describe("user_profiles and issues RLS (PP-7ruw)", () => {
   let admin: TestUser;
   let member: TestUser;
   let other: TestUser;
+  const created: TestUser[] = [];
 
   beforeAll(async () => {
     admin = await createSignedInUser("admin", "admin");
+    created.push(admin);
     member = await createSignedInUser("member", "member");
+    created.push(member);
     other = await createSignedInUser("other", "member");
+    created.push(other);
   });
 
   afterAll(async () => {
-    for (const user of [admin, member, other]) {
+    for (const user of created) {
       await serviceClient.auth.admin.deleteUser(user.id);
     }
   });
