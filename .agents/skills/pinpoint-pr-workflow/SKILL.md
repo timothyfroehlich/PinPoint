@@ -187,27 +187,27 @@ circular. A PR may be GitHub-ready while still lacking the
 final PinPoint `ready-for-review` label. Do not call it merge-ready until 3.6 is
 satisfied.
 
-### 3.5 Post UI screenshots (UI-touching PRs only)
+### 3.5 Get Tim's UI approval (UI-touching PRs, while still a draft)
 
-If the diff touches `src/app/**`, `src/components/**`, any `.css`, or design tokens, screenshots must be posted before the PR can be called ready unless the edit genuinely has no rendered effect and the PR body records `<!-- no-visual-change -->`. Tim reviews rendered UI changes by eye, not by reading a diff. The commit-time `ui-screenshot-reminder.cjs` PostToolUse hook nudges on the first `git commit` that touches a UI glob; satisfy it with screenshots or the documented opt-out.
+When the diff touches a path in `scripts/workflow/ui-paths.txt` (`src/app/**/*.tsx`, `src/components/**`, any `.css`, Tailwind config, design tokens), the required `UI Approval` check waits for Tim's sign-off on the head. Tim reviews rendered UI by eye, not by reading a diff. Get it while the PR is a draft, before updating E2E tests and before marking the PR ready for Claude Review, so no E2E work rides on a layout he has not seen. The commit-time `ui-screenshot-reminder.cjs` hook nudges on the first UI commit.
 
-```
-node scripts/workflow/pr-screenshots.mjs <PR>
-```
+1. **Capture.** With the dev server (`pnpm run dev`) and Supabase (`pnpm supabase:start`) running:
+   ```
+   node scripts/workflow/pr-screenshots.mjs [--pages=a,b,c]
+   ```
+   It shoots the pages in `scripts/workflow/ui-screenshot-manifest.json` at the three review viewports (`pinpoint-design-bible` §4: desktop 1440×900, large mobile 430×932, small mobile 320×568) into `tmp/pr-screenshots/<short-sha>/` and prints one path per PNG. `--pages` takes only the equals form. The first run, or a stale login, regenerates `e2e/.auth/*.json` through the `auth-setup` Playwright project, which resets and reseeds the local dev DB. For a state the manifest cannot reach (a dialog open, a toggle set), shoot it in the browser pane (`preview_start`, then `resize_window` and a screenshot) at the same three sizes.
+2. **Show.** Put the screenshots in front of Tim in the session, each page's three sizes together, and offer the running dev server for hands-on review. In Claude Code Desktop that is `SendUserFile` (`display: "render"`) and the browser pane (`preview_start`); a harness that cannot show images gives him the printed paths and the dev server URL. For an ownerless or cloud-routine PR, the Desktop session that adopts it presents them; under the orchestrator, the lead collects them into its artifact (the `pinpoint-orchestrator` skill in Claude Code).
+3. **Record his approval.** When Tim approves in the session, or clicks Approve in the orchestrator artifact, run:
+   ```
+   bash scripts/workflow/approve-ui.sh <PR> --head <sha> --source chat|artifact
+   ```
+   `--head` is the commit the screenshots came from; the script refuses if the PR head has moved past it, so capture from a committed, pushed tree. It approves the `ui-approval` environment deployment that head's UI Approval run is waiting on, and only that one. Run it only on Tim's own approval; never call the `pending_deployments` API directly. Tim can also approve on GitHub from the run's "Review deployments".
 
-Shoots the manifest in `scripts/workflow/ui-screenshot-manifest.json` (issues list, issue detail, report form, dashboard, a machine detail, collections — pass `--pages=a,b,c` to shoot a subset) at the three review viewports (`pinpoint-design-bible` §4: desktop 1440×900, large mobile 430×932, small mobile 320×568), pushes the PNGs to the orphan `pr-screenshots` branch, and posts/updates one sticky PR comment (marker `<!-- pr-screenshots -->`) with a three-column table per page. Re-run after any UI-affecting push — it updates the same sticky comment in place, tagged with the new head SHA.
-
-**Shots the manifest can't reach** (a toggle in one position, an open dialog): capture them yourself, name each `<viewport>-<id>.png` (`desktop`, `mobile-large`, `mobile-small`), and publish with `node scripts/workflow/pr-screenshots.mjs <PR> --files=a.png,b.png`. It needs no dev server, runs without a permission prompt, and rebuilds the sticky comment from just those files. Never push to `pr-screenshots` or post the screenshot comment by hand: a hand-rolled push that clears its scratch dir with `rm -rf` hits the `Bash(rm -rf:*)` ask rule and prompts Tim, who has said seed-data screenshots need no approval.
-
-Two `--pages` gotchas: it only accepts the **equals** form (`--pages=machine-edit`); the space-separated form fails with `Unrecognized argument`. And a filtered run rebuilds the sticky comment from just the pages it shot, silently dropping the others — so always finish with an unfiltered run before handing the PR off.
-
-Requires the local dev server (`pnpm run dev`) and Supabase (`pnpm supabase:start`) running. First run (or a stale/missing login session) regenerates `e2e/.auth/*.json` via the `auth-setup` Playwright project, which resets + reseeds the local dev DB — same as running E2E tests locally, not a new risk.
-
-**No visible change?** The screenshot check keys on file **paths**, so a UI-glob edit that renders nothing new (a pure refactor, a non-null-`!` removal) still trips the "screenshots?" nudge — and two identical screenshots would satisfy it without conveying anything. Record the claim instead: put `<!-- no-visual-change -->` in the PR **body**. `merge-handoff.sh` reads that marker and clears its `NO screenshots posted` nudge (posted screenshots always take precedence over it). Use it only when the change genuinely has no rendered effect.
+The approval carries across later commits that touch no UI path, so E2E updates after sign-off pass on their own. A later UI change makes the new head wait again; show Tim what changed and repeat step 3. A UI-path edit with no rendered effect (a refactor, a type-only change) still waits: tell Tim it renders nothing new and let him approve it from the description.
 
 ### 3.6 Apply `ready-for-review` label
 
-Once CI green + an exact-head review record (3.4) + zero unresolved review threads + no merge conflict + the screenshot requirement or documented opt-out in 3.5 satisfied, apply the label via `mcp__github__issue_write(method: "update", …)` or `gh pr edit <PR> --add-label ready-for-review`.
+Once CI green + an exact-head review record (3.4) + zero unresolved review threads + no merge conflict + a passing `UI Approval` (3.5), apply the label via `mcp__github__issue_write(method: "update", …)` or `gh pr edit <PR> --add-label ready-for-review`.
 
 The label signals readiness, not merge authorization. A direct request from Tim in the active task authorizes the owning agent to run the guarded merge script; the script rechecks all gates.
 
