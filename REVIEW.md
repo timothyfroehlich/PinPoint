@@ -79,7 +79,7 @@ Reviewers never merge a PinPoint PR merely by reviewing it. Tim decides whether 
 
 Claude Code (`permissions.ask` in `.claude/settings.json`) and Codex (`.codex/rules/pinpoint.rules`) show an approval prompt before the guarded script runs. Tim’s explicit request in the task authorizes the agent in any harness to pass `--human`; that additional prompt is not a reason to refuse or ask him to type a command. Antigravity may not prompt. If the target is ambiguous, clarify it first. If any gate fails, stop and report it; bypass flags need separate explicit authorization.
 
-Without an explicit merge request, hand off a GitHub-ready PR with CI green, exact-head review coverage, zero unresolved threads, the `ready-for-review` label, and screenshots or the no-visual-change marker as required. When Tim explicitly requests the merge, run the guarded script in any harness and verify the result.
+Without an explicit merge request, hand off a GitHub-ready PR with CI green, exact-head review coverage, zero unresolved threads, the `ready-for-review` label, and a passing `UI Approval` check. When Tim explicitly requests the merge, run the guarded script in any harness and verify the result.
 
 ## Pointers, not copies
 

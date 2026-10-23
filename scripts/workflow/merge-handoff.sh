@@ -35,14 +35,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/_pr-gates.sh"
 
-SCREENSHOT_MARKER="<!-- pr-screenshots -->"
-# A PR-body opt-out marker: when a UI-glob file changed but nothing renders differently
-# (a refactor, a non-null-`!` removal), the author records that with this marker in the
-# PR body so the report drops its "NO screenshots posted" nudge — the claim lives in the
-# PR rather than being argued in chat. Substring-matched (not whole-line) because GitHub
-# stores bodies with CRLF; a `grep -x` anchor would silently miss the marker. (PP-lhjg)
-NO_VISUAL_CHANGE_MARKER="<!-- no-visual-change -->"
-
 pr="${1:-}"
 if [[ -z "$pr" || ! "$pr" =~ ^[0-9]+$ ]]; then
   echo "usage: merge-handoff.sh <PR>" >&2
@@ -53,10 +45,9 @@ fi
 # Facts from GitHub
 # ---------------------------------------------------------------------------------
 
-meta=$(gh pr view "$pr" --json number,title,url,headRefName,headRefOid,baseRefName,isDraft,state,body)
+meta=$(gh pr view "$pr" --json number,title,url,headRefName,headRefOid,baseRefName,isDraft,state)
 title=$(jq -r '.title' <<< "$meta")
 url=$(jq -r '.url' <<< "$meta")
-pr_body=$(jq -r '.body // ""' <<< "$meta")
 head_ref=$(jq -r '.headRefName' <<< "$meta")
 head_sha=$(jq -r '.headRefOid' <<< "$meta")
 base_ref=$(jq -r '.baseRefName' <<< "$meta")
@@ -338,57 +329,43 @@ if [[ -z "$env_added" ]]; then
   env_added="none"
 fi
 
-UI_PATHS='(^src/app/.*\.tsx$|^src/components/|\.css$)'
+# The one UI path list, shared with the UI Approval check and the reminder hook.
 ui_changed=no
-if grep -qE "$UI_PATHS" <<< "$changed_paths"; then
+if grep -qEi -f "${SCRIPT_DIR}/ui-paths.txt" <<< "$changed_paths"; then
   ui_changed=yes
 fi
 
-shots=$(gh api --paginate "repos/$(_repo_slug)/issues/${pr}/comments" \
-  | jq -rs --arg marker "$SCREENSHOT_MARKER" \
-      '[ .[] | flatten | .[] | select((.body // "") | startswith($marker)) ] | last.updated_at // ""')
-
-# "Screenshots exist" is not "screenshots of this" — the sticky comment survives every
-# later push, so a UI commit landing after it leaves the report vouching for pictures of
-# an older tree. Every other claim in this block is pinned to a commit; this was the one
-# "trust me" field.
-#
-# Compared as UTC strings in GitHub's own format, which sorts lexicographically — date
-# arithmetic would need GNU `date -d`, and this has to run on the Mac too. Commit dates
-# can be rewritten, so this is a staleness signal, not proof.
-last_ui_commit=""
-if [[ "$ui_changed" == "yes" ]]; then
-  ui_files=()
-  while IFS= read -r ui_file; do
-    ui_files+=("$ui_file")
-  done < <(grep -E "$UI_PATHS" <<< "$changed_paths")
-  last_ui_commit=$(TZ=UTC0 git log -1 --format='%cd' --date=format:'%Y-%m-%dT%H:%M:%SZ' \
-    "${merge_base}..${head_sha}" -- "${ui_files[@]}" 2>/dev/null || true)
+# The UI sign-off is the PR head's "UI Approval" check run (the ui-approval.yaml workflow,
+# a GitHub Actions check), not a PR comment: it is pinned to the head SHA, so a push after
+# Tim's approval is reported for what it is rather than vouched for by an older picture.
+# One head can carry several runs (re-runs, draft promotion), so the newest by start time
+# wins. A run that has not concluded is "pending" — Tim has not approved yet.
+# While Tim's sign-off is pending, the final UI Approval job has not started and has
+# no check run of its own; the waiting "Tim's UI sign-off" run says so instead.
+ui_state=$(gh api --paginate "repos/$(_repo_slug)/commits/${head_sha}/check-runs?per_page=100" \
+  | jq -rs '[ .[] | .check_runs[]? | select(.app.slug == "github-actions") ] as $runs
+            | ($runs | map(select(.name == "UI Approval")) | sort_by(.started_at // "") | last) as $gate
+            | ($runs | map(select(.name == "Tim'"'"'s UI sign-off")) | sort_by(.started_at // "") | last) as $wait
+            | if $gate != null then
+                (if $gate.status == "completed" then ($gate.conclusion // "unknown") else "pending" end)
+              elif $wait != null and $wait.status != "completed" then "waiting for Tim'"'"'s sign-off"
+              elif $wait != null and $wait.conclusion == "success" then "pending"
+              else empty end') || ui_state="unavailable"
+if [[ -z "$ui_state" ]]; then
+  ui_approval="no UI Approval run"
+else
+  ui_approval="UI Approval ${ui_state}"
 fi
 
 # The value states only what the path heuristic actually knows — a UI FILE changed, not
 # that the UI changed. Bare `ui yes` over-claimed, so it trained readers to skim the one
-# line that also flags a genuinely unscreenshotted change. (PP-lhjg)
+# line that also flags a genuinely unapproved change. (PP-lhjg)
 if [[ "$ui_changed" == "yes" ]]; then
   ui_desc="UI file(s) changed"
 else
   ui_desc="no UI files changed"
 fi
-
-if [[ -n "$shots" ]]; then
-  ui_line="${ui_desc} · screenshots posted ${shots}"
-  if [[ -n "$last_ui_commit" && "$last_ui_commit" > "$shots" ]]; then
-    ui_line="${ui_line} · STALE: UI changed at ${last_ui_commit}, after the screenshots"
-  fi
-elif [[ "$ui_changed" == "yes" ]]; then
-  if grep -qF "$NO_VISUAL_CHANGE_MARKER" <<< "$pr_body"; then
-    ui_line="${ui_desc} · marked no-visual-change"
-  else
-    ui_line="${ui_desc} · NO screenshots posted"
-  fi
-else
-  ui_line="$ui_desc"
-fi
+ui_line="${ui_desc} · ${ui_approval}"
 
 # ---------------------------------------------------------------------------------
 # Branch freshness

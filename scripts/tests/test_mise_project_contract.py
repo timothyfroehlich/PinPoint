@@ -9,6 +9,7 @@ Verifies that:
 6. mise meets the minimum version requirement (>= 2026.8.11).
 7. CI's required mise-only canary validates the locked toolchain and cache identity (PP-h2ui.8).
 8. CI and preview workflows use the shared mise setup without legacy setup actions (PP-h2ui.9).
+9. pnpm-lock.yaml stays one YAML document, because pnpm self-switching is off (PP-o961).
 """
 
 import json
@@ -20,6 +21,7 @@ from copy import deepcopy
 from pathlib import Path
 
 import pytest
+import yaml
 
 pytestmark = [pytest.mark.integration, pytest.mark.xdist_group("mise")]
 
@@ -33,6 +35,8 @@ REPO_ROOT = Path(__file__).parent.parent.parent
 MISE_TOML_PATH = REPO_ROOT / "mise.toml"
 MISE_LOCK_PATH = REPO_ROOT / "mise.lock"
 PACKAGE_JSON_PATH = REPO_ROOT / "package.json"
+PNPM_LOCK_PATH = REPO_ROOT / "pnpm-lock.yaml"
+PNPM_WORKSPACE_PATH = REPO_ROOT / "pnpm-workspace.yaml"
 RUFF_TOML_PATH = REPO_ROOT / "ruff.toml"
 REQUIREMENTS_TXT_PATH = REPO_ROOT / "scripts" / "requirements.txt"
 CHECK_PYTEST_PATH = REPO_ROOT / "scripts" / "check-pytest.sh"
@@ -350,6 +354,30 @@ def test_package_json_pnpm_authority() -> None:
     # engines.node must be defined as deployment compatibility contract
     engines = pkg.get("engines", {})
     assert "node" in engines, "package.json must declare engines.node"
+
+
+def test_pnpm_lockfile_is_single_document() -> None:
+    """GitHub's dependency graph reads only the first lockfile document (PP-o961).
+
+    With pmOnFail other than `ignore`, pnpm 12 writes a leading environment
+    document holding only the pnpm binaries, which hides every npm package from
+    Dependabot alerts.
+    """
+    workspace = yaml.safe_load(PNPM_WORKSPACE_PATH.read_text(encoding="utf-8"))
+    assert workspace.get("pmOnFail") == "ignore", (
+        "pnpm-workspace.yaml must set `pmOnFail: ignore`; any other value lets "
+        "pnpm write its environment document back into pnpm-lock.yaml"
+    )
+
+    loader = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
+    documents = list(
+        yaml.load_all(PNPM_LOCK_PATH.read_text(encoding="utf-8"), Loader=loader)
+    )
+    assert len(documents) == 1, (
+        f"pnpm-lock.yaml has {len(documents)} YAML documents; delete the leading "
+        "environment document and rerun `pnpm install --lockfile-only`"
+    )
+    assert "packages" in documents[0], "pnpm-lock.yaml lost its packages section"
 
 
 def test_mise_lock_exists_and_captures_tools() -> None:
