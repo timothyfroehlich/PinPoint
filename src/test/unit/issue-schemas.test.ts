@@ -125,7 +125,8 @@ describe("Issue Validation Schemas", () => {
 
   describe("imageMetadataSchema fileSizeBytes (PP-ysk3)", () => {
     const base = {
-      blobUrl: "https://teststore.public.blob.vercel-storage.com/img.jpg",
+      blobUrl:
+        "https://teststore.public.blob.vercel-storage.com/issue-images/pending/img.jpg",
       blobPathname: "issue-images/pending/img.jpg",
       originalFilename: "img.jpg",
       mimeType: "image/jpeg",
@@ -199,7 +200,23 @@ describe("Issue Validation Schemas", () => {
       ],
       [
         "a malformed percent-escape",
-        "https://teststore.public.blob.vercel-storage.com/bad%E0%A4%A.jpg",
+        "https://teststore.public.blob.vercel-storage.com/issue-images/bad%E0%A4%A.jpg",
+      ],
+      [
+        "a path outside issue-images/",
+        "https://teststore.public.blob.vercel-storage.com/user-avatars/someone.png",
+      ],
+      [
+        "encoded .. segments that leave issue-images/",
+        "https://teststore.public.blob.vercel-storage.com/issue-images/a%2F..%2F..%2Fuser-avatars%2Fy.png",
+      ],
+      [
+        "an encoded backslash",
+        "https://teststore.public.blob.vercel-storage.com/issue-images/a%5C..%5Cy.png",
+      ],
+      [
+        "an encoded empty segment",
+        "https://teststore.public.blob.vercel-storage.com/issue-images/a%2F%2Fy.png",
       ],
     ])("rejects %s", (_label, blobUrl) => {
       vi.stubEnv("MOCK_BLOB_STORAGE", "true");

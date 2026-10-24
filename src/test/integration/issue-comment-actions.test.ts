@@ -647,7 +647,7 @@ describe("addCommentAction — integration (PP-x4li.1.4)", () => {
     const { addCommentAction } = await import("~/app/(app)/issues/actions");
 
     const excessiveImages = Array.from({ length: 5 }, (_, i) => ({
-      blobUrl: `https://test-blob.public.blob.vercel-storage.com/test-${i}.jpg`,
+      blobUrl: `https://test-blob.public.blob.vercel-storage.com/issue-images/test-${i}.jpg`,
       blobPathname: `issue-images/test-${i}.jpg`,
       originalFilename: `test-${i}.jpg`,
       fileSizeBytes: 1024,

@@ -74,11 +74,17 @@ export const assignIssueSchema = z.object({
 });
 
 const VERCEL_BLOB_HOST_SUFFIX = ".public.blob.vercel-storage.com";
+// uploadIssueImage writes every issue image under this prefix.
+const ISSUE_IMAGE_PATH_PREFIX = "issue-images/";
 
 /**
  * The blob pathname a host-verified blobUrl names, or null when the URL names
- * none. Vercel Blob serves a blob at `/<pathname>`; the local mock store
- * serves it at `/uploads/<pathname>`.
+ * no issue image. Vercel Blob serves a blob at `/<pathname>`; the local mock
+ * store serves it at `/uploads/<pathname>`.
+ *
+ * The decoded pathname must sit under `issue-images/` and contain no `.`,
+ * `..` or empty segments, backslashes or control characters, so an encoded
+ * `%2F..%2F` cannot turn it into a path that leaves that prefix.
  */
 function blobPathnameFromUrl(blobUrl: string): string | null {
   const url = new URL(blobUrl);
@@ -86,14 +92,19 @@ function blobPathnameFromUrl(blobUrl: string): string | null {
     ? "/"
     : MOCK_UPLOADS_URL_PREFIX;
   if (!url.pathname.startsWith(prefix)) return null;
+  let pathname: string;
   try {
-    const pathname = decodeURIComponent(url.pathname.slice(prefix.length));
-    return pathname.length > 0 ? pathname : null;
+    pathname = decodeURIComponent(url.pathname.slice(prefix.length));
   } catch (error) {
     // decodeURIComponent throws URIError on a malformed escape.
     if (error instanceof URIError) return null;
     throw error;
   }
+  if (!pathname.startsWith(ISSUE_IMAGE_PATH_PREFIX)) return null;
+  if (/[\\\p{Cc}]/u.test(pathname)) return null;
+  const segments = pathname.split("/");
+  if (segments.some((s) => s === "" || s === "." || s === "..")) return null;
+  return pathname;
 }
 
 /**
