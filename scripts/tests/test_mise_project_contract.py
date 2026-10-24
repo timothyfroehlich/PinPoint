@@ -1,7 +1,7 @@
 """Tests for the PinPoint mise project contract (PP-h2ui.4, .5, .6, .8, .9).
 
 Verifies that:
-1. mise.toml defines the exact development Node/Python/Ruff/Supabase-CLI/zizmor tools and settings.
+1. mise.toml defines the exact development Node/Python/Ruff/Supabase-CLI/zizmor/actionlint tools and settings.
 2. package.json#packageManager remains the single pnpm version and checksum authority.
 3. mise.toml does not duplicate the pnpm version (idiomatic_version_file_enable_tools is used).
 4. mise.lock exists and captures resolved artifacts across platforms.
@@ -46,8 +46,9 @@ PREVIEW_CONTROL_PATH = REPO_ROOT / ".github" / "workflows" / "preview-control.ya
 PREVIEW_REAPER_PATH = REPO_ROOT / ".github" / "workflows" / "preview-reaper.yaml"
 
 MINIMUM_MISE_VERSION = (2026, 8, 11)
-MISE_MANAGED_TOOLS = ("node", "python", "ruff", "supabase", "zizmor")
+MISE_MANAGED_TOOLS = ("node", "python", "ruff", "supabase", "zizmor", "actionlint")
 EXPECTED_TOOL_BACKENDS = {
+    "actionlint": "aqua:rhysd/actionlint",
     "node": "core:node",
     "pnpm": "aqua:pnpm/pnpm",
     "python": "core:python",
@@ -56,6 +57,15 @@ EXPECTED_TOOL_BACKENDS = {
     "zizmor": "aqua:zizmorcore/zizmor",
 }
 REQUIRED_LOCK_PLATFORMS = {
+    "actionlint": {
+        "linux-arm64",
+        "linux-arm64-musl",
+        "linux-x64",
+        "linux-x64-musl",
+        "macos-arm64",
+        "macos-x64",
+        "windows-x64",
+    },
     "node": {
         "linux-arm64",
         "linux-arm64-musl",
@@ -102,6 +112,7 @@ REQUIRED_LOCK_PLATFORMS = {
     },
 }
 EXPECTED_LOCK_PROVENANCE = {
+    "actionlint": "github-attestations",
     "python": "github-attestations",
     "zizmor": "github-attestations",
 }
@@ -669,6 +680,7 @@ def test_mise_ls_resolves_sources_correctly() -> None:
     assert "ruff" in tools_dict, "ruff not listed by mise ls"
     assert "supabase" in tools_dict, "supabase not listed by mise ls"
     assert "zizmor" in tools_dict, "zizmor not listed by mise ls"
+    assert "actionlint" in tools_dict, "actionlint not listed by mise ls"
 
     # pnpm's version is authored in package.json; the rest are pinned in mise.toml.
     expected_sources = {
@@ -678,6 +690,7 @@ def test_mise_ls_resolves_sources_correctly() -> None:
         "ruff": MISE_TOML_PATH,
         "supabase": MISE_TOML_PATH,
         "zizmor": MISE_TOML_PATH,
+        "actionlint": MISE_TOML_PATH,
     }
     for tool, expected_path in expected_sources.items():
         selected_entry = _selected_tool_entry(tools_dict[tool])
@@ -906,13 +919,14 @@ def test_ci_installs_pytest_for_mise_python() -> None:
     assert 'pipx install "pytest==' not in workflow
 
 
-def test_ci_installs_zizmor_from_locked_mise_toolchain() -> None:
-    """Verify local and CI zizmor use the same mise-authored exact pin."""
+def test_ci_installs_linters_from_locked_mise_toolchain() -> None:
+    """Verify local and CI zizmor and actionlint use the same mise-authored exact pin."""
     workflow = CI_WORKFLOW_PATH.read_text(encoding="utf-8")
     linters = _workflow_job_block(workflow, "linters")
 
-    assert 'install-args: "--locked python ruff zizmor"' in linters
+    assert 'install-args: "--locked python ruff zizmor actionlint"' in linters
     assert "pipx install" not in linters
+    assert "download-actionlint" not in workflow
 
 
 def _workflow_job_block(workflow: str, job_name: str) -> str:
