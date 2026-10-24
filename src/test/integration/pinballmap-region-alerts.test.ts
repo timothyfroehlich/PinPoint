@@ -1158,7 +1158,15 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
     });
     expect(reportError).toHaveBeenCalledWith(
       expect.any(RegionPayloadTooLargeError),
-      expect.objectContaining({ observedAtLeast: MAX_REGION_ENTRIES + 1 })
+      expect.objectContaining({
+        observedAtLeast: MAX_REGION_ENTRIES + 1,
+        action: "pinballmap.regionAlerts",
+      })
+    );
+    // The run aborted, so this is a primary failure, not a tolerated one.
+    expect(reportError).not.toHaveBeenCalledWith(
+      expect.any(RegionPayloadTooLargeError),
+      expect.objectContaining({ bestEffort: true })
     );
     expect(await seenRows()).toEqual([]);
     expect(discord.posts).toEqual([]);
