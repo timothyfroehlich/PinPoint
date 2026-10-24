@@ -14,7 +14,7 @@ import {
 } from "~/lib/types";
 import { ISSUE_STATUS_VALUES } from "~/lib/issues/status";
 import { isProductionBuild } from "~/lib/runtime-env";
-import { BLOB_CONFIG } from "~/lib/blob/config";
+import { BLOB_CONFIG, MOCK_UPLOADS_URL_PREFIX } from "~/lib/blob/config";
 
 const uuidish = z
   .string()
@@ -74,10 +74,6 @@ export const assignIssueSchema = z.object({
 });
 
 const VERCEL_BLOB_HOST_SUFFIX = ".public.blob.vercel-storage.com";
-// Mirrors MOCK_UPLOADS_URL_PREFIX in ~/lib/blob/mock-storage, which this file
-// cannot import: a client component imports these schemas, and that module
-// imports node:path.
-const MOCK_BLOB_URL_PREFIX = "/uploads/";
 
 /**
  * The blob pathname a host-verified blobUrl names, or null when the URL names
@@ -88,7 +84,7 @@ function blobPathnameFromUrl(blobUrl: string): string | null {
   const url = new URL(blobUrl);
   const prefix = url.hostname.endsWith(VERCEL_BLOB_HOST_SUFFIX)
     ? "/"
-    : MOCK_BLOB_URL_PREFIX;
+    : MOCK_UPLOADS_URL_PREFIX;
   if (!url.pathname.startsWith(prefix)) return null;
   try {
     const pathname = decodeURIComponent(url.pathname.slice(prefix.length));
