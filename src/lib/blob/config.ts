@@ -1,3 +1,10 @@
+/**
+ * URL path prefix that mock uploads are served from. Lives here rather than in
+ * ~/lib/blob/mock-storage so client-bundled code (the image metadata schema)
+ * can import it without pulling in node:path.
+ */
+export const MOCK_UPLOADS_URL_PREFIX = "/uploads/";
+
 export const BLOB_CONFIG = {
   // File validation
   ALLOWED_MIME_TYPES: ["image/jpeg", "image/png", "image/webp"] as const,

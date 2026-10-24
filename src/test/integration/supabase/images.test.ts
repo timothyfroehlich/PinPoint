@@ -561,6 +561,84 @@ describe("uploadIssueImage — action integration (PGlite)", () => {
     expect(rows).toHaveLength(0);
   });
 
+  // Attaching an image to a comment takes `comments.edit`, which is "own" for
+  // every role: only the comment's author may attach, admins included.
+  // (PP-ne5y)
+  describe("attaching to a comment", () => {
+    async function seedComment(authorId: string, issueId: string) {
+      const db = await getTestDb();
+      const [comment] = await db
+        .insert(issueComments)
+        .values({
+          issueId,
+          content: plainTextToDoc("Author's comment"),
+          authorId,
+        })
+        .returning();
+      return comment.id;
+    }
+
+    function commentUploadForm(issueId: string, commentId: string) {
+      const formData = new FormData();
+      formData.append("issueId", issueId);
+      formData.append("commentId", commentId);
+      formData.append("image", createMockFile("test.jpg", "image/jpeg", 2048));
+      return formData;
+    }
+
+    it("lets the comment's author attach an image", async () => {
+      const { ownerId, issueId } = await seedIssueWithOwner("member");
+      const commentId = await seedComment(ownerId, issueId);
+      mockAuth(ownerId);
+      mockRateLimitPass();
+      mockBlobUpload();
+
+      const { uploadIssueImage } = await import("~/lib/blob/image-actions");
+      const result = await uploadIssueImage(
+        commentUploadForm(issueId, commentId)
+      );
+
+      expect(result.ok).toBe(true);
+      const db = await getTestDb();
+      const rows = await db
+        .select()
+        .from(issueImages)
+        .where(eq(issueImages.commentId, commentId));
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.uploadedBy).toBe(ownerId);
+    });
+
+    it.each(["member", "admin"] as const)(
+      "denies a non-author %s",
+      async (role) => {
+        // The requester can update the issue (it is their report), so only
+        // the comment-author check stands between them and the comment.
+        const { reporterId, ownerId, issueId } = await seedIssueWithOwner(role);
+        const commentId = await seedComment(ownerId, issueId);
+        mockAuth(reporterId);
+        mockRateLimitPass();
+        mockBlobUpload();
+
+        const { uploadIssueImage } = await import("~/lib/blob/image-actions");
+        const result = await uploadIssueImage(
+          commentUploadForm(issueId, commentId)
+        );
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+          expect(result.code).toBe("AUTH");
+        }
+        expect(uploadToBlob).not.toHaveBeenCalled();
+        const db = await getTestDb();
+        const rows = await db
+          .select()
+          .from(issueImages)
+          .where(eq(issueImages.commentId, commentId));
+        expect(rows).toHaveLength(0);
+      }
+    );
+  });
+
   it("allows an authenticated user with >= AUTHENTICATED_USER_MAX previous images to upload", async () => {
     const { reporterId, issueId } = await seedIssueWithOwner("member");
     mockAuth(reporterId);
