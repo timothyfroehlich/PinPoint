@@ -14,7 +14,7 @@
 # required check counts as passing). Claude may read the checkout, including the
 # review inputs the job prepares, and post inline comments on this PR; it has no
 # shell and cannot edit, commit, or push (tool boundary on the Review step).
-# Outbound traffic is blocked outside the allowlist on Harden Runner, taken from
+# Outbound traffic after the checkout is blocked outside the allowlist on Harden Runner, taken from
 # the trial runs' audit logs.
 #
 # Trust: the range scripts and REVIEW.md come from main, so a PR cannot rescope or
@@ -47,24 +47,6 @@ jobs:
       checks: read
       pull-requests: write
     steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
-        with:
-          egress-policy: block
-          # GitHub's own endpoints are allowed by Harden Runner itself. Anthropic's
-          # are the API, the Claude Code download, and claude.ai for the OAuth
-          # token; registry.npmjs.org and release-assets serve the action's
-          # Claude Code and Bun installs.
-          allowed-endpoints: >
-            api.anthropic.com:443
-            claude.ai:443
-            downloads.claude.ai:443
-            registry.npmjs.org:443
-            release-assets.githubusercontent.com:443
-            github.com:443
-            api.github.com:443
-            results-receiver.actions.githubusercontent.com:443
-
       - name: Refuse fork pull requests
         if: github.event.pull_request.head.repo.full_name != github.repository
         run: |
@@ -87,6 +69,29 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           persist-credentials: false
+
+      # Harden Runner starts after the checkout: under egress-policy block, checkout's
+      # first git fetch to github.com was intermittently refused (run 40017303524).
+      # The checkout is GitHub's own action talking only to github.com; every later
+      # step, the Claude step included, runs under the allowlist.
+      - name: Harden Runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
+        with:
+          egress-policy: block
+          # GitHub's own endpoints are allowed by Harden Runner itself. Anthropic's
+          # are the API, the Claude Code download, and claude.ai for the OAuth
+          # token; registry.npmjs.org and release-assets serve the action's
+          # Claude Code and Bun installs.
+          allowed-endpoints: >
+            api.anthropic.com:443
+            claude.ai:443
+            downloads.claude.ai:443
+            registry.npmjs.org:443
+            release-assets.githubusercontent.com:443
+            github.com:443
+            api.github.com:443
+            results-receiver.actions.githubusercontent.com:443
+
 
       - name: Plan the review range
         id: range
