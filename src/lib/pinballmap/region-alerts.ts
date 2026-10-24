@@ -848,6 +848,7 @@ export async function runRegionMachineAlerts(opts?: {
         observedAtLeast: error.observedAtLeast,
         ceiling: MAX_REGION_ENTRIES,
         action: "pinballmap.regionAlerts",
+        step: "fetchRegionLmxes",
       });
       return noop(region, "implausible_payload", error.observedAtLeast);
     }

@@ -1161,6 +1161,7 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
       expect.objectContaining({
         observedAtLeast: MAX_REGION_ENTRIES + 1,
         action: "pinballmap.regionAlerts",
+        step: "fetchRegionLmxes",
       })
     );
     // The run aborted, so this is a primary failure, not a tolerated one.

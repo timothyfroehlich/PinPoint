@@ -303,7 +303,9 @@ export async function saveRegionAlertConfigAction(
       try {
         await bootstrapRegion(normalizedRegion);
       } catch (err) {
-        // Tolerated: the config is saved, and the next hourly run bootstraps.
+        // Tolerated: the config still saves. A region with no seen rows
+        // bootstraps on the next hourly run; one seen before resumes from its
+        // stored seen set.
         reportError(err, {
           region: normalizedRegion,
           action: "saveRegionAlertConfigAction.bootstrapRegion",
