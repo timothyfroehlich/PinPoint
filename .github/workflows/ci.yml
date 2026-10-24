@@ -296,7 +296,7 @@ jobs:
       - name: Setup locked Python toolchain
         uses: $/.github/actions/setup-mise
         with:
-          install-args: "--locked python ruff zizmor"
+          install-args: "--locked python ruff zizmor actionlint"
           cache-pnpm: "false"
 
       - name: Install Python test dependencies
@@ -311,14 +311,9 @@ jobs:
       # actionlint reads .github/actionlint.yaml, which ignores the
       # self-repository `uses: $/...` references until rhysd/actionlint#711.
       - name: Action lint
-        env:
-          ACTIONLINT_VERSION: "1.7.11"
         run: |
-          dl="https://raw.githubusercontent.com/rhysd/actionlint"
-          dl="${dl}/main/scripts/download-actionlint.bash"
-          bash <(curl -sL "$dl") "$ACTIONLINT_VERSION"
           find .github/workflows \( -name '*.yml' -o -name '*.yaml' \) \
-            ! -name '*.lock.yml' -print0 | xargs -0 ./actionlint
+            ! -name '*.lock.yml' -print0 | xargs -0 actionlint
 
       - name: Ruff check
         run: ruff check scripts/
