@@ -40,12 +40,15 @@ vi.mock("~/server/db", async () => {
 });
 
 const mockGetUser = vi.fn();
+const mockGetSession = vi.fn();
 const mockSignOut = vi.fn();
+const ACCESS_TOKEN = "caller-access-token";
 vi.mock("~/lib/supabase/server", () => ({
   createClient: vi.fn(() =>
     Promise.resolve({
       auth: {
         getUser: mockGetUser,
+        getSession: mockGetSession,
         signOut: mockSignOut,
       },
     })
@@ -417,6 +420,9 @@ describe("deleteAccountAction — DB integration (PGlite)", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetSession.mockResolvedValue({
+      data: { session: { access_token: ACCESS_TOKEN } },
+    });
     mockSignOut.mockResolvedValue({ error: null });
     mockDeleteUser.mockResolvedValue({ error: null });
     mockAdminSignOut.mockResolvedValue({ error: null });
@@ -663,7 +669,8 @@ describe("deleteAccountAction — DB integration (PGlite)", () => {
         userId,
       })
     );
-    expect(mockAdminSignOut).toHaveBeenCalledWith(userId, "global");
+    // admin.signOut takes the caller's JWT, not a user id (PP-mf5t).
+    expect(mockAdminSignOut).toHaveBeenCalledWith(ACCESS_TOKEN, "global");
     expect(mockDeleteUser).toHaveBeenCalledWith(userId);
 
     // SECURITY INVARIANT: admin signOut must revoke all sessions BEFORE the
@@ -674,5 +681,154 @@ describe("deleteAccountAction — DB integration (PGlite)", () => {
     expect(deleteOrder).toBeDefined();
     expect(signOutOrder).toBeLessThan(deleteOrder);
     expect(redirect).toHaveBeenCalledWith("/");
+  });
+
+  it("reports a missing session instead of skipping global sign-out silently", async () => {
+    const { deleteAccountAction } =
+      await import("~/app/(app)/settings/actions");
+    const { reportError } = await import("~/lib/observability/report-error");
+    const db = await getTestDb();
+    const userId = randomUUID();
+
+    mockGetUser.mockResolvedValue({ data: { user: { id: userId } } });
+    mockGetSession.mockResolvedValue({ data: { session: null } });
+    await db.insert(userProfiles).values(
+      createTestUser({
+        id: userId,
+        email: "deleter-no-session@example.com",
+        role: "member",
+      })
+    );
+
+    const fd = new FormData();
+    fd.set("confirmation", "DELETE");
+
+    await expect(deleteAccountAction(undefined, fd)).rejects.toThrow(
+      "NEXT_REDIRECT"
+    );
+
+    expect(mockAdminSignOut).not.toHaveBeenCalled();
+    expect(reportError).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ action: "deleteAccountAuthSignOut", userId })
+    );
+    expect(mockDeleteUser).toHaveBeenCalledWith(userId);
+  });
+
+  it("reassigns machines to a target the picker offers", async () => {
+    const { deleteAccountAction } =
+      await import("~/app/(app)/settings/actions");
+    const db = await getTestDb();
+    const userId = randomUUID();
+    const newOwnerId = randomUUID();
+
+    mockGetUser.mockResolvedValue({ data: { user: { id: userId } } });
+    await db.insert(userProfiles).values([
+      createTestUser({
+        id: userId,
+        email: "deleter-reassign@example.com",
+        role: "member",
+      }),
+      createTestUser({
+        id: newOwnerId,
+        email: "new-owner@example.com",
+        role: "technician",
+      }),
+    ]);
+    const machine = createTestMachine({ ownerId: userId, initials: "RA" });
+    await db.insert(machines).values(machine);
+
+    const fd = new FormData();
+    fd.set("confirmation", "DELETE");
+    fd.set("reassignTo", newOwnerId);
+
+    await expect(deleteAccountAction(undefined, fd)).rejects.toThrow(
+      "NEXT_REDIRECT"
+    );
+
+    const updatedMachine = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    expect(updatedMachine?.ownerId).toBe(newOwnerId);
+    expect(mockDeleteUser).toHaveBeenCalledWith(userId);
+  });
+
+  it.each([
+    ["a guest", "guest"],
+    ["an id with no profile", null],
+  ] as const)(
+    "rejects reassignTo set to %s and leaves the account untouched (PP-mf5t)",
+    async (_label, role) => {
+      const { deleteAccountAction } =
+        await import("~/app/(app)/settings/actions");
+      const db = await getTestDb();
+      const userId = randomUUID();
+      const targetId = randomUUID();
+
+      mockGetUser.mockResolvedValue({ data: { user: { id: userId } } });
+      await db.insert(userProfiles).values(
+        createTestUser({
+          id: userId,
+          email: "deleter-forged@example.com",
+          role: "member",
+        })
+      );
+      if (role) {
+        await db.insert(userProfiles).values(
+          createTestUser({
+            id: targetId,
+            email: "forged-target@example.com",
+            role,
+          })
+        );
+      }
+      const machine = createTestMachine({ ownerId: userId, initials: "FG" });
+      await db.insert(machines).values(machine);
+
+      const fd = new FormData();
+      fd.set("confirmation", "DELETE");
+      fd.set("reassignTo", targetId);
+
+      const result = await deleteAccountAction(undefined, fd);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("VALIDATION");
+      }
+      const unchangedMachine = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(unchangedMachine?.ownerId).toBe(userId);
+      expect(mockAdminSignOut).not.toHaveBeenCalled();
+      expect(mockDeleteUser).not.toHaveBeenCalled();
+    }
+  );
+
+  it("rejects reassigning machines to the deleting user themselves", async () => {
+    const { deleteAccountAction } =
+      await import("~/app/(app)/settings/actions");
+    const db = await getTestDb();
+    const userId = randomUUID();
+
+    mockGetUser.mockResolvedValue({ data: { user: { id: userId } } });
+    await db.insert(userProfiles).values(
+      createTestUser({
+        id: userId,
+        email: "deleter-self@example.com",
+        role: "member",
+      })
+    );
+
+    const fd = new FormData();
+    fd.set("confirmation", "DELETE");
+    fd.set("reassignTo", userId);
+
+    const result = await deleteAccountAction(undefined, fd);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("VALIDATION");
+    }
+    expect(mockDeleteUser).not.toHaveBeenCalled();
   });
 });
