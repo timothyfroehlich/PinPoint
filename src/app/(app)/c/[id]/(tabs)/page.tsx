@@ -48,6 +48,11 @@ export default async function CollectionOverviewPage({
     }),
   ]);
   return (
-    <MachineView result={result} preset="collection" savedViews={savedViews} />
+    <MachineView
+      result={result}
+      preset="collection"
+      savedViews={savedViews}
+      exportScope={{ kind: "collection", handle: id }}
+    />
   );
 }
