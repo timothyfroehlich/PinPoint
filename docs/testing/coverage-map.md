@@ -185,7 +185,7 @@ a blank Full-E2E cell is often correct by design) is in the
 | Feature surface                   | Unit | Integration | Smoke | Full E2E | Representative tests                                                                                                                                         |
 | --------------------------------- | :--: | :---------: | :---: | :------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Permission matrix / role defaults |  ✓   |      ✓      |   ✓   |    ✓     | `test/unit/permissions-matrix.test.ts`, `issue-detail-permissions.test.ts`, `e2e/smoke/issue-detail-permissions.spec.ts`, `e2e/full/technician-role.spec.ts` |
-| Resource predicates & RLS         |  ✓   |      ✓      |       |          | `lib/permissions/machines.test.ts`, `supabase/email-privacy-rls.test.ts`, `protected-action-pilots.test.ts`                                                  |
+| Resource predicates & RLS         |  ✓   |      ✓      |       |          | `lib/permissions/machines.test.ts`, `supabase/email-privacy-rls.test.ts`, `supabase/profiles-issues-rls.test.ts`, `protected-action-pilots.test.ts`          |
 
 ## Shared UI primitives & utilities
 
