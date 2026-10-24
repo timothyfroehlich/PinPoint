@@ -4,6 +4,17 @@ import { isProductionBuild, isVercelProduction } from "~/lib/runtime-env";
 import { getSupabaseEnv } from "~/lib/supabase/env";
 
 /**
+ * Shared collection views (Wave 0b): /c/<handle> and its Issues and Timeline
+ * tabs, where the handle is a collection uuid or a view token (32 base64url
+ * characters, `generateViewToken`). They open for anonymous visitors: a valid
+ * view token grants read access, and the in-page resolver 404s any other
+ * handle, so opening the route publicly reveals nothing. Owner-only siblings
+ * such as /c/collections match neither handle shape and stay gated.
+ */
+const COLLECTION_VIEW_PATH =
+  /^\/c\/(?:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|[A-Za-z0-9_-]{32})(?:\/(?:issues|timeline))?$/;
+
+/**
  * Updates the Supabase session for the request
  *
  * CRITICAL: This function MUST call supabase.auth.getUser() to refresh tokens
@@ -97,16 +108,6 @@ export async function updateSession(
   // Protected routes logic
   const path = request.nextUrl.pathname;
 
-  // Shared collection views (Wave 0b) live at /c/<handle> — a uuid or view
-  // token — and must open for anonymous visitors (a valid view token grants
-  // read access; the in-page resolver 404s a missing/invalid handle, so opening
-  // the route publicly reveals nothing). Exclude the owner-only sibling, which
-  // stays auth-gated: /c/collections (the "My Collections" list).
-  const isPublicCollectionView =
-    path.startsWith("/c/") &&
-    path !== "/c/collections" &&
-    !path.startsWith("/c/collections/");
-
   const isPublic =
     path === "/" ||
     path === "/m" ||
@@ -114,11 +115,15 @@ export async function updateSession(
     // Legacy id-addressed links redirect to public /m/<initials> pages.
     path.startsWith("/machines/") ||
     path.startsWith("/issues") ||
-    isPublicCollectionView ||
-    // Tags are always public (spec collections-and-tags 7.1), whatever the
-    // collection rules above become.
+    // /c/ is an allowlist: a route added under /c/ stays gated until it is
+    // opted in here (CORE-SEC-001, PP-u79s).
+    COLLECTION_VIEW_PATH.test(path) ||
+    // Tags are always public (spec collections-and-tags 7.1).
     path === "/c/tags" ||
     path.startsWith("/c/tags/") ||
+    // Settings tag pages are public (spec machine-settings 3.6, 3.7).
+    path === "/c/settings-tags" ||
+    path.startsWith("/c/settings-tags/") ||
     path.startsWith("/login") ||
     path.startsWith("/signup") ||
     path.startsWith("/forgot-password") ||
