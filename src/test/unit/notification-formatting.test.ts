@@ -52,7 +52,7 @@ describe("Notification Formatting", () => {
   });
 
   describe("getEmailHtml", () => {
-    it("should sanitize comment content to prevent XSS", () => {
+    it("should escape comment content to prevent XSS", () => {
       const maliciousContent =
         '<script>alert("xss")</script>Hello <img src=x onerror=alert(1)>';
       const html = getEmailHtml({
@@ -63,26 +63,107 @@ describe("Notification Formatting", () => {
         commentContent: maliciousContent,
       });
 
-      // Should not contain script tags or onerror handlers
+      // The markup survives only as escaped, inert text.
       expect(html).not.toContain("<script>");
-      expect(html).not.toContain("onerror=");
-
-      // Should still contain safe content
+      expect(html).not.toContain("<img");
+      expect(html).toContain("&lt;script&gt;");
       expect(html).toContain("Hello");
     });
 
-    it("should preserve safe HTML in comments", () => {
-      const safeContent = "<b>Bold</b> and <i>Italic</i>";
+    // Comments and descriptions are plain text (docToPlainText output), so
+    // markup a reporter types must reach the inbox as visible characters, not
+    // as a link or styled text. (PP-40qy)
+    const PHISHING =
+      '<a href="https://evil.example">View photos</a><span style="color:red">Sign in again</span>';
+
+    function expectNoInjectedMarkup(html: string): void {
+      expect(html).not.toContain('<a href="https://evil.example');
+      expect(html).not.toContain("<span");
+      expect(html).not.toContain('style="color:red');
+      expect(html).toContain(
+        "&lt;a href=&quot;https://evil.example&quot;&gt;View photos&lt;/a&gt;"
+      );
+    }
+
+    it.each(["new_comment", "mentioned"] as const)(
+      "escapes HTML in %s comment content",
+      (type) => {
+        const html = getEmailHtml({
+          type,
+          issueTitle: "Test Issue",
+          machineName: "Test Machine",
+          formattedIssueId: "MM-01",
+          commentContent: PHISHING,
+        });
+
+        expectNoInjectedMarkup(html);
+      }
+    );
+
+    it.each(["new_issue", "issue_assigned"] as const)(
+      "escapes HTML in %s issue description",
+      (type) => {
+        const html = getEmailHtml({
+          type,
+          issueTitle: "Test Issue",
+          machineName: "Test Machine",
+          formattedIssueId: "MM-01",
+          issueDescription: PHISHING,
+        });
+
+        expectNoInjectedMarkup(html);
+      }
+    );
+
+    it("escapes HTML in the issue title, machine name, and status", () => {
       const html = getEmailHtml({
-        type: "new_comment",
-        issueTitle: "Test Issue",
-        machineName: "Test Machine",
+        type: "issue_status_changed",
+        issueTitle: PHISHING,
+        machineName: '<a href="https://evil.example">MM</a>',
         formattedIssueId: "MM-01",
-        commentContent: safeContent,
+        newStatus: '<span style="color:red">fixed</span>',
       });
 
-      expect(html).toContain("<b>Bold</b>");
-      expect(html).toContain("<i>Italic</i>");
+      expectNoInjectedMarkup(html);
+      expect(html).toContain(
+        "[&lt;a href=&quot;https://evil.example&quot;&gt;MM&lt;/a&gt;] MM-01:"
+      );
+      expect(html).toContain(
+        "&lt;span style=&quot;color:red&quot;&gt;fixed&lt;/span&gt;"
+      );
+    });
+
+    it("escapes HTML in the machine name of an ownership email", () => {
+      const html = getEmailHtml({
+        type: "machine_ownership_changed",
+        machineName: PHISHING,
+        machineInitials: "MM",
+        newStatus: "added",
+      });
+
+      expectNoInjectedMarkup(html);
+    });
+
+    it("renders newlines in comments and descriptions as line breaks", () => {
+      const comment = getEmailHtml({
+        type: "new_comment",
+        issueTitle: "Test Issue",
+        formattedIssueId: "MM-01",
+        commentContent: "first line\nsecond line\r\nthird line",
+      });
+      const description = getEmailHtml({
+        type: "new_issue",
+        issueTitle: "Test Issue",
+        formattedIssueId: "MM-01",
+        issueDescription: "Left flipper\nRight flipper",
+      });
+
+      expect(comment).toContain(
+        "<blockquote>first line<br/>second line<br/>third line</blockquote>"
+      );
+      expect(description).toContain(
+        "<blockquote>Left flipper<br/>Right flipper</blockquote>"
+      );
     });
 
     it("should handle empty comment content", () => {
@@ -109,7 +190,7 @@ describe("Notification Formatting", () => {
 
       expect(html).toContain("A new issue has been reported.");
       expect(html).toContain(
-        "<blockquote>Left flipper is stuck and won't return</blockquote>"
+        "<blockquote>Left flipper is stuck and won&#39;t return</blockquote>"
       );
     });
 
@@ -138,7 +219,7 @@ describe("Notification Formatting", () => {
       expect(html).not.toContain("<blockquote>");
     });
 
-    it("should sanitize description content to prevent XSS", () => {
+    it("should escape description content to prevent XSS", () => {
       const maliciousDescription =
         '<script>alert("xss")</script>Flipper broken';
       const html = getEmailHtml({
