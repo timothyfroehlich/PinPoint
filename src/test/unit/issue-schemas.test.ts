@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
+import { BLOB_CONFIG } from "~/lib/blob/config";
 import {
   updateIssueStatusSchema,
   updateIssueSeveritySchema,
   updateIssuePrioritySchema,
   assignIssueSchema,
+  imageMetadataSchema,
 } from "~/app/(app)/issues/schemas";
 
 describe("Issue Validation Schemas", () => {
@@ -118,6 +120,27 @@ describe("Issue Validation Schemas", () => {
         assignedTo: validUuid,
       });
       expect(result.success).toBe(false);
+    });
+  });
+
+  describe("imageMetadataSchema fileSizeBytes (PP-ysk3)", () => {
+    const base = {
+      blobUrl: "https://teststore.public.blob.vercel-storage.com/img.jpg",
+      blobPathname: "issue-images/pending/img.jpg",
+      originalFilename: "img.jpg",
+      mimeType: "image/jpeg",
+    };
+
+    it.each([
+      ["a whole size within the limit", 12345, true],
+      ["exactly the limit", BLOB_CONFIG.MAX_FILE_SIZE_BYTES, true],
+      ["a fractional size", 1234.5, false],
+      ["a size above the limit", BLOB_CONFIG.MAX_FILE_SIZE_BYTES + 1, false],
+      ["a size above Postgres int4", 2 ** 31, false],
+      ["zero", 0, false],
+    ])("%s → success=%s", (_label, fileSizeBytes, expected) => {
+      const result = imageMetadataSchema.safeParse({ ...base, fileSizeBytes });
+      expect(result.success).toBe(expected);
     });
   });
 });

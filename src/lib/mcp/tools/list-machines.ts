@@ -1,6 +1,5 @@
 import "server-only";
 
-import type { McpServer } from "@modelcontextprotocol/server";
 import {
   and,
   count,
@@ -28,13 +27,13 @@ import {
   type LineupSource,
 } from "./pinballmap-block";
 import {
+  defineTool,
   getOpenIssueCounts,
   getOwnerNamesByMachine,
   McpToolError,
   presenceFilterSchema,
   READ_ONLY_TOOL_ANNOTATIONS,
   resolvePresence,
-  runTool,
   type ToolOutcome,
 } from "./shared";
 import type { McpAuthContext } from "~/lib/mcp/verify-token";
@@ -340,17 +339,12 @@ export async function runListMachines(
  * filter) and `name` (both the `search` target and the primary sort key), and
  * `add_machine` inserts rows that can land inside any filter.
  */
-export function registerListMachines(server: McpServer): void {
-  server.registerTool(
-    "list_machines",
-    {
-      title: "List machines",
-      description:
-        "List machines with initials, name, availability (presence), owner name, and open-issue count. Supports search by name/initials, presence filtering (Removed machines are left out unless presence names 'removed'), and PinballMap filtering ('unlinked' | 'linked' | 'excluded' | 'out_of_sync'). Under 'out_of_sync' each machine carries lineup.state and lineup.pushAction, and the result carries lineupSnapshot (when the lineup was last synced). Returns paginated results with total count and hasMore.",
-      inputSchema: listMachinesSchema,
-      annotations: READ_ONLY_TOOL_ANNOTATIONS,
-    },
-    (args, extra) =>
-      runTool("list_machines", extra, (ctx) => runListMachines(args, ctx))
-  );
-}
+export const listMachinesTool = defineTool({
+  name: "list_machines",
+  title: "List machines",
+  description:
+    "List machines with initials, name, availability (presence), owner name, and open-issue count. Supports search by name/initials, presence filtering (Removed machines are left out unless presence names 'removed'), and PinballMap filtering ('unlinked' | 'linked' | 'excluded' | 'out_of_sync'). Under 'out_of_sync' each machine carries lineup.state and lineup.pushAction, and the result carries lineupSnapshot (when the lineup was last synced). Returns paginated results with total count and hasMore.",
+  inputSchema: listMachinesSchema,
+  annotations: READ_ONLY_TOOL_ANNOTATIONS,
+  run: runListMachines,
+});

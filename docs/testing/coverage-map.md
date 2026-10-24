@@ -93,12 +93,12 @@ a blank Full-E2E cell is often correct by design) is in the
 
 ## Collections & tags
 
-| Feature surface                    | Unit | Integration | Smoke | Full E2E | Representative tests                                                                                                                                                     |
-| ---------------------------------- | :--: | :---------: | :---: | :------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Collections CRUD & view            |  ✓   |      ✓      |   ✓   |    ✓     | `components/collections/CreateCollectionDialog.test.tsx`, `collections-actions.test.ts`, `e2e/smoke/collection-view.spec.ts`, `e2e/full/collection-edit-sharing.spec.ts` |
-| Collaborators & share / view links |  ✓   |      ✓      |       |    ✓     | `components/collections/CollectionShareDialog.test.tsx`, `collections-collaborators.test.ts`, `e2e/full/collection-edit-sharing.spec.ts`                                 |
-| Owner collections                  |      |      ✓      |       |          | `collections-owner.test.ts`, `collections-user.test.ts`                                                                                                                  |
-| Tags (OPDB / manufacturer)         |  ✓   |      ✓      |       |          | `lib/tags/opdb.test.ts`, `opdb-tags.test.ts`, `manufacturer-tags.test.ts`                                                                                                |
+| Feature surface                    | Unit | Integration | Smoke | Full E2E | Representative tests                                                                                                                                                                             |
+| ---------------------------------- | :--: | :---------: | :---: | :------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Collections CRUD & view            |  ✓   |      ✓      |   ✓   |    ✓     | `components/collections/CreateCollectionDialog.test.tsx`, `collections-actions.test.ts`, `collections-user.test.ts`, `e2e/smoke/collections.spec.ts`, `e2e/full/collection-edit-sharing.spec.ts` |
+| Collaborators & share / view links |  ✓   |      ✓      |       |    ✓     | `components/collections/CollectionShareDialog.test.tsx`, `collections-collaborators.test.ts`, `e2e/full/collection-edit-sharing.spec.ts`                                                         |
+| A person's machines (Owner filter) |  ✓   |      ✓      |   ✓   |          | `test/unit/components/profiles/owned-machines.test.tsx`, `issue-export-scope.test.ts`, `e2e/smoke/owner-machines.spec.ts`                                                                        |
+| Tags (OPDB / manufacturer)         |  ✓   |      ✓      |       |          | `lib/tags/opdb.test.ts`, `opdb-tags.test.ts`, `manufacturer-tags.test.ts`                                                                                                                        |
 
 ## PinballMap integration
 
@@ -185,7 +185,7 @@ a blank Full-E2E cell is often correct by design) is in the
 | Feature surface                   | Unit | Integration | Smoke | Full E2E | Representative tests                                                                                                                                         |
 | --------------------------------- | :--: | :---------: | :---: | :------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Permission matrix / role defaults |  ✓   |      ✓      |   ✓   |    ✓     | `test/unit/permissions-matrix.test.ts`, `issue-detail-permissions.test.ts`, `e2e/smoke/issue-detail-permissions.spec.ts`, `e2e/full/technician-role.spec.ts` |
-| Resource predicates & RLS         |  ✓   |      ✓      |       |          | `lib/permissions/machines.test.ts`, `supabase/email-privacy-rls.test.ts`, `protected-action-pilots.test.ts`                                                  |
+| Resource predicates & RLS         |  ✓   |      ✓      |       |          | `lib/permissions/machines.test.ts`, `supabase/email-privacy-rls.test.ts`, `supabase/profiles-issues-rls.test.ts`, `protected-action-pilots.test.ts`          |
 
 ## Shared UI primitives & utilities
 

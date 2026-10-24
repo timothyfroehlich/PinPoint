@@ -21,13 +21,15 @@
 
 import { test, expect, type Page } from "../support/fixtures.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
-import { seededMachines } from "../support/constants.js";
+import { seededMachines, TEST_USERS } from "../support/constants.js";
 import {
   createTestMachine,
   deleteTestMachine,
+  deleteTestSettingsTags,
   getProfileIdByEmail,
   seedSettingsSet,
 } from "../support/supabase-admin.js";
+import { getTestPrefix } from "../support/test-isolation.js";
 
 const machine = seededMachines.addamsFamily.initials;
 const PREFIX = "E2E PP-43q3";
@@ -330,6 +332,122 @@ test.describe("Machine Settings (PP-43q3)", () => {
           "More options for the Software settings section",
         ]);
       }).toPass({ timeout: 45_000 });
+    });
+  });
+
+  // Custom settings tags (machine-settings §3, PP-k3km.2). The journey crosses
+  // three pages — a machine's Settings tab, the Settings tags list, and the
+  // tag's own page — which is what only a browser run proves. Create/rename/
+  // delete authorization and name rules are covered at the action layer in
+  // src/test/integration/machine-settings-actions.test.ts.
+  test.describe("custom settings tag lifecycle (admin, isolated machine)", () => {
+    test.use({
+      storageState: STORAGE_STATE.admin,
+      viewport: { width: 1280, height: 1800 },
+    });
+
+    let machineId = "";
+    let machineInitials: string;
+    let machineName: string;
+    // At most 20 characters (TAG_NAME_MAX) and unique per worker run.
+    const tagName = `ST ${getTestPrefix()}`;
+    const renamedTag = `ST2 ${getTestPrefix()}`;
+
+    test.beforeEach(async () => {
+      machineId = "";
+      const adminId = await getProfileIdByEmail(TEST_USERS.admin.email);
+      const created = await createTestMachine(adminId);
+      machineId = created.id;
+      machineInitials = created.initials;
+      machineName = created.name;
+      await seedSettingsSet(machineId, `${PREFIX} Tag target`, []);
+    });
+
+    test.afterEach(async () => {
+      // Settings tags are global, so a run that failed midway would leave its
+      // tag on the shared Settings tags page.
+      await deleteTestSettingsTags([tagName, renamedTag]);
+      if (machineId === "") return;
+      await deleteTestMachine(machineId);
+      machineId = "";
+    });
+
+    test("create a tag from the picker, then rename and delete it on its page", async ({
+      page,
+    }) => {
+      test.slow();
+
+      // Create the tag from the set's picker; it applies to the set at once.
+      await page.goto(`/m/${machineInitials}/settings`);
+      await page
+        .getByRole("button", { name: "More options for this set" })
+        .click();
+      await page.getByRole("menuitem", { name: "Edit tags…" }).click();
+      const picker = page.getByRole("dialog", { name: "Tags" });
+      await picker.getByLabel("Find or create a tag").fill(tagName);
+      await picker.getByRole("button", { name: `Create “${tagName}”` }).click();
+      await expect(
+        picker.getByRole("checkbox", { name: tagName, exact: true })
+      ).toBeChecked();
+      await picker.getByRole("button", { name: "Done" }).click();
+      await expect(picker).toBeHidden();
+
+      // The set card links its custom tag. The picker checks the tag before
+      // the apply action returns, so reload until the link renders from the
+      // database (the dev webServer can also serve a stale render right after
+      // a revalidate).
+      await expect(async () => {
+        await page.reload();
+        await expect(
+          page.getByRole("link", { name: tagName, exact: true })
+        ).toBeVisible({ timeout: 8_000 });
+      }).toPass({ timeout: 45_000 });
+
+      // The tag lists on the Settings tags page with the one set it finds.
+      await page.goto("/c/settings-tags");
+      const row = page.getByRole("listitem").filter({
+        has: page.getByRole("link", { name: tagName, exact: true }),
+      });
+      await expect(row).toContainText("1 set on 1 machine");
+
+      // The tag page lists the machine the set belongs to.
+      await row.getByRole("link", { name: tagName, exact: true }).click();
+      await expect(page).toHaveURL(/\/c\/settings-tags\/[a-z0-9-]+$/);
+      await expect(
+        page.getByRole("heading", { level: 1, name: tagName })
+      ).toBeVisible();
+      await expect(
+        page.getByRole("link", { name: machineName, exact: true })
+      ).toBeVisible();
+
+      // Rename keeps the page; the heading takes the new name.
+      await page
+        .getByRole("button", { name: "More options for this tag" })
+        .click();
+      await page.getByRole("menuitem", { name: "Rename…" }).click();
+      const renameDialog = page.getByRole("dialog", { name: "Rename tag" });
+      await renameDialog.getByLabel("Name").fill(renamedTag);
+      await renameDialog.getByRole("button", { name: "Rename" }).click();
+      await expect(
+        page.getByRole("heading", { level: 1, name: renamedTag })
+      ).toBeVisible();
+
+      // Delete returns to the Settings tags page, where the tag is gone.
+      await page
+        .getByRole("button", { name: "More options for this tag" })
+        .click();
+      await page.getByRole("menuitem", { name: "Delete tag…" }).click();
+      await page
+        .getByRole("alertdialog")
+        .getByRole("button", { name: "Delete tag" })
+        .click();
+      await expect(page).toHaveURL(/\/c\/settings-tags$/);
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Settings tags" })
+      ).toBeVisible();
+      await expect(
+        page.getByRole("link", { name: renamedTag, exact: true })
+      ).toHaveCount(0);
     });
   });
 

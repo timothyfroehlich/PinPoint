@@ -136,6 +136,7 @@
 | 7.4 | Local execution telemetry (harness, model, wake count, elapsed duration) | Removed 2026-09-24 with the MCP wrapper and watcher agents, the only sources of harness, model, and wake data; nothing read the `tmp/gh-monitor/watcher-run-*.json` records. | Delete 7.4 (requirement diff needs Tim's approval) |
 | 8.12 | A base-branch merge whose only resolution renumbers the branch's migrations keeps coverage | `_is_pure_merge_from_main` in `scripts/workflow/_pr-gates.sh` accepts only merges whose tree equals the clean merge, so a renumber needs a new review | Extend the merge check (PP-ncxx.4) |
 | 8.3 | Only a review record provides coverage | The gate still accepts a Codex review on the exact head | Remove the Codex checker once its subscription ends |
+| 8 | Coverage comes from the owning agent's local review record | Ruleset `6326455` also requires the `Claude Review` CI check on head and resolved conversations (PP-zxlq.2), so a PR needs both the local record and a passing CI review | Rewrite §8 around the CI review when PP-zxlq retires the local record (requirement diff needs Tim's approval) |
 
 ---
 

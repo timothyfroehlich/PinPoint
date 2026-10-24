@@ -17,7 +17,7 @@ import {
 } from "~/lib/machines/settings-sheet";
 import type { SettingsSection } from "~/lib/machines/settings-types";
 
-/** A default set choice (§1): a preferred set, or one settings tag. */
+/** A starting set choice (§1): a default set, or one settings tag. */
 export type SheetDefault =
   { kind: "house" } | { kind: "tournament" } | { kind: "tag"; slug: string };
 
@@ -74,7 +74,7 @@ export type SheetResolution =
   | { kind: "none" }
   | { kind: "choose"; setIds: string[] };
 
-/** A side's preferred set: House for From, Tournament for To (§6.2). */
+/** A side's default set: House for From, Tournament for To (§6.2). */
 function preferredFor(
   machine: PrintRunMachine,
   slot: "house" | "tournament"
@@ -307,9 +307,9 @@ function defaultNames(
 ): { full: string; short: string } {
   switch (value.kind) {
     case "house":
-      return { full: "Preferred House", short: "House" };
+      return { full: "Default House", short: "House" };
     case "tournament":
-      return { full: "Preferred Tournament", short: "Tournament" };
+      return { full: "Default Tournament", short: "Tournament" };
     case "tag": {
       const name =
         tags.find((tag) => tag.slug === value.slug)?.name ?? value.slug;

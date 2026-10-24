@@ -43,6 +43,7 @@ export interface MachineDetailsFormProps {
   playerCount: number | null;
   designers: string[] | null;
   artists: string[] | null;
+  programmers: string[] | null;
   /** Linked iScored game ID string, or null if unlinked. */
   iscoredGameId: string | null;
   ownerRequirements: ProseMirrorDoc | null;
@@ -86,6 +87,7 @@ export function MachineDetailsForm({
   playerCount,
   designers,
   artists,
+  programmers,
   iscoredGameId,
   ownerRequirements,
   canViewOwnerRequirements,
@@ -277,6 +279,7 @@ export function MachineDetailsForm({
                 defaultPlayerCount={playerCount}
                 defaultDesigners={designers}
                 defaultArtists={artists}
+                defaultProgrammers={programmers}
                 // The Model name's placeholder — the live input, not the
                 // stored prop, so a rename in the same unsaved edit previews
                 // the name a blank model will actually resolve to.

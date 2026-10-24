@@ -54,6 +54,7 @@ export async function getPrintableApronCards(): Promise<PrintableApronCard[]> {
       pinballmapExcluded: true,
       designers: true,
       artists: true,
+      programmers: true,
     },
     with: {
       owner: { columns: { name: true } },
@@ -115,7 +116,11 @@ export async function getPrintableApronCards(): Promise<PrintableApronCard[]> {
     const opdbId = machine.pinballmapTitle?.opdbId ?? null;
     const record = opdbId === null ? undefined : records.get(opdbId);
     const credits = machine.pinballmapExcluded
-      ? creditsFromNames(machine.designers, machine.artists)
+      ? creditsFromNames(
+          machine.designers,
+          machine.artists,
+          machine.programmers
+        )
       : record
         ? creditsFromPeople(record.people)
         : NO_CREDITS;

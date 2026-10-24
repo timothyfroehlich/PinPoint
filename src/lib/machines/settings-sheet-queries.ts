@@ -2,10 +2,8 @@ import { and, asc, eq, inArray, sql } from "drizzle-orm";
 
 import { type DbTransaction } from "~/server/db";
 import { machines, settingsTags } from "~/server/db/schema";
-import {
-  BUILTIN_SETTINGS_TAGS,
-  type SettingsTagRef,
-} from "~/lib/machines/settings-types";
+import { type SettingsTagRef } from "~/lib/machines/settings-types";
+import { compareSettingsTags } from "~/lib/machines/settings-tags";
 import type { PrintRunMachine } from "~/lib/machines/settings-sheet-run";
 
 /**
@@ -85,13 +83,7 @@ export async function getSettingsTagOptions(
       name: settingsTags.name,
     })
     .from(settingsTags);
-  const rank = (slug: string): number => {
-    const i = (BUILTIN_SETTINGS_TAGS as readonly string[]).indexOf(slug);
-    return i === -1 ? BUILTIN_SETTINGS_TAGS.length : i;
-  };
-  return tags.sort(
-    (a, b) => rank(a.slug) - rank(b.slug) || a.name.localeCompare(b.name)
-  );
+  return tags.sort(compareSettingsTags);
 }
 
 /** The ids of every machine On the Floor (§2.3). */

@@ -214,6 +214,7 @@ export function ApronCardTab({
           tipEnabled: card.tipEnabled,
           designEnabled: card.designEnabled,
           artEnabled: card.artEnabled,
+          codeEnabled: card.codeEnabled,
         })),
       });
       if (!result.ok) {
@@ -597,6 +598,15 @@ export function ApronCardTab({
                   checked={selected.artEnabled}
                   onCheckedChange={(checked) => {
                     update({ artEnabled: checked });
+                  }}
+                />
+                <CreditCheckbox
+                  id={`${id}-code`}
+                  label="Code"
+                  names={identity.credits.code}
+                  checked={selected.codeEnabled}
+                  onCheckedChange={(checked) => {
+                    update({ codeEnabled: checked });
                   }}
                 />
               </fieldset>

@@ -22,6 +22,8 @@ import {
 import { logoutAction } from "~/app/(auth)/actions";
 import { clearStoredCommentDrafts } from "~/components/issues/comment-draft";
 import type { UserRole } from "~/lib/types/user";
+import { ME_PERSON_ID } from "~/lib/list-view/url-state";
+import { ownerMachinesHref } from "~/lib/machines/links";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 
 interface UserMenuProps {
@@ -104,13 +106,13 @@ export function UserMenu({
           </DropdownMenuItem>
         )}
 
-        {/* My Machines — the user's own collection view (PP-slrd.1).
-            Always shown when authenticated; the collection page's empty
-            state covers non-owners. */}
+        {/* My Machines — the Machines list filtered to Owner = Me
+            (collections-and-tags 6.4). Always shown when authenticated; the
+            list's empty state covers non-owners. */}
         {userId && (
           <DropdownMenuItem asChild>
             <a
-              href={`/c/owner/${userId}`}
+              href={ownerMachinesHref(ME_PERSON_ID)}
               className="flex items-center cursor-pointer"
               data-testid="user-menu-my-machines"
             >

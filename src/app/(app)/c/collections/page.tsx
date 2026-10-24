@@ -12,6 +12,7 @@ import {
   getSharedWithMe,
 } from "~/lib/collections/list";
 import { getCollectionPickerMachines } from "~/lib/collections/user";
+import { ownerMachinesHref } from "~/lib/machines/links";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
 import { CreateCollectionDialog } from "~/components/collections/CreateCollectionDialog";
@@ -63,7 +64,7 @@ export default async function MyCollectionsPage(): Promise<React.JSX.Element> {
                   {ownedMachineCount > 0 && (
                     <li>
                       <Link
-                        href={`/c/owner/${userId}`}
+                        href={ownerMachinesHref(userId)}
                         data-testid="my-machines-collection-link"
                         className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-surface-variant"
                       >
