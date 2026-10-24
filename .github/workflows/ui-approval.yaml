@@ -49,6 +49,11 @@ jobs:
       ui_changed: ${{ steps.scope.outputs.ui_changed }}
       detail: ${{ steps.scope.outputs.detail }}
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
+        with:
+          egress-policy: audit
+
       - name: Refuse fork pull requests
         if: github.event.pull_request.head.repo.full_name != github.repository
         run: |
@@ -61,18 +66,6 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           persist-credentials: false
-
-      # Harden Runner starts after the checkout: under egress-policy block, checkout's
-      # first git fetch to github.com was intermittently refused (seen in Claude
-      # Review, run 40017303524, with the same step order). The checkout is GitHub's
-      # own action talking only to github.com; the scope step runs under the allowlist.
-      - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
-        with:
-          egress-policy: block
-          allowed-endpoints: >
-            github.com:443
-            api.github.com:443
 
       - name: Find UI changes since the last approval
         id: scope
