@@ -14,10 +14,13 @@
 # required check counts as passing). Claude may read the checkout, including the
 # review inputs the job prepares, and post inline comments on this PR; it has no
 # shell and cannot edit, commit, or push (tool boundary on the Review step).
-# Harden Runner audits outbound traffic, as in every PinPoint workflow. Block mode
+# Harden Runner audits outbound traffic, as in most PinPoint workflows. Block mode
 # was tried (PP-zxlq.6) and dropped: its firewall intermittently refused checkout's
 # first connection to github.com although github.com was allowlisted, failing the
-# required check. The Claude step needs no network tools to do its job and has none.
+# required check. What remains is Claude's tool boundary: no shell, WebFetch or
+# WebSearch, and reads only inside the checkout, so PR content cannot steer Claude
+# into sending a token anywhere. Audit mode does not limit the action's own network
+# use or a compromised install step; pinned action SHAs are the guard there.
 #
 # Trust: the range scripts and REVIEW.md come from main, so a PR cannot rescope or
 # re-rubric its own review. This workflow file itself still runs from the PR, as
