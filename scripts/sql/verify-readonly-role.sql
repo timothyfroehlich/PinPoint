@@ -119,40 +119,40 @@ BEGIN
       failures := failures + 1;
       RAISE WARNING 'cannot SELECT public table(s): % — the public grant did not land', v_bad_rels;
     END IF;
+  END IF;
 
-    -- Never writable: every table and view in public AND readonly_auth. The
-    -- readonly_auth views are simple, auto-updatable, and run with their
-    -- owner's rights, so a write grant on one would write auth.users itself.
-    -- has_any_column_privilege also catches a column-level INSERT/UPDATE grant,
-    -- which has_table_privilege does not report. TRIGGER is listed because it
-    -- lets the role attach code to a production table.
-    checked := checked + 1;
-    SELECT string_agg(format('%I.%I', n.nspname, c.relname), ', ' ORDER BY n.nspname, c.relname)
-      INTO v_bad_rels
-      FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-     WHERE n.nspname IN ('public', 'readonly_auth') AND c.relkind IN ('r', 'p', 'v', 'f')
-       AND (has_table_privilege('pinpoint_readonly', c.oid, 'INSERT, UPDATE, DELETE, TRUNCATE, TRIGGER')
-            OR has_any_column_privilege('pinpoint_readonly', c.oid, 'INSERT, UPDATE'));
-    IF v_bad_rels IS NOT NULL THEN
-      failures := failures + 1;
-      RAISE WARNING 'holds a WRITE privilege on relation(s): %', v_bad_rels;
-    END IF;
+  -- Never writable: every table and view in public AND readonly_auth. The
+  -- readonly_auth views are simple, auto-updatable, and run with their
+  -- owner's rights, so a write grant on one would write auth.users itself.
+  -- has_any_column_privilege also catches a column-level INSERT/UPDATE grant,
+  -- which has_table_privilege does not report. TRIGGER is listed because it
+  -- lets the role attach code to a production table.
+  checked := checked + 1;
+  SELECT string_agg(format('%I.%I', n.nspname, c.relname), ', ' ORDER BY n.nspname, c.relname)
+    INTO v_bad_rels
+    FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+   WHERE n.nspname IN ('public', 'readonly_auth') AND c.relkind IN ('r', 'p', 'v', 'f')
+     AND (has_table_privilege('pinpoint_readonly', c.oid, 'INSERT, UPDATE, DELETE, TRUNCATE, TRIGGER')
+          OR has_any_column_privilege('pinpoint_readonly', c.oid, 'INSERT, UPDATE'));
+  IF v_bad_rels IS NOT NULL THEN
+    failures := failures + 1;
+    RAISE WARNING 'holds a WRITE privilege on relation(s): %', v_bad_rels;
+  END IF;
 
-    -- nextval() and setval() are writes too: USAGE or UPDATE on a sequence.
-    checked := checked + 1;
-    SELECT string_agg(quote_ident(c.relname), ', ' ORDER BY c.relname)
-      INTO v_bad_rels
-      FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-     WHERE n.nspname = 'public' AND c.relkind = 'S'
-       -- CASE, not AND: the planner may evaluate the call before the relkind
-       -- filter, and has_sequence_privilege raises on a non-sequence OID.
-       AND CASE WHEN c.relkind = 'S'
-                THEN has_sequence_privilege('pinpoint_readonly', c.oid, 'USAGE, UPDATE')
-                ELSE false END;
-    IF v_bad_rels IS NOT NULL THEN
-      failures := failures + 1;
-      RAISE WARNING 'can advance or set public sequence(s): %', v_bad_rels;
-    END IF;
+  -- nextval() and setval() are writes too: USAGE or UPDATE on a sequence.
+  checked := checked + 1;
+  SELECT string_agg(quote_ident(c.relname), ', ' ORDER BY c.relname)
+    INTO v_bad_rels
+    FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+   WHERE n.nspname = 'public' AND c.relkind = 'S'
+     -- CASE, not AND: the planner may evaluate the call before the relkind
+     -- filter, and has_sequence_privilege raises on a non-sequence OID.
+     AND CASE WHEN c.relkind = 'S'
+              THEN has_sequence_privilege('pinpoint_readonly', c.oid, 'USAGE, UPDATE')
+              ELSE false END;
+  IF v_bad_rels IS NOT NULL THEN
+    failures := failures + 1;
+    RAISE WARNING 'can advance or set public sequence(s): %', v_bad_rels;
   END IF;
 
   -- Future tables must be auto-readable. Asserting ALTER DEFAULT PRIVILEGES from
