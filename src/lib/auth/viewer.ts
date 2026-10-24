@@ -80,12 +80,13 @@ export const getViewer = cache(async (): Promise<Viewer> => {
  * reset) gets the row recreated by `ensureUserProfile` and read again. Only
  * MainLayout calls this. The healed row is not visible to `getViewer` callers
  * already rendering in the same request; they see it on the next navigation.
+ * Request-cached, so the heal's insert runs at most once per request.
  */
-export async function getHealedViewer(): Promise<Viewer> {
+export const getHealedViewer = cache(async (): Promise<Viewer> => {
   const [user, viewer] = await Promise.all([getAuthUser(), getViewer()]);
   if (!user || viewer.profile) return viewer;
 
   await ensureUserProfile(user);
   const profile = await readViewerProfile(user.id);
   return { userId: user.id, role: profile?.role ?? null, profile };
-}
+});

@@ -7,7 +7,8 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { randomUUID } from "node:crypto";
-import { authUsers } from "~/server/db/schema";
+import { eq } from "drizzle-orm";
+import { authUsers, userProfiles } from "~/server/db/schema";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 
 const { getUserMock } = vi.hoisted(() => ({ getUserMock: vi.fn() }));
@@ -67,6 +68,12 @@ describe("getHealedViewer", () => {
       role: null,
       profile: null,
     });
+    const db = await getTestDb();
+    const rows = await db
+      .select({ id: userProfiles.id })
+      .from(userProfiles)
+      .where(eq(userProfiles.id, userId));
+    expect(rows).toEqual([]);
   });
 
   it("renders a signed-out visitor as signed out", async () => {
