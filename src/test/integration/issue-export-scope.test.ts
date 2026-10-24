@@ -193,10 +193,10 @@ describe("exportIssuesAction — PGlite integration (CORE-TEST-004, CORE-TEST-00
     expect(exportedIds(result)).toEqual(["AL-01", "IN-01"]);
   });
 
-  it("exports an owner Collection's issues", async () => {
+  it("exports a person's machines' issues through the Machine owner filter (collections-and-tags 6.4)", async () => {
     signInAs(STRANGER);
     const result = await exportIssuesAction({
-      scope: { kind: "owner", userId: OWNER },
+      query: `owner=${OWNER}&sort=id&dir=asc`,
     });
     expect(exportedIds(result)).toEqual(["AL-01", "IN-01"]);
   });

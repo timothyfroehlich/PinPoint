@@ -460,6 +460,57 @@ describe("Issue Service Functions (Integration)", () => {
       expect(b.issue.idempotencyKey).toBeNull();
       expect(b.issue.id).not.toBe(a.issue.id);
     });
+
+    // A replayed key must never put a different reporter in the original
+    // reporter's retry branch: the caller would act on that issue as its own
+    // retry. (PP-ysk3)
+    it.each([
+      ["a member's key replayed anonymously", "member", "anonymous"],
+      ["an anonymous key replayed by a member", "anonymous", "member"],
+      ["a member's key replayed by another member", "member", "otherMember"],
+    ] as const)("%s is not deduped", async (_label, holder, replayer) => {
+      const db = await getTestDb();
+      const [otherUser] = await db
+        .insert(userProfiles)
+        .values(
+          createTestUser({
+            id: "00000000-0000-0000-0000-0000000000c3",
+            role: "member",
+          })
+        )
+        .returning();
+      const reporterFor = {
+        member: testUser.id as string,
+        otherMember: otherUser.id,
+        anonymous: null,
+      };
+      const sharedKey = "44444444-4444-4444-8444-444444444444";
+
+      const original = await createIssue({
+        title: "Original",
+        machineInitials: testMachine.initials,
+        severity: "minor" as const,
+        reportedBy: reporterFor[holder],
+        idempotencyKey: sharedKey,
+      });
+      expect(original.deduped).toBe(false);
+
+      await expect(
+        createIssue({
+          title: "Replay",
+          machineInitials: testMachine.initials,
+          severity: "minor" as const,
+          reportedBy: reporterFor[replayer],
+          idempotencyKey: sharedKey,
+        })
+      ).rejects.toThrow("Issue creation failed");
+
+      const rows = await db.query.issues.findMany({
+        where: eq(issues.idempotencyKey, sharedKey),
+      });
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.id).toBe(original.issue.id);
+    });
   });
 
   describe("assignIssue", () => {

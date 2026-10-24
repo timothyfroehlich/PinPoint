@@ -45,7 +45,7 @@ describe("PersonHoverCard", () => {
     expect(screen.getByText("Former user")).toBeInTheDocument();
   });
 
-  it("shows a capitalized role pill after fetch on hover", async () => {
+  it("shows a capitalized role pill and links the person's machines after fetch on hover", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
@@ -63,5 +63,9 @@ describe("PersonHoverCard", () => {
     render(<PersonHoverCard userId="abc" displayName="Admin User" />);
     fireEvent.pointerEnter(screen.getByRole("link", { name: "Admin User" }));
     await waitFor(() => expect(screen.getByText("admin")).toBeInTheDocument());
+    // A person's machines are Machines filtered by Owner (collections-and-tags 6.4).
+    expect(
+      screen.getByRole("link", { name: "Owns 4 machines" })
+    ).toHaveAttribute("href", "/m?owner=abc");
   });
 });

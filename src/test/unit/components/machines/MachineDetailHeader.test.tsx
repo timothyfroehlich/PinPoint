@@ -77,6 +77,7 @@ function makeMachine(
     playerCount: null,
     designers: null,
     artists: null,
+    programmers: null,
     artwork: null,
     ...overrides,
   };

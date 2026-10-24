@@ -77,6 +77,7 @@ export interface MachinePbmColumns {
   playerCount: number | null;
   designers: string[] | null;
   artists: string[] | null;
+  programmers: string[] | null;
   opdbId: string | null;
   ipdbId: number | null;
 }
@@ -925,6 +926,7 @@ type PbmLinkBasis = StoredPbmLinkState & {
   playerCount: number | null;
   designers: string[] | null;
   artists: string[] | null;
+  programmers: string[] | null;
 };
 
 const PBM_LINK_COLUMNS = {
@@ -946,6 +948,7 @@ const PBM_LINK_COLUMNS = {
   playerCount: true,
   designers: true,
   artists: true,
+  programmers: true,
   opdbId: true,
   ipdbId: true,
 } as const;
@@ -972,7 +975,8 @@ function pbmLinkBasisUnchanged(a: PbmLinkBasis, b: PbmLinkBasis): boolean {
     a.display === b.display &&
     a.playerCount === b.playerCount &&
     sameNameList(a.designers, b.designers) &&
-    sameNameList(a.artists, b.artists)
+    sameNameList(a.artists, b.artists) &&
+    sameNameList(a.programmers, b.programmers)
   );
 }
 
@@ -1031,6 +1035,7 @@ function carryExcludedFields(
     | "playerCount"
     | "designers"
     | "artists"
+    | "programmers"
   >
 ): PbmLinkSelection {
   // Only a re-statement of an exclusion that was already stored can carry —
@@ -1059,6 +1064,8 @@ function carryExcludedFields(
     carried.designers = stored.designers;
   if (selection.artists === undefined && stored.artists !== null)
     carried.artists = stored.artists;
+  if (selection.programmers === undefined && stored.programmers !== null)
+    carried.programmers = stored.programmers;
   return carried;
 }
 
@@ -1228,6 +1235,7 @@ export async function updateMachinePbmLink({
           playerCount: machines.playerCount,
           designers: machines.designers,
           artists: machines.artists,
+          programmers: machines.programmers,
           opdbId: machines.opdbId,
           ipdbId: machines.ipdbId,
           presenceStatus: machines.presenceStatus,

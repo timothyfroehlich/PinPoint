@@ -23,6 +23,7 @@ export interface ApronCardDraft {
   tipEnabled: boolean;
   designEnabled: boolean;
   artEnabled: boolean;
+  codeEnabled: boolean;
 }
 
 export function draftFromSaved(card: SavedApronCard): ApronCardDraft {
@@ -46,6 +47,7 @@ export function blankDraft(key: string, name: string): ApronCardDraft {
     tipEnabled: false,
     designEnabled: true,
     artEnabled: true,
+    codeEnabled: false,
   };
 }
 
@@ -74,7 +76,8 @@ function sameCard(draft: ApronCardDraft, saved: SavedApronCard): boolean {
     sameText(draft.tip, saved.tip) &&
     draft.tipEnabled === saved.tipEnabled &&
     draft.designEnabled === saved.designEnabled &&
-    draft.artEnabled === saved.artEnabled
+    draft.artEnabled === saved.artEnabled &&
+    draft.codeEnabled === saved.codeEnabled
   );
 }
 

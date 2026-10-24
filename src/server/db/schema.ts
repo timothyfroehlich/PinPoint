@@ -292,13 +292,14 @@ export const machines = pgTable(
     // what OPDB would supply for a catalog title. Same rule as `model_name` —
     // set only on an uncataloged machine (CHECK below), so the Type, Display
     // and Player Count tags and the apron credits never see two sources.
-    // Designers and artists are ordered name lists; an empty list is stored
-    // as NULL so the CHECK has one "no value" to test.
+    // Designers, artists, and programmers are ordered name lists; an empty
+    // list is stored as NULL so the CHECK has one "no value" to test.
     type: text("type", { enum: OPDB_MACHINE_TYPES }),
     display: text("display", { enum: OPDB_DISPLAY_TYPES }),
     playerCount: integer("player_count"),
     designers: text("designers").array(),
     artists: text("artists").array(),
+    programmers: text("programmers").array(),
     opdbId: text("opdb_id"),
     ipdbId: integer("ipdb_id"),
     // iScored game link (PP-h2bu.2). Nullable string identifier for the game
@@ -325,7 +326,7 @@ export const machines = pgTable(
     ),
     manualModelRequiresExcludedCheck: check(
       "machines_manual_model_requires_excluded",
-      sql`pinballmap_excluded OR (type IS NULL AND display IS NULL AND player_count IS NULL AND designers IS NULL AND artists IS NULL)`
+      sql`pinballmap_excluded OR (type IS NULL AND display IS NULL AND player_count IS NULL AND designers IS NULL AND artists IS NULL AND programmers IS NULL)`
     ),
     typeCheck: check(
       "machines_type_check",
@@ -341,7 +342,7 @@ export const machines = pgTable(
     ),
     creditListsNotEmptyCheck: check(
       "machines_credit_lists_not_empty",
-      sql`(designers IS NULL OR cardinality(designers) > 0) AND (artists IS NULL OR cardinality(artists) > 0)`
+      sql`(designers IS NULL OR cardinality(designers) > 0) AND (artists IS NULL OR cardinality(artists) > 0) AND (programmers IS NULL OR cardinality(programmers) > 0)`
     ),
     // Intent On presupposes a catalog link — you can only appear on the public
     // map as a recognized title. Off and `no_sync` are fine unmatched: they are
@@ -403,6 +404,9 @@ export const machineApronCards = pgTable(
     // "Unknown".
     designEnabled: boolean("design_enabled").notNull().default(true),
     artEnabled: boolean("art_enabled").notNull().default(true),
+    // Whether the card shows its Code credit row (§10.5). Off by default:
+    // most games before the DMD era carry no software credit in OPDB.
+    codeEnabled: boolean("code_enabled").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

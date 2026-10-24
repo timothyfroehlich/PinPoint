@@ -40,7 +40,7 @@ const MEDIUM_DATE = new Intl.DateTimeFormat("en-US", {
 
 /** How the sheet names each side: the default's short name, e.g. "House". */
 export interface SheetLabels {
-  /** The defaults in full, for the header, e.g. "Preferred House". */
+  /** The defaults in full, for the header, e.g. "Default House". */
   fromDefault: string;
   toDefault: string;
   /** Column and step names, e.g. "House" and "Tournament". */

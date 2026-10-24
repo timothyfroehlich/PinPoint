@@ -282,6 +282,141 @@ describe("query-readonly.mjs — says which database and which protection", () =
   });
 });
 
+describe("query-readonly.mjs — forces an explicit choice before prod (PP-4yc8)", () => {
+  // The footgun: a worktree whose .env.local carries the prod read-only URL in
+  // POSTGRES_URL_READONLY, next to a local POSTGRES_URL. The readonly-first
+  // preference would default to PRODUCTION while the operator sits in a local
+  // checkout. Defaulting to a local DB is harmless; defaulting to prod is not,
+  // so only the prod default is gated.
+
+  it("refuses to default to prod when a non-production URL is also configured", () => {
+    const { status, stderr } = run(
+      { POSTGRES_URL_READONLY: PROD_LIKE_URL, POSTGRES_URL: LOCAL_URL },
+      [...NO_ENV_FILE, "select 1"]
+    );
+    expect(status).toBe(1);
+    expect(stderr).toContain("Refusing to default to PRODUCTION");
+    // Names both targets and both escape hatches, or the operator is stuck.
+    expect(stderr).toContain("--prod");
+    expect(stderr).toContain("--local");
+    // It stopped in resolution, before ever opening a connection or a banner.
+    expect(stderr).not.toContain("read-only role");
+  });
+
+  it("does not leak the password in the refusal", () => {
+    const { stderr } = run(
+      { POSTGRES_URL_READONLY: PROD_LIKE_URL, POSTGRES_URL: LOCAL_URL },
+      [...NO_ENV_FILE, "select 1"]
+    );
+    expect(stderr).not.toContain("sup3rs3cret");
+  });
+
+  it("--prod runs against production in that ambiguous config", () => {
+    const { stderr } = run(
+      { POSTGRES_URL_READONLY: PROD_LIKE_URL, POSTGRES_URL: LOCAL_URL },
+      [...NO_ENV_FILE, "--prod", "select 1"]
+    );
+    expect(stderr).toContain("PRODUCTION");
+    expect(stderr).not.toContain("Refusing to default");
+    // The prod URL here IS the read-only one, so the dedicated role is chosen
+    // and the can-write warning must not appear.
+    expect(stderr).toContain("read-only role");
+    expect(stderr).not.toContain("CAN write");
+  });
+
+  it("--local runs against the non-production database in that ambiguous config", () => {
+    const { stderr } = run(
+      { POSTGRES_URL_READONLY: PROD_LIKE_URL, POSTGRES_URL: LOCAL_URL },
+      [...NO_ENV_FILE, "--local", "select 1"]
+    );
+    expect(stderr).toContain("non-production");
+    expect(stderr).not.toContain("PRODUCTION");
+    // --local here picks POSTGRES_URL, a role that can write — say so honestly.
+    expect(stderr).toContain("CAN write");
+    // And honestly about WHY: POSTGRES_URL_READONLY IS set here (it targets
+    // prod, which is why --local skipped it), so the banner must not claim it
+    // is "unset" — the lie this path used to tell.
+    expect(stderr).not.toContain("unset");
+    expect(stderr).toContain("POSTGRES_URL_READONLY is set but was not");
+  });
+
+  it("--prod can deliberately land on a writable production role", () => {
+    // readonly points at local, the can-write fallback at prod. --prod picks the
+    // prod URL wherever it lives — here the can-write fallback — so the banner
+    // must both name PRODUCTION and warn that this role CAN write.
+    const { stderr } = run(
+      { POSTGRES_URL_READONLY: LOCAL_URL, POSTGRES_URL: PROD_LIKE_URL },
+      [...NO_ENV_FILE, "--prod", "select 1"]
+    );
+    expect(stderr).toContain("PRODUCTION");
+    expect(stderr).toContain("CAN write");
+  });
+
+  it("uses the read-only role when both configured URLs target prod", () => {
+    // No non-production candidate exists, so there is nothing to disambiguate:
+    // the readonly-first preference wins and the dedicated role's guarantee holds.
+    const { stderr } = run(
+      { POSTGRES_URL_READONLY: PROD_LIKE_URL, POSTGRES_URL: PROD_LIKE_URL },
+      [...NO_ENV_FILE, "select 1"]
+    );
+    expect(stderr).not.toContain("Refusing to default");
+    expect(stderr).toContain("PRODUCTION");
+    expect(stderr).toContain("read-only role");
+    expect(stderr).not.toContain("CAN write");
+  });
+
+  it("does not gate a non-production default, even when a prod URL is present", () => {
+    // Readonly points at local, the can-write fallback at prod: the safe target
+    // wins silently, exactly as before PP-4yc8. (Mirror of the preference test.)
+    const { stderr } = run(
+      { POSTGRES_URL_READONLY: LOCAL_URL, POSTGRES_URL: PROD_LIKE_URL },
+      [...NO_ENV_FILE, "select 1"]
+    );
+    expect(stderr).not.toContain("Refusing to default");
+    expect(stderr).toContain("non-production");
+  });
+
+  it("does not gate prod when no non-production URL is configured", () => {
+    // Only a prod URL set: reading prod through the read-only role is the tool's
+    // whole purpose, so there is nothing to disambiguate.
+    const { stderr } = run({ POSTGRES_URL_READONLY: PROD_LIKE_URL }, [
+      ...NO_ENV_FILE,
+      "select 1",
+    ]);
+    expect(stderr).not.toContain("Refusing to default");
+    expect(stderr).toContain("PRODUCTION");
+  });
+
+  it("--prod errors when no production URL is configured", () => {
+    const { status, stderr } = run({ POSTGRES_URL_READONLY: LOCAL_URL }, [
+      ...NO_ENV_FILE,
+      "--prod",
+      "select 1",
+    ]);
+    expect(status).toBe(1);
+    expect(stderr).toContain("no production database is configured");
+  });
+
+  it("--local errors when only a production URL is configured", () => {
+    const { status, stderr } = run({ POSTGRES_URL_READONLY: PROD_LIKE_URL }, [
+      ...NO_ENV_FILE,
+      "--local",
+      "select 1",
+    ]);
+    expect(status).toBe(1);
+    expect(stderr).toContain("no non-production database is configured");
+  });
+
+  it("rejects --prod and --local together", () => {
+    const { status, stderr } = run(
+      { POSTGRES_URL_READONLY: PROD_LIKE_URL, POSTGRES_URL: LOCAL_URL },
+      [...NO_ENV_FILE, "--prod", "--local", "select 1"]
+    );
+    expect(status).toBe(1);
+    expect(stderr).toContain("not both");
+  });
+});
+
 /**
  * Strip `--` comments before asserting on a SQL file.
  *

@@ -88,9 +88,14 @@ describe("apronCardContent", () => {
     tipEnabled: false,
     designEnabled: true,
     artEnabled: false,
+    codeEnabled: true,
   };
 
-  const credits = { design: ["Keith Elwin"], art: ["Jeremy Packer"] };
+  const credits = {
+    design: ["Keith Elwin"],
+    art: ["Jeremy Packer"],
+    code: ["Tim Sexton"],
+  };
 
   it("uses the main description while retaining disabled tip text", () => {
     expect(apronCardContent(machine, card, credits, false)).toMatchObject({
@@ -170,25 +175,37 @@ describe("apronCardContent", () => {
       credits,
       designEnabled: true,
       artEnabled: false,
+      codeEnabled: true,
+    });
+  });
+
+  it("leaves Code off when there is no saved card (spec 10.5)", () => {
+    expect(apronCardContent(machine, null, credits, false)).toMatchObject({
+      designEnabled: true,
+      artEnabled: true,
+      codeEnabled: false,
     });
   });
 });
 
 describe("apronCreditRows", () => {
-  const both = { designEnabled: true, artEnabled: true };
+  const both = { designEnabled: true, artEnabled: true, codeEnabled: false };
+  const all = { ...both, codeEnabled: true };
 
-  it("shows Design then Art", () => {
+  it("shows Design, Art, then Code (spec 10.2)", () => {
     expect(
       apronCreditRows({
-        ...both,
+        ...all,
         credits: {
           design: ["Pat Lawlor", "Larry DeMar"],
           art: ["John Youssi"],
+          code: ["Larry DeMar", "Brian Eddy"],
         },
       })
     ).toEqual([
       { label: "Design", text: "Pat Lawlor, Larry DeMar" },
       { label: "Art", text: "John Youssi" },
+      { label: "Code", text: "Larry DeMar, Brian Eddy" },
     ]);
   });
 
@@ -198,15 +215,17 @@ describe("apronCreditRows", () => {
       credits: {
         design: ["Steve Ritchie"],
         art: ["Bob Stevlic", "Kevin O'Connor", "Stephen Alexander"],
+        code: [],
       },
     });
     expect(art?.text).toBe("Bob Stevlic, Kevin O'Connor +1 more");
   });
 
   it("shows Unknown for a role with no credits (spec 10.4)", () => {
-    expect(apronCreditRows({ ...both, credits: NO_CREDITS })).toEqual([
+    expect(apronCreditRows({ ...all, credits: NO_CREDITS })).toEqual([
       { label: "Design", text: "Unknown" },
       { label: "Art", text: "Unknown" },
+      { label: "Code", text: "Unknown" },
     ]);
   });
 
@@ -215,13 +234,19 @@ describe("apronCreditRows", () => {
       apronCreditRows({
         designEnabled: false,
         artEnabled: true,
-        credits: { design: ["Keith Elwin"], art: ["Jeremy Packer"] },
+        codeEnabled: false,
+        credits: {
+          design: ["Keith Elwin"],
+          art: ["Jeremy Packer"],
+          code: ["Tim Sexton"],
+        },
       })
     ).toEqual([{ label: "Art", text: "Jeremy Packer" }]);
     expect(
       apronCreditRows({
         designEnabled: false,
         artEnabled: false,
+        codeEnabled: false,
         credits: NO_CREDITS,
       })
     ).toEqual([]);

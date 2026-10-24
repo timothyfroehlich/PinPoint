@@ -138,9 +138,11 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
+     * - manifest.webmanifest (browsers fetch it without cookies, so the
+     *   login redirect would hide it from "Add to Home screen")
      * - Assets with extensions (.svg, .png, .jpg, .jpeg, .gif, .webp)
      * - /api/health (health check endpoint)
      */
-    "/((?!_next/static|_next/image|favicon.ico|api/health|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon\\.ico|manifest\\.webmanifest|api/health|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

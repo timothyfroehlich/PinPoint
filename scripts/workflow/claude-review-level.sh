@@ -4,6 +4,8 @@
 # the base branch.
 #
 # Usage: claude-review-level.sh [<base-ref>]     (default: origin/main)
+#        claude-review-level.sh --from <rev>     (size of `git diff <rev> HEAD`; the
+#                                                 Claude Review CI job's incremental range)
 #
 # stdout, line 1: low | medium | high | ask   — the word agents act on
 # stdout, line 2: the weighted size and how it was counted
@@ -15,16 +17,18 @@
 # xhigh or max, or to split the PR. record-claude-review.sh accepts all five levels.
 set -euo pipefail
 
-if [[ $# -gt 1 ]]; then
-  echo "Usage: $0 [<base-ref>]" >&2
+if [[ $# -eq 2 && "$1" == "--from" ]]; then
+  merge_base=$2
+elif [[ $# -le 1 && "${1:-}" != --* ]]; then
+  base_ref=${1:-origin/main}
+  merge_base=$(git merge-base "$base_ref" HEAD) || {
+    echo "claude-review-level: no merge base between ${base_ref} and HEAD" >&2
+    exit 2
+  }
+else
+  echo "Usage: $0 [<base-ref>] | --from <rev>" >&2
   exit 2
 fi
-base_ref=${1:-origin/main}
-
-merge_base=$(git merge-base "$base_ref" HEAD) || {
-  echo "claude-review-level: no merge base between ${base_ref} and HEAD" >&2
-  exit 2
-}
 
 # --no-renames keeps one plain path per line and core.quotePath=false keeps non-ASCII
 # paths unquoted so the patterns below match them; binary files report "-" and drop out.

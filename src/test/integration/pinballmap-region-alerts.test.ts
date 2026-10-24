@@ -1053,80 +1053,35 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
     expect(nextRun.pending).toBe(600);
   });
 
-  it("re-bootstraps instead of announcing when one run discovers a huge share of the region", async () => {
-    // The flood this guards: PBM returns a TRUNCATED first payload, the region
-    // bootstraps on a handful of entries, and the next run reads the rest of the
-    // region as brand-new arrivals. Neither existing guard catches it — the
-    // payload is neither empty nor implausibly large.
+  it("announces a run that adds a large share of the region", async () => {
+    await seedCatalog([{ machineId: 6412, name: "Godzilla (Premium)" }]);
     pbm.entries = [lmx({ lmxId: 1 })];
-    await runRegionMachineAlerts(); // truncated bootstrap: 1 of 300
+    await runRegionMachineAlerts();
 
     pbm.entries = Array.from({ length: 300 }, (_, i) => lmx({ lmxId: i + 1 }));
     const run = await runRegionMachineAlerts();
 
-    expect(run.discovered).toBe(299);
-    expect(run.announced).toBe(0);
-    expect(run.pending).toBe(0);
-    // Nothing posted, and the seen-set self-heals: every row is present again,
-    // so the next genuine arrival is the only thing that can be announced.
-    expect(discord.posts).toEqual([]);
-    const rows = await seenRows();
-    expect(rows).toHaveLength(300);
-    expect(rows.every((r) => r.isPresent)).toBe(true);
+    expect(run).toMatchObject({ skipped: null, discovered: 299, removed: 0 });
+    expect(await eventRows()).toHaveLength(299);
+    expect(discord.posts).toHaveLength(1);
   });
 
-  it("silently reconciles removals from the same snapshot that triggers re-bootstrap", async () => {
-    pbm.entries = [lmx({ lmxId: 1 }), lmx({ lmxId: 2 })];
-    await runRegionMachineAlerts();
-
-    pbm.entries = [
-      lmx({ lmxId: 1 }),
-      ...Array.from({ length: 51 }, (_, i) => lmx({ lmxId: i + 100 })),
-    ];
-    const rebootstrapped = await runRegionMachineAlerts();
-
-    expect(rebootstrapped).toMatchObject({
-      discovered: 51,
-      removed: 0,
-      announced: 0,
-      pending: 0,
-    });
-    expect(await seenRows()).toContainEqual(
-      expect.objectContaining({ lmxId: 2, isPresent: false, missedRuns: 1 })
-    );
-    expect(await eventRows()).toEqual([]);
-    expect(discord.posts).toEqual([]);
-  });
-
-  it("discards a read missing more than 50 active entries without advancing misses", async () => {
+  it("announces a run that removes a large share of the region", async () => {
+    await seedCatalog([{ machineId: 6412, name: "Godzilla (Premium)" }]);
+    // PP-3fq4: a venue closing removes dozens of machines at once. That is a
+    // real change, so it is announced rather than discarded as an incomplete read.
     pbm.entries = Array.from({ length: 100 }, (_, i) => lmx({ lmxId: i + 1 }));
     await runRegionMachineAlerts();
 
     pbm.entries = pbm.entries.slice(0, 40);
     const run = await runRegionMachineAlerts();
 
-    expect(run).toMatchObject({
-      skipped: "incomplete_payload",
-      observed: 40,
-      discovered: 0,
-      removed: 0,
-      announced: 0,
-    });
-    expect((await seenRows()).every((row) => row.missedRuns === 0)).toBe(true);
-    expect(await eventRows()).toEqual([]);
-  });
-
-  it("still announces a normal day's arrivals, well under the re-bootstrap ceiling", async () => {
-    // The guard must not swallow real discoveries — this is the case it would
-    // break if the threshold were set anywhere near a plausible hour.
-    await seedCatalog([{ machineId: 6412, name: "Godzilla (Premium)" }]);
-    pbm.entries = Array.from({ length: 300 }, (_, i) => lmx({ lmxId: i + 1 }));
-    await runRegionMachineAlerts();
-
-    pbm.entries = [...pbm.entries, lmx({ lmxId: 901 }), lmx({ lmxId: 902 })];
-    const run = await runRegionMachineAlerts();
-
-    expect(run).toMatchObject({ discovered: 2, announced: 2, pending: 0 });
+    expect(run).toMatchObject({ skipped: null, observed: 40, removed: 60 });
+    const rows = await seenRows();
+    expect(rows.filter((row) => !row.isPresent)).toHaveLength(60);
+    expect(
+      (await eventRows()).filter((event) => event.eventType === "removed")
+    ).toHaveLength(60);
     expect(discord.posts).toHaveLength(1);
   });
 

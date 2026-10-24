@@ -19,6 +19,7 @@ import {
   type SettingsSection,
   type SettingsSetPayload,
 } from "~/lib/machines/settings-types";
+import { builtinSlotOf } from "~/lib/machines/settings-tags";
 import { type Result, err, ok } from "~/lib/result";
 import { type ProseMirrorDoc } from "~/lib/tiptap/types";
 import { emitSettingsSetEvent } from "~/lib/timeline/machine-events";
@@ -494,8 +495,8 @@ export async function updateSettingsSet({
 export interface SetSettingsSetTagParams {
   setId: string;
   actor: SettingsActor;
-  /** A built-in tag's slot (custom tags arrive with PP-k3km.2). */
-  tag: SettingsPreferredSlot;
+  /** A built-in tag's slot, or any settings tag by id (spec §3.1). */
+  tag: SettingsPreferredSlot | { tagId: string };
   applied: boolean;
 }
 
@@ -506,9 +507,48 @@ export interface SettingsSetRef {
   changed: boolean;
 }
 
+/** The tag a caller named, with the built-in slot it fills, if any. */
+interface ResolvedTag {
+  id: string;
+  name: string;
+  slot: SettingsPreferredSlot | null;
+}
+
+async function resolveTag(
+  tag: SetSettingsSetTagParams["tag"],
+  tx: DbTransaction
+): Promise<ResolvedTag | null> {
+  if (typeof tag === "string") {
+    const builtin = await ensureBuiltinSettingsTags(tx);
+    return {
+      id: builtin[tag],
+      name: BUILTIN_SETTINGS_TAG_NAMES[tag],
+      slot: tag,
+    };
+  }
+  // Shared until commit, so the tag cannot be deleted under the write.
+  const [row] = await tx
+    .select({
+      id: settingsTags.id,
+      slug: settingsTags.slug,
+      name: settingsTags.name,
+      isBuiltin: settingsTags.isBuiltin,
+    })
+    .from(settingsTags)
+    .where(eq(settingsTags.id, tag.tagId))
+    .for("share");
+  if (!row) return null;
+  const slot = row.isBuiltin ? builtinSlotOf(row.slug) : null;
+  return { id: row.id, name: row.name, slot };
+}
+
+/** The tag named by id no longer exists; rolls the write back. */
+class TagMissingError extends Error {}
+
 /**
- * Apply or remove a settings tag (spec §3.4). A preferred set keeps its slot's
- * tag until it stops being preferred (§4.2).
+ * Apply or remove a settings tag (spec §3.4); any tag goes on any set (§3.1).
+ * A default set keeps its slot's tag until it stops being the default (§4.2).
+ * Tagging records an event and notifies no one (§5.1, §5.3).
  */
 export async function setSettingsSetTag({
   setId,
@@ -527,24 +567,24 @@ export async function setSettingsSetTag({
   let changed: boolean;
   try {
     changed = await db.transaction(async (tx) => {
-      if (!applied) {
+      const resolved = await resolveTag(tag, tx);
+      if (!resolved) throw new TagMissingError("Settings tag not found");
+      if (!applied && resolved.slot !== null) {
         const flags = await lockPreferredFlags(setId, tx);
-        const isPreferredInSlot =
-          tag === "house"
+        const isDefaultInSlot =
+          resolved.slot === "house"
             ? flags.isPreferredHouse
             : flags.isPreferredTournament;
-        if (isPreferredInSlot) {
+        if (isDefaultInSlot) {
           throw new IneligibleError(
-            `Unset the preferred ${BUILTIN_SETTINGS_TAG_NAMES[tag]} set before removing its tag.`
+            `Clear the default ${resolved.name} set before removing its tag.`
           );
         }
       }
-      const builtin = await ensureBuiltinSettingsTags(tx);
-      const tagId = builtin[tag];
       const rows = applied
         ? await tx
             .insert(machineSettingsSetTags)
-            .values({ setId, tagId, addedBy: actor.userId })
+            .values({ setId, tagId: resolved.id, addedBy: actor.userId })
             .onConflictDoNothing()
             .returning({ setId: machineSettingsSetTags.setId })
         : await tx
@@ -552,7 +592,7 @@ export async function setSettingsSetTag({
             .where(
               and(
                 eq(machineSettingsSetTags.setId, setId),
-                eq(machineSettingsSetTags.tagId, tagId)
+                eq(machineSettingsSetTags.tagId, resolved.id)
               )
             )
             .returning({ setId: machineSettingsSetTags.setId });
@@ -562,7 +602,7 @@ export async function setSettingsSetTag({
         {
           kind: "settings_set_tagged",
           setName: set.name,
-          tagName: BUILTIN_SETTINGS_TAG_NAMES[tag],
+          tagName: resolved.name,
           added: applied,
         },
         actor.userId,
@@ -572,6 +612,9 @@ export async function setSettingsSetTag({
     });
   } catch (error) {
     if (error instanceof IneligibleError) return err("invalid", error.message);
+    if (error instanceof TagMissingError) {
+      return err("not_found", error.message);
+    }
     throw error;
   }
 
@@ -634,7 +677,7 @@ export async function setPreferredSettingsSet({
         const slots = await builtinSlotsOf(setId, builtin, tx);
         if (!slots.has(slot)) {
           throw new IneligibleError(
-            `Only a set tagged ${slotName} can be the preferred ${slotName} set.`
+            `Only a set tagged ${slotName} can be the default ${slotName} set.`
           );
         }
         await tx
@@ -686,7 +729,7 @@ export async function setPreferredSettingsSet({
     if (isPgErrorCode(error, "23505")) {
       return err(
         "conflict",
-        `Another set was just made the preferred ${slotName} set. Please try again.`
+        `Another set was just made the default ${slotName} set. Try again.`
       );
     }
     throw error;

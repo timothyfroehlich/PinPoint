@@ -37,12 +37,14 @@ describe("request proxy", () => {
       "/_next/static/chunk.js",
       "/_next/image?url=logo.png",
       "/favicon.ico",
+      "/manifest.webmanifest",
       "/logo.svg",
       "/api/health",
     ]) {
       expect(matcher.test(path), path).toBe(false);
     }
     expect(matcher.test("/login")).toBe(true);
+    expect(matcher.test("/manifestXwebmanifest")).toBe(true);
     expect(matcher.test("/m/afm")).toBe(true);
   });
 

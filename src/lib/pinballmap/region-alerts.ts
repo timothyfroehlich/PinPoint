@@ -65,6 +65,12 @@ import type { PinballmapRuntimeState } from "~/lib/types";
  * - **Confirmed returns are additions.** PBM may revive the same LMX id inside
  *   seven days. `generation` makes that absent -> present transition announceable
  *   without forgetting earlier removal/addition delivery state.
+ * - **No cap on how much one run may change** (PP-3fq4). A run that adds or
+ *   removes many machines is announced like any other. A change-count guard
+ *   cannot tell a venue closing from a bad response, and the one this replaced
+ *   failed both ways at once: it silently accepted one oversized response, then
+ *   discarded every correct response after it as incomplete. A bad PBM response
+ *   may post spurious changes; that is the accepted cost.
  */
 
 /**
@@ -101,18 +107,6 @@ const PENDING_READ_LIMIT = 500;
 const RUN_LEASE_MS = 10 * 60 * 1000;
 
 /**
- * How many entries one non-bootstrap run may discover before it is read as a
- * re-sync against a bad seen-set rather than as real arrivals.
- *
- * Austin gains 1-3 machines on a busy DAY and measured 487 total entries, so 50
- * sits roughly 20x above any believable hour and an order of magnitude below the
- * region. The number only has to separate "a venue added a bank of games" from
- * "our seen-set was seeded from a truncated payload"; those differ by two orders
- * of magnitude, so its exact value is not load-bearing.
- */
-const REBOOTSTRAP_THRESHOLD = 50;
-
-/**
  * Minimum gap between on-demand catalog refreshes triggered by an unknown machine
  * id (see {@link resolveMachineNames}).
  *
@@ -138,7 +132,6 @@ export interface RegionAlertRun {
     | "not_configured"
     | "empty_payload"
     | "implausible_payload"
-    | "incomplete_payload"
     | "location_cache_unavailable"
     | "already_running"
     | null;
@@ -162,7 +155,6 @@ function noop(
     | "not_configured"
     | "empty_payload"
     | "implausible_payload"
-    | "incomplete_payload"
     | "location_cache_unavailable"
     | "already_running",
   observed = 0
@@ -371,8 +363,6 @@ interface SnapshotResult {
   bootstrapped: boolean;
   discovered: number;
   removed: number;
-  rebootstrapped: boolean;
-  incompleteMissing: number;
 }
 
 /** Apply one validated full-region snapshot using only database work. */
@@ -421,27 +411,12 @@ async function applySnapshot(
           .set({ removalTrackingInitializedAt: now })
           .where(eq(pinballmapRegionAlertState.region, region));
       }
-      return {
-        bootstrapped: true,
-        discovered,
-        removed: 0,
-        rebootstrapped: false,
-        incompleteMissing: 0,
-      };
+      return { bootstrapped: true, discovered, removed: 0 };
     }
 
     const missing = current.filter(
       (row) => row.isPresent && !observedById.has(row.lmxId)
     );
-    if (missing.length > REBOOTSTRAP_THRESHOLD) {
-      return {
-        bootstrapped: false,
-        discovered: 0,
-        removed: 0,
-        rebootstrapped: false,
-        incompleteMissing: missing.length,
-      };
-    }
 
     const currentById = new Map(current.map((row) => [row.lmxId, row]));
     const newEntries = observed.filter(
@@ -450,8 +425,6 @@ async function applySnapshot(
     const returningEntries = observed.filter(
       (entry) => currentById.get(entry.lmxId)?.isPresent === false
     );
-    const rebootstrapped =
-      newEntries.length + returningEntries.length > REBOOTSTRAP_THRESHOLD;
     const detectedAt = new Date();
 
     const additions: RegionAlertTransition[] = [];
@@ -555,11 +528,11 @@ async function applySnapshot(
     }
 
     // Confirm removals on the first run where a machine is absent from the snapshot.
-    // If removal tracking is being initialized or if the run rebootstrapped, missing
-    // entries are marked not present without generating announcement events.
+    // If removal tracking is being initialized, missing entries are marked not
+    // present without generating announcement events.
     let removals: RegionAlertTransition[] = [];
     if (missing.length > 0) {
-      if (initializeRemovals || rebootstrapped) {
+      if (initializeRemovals) {
         await tx
           .update(pinballmapRegionSeenMachines)
           .set({ isPresent: false, missedRuns: 1 })
@@ -601,7 +574,7 @@ async function applySnapshot(
       }
     }
 
-    const events = [...(rebootstrapped ? [] : additions), ...removals];
+    const events = [...additions, ...removals];
     for (let i = 0; i < events.length; i += INSERT_CHUNK) {
       await tx
         .insert(pinballmapRegionAlertEvents)
@@ -630,8 +603,6 @@ async function applySnapshot(
       bootstrapped: false,
       discovered: additions.length,
       removed: removals.length,
-      rebootstrapped,
-      incompleteMissing: 0,
     };
   });
 }
@@ -942,21 +913,6 @@ export async function runRegionMachineAlerts(opts?: {
     }
 
     const snapshot = await applySnapshot(region, observed, initializeRemovals);
-    if (snapshot.incompleteMissing > 0) {
-      reportError(
-        new Error(
-          "PinballMap region payload is implausibly incomplete; discarded without updating membership"
-        ),
-        {
-          region,
-          observed: observed.length,
-          missing: snapshot.incompleteMissing,
-          threshold: REBOOTSTRAP_THRESHOLD,
-          action: "pinballmap.regionAlerts",
-        }
-      );
-      return noop(region, "incomplete_payload", observed.length);
-    }
 
     const base = {
       region,
@@ -966,39 +922,6 @@ export async function runRegionMachineAlerts(opts?: {
       discovered: snapshot.discovered,
       removed: snapshot.removed,
     } as const;
-
-    // A run that "discovers" a large fraction of the whole region did not witness
-    // an arrival — it re-synced against a seen-set that was wrong. The way there is
-    // a TRUNCATED first payload: the empty and implausibly-large guards above catch
-    // 0 and >20k, but nothing catches PBM returning a partial region (an upstream
-    // default change, a partial outage). Bootstrap on 5 of 487 entries, and the
-    // next run reads the other 482 as brand-new and posts "482 new machines" — the
-    // exact flood the bootstrap stamp exists to prevent, and a Discord post is
-    // immutable.
-    //
-    // `discovered` is the right signal because it counts rows INSERTED this run.
-    // A genuine backlog behaves differently: a long Discord outage leaves many rows
-    // PENDING while each run still discovers only the day's 1-3, so draining one is
-    // untouched by this guard.
-    //
-    // Treated as a re-bootstrap rather than an abort: the rows are stamped
-    // announced so the region self-heals to a correct seen-set on the next tick,
-    // and it is reported, because a silent re-bootstrap would hide a real upstream
-    // change.
-    if (snapshot.rebootstrapped) {
-      reportError(
-        new Error(
-          "PinballMap region alert re-bootstrapped: one run discovered an implausible share of the region"
-        ),
-        {
-          region,
-          discovered: snapshot.discovered,
-          observed: observed.length,
-          threshold: REBOOTSTRAP_THRESHOLD,
-          action: "pinballmap.regionAlerts",
-        }
-      );
-    }
 
     const pending = await readPending(region);
     if (pending.length > 0 && !locationNamesFresh) {

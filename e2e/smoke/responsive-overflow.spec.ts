@@ -12,12 +12,7 @@ import {
   ensureLoggedIn,
   assertNoA11yViolations,
 } from "../support/actions.js";
-import {
-  seededMachines,
-  seededIssue,
-  seededMember,
-} from "../support/constants.js";
-import { getProfileIdByEmail } from "../support/supabase-admin.js";
+import { seededMachines, seededIssue } from "../support/constants.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
 
 // Build routes from seeded data so they don't break if seed data changes
@@ -78,6 +73,10 @@ const authenticatedRoutes = [
   "/c/tags",
   "/c/tags/location",
   "/c/tags/location/front-room",
+  // Settings tags (machine-settings §3.6–§3.7), from seed-machine-settings.mjs:
+  // the list, and a custom tag that finds sets on several machines.
+  "/c/settings-tags",
+  "/c/settings-tags/bat-city-2025",
 ];
 
 const publicRoutes = [
@@ -219,17 +218,15 @@ test.describe("Responsive: no horizontal overflow", () => {
       });
     });
 
-    // Collection routes (PP-slrd.1) are keyed by a seed-time-generated user
-    // uuid, so the owner id is resolved at runtime instead of hardcoded.
+    // Machine group pages (Collections and Tags) share one header and tab
+    // strip (collections-and-tags 4.1). A seeded tag is the stable vehicle:
+    // its slug is fixed, and front-room holds TAF, the filter-heavy machine.
+    // Its Overview is already in authenticatedRoutes above.
     test.describe("collection pages", () => {
-      let collectionBase = "";
-      test.beforeAll(async () => {
-        const memberId = await getProfileIdByEmail(seededMember.email);
-        collectionBase = `/c/owner/${memberId}`;
-      });
+      const collectionBase = "/c/tags/location/front-room";
 
-      for (const suffix of ["", "/issues", "/timeline"]) {
-        test(`/c/owner/[member]${suffix}`, async ({ page }) => {
+      for (const suffix of ["/issues", "/timeline"]) {
+        test(`${collectionBase}${suffix}`, async ({ page }) => {
           await page.goto(`${collectionBase}${suffix}`);
           await page.waitForLoadState("load");
           await assertNoHorizontalOverflow(page);
@@ -237,10 +234,10 @@ test.describe("Responsive: no horizontal overflow", () => {
         });
       }
 
-      // Loaded state: the collection Issues tab with a wide set of active
+      // Loaded state: the group's Issues tab with a wide set of active
       // filters renders the full chip row — the surface where the chip overflow
       // was originally reported.
-      test(`/c/owner/[member]/issues (filters active)`, async ({ page }) => {
+      test(`${collectionBase}/issues (filters active)`, async ({ page }) => {
         await page.goto(`${collectionBase}/issues${filterHeavyQuery}`);
         await page.waitForLoadState("load");
         await assertNoHorizontalOverflow(page);

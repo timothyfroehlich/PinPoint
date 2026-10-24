@@ -1,7 +1,6 @@
 import "server-only";
 
 import { getCollectionForLayout } from "~/app/(app)/c/[id]/_data";
-import { getOwnerCollectionForLayout } from "~/app/(app)/c/owner/[userId]/_data";
 import { getTagForLayout } from "~/app/(app)/c/tags/[type]/[slug]/_data";
 import type { IssueExportScope } from "./export-schema";
 
@@ -19,10 +18,6 @@ export async function resolveExportScopeInitials(
     case "collection": {
       const data = await getCollectionForLayout(scope.handle);
       return data ? data.collection.machines.map((m) => m.initials) : null;
-    }
-    case "owner": {
-      const collection = await getOwnerCollectionForLayout(scope.userId);
-      return collection ? collection.machines.map((m) => m.initials) : null;
     }
     case "tag": {
       const resolved = await getTagForLayout(scope.type, scope.slug);
