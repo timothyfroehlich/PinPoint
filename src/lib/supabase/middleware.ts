@@ -9,7 +9,9 @@ import { getSupabaseEnv } from "~/lib/supabase/env";
  * characters, `generateViewToken`). They open for anonymous visitors: a valid
  * view token grants read access, and the in-page resolver 404s any other
  * handle, so opening the route publicly reveals nothing. Owner-only siblings
- * such as /c/collections match neither handle shape and stay gated.
+ * such as /c/collections match neither handle shape and stay gated. Do not
+ * name a new /c/ route with exactly 32 of [A-Za-z0-9_-]: it would match the
+ * token shape and open publicly.
  */
 const COLLECTION_VIEW_PATH =
   /^\/c\/(?:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|[A-Za-z0-9_-]{32})(?:\/(?:issues|timeline))?$/;
