@@ -92,7 +92,6 @@ jobs:
             api.github.com:443
             results-receiver.actions.githubusercontent.com:443
 
-
       - name: Plan the review range
         id: range
         env:
