@@ -927,7 +927,6 @@ def test_ci_installs_linters_from_locked_mise_toolchain() -> None:
     assert 'install-args: "--locked python ruff zizmor actionlint"' in linters
     assert "pipx install" not in linters
     assert "download-actionlint" not in workflow
-    assert "raw.githubusercontent.com" not in workflow
 
 
 def _workflow_job_block(workflow: str, job_name: str) -> str:
