@@ -82,11 +82,8 @@ export const getViewer = cache(async (): Promise<Viewer> => {
  * already rendering in the same request; they see it on the next navigation.
  */
 export async function getHealedViewer(): Promise<Viewer> {
-  const viewer = await getViewer();
-  if (!viewer.userId || viewer.profile) return viewer;
-
-  const user = await getAuthUser();
-  if (!user) return viewer;
+  const [user, viewer] = await Promise.all([getAuthUser(), getViewer()]);
+  if (!user || viewer.profile) return viewer;
 
   await ensureUserProfile(user);
   const profile = await readViewerProfile(user.id);

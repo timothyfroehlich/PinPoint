@@ -16,12 +16,6 @@ vi.mock("~/lib/supabase/server", () => ({
   createClient: () => Promise.resolve({ auth: { getUser: getUserMock } }),
 }));
 
-vi.mock("~/server/db", async () => {
-  const { getTestDb } = await import("~/test/setup/pglite");
-  const db = await getTestDb();
-  return { db };
-});
-
 vi.mock("~/lib/logger", () => ({
   log: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
