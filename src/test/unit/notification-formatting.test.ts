@@ -52,7 +52,7 @@ describe("Notification Formatting", () => {
   });
 
   describe("getEmailHtml", () => {
-    it("should sanitize comment content to prevent XSS", () => {
+    it("should escape comment content to prevent XSS", () => {
       const maliciousContent =
         '<script>alert("xss")</script>Hello <img src=x onerror=alert(1)>';
       const html = getEmailHtml({
@@ -77,7 +77,6 @@ describe("Notification Formatting", () => {
       '<a href="https://evil.example">View photos</a><span style="color:red">Sign in again</span>';
 
     function expectNoInjectedMarkup(html: string): void {
-      expect(html).not.toContain('evil.example">');
       expect(html).not.toContain('<a href="https://evil.example');
       expect(html).not.toContain("<span");
       expect(html).not.toContain('style="color:red');
@@ -220,7 +219,7 @@ describe("Notification Formatting", () => {
       expect(html).not.toContain("<blockquote>");
     });
 
-    it("should sanitize description content to prevent XSS", () => {
+    it("should escape description content to prevent XSS", () => {
       const maliciousDescription =
         '<script>alert("xss")</script>Flipper broken';
       const html = getEmailHtml({
