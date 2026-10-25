@@ -86,7 +86,7 @@ Superpowers presents a 4-option menu led by "1. Merge back to `<base>` locally".
 | Worktree create          | `EnterWorktree` / `Agent(isolation:"worktree")`                                                   |
 | SDD dispatch             | clear the scale gate (count + cost, Tim's yes) first                                              |
 | Code review              | CI Gate + the `Claude Review` check; replies via MCP, signed with your agent name                 |
-| Finish: "merge locally"  | ❌ prohibited → PR; `gh pr merge --squash` only on Tim’s explicit request                         |
+| Finish: "merge locally"  | ❌ prohibited → PR; `gh pr merge <PR> --squash` only on Tim’s explicit request                    |
 | Finish: tests            | AGENTS.md §5's tiered `check`/`test`/`preflight`/`smoke`, not `npm test`                          |
 | Finish: worktree cleanup | after merge, `worktree_reap.py --apply --branch`; otherwise `worktree_cleanup.py` on confirmation |
 | Close bead               | only after merge                                                                                  |

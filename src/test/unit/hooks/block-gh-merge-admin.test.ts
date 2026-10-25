@@ -41,6 +41,13 @@ describe("block-gh-merge-admin hook", () => {
     "gh alias set m 'pr merge --admin'",
     "gh alias import aliases.yml",
     "gh m 12 --admin",
+    "g* pr merge 12 --squash",
+    "{gh,x} pr merge 12 --squash",
+    "~/bin/gh pr merge 12 --squash",
+    "$GH pr merge 12 --squash",
+    "env FOO=1 gh pr merge 12 --squash --body x",
+    'bash -c "gh pr merge 12 --squash"',
+    "gh pr merge 12 --squash --repo other/repo",
   ])("blocks %s", (command) => {
     expect(run(command)).toBe(2);
   });
@@ -52,6 +59,10 @@ describe("block-gh-merge-admin hook", () => {
     "gh pr view 12 --json mergeStateStatus",
     "git merge origin/main",
     "gh pr update-branch 12",
+    "  gh pr merge 12 --squash  ",
+    "cd /tmp && gh pr merge 12 --auto --squash",
+    "grep -n merge src/file.ts",
+    "rg --hidden 'gh pr merge' docs",
     'echo "$HOME" && gh pr checks 12 --required',
   ])("allows %s", (command) => {
     expect(run(command)).not.toBe(2);
