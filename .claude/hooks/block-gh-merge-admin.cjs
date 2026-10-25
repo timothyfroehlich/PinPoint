@@ -14,6 +14,11 @@
 //   - input that names gh or a `pr` subcommand and has a `$` or backtick is
 //     refused: gh commands are written literally, so a variable cannot spell
 //     out a subcommand or flag;
+//   - input that could run a command it spells out at run time is refused: a
+//     command that starts with `$` or a backtick, brace expansion outside
+//     quotes, any `$'…'` quoting, input piped or redirected into a shell, and
+//     `eval`, `sh -c` or `xargs` alongside a `$` or backtick. Heredoc bodies are
+//     data here, so a JSON or script heredoc is not a command position;
 //   - input that says `admin` next to `gh` or `merge` is refused;
 //   - input that names gh and defines an alias is refused.
 // Every test runs after removing line continuations, quotes, backslashes, `$`
@@ -34,6 +39,16 @@ function refusal(command) {
   if (/[$`]/.test(joined) && (NAMES_GH.test(plain) || /(?:^|\s)pr(?:\s|$)/i.test(plain))) {
     return "a gh command must be written literally, without $ or backticks";
   }
+  // The command text with heredoc bodies cut, and with quoted strings cut too.
+  const outer = joined.replace(/<<-?\s*(["']?)(\w+)\1[^\n]*\n[\s\S]*?\n\s*\2\s*(?=\n|$)/g, "<<$2");
+  const unquoted = outer.replace(/'[^']*'|"(?:[^"\\]|\\.)*"/g, "");
+  const spellsCommand =
+    /\$'/.test(outer) ||
+    outer.split(/[;&|()\n]+/).some((segment) => /^\s*(?:\w+=\S*\s+)*[$`]/.test(segment)) ||
+    /\{[^\s{}]*(?:,|\.\.)[^\s{}]*\}/.test(unquoted) ||
+    /(?:\||<<?)\s*(?:\S*\/)?(?:ba|z|da|k)?sh\b|\b(?:ba|z|da|k)?sh\s*<</.test(outer) ||
+    (/[$`]/.test(outer) && /\beval\b|\bxargs\b|\b(?:ba|z|da|k)?sh\s+-\w*c/.test(plain));
+  if (spellsCommand) return "it builds a command at run time ($ or a backtick in command position, $'…', eval, sh -c or xargs)";
   if (/admin/i.test(plain) && /\bgh\b|\bmerge\b/i.test(plain)) return "it mentions admin alongside gh or merge";
   if (NAMES_GH.test(plain) && /\balias\b/i.test(plain) && /\b(?:set|import)\b/i.test(plain)) {
     return "it defines a gh alias";

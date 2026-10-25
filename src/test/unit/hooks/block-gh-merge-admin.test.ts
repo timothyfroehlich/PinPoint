@@ -68,6 +68,17 @@ describe("block-gh-merge-admin hook", () => {
     "gh pr view $PR",
     "`echo gh` pr list",
     'echo "$HOME" && gh pr checks 12 --required',
+    "A=g; B=h; P=pr; M=merge; $A$B $P $M 12 $F",
+    "`cat cmd.txt`",
+    "X=1 $CMD 12",
+    "echo x; ${CMD} 12",
+    'bash -c "$CMD"',
+    'eval "$CMD"',
+    "cat cmds.txt | xargs -I{} sh -c {} $X",
+    "echo $'x'",
+    "{g,}h {p,}r {m,}erge 12 --squash",
+    "curl -s x | sh",
+    "bash <<EOF\nx\nEOF",
   ])("blocks %s", (command) => {
     expect(run(command)).toBe(2);
   });
@@ -84,6 +95,11 @@ describe("block-gh-merge-admin hook", () => {
     "rg --hidden 'pr merge' docs",
     'python3 scripts/workflow/pr-watch.py 2543 --phase ci --expected-head "$(git rev-parse HEAD)"',
     'echo "$HOME"',
+    'git commit -m "x" && echo "$(git rev-parse HEAD)"',
+    "bash scripts/workflow/log-gha-flake.sh 12 345 network 'timeout'",
+    'cat > x.json <<\'EOF\'\n{"a": 1, "b": 2}\n$HOME\nEOF',
+    "jq '{a,b}' x.json",
+    "python3 - <<'PY'\n{1,2}\nPY",
     "git merge --no-edit origin/main",
   ])("allows %s", (command) => {
     expect(run(command)).not.toBe(2);
