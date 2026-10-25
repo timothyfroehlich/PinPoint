@@ -268,10 +268,10 @@ def _current_phase_ci_snapshot(
     head_sha = str(data.get("headRefOid") or "")
     rollup = data.get("statusCheckRollup") or []
     gate = _select_ci_gate(rollup)
-    # Only the Claude Review workflow's own job counts, not another check that
-    # borrows the name.
+    # Only the Claude Review workflow's own job counts, not a check another app
+    # posts under the same name (those carry no workflowName).
     review = _select_ci_gate(
-        [c for c in rollup if c.get("workflowName") in (None, "", CLAUDE_REVIEW_NAME)],
+        [c for c in rollup if c.get("workflowName") == CLAUDE_REVIEW_NAME],
         CLAUDE_REVIEW_NAME,
     )
     merge_state = str(data.get("mergeStateStatus") or "UNKNOWN")

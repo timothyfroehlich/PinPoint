@@ -424,7 +424,7 @@ def test_watch_phase_ci_draft_needs_only_ci_gate(monkeypatch):
 
 @pytest.mark.unit
 def test_watch_phase_ci_ignores_claude_review_name_from_another_workflow(monkeypatch):
-    impostor = _gate("SUCCESS", name=pr_watch.CLAUDE_REVIEW_NAME, workflow_name="Other")
+    impostor = _gate("SUCCESS", name=pr_watch.CLAUDE_REVIEW_NAME, workflow_name="")
     fake = snapshot_gh(
         [
             ci_snapshot(gate=_gate("SUCCESS"), review=impostor),
