@@ -61,17 +61,17 @@ Code work still happens **in a worktree** — the root checkout is read-only (AG
 
 ### `requesting-code-review` / `receiving-code-review`
 
-- Superpowers' reviewer-subagent is fine as an **optional local self-check**. The **authoritative** gate is current-head `CI Gate` plus exact-head review record coverage (or Codex during transition), obtained through `pinpoint-pr-workflow`. A superpowers review alone does not satisfy it.
-- **`requesting-code-review` does not satisfy the merge gate by itself.** Own the GitHub draft/CI/review loop through exact-head coverage with every finding thread adjudicated and resolved. Run the local Claude Code `/code-review` after current-head CI succeeds, address every finding, and post the review record (`bash scripts/workflow/record-claude-review.sh <PR> --level <level> --findings <file>`) to promote the draft. A corrective push requires replacement CI, a new review round, and a new record. Full rules: `pinpoint-pr-workflow` Phase 3.4.
+- Superpowers' reviewer-subagent is fine as an **optional local self-check**. The **authoritative** review is the required `Claude Review` CI check, which runs when the PR is marked ready and on every later push (`pinpoint-pr-workflow` Phase 3.4). A superpowers review alone does not satisfy it.
+- **`requesting-code-review` does not satisfy the merge gate by itself.** Own the GitHub draft/CI/review loop: current-head `CI Gate`, mark ready (`gh pr ready <PR>`), then adjudicate every Claude Review finding (fix, or decline with a signed one-sentence reply) and resolve its thread. Each corrective push gets fresh CI and an incremental Claude Review. Full rules: `pinpoint-pr-workflow` Phase 3.4.
 - **Reply to review comments via MCP** (`add_reply_to_pull_request_comment` + resolve the thread with `pull_request_review_write method:"resolve_thread"`), **signed with your agent name** (`—Claude` / `—Gemini` / `—Codex` / `—Antigravity`, per AGENTS.md §5 "Review comments"). Declined comments still get a one-sentence reply — no silent ignores. Do not use the plugin's own reply flow.
 
 ### `finishing-a-development-branch` — the biggest override
 
 Superpowers presents a 4-option menu led by "1. Merge back to `<base>` locally". **In PinPoint that menu does not apply.** There is exactly one finish path:
 
-- **Never merge locally or push directly to `main`.** Ship through a draft PR and follow `pinpoint-pr-workflow` through current-head CI, exact-head review, final labeling, and screenshots. Without Tim’s explicit merge request, hand off. When he directly requests the unambiguous PR’s merge, the owning agent in any harness runs the gate-enforced `merge-pr.sh <PR> --human`; Claude Code and Codex also show a permission prompt. Raw merge channels remain prohibited (PP-wi85).
+- **Never merge locally or push directly to `main`.** Ship through a draft PR and follow `pinpoint-pr-workflow` through current-head CI, UI approval and screenshots, and Claude Review with every conversation resolved. Without Tim’s explicit merge request, report the PR ready. When he directly requests the unambiguous PR’s merge, the owning agent in any harness runs `gh pr merge <PR> --squash` (or `--auto --squash`), never `--admin`; GitHub's ruleset enforces the gates (`pinpoint-pr-workflow` Phase 4).
 - **Tests:** use PinPoint's tiered commands, listed in **AGENTS.md §5 "Which tests to run"** (`pnpm run check` is the **static** floor and runs no tests; `pnpm run test` is the unit suite; `pnpm run check:python` covers `scripts/` and `.claude/hooks/`; `pnpm run preflight` for migrations/auth/server-actions/middleware/schema; `pnpm run smoke` for UI) — **not** `npm test` / `pytest`. The full E2E suite (`e2e:full` / `e2e:all`) is CI's job by default; it peaks at several GB, so run it locally only when the host has the headroom.
-- **Worktree cleanup is destructive → wait for explicit confirmation** (`pinpoint-pr-workflow` Phase 5.2 "Cleanup"). When confirmed, cleanup goes through the `WorktreeRemove` hook / `scripts/worktree_cleanup.py` (dealloc slot + Docker volumes) — **never raw `git worktree remove`/`rm -rf`**, which leaks the slot manifest and volumes.
+- **Worktree cleanup goes through the reap or the cleanup hook.** After the merge, reap the merged branch's worktree with `python3 scripts/worktree_reap.py --apply --branch <branch>` (`pinpoint-pr-workflow` Phase 5.2 "Cleanup"). Any other worktree removal is destructive → wait for explicit confirmation; when confirmed, it goes through the `WorktreeRemove` hook / `scripts/worktree_cleanup.py` (dealloc slot + Docker volumes) — **never raw `git worktree remove`/`rm -rf`**, which leaks the slot manifest and volumes.
 - **"Discard" is not a routine option.** Abandoning work is a deliberate, confirmed action, not a menu pick.
 - **Close the bead only after merge** (landing-the-plane) — not at push, not at PR-open.
 
@@ -85,10 +85,10 @@ Superpowers presents a 4-option menu led by "1. Merge back to `<base>` locally".
 | Plan written             | don't commit it; paste full plan text into `--design` (§1)                                        |
 | Worktree create          | `EnterWorktree` / `Agent(isolation:"worktree")`                                                   |
 | SDD dispatch             | clear the scale gate (count + cost, Tim's yes) first                                              |
-| Code review              | CI Gate + `pinpoint-pr-workflow` head-commit review; replies via MCP, signed with your agent name |
-| Finish: "merge locally"  | ❌ prohibited → PR; guarded `merge-pr.sh --human` only on Tim’s explicit request                  |
+| Code review              | CI Gate + the `Claude Review` check; replies via MCP, signed with your agent name                 |
+| Finish: "merge locally"  | ❌ prohibited → PR; `gh pr merge --squash` only on Tim’s explicit request                         |
 | Finish: tests            | AGENTS.md §5's tiered `check`/`test`/`preflight`/`smoke`, not `npm test`                          |
-| Finish: worktree cleanup | `WorktreeRemove` hook / `worktree_cleanup.py`, on confirmation                                    |
+| Finish: worktree cleanup | after merge, `worktree_reap.py --apply --branch`; otherwise `worktree_cleanup.py` on confirmation |
 | Close bead               | only after merge                                                                                  |
 
 ## Red flags — stop if you catch yourself
