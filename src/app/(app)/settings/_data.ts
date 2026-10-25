@@ -63,10 +63,14 @@ export async function getOwnedMachineTotal(userId: string): Promise<number> {
 }
 
 /** How many admins there are besides this user, for the sole-admin check. */
-export async function countOtherAdmins(userId: string): Promise<number> {
+export async function countOtherAdmins(
+  userId: string
+): Promise<number | undefined> {
   const [row] = await db
     .select({ count: count() })
     .from(userProfiles)
     .where(and(eq(userProfiles.role, "admin"), ne(userProfiles.id, userId)));
-  return row?.count ?? 0;
+  // No row reads as undefined, never 0, so a missing result never claims
+  // the user is the sole admin.
+  return row?.count;
 }
