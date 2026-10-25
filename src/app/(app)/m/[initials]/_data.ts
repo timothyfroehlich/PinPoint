@@ -22,8 +22,6 @@ import {
 import type { SettingsSetData } from "~/lib/machines/settings-types";
 import { getTagsForMachine } from "~/lib/tags/tags";
 import type { MachineTag } from "~/lib/tags/types";
-import type { PbmSiblingInput } from "~/lib/pinballmap/listing-state";
-import type { PbmIcIntent } from "~/lib/pinballmap/insider-connected";
 import {
   getMachineTimeline,
   type GetMachineTimelineArgs,
@@ -335,33 +333,6 @@ export const getMachineAllIssues = cache(async (initials: string) => {
     orderBy: (issues, { desc }) => [desc(issues.createdAt)],
   });
 });
-
-/** One cabinet sharing a Pinball Map catalog title, as coverage reads it. */
-export type SameTitleMachine = PbmSiblingInput & {
-  icIntent: PbmIcIntent | null;
-};
-
-/**
- * Every cabinet sharing this catalog title — what decides Pinball Map coverage
- * (pinballmap spec §1, 4.7). The Info tab reads it for the Config-issue
- * warning and the Manage tab for the listing control. Small by construction:
- * the group is keyed on one catalog title, so it is one cabinet in almost
- * every case and a handful in the worst. `cache()`-wrapped for request-level
- * dedupe.
- */
-export const getSameTitleMachines = cache(
-  async (pinballmapMachineId: number): Promise<SameTitleMachine[]> =>
-    db
-      .select({
-        id: machines.id,
-        initials: machines.initials,
-        name: machines.name,
-        intent: machines.pinballmapIntent,
-        icIntent: machines.pinballmapIcIntent,
-      })
-      .from(machines)
-      .where(eq(machines.pinballmapMachineId, pinballmapMachineId))
-);
 
 /** One page of the machine's timeline, for the Timeline tab. */
 export function getMachineTimelinePage(

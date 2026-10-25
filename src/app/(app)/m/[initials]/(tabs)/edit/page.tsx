@@ -23,11 +23,11 @@ import {
 } from "~/lib/pinballmap/insider-connected";
 import { PinballmapAbandonedEntries } from "~/components/machines/PinballmapAbandonedEntries";
 import { getUnifiedUsers } from "~/lib/users/queries";
+import { getMachineForLayout } from "~/app/(app)/m/[initials]/_data";
 import {
-  getMachineForLayout,
   getSameTitleMachines,
   type SameTitleMachine,
-} from "~/app/(app)/m/[initials]/_data";
+} from "~/lib/pinballmap/same-title";
 import { MachineDetailsForm } from "./machine-details-form";
 import { DetailsDirtyProvider } from "./details-dirty";
 import { PinballmapDirtyGate } from "./pinballmap-dirty-gate";

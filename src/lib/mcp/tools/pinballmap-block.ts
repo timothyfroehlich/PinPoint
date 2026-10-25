@@ -1,7 +1,5 @@
 import "server-only";
 
-import { eq } from "drizzle-orm";
-
 import { getCatalogEntry, isCatalogEmpty } from "~/lib/pinballmap/catalog";
 import {
   deriveInsiderConnectedView,
@@ -18,11 +16,10 @@ import {
   type PbmPushAction,
   type PbmSiblingInput,
 } from "~/lib/pinballmap/listing-state";
+import { getSameTitleMachines } from "~/lib/pinballmap/same-title";
 import { getPinballMapState } from "~/lib/pinballmap/state";
 import type { LocationSnapshot } from "~/lib/pinballmap/types";
 import type { MachinePresenceStatus } from "~/lib/machines/presence";
-import { db } from "~/server/db";
-import { machines } from "~/server/db/schema";
 import type { MachinePbmColumns } from "~/services/machines";
 
 /**
@@ -291,16 +288,7 @@ export async function buildMachinePinballmap(
       loadLineupSource(),
       // Coverage is what separates Covered (quiet) from Lingering (out of sync),
       // so the same-title cabinets are needed to call either one.
-      db
-        .select({
-          id: machines.id,
-          initials: machines.initials,
-          name: machines.name,
-          intent: machines.pinballmapIntent,
-          icIntent: machines.pinballmapIcIntent,
-        })
-        .from(machines)
-        .where(eq(machines.pinballmapMachineId, pinballmapMachineId)),
+      getSameTitleMachines(pinballmapMachineId),
     ]);
     // Only on a miss, so a resolved link stays one query. `get_machine` has a
     // real non-PBM answer to give (name, presence, owner, open issues), so it

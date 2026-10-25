@@ -254,7 +254,7 @@ Data access lives in **colocated** `_data.ts` / `queries.ts` files next to the r
 Pages, layouts and `src/components` never import `~/server/db` or its subpaths. An oxlint `no-restricted-imports` override in `.oxlintrc.json` fails `src/app/**/page.tsx`, `src/app/**/layout.tsx` and `src/components/**` on that import. Its `excludeFiles` list is the only opt-out besides test files: it names files, never directories, and only shrinks (PP-az4d.34 empties it). A `src/lib` read whose database handle is a required first argument gets a one-line binding in the route's `_data.ts`, so the page never holds `db`. A read whose handle defaults to `db` is called with `undefined` in that position, as the Collection reads already are. Reuse the loaders that already exist before writing one:
 
 - `getMachineForLayout(initials)` (`m/[initials]/_data.ts`) is the machine for every `/m/[initials]/*` tab. A tab reads the machine from it, never with its own query.
-- `getSameTitleMachines(pinballmapMachineId)` (`m/[initials]/_data.ts`) returns the cabinets sharing a Pinball Map title, used by the Info and Manage tabs.
+- `getSameTitleMachines(pinballmapMachineId)` (`~/lib/pinballmap/same-title`) returns the cabinets sharing a Pinball Map title, used by the Info and Manage tabs and the MCP `get_machine` block.
 - `getSettingsTags()` (`m/settings-sheets/_data.ts`) returns every settings tag, used by Print settings sheets, its print page and a machine's Settings tab.
 - `getPickerMachines(collectionId | null)` (`c/[id]/_data.ts`) returns the Collection machine picker's choices. Pass null for a Collection not yet created.
 

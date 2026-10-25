@@ -16,9 +16,11 @@ import {
   getMachineForLayout,
   getMachinePinTips,
   getMachineTags,
+} from "../_data";
+import {
   getSameTitleMachines,
   type SameTitleMachine,
-} from "../_data";
+} from "~/lib/pinballmap/same-title";
 import { PinTipCard } from "../pin-tip-card";
 import { pinballmapLocationUrl } from "~/lib/pinballmap/public-url";
 import { getPinballMapState } from "~/lib/pinballmap/state";
