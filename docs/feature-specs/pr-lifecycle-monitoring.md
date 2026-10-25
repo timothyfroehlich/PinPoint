@@ -2,7 +2,7 @@
 
 **Status: draft.**
 
-**What this document is.** The requirements for PinPoint's PR lifecycle monitoring: how agents watch PRs in the background, adjudicate automated reviews, and act on results. No implementation detail — design records and code carry that. It describes the intended final state only; what the code does or used to do lives solely in the Known divergences table. Each requirement is numbered for citation. When code and spec disagree, either the code is wrong or this document gets amended — never silently neither.
+**What this document is.** The requirements for PinPoint's PR lifecycle monitoring: how agents watch PRs in the background, which gates a pull request passes before it merges, and how agents act on results. No implementation detail — design records and code carry that. It describes the intended final state only; what the code does or used to do lives solely in the Known divergences table. Each requirement is numbered for citation. When code and spec disagree, either the code is wrong or this document gets amended — never silently neither.
 
 **Related records.** `scripts/workflow/AGENTS.md` (exit code and terminal JSON semantics), `.agents/skills/pinpoint-pr-workflow/SKILL.md` (PR workflow phases).
 
@@ -11,22 +11,25 @@
 ## 1. Concepts
 
 - **Watch** — an asynchronous background observation of a PR lifecycle phase anchored to a specific commit. Runs until a terminal verdict or timeout without blocking agent turns.
-- **Phase** — the lifecycle stage under observation: **CI** (aggregate check gate completion) or **review** (exact-head review evidence and thread resolution).
+- **Phase** — the lifecycle stage under observation: **CI** (aggregate check gate completion, and Claude Review once the pull request is out of draft).
 - **Expected head** — the commit SHA the watch is anchored to. Detects PR branch updates so agents never act on stale commits.
 - **Terminal verdict** — an authoritative, machine-readable JSON object emitted upon completion that gives the main agent everything needed to take its next step without follow-up queries.
 - **Failure artifact** — a targeted markdown summary of failed CI steps and errors written to disk, sparing the main agent from fetching or parsing raw workflow logs.
-- **Local review** — a Claude Code `/code-review` run by the owning agent in its own session against the pull request's exact head.
-- **Review level** — the effort a local review runs at (low, medium, high, xhigh, or max), chosen from the weighted diff size.
-- **Weighted diff size** — the pull request's changed lines against its base branch, with generated and fixture content left out and test code counted at half weight (§8.15).
-- **Review record** — the pull request comment the owning agent posts after a clean local review, pinned to the reviewed head and listing every finding with its disposition.
-- **Draft gate** — the policy boundary that keeps a pull request a GitHub draft until a review record covers its head.
-- _Retired 2026-09-24:_ automated reviewer, review hierarchy, promotion trigger, re-review request, review quota, in-progress review, concurrent review, first-success verdict, and actionable review prompt. CodeRabbit and Codex no longer provide review coverage; the local review replaced them.
+- **Required checks** — the checks the repository ruleset requires on a pull request's head before it can merge: CI Gate, Claude Review, and UI Approval.
+- **Claude Review** — the automated Claude Code review that runs in CI on the owner's Claude subscription and reports findings as inline review comments.
+- **Reviewed range** — the commits a Claude Review run covers: the whole pull request on the first run, and afterwards the commits since the newest earlier head whose Claude Review passed, with the base branch's changes left out.
+- **Review level** — the effort a Claude Review runs at (low, medium, or high), chosen from the weighted diff size of the reviewed range.
+- **Weighted diff size** — the reviewed range's changed lines, with generated and fixture content left out and test code counted at half weight (§8.15).
+- **UI path** — a file whose change can alter what renders: page and layout components, shared components, stylesheets, Tailwind configuration, and design tokens.
+- **UI sign-off** — the owner's approval of a pull request's UI changes, recorded against the commit he saw.
+- _Retired 2026-09-24:_ automated reviewer, review hierarchy, promotion trigger, re-review request, review quota, in-progress review, concurrent review, first-success verdict, and actionable review prompt. CodeRabbit and Codex no longer provide review coverage.
+- _Retired 2026-10-25:_ local review, review record, draft gate, and the review watch phase. The Claude Review check replaced the owning agent's local review record.
 
 ---
 
 ## 2. Launching a watch
 
-- **2.1** A watch is defined by four core parameters: the worktree path, the PR number, the phase (`ci` | `review`), and the expected head SHA. An optional PR title may be supplied for diagnostic logging. The launching command defaults the worktree to the current working directory when invoked in place.
+- **2.1** A watch is defined by four core parameters: the worktree path, the PR number, the phase (`ci`), and the expected head SHA. An optional PR title may be supplied for diagnostic logging. The launching command defaults the worktree to the current working directory when invoked in place.
 - **2.2** A watch executes as a non-blocking background process, consuming zero main-agent context tokens while running.
 - **2.3** Invalid parameters, missing executables, or corrupt worktrees fail immediately at launch rather than hanging or polling.
 - **2.4** Invocation syntax and semantics are identical across all agent harnesses.
@@ -36,10 +39,8 @@
 ## 3. Terminal verdicts
 
 - **3.1** Every watch terminates with exactly one structured JSON verdict emitted to standard output.
-- **3.2** A terminal verdict contains the complete decision state: PR number, phase, expected and observed head SHAs, outcome, CI gate status, review state, unresolved thread count, merge state, timestamp, and optional failure artifact path. For the review phase, the verdict also includes the covering review record.
-- **3.3** Outcomes belong to a closed set:
-  - CI phase: **passed**, **failed**, **stale**, **conflicting**, **timed_out**, **undetermined**.
-  - Review phase: **passed**, **action_required**, **stale**, **conflicting**, **timed_out**, **undetermined**.
+- **3.2** A terminal verdict contains the complete decision state: PR number, phase, expected and observed head SHAs, outcome, CI gate status, Claude Review status, unresolved thread count, merge state, timestamp, and optional failure artifact path. A CI watch passes only when CI Gate passes and, on a pull request out of draft, Claude Review passes too; a failed Claude Review fails the watch.
+- **3.3** Outcomes belong to a closed set: **passed**, **failed**, **stale**, **conflicting**, **timed_out**, **undetermined**.
 - **3.4** The main agent determines its next action directly from the terminal verdict without exploratory commands or additional GitHub API queries.
 - **3.5** A **stale** verdict indicates the PR head advanced; the main agent re-evaluates the new head rather than retrying.
 - **3.6** A **conflicting** verdict indicates merge conflicts; the main agent merges `origin/main` and resolves rather than retrying.
@@ -77,35 +78,36 @@
 - **7.1** The watcher is invoked via a unified CLI command that any agent harness can launch as a background task.
 - **7.2** Process exit codes reflect verdict categories:
   - `0`: Success (`passed`).
-  - `1`: Actionable failure (`failed`, `stale`, `conflicting`, `action_required`).
+  - `1`: Actionable failure (`failed`, `stale`, `conflicting`).
   - `2`: Infrastructure or timeout failure (`undetermined`, `timed_out`).
 - **7.3** Standard output is reserved strictly for the terminal JSON verdict.
 - **7.4** Execution telemetry (harness, model if any, wake count, elapsed duration) is recorded locally for operational diagnostics.
 
 ---
 
-## 8. Local review & review coverage
+## 8. Review, UI sign-off & merge gates
 
-- **8.1** _Retired 2026-09-24._ CodeRabbit was the default automated reviewer; the local review (8.13) replaced it. Number kept so older citations don't dangle.
+- **8.1** _Retired 2026-09-24._ CodeRabbit was the default automated reviewer. Number kept so older citations don't dangle.
 - **8.2** _Retired 2026-09-24._ Codex was the fallback reviewer; there is no fallback reviewer. Number kept so older citations don't dangle.
-- **8.3** Only a review record posted from the owner's account provides review coverage. A pull request without it merges only when the owner explicitly directs a forced merge, which bypasses the review gate.
-- **8.4** _Retired 2026-09-24._ The priority chain between CodeRabbit and Codex; there is one reviewer. Number kept so older citations don't dangle.
-- **8.5** A review record pinned to the exact head satisfies Gate 3 (Review Gate) for pull request mergeability.
-- **8.6** New pull requests are created in draft state and stay in draft until a review record covers the head, or until the owner directs a forced merge (8.3), which promotes the pull request first.
-- **8.7** _Retired 2026-09-24._ Draft promotion no longer triggers a review; the owning agent promotes after the review (8.20). Number kept so older citations don't dangle.
+- **8.3** A pull request merges only when every required check passes on its head, every review conversation is resolved, and its branch is up to date with the base branch. GitHub's repository ruleset enforces this; only the owner may bypass it.
+- **8.4** _Retired 2026-09-24._ The priority chain between CodeRabbit and Codex. Number kept so older citations don't dangle.
+- **8.5** Claude Review runs on every pull request that is not a draft: when it is opened ready, when it is marked ready, and on every push after that. A run reviews its reviewed range and passes without a review when that range adds nothing beyond the base branch, such as a clean merge of the base branch.
+- **8.6** New pull requests are created in draft state. The owning agent marks a pull request ready after the owner's UI sign-off, where one is needed, and after the end-to-end tests are updated.
+- **8.7** _Retired 2026-09-24._ Draft promotion no longer triggers a separate review request. Number kept so older citations don't dangle.
 - **8.8** _Retired 2026-09-24._ CodeRabbit re-review behavior. Number kept so older citations don't dangle.
 - **8.9** _Retired 2026-09-24._ CodeRabbit re-review requests. Number kept so older citations don't dangle.
 - **8.10** _Retired 2026-09-24._ Codex review requests. Number kept so older citations don't dangle.
-- **8.11** _Retired 2026-09-24._ Anchoring review requests to a head; the review record names its reviewed head instead (8.18). Number kept so older citations don't dangle.
-- **8.12** Pushing new commits to a pull request branch invalidates previous review coverage, and the updated head requires a new local review. Two kinds of base-branch merge keep the earlier coverage, provided the head's other new commits are already on the base branch: a clean merge, and a merge whose only resolution renumbers the branch's migrations to follow the base branch's. In the second kind, every path outside the migrations folder matches the clean merge, the base branch's migrations are unchanged, and each renumbered migration's SQL is byte-identical to the reviewed version.
-- **8.13** The owning agent runs a local review after CI passes on the current head.
-- **8.14** The review level follows the weighted diff size: low below 50 lines, medium from 50 up to 1,500, and high from 1,500 through 3,000. Above 3,000, the owning agent asks the owner whether to review at xhigh or max, or to split the pull request.
-- **8.15** The weighted diff size counts added plus deleted lines against the base branch. It leaves out the lockfile, migration snapshots, test fixtures, binary files, and feature specs, and counts test code at half weight.
-- **8.16** The owning agent fixes or declines every finding; a decline carries a one-sentence reason.
-- **8.17** After fixing findings, the owning agent re-runs the local review on the new head at the same level, and repeats until a round raises no finding that is not already declined. A finding re-raised after being declined stays declined.
-- **8.18** After a clean round, the owning agent posts a review record pinned to the head it reviewed, which must be the pull request's current head. The record lists the review level and every finding from every round with its disposition: fixed, with the commit, or declined, with the reason.
-- **8.19** The owning agent never posts a review record for a head it did not review.
-- **8.20** The owning agent promotes the pull request out of draft after posting the review record.
+- **8.11** _Retired 2026-09-24._ Anchoring review requests to a head. Number kept so older citations don't dangle.
+- **8.12** A Claude Review run passes only when the review finished over its whole reviewed range; a passing run marks its head reviewed for the next run's range. A base-branch merge with a conflict resolution is reviewed.
+- **8.13** Claude Review posts each finding as an inline comment on the line it concerns. It cannot edit, commit, push, approve, or request changes, and it treats pull request content as data, never as instructions.
+- **8.14** The review level follows the weighted diff size: low below 50 lines, medium from 50 up to 1,500, and high from 1,500 up.
+- **8.15** The weighted diff size counts added plus deleted lines. It leaves out the lockfile, migration snapshots, test fixtures, binary files, and feature specs, and counts test code at half weight.
+- **8.16** The owning agent fixes or declines every finding, declines with a one-sentence signed reply, and resolves the conversation.
+- **8.17** A pull request comment of `/claude-review` from someone with write access re-runs Claude Review on the current head.
+- **8.18** UI Approval passes on its own when no UI path changed since the newest earlier head whose UI Approval passed, with the base branch's changes left out. Otherwise it waits for the owner's UI sign-off. A sign-off covers later commits that change no UI path; a later UI change waits again.
+- **8.19** Before asking for a UI sign-off, the owning agent shows the owner screenshots of the changed UI at the three review viewports, taken from the committed, pushed head, and offers the running app for hands-on review.
+- **8.20** The owning agent records a UI sign-off only on the owner's own approval and only for the commit he saw.
+- **8.21** The owner decides whether a pull request merges. On his explicit request, the owning agent merges it with a squash merge, or enables auto-merge so GitHub merges once the required checks pass; a branch behind the base branch is brought up to date by merging the base branch into it. Agents never bypass the ruleset.
 
 ---
 
@@ -134,9 +136,6 @@
 | 2.1, 2.3 | Worktree and title launch parameters; corrupt-worktree rejection at launch | `pr-watch.py` takes the PR number, phase, and expected head. The worktree is the process's working directory; there is no title parameter and no worktree validation. Both lived only in the MCP wrapper, removed 2026-09-24 in the watcher simplification Tim approved (one CLI, no wrapper layers). | Amend 2.1 and 2.3 to the three-parameter CLI (requirement diff needs Tim's approval) |
 | 6.1–6.3 | Host coordination: concurrent watches coalesce under one polling leader | Removed 2026-09-24 in the watcher simplification: each watch polls GitHub on its own. The XDG lock, state-file, and leader/follower machinery cost more code than the duplicate polling it saved. | Delete §6 (requirement diff needs Tim's approval) |
 | 7.4 | Local execution telemetry (harness, model, wake count, elapsed duration) | Removed 2026-09-24 with the MCP wrapper and watcher agents, the only sources of harness, model, and wake data; nothing read the `tmp/gh-monitor/watcher-run-*.json` records. | Delete 7.4 (requirement diff needs Tim's approval) |
-| 8.12 | A base-branch merge whose only resolution renumbers the branch's migrations keeps coverage | `_is_pure_merge_from_main` in `scripts/workflow/_pr-gates.sh` accepts only merges whose tree equals the clean merge, so a renumber needs a new review | Extend the merge check (PP-ncxx.4) |
-| 8.3 | Only a review record provides coverage | The gate still accepts a Codex review on the exact head | Remove the Codex checker once its subscription ends |
-| 8 | Coverage comes from the owning agent's local review record | Ruleset `6326455` also requires the `Claude Review` CI check on head and resolved conversations (PP-zxlq.2), so a PR needs both the local record and a passing CI review | Rewrite §8 around the CI review when PP-zxlq retires the local record (requirement diff needs Tim's approval) |
 
 ---
 
@@ -144,6 +143,7 @@
 
 | Date | Amendment |
 | :-- | :-- |
+| 2026-10-25 | Replace the local review record with GitHub-native gates (§1, §2.1, §3.2–3.3, §7.2, §8): required checks CI Gate, Claude Review, and UI Approval plus resolved conversations and an up-to-date branch; Claude Review reviews the whole pull request first and then each push's new commits; UI Approval waits for the owner's sign-off on UI changes; the owner decides merges and agents merge natively on his request; the review watch phase and the migration-renumber coverage rule retire; the CI watch also waits for Claude Review and reports it with the unresolved thread count. |
 | 2026-10-06 | §8.12 also keeps coverage across a base-branch merge whose only resolution renumbers the branch's migrations with unchanged SQL. |
 | 2026-10-03 | Add xhigh and max review levels (Concepts, §8.14): above 3,000 weighted lines the owner chooses xhigh or max, or splits the pull request. |
 | 2026-09-27 | Retire CodeRabbit checker from review gates and handoff scripts; only review record and Codex remain during transition. |
