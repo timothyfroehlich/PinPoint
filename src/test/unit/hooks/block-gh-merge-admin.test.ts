@@ -48,6 +48,15 @@ describe("block-gh-merge-admin hook", () => {
     "env FOO=1 gh pr merge 12 --squash --body x",
     'bash -c "gh pr merge 12 --squash"',
     "gh pr merge 12 --squash --repo other/repo",
+    "nice gh pr merge 12 $F",
+    "timeout 30 gh pr merge 12 --squash --body x",
+    "/usr/bin/nice -n 5 /opt/homebrew/bin/gh pr merge 12 --body x",
+    "doas -u tim gh pr merge 12 --squash --subject x",
+    "git -c alias.x='!gh pr merge 12 $F' x",
+    "rg --pre 'gh pr merge 12' merge docs",
+    "grep merge $(gh pr merge 12 --body x)",
+    "echo ok; gh alias set m 'pr merge'",
+    "! gh pr merge 12 --body x",
   ])("blocks %s", (command) => {
     expect(run(command)).toBe(2);
   });
@@ -63,6 +72,8 @@ describe("block-gh-merge-admin hook", () => {
     "cd /tmp && gh pr merge 12 --auto --squash",
     "grep -n merge src/file.ts",
     "rg --hidden 'gh pr merge' docs",
+    "grep -rn 'gh pr merge' .agents/skills/*/SKILL.md",
+    "git merge --no-edit origin/main",
     'echo "$HOME" && gh pr checks 12 --required',
   ])("allows %s", (command) => {
     expect(run(command)).not.toBe(2);
