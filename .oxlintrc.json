@@ -531,6 +531,54 @@
           }
         ]
       }
+    },
+    {
+      // Pages, layouts and components never touch the database handle or the
+      // schema: their reads live in a cache()'d route `_data.ts` loader or a
+      // `src/lib/<domain>` read (pinpoint-ui § Data access, PP-az4d.10). An
+      // override replaces the base rule's options, so the deep-relative ban is
+      // repeated here.
+      "files": [
+        "src/app/**/page.tsx",
+        "src/app/**/layout.tsx",
+        "src/components/**"
+      ],
+      // The only opt-out. Exempt files by name, never by directory, and shrink
+      // the list as files move off the database.
+      "excludeFiles": [
+        // PP-az4d.34: move its reads into a loader.
+        "src/components/collections/MachineGroupShell.tsx",
+        // PP-az4d.34: move its reads into a loader.
+        "src/components/collections/MachineGroupTimelineTab.tsx",
+        // PP-az4d.34: fold its notification reads into one query, once the
+        // List Header change to this file (PR #2486) lands.
+        "src/components/layout/MainLayout.tsx",
+        // PP-az4d.34: move its reads into a loader.
+        "src/components/machines/timeline/MachineRecentActivity.tsx"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "~/server/db",
+                "message": "Pages, layouts and components do not import the database. Move the read into a cache()'d route _data.ts loader or a src/lib/<domain> read (pinpoint-ui § Data access)."
+              }
+            ],
+            "patterns": [
+              {
+                "group": ["../../*", "../../../*", "../../../../*"],
+                "message": "Use '~/' path alias instead of deep relative imports (../../). This improves maintainability and prevents broken imports when files are moved."
+              },
+              {
+                "group": ["~/server/db/*"],
+                "message": "Pages, layouts and components do not import the database schema. Move the read into a cache()'d route _data.ts loader or a src/lib/<domain> read (pinpoint-ui § Data access)."
+              }
+            ]
+          }
+        ]
+      }
     }
   ]
 }

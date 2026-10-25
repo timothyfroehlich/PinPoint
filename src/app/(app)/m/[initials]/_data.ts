@@ -15,6 +15,20 @@ import { getOpdbRecords } from "~/lib/opdb/records";
 import { opdbGroupId, pinTipsPageUrl } from "~/lib/pintips/parse";
 import { pickWeightedTipIndex } from "~/lib/pintips/pick";
 import { getPinTipsForGroup } from "~/lib/pintips/records";
+import {
+  getMachineSettingsSets,
+  type SettingsSetsViewer,
+} from "~/lib/machines/settings-queries";
+import type { SettingsSetData } from "~/lib/machines/settings-types";
+import { getTagsForMachine } from "~/lib/tags/tags";
+import type { MachineTag } from "~/lib/tags/types";
+import type { PbmSiblingInput } from "~/lib/pinballmap/listing-state";
+import type { PbmIcIntent } from "~/lib/pinballmap/insider-connected";
+import {
+  getMachineTimeline,
+  type GetMachineTimelineArgs,
+  type MachineTimelineRow,
+} from "~/lib/timeline/machine-events";
 import { loadMentionNames } from "~/lib/tiptap/mention-names";
 import { applyMentionNames } from "~/lib/tiptap/types";
 import type { PinTipForCard } from "~/lib/pintips/types";
@@ -321,3 +335,53 @@ export const getMachineAllIssues = cache(async (initials: string) => {
     orderBy: (issues, { desc }) => [desc(issues.createdAt)],
   });
 });
+
+/** One cabinet sharing a Pinball Map catalog title, as coverage reads it. */
+export type SameTitleMachine = PbmSiblingInput & {
+  icIntent: PbmIcIntent | null;
+};
+
+/**
+ * Every cabinet sharing this catalog title — what decides Pinball Map coverage
+ * (pinballmap spec §1, 4.7). The Info tab reads it for the Config-issue
+ * warning and the Manage tab for the listing control. Small by construction:
+ * the group is keyed on one catalog title, so it is one cabinet in almost
+ * every case and a handful in the worst. `cache()`-wrapped for request-level
+ * dedupe.
+ */
+export const getSameTitleMachines = cache(
+  async (pinballmapMachineId: number): Promise<SameTitleMachine[]> =>
+    db
+      .select({
+        id: machines.id,
+        initials: machines.initials,
+        name: machines.name,
+        intent: machines.pinballmapIntent,
+        icIntent: machines.pinballmapIcIntent,
+      })
+      .from(machines)
+      .where(eq(machines.pinballmapMachineId, pinballmapMachineId))
+);
+
+/** One page of the machine's timeline, for the Timeline tab. */
+export function getMachineTimelinePage(
+  args: GetMachineTimelineArgs
+): Promise<MachineTimelineRow[]> {
+  return getMachineTimeline(db, args);
+}
+
+/**
+ * The machine's settings sets as the Settings tab renders them, each carrying
+ * the viewer's rights (machine-settings §2.5).
+ */
+export function getMachineSettingsSetsFor(
+  machineId: string,
+  viewer: SettingsSetsViewer
+): Promise<SettingsSetData[]> {
+  return getMachineSettingsSets(db, machineId, viewer);
+}
+
+/** The tags on a machine, for the Info tab. `cache()`-wrapped per request. */
+export const getMachineTags = cache(
+  (machineId: string): Promise<MachineTag[]> => getTagsForMachine(db, machineId)
+);

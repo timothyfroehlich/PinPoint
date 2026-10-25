@@ -1,7 +1,6 @@
 import type React from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { eq } from "drizzle-orm";
 
 import { MachineTimelineActionsRow } from "~/components/machines/timeline/MachineTimelineActionsRow";
 import { TimelineBucketBanner } from "~/components/machines/timeline/TimelineBucketBanner";
@@ -10,14 +9,15 @@ import { bucketTimelineRows } from "~/lib/timeline/bucket-rows";
 import { isSiteToday } from "~/lib/dates";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/index";
 import { getViewer } from "~/lib/auth/viewer";
-import { getMachineTimeline } from "~/lib/timeline/machine-events";
 import {
   DEFAULT_TIMELINE_TAGS,
   tagSchema,
   type TimelineTag,
 } from "~/lib/timeline/machine-tags";
-import { db } from "~/server/db";
-import { machines } from "~/server/db/schema";
+import {
+  getMachineForLayout,
+  getMachineTimelinePage,
+} from "~/app/(app)/m/[initials]/_data";
 
 interface PageProps {
   params: Promise<{ initials: string }>;
@@ -51,11 +51,9 @@ export default async function MachineTimelinePage({
   const currentPage =
     Number.isFinite(parsedPage) && parsedPage >= 1 ? parsedPage : 1;
 
-  // Load the machine (FK target for getMachineTimeline + initials for routes).
-  const machine = await db.query.machines.findFirst({
-    where: eq(machines.initials, initials),
-    columns: { id: true, initials: true, ownerId: true, name: true },
-  });
+  // The machine the (tabs) layout already loaded — `cache()` dedupes the
+  // read (FK target for the timeline query + initials for routes).
+  const { machine } = await getMachineForLayout(initials);
   if (!machine) notFound();
 
   // Parse the CSV `?tag=a,b,c` query param into a validated TimelineTag[].
@@ -102,7 +100,7 @@ export default async function MachineTimelinePage({
 
   // Fetch one extra row so we can detect whether a next page exists without
   // a separate COUNT(*) query. Trim it back to PAGE_SIZE before rendering.
-  const fetched = await getMachineTimeline(db, {
+  const fetched = await getMachineTimelinePage({
     machineId,
     tags: effectiveTags,
     limit: PAGE_SIZE + 1,

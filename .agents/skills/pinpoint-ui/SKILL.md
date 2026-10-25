@@ -251,6 +251,13 @@ Three guardrails enforce this, so a violation fails loudly instead of silently s
 
 Data access lives in **colocated** `_data.ts` / `queries.ts` files next to the route that uses it, wrapped in `cache()` from React so a layout and its page don't double-hit the DB in one render pass. There is **no** `src/server/data-access/` directory — don't create one.
 
+Pages, layouts and components never import `~/server/db` or its subpaths. An oxlint `no-restricted-imports` override in `.oxlintrc.json` fails `src/app/**/page.tsx`, `src/app/**/layout.tsx` and `src/components/**` on that import. Its `excludeFiles` list is the only opt-out: it names files, never directories, and only shrinks (PP-az4d.34 empties it). A `src/lib` read that takes the database handle as its first argument gets a one-line `cache()`'d binding in the route's `_data.ts`, so the page never holds `db`. Reuse the loaders that already exist before writing one:
+
+- `getMachineForLayout(initials)` (`m/[initials]/_data.ts`) is the machine for every `/m/[initials]/*` tab. A tab reads the machine from it, never with its own query.
+- `getSameTitleMachines(pinballmapMachineId)` (`m/[initials]/_data.ts`) returns the cabinets sharing a Pinball Map title, used by the Info and Manage tabs.
+- `getSettingsTags()` (`m/settings-sheets/_data.ts`) returns every settings tag, used by Print settings sheets, its print page and a machine's Settings tab.
+- `getPickerMachines(collectionId | null)` (`c/[id]/_data.ts`) returns the Collection machine picker's choices. Pass null for a Collection not yet created.
+
 The current viewer is the one shared exception: pages, layouts and server components read it from `getViewer()` (`~/lib/auth/viewer`), a request-scoped `cache()` that runs `auth.getUser()` and the profile read (id, role, name, report modes) once per render. It returns nulls for a signed-out viewer or a missing profile row; the caller keeps its own redirect, 404 or Forbidden. Server Actions keep their own auth check (`createProtectedAction`).
 
 Revalidate with `revalidatePath` — that's the convention throughout. `revalidateTag` has **zero** usages in `src/`; if you think you need it, you're introducing a second caching convention.

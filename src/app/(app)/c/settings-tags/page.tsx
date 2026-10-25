@@ -7,14 +7,13 @@ import { NewSettingsTagDialog } from "~/components/settings-tags/NewSettingsTagD
 import { getViewer } from "~/lib/auth/viewer";
 import { canManageSettingsTags } from "~/lib/permissions";
 import { getAccessLevel } from "~/lib/permissions/helpers";
-import { listSettingsTagSummaries } from "~/lib/machines/settings-tag-queries";
 import {
   builtinSlotOf,
   setsOnMachinesPhrase,
   settingsTagHref,
 } from "~/lib/machines/settings-tags";
 import { cn } from "~/lib/utils";
-import { db } from "~/server/db";
+import { getSettingsTagSummaries } from "./_data";
 
 export const metadata: Metadata = {
   title: "Settings tags | PinPoint",
@@ -39,7 +38,7 @@ function chipTone(slug: string): string {
  */
 export default async function SettingsTagsPage(): Promise<React.JSX.Element> {
   const [tags, viewer] = await Promise.all([
-    listSettingsTagSummaries(db),
+    getSettingsTagSummaries(),
     getViewer(),
   ]);
   const canManage = canManageSettingsTags(getAccessLevel(viewer.role));

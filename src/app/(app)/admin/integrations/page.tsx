@@ -1,7 +1,4 @@
 import type React from "react";
-import { eq } from "drizzle-orm";
-import { db } from "~/server/db";
-import { discordIntegrationConfig } from "~/server/db/schema";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
 import { HelpLink } from "~/components/help/HelpLink";
@@ -19,6 +16,7 @@ import {
   type SectionNavItem,
 } from "~/components/layout/SectionNav";
 import { SectionAnchor } from "~/components/machines/machine-form/SectionAnchor";
+import { getDiscordIntegrationSettings } from "./_data";
 import { ActivitySummaryForm } from "./discord/activity-summary-form";
 import { DiscordConfigForm } from "./discord/discord-config-form";
 import { IntegrationsDirtyStateProvider } from "./integrations-dirty-state";
@@ -60,21 +58,7 @@ const SECTIONS: SectionNavItem[] = [
 
 export default async function AdminIntegrationsPage(): Promise<React.JSX.Element> {
   const [discordConfig, pinballMapState] = await Promise.all([
-    db.query.discordIntegrationConfig.findFirst({
-      where: eq(discordIntegrationConfig.id, "singleton"),
-      columns: {
-        guildId: true,
-        inviteLink: true,
-        botTokenVaultId: true,
-        summaryChannelId: true,
-        summaryIntervalHours: true,
-        summaryStartHour: true,
-        summaryEvents: true,
-        summaryStatus: true,
-        summaryStatusDetail: true,
-        summaryLastPostAt: true,
-      },
-    }),
+    getDiscordIntegrationSettings(),
     getPinballMapAdminViewState(),
   ]);
 
