@@ -63,6 +63,11 @@ describe("block-gh-merge-admin hook", () => {
     "rg --hidden 'gh pr merge' docs",
     "grep -rn 'gh pr merge' .agents/skills/*/SKILL.md",
     "$'\\x67h' pr merge 12 --squash",
+    "gh pr $M 12 --squash",
+    "g$'h' pr mer$'ge' 12 --squash",
+    "gh pr view $PR",
+    "`echo gh` pr list",
+    'echo "$HOME" && gh pr checks 12 --required',
   ])("blocks %s", (command) => {
     expect(run(command)).toBe(2);
   });
@@ -77,8 +82,9 @@ describe("block-gh-merge-admin hook", () => {
     "  gh pr merge 12 --squash  ",
     "grep -n merge src/file.ts",
     "rg --hidden 'pr merge' docs",
+    'python3 scripts/workflow/pr-watch.py 2543 --phase ci --expected-head "$(git rev-parse HEAD)"',
+    'echo "$HOME"',
     "git merge --no-edit origin/main",
-    'echo "$HOME" && gh pr checks 12 --required',
   ])("allows %s", (command) => {
     expect(run(command)).not.toBe(2);
   });

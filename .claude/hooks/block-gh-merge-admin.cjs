@@ -11,9 +11,13 @@
 //     --delete-branch: no separators, wrappers, functions or other commands
 //     around it. A search such as `rg 'gh pr merge'` is refused too; search for
 //     `pr merge` instead, or run the search separately;
+//   - input that names gh or a `pr` subcommand and has a `$` or backtick is
+//     refused: gh commands are written literally, so a variable cannot spell
+//     out a subcommand or flag;
 //   - input that says `admin` next to `gh` or `merge` is refused;
 //   - input that names gh and defines an alias is refused.
-// Every test runs after removing line continuations, quotes and backslashes.
+// Every test runs after removing line continuations, quotes, backslashes, `$`
+// and backticks, so `g$'h' pr mer$'ge'` reads as `gh pr merge`.
 // The residual is code that builds the flag inside another program, such as a
 // script file run separately.
 // Exit 2 blocks the call and shows stderr to Claude; anything else allows it.
@@ -26,7 +30,10 @@ const MAY_EXPAND = /[$`*?[\]{}~]/;
 /** Why the input is refused, or "" when it is fine. */
 function refusal(command) {
   const joined = command.replace(/\\\r?\n/g, "");
-  const plain = joined.replace(/["'\\]/g, "");
+  const plain = joined.replace(/["'\\$`]/g, "");
+  if (/[$`]/.test(joined) && (NAMES_GH.test(plain) || /(?:^|\s)pr(?:\s|$)/i.test(plain))) {
+    return "a gh command must be written literally, without $ or backticks";
+  }
   if (/admin/i.test(plain) && /\bgh\b|\bmerge\b/i.test(plain)) return "it mentions admin alongside gh or merge";
   if (NAMES_GH.test(plain) && /\balias\b/i.test(plain) && /\b(?:set|import)\b/i.test(plain)) {
     return "it defines a gh alias";
