@@ -14,7 +14,7 @@ import { DeleteAccountSection } from "./delete-account-section";
 import { getReassignmentTargets } from "./account-deletion";
 import {
   countOtherAdmins,
-  getOrCreateNotificationPreferences,
+  ensureNotificationPreferences,
   getOwnedMachineTotal,
   getSettingsAccount,
 } from "./_data";
@@ -48,7 +48,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
     notFound();
   }
 
-  const preferences = await getOrCreateNotificationPreferences(userId);
+  const preferences = await ensureNotificationPreferences(userId);
 
   // Fetch owned machines count and potential reassignment targets.
   // The reassignment-target query lives in account-deletion.ts so the

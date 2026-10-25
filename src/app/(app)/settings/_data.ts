@@ -28,7 +28,7 @@ export async function getSettingsAccount(
  * The user's notification preferences. A user with no preferences row (an old
  * account) gets one created with the defaults, so this writes on first read.
  */
-export async function getOrCreateNotificationPreferences(
+export async function ensureNotificationPreferences(
   userId: string
 ): Promise<NotificationPreference> {
   let preferences = await db.query.notificationPreferences.findFirst({

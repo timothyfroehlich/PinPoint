@@ -544,8 +544,13 @@
         "src/components/**"
       ],
       // The only opt-out. Exempt files by name, never by directory, and shrink
-      // the list as files move off the database.
+      // the list as files move off the database. Test files keep the test
+      // override's exemption, which this later override would otherwise undo.
       "excludeFiles": [
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/*.spec.ts",
+        "**/*.spec.tsx",
         // PP-az4d.34: move its reads into a loader.
         "src/components/collections/MachineGroupShell.tsx",
         // PP-az4d.34: move its reads into a loader.
