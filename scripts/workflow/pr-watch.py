@@ -415,7 +415,11 @@ def _watch_phase_ci(
         if status == "COMPLETED":
             if _is_passing(conclusion):
                 if is_draft or (
-                    review_status == "COMPLETED" and _is_passing(review_conclusion)
+                    review_status == "COMPLETED"
+                    and _is_passing(review_conclusion)
+                    # A job-level skip only happens on a draft; on a ready PR
+                    # it is a leftover from the draft, so wait for the review.
+                    and review_conclusion.upper() != "SKIPPED"
                 ):
                     threads = _unresolved_threads(pr)
                     if threads:

@@ -37,8 +37,9 @@ permissions: {}
 
 concurrency:
   # A newer push supersedes the review in progress; the next run's range covers
-  # the cancelled head's commits too.
-  group: claude-review-${{ github.event.pull_request.number }}
+  # the cancelled head's commits too. Draft runs (which skip) get their own
+  # group, so a push landing just after `gh pr ready` cannot cancel the review.
+  group: claude-review-${{ github.event.pull_request.number }}-${{ github.event.pull_request.draft }}
   cancel-in-progress: true
 
 jobs:

@@ -396,6 +396,23 @@ def test_watch_phase_ci_thread_count_outage_leaves_it_unknown(monkeypatch):
 
 
 @pytest.mark.unit
+def test_watch_phase_ci_ready_pr_waits_past_a_draft_skipped_review(monkeypatch):
+    fake = snapshot_gh(
+        [
+            ci_snapshot(gate=_gate("SUCCESS"), review=_review("SKIPPED")),
+            ci_snapshot(gate=_gate("SUCCESS"), review=_review("SUCCESS")),
+        ]
+    )
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    no_sleep(monkeypatch)
+
+    verdict = pr_watch._watch_phase_ci(PR, HEAD_SHA, timeout_sec=60, poll_sec=0)
+    assert verdict.outcome == "passed"
+    assert verdict.claude_review == "SUCCESS"
+    assert len(fake.calls) == 2
+
+
+@pytest.mark.unit
 def test_watch_phase_ci_draft_needs_only_ci_gate(monkeypatch):
     fake = snapshot_gh([ci_snapshot(gate=_gate("SUCCESS"), review=None, draft=True)])
     monkeypatch.setattr(pr_watch, "gh", fake)
