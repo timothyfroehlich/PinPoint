@@ -8,7 +8,7 @@ import { ExclusiveBadge } from "~/components/tags/ExclusiveBadge";
 import { TagList } from "~/components/tags/TagList";
 import { TagTrail } from "~/components/tags/TagTrail";
 import { TagTypeActionsMenu } from "~/components/tags/TagTypeActionsMenu";
-import { getViewer } from "~/lib/collections/viewer";
+import { getViewer } from "~/lib/auth/viewer";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { exclusiveConflicts } from "~/lib/tags/conflicts";
 import { listTags } from "~/lib/tags/tags";
