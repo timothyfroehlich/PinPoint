@@ -33,6 +33,14 @@ describe("block-gh-merge-admin hook", () => {
     'eval "gh pr merge 12 --squash"',
     "gh pr -R timothyfroehlich/PinPoint merge 12 --admin",
     "cd /tmp && gh pr merge 12 --admin",
+    "GH pr merge 12 --admin",
+    "Gh pr merge 12 --squash $F",
+    "g? pr merge 12 --admin",
+    "gh pr merge 12 --ad\\\nmin",
+    "gh pr merge 12 \\\n  --admin",
+    "gh alias set m 'pr merge --admin'",
+    "gh alias import aliases.yml",
+    "gh m 12 --admin",
   ])("blocks %s", (command) => {
     expect(run(command)).toBe(2);
   });
