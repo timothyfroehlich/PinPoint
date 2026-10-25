@@ -14,8 +14,13 @@
 # required check counts as passing). Claude may read the checkout, including the
 # review inputs the job prepares, and post inline comments on this PR; it has no
 # shell and cannot edit, commit, or push (tool boundary on the Review step).
-# Outbound traffic is blocked outside the allowlist on Harden Runner, taken from
-# the trial runs' audit logs.
+# Harden Runner audits outbound traffic, as in most PinPoint workflows. Block mode
+# was tried (PP-zxlq.6) and dropped: its firewall intermittently refused checkout's
+# first connection to github.com although github.com was allowlisted, failing the
+# required check. What remains is Claude's tool boundary: no shell, WebFetch or
+# WebSearch, and reads only inside the checkout, so PR content cannot steer Claude
+# into sending a token anywhere. Audit mode does not limit the action's own network
+# use or a compromised install step; pinned action SHAs are the guard there.
 #
 # Trust: the range scripts and REVIEW.md come from main, so a PR cannot rescope or
 # re-rubric its own review. This workflow file itself still runs from the PR, as
@@ -50,20 +55,7 @@ jobs:
       - name: Harden Runner
         uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
         with:
-          egress-policy: block
-          # GitHub's own endpoints are allowed by Harden Runner itself. Anthropic's
-          # are the API, the Claude Code download, and claude.ai for the OAuth
-          # token; registry.npmjs.org and release-assets serve the action's
-          # Claude Code and Bun installs.
-          allowed-endpoints: >
-            api.anthropic.com:443
-            claude.ai:443
-            downloads.claude.ai:443
-            registry.npmjs.org:443
-            release-assets.githubusercontent.com:443
-            github.com:443
-            api.github.com:443
-            results-receiver.actions.githubusercontent.com:443
+          egress-policy: audit
 
       - name: Refuse fork pull requests
         if: github.event.pull_request.head.repo.full_name != github.repository
@@ -143,7 +135,7 @@ jobs:
         if: steps.range.outputs.mode != 'skip'
         uses: anthropics/claude-code-action@58985842b834ed26087302ba27d07bc24ca8697a  # ratchet:anthropics/claude-code-action@v1.0.244
         env:
-          # Telemetry and error reporting stay off; the egress allowlist blocks them.
+          # Telemetry and error reporting stay off.
           CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
