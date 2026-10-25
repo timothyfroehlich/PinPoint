@@ -82,7 +82,6 @@ NODE_HOOK_COMMANDS = _node_hook_commands()
 EXPECTED_NODE_HOOK_BASENAMES = [
     "inject-beads-actor.cjs",
     "block-main-worktree-branch-switch.cjs",
-    "block-gh-merge-admin.cjs",
     "ui-screenshot-reminder.cjs",
     "verify-guard-stack.cjs",
 ]

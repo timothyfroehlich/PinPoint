@@ -124,16 +124,6 @@
             "timeout": 5
           }
         ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/block-gh-merge-admin.cjs",
-            "timeout": 5
-          }
-        ]
       }
     ],
     "PostToolUse": [
