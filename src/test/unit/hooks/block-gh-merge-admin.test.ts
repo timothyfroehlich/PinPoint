@@ -57,6 +57,12 @@ describe("block-gh-merge-admin hook", () => {
     "grep merge $(gh pr merge 12 --body x)",
     "echo ok; gh alias set m 'pr merge'",
     "! gh pr merge 12 --body x",
+    "grep() { gh pr merge 12 $F; }; grep merge x",
+    "function f { gh pr merge 12 --body x; }; f",
+    "cd /tmp && gh pr merge 12 --auto --squash",
+    "rg --hidden 'gh pr merge' docs",
+    "grep -rn 'gh pr merge' .agents/skills/*/SKILL.md",
+    "$'\\x67h' pr merge 12 --squash",
   ])("blocks %s", (command) => {
     expect(run(command)).toBe(2);
   });
@@ -69,10 +75,8 @@ describe("block-gh-merge-admin hook", () => {
     "git merge origin/main",
     "gh pr update-branch 12",
     "  gh pr merge 12 --squash  ",
-    "cd /tmp && gh pr merge 12 --auto --squash",
     "grep -n merge src/file.ts",
-    "rg --hidden 'gh pr merge' docs",
-    "grep -rn 'gh pr merge' .agents/skills/*/SKILL.md",
+    "rg --hidden 'pr merge' docs",
     "git merge --no-edit origin/main",
     'echo "$HOME" && gh pr checks 12 --required',
   ])("allows %s", (command) => {
