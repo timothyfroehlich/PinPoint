@@ -165,8 +165,27 @@ export async function deleteAccountAction(
       });
     }
 
-    // Sign out the current session
-    await supabase.auth.signOut();
+    // Clear this browser's auth cookies. Global scope retries the revocation
+    // if the admin sign-out above failed; once the session is revoked (or the
+    // user deleted), signOut() ignores the 401/403/404 and still clears the
+    // cookies. Best-effort: the account is gone, so a failure here must not
+    // turn into a "Failed to delete account" error.
+    try {
+      const { error: finalSignOutError } = await supabase.auth.signOut();
+      if (finalSignOutError) {
+        reportError(finalSignOutError, {
+          action: "deleteAccountFinalSignOut",
+          bestEffort: true,
+          userId,
+        });
+      }
+    } catch (error) {
+      reportError(error, {
+        action: "deleteAccountFinalSignOut",
+        bestEffort: true,
+        userId,
+      });
+    }
 
     log.info({ userId }, "Account deleted successfully");
   } catch (error) {

@@ -831,4 +831,38 @@ describe("deleteAccountAction — DB integration (PGlite)", () => {
     }
     expect(mockDeleteUser).not.toHaveBeenCalled();
   });
+
+  it("still redirects when the final sign-out throws after deletion", async () => {
+    const { deleteAccountAction } =
+      await import("~/app/(app)/settings/actions");
+    const { redirect } = await import("next/navigation");
+    const { reportError } = await import("~/lib/observability/report-error");
+    const db = await getTestDb();
+    const userId = randomUUID();
+
+    mockGetUser.mockResolvedValue({ data: { user: { id: userId } } });
+    const finalSignOutErr = new Error("network down");
+    mockSignOut.mockRejectedValue(finalSignOutErr);
+    await db.insert(userProfiles).values(
+      createTestUser({
+        id: userId,
+        email: "deleter-final-signout@example.com",
+        role: "member",
+      })
+    );
+
+    const fd = new FormData();
+    fd.set("confirmation", "DELETE");
+
+    await expect(deleteAccountAction(undefined, fd)).rejects.toThrow(
+      "NEXT_REDIRECT"
+    );
+    expect(mockDeleteUser).toHaveBeenCalledWith(userId);
+    expect(mockSignOut).toHaveBeenCalled();
+    expect(reportError).toHaveBeenCalledWith(
+      finalSignOutErr,
+      expect.objectContaining({ action: "deleteAccountFinalSignOut", userId })
+    );
+    expect(redirect).toHaveBeenCalledWith("/");
+  });
 });
