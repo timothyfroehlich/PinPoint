@@ -445,7 +445,8 @@ export async function logoutAction(): Promise<void> {
     reportError(cause, { action: "logout" });
   }
 
-  // Always redirect to dashboard after logout attempt
+  // Redirect after a successful logout or a thrown failure. A returned signOut
+  // error exits early above without redirecting.
   redirect("/dashboard");
 }
 
