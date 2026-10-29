@@ -363,7 +363,6 @@ describe("Auth Actions Security - Error Handling", () => {
     expect(result).toBeUndefined();
     expect(reportError).toHaveBeenCalledWith(signOutError, {
       action: "reset-password.signOut",
-      bestEffort: true,
       userId: "user-123",
     });
     expect(redirect).toHaveBeenCalledWith("/login");
@@ -391,7 +390,6 @@ describe("Auth Actions Security - Error Handling", () => {
     expect(result).toBeUndefined();
     expect(reportError).toHaveBeenCalledWith(signOutError, {
       action: "reset-password.signOut",
-      bestEffort: true,
       userId: "user-123",
     });
     expect(redirect).toHaveBeenCalledWith("/login");
