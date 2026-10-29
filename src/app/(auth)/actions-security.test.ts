@@ -7,6 +7,7 @@ import {
   logoutAction,
 } from "./actions";
 import type * as ReportErrorModule from "~/lib/observability/report-error";
+import type * as SentryModule from "@sentry/nextjs";
 
 // Mock Next.js server modules
 vi.mock("next/headers", () => ({
@@ -49,7 +50,10 @@ vi.mock("~/lib/observability/report-error", async (importOriginal) => {
 
 // serverActionError calls the module's own reportError, not the spy above, so
 // "stays out of Sentry" assertions also check captureException.
-vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
+vi.mock("@sentry/nextjs", async (importOriginal) => {
+  const actual = await importOriginal<typeof SentryModule>();
+  return { ...actual, captureException: vi.fn() };
+});
 
 // Mock Supabase
 vi.mock("~/lib/supabase/server", () => ({
@@ -353,8 +357,10 @@ describe("Auth Actions Security - Error Handling", () => {
     formData.set("password", "NewPassword123!");
     formData.set("confirmPassword", "NewPassword123!");
 
-    await resetPasswordAction(undefined, formData);
+    const result = await resetPasswordAction(undefined, formData);
 
+    // The password already changed, so no SERVER error reaches the user.
+    expect(result).toBeUndefined();
     expect(reportError).toHaveBeenCalledWith(signOutError, {
       action: "reset-password.signOut",
       bestEffort: true,
