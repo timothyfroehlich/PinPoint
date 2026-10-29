@@ -615,10 +615,19 @@ export async function resetPasswordAction(
       { userId: user.id, action: "reset-password" },
       "Password updated successfully"
     );
-    // Best-effort: the password is already changed. supabase-js filters the
+    // Best-effort: the password is already changed, so a sign-out failure must
+    // not turn into an "unexpected error" response. supabase-js filters the
     // expected no-session responses, so a returned error is unexpected.
-    const { error: signOutError } = await supabase.auth.signOut();
-    if (signOutError) {
+    try {
+      const { error: signOutError } = await supabase.auth.signOut();
+      if (signOutError) {
+        reportError(signOutError, {
+          action: "reset-password.signOut",
+          bestEffort: true,
+          userId: user.id,
+        });
+      }
+    } catch (signOutError) {
       reportError(signOutError, {
         action: "reset-password.signOut",
         bestEffort: true,
