@@ -174,8 +174,8 @@ function idleState(
 // requires. Mirrors what ImageUploadButton.onUploadComplete produces.
 const VALID_IMAGE = {
   blobUrl:
-    "https://abc123.public.blob.vercel-storage.com/uploads/photo-xyz.jpg",
-  blobPathname: "uploads/photo-xyz.jpg",
+    "https://abc123.public.blob.vercel-storage.com/issue-images/pending/photo-xyz.jpg",
+  blobPathname: "issue-images/pending/photo-xyz.jpg",
   originalFilename: "photo.jpg",
   fileSizeBytes: 123456,
   mimeType: "image/jpeg",

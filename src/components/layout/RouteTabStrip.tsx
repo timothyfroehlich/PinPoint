@@ -37,7 +37,7 @@ export interface RouteTab {
 }
 
 interface RouteTabStripProps {
-  /** Route prefix the tabs hang off, e.g. `/m/GZ` or `/c/owner/<id>`. */
+  /** Route prefix the tabs hang off, e.g. `/m/GZ` or `/c/<id>`. */
   basePath: string;
   tabs: readonly RouteTab[];
   /** Accessible name for the `<nav>` landmark. */

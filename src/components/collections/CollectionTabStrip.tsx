@@ -6,7 +6,7 @@ import { useListReturnHref } from "~/components/list-view/use-list-return-href";
 import type { MachineStatus } from "~/lib/machines/status";
 
 interface CollectionTabStripProps {
-  /** e.g. `/c/owner/123e4567-...` */
+  /** e.g. `/c/123e4567-...` */
   basePath: string;
   openIssueCount: number;
   /** Worst derived status across the collection — drives the badge color. */

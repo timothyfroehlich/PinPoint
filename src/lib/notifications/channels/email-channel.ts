@@ -1,6 +1,4 @@
 import "server-only";
-import sanitizeHtml from "sanitize-html";
-import { NON_TEXT_TAGS } from "~/lib/sanitize-html-config";
 import { isInternalAccount } from "~/lib/auth/internal-accounts";
 import { getSiteUrl } from "~/lib/url";
 import { generateUnsubscribeToken } from "~/lib/notifications/unsubscribe-token";
@@ -23,36 +21,15 @@ import type { NotificationType } from "~/lib/notifications/dispatch";
 import type { RecipientReason } from "~/lib/notifications/events";
 
 /**
- * Strict sanitization policy for email notifications.
- * Prevents remote images, tracking pixels, and complex HTML.
+ * Every value interpolated into an email body is plain text: titles, machine
+ * names, and statuses are stored as text, and issue descriptions and comments
+ * arrive flattened by `docToPlainText`. Escaping them means markup a reporter
+ * types (including an anonymous public reporter) shows as the characters they
+ * typed, never as a link or styled text in the recipient's inbox. (PP-40qy)
  */
-const EMAIL_SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
-  allowedTags: [
-    "h2",
-    "h3",
-    "p",
-    "ul",
-    "ol",
-    "li",
-    "strong",
-    "em",
-    "b",
-    "i",
-    "a",
-    "span",
-    "br",
-    "blockquote",
-    "hr",
-    "code",
-    "pre",
-    "s",
-  ],
-  nonTextTags: [...NON_TEXT_TAGS],
-  allowedAttributes: {
-    a: ["href"],
-    span: ["style"],
-  },
-};
+function plainTextToHtml(value: string): string {
+  return escapeHtml(value).replace(/\r?\n/g, "<br/>");
+}
 
 function getEmailFooter(userId?: string): string {
   const siteUrl = getSiteUrl();
@@ -188,36 +165,26 @@ export function getEmailHtml({
       body = "You have been assigned to this issue.";
       break;
     case "issue_status_changed":
-      body = `Status changed to: <strong>${newStatus ? sanitizeHtml(newStatus, EMAIL_SANITIZE_OPTIONS) : ""}</strong>`;
+      body = `Status changed to: <strong>${escapeHtml(newStatus ?? "")}</strong>`;
       break;
     case "new_comment": {
-      const sanitizedComment = commentContent
-        ? sanitizeHtml(commentContent, EMAIL_SANITIZE_OPTIONS)
-        : "";
-      body = `New comment:<br/><blockquote>${sanitizedComment}</blockquote>`;
+      const comment = plainTextToHtml(commentContent ?? "");
+      body = `New comment:<br/><blockquote>${comment}</blockquote>`;
       break;
     }
     case "mentioned": {
-      const sanitizedComment = commentContent
-        ? sanitizeHtml(commentContent, EMAIL_SANITIZE_OPTIONS)
-        : "";
-      body = `You were mentioned in an issue${sanitizedComment ? `:<br/><blockquote>${sanitizedComment}</blockquote>` : "."}`;
+      const comment = plainTextToHtml(commentContent ?? "");
+      body = `You were mentioned in an issue${comment ? `:<br/><blockquote>${comment}</blockquote>` : "."}`;
       break;
     }
     case "machine_ownership_changed":
       body = newStatus?.includes("removed")
-        ? `You have been <strong>removed</strong> as an owner of <strong>${machineName ? sanitizeHtml(machineName, EMAIL_SANITIZE_OPTIONS) : "a machine"}</strong>. You will no longer receive notifications for new issues on this machine.`
-        : `You have been <strong>added</strong> as an owner of <strong>${machineName ? sanitizeHtml(machineName, EMAIL_SANITIZE_OPTIONS) : "a machine"}</strong>. You will receive notifications for new issues reported on this machine.`;
+        ? `You have been <strong>removed</strong> as an owner of <strong>${machineName ? escapeHtml(machineName) : "a machine"}</strong>. You will no longer receive notifications for new issues on this machine.`
+        : `You have been <strong>added</strong> as an owner of <strong>${machineName ? escapeHtml(machineName) : "a machine"}</strong>. You will receive notifications for new issues reported on this machine.`;
       break;
     case "pinballmap_comment": {
-      // Pinball Map comments are plain text typed on pinballmap.com, so they
-      // are escaped rather than sanitized as HTML: markup in a comment shows
-      // as the characters the person typed.
       const commenter = escapeHtml(actorName ?? "A Pinball Map user");
-      const comment = escapeHtml(commentContent ?? "").replace(
-        /\r?\n/g,
-        "<br/>"
-      );
+      const comment = plainTextToHtml(commentContent ?? "");
       const attribution =
         pinballmapLocationId === undefined
           ? "Pinball Map"
@@ -232,18 +199,9 @@ export function getEmailHtml({
   const eventLabel = getEventTypeLabel(type);
 
   const siteUrl = getSiteUrl();
-  const sanitizedMachineName = machineName
-    ? sanitizeHtml(machineName, EMAIL_SANITIZE_OPTIONS)
-    : "";
-  const machinePrefix = sanitizedMachineName
-    ? `[${sanitizedMachineName}] `
-    : "";
-  const sanitizedIssueTitle = issueTitle
-    ? sanitizeHtml(issueTitle, EMAIL_SANITIZE_OPTIONS)
-    : "";
-  const sanitizedIssueId = formattedIssueId
-    ? sanitizeHtml(formattedIssueId, EMAIL_SANITIZE_OPTIONS)
-    : "";
+  const machinePrefix = machineName ? `[${escapeHtml(machineName)}] ` : "";
+  const escapedIssueTitle = escapeHtml(issueTitle ?? "");
+  const escapedIssueId = escapeHtml(formattedIssueId ?? "");
 
   // Machine-ownership emails are about a machine, not an issue — pointing them
   // at the global issue list under a "View Issue" label was the email half of
@@ -265,17 +223,16 @@ export function getEmailHtml({
       ? "View Machine"
       : "View Issue";
 
-  const sanitizedDescription =
+  const description =
     (type === "new_issue" || type === "issue_assigned") && issueDescription
-      ? sanitizeHtml(issueDescription, EMAIL_SANITIZE_OPTIONS)
+      ? plainTextToHtml(issueDescription)
       : "";
-  const showDescription = !!sanitizedDescription;
 
   return `
-      <h2>${machinePrefix}${sanitizedIssueId ? `${sanitizedIssueId}: ` : ""}${sanitizedIssueTitle}${isPinballMapComment && machineInitials ? sanitizeHtml(machineInitials, EMAIL_SANITIZE_OPTIONS) : ""}</h2>
+      <h2>${machinePrefix}${escapedIssueId ? `${escapedIssueId}: ` : ""}${escapedIssueTitle}${isPinballMapComment && machineInitials ? escapeHtml(machineInitials) : ""}</h2>
       ${eventLabel ? `<h3 style="color: #555; font-weight: 600; margin-bottom: 8px;">${eventLabel}</h3>` : ""}
       <div>${body}</div>
-      ${showDescription ? `<blockquote>${sanitizedDescription}</blockquote>` : ""}
+      ${description ? `<blockquote>${description}</blockquote>` : ""}
       <p><a href="${resourceUrl}">${resourceLinkLabel}</a></p>
       ${getEmailFooter(userId)}
     `;

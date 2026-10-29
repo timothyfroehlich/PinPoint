@@ -135,12 +135,20 @@ export const config = {
   matcher: [
     /*
      * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
+     * - _next/static/ (static files)
+     * - _next/image (image optimization endpoint)
      * - favicon.ico (favicon file)
+     * - manifest.webmanifest (browsers fetch it without cookies, so the
+     *   login redirect would hide it from "Add to Home screen")
      * - Assets with extensions (.svg, .png, .jpg, .jpeg, .gif, .webp)
      * - /api/health (health check endpoint)
+     *
+     * Every alternative MUST be anchored — `$` for an exact path, a trailing
+     * `/` for a directory. The lookahead runs right after the leading `/`, so
+     * a bare `api/health` would also skip /api/healthz and /api/health/db,
+     * and any path the proxy skips loses the nonce CSP and the session
+     * refresh (PP-5aev). Next reads this statically: keep it a literal.
      */
-    "/((?!_next/static|_next/image|favicon.ico|api/health|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static/|_next/image$|favicon\\.ico$|manifest\\.webmanifest$|api/health$|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

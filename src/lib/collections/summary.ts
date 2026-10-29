@@ -1,6 +1,6 @@
 import type { MachineViewHealth } from "~/lib/types";
 import { isRemoved } from "~/lib/machines/presence";
-import type { CollectionMachine } from "./owner";
+import type { CollectionMachine } from "./types";
 
 export interface CollectionSummary {
   total: number;

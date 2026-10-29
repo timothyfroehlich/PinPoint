@@ -19,6 +19,7 @@ import { checkLoginAccountLimit } from "~/lib/rate-limit";
 import { unlinkPinballMapAccount } from "~/lib/pinballmap/user-credentials";
 import {
   anonymizeUserReferences,
+  getReassignmentTargets,
   SoleAdminError,
 } from "~/app/(app)/settings/account-deletion";
 
@@ -39,12 +40,13 @@ export type DeleteAccountResult = Result<
  *
  * Permanently deletes the user's account with data anonymization:
  * 1. Auth check
- * 2. Admin sole-admin guard
- * 3. Bulk reassign owned machines (or set to unassigned)
- * 4. Anonymize references in issues, comments, images (SET NULL)
- * 5. Delete avatar from Vercel Blob (best-effort)
- * 6. Delete auth user via admin API (cascades profiles, watchers, notifications)
- * 7. Sign out and redirect to landing page
+ * 2. Validate the reassignment target against the picker's list
+ * 3. Admin sole-admin guard
+ * 4. Bulk reassign owned machines (or set to unassigned)
+ * 5. Anonymize references in issues, comments, images (SET NULL)
+ * 6. Delete avatar from Vercel Blob (best-effort)
+ * 7. Revoke every session, then delete the auth user via admin API
+ * 8. Sign out and redirect to landing page
  */
 export async function deleteAccountAction(
   _prevState: DeleteAccountResult | undefined,
@@ -81,6 +83,18 @@ export async function deleteAccountAction(
   const userId = user.id;
 
   try {
+    // The picker offers only getReassignmentTargets; a forged form value could
+    // otherwise hand the machines to a guest or to an id with no profile.
+    if (reassignTo !== null) {
+      const targets = await getReassignmentTargets(userId);
+      if (!targets.some((target) => target.id === reassignTo)) {
+        return err(
+          "VALIDATION",
+          "Choose a member from the list to receive your machines."
+        );
+      }
+    }
+
     log.info({ userId }, "Starting account deletion process");
     // Fetch profile and run anonymization in a single transaction
     const avatarUrl = await anonymizeUserReferences(userId, reassignTo);
@@ -119,16 +133,19 @@ export async function deleteAccountAction(
     // already anonymized, so the user's information is protected.
     const adminClient = createAdminClient();
 
-    // Revoke all issued JWTs for this user before deletion. deleteUser() does
-    // not invalidate existing tokens, so we must revoke sessions first to
-    // prevent the deleted account from remaining accessible until JWT expiry.
-    // Best-effort: log on failure but still proceed with deletion. The user's
-    // data is already anonymized, and tokens will expire naturally per the
-    // configured Supabase access token TTL.
-    const { error: signOutError } = await adminClient.auth.admin.signOut(
-      userId,
-      "global"
-    );
+    // End every session on every device before deletion. admin.signOut takes
+    // the caller's access token (not a user id) and, with "global" scope,
+    // revokes all of that user's sessions and refresh tokens. A successful
+    // deleteUser() cascades those rows too, but deletion is best-effort, so
+    // this revocation must not depend on it. An access token already issued
+    // still passes signature-only checks until the Supabase access token TTL.
+    // Best-effort: log on failure but still proceed with deletion.
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const { error: signOutError } = session
+      ? await adminClient.auth.admin.signOut(session.access_token, "global")
+      : { error: new Error("No session access token for global sign-out") };
     if (signOutError) {
       reportError(signOutError, {
         action: "deleteAccountAuthSignOut",
@@ -148,13 +165,23 @@ export async function deleteAccountAction(
       });
     }
 
-    // Sign out the current session. supabase-js already swallows the expected
-    // 401/403/404 from a session the admin signOut above revoked, so any error
-    // returned here is unexpected. Best-effort: the account is already gone.
-    const { error: sessionSignOutError } = await supabase.auth.signOut();
-    if (sessionSignOutError) {
-      reportError(sessionSignOutError, {
-        action: "deleteAccountSessionSignOut",
+    // Clear this browser's auth cookies. Global scope retries the revocation
+    // if the admin sign-out above failed; once the session is revoked (or the
+    // user deleted), signOut() ignores the 401/403/404 and still clears the
+    // cookies. Best-effort: the account is gone, so a failure here must not
+    // turn into a "Failed to delete account" error.
+    try {
+      const { error: finalSignOutError } = await supabase.auth.signOut();
+      if (finalSignOutError) {
+        reportError(finalSignOutError, {
+          action: "deleteAccountFinalSignOut",
+          bestEffort: true,
+          userId,
+        });
+      }
+    } catch (error) {
+      reportError(error, {
+        action: "deleteAccountFinalSignOut",
         bestEffort: true,
         userId,
       });

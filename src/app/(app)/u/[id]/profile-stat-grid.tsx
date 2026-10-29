@@ -7,7 +7,7 @@ interface ProfileStatGridProps {
   comments: number;
   machinesOwned: number;
   fixed: number;
-  collectionHref: string;
+  machinesHref: string;
 }
 
 const tileBase = "rounded-xl border border-outline-variant bg-card p-4";
@@ -49,7 +49,7 @@ export function ProfileStatGrid({
   comments,
   machinesOwned,
   fixed,
-  collectionHref,
+  machinesHref,
 }: ProfileStatGridProps): React.JSX.Element {
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -68,7 +68,7 @@ export function ProfileStatGrid({
           label="Comments"
         />
       </div>
-      <Link href={collectionHref} className={`${tileBase} ${linkTile}`}>
+      <Link href={machinesHref} className={`${tileBase} ${linkTile}`}>
         <Stat
           icon={<Gamepad2 className="size-3.5" aria-hidden="true" />}
           value={machinesOwned}

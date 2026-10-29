@@ -19,9 +19,10 @@ const content: ApronCardContent = {
   description: [],
   tip: [],
   tipEnabled: false,
-  credits: { design: [], art: [] },
+  credits: { design: [], art: [], code: [] },
   designEnabled: false,
   artEnabled: false,
+  codeEnabled: false,
   hasPinTips: false,
 };
 
@@ -101,9 +102,14 @@ describe("ApronCardFace templates", () => {
   const withCredits: ApronCardContent = {
     ...content,
     hasPinTips: true,
-    credits: { design: ["Keith Elwin"], art: ["Jeremy Packer"] },
+    credits: {
+      design: ["Keith Elwin"],
+      art: ["Jeremy Packer"],
+      code: ["Tim Sexton"],
+    },
     designEnabled: true,
     artEnabled: true,
+    codeEnabled: true,
   };
 
   it("shows credits on Standard only (spec 10.2)", () => {
@@ -116,6 +122,7 @@ describe("ApronCardFace templates", () => {
       />
     );
     expect(screen.getByText("Keith Elwin")).toBeInTheDocument();
+    expect(screen.getByText("Tim Sexton")).toBeInTheDocument();
 
     for (const template of ["side-rail", "header-band"] as const) {
       rerender(

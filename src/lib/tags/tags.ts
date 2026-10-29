@@ -10,7 +10,7 @@ import {
   tagSlugAliases,
   tagTypes,
 } from "~/server/db/schema";
-import type { CollectionMachine } from "~/lib/collections/owner";
+import type { CollectionMachine } from "~/lib/collections/types";
 import type { PickerMachine } from "~/lib/collections/user";
 import { isRemoved } from "~/lib/machines/presence";
 import { machineNotRemoved } from "~/lib/machines/queries";

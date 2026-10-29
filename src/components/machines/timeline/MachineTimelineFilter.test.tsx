@@ -111,13 +111,11 @@ describe("MachineTimelineFilter (shared MultiSelect)", () => {
   it("pushes to baseUrl when provided (collection feed)", async () => {
     pushMock.mockClear();
     const user = userEvent.setup();
-    render(
-      <MachineTimelineFilter currentTags={[]} baseUrl="/c/owner/u1/timeline" />
-    );
+    render(<MachineTimelineFilter currentTags={[]} baseUrl="/c/c1/timeline" />);
     await user.click(screen.getByRole("combobox", { name: /filter by tag/i }));
     await user.click(screen.getByText("Maintenance"));
     expect(pushMock).toHaveBeenCalledWith(
-      expect.stringMatching(/^\/c\/owner\/u1\/timeline\?/)
+      expect.stringMatching(/^\/c\/c1\/timeline\?/)
     );
   });
 });

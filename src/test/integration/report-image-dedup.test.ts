@@ -1,13 +1,16 @@
 /**
  * Integration test: idempotent retry must NOT link duplicate issue_images rows
- * (PP-u0v1) and must clean up the retry's freshly-uploaded blobs.
+ * (PP-u0v1), and no path in the report action deletes a blob named by the
+ * client's imagesMetadata (PP-ysk3).
  *
- * Bug: createIssue returns the existing issue on a same-key retry, but
+ * PP-u0v1: createIssue returns the existing issue on a same-key retry, but
  * report/actions.ts was unconditionally running db.insert(issueImages)
- * afterwards → each photo appeared twice on the deduplicated issue.
+ * afterwards → each photo appeared twice on the deduplicated issue. The action
+ * now skips the insert when `deduped` is true.
  *
- * Fix: createIssue now returns `deduped: boolean`. The action skips the DB
- * insert when true and instead deletes the redundant blobs.
+ * PP-ysk3: the retry branch and the link-failure branch used to delete every
+ * blob the metadata named. The metadata is client input, so it could name any
+ * blob in the store. Unlinked uploads are now left to the orphan-cleanup cron.
  *
  * Test layer: Integration (PGlite + direct action call) — class B/I.
  * Matches the cheapest layer that catches this bug class (CORE-TEST-005).
@@ -15,7 +18,7 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import {
   issues,
   issueImages,
@@ -84,16 +87,26 @@ vi.mock("~/lib/notifications", () => ({
   getChannels: vi.fn().mockResolvedValue([]),
 }));
 
+const mockReportError = vi.fn();
 vi.mock("~/lib/observability/report-error", () => ({
-  reportError: vi.fn(),
+  reportError: mockReportError,
   serverActionError: vi.fn(),
 }));
 
-// deleteFromBlob is the Vercel Blob deletion helper — mock at its boundary.
+// Blob deletion is mocked at both boundaries: our helper and the SDK's del().
 const mockDeleteFromBlob = vi.fn().mockResolvedValue(undefined);
 vi.mock("~/lib/blob/client", () => ({
   deleteFromBlob: mockDeleteFromBlob,
 }));
+const mockBlobDel = vi.fn().mockResolvedValue(undefined);
+vi.mock("@vercel/blob", () => ({
+  del: mockBlobDel,
+}));
+
+function expectNoBlobDeletes(): void {
+  expect(mockDeleteFromBlob).not.toHaveBeenCalled();
+  expect(mockBlobDel).not.toHaveBeenCalled();
+}
 
 // Route production `db` to PGlite.
 vi.mock("~/server/db", async () => {
@@ -137,7 +150,8 @@ function makeFormData(opts: {
 
 // blobUrl must satisfy imageMetadataSchema's refine: a Vercel Blob host.
 const TEST_IMAGE = {
-  blobUrl: "https://teststore.public.blob.vercel-storage.com/img1.jpg",
+  blobUrl:
+    "https://teststore.public.blob.vercel-storage.com/issue-images/pending/img1.jpg",
   blobPathname: "images/img1.jpg",
   fileSizeBytes: 12345,
   mimeType: "image/jpeg",
@@ -145,7 +159,8 @@ const TEST_IMAGE = {
 };
 
 const RETRY_IMAGE = {
-  blobUrl: "https://teststore.public.blob.vercel-storage.com/img2.jpg",
+  blobUrl:
+    "https://teststore.public.blob.vercel-storage.com/issue-images/pending/img2.jpg",
   blobPathname: "images/img2.jpg",
   fileSizeBytes: 9999,
   mimeType: "image/jpeg",
@@ -211,7 +226,29 @@ describe("report action — idempotent retry image handling (PP-u0v1)", () => {
     expect(linked).toHaveLength(1);
     expect(linked[0]?.fullImageUrl).toBe(TEST_IMAGE.blobUrl);
     // No blob cleanup on fresh insert.
-    expect(mockDeleteFromBlob).not.toHaveBeenCalled();
+    expectNoBlobDeletes();
+  });
+
+  it("stores the pathname the blobUrl names, not the client's blobPathname (PP-9my0)", async () => {
+    const db = await getTestDb();
+
+    await submitPublicIssueAction(
+      { error: "" },
+      makeFormData({
+        machineId,
+        idempotencyKey: randomUUID(),
+        imagesMetadata: [
+          { ...TEST_IMAGE, blobPathname: "avatars/someone-else.png" },
+        ],
+      })
+    );
+
+    const linked = await db
+      .select()
+      .from(issueImages)
+      .where(eq(issueImages.fullImageUrl, TEST_IMAGE.blobUrl));
+    expect(linked).toHaveLength(1);
+    expect(linked[0]?.fullBlobPathname).toBe("issue-images/pending/img1.jpg");
   });
 
   it("idempotent retry does NOT add duplicate issueImages rows (PP-u0v1)", async () => {
@@ -258,8 +295,129 @@ describe("report action — idempotent retry image handling (PP-u0v1)", () => {
     expect(afterRetry).toHaveLength(1);
     expect(afterRetry[0]?.fullImageUrl).toBe(TEST_IMAGE.blobUrl);
 
-    // The retry's redundant blob must be cleaned up.
-    expect(mockDeleteFromBlob).toHaveBeenCalledWith(RETRY_IMAGE.blobPathname);
+    // The retry's metadata is client input: nothing it names is deleted
+    // (PP-ysk3). The orphan-cleanup cron reclaims the unlinked upload.
+    expectNoBlobDeletes();
+  });
+
+  it("a retry naming another issue's linked blob does not delete it (PP-ysk3)", async () => {
+    const db = await getTestDb();
+
+    // Another report already links TEST_IMAGE.
+    await submitPublicIssueAction(
+      { error: "" },
+      makeFormData({
+        machineId,
+        idempotencyKey: randomUUID(),
+        imagesMetadata: [TEST_IMAGE],
+      })
+    );
+
+    // A second submission and its same-key retry, whose metadata names the
+    // first report's blob.
+    const idempotencyKey = randomUUID();
+    await submitPublicIssueAction(
+      { error: "" },
+      makeFormData({ machineId, idempotencyKey })
+    );
+    vi.clearAllMocks();
+    await submitPublicIssueAction(
+      { error: "" },
+      makeFormData({
+        machineId,
+        idempotencyKey,
+        imagesMetadata: [TEST_IMAGE],
+      })
+    );
+
+    expectNoBlobDeletes();
+    const linked = await db
+      .select()
+      .from(issueImages)
+      .where(eq(issueImages.fullImageUrl, TEST_IMAGE.blobUrl));
+    expect(linked).toHaveLength(1);
+  });
+
+  it("a failed image link does not delete the blobs it named (PP-ysk3)", async () => {
+    const db = await getTestDb();
+    try {
+      // Make every issue_images insert fail so the action takes its
+      // link-failure branch.
+      await db.execute(sql`
+        CREATE OR REPLACE FUNCTION pp_ysk3_fail_image_link() RETURNS trigger
+        LANGUAGE plpgsql AS $$
+        BEGIN RAISE EXCEPTION 'simulated link failure'; END $$
+      `);
+      await db.execute(sql`
+        CREATE TRIGGER pp_ysk3_fail_image_link BEFORE INSERT ON issue_images
+        FOR EACH ROW EXECUTE FUNCTION pp_ysk3_fail_image_link()
+      `);
+      await submitPublicIssueAction(
+        { error: "" },
+        makeFormData({
+          machineId,
+          idempotencyKey: randomUUID(),
+          imagesMetadata: [TEST_IMAGE],
+        })
+      );
+    } finally {
+      await db.execute(
+        sql`DROP TRIGGER IF EXISTS pp_ysk3_fail_image_link ON issue_images`
+      );
+      await db.execute(sql`DROP FUNCTION IF EXISTS pp_ysk3_fail_image_link()`);
+    }
+
+    // The issue was created; the link failed; nothing was deleted.
+    const issue = await db.query.issues.findFirst({
+      where: eq(issues.machineInitials, "RID"),
+    });
+    expect(issue).toBeDefined();
+    expect(mockReportError).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ action: "linkIssueImages" })
+    );
+    expectNoBlobDeletes();
+  });
+
+  it("another reporter replaying a key is not treated as a retry (PP-ysk3)", async () => {
+    const db = await getTestDb();
+    const idempotencyKey = randomUUID();
+
+    // The member's report links TEST_IMAGE.
+    await submitPublicIssueAction(
+      { error: "" },
+      makeFormData({
+        machineId,
+        idempotencyKey,
+        imagesMetadata: [TEST_IMAGE],
+      })
+    );
+    const original = await db.query.issues.findFirst({
+      where: eq(issues.idempotencyKey, idempotencyKey),
+    });
+    expect(original).toBeDefined();
+
+    // An anonymous visitor replays the member's key.
+    vi.clearAllMocks();
+    mockGetUser.mockResolvedValue({ data: { user: null } });
+    const result = await submitPublicIssueAction(
+      { error: "" },
+      makeFormData({
+        machineId,
+        idempotencyKey,
+        imagesMetadata: [TEST_IMAGE],
+      })
+    );
+
+    expect(result).toEqual({
+      error: "Unable to submit the issue. Please try again.",
+    });
+    expectNoBlobDeletes();
+    const images = await db
+      .select()
+      .from(issueImages)
+      .where(eq(issueImages.issueId, original!.id));
+    expect(images).toHaveLength(1);
   });
 
   it("idempotent retry without images does not call deleteFromBlob", async () => {
@@ -288,7 +446,7 @@ describe("report action — idempotent retry image handling (PP-u0v1)", () => {
       })
     );
 
-    expect(mockDeleteFromBlob).not.toHaveBeenCalled();
+    expectNoBlobDeletes();
 
     // Original image still linked.
     const issue = await db.query.issues.findFirst({

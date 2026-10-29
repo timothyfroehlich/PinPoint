@@ -39,13 +39,15 @@ export interface PbmLinkSelection {
   /**
    * The rest of the manual model (PP-wqit.14, pinballmap spec 2.4): what OPDB
    * supplies for a catalog title. Same rule as `modelName` — read only on the
-   * excluded branch. Designers and artists are ordered name lists.
+   * excluded branch. Designers, artists, and programmers are ordered name
+   * lists.
    */
   type?: OpdbMachineType | undefined;
   display?: OpdbDisplayType | undefined;
   playerCount?: number | undefined;
   designers?: readonly string[] | undefined;
   artists?: readonly string[] | undefined;
+  programmers?: readonly string[] | undefined;
 }
 
 /**
@@ -249,6 +251,7 @@ async function resolveCore(
     playerCount: null,
     designers: null,
     artists: null,
+    programmers: null,
     opdbId: null,
     ipdbId: null,
   };
@@ -273,6 +276,7 @@ async function resolveCore(
         playerCount: input.playerCount ?? null,
         designers: normalizeCreditNames(input.designers),
         artists: normalizeCreditNames(input.artists),
+        programmers: normalizeCreditNames(input.programmers),
       },
       abandoned,
     };

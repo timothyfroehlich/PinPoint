@@ -139,7 +139,7 @@ test.describe("Print settings sheets", () => {
       .getByRole("link", { name: "Print" })
       .click();
     const sheet = page.getByRole("article", { name: "Settings sheet" });
-    await expect(sheet).toContainText("Preferred House to Tag: Bat City 2025");
+    await expect(sheet).toContainText("Default House to Tag: Bat City 2025");
     await expect(sheet).toContainText("1-ball");
   });
 

@@ -124,4 +124,56 @@ describe("MCP route boundary", () => {
     );
     expect(registerPinpointToolsMock).not.toHaveBeenCalled();
   });
+
+  it("answers whoami through the MCP transport", async () => {
+    verifyTokenMock.mockResolvedValue(AUTH);
+
+    const response = await handleMcpRequest(
+      new Request("https://pinpoint.test/api/mcp/mcp", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${AUTH.token}`,
+          "Content-Type": "application/json",
+          Accept: "application/json, text/event-stream",
+          "mcp-protocol-version": "2025-06-18",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/call",
+          params: { name: "whoami", arguments: {} },
+        }),
+      })
+    );
+
+    expect(response.status).toBe(200);
+    const text = await response.text();
+    const dataLine = text.split("\n").find((line) => line.startsWith("data: "));
+    expect(dataLine).toBeDefined();
+
+    if (dataLine) {
+      const message = JSON.parse(dataLine.slice(6)) as {
+        jsonrpc: string;
+        id: number;
+        result?: {
+          content: [{ type: string; text: string }];
+          isError?: boolean;
+        };
+      };
+
+      expect(message.result).toBeDefined();
+      expect(message.result?.isError).toBeFalsy();
+      const content = message.result?.content[0];
+      expect(content?.type).toBe("text");
+      if (content?.type === "text") {
+        const payload = JSON.parse(content.text);
+        expect(payload).toEqual({
+          userId: AUTH_CONTEXT.userId,
+          accessLevel: AUTH_CONTEXT.accessLevel,
+          clientId: AUTH_CONTEXT.clientId,
+          authMode: AUTH_CONTEXT.authMode,
+        });
+      }
+    }
+  });
 });

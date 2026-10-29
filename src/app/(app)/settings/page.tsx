@@ -25,18 +25,21 @@ import { PageHeader } from "~/components/layout/PageHeader";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { DefaultReportModeForm } from "./reporting/default-report-mode-form";
 export default async function SettingsPage(): Promise<React.JSX.Element> {
-  const { userId } = await getViewer();
+  const { userId, profile } = await getViewer();
 
   if (!userId) {
     redirect(getLoginUrl("/settings"));
   }
 
-  // Fetch user profile
-  const profile = await db.query.userProfiles.findFirst({
+  // The viewer carries role and report modes; this page alone also needs the
+  // account's email and Discord link. Email stays out of the shared viewer
+  // (CORE-SEC-007).
+  const account = await db.query.userProfiles.findFirst({
     where: eq(userProfiles.id, userId),
+    columns: { email: true, discordUserId: true },
   });
 
-  if (!profile) {
+  if (!profile || !account) {
     // Data-integrity anomaly: auth.users row exists but handle_new_user trigger
     // did not create the user_profiles row. Redirecting to login would send the
     // authenticated user into an infinite loop (login → already-authed → /settings
@@ -83,7 +86,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
   // Discord integration state for the preferences form (PP-2n5). Only need
   // the boolean here — skip the Vault decrypt that getDiscordConfig() does.
   const discordIntegrationEnabled = await isDiscordIntegrationConfigured();
-  const userHasDiscord = profile.discordUserId !== null;
+  const userHasDiscord = account.discordUserId !== null;
   const canMultiple = checkPermission(
     "issues.report.quick",
     getAccessLevel(profile.role)
@@ -175,7 +178,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
               discordNotifyOnPinballMapComment:
                 preferences.discordNotifyOnPinballMapComment,
             }}
-            isInternalAccount={isInternalAccount(profile.email)}
+            isInternalAccount={isInternalAccount(account.email)}
             discordIntegrationEnabled={discordIntegrationEnabled}
             userHasDiscord={userHasDiscord}
           />
@@ -188,7 +191,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
             Authentication
           </h2>
           <div className="mb-6">
-            <AccountEmail email={profile.email} />
+            <AccountEmail email={account.email} />
           </div>
           <p className="text-pretty text-sm text-muted-foreground mb-4">
             Change your account password.

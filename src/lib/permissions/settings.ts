@@ -4,7 +4,7 @@
  *
  * The matrix entry `machines.settings.manage` (technicians and admins on any
  * machine, a member on the machines they own) gates creating sets, editing
- * community sets, applying settings tags, and choosing preferred sets. A
+ * community sets, applying settings tags, and choosing default sets. A
  * personal set adds one rule on top: only its author edits it (§2.2). Every set
  * is visible to everyone who can open the machine (§2.5), so there is no view
  * predicate.
@@ -21,7 +21,7 @@ export interface SettingsSetAuth {
 
 /**
  * Who may create sets on a machine, edit its community sets, tag its sets, and
- * choose its preferred sets (§2.1, §2.3, §3.4, §4.3).
+ * choose its default sets (§2.1, §2.3, §3.4, §4.3).
  */
 export function canManageMachineSettings(
   machineOwnerId: string | null,
@@ -81,4 +81,12 @@ export function canMakeCommunity(
   access: AccessLevel
 ): boolean {
   return !set.isCommunity && isAuthor(set, viewerId, access);
+}
+
+/**
+ * Who may create, rename, and delete settings tags (§3.3): technicians and
+ * admins. House and Tournament stay fixed for everyone (§3.2).
+ */
+export function canManageSettingsTags(access: AccessLevel): boolean {
+  return checkPermission("machines.settings.tags.manage", access);
 }

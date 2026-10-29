@@ -34,6 +34,8 @@ describe("machine view database pipeline", () => {
   const ownerOneId = randomUUID();
   const ownerTwoId = randomUUID();
   const collectionId = randomUUID();
+  /** Holds exactly Owner One's machines, AAA and BBB. */
+  const ownerOneCollectionId = randomUUID();
   const alphaId = randomUUID();
   const betaId = randomUUID();
   const gammaId = randomUUID();
@@ -72,14 +74,27 @@ describe("machine view database pipeline", () => {
         ownerId: ownerTwoId,
       }),
     ]);
-    await db.insert(collections).values({
-      id: collectionId,
-      name: "Mixed Collection",
-      ownerId: ownerOneId,
-    });
+    await db.insert(collections).values([
+      { id: collectionId, name: "Mixed Collection", ownerId: ownerOneId },
+      {
+        id: ownerOneCollectionId,
+        name: "Owner One's Machines",
+        ownerId: ownerOneId,
+      },
+    ]);
     await db.insert(collectionMachines).values([
       { collectionId, machineId: alphaId, addedBy: ownerOneId },
       { collectionId, machineId: gammaId, addedBy: ownerOneId },
+      {
+        collectionId: ownerOneCollectionId,
+        machineId: alphaId,
+        addedBy: ownerOneId,
+      },
+      {
+        collectionId: ownerOneCollectionId,
+        machineId: betaId,
+        addedBy: ownerOneId,
+      },
     ]);
   });
 
@@ -152,7 +167,7 @@ describe("machine view database pipeline", () => {
     expect(dates.get(alphaId)).toEqual(selected);
   });
 
-  it("keeps all, collection, and owner scopes exact", async () => {
+  it("keeps all and collection scopes exact", async () => {
     const db = await getTestDb();
     const searchParams = new URLSearchParams({
       presence: "all",
@@ -172,16 +187,9 @@ describe("machine view database pipeline", () => {
       viewerId: null,
       searchParams,
     });
-    const owner = await loadMachineViewFromDatabase(tx, {
-      scope: { kind: "owner", ownerId: ownerOneId },
-      preset: "collection",
-      viewerId: null,
-      searchParams,
-    });
 
     expect(all.rows.map((row) => row.initials)).toEqual(["AAA", "BBB", "CCC"]);
     expect(collection.rows.map((row) => row.initials)).toEqual(["AAA", "CCC"]);
-    expect(owner.rows.map((row) => row.initials)).toEqual(["AAA", "BBB"]);
     expect(all.rows.every((row) => row.lastServicedAt === undefined)).toBe(
       true
     );
@@ -330,10 +338,10 @@ describe("machine view database pipeline", () => {
       role: "member",
     });
 
-    // Owner Two's only machine is outside Owner One's Collection, and the
-    // invited person and Unassigned own nothing at all.
+    // Owner Two's only machine is outside this Collection, and the invited
+    // person and Unassigned own nothing at all.
     const result = await loadMachineViewFromDatabase(asDbOrTx(db), {
-      scope: { kind: "owner", ownerId: ownerOneId },
+      scope: { kind: "collection", collectionId: ownerOneCollectionId },
       preset: "collection",
       viewerId: null,
       searchParams: new URLSearchParams({
@@ -418,7 +426,7 @@ describe("machine view database pipeline", () => {
   it("drops owner values that name no one (list-views §10.14)", async () => {
     const db = await getTestDb();
     const result = await loadMachineViewFromDatabase(asDbOrTx(db), {
-      scope: { kind: "owner", ownerId: ownerOneId },
+      scope: { kind: "collection", collectionId: ownerOneCollectionId },
       preset: "collection",
       viewerId: null,
       searchParams: new URLSearchParams({
