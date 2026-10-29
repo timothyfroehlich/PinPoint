@@ -615,22 +615,17 @@ export async function resetPasswordAction(
       { userId: user.id, action: "reset-password" },
       "Password updated successfully"
     );
-    // The password is already changed, so a sign-out failure must not turn
-    // into an "unexpected error" response. It is not flagged bestEffort: this
-    // global sign-out is what revokes the user's other sessions, so a failure
-    // leaves them alive. supabase-js filters the expected no-session
-    // responses, so a returned error is unexpected.
+    // Best-effort: GoTrue already revoked the user's other sessions when the
+    // password changed, so this only ends the current one, and a failure must
+    // not turn into an "unexpected error" response. supabase-js filters the
+    // expected no-session responses, so a returned error is unexpected.
     try {
       const { error: signOutError } = await supabase.auth.signOut();
-      if (signOutError) {
-        reportError(signOutError, {
-          action: "reset-password.signOut",
-          userId: user.id,
-        });
-      }
+      if (signOutError) throw signOutError;
     } catch (signOutError) {
       reportError(signOutError, {
         action: "reset-password.signOut",
+        bestEffort: true,
         userId: user.id,
       });
     }
