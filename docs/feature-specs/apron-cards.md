@@ -118,7 +118,7 @@
 - **13.1** Every member has a print queue (§1). Using it requires the same signed-in membership as exporting a card (§9.3).
 - **13.2** From a saved card's export, a member adds that card to their print queue or removes it. Export marks each saved card that is in the member's queue.
 - **13.3** A queued card stays queued when it is edited; batch printing prints its saved state at the time of printing. Deleting a saved card removes it from every queue. A queue counts and offers only cards the Print apron cards page lists (§12.2).
-- **13.4** The Machines list's entry to the Print apron cards page shows how many cards are in the member's print queue whenever it holds any.
+- **13.4** The Print apron cards entry in the Machines page's ⋯ Actions menu (machine-views §6.7) shows how many cards are in the member's print queue whenever it holds any; the count appears only inside that menu.
 - **13.5** The Print apron cards page opens with the member's queued cards selected, apart from cards that cannot be selected (§12.3). It marks each queued card in the list, shows how many cards are queued, how many of those are selected, and how many do not fit, and offers selecting all of the member's selectable queued cards at once.
 - **13.6** Mark as printed removes the selected queued cards from the member's print queue; queued cards that are not selected stay. It is offered only while the selection includes a queued card, and it can be undone immediately afterwards.
 
@@ -126,6 +126,7 @@
 
 | Requirement | Current implementation gap |
 | :-- | :-- |
+| §13.4 | The print-queue count shows on the Print menu button in the Machines page header, not inside a ⋯ Actions menu (PP-jb9v.17). |
 | §3.1, §3.2, §3.6 | The Apron card tab shows the machine's main description read-only and points to the Manage tab; editing it in place is not built yet. |
 | §4.2 | Automatic apron-size fill from a Pinball Map match is intentionally deferred. Editors choose a size manually for now; unmatched machines still have no default. |
 
@@ -133,6 +134,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-11 | The print-queue count shows on the Print apron cards entry inside the Machines page's ⋯ Actions menu (§13.4). |
 | 2026-10-10 | The Apron card tab edits the machine's main description in place when a card uses it (§3.1, §3.2, §3.6). |
 | 2026-10-08 | Credits gain a third role, code, shown as a Code row after Design and Art; its per-card display setting is off by default. Uncataloged machines use hand-entered programmers (§1, §2.1, §5.1, §10.1, §10.2, §10.4, §10.5). |
 | 2026-10-05 | Added §13 Print queue: each member queues saved cards from Export, and the Print apron cards page opens with them selected and offers Mark as printed. Export applies to one chosen card shown in a preview (§1, §9.5, §9.6). |
