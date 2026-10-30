@@ -1,3 +1,10 @@
+/**
+ * URL path prefix that mock uploads are served from. Lives here rather than in
+ * ~/lib/blob/mock-storage so client-bundled code (the image metadata schema)
+ * can import it without pulling in node:path.
+ */
+export const MOCK_UPLOADS_URL_PREFIX = "/uploads/";
+
 export const BLOB_CONFIG = {
   // File validation
   ALLOWED_MIME_TYPES: ["image/jpeg", "image/png", "image/webp"] as const,
@@ -32,7 +39,9 @@ export const BLOB_CONFIG = {
   },
 
   // Cleanup
-  // TODO: Implement cron/cleanup job to delete blobs in "pending" folder older than 24h
+  // The daily /api/cron/cleanup-blobs job (~/lib/blob/cleanup) deletes any
+  // blob no database row references once it is older than this window,
+  // including uploads that never got linked to an issue.
   // TODO: Implement cron/cleanup job to enforce SOFT_DELETE_RETENTION_HOURS
   SOFT_DELETE_RETENTION_HOURS: 24,
 } as const;

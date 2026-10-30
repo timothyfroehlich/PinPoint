@@ -31,7 +31,6 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { createClient } from "~/lib/supabase/server";
 import type { ActionState } from "./unified-report-form";
 import { imagesMetadataArraySchema } from "../issues/schemas";
-import { deleteFromBlob } from "~/lib/blob/client";
 import { z } from "zod";
 import { ok, err, type Result } from "~/lib/result";
 import {
@@ -285,17 +284,15 @@ export async function submitPublicIssueAction(
         const imagesMetadata = imagesMetadataArraySchema.parse(rawJson);
 
         // On an idempotent retry the existing issue already has its images linked.
-        // The blobs uploaded for this retry attempt are redundant duplicates — clean
-        // them up and skip the DB insert to prevent duplicate issue_images rows.
-        // (PP-u0v1)
+        // Skip the DB insert to prevent duplicate issue_images rows. (PP-u0v1)
+        // Never delete blobs named in this metadata: it is client input, so it
+        // can name any blob in the store. Unlinked uploads are reclaimed by the
+        // orphan-cleanup cron (~/lib/blob/cleanup). (PP-ysk3)
         if (deduped) {
           if (imagesMetadata.length > 0) {
             log.info(
               { issueId: issue.id, count: imagesMetadata.length },
-              "Idempotent retry — cleaning up redundant blobs, skipping image link"
-            );
-            await Promise.allSettled(
-              imagesMetadata.map((img) => deleteFromBlob(img.blobPathname))
+              "Idempotent retry — skipping image link; orphan cleanup reclaims unlinked uploads"
             );
           }
         } else {
@@ -338,17 +335,15 @@ export async function submitPublicIssueAction(
                   issueId: issue.id,
                   orphanedBlobs: imagesMetadata.map((img) => img.blobPathname),
                 },
-                "Database failed to link images to issue. Cleaning up orphaned blobs."
+                "Database failed to link images to issue. Orphan cleanup will reclaim the blobs."
               );
               reportError(dbError, {
                 action: "linkIssueImages",
                 issueId: issue.id,
                 bestEffort: true,
               });
-              // Immediate cleanup of orphaned blobs
-              await Promise.allSettled(
-                imagesMetadata.map((img) => deleteFromBlob(img.blobPathname))
-              );
+              // No immediate blob delete: the pathnames are client input
+              // (PP-ysk3). The orphan-cleanup cron reclaims unlinked uploads.
               // Don't return error here - issue was already created successfully
               // User will be redirected, but images won't appear on the issue
               // TODO: Consider implementing a flash message system to show warning

@@ -1,6 +1,6 @@
 // Unit tests for .claude/hooks/ui-screenshot-reminder.cjs — the PostToolUse
-// (Bash) hook that nudges toward posting screenshots after a UI-touching
-// `git commit` (PP-wi85). Non-blocking: always exits 0.
+// (Bash) hook that nudges toward capturing screenshots for Tim's UI approval after a
+// UI-touching `git commit`. Non-blocking: always exits 0.
 //
 // Builds a scratch git repo per test with a fake `origin/main` ref (via
 // `update-ref`, no real remote needed) so `git diff --name-only
@@ -81,6 +81,9 @@ describe("ui-screenshot-reminder.cjs", () => {
     expect(status).toBe(0);
     expect(stdout).toContain("UI-touching change");
     expect(stdout).toContain("pr-screenshots.mjs");
+    expect(stdout).toContain("UI Approval");
+    expect(stdout).not.toContain("<PR>");
+    expect(stdout).not.toContain("no-visual-change");
   });
 
   it("reminds when a commit touches a src/app tsx page", () => {

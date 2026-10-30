@@ -7,7 +7,7 @@ import { AddTagTypeDialog } from "~/components/tags/AddTagTypeDialog";
 import { TagGroupCard, tagGroupKey } from "~/components/tags/TagGroupCard";
 import { Button } from "~/components/ui/button";
 import { SETTINGS_TAGS_HREF } from "~/lib/machines/settings-tags";
-import { getViewer } from "~/lib/collections/viewer";
+import { getViewer } from "~/lib/auth/viewer";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { listTags } from "~/lib/tags/tags";
 

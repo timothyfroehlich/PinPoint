@@ -146,10 +146,11 @@ This has been learned twice the expensive way. `0028_natural_vengeance.sql` ship
 
 ## Input sanitization
 
-Don't roll a new `sanitize-html` allowlist. The codebase has a shared config — `~/lib/sanitize-html-config` exports `NON_TEXT_TAGS`, the canonical set of raw-text tags that must be stripped (covered by the test in `sanitize-html-config.test.ts`). The shared config is consumed by `src/lib/markdown.ts`, `src/lib/tiptap/render.ts`, and `src/lib/notifications/channels/email-channel.ts`.
+Don't roll a new `sanitize-html` allowlist. The codebase has a shared config — `~/lib/sanitize-html-config` exports `NON_TEXT_TAGS`, the canonical set of raw-text tags that must be stripped (covered by the test in `sanitize-html-config.test.ts`). The shared config is consumed by `src/lib/markdown.ts` and `src/lib/tiptap/render.ts`.
 
 For the common cases:
 
 - **Markdown-from-user-input → safe HTML**: call `renderMarkdownToHtml(...)` from `~/lib/markdown` (double-sanitizes after the markdown renderer runs).
 - **TipTap ProseMirror JSON → safe HTML for display**: use the renderer in `~/lib/tiptap/render` (this is what `RichTextDisplay` uses; the comment there reads "Output is double-sanitized — the renderer escapes all text").
+- **Plain text interpolated into HTML** (email bodies, titles, `docToPlainText` output): `escapeHtml` from `~/lib/markdown`, never `sanitize-html`. An allowlist that keeps `a[href]` turns a reporter's typed markup into a live link; notification emails had exactly this bug (PP-40qy).
 - **Raw HTML that genuinely needs sanitization in a new place**: import `sanitizeHtml` from `sanitize-html` AND `NON_TEXT_TAGS` from `~/lib/sanitize-html-config`, and pass `nonTextTags: NON_TEXT_TAGS` alongside whatever `allowedTags`/`allowedAttributes` you need. The shared `NON_TEXT_TAGS` constant is what keeps `<script>`, `<style>`, `<textarea>`, etc. from leaking through; replicating an inline allowlist that omits it is a footgun.

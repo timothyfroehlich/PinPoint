@@ -28,10 +28,22 @@ export const exportIssuesSchema = z.object({
   /** The Issue View URL query (issues-list §7). Omitted for machine exports. */
   query: z.string().max(4000).optional(),
 
-  /** Machine initials for machine-page export (overrides any machine filter). */
+  /**
+   * Machine initials for machine-page export (overrides any machine filter).
+   *
+   * Stored initials are uppercase, and the machine filter matches them
+   * case-sensitively, so lowercase input is normalized up here. Without it a
+   * lowercase caller (e.g. "afm") matched nothing and the export came back
+   * empty instead of returning the machine's issues (PP-mf4e).
+   *
+   * `reassignIssueMachineSchema.newMachineInitials` in ./schemas.ts validates
+   * and uppercases initials the same way; kept separate per CORE-ARCH-010
+   * until a third use justifies a shared helper.
+   */
   machineInitials: z
     .string()
     .regex(/^[A-Za-z0-9]{2,6}$/, "Invalid machine initials")
+    .transform((s) => s.toUpperCase())
     .optional(),
 
   /** The Collection or Tag Issues tab the export comes from. */

@@ -1,12 +1,12 @@
 # PR Workflow Scripts
 
-Bash/Node scripts for managing GitHub PR lifecycle: CI monitoring, UI screenshots, readiness labeling, and the gate-enforced, Tim-approved merge.
+Bash/Node/Python scripts for the GitHub PR lifecycle: CI monitoring, the PR dashboard, UI screenshots and approval, and the trusted helpers behind the required review checks. No script here merges.
 
 ## Architecture
 
 Scripts are designed for the **PinPoint orchestrator workflow** where multiple subagents work in parallel worktrees. The orchestrator (or a human) uses these from the main repo to monitor and manage PRs created by agents.
 
-Tim decides whether PinPoint PRs merge (PP-wi85). When he explicitly requests a merge in the active task and the PR target is unambiguous, the owning agent in any harness runs `merge-pr.sh <PR> --human`; the script rechecks all four gates. Claude Code and Codex show a permission prompt for the script; the direct request authorizes the agent in every harness. Without that request, use `merge-handoff.sh`. Raw PinPoint merge channels (`gh pr merge`, `gh api PUT .../merge`, MCP `merge_pull_request`) remain prohibited for agents because they skip the gates. In PinPoint sessions Claude Code and Codex deny the raw merge channels for every repository; merge another repository's PR from that repository.
+Merging is native GitHub. Ruleset `6326455` enforces the gates: required checks `CI Gate`, `Claude Review`, and `UI Approval`, every conversation resolved, and the branch up to date with `main`. Tim decides whether a PinPoint PR merges; after his explicit request the owning agent runs `gh pr merge <PR> --squash` (or `--auto --squash`), never `--admin` (AGENTS.md §2.2 "Process rules", `pinpoint-pr-workflow` Phase 4).
 
 ## Codex Git Mutations
 
@@ -28,42 +28,39 @@ intentionally require approval.
 `merge-main` fetches `origin` immediately before the merge so the tracking ref cannot be
 stale.
 
-Codex prefix rules in `.codex/rules/pinpoint.rules` allow `gh pr list|view|checks|diff` and
-`gh run list|view` directly, forbid `gh pr merge` and `gh pr checkout`/`gh pr co`/`gh co`, and
-prompt for `merge-pr.sh`. Other `gh` commands fall through to Codex's default approval
-policy. Merge another repository's PR from that repository's own checkout.
+Codex prefix rules in `.codex/rules/pinpoint.rules` allow `gh pr list|view|checks|diff`,
+`gh run list|view`, and `gh pr update-branch` directly, prompt for `gh pr merge` (a prefix
+rule cannot deny a later `--admin` flag, so a human stays in the loop), and forbid
+`gh pr checkout`/`gh pr co`/`gh co`. Other `gh` commands fall through to Codex's default
+approval policy.
 
 ## Scripts
 
 ### PR Monitoring
 
-| Script                                                     | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pr-dashboard.sh [PR...]`                                  | Status table: CI checks, review state, merge state, draft state. All open PRs if no args. One repository GraphQL snapshot batches metadata and checks; the Review column is the merge gate's own label (`_review_summary`, run once per PR): `approved`, `changes requested`, `stale review`, `not reviewed`, or `?` when the gate could not answer.                                                                                                                                                       |
-| `pr-watch.py <PR>`                                         | Wait on one PR head: `--phase ci\|review --expected-head <SHA>` polls every 30s until a terminal verdict (1h ceiling). Progress goes to stderr; stdout is exactly one terminal JSON verdict. A CI failure writes `tmp/gh-monitor/failure-<run>.md` when the run log can be fetched. `--check-ready` prints a readiness snapshot instead.                                                                                                                                                                   |
-| `claude-review-level.sh [<base-ref>]`                      | Print the `/code-review` level for HEAD against `origin/main` (spec §8.14–8.15): line 1 `low`, `medium`, `high`, or `ask`; line 2 the weighted size. Leaves out the lockfile, `drizzle/meta`, fixtures, binaries and feature specs; counts test code at half weight.                                                                                                                                                                                                                                       |
-| `record-claude-review.sh <PR> --level L --findings F`      | Post the SHA-pinned review record after a clean local review, then mark a draft ready. Refuses non-owner auth, a closed PR, a local HEAD that is not the PR head, uncommitted changes, a duplicate record for the head, and any finding not marked fixed (with a commit in HEAD) or declined (with a reason). `--dry-run` prints the record.                                                                                                                                                               |
-| `request-codex-review.sh <PR>`                             | Retired from the workflow (spec §8.10); kept until the Codex subscription ends. Requests exactly one manual Codex review for the current head. Refuses non-owner auth, draft/closed PRs, non-green current-head CI, heads already reviewed/requested, and a head that moves during validation. Posts the SHA-bound `@codex review` comment consumed by the trusted reaction witness.                                                                                                                       |
-| `codex-reaction-witness.sh <PR> <SHA> <TIME> [COMMENT_ID]` | Trusted helper for `.github/workflows/codex-reaction-witness.yaml`. After the SHA-bound manual request it waits for the connector bot's `+1` on that request comment (`COMMENT_ID`, which the workflow always passes; without it the helper reads PR-level reactions), checking that the named SHA remains head, then posts a SHA-pinned witness. (`eyes` is not required: Codex replaces it with `+1`, so a fast review may never show it.) A native exact-head review supersedes the need for a witness. |
+| Script                                | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pr-dashboard.sh [PR...]`             | Status table: CI checks, review, UI approval, merge state, draft state. All open PRs if no args. One repository GraphQL snapshot supplies every column. Review and UI are the head's `Claude Review` and `UI Approval` required checks, counted only when the GitHub Actions app ran them: pass, fail, pending, skipped (the job did not run, as Claude Review on a draft), or — when absent. Anything the dashboard cannot read renders as `?`, never as green. |
+| `pr-watch.py <PR>`                    | Wait on one PR head's CI Gate and, once the PR is ready, its Claude Review: `--phase ci --expected-head <SHA>` polls every 30s until a terminal verdict (1h ceiling). Progress goes to stderr; stdout is exactly one terminal JSON verdict. A failed check writes `tmp/gh-monitor/failure-<run>.md` when the run log can be fetched.                                                                                                                             |
+| `claude-review-level.sh [<base-ref>]` | Trusted helper for `.github/workflows/claude-review.yaml`, not an agent step: prints the review level for HEAD against `origin/main`. Line 1 `low`, `medium`, `high`, or `ask`; line 2 the weighted size. Leaves out the lockfile, `drizzle/meta`, fixtures, binaries and feature specs; counts test code at half weight.                                                                                                                                        |
+| `claude-review-range.sh <PR> <SHA>`   | Trusted helper for `.github/workflows/claude-review.yaml` (run from main's copy): picks full, incremental (commits since the newest earlier passing check, main's changes left out), or skip. `CLAUDE_REVIEW_CHECK_NAME` keys it on another check; `CLAUDE_REVIEW_SKIP_LEVEL=1` skips the level.                                                                                                                                                                 |
 
 #### `pr-watch.py` flags and terminal verdict
 
 ```bash
-python3 scripts/workflow/pr-watch.py <PR> --phase <ci|review> --expected-head <FULL_SHA>
-python3 scripts/workflow/pr-watch.py <PR> --check-ready
+python3 scripts/workflow/pr-watch.py <PR> --phase ci --expected-head <FULL_SHA>
 ```
 
-Run the first form as a background command. `--phase` and `--expected-head` (full lowercase 40-character SHA) are required together; `--check-ready` takes neither. Usage errors exit 2 with nothing on stdout.
+Run it as a background command. `--phase` and `--expected-head` (full lowercase 40-character SHA) are required together. Usage errors exit 2 with nothing on stdout.
 
-- `--phase ci`: polls CI Gate for the expected head. Terminal outcomes: `passed` (exit 0), `failed` / `stale` / `conflicting` (exit 1), `timed_out` / `undetermined` (exit 2).
-- `--phase review`: polls the merge gate's review label for the expected head. `passed` = `approved` AND 0 unresolved threads (exit 0); `action_required` = unresolved threads or `changes requested` (exit 1); `stale` / `conflicting` (exit 1); `timed_out` / `undetermined` (exit 2).
+- `--phase ci`: polls CI Gate for the expected head and, on a PR that is not a draft, `Claude Review` too (a draft skips Claude Review). `passed` needs both; a red Claude Review ends the watch `failed` without waiting for CI. A passed verdict carries `unresolved_threads`, Claude Review's findings and any other open threads still to adjudicate. Terminal outcomes: `passed` (exit 0), `failed` / `stale` / `conflicting` (exit 1), `timed_out` / `undetermined` (exit 2). It does not watch `UI Approval`, which can wait on Tim indefinitely.
 - `--expected-head <SHA>`: if the PR head moves, the watch ends `stale` rather than following the new head. GitHub's transient `UNKNOWN` merge state is not treated as a conflict.
 
 Terminal JSON schema (`stdout`):
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "repository": "timothyfroehlich/PinPoint",
   "pr": 1234,
   "phase": "ci",
@@ -71,7 +68,7 @@ Terminal JSON schema (`stdout`):
   "observed_head": "40-char-sha",
   "outcome": "passed",
   "ci_gate": "SUCCESS",
-  "review_state": "not reviewed",
+  "claude_review": "SUCCESS",
   "unresolved_threads": 0,
   "merge_state": "CLEAN",
   "detail_url": "https://github.com/...",
@@ -80,10 +77,12 @@ Terminal JSON schema (`stdout`):
 }
 ```
 
+`claude_review` is the head's Claude Review conclusion or status, `SKIPPED_DRAFT` on a draft, or `UNKNOWN` before the check posts. `unresolved_threads` is counted only on a `passed` verdict, and is `null` otherwise or when GitHub cannot say.
+
 `pr-watch.py` exit codes:
 
-- **0**: `passed` (clean gate verdict or exact-head review with 0 unresolved threads).
-- **1**: Action required or failure (`failed`, `action_required`, `stale`, `conflicting`).
+- **0**: `passed` (CI Gate passed on the expected head, and Claude Review too unless the PR is a draft).
+- **1**: Failure or action required (`failed`, `stale`, `conflicting`).
 - **2**: Undetermined / unavailable evidence (`undetermined`, `timed_out`). Exit 2 is not a red CI: re-run the watch once evidence is available rather than hunting for a broken test. (PP-qkl8)
 
 ### Compact Validation Progress
@@ -101,50 +100,19 @@ chromium-only smoke. `pnpm run preflight` wraps it in `quiet-run.py`;
 
 ### UI Screenshots
 
-| Script                                                                                 | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pr-screenshots.mjs <PR> [--pages=a,b,c] [--force-auth]` or `<PR> --files=a.png,b.png` | Shoots the pages in `ui-screenshot-manifest.json` at the three review viewports (desktop 1440×900, large mobile 430×932, small mobile 320×568; `pinpoint-design-bible` §4), pushes PNGs to the orphan `pr-screenshots` branch, posts/updates one sticky PR comment (marker `<!-- pr-screenshots -->`). Agent-runnable — not a merge action. `--pages` needs the **equals** form; the space form errors. A filtered run rebuilds the sticky comment from only the pages it shot, so end with an unfiltered run. `--files` publishes PNGs you captured yourself (named `<viewport>-<id>.png`) through the same branch and comment; use it instead of pushing to `pr-screenshots` by hand. |
-| `ui-screenshot-manifest.json`                                                          | Page manifest: id → `{ label, route, authRole, seedNeeds }`. Edit to add/remove shot targets.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Script                                                            | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pr-screenshots.mjs [--pages=a,b,c] [--out=<dir>] [--force-auth]` | Local only: shoots the pages in `ui-screenshot-manifest.json` at the three review viewports (desktop 1440×900, large mobile 430×932, small mobile 320×568; `pinpoint-design-bible` §4) into `tmp/pr-screenshots/<short-sha>/` (or `--out`) as `<viewport>-<page-id>.png`, then prints one absolute path per PNG on stdout (progress on stderr) so the agent can send the files to Tim in Claude Code Desktop chat before the PR's `UI Approval` check can pass. Nothing is uploaded to GitHub. Agent-runnable — not a merge action. `--pages` needs the **equals** form; the space form errors. |
+| `ui-screenshot-manifest.json`                                     | Page manifest: id → `{ label, route, authRole, seedNeeds }`. Edit to add/remove shot targets.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `ui-paths.txt`                                                    | The one UI path list (extended regexes, matched case-insensitively), read by the UI Approval check and the reminder hook.                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `ui-approval-scope.sh <PR> <SHA>`                                 | Trusted helper for `.github/workflows/ui-approval.yaml`: whether a UI path changed since the newest earlier passing UI Approval, with main's changes left out.                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `approve-ui.sh <PR> --head <SHA> --source chat\|artifact`         | Records Tim's own UI approval (in chat, or an orchestrator-artifact click) on the waiting UI Approval run of the commit he saw; refuses if the PR head moved. Agents never call the `pending_deployments` API directly.                                                                                                                                                                                                                                                                                                                                                                         |
 
-### Readiness and Merge
+### Shared helpers
 
-| Script                          | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `merge-handoff.sh <PR>`         | **Agent-runnable, read-only.** Prints the merge handoff block: review depth + how many commits back it was, CI, threads, mergeable + distance behind main, last merge-from-main, diff split src/tests/docs/other, diff since the review, migrations, newly-registered env vars, UI + screenshots, bead. Ends with two `!`-prefixed commands — re-run the report, and merge. The merge command is printed **only** when all four gates pass. Fetches `main` and `refs/pull/<PR>/head` into per-invocation temporary refs with `--no-write-fetch-head` and `--refmap=`, then removes those refs on exit; concurrent reports neither read nor overwrite shared `FETCH_HEAD`, update remote-tracking refs, or move local branches. If `gh` and the pull ref disagree about head, it says so and blocks: the gate answers would be about one commit and the diff about another. |
-| `merge-pr.sh <PR> --human [-a]` | Runs only after Tim explicitly requests the merge. Re-evaluates all 4 gates and squash-merges if they pass; `--human` records that request. Claude Code and Codex prompt before it runs. `--automerge` never waits out review.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| `_pr-gates.sh`                  | Shared bash helper sourced by `merge-pr.sh`, `merge-handoff.sh`, `record-claude-review.sh`, and `request-codex-review.sh`, and shelled out to by `pr-watch.py` and `pr-dashboard.py`. `_review_summary <PR>` is the one implementation of review evidence: two checkers (Claude review record, Codex evidence) and a four-word label.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `_gh-transport.sh`              | Sourced by `_pr-gates.sh`. Wraps the gates' GraphQL reads (`gh pr view --json`, `gh repo view`, `gh api graphql`). On the Claude Code cloud proxy's GraphQL 403, it switches to REST: pull and check-run endpoints, plus the proxy's `/pulls/{n}/ccr/review_threads` route for threads. The thread read fails closed on any payload shape it does not recognize. `merge-pr.sh` then merges with `PUT /pulls/{n}/merge` pinned to the audited head. `PINPOINT_GH_TRANSPORT=rest` forces REST from the start.                                                                                                                                                                                                                                                                                                                                                                |
-| `gh_cli.py`                     | Python's one `gh` wrapper: `run_gh(*args, error=...)` returns stdout and raises the caller's exception type on a non-zero exit. `pr-watch.py` and `pr-dashboard.py` import it and keep their own `gh()` seam; add any new Python workflow script's `gh` calls here rather than a third copy.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-
-`merge-handoff.sh`'s `ui` line keys on file **paths**, so it reads `UI file(s) changed`, never `the UI changed`. A UI-glob edit that renders nothing new (a pure refactor, a non-null-`!` removal) can carry the marker `<!-- no-visual-change -->` in the PR **body** to clear the `NO screenshots posted` nudge — mirroring `pr-screenshots.mjs`'s `<!-- pr-screenshots -->` token. Posted screenshots always take precedence over the marker. It is informational only, below the divider — never a merge gate. (PP-lhjg)
-
-### Gates (evaluated by `merge-pr.sh`, defined in `_pr-gates.sh`)
-
-| Gate          | Passes when                                                                                                                                                                                    | Bypass kind |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
-| `ci`          | `CI Gate` check is SUCCESS/NEUTRAL/SKIPPED                                                                                                                                                     | `admin`     |
-| `threads`     | Zero unresolved review threads, from any author                                                                                                                                                | `force`     |
-| `reviewed`    | Hard backstop — some reviewer's evidence covers the exact head. PASS when a review record or Codex covers head (label `approved`); FAIL on `changes requested`, `stale review`, `not reviewed` | `force`     |
-| `no_conflict` | PR is MERGEABLE (never bypassable — GitHub rejects conflicting merges)                                                                                                                         | `none`      |
-
-### Review state (`reviewed`)
-
-**The reviewer is a local Claude Code `/code-review`** (spec `docs/feature-specs/pr-lifecycle-monitoring.md` §8). `claude-review-level.sh` picks the level; after a clean round, `record-claude-review.sh` posts the review record: an issue comment from the repository owner whose first line is `<!-- pinpoint-claude-review: <40-char head> level=<low|medium|high|xhigh|max> -->`. The gate trusts only the owner's account and only a marker at the very start of the body. Codex evidence (below) still counts until its subscription ends; nothing requests it any more. A PR with no coverage merges only through `merge-pr.sh --force` at Tim's explicit direction.
-
-`_review_summary` in `_pr-gates.sh` runs two independent checkers over one fetch of the PR's reviews and comments. Each answers for its own reviewer only:
-
-| Checker  | Covers head when                                                                                                                                                                   | Other verdicts                                                               |
-| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `claude` | A review record from the owner whose marker names head (or, across a clean merge of `main`, the pre-merge head)                                                                    | `stale` (newest record names an older commit), `none`                        |
-| `codex`  | Newest exact-head record among: native `APPROVED`; native `COMMENTED`/`CHANGES_REQUESTED` (thread gate owns findings); trusted clean comment (10/40-char prefix); reaction witness | `stale` (newest Codex record names an older commit), `none` (nothing usable) |
-
-The label is derived from the checkers, in order: any `covers` → **`approved`**; else unresolved threads > 0 or any `changes_requested` → **`changes requested`**; else any `stale` → **`stale review`**; else **`not reviewed`**. `codex_request_pending` is reported alongside (the owner's `@codex review` marker pinned to head) so remedies never recommend a second request; it is not evidence.
-
-Checkers never consult each other: a stale record cannot hide current-head coverage from another checker. Within one checker, only exact-head records decide; a delayed review of an older SHA cannot displace current-head coverage. When several cover head, `coverage` reports the review record first, then Codex.
-
-Nothing here WAITs. The gate reports the current snapshot and fails on a not-reviewed or stale head; the owning agent runs the review and posts the record outside the merge script. `merge-pr.sh --automerge` must stop rather than hide that unfinished state.
-
-**Every accepted path is SHA-pinned.** Review records name the full head SHA; native reviews carry `commit_id`; clean comments name the reviewed SHA; the reaction-witness workflow reads reactions only on the SHA-tagged request comment and verifies the event SHA is still head before recording the `+1` against that SHA. A delayed reaction for an older head is on an older request comment, so it cannot satisfy a newer head's gate.
+| Script      | Purpose                                                                                                                                                                                                                                                                                      |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `gh_cli.py` | Python's one `gh` wrapper: `run_gh(*args, error=...)` returns stdout and raises the caller's exception type on a non-zero exit. `pr-watch.py` and `pr-dashboard.py` import it and keep their own `gh()` seam; add any new Python workflow script's `gh` calls here rather than a third copy. |
 
 ## Status Token Vocabulary
 
@@ -152,37 +120,36 @@ Scripts emit machine-parseable status with these prefixes:
 
 | Token    | Meaning                                                     | Action                        |
 | -------- | ----------------------------------------------------------- | ----------------------------- |
-| `PASS:`  | Gate passed                                                 | Continue                      |
+| `PASS:`  | Check passed                                                | Continue                      |
 | `FAIL:`  | Hard failure                                                | Block; fix underlying issue   |
 | `WAIT:`  | Transient state (e.g., GitHub computing mergeable)          | Retry; may resolve on its own |
 | `WARN:`  | Soft gate proceeding with a notice                          | Read the notice; not blocking |
 | `BLOCK:` | State mismatch requiring user action (e.g., merge conflict) | Resolve, push, retry          |
 
-The agent reads these tokens from script stdout to decide next steps. The `reviewed` remedy says to run `/code-review` at the level `claude-review-level.sh` prints after current-head CI succeeds, adjudicate every finding, re-review until clean, then run `record-claude-review.sh`. Continuation lines are indented and carry no status token, so token parsing is unaffected.
+The agent reads these tokens from script stdout to decide next steps. Continuation lines are indented and carry no status token, so token parsing is unaffected.
 
 ## MCP vs Script — When to use which
 
-The pinpoint-pr-workflow skill defaults to MCP tools for per-operation reads and writes. Scripts handle composite enforcement.
+The pinpoint-pr-workflow skill defaults to MCP tools for per-operation reads and writes. Scripts and `gh` handle what is not a single typed call.
 
-| Operation                                      | Use MCP                                        | Use Script                                                                         |
-| ---------------------------------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------- |
-| Read PR metadata, reviews, threads, check_runs | `pull_request_read(method: ...)`               | —                                                                                  |
-| Apply/remove PR label                          | `issue_write(method: "update", labels: [...])` | —                                                                                  |
-| Get failed CI logs                             | `get_job_logs(failed_only, tail_lines)`        | —                                                                                  |
-| Wait on CI or review for one PR head           | —                                              | `pr-watch.py`                                                                      |
-| Record a clean local review, promote the draft | —                                              | `record-claude-review.sh`                                                          |
-| Merge a PR                                     | —                                              | `merge-pr.sh --human` after Tim explicitly requests that PR; script rechecks gates |
-| Composite gate evaluation                      | —                                              | `merge-handoff.sh` (read-only); merge script rechecks before a requested merge     |
-| Post UI screenshots                            | —                                              | `pr-screenshots.mjs` (agent-runnable)                                              |
+| Operation                                      | Use MCP                                        | Use Script                                                                                                          |
+| ---------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Read PR metadata, reviews, threads, check_runs | `pull_request_read(method: ...)`               | —                                                                                                                   |
+| Apply/remove PR label                          | `issue_write(method: "update", labels: [...])` | —                                                                                                                   |
+| Get failed CI logs                             | `get_job_logs(failed_only, tail_lines)`        | —                                                                                                                   |
+| Wait on CI for one PR head                     | —                                              | `pr-watch.py --phase ci`                                                                                            |
+| Required-check state for one PR                | —                                              | `gh pr checks <PR> --required`                                                                                      |
+| Merge a PR                                     | —                                              | `gh pr merge <PR> --squash` (or `--auto --squash`) after Tim explicitly requests that PR; GitHub enforces the gates |
+| Capture UI screenshots                         | —                                              | `pr-screenshots.mjs` (agent-runnable, local)                                                                        |
 
 MCP field-naming gotcha: responses use snake_case (`is_resolved`, `submitted_at`, `head.sha`). GraphQL we previously used was camelCase.
 
 ## Key Design Decisions
 
-- **MCP first for reads and per-op writes**: typed tool calls beat shell-escaped gh CLI for the agent's use cases. Scripts wrap composite enforcement that can't be a single API call.
-- **Mechanical script output**: scripts emit status tokens (PASS, WARN, WAIT, FAIL, BLOCK) and the table above says what to do per token. The `reviewed` and `threads` gates are the deliberate exception — they append indented `remedy:` lines, because which state you are in decides the action and the token alone doesn't say.
-- **Tim decides whether PinPoint PRs merge (PP-wi85)**: an explicit request in the active task authorizes the owning agent in any harness to run `scripts/workflow/merge-pr.sh <PR> --human` for the unambiguous PR. The flag records the request; Tim need not repeat it in a shell. Claude Code and Codex also show a permission prompt; the direct request remains authorization in every harness. A readiness label or green gate alone is not authorization. Raw merge channels remain prohibited because they skip the gates; bypass flags require separate explicit authorization. The script fails closed on gate errors. The old `.claude-merge-bypass` sentinel remains removed.
-- **Fail closed on API errors**: gates that can't determine state exit non-zero.
+- **MCP first for reads and per-op writes**: typed tool calls beat shell-escaped gh CLI for the agent's use cases.
+- **Mechanical script output**: scripts emit status tokens (PASS, WARN, WAIT, FAIL, BLOCK) and the table above says what to do per token.
+- **GitHub enforces the merge gates**: the ruleset is the one gate implementation, so no script re-evaluates it. A green check alone is not merge authorization; Tim's explicit request is. The ruleset's admin bypass is Tim's alone; agents never pass `--admin`.
+- **Fail closed on API errors**: a script that cannot determine state exits non-zero, and the dashboard shows `?`.
 
 ## Dependencies
 
@@ -192,4 +159,4 @@ MCP field-naming gotcha: responses use snake_case (`is_resolved`, `submitted_at`
 
 ## Related Docs
 
-- `.agents/skills/pinpoint-pr-workflow/SKILL.md` — Full skill: the review handoff, the merge handoff, and the MCP call sequences. Status-token responses are the table above, not there.
+- `.agents/skills/pinpoint-pr-workflow/SKILL.md` — Full skill: the review flow, the merge, and the MCP call sequences. Status-token responses are the table above, not there.

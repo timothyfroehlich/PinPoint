@@ -74,7 +74,7 @@ jobs:
       deps: ${{ steps.base.outputs.force == 'true' && 'true' || steps.deps-filter.outputs.deps }}
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25  # ratchet:step-security/harden-runner@v2.22.1
         with:
           egress-policy: audit
 
@@ -157,7 +157,6 @@ jobs:
               - '!.github/dependabot.yml'
               - '!.github/renovate.json'
               - '!.github/CODEOWNERS'
-              - '!.github/workflows/codex-reaction-witness.yaml'
               - '!.github/workflows/ownerless-renovate-issues.yaml'
               - '!.github/workflows/preview-control.yaml'
               - '!.github/workflows/preview-reaper.yaml'
@@ -193,7 +192,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25  # ratchet:step-security/harden-runner@v2.22.1
         with:
           egress-policy: audit
 
@@ -251,7 +250,7 @@ jobs:
     if: needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true'
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25  # ratchet:step-security/harden-runner@v2.22.1
         with:
           egress-policy: audit
 
@@ -279,7 +278,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25  # ratchet:step-security/harden-runner@v2.22.1
         with:
           egress-policy: audit
 
@@ -296,7 +295,7 @@ jobs:
       - name: Setup locked Python toolchain
         uses: $/.github/actions/setup-mise
         with:
-          install-args: "--locked python ruff zizmor"
+          install-args: "--locked python ruff zizmor actionlint"
           cache-pnpm: "false"
 
       - name: Install Python test dependencies
@@ -311,14 +310,9 @@ jobs:
       # actionlint reads .github/actionlint.yaml, which ignores the
       # self-repository `uses: $/...` references until rhysd/actionlint#711.
       - name: Action lint
-        env:
-          ACTIONLINT_VERSION: "1.7.11"
         run: |
-          dl="https://raw.githubusercontent.com/rhysd/actionlint"
-          dl="${dl}/main/scripts/download-actionlint.bash"
-          bash <(curl -sL "$dl") "$ACTIONLINT_VERSION"
           find .github/workflows \( -name '*.yml' -o -name '*.yaml' \) \
-            ! -name '*.lock.yml' -print0 | xargs -0 ./actionlint
+            ! -name '*.lock.yml' -print0 | xargs -0 actionlint
 
       - name: Ruff check
         run: ruff check scripts/
@@ -357,7 +351,7 @@ jobs:
     needs: setup
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25  # ratchet:step-security/harden-runner@v2.22.1
         with:
           egress-policy: audit
 
@@ -401,7 +395,7 @@ jobs:
     needs: setup
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25  # ratchet:step-security/harden-runner@v2.22.1
         with:
           egress-policy: audit
 
@@ -458,7 +452,7 @@ jobs:
     needs: changes
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25  # ratchet:step-security/harden-runner@v2.22.1
         with:
           egress-policy: audit
 
@@ -519,7 +513,7 @@ jobs:
         shard: [1, 2]
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25  # ratchet:step-security/harden-runner@v2.22.1
         with:
           egress-policy: audit
 
@@ -568,7 +562,7 @@ jobs:
 
       - name: Upload Playwright report
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # ratchet:actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # ratchet:actions/upload-artifact@v7.0.2
         with:
           name: playwright-report-smoke-chromium-shard-${{ matrix.shard }}
           path: playwright-report/
@@ -591,7 +585,7 @@ jobs:
         shard: [1, 2]
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25  # ratchet:step-security/harden-runner@v2.22.1
         with:
           egress-policy: audit
 
@@ -640,7 +634,7 @@ jobs:
 
       - name: Upload Playwright report
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # ratchet:actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # ratchet:actions/upload-artifact@v7.0.2
         with:
           name: playwright-report-smoke-mobile-chrome-shard-${{ matrix.shard }}
           path: playwright-report/
@@ -663,7 +657,7 @@ jobs:
         shard: [1, 2]
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25  # ratchet:step-security/harden-runner@v2.22.1
         with:
           egress-policy: audit
 
@@ -712,7 +706,7 @@ jobs:
 
       - name: Upload Playwright report
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # ratchet:actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # ratchet:actions/upload-artifact@v7.0.2
         with:
           name: playwright-report-full-chromium-shard-${{ matrix.shard }}
           path: playwright-report/
@@ -792,7 +786,7 @@ jobs:
             total: 4
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25  # ratchet:step-security/harden-runner@v2.22.1
         with:
           egress-policy: audit
 
@@ -904,7 +898,7 @@ jobs:
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # ratchet:actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # ratchet:actions/upload-artifact@v7.0.2
         with:
           name: playwright-report-comprehensive-${{ matrix.suite }}-${{ matrix.shard }}
           path: playwright-report/
@@ -915,7 +909,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25  # ratchet:step-security/harden-runner@v2.22.1
         with:
           egress-policy: audit
 
@@ -941,7 +935,7 @@ jobs:
     if: needs.changes.outputs.deps == 'true'
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25  # ratchet:step-security/harden-runner@v2.22.1
         with:
           egress-policy: audit
 
@@ -1041,7 +1035,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25  # ratchet:step-security/harden-runner@v2.22.1
         with:
           egress-policy: audit
 
