@@ -1,6 +1,6 @@
 ---
 name: pinpoint-pr-workflow
-description: The PR-lifecycle decisions the scripts and gates do not state — draft-first creation, the local Claude Code review and the review record that covers a head, exact-head review evidence, and why every push needs fresh CI and review. Also covers the merge handoff, screenshot gotchas, Dependabot lockfile trap, merge escape hatches, broken merge scripts, and GitHub MCP gotchas. Use when committing, opening or updating a PR, monitoring CI or review, addressing review comments, posting screenshots, handing a PR over to merge, landing the plane after Tim merges, or when a GitHub MCP call does something unexpected.
+description: The PR-lifecycle decisions GitHub's native gates do not state — draft-first creation, Tim's UI approval while a draft, marking ready for the automated Claude Review check, adjudicating its findings, and why every push needs fresh CI and review. Also covers the merge on Tim's request (`gh pr merge`, never `--admin`), keeping the branch up to date, the Dependabot lockfile trap, merge escape hatches, post-merge worktree reaping, and GitHub MCP gotchas. Use when committing, opening or updating a PR, monitoring CI or review, addressing review comments, posting screenshots, merging or reporting a PR ready, landing the plane after a merge, or when a GitHub MCP call does something unexpected.
 ---
 
 # PinPoint PR Workflow
@@ -11,9 +11,9 @@ End-to-end pipeline from "I have changes" to "merged in main".
 
 - Uncommitted changes in tree → **Phase 1: Commit**
 - Local commits, no PR yet → **Phase 2: PR**
-- PR open, CI not yet green-and-clean → **Phase 3: Review**
-- `ready-for-review` label applied → **Phase 4: Merge** (Tim's decision — hand off, or run the script and let him approve the prompt; see below)
-- Tim has merged the PR → **Phase 5: after the merge**
+- PR open, required checks or conversations not yet clean → **Phase 3: Review**
+- Required checks green, every conversation resolved → **Phase 4: Merge** (Tim's decision — report ready, or merge on his explicit request)
+- The PR has merged → **Phase 5: after the merge**
 
 ---
 
@@ -43,9 +43,8 @@ AGENTS.md "Documentation"). With those approved, or with neither in the change, 
 
 Prefer MCP `create_pull_request` for typed argument handling, or `gh pr create` if you're
 already in a shell. Open every agent-created PR as a **GitHub draft**, regardless of
-size (`gh pr create --draft ...`). It stays draft until its review record is posted;
-`record-claude-review.sh` promotes it (3.4). Promotion is separate from the PinPoint
-`ready-for-review` label applied only at the end of Phase 3.
+size (`gh pr create --draft ...`). It stays draft through CI and any UI approval (3.5);
+marking it ready (3.4) is what starts Claude Review.
 
 ### Agent origin
 
@@ -97,17 +96,13 @@ Closes #N (if applicable)
 
 ---
 
-## Phase 3: Review (CI + review + label)
+## Phase 3: Review (CI, UI approval, Claude Review, threads)
 
-### Waiting on CI or review
+The order: push → CI (3.1) → while still a draft, Tim's UI approval if the diff touches a UI path (3.5) → mark ready → Claude Review (3.4) → adjudicate its findings and every other thread (3.2–3.3). Each later push repeats CI and Claude Review on the new commits.
 
-Run the watcher as a background command (Claude Code: Bash with `run_in_background`; other harnesses: their background-task equivalent) so the wait costs no tokens:
+### Waiting on CI
 
-```bash
-python3 scripts/workflow/pr-watch.py <PR> --phase <ci|review> --expected-head <HEAD_SHA>
-```
-
-It polls until a terminal verdict, then prints one JSON object on stdout (progress goes to stderr) and exits 0 passed / 1 act on it / 2 timed out or undetermined. Never hand-roll a polling loop.
+Run the watcher as a background command (Claude Code: Bash with `run_in_background`; other harnesses: their background-task equivalent) so the wait costs no tokens. It polls until a terminal verdict, then prints one JSON object on stdout (progress goes to stderr) and exits 0 passed / 1 act on it / 2 timed out or undetermined. Never hand-roll a polling loop.
 
 ---
 
@@ -119,13 +114,13 @@ After pushing a commit at `HEAD_SHA`, watch CI in the background:
 python3 scripts/workflow/pr-watch.py <PR> --phase ci --expected-head <HEAD_SHA>
 ```
 
-A green `CI Gate` on the current head is what starts the local review (3.4). A green run
-for an older SHA does not qualify.
+A green `CI Gate` on the current head is what the ruleset requires. A green run for an
+older SHA does not qualify.
 
 **Handling the CI result**:
 
-- `outcome: "passed"` (exit 0): CI Gate passed on `HEAD_SHA`. Run the local review in 3.4.
-- `outcome: "failed"` (exit 1): A run or CI Gate failed. When it can fetch the failed-step log, the watcher saves it and returns its path as `failure_artifact` (under `tmp/gh-monitor/`); if `failure_artifact` is null, open `detail_url` for the run log. Address the failure, commit, and push.
+- `outcome: "passed"` (exit 0): CI Gate passed on `HEAD_SHA`, and on a ready PR Claude Review passed too. On a draft, continue with 3.5 (UI paths) or mark ready (3.4). On a ready PR, adjudicate the `unresolved_threads` it reports (3.3).
+- `outcome: "failed"` (exit 1): CI Gate or Claude Review failed; `ci_gate` and `claude_review` say which. When it can fetch the failed-step log, the watcher saves it and returns its path as `failure_artifact` (under `tmp/gh-monitor/`); if `failure_artifact` is null, open `detail_url` for the run log. Address the failure, commit, and push.
   - If judged to be a GitHub Actions **infra** flake (network timeout, runner loss, download 5xx, container start): log it with `bash scripts/workflow/log-gha-flake.sh <pr> <run-id> <class> "<symptom>"` before retrying.
 - `outcome: "stale"` (exit 1): The PR head moved away from `expected_head`. The owner re-checks branch state.
 - `outcome: "conflicting"` (exit 1): Merge conflict developed (`DIRTY` or `CONFLICTING`). Merge `origin/main` into the branch and push.
@@ -139,53 +134,18 @@ Read threads via `mcp__github__pull_request_read(method: "get_review_comments", 
 
 Fixing, declining with a one-sentence signed reply, and resolving the thread is AGENTS.md §5 "Review comments"; the rubric is `REVIEW.md`.
 
-Every unresolved thread counts, whoever opened it — the `threads` gate is author-agnostic. Resolve or decline each one before moving on.
+Every unresolved thread counts, whoever opened it — Claude Review's findings, Tim's comments, another agent's. The ruleset requires every conversation resolved, so fix or decline each one and resolve it.
 
-### 3.4 Get the head commit reviewed
+### 3.4 Claude Review
 
-The reviewer is Claude Code's built-in `/code-review`, run by the owning agent in its own session against the PR's exact head (spec `docs/feature-specs/pr-lifecycle-monitoring.md` §8). What covers the head is the **review record** that run leaves on the PR, not the run itself.
+The reviewer is the required `Claude Review` check (`.github/workflows/claude-review.yaml`, spec `docs/feature-specs/pr-lifecycle-monitoring.md`). It reads `REVIEW.md` from `main`, so a PR cannot rescope its own review.
 
-1. **Pick the level.** With current-head CI green and the PR head checked out:
-   ```bash
-   bash scripts/workflow/claude-review-level.sh
-   ```
-   Line 1 is `low`, `medium`, `high`, or `ask`. On `ask` (over 3,000 weighted lines), stop and ask Tim whether to run `xhigh` or `max`, or to split the PR. The record accepts all five levels; record the level the review actually ran at.
-2. **Review.** Invoke the `code-review` skill with the level first, then the PR number: `medium 1234`. The reverse order (`1234 medium`) silently runs at the last-used level.
-3. **Adjudicate every finding.** Fix it, or decline it with a one-sentence reason. Keep one findings file across all rounds (format in the header of `record-claude-review.sh`): each finding's round, file, line and summary, with `fixed` plus the fixing commit or `declined` plus the reason.
-4. **Re-review until clean.** After pushing fixes, wait for replacement CI, then repeat step 2 on the new head at the same level. The loop ends on a round that raises nothing new; a finding re-raised after a decline stays declined.
-5. **Record and promote.**
-   ```bash
-   bash scripts/workflow/record-claude-review.sh <PR> --level <level> --findings <file>
-   ```
-   It requires the local checkout to be the PR's current head with no uncommitted changes, and every finding to be fixed or declined. It posts the SHA-pinned record, which lists every finding for Tim, and marks a draft PR ready. `--dry-run` prints the record without posting.
+1. **Mark ready.** With current-head CI green and any UI approval in (3.5): `gh pr ready <PR>`. Claude Review runs on that event with a full review of the PR. On a draft its job is skipped.
+2. **Wait for it.** After `gh pr ready`, run the 3.1 watch again on the same head: on a ready PR it waits for Claude Review as well as CI Gate, and its verdict counts the unresolved threads.
+3. **Adjudicate every finding.** Findings arrive as inline review comments: fix each, or decline it with a one-sentence signed reply, then resolve the thread (3.3). A finding re-raised after a decline gets the same reply and is resolved again.
+4. **Every push is reviewed.** Each later push gets an incremental review of its new commits (main's changes left out), with fresh CI. A comment starting with `/claude-review` re-runs the latest run on the current head, for a run that failed or never ran.
 
-Post a record only for a head the review actually ran on. The gate cannot tell a real review from a fabricated record; Tim reads the findings list before he merges.
-
-The review runs inside the session, so there is nothing to wait for; `pr-watch.py --phase review` is only needed to confirm the gate reads the record. Until its subscription ends, the gate also accepts exact-head Codex evidence already on a PR; request none.
-
-#### Merging without a review
-
-Only a review record covers a head. When Tim reviewed a PR himself, or wants it merged without a review, he says so explicitly, and you run the guarded merge with `--force`. A draft must be promoted first (`gh pr ready <PR>`), since GitHub will not merge a draft:
-
-```bash
-bash scripts/workflow/merge-pr.sh <PR> --human --force
-```
-
-`--force` bypasses only the `threads` and `reviewed` gates; CI, authorship and merge conflicts still apply. Never add `--force` on your own initiative.
-
-#### Pushing after the review
-
-Any push invalidates review coverage for the previous SHA — except a clean merge of `main`,
-which the gate carries the record across (PP-ojoj). Any other push needs replacement CI, a
-new review round, and a new record (3.4 steps 4–5).
-
-#### Readiness is not review
-
-`pr-watch.py --check-ready` reports review state but does **not** gate on it. It answers
-whether current-head CI allows the review to start; gating on review there would be
-circular. A PR may be GitHub-ready while still lacking the
-final PinPoint `ready-for-review` label. Do not call it merge-ready until 3.6 is
-satisfied.
+A local `/code-review` by the owning agent is optional, useful before marking a large change ready so findings are fixed before they become threads. Pass the level first, then the PR number (`medium 1234`; the reverse order silently runs at the last-used level, and omitting the PR number diffs against a possibly stale local `main`). It leaves no gate evidence.
 
 ### 3.5 Get Tim's UI approval (UI-touching PRs, while still a draft)
 
@@ -205,78 +165,46 @@ When the diff touches a path in `scripts/workflow/ui-paths.txt` (`src/app/**/*.t
 
 The approval carries across later commits that touch no UI path, so E2E updates after sign-off pass on their own. A later UI change makes the new head wait again; show Tim what changed and repeat step 3. A UI-path edit with no rendered effect (a refactor, a type-only change) still waits: tell Tim it renders nothing new and let him approve it from the description.
 
-### 3.6 Apply `ready-for-review` label
-
-Once CI green + an exact-head review record (3.4) + zero unresolved review threads + no merge conflict + a passing `UI Approval` (3.5), apply the label via `mcp__github__issue_write(method: "update", …)` or `gh pr edit <PR> --add-label ready-for-review`.
-
-The label signals readiness, not merge authorization. A direct request from Tim in the active task authorizes the owning agent to run the guarded merge script; the script rechecks all gates.
-
-**The label does not get the PR reviewed.** Applying it on a PR whose head is past its last review — or that was never reviewed at all — just moves the failure to merge time.
-
 ---
 
-## Phase 4: Merge — Tim's decision (PP-wi85)
+## Phase 4: Merge — Tim's decision
 
-**Tim decides whether to merge.** If he explicitly requests it in the active task (for example, “merge it” with one unambiguous PR), the owning agent in any harness runs `bash scripts/workflow/merge-pr.sh <PR> --human`. The flag records Tim’s authorization; he need not repeat it in a shell. The script rechecks CI, exact-head review, unresolved threads, and conflicts. Claude Code and Codex also show a permission prompt; the direct user request authorizes the agent to initiate the guarded merge in every harness. If the PR target is ambiguous, clarify it. If a gate fails, stop and report the blocker. Raw channels (`gh pr merge`, `gh api PUT .../merge`, MCP `merge_pull_request`) remain prohibited for agents because they skip the gates. In PinPoint sessions Claude Code and Codex deny the raw merge channels for every repository; merge another repository's PR from that repository.
+**Tim decides whether to merge.** GitHub's ruleset `6326455` enforces the gates natively: required checks `CI Gate`, `Claude Review`, and `UI Approval`, every conversation resolved, and the branch up to date with `main`. Green checks alone never authorize a merge; Tim's explicit request does.
 
-### 4.1 Handoff by default; merge on explicit request
+### 4.1 Report ready by default; merge on explicit request
 
-Once 3.1–3.6 are satisfied, hand off with the report below if Tim has not requested a merge. If he has directly requested it, run the guarded script instead and verify the PR reached `MERGED`; do not ask him to repeat the request. Readiness alone never authorizes merging.
+**Without an explicit merge request**, report the PR as ready: its URL and the output of `gh pr checks <PR> --required`. Add prose only for what the checks cannot say (why a finding was declined, what to watch on deploy).
+
+**When Tim directly asks to merge** an unambiguous PR (for example, “merge it” with one PR in play), the owning agent in any harness runs it; he need not repeat the decision in a shell. If the target is ambiguous, clarify it first.
 
 ```bash
-bash scripts/workflow/merge-handoff.sh <PR>
+gh pr merge <PR> --squash          # gates already pass
+gh pr merge <PR> --auto --squash   # GitHub merges once the required checks pass
 ```
 
-It prints what Tim needs to decide whether to merge — which review ran and whether it covers head, how many commits landed since, CI, threads, mergeable + how far behind main, when main was last merged in, the diff split into src / tests / docs / other, migrations, newly-registered env vars, UI + screenshots — and ends with two `!`-prefixed commands: one to re-run the report, one to merge.
+Use `--auto` when checks are still running. Say “merged” only after `gh pr view <PR> --json state` reads `MERGED`; an auto-merge that is armed but not yet merged is “queued to merge”.
 
-**Why a script and not a format you fill in.** Every line of it is a fact you would otherwise be recalling: how many commits back the review was, what the line counts are, whether main has been merged in. Those are exactly the claims that drift, and Tim acts on them. `git` and `gh` already know all of it. Paste the block; add prose only for what the block cannot know (why a finding was declined, what to watch on deploy).
+**Behind main.** The ruleset requires the branch up to date. Bring it current with `gh pr update-branch <PR>`, which merges `main` into the branch (never `--rebase`; AGENTS.md §5 Branches). The new head gets fresh CI and an incremental Claude Review.
 
-**The re-run line is part of the report, not decoration.** The block is a snapshot and is stale as soon as CI re-runs or anyone pushes. Tim re-runs it himself rather than asking you to re-check.
-
-**The merge command only appears when all four gates actually pass.** An un-ready PR gets the blocking reasons instead — so don't hand over a merge command the report didn't print. If CI is still running, the report says so; hand him the automerge form, which waits rather than making him come back. Get the head reviewed first (Phase 3.4); automerge waits out CI, not an unreviewed head:
-
-```
-! scripts/workflow/merge-pr.sh <PR> --human --automerge
-```
-
-Push completed work. Without an explicit merge request, report that the PR is ready for Tim and give the guarded command. After his explicit request, run the script and say “merged” only after verifying its result.
+**A refused merge means a gate is unmet.** Read `gh pr checks <PR> --required` and the unresolved conversations, fix what is missing, and merge again. `gh pr merge` is the one merge path: `--admin` is denied to agents (they act through Tim's account, and the ruleset's admin bypass is his), as are the raw API and MCP merge channels.
 
 ### 4.2 Escape hatches (Tim decides; you can inform, not invoke)
 
-`merge-pr.sh` evaluates **4 gates**: `ci`, `threads`, `reviewed`, `no_conflict`. `--force` bypasses the review-state pair (`threads` + `reviewed`); `--bypass-merge-requirements` bypasses `ci` and passes `--admin`. Each bypass requires a separate explicit request from Tim; “merge it” alone authorizes neither. The `no_conflict` gate is NEVER bypassable; GitHub rejects conflicting merges regardless of `--admin`.
+When a gate cannot pass for reasons unrelated to the change (an infrastructure flake, a broken workflow, an emergency hotfix), tell Tim which gate and why, and let him choose: he merges himself, or uses his admin bypass. Log a GitHub Actions flake first with `bash scripts/workflow/log-gha-flake.sh <pr> <run-id> <class> "<symptom>"` (see `docs/runbooks/gha-flake-log.md`). Do not suggest a bypass when a merge conflict exists or the change has not been manually verified safe.
 
-**On any FAIL the script removes the `ready-for-review` label if present** (and likewise on the `--automerge` RED path). The label's contract is "click-merge-without-thinking"; if a gate fails at merge time that contract is broken, so the label goes. Practical consequence: after Tim reports a FAIL, fix the underlying issue, push, and **re-apply the label** (3.6) before re-handing him the `--human` command — don't assume it survived.
+### 4.3 Dependabot PRs: back-to-back lockfile merges
 
-**A `reviewed` FAIL is a `--force` case only when Tim says so** — he reviewed the PR himself, or wants it merged unreviewed (3.4 "Merging without a review"). Otherwise `not reviewed` means no checker covers head, `stale review` means you pushed past the review record, and `changes requested` means a reviewer asked for changes on this head (or threads are open) — all describe an unfinished PR, not a broken gate. Run the review and post the record (3.4).
+When two or more Dependabot PRs that both touch `pnpm-lock.yaml` (or any lockfile) are open at once, the second can carry a lockfile that is broken against current `main`.
 
-`--bypass-merge-requirements` is for a required check failing for known-irrelevant reasons (infrastructure flake, unrelated job) where the change has been manually verified safe — log the flake first with `bash scripts/workflow/log-gha-flake.sh <pr> <run-id> <class> "<symptom>"` (see `docs/runbooks/gha-flake-log.md`) — or an emergency hotfix where waiting for CI is not acceptable. Do NOT suggest bypassing when a merge conflict exists, or when the underlying state hasn't been manually verified.
+**The trap:** each Dependabot PR's lockfile diff adds entries in slightly different alphabetical zones based on its own snapshot of main. After the first PR merges, git's textual three-way merge of the second doesn't see a conflict because the additions live in non-overlapping line ranges — but both PRs may add the _same_ transitive dep (e.g., `brace-expansion@5.0.6`). The merged lockfile carries a duplicated mapping key, which `pnpm install --frozen-lockfile` rejects with `ERR_PNPM_BROKEN_LOCKFILE`.
 
-### 4.3 If `merge-pr.sh` itself is broken
+**Why `rebase-strategy: auto` in `.github/dependabot.yml` doesn't save you:** "auto" means Dependabot rebases when _the dependency version_ is out of date, not when _the lockfile region_ has shifted under it. Two independent Dependabot PRs against the same main can both stay "current" by Dependabot's definition while their lockfile diffs collide.
 
-An owning agent can run `merge-pr.sh` after Tim’s explicit request, but that does not help when the script itself is broken. Raw channels remain prohibited for agents. If a hotfix genuinely cannot wait for a script fix, tell Tim why and let him choose a manual path in his own shell; do not work around the guard.
+**What the up-to-date rule changes:** the ruleset requires the branch current with `main`, so the second PR must be updated before it can merge, and the duplicate key then fails `Setup Dependencies` in that PR's CI instead of breaking `main`. A red `Setup Dependencies` with `ERR_PNPM_BROKEN_LOCKFILE` on an updated Dependabot PR is this trap, not a flake.
 
-### 4.4 Dependabot PRs: rebase before merging back-to-back
+**Rule:** after the first of two lockfile-touching Dependabot PRs merges, comment `@dependabot rebase` on each remaining one (Dependabot's own command: it regenerates the lockfile against current `main`, which dedupes the entry). `gh pr update-branch <PR>` also brings it current, but a textual merge keeps the duplicate, so prefer the Dependabot rebase for lockfile PRs. Wait for the regenerated PR's CI before reporting it ready.
 
-When two or more Dependabot PRs that both touch `pnpm-lock.yaml` (or any lockfile) are open simultaneously, merging them in succession without rebasing the second-and-later PRs can silently break the lockfile.
-
-**The trap:** each Dependabot PR's lockfile diff adds entries in slightly different alphabetical zones based on its own snapshot of main. After the first PR merges, git's textual three-way merge of the second PR doesn't see a conflict because the additions live in non-overlapping line ranges — but both PRs may add the _same_ transitive dep (e.g., `brace-expansion@5.0.6`). The squash-merge produces a lockfile with a duplicated mapping key, which `pnpm install --frozen-lockfile` rejects with `ERR_PNPM_BROKEN_LOCKFILE`. Every new PR's `Setup Dependencies` then fails until main is fixed.
-
-**Why `rebase-strategy: auto` in `.github/dependabot.yml` doesn't save you:** "auto" means Dependabot rebases when _the dependency version_ is out of date, not when _the lockfile region_ has shifted under it. Two independent Dependabot PRs against the same main can both stay "current" by Dependabot's definition while their lockfile diffs collide on merge.
-
-**Rule:** when merging the first of two or more Dependabot PRs that both touch a lockfile, comment `@dependabot rebase` on each remaining Dependabot PR before merging it. Dependabot regenerates the lockfile against post-first-merge main and the duplicate is deduped automatically. Wait for the rebased CI to pass before handing Tim the `--human` command for the second PR.
-
-**Casework:** 2026-05-19 — PRs #1379 and #1381 each added `brace-expansion@5.0.6:` to `packages:` independently. Both merged within ~1 minute. Main's `Setup Dependencies` broke until a manual dedup of `pnpm-lock.yaml` was bundled into PR #1383 alongside that PR's primary E2E locator fix.
-
-**Quick triage check before merging the second of two open Dependabot PRs:**
-
-```bash
-# How many commits is the PR's branch behind origin/main?
-# behind_by > 0 means the PR's lockfile snapshot predates current main.
-pr_branch=$(gh pr view <second_pr> --json headRefName --jq .headRefName)
-gh api "repos/{owner}/{repo}/compare/main...$pr_branch" --jq '.behind_by'
-```
-
-If `behind_by > 0`, comment `@dependabot rebase` on the PR and wait for the rebased CI to pass before handing Tim the `--human` command. Do not use `gh pr view --json baseRefOid` for this — `baseRefOid` is the base branch's current SHA at query time, so it always equals `origin/main` and cannot detect a stale PR head.
+**Casework:** 2026-05-19 — PRs #1379 and #1381 each added `brace-expansion@5.0.6:` to `packages:` independently. Both merged within ~1 minute, before branches had to be up to date. Main's `Setup Dependencies` broke until a manual dedup of `pnpm-lock.yaml` was bundled into PR #1383.
 
 ---
 
@@ -292,9 +220,17 @@ Work isn't done at "git push" — it's done when the change is **merged, deploye
 
 ### 5.2 Cleanup — non-destructive now, destructive on confirmation
 
-Close the bead, file genuine follow-up beads, and hand off freely. For destructive cleanup (removing worktrees, deleting branches/volumes), wait for explicit confirmation.
+Close the bead, file genuine follow-up beads, and hand off freely. For destructive cleanup beyond the merged branch's own worktree (deleting other branches or volumes), wait for explicit confirmation.
 
-**Stop the merged branch's services.** Once the PR merges, stop the dev server you started (`pnpm run dev:stop` from inside the worktree, or `preview_stop` for one `preview_start` launched) and the worktree's Supabase stack (`pnpm supabase:stop` from inside the worktree — data is kept, `pnpm supabase:start` brings it back). A merged branch's stack is idle memory on a host running several of them. Skip it when you have a concrete reason the stack is still in use: follow-up work in this same worktree is next, Tim is still looking at the preview, or another session shares the stack. Say which you did in the hand-off. If `merge-pr.sh` already reaped the worktree, the reap removed the stack and its volumes — unless it reported the volume state `UNKNOWN`, in which case run `python3 scripts/worktree_reap.py --apply`.
+**Stop the merged branch's services.** Once the PR merges, stop the dev server you started (`pnpm run dev:stop` from inside the worktree, or `preview_stop` for one `preview_start` launched) and the worktree's Supabase stack (`pnpm supabase:stop` from inside the worktree — data is kept, `pnpm supabase:start` brings it back). A merged branch's stack is idle memory on a host running several of them. Skip it when you have a concrete reason the stack is still in use: follow-up work in this same worktree is next, Tim is still looking at the preview, or another session shares the stack. Say which you did in the hand-off.
+
+**Then reap the merged worktree:**
+
+```bash
+python3 scripts/worktree_reap.py --apply --branch <branch>
+```
+
+It removes the merged branch's worktree, its Supabase stack and volumes, and its slot, only on positive proof (the merged PR's head is local `HEAD` and the tree is clean); anything else it leaves alone and reports. A worktree that still holds a live process, your own session's shell included, reads KEEP and stays; a later run from another session, or the SessionStart reap nudge, reclaims it. If it reports the volume state `UNKNOWN`, run `python3 scripts/worktree_reap.py --apply` once the daemon is reachable. Skip the reap for the same reasons you skip stopping the stack.
 
 ### 5.3 Hand off
 
@@ -313,4 +249,4 @@ Hand off for the next session, and post to the huddle daily bead if other sessio
 ## Cross-reference
 
 - Status tokens (`PASS`/`FAIL`/`WAIT`/`WARN`/`BLOCK`) and what to do for each: `scripts/workflow/AGENTS.md`
-- Spec: `docs/superpowers/specs/2026-05-16-pinpoint-pr-workflow-consolidation-design.md`
+- Spec: `docs/feature-specs/pr-lifecycle-monitoring.md`
