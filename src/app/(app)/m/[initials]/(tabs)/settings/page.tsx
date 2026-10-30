@@ -1,11 +1,12 @@
 import type React from "react";
 import { notFound } from "next/navigation";
-import { getMachineForLayout } from "~/app/(app)/m/[initials]/_data";
+import {
+  getMachineForLayout,
+  getMachineSettingsSetsFor,
+} from "~/app/(app)/m/[initials]/_data";
+import { getSettingsTags } from "~/app/(app)/m/settings-sheets/_data";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
-import { getMachineSettingsSets } from "~/lib/machines/settings-queries";
-import { getSettingsTagOptions } from "~/lib/machines/settings-sheet-queries";
 import { getViewer } from "~/lib/auth/viewer";
-import { db } from "~/server/db";
 import { SettingsTab } from "~/components/machines/settings/SettingsTab";
 
 // The soft-keyboard `interactive-widget=resizes-content` viewport now ships
@@ -44,12 +45,12 @@ export default async function MachineSettingsTab({
   });
 
   const [sets, allTags] = await Promise.all([
-    getMachineSettingsSets(db, machine.id, {
+    getMachineSettingsSetsFor(machine.id, {
       viewerId: userId ?? null,
       access,
       machineOwnerId,
     }),
-    getSettingsTagOptions(db),
+    getSettingsTags(),
   ]);
 
   return (

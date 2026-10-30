@@ -4,14 +4,13 @@ import { Gamepad2 } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getViewer } from "~/lib/auth/viewer";
-import { db } from "~/server/db";
 import { getLoginUrl } from "~/lib/url";
 import {
   getMyCollections,
   getOwnedMachineCount,
   getSharedWithMe,
 } from "~/lib/collections/list";
-import { getCollectionPickerMachines } from "~/lib/collections/user";
+import { getPickerMachines } from "~/app/(app)/c/[id]/_data";
 import { ownerMachinesHref } from "~/lib/machines/links";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
@@ -30,7 +29,7 @@ export default async function MyCollectionsPage(): Promise<React.JSX.Element> {
   const [owned, shared, allMachines, ownedMachineCount] = await Promise.all([
     getMyCollections(undefined, userId),
     getSharedWithMe(undefined, userId),
-    getCollectionPickerMachines(db, null),
+    getPickerMachines(null),
     getOwnedMachineCount(undefined, userId),
   ]);
 

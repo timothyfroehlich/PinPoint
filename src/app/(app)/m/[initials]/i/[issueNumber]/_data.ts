@@ -1,13 +1,15 @@
 import "server-only";
 
-import { and, eq } from "drizzle-orm";
+import { cache } from "react";
+import { and, asc, eq, ne, notInArray, sql } from "drizzle-orm";
 
 import { resolveIssueActivityEvents } from "~/lib/timeline/events";
 import { loadMentionNames } from "~/lib/tiptap/mention-names";
 import { applyMentionNames } from "~/lib/tiptap/types";
+import { CLOSED_STATUSES } from "~/lib/issues/status";
 import type { IssueWithAllRelations } from "~/lib/types";
 import { db } from "~/server/db";
-import { issues } from "~/server/db/schema";
+import { issues, userProfiles } from "~/server/db/schema";
 
 /**
  * The issue detail page's issue, with its machine, people, comments, images,
@@ -123,3 +125,56 @@ export async function getIssueForDetail(
     })),
   };
 }
+
+/**
+ * The machine's other open issues for the Other issues section: the newest
+ * `limit` of them, and how many there are in all (spec §10.5, §11.1). Both
+ * queries run in parallel.
+ */
+export const getOtherOpenIssues = cache(
+  async (initials: string, issueNumber: number, limit: number) => {
+    const otherOpenIssues = and(
+      eq(issues.machineInitials, initials),
+      ne(issues.issueNumber, issueNumber),
+      notInArray(issues.status, [...CLOSED_STATUSES])
+    );
+    const [rows, count] = await Promise.all([
+      db.query.issues.findMany({
+        where: otherOpenIssues,
+        columns: {
+          id: true,
+          issueNumber: true,
+          title: true,
+          status: true,
+          severity: true,
+          priority: true,
+          frequency: true,
+          machineInitials: true,
+          createdAt: true,
+          reporterName: true,
+        },
+        orderBy: (otherIssue, { desc }) => [desc(otherIssue.createdAt)],
+        limit,
+      }),
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(issues)
+        .where(otherOpenIssues)
+        .then((result) => result[0]?.count ?? 0),
+    ]);
+    return { issues: rows, count };
+  }
+);
+
+/**
+ * Everyone an issue can be assigned to — every account that is not a guest —
+ * by name, for the triage picker. Only id and name (CORE-SEC-007).
+ * `cache()`-wrapped per request.
+ */
+export const getAssigneeRoster = cache(async () =>
+  db
+    .select({ id: userProfiles.id, name: userProfiles.name })
+    .from(userProfiles)
+    .where(notInArray(userProfiles.role, ["guest"]))
+    .orderBy(asc(userProfiles.name))
+);

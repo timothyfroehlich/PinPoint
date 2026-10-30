@@ -42,13 +42,14 @@ export interface CollectionForLayout {
 const uuidSchema = z.uuid();
 
 /**
- * Request-deduped machine choice for the collection edit/add pickers: every
- * machine not marked Removed, plus the collection's own (spec 2.7). The
+ * Request-deduped machine choice for the collection create/edit/add pickers:
+ * every machine not marked Removed, plus the collection's own (spec 2.7). The
  * layout's Edit modal and the empty Overview's inline picker both need it;
- * caching collapses them to one query.
+ * caching collapses them to one query. My Collections' Create dialog passes
+ * null, for a collection not yet created.
  */
 export const getPickerMachines = cache(
-  async (collectionId: string): Promise<PickerMachine[]> =>
+  async (collectionId: string | null): Promise<PickerMachine[]> =>
     getCollectionPickerMachines(db, collectionId)
 );
 
