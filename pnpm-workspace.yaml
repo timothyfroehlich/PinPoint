@@ -54,3 +54,4 @@ overrides:
   source-map-js: '>=1.2.2 <2'
   dompurify: '>=3.4.16 <4'
   fast-copy: '>=4.1.0 <5'
+  zod: '>=4.6.6 <5'
