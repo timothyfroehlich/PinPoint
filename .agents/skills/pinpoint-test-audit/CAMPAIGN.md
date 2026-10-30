@@ -81,7 +81,7 @@ Read the ledger as a whole to find redundant layers, not just redundant tests:
 
 Merge `origin/main`. When `main` added tests to a file this lane deleted, port those contracts into the keeper. Run `pnpm run check` and the keepers again, then land per SKILL.md. Add the lane's line diff (production and test) and mutation results to the PR body.
 
-**Done when:** the PR is open per `pinpoint-pr-workflow`, CI passes, the review record is posted, and the lane bead's notes carry the PR.
+**Done when:** the PR is open per `pinpoint-pr-workflow`, CI and Claude Review pass with every conversation resolved, and the lane bead's notes carry the PR.
 
 ## Defect bead
 

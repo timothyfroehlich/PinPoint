@@ -430,10 +430,9 @@ export async function logoutAction(): Promise<void> {
     const { error } = await supabase.auth.signOut({ scope: "local" });
 
     if (error) {
-      log.error(
-        { userId: user?.id, err: error.message, action: "logout" },
-        "Logout failed"
-      );
+      // supabase-js filters the expected no-session/expired-JWT responses, so
+      // an error here is unexpected.
+      reportError(error, { action: "logout", userId: user?.id });
 
       return; // Early exit without redirect
     }
@@ -446,7 +445,8 @@ export async function logoutAction(): Promise<void> {
     reportError(cause, { action: "logout" });
   }
 
-  // Always redirect to dashboard after logout attempt
+  // Redirect after a successful logout or a thrown failure. A returned signOut
+  // error exits early above without redirecting.
   redirect("/dashboard");
 }
 
@@ -615,7 +615,20 @@ export async function resetPasswordAction(
       { userId: user.id, action: "reset-password" },
       "Password updated successfully"
     );
-    await supabase.auth.signOut();
+    // Best-effort: GoTrue already revoked the user's other sessions when the
+    // password changed, so this only ends the current one, and a failure must
+    // not turn into an "unexpected error" response. supabase-js filters the
+    // expected no-session responses, so a returned error is unexpected.
+    try {
+      const { error: signOutError } = await supabase.auth.signOut();
+      if (signOutError) throw signOutError;
+    } catch (signOutError) {
+      reportError(signOutError, {
+        action: "reset-password.signOut",
+        bestEffort: true,
+        userId: user.id,
+      });
+    }
     redirect("/login");
   } catch (error) {
     // If redirect was thrown, re-throw it

@@ -67,6 +67,19 @@ updates:
     # 2 week cooldown for all GitHub Actions updates
     cooldown:
       default-days: 14
+    # Group minor and patch action bumps into one PR per wave, mirroring the
+    # npm block's minor-patch-updates group. Major bumps stay ungrouped (not in
+    # update-types) so each still gets its own review. Security updates are
+    # intentionally left ungrouped here — they're rare for actions. Grouping
+    # cuts PR count and human merges only: unlike pnpm updates, action bumps
+    # don't touch pnpm-lock.yaml, so there are no lockfile-rebase collisions to
+    # avoid. PP-d2mr
+    groups:
+      minor-patch-updates:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
     labels:
       - "dependencies"
       - "github-actions"

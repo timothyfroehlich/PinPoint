@@ -222,6 +222,13 @@ describe("updateSession public route access", () => {
     "/c/tags/other/needs-rubbers",
     "/c/settings-tags",
     "/c/settings-tags/bat-city-2025",
+    // Shared collection views: a uuid or 32-char base64url view token, plus
+    // its Issues and Timeline tabs.
+    "/c/00000000-0000-4000-8000-000000000000",
+    "/c/0A1B2C3D-0000-4000-8000-00000000ABCD/issues",
+    "/c/AbCdEfGhIjKlMnOpQrStUvWxYz01_-23",
+    "/c/AbCdEfGhIjKlMnOpQrStUvWxYz01_-23/issues",
+    "/c/AbCdEfGhIjKlMnOpQrStUvWxYz01_-23/timeline",
   ];
 
   it.each(publicRoutes)("allows unauthenticated access to %s", async (path) => {
@@ -242,6 +249,16 @@ describe("updateSession public route access", () => {
     "/admin/users",
     "/notifications",
     "/dev/badges",
+    // /c/ is an allowlist (PP-u79s): the owner-only list and any route not
+    // opted in — a new page, a new collection tab, a malformed handle — gate.
+    "/c",
+    "/c/collections",
+    "/c/collections/new",
+    "/c/foo",
+    "/c/AbCdEfGhIjKlMnOpQrStUvWxYz01_-23/settings",
+    "/c/AbCdEfGhIjKlMnOpQrStUvWxYz01_-234",
+    "/c/AbCdEfGhIjKlMnOpQrStUvWxYz01_-2",
+    "/c/00000000-0000-4000-8000-000000000000/issues/extra",
   ];
 
   it.each(protectedRoutes)(
