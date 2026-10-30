@@ -84,11 +84,13 @@ jobs:
               echo "::warning::$line"
             elif [[ "$behind" == 0 ]]; then
               line="#$number: up to date"
-            elif gh api -X PUT "repos/$GITHUB_REPOSITORY/pulls/$number/update-branch" \
-                -f expected_head_sha="$head" > /dev/null; then
+            elif err=$(gh api -X PUT "repos/$GITHUB_REPOSITORY/pulls/$number/update-branch" \
+                -f expected_head_sha="$head" 2>&1 > /dev/null); then
               line="#$number: merged main in ($behind commits behind)"
             else
-              line="#$number: not updated (merge conflict, or the head moved); the owning session merges main in"
+              # GitHub's message tells a conflict apart from a missing permission
+              # or a rate limit; only a conflict is the owning session's to fix.
+              line="#$number: not updated: ${err//$'\n'/ }"
               echo "::warning::$line"
             fi
             echo "- $line" >> "$GITHUB_STEP_SUMMARY"
