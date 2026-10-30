@@ -1,0 +1,95 @@
+# Auto-update branches: keep PRs that Tim has said to merge up to date with main
+# (PP-zxlq.8).
+#
+# The ruleset (6326455) requires a branch to be up to date with main before it
+# merges. When several PRs are set to merge, each one that lands puts the rest
+# behind. After every push to main, this merges main into each open, non-draft
+# PR from this repository that has auto-merge armed and is behind, through the
+# update-branch API. CI, Claude Review and UI Approval then run on the updated
+# head as on any push, and GitHub merges it once they pass. A clean merge of main
+# passes Claude Review and UI Approval without a new review or sign-off.
+#
+# PRs without auto-merge armed are never touched: their sessions are still
+# working, and an update would only make them pull before their next push. A PR
+# whose update conflicts is left as it is and listed in the job summary; its
+# owning session merges main in and resolves the conflict. Bot PRs (Dependabot,
+# Renovate) are skipped: a commit pushed by anyone else makes the bot stop
+# rebasing its PR, and a lockfile PR needs the bot's regenerated lockfile
+# (`@dependabot rebase`), not a textual merge (pinpoint-pr-workflow Phase 4).
+#
+# Token: a commit made with GITHUB_TOKEN starts no workflows, so the updated PR
+# would never get its required checks. The update uses an installation token of
+# Tim's GitHub App instead (variable AUTO_UPDATE_APP_CLIENT_ID, secret
+# AUTO_UPDATE_APP_PRIVATE_KEY). The App needs Contents, Pull requests and
+# Workflows write; Workflows because main's new commits can include workflow
+# files. It is not a ruleset bypass actor, so it cannot skip a gate. The job is
+# skipped until the variable is set.
+
+name: Auto-update branches
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  # A newer push to main supersedes a run in progress; the next run finds every
+  # PR that is still behind.
+  group: auto-update-branches
+  cancel-in-progress: true
+
+jobs:
+  update:
+    name: Update PRs set to merge
+    if: vars.AUTO_UPDATE_APP_CLIENT_ID != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions: {}
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
+        with:
+          egress-policy: audit
+
+      - name: Create an App token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510  # ratchet:actions/create-github-app-token@v3.3.0
+        with:
+          client-id: ${{ vars.AUTO_UPDATE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.AUTO_UPDATE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-workflows: write
+
+      - name: Merge main into PRs set to merge
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          prs=$(gh pr list --repo "$GITHUB_REPOSITORY" --base main --state open --limit 100 \
+            --json number,author,isDraft,isCrossRepository,autoMergeRequest,headRefOid \
+            --jq '.[] | select(.autoMergeRequest != null and (.isDraft | not) and (.isCrossRepository | not)
+                               and (.author.is_bot | not))
+                      | "\(.number) \(.headRefOid)"')
+          {
+            echo "## PRs set to merge"
+            [[ -n "$prs" ]] || echo "None."
+          } >> "$GITHUB_STEP_SUMMARY"
+          while read -r number head; do
+            [[ -n "$number" ]] || continue
+            behind=$(gh api "repos/$GITHUB_REPOSITORY/compare/main...$head" --jq .behind_by) || behind=""
+            if [[ -z "$behind" ]]; then
+              line="#$number: could not compare with main"
+              echo "::warning::$line"
+            elif [[ "$behind" == 0 ]]; then
+              line="#$number: up to date"
+            elif gh api -X PUT "repos/$GITHUB_REPOSITORY/pulls/$number/update-branch" \
+                -f expected_head_sha="$head" > /dev/null; then
+              line="#$number: merged main in ($behind commits behind)"
+            else
+              line="#$number: not updated (merge conflict, or the head moved); the owning session merges main in"
+              echo "::warning::$line"
+            fi
+            echo "- $line" >> "$GITHUB_STEP_SUMMARY"
+          done <<< "$prs"
