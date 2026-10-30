@@ -1,5 +1,17 @@
 {/* This file is auto-updated by the weekly changelog workflow. Newest entries at top. */}
 
+## October 19, 2026
+
+### Bug Fixes
+
+- Photos attached to an issue could be deleted by somebody else's report. A submission that was retried, or whose photos failed to attach, removed whatever photos its own form named — including another issue's pictures or a member's profile photo. Nothing deletes a photo on that path now; uploads that never got attached to anything are cleaned up a day later
+- When a lot of machines joined or left the Austin lineup at once, Pinball Map alerts went quiet instead of saying so. A big lineup change is now announced like any other
+- Exporting issues for one machine found nothing if you typed the initials in lowercase — `afm` instead of `AFM`. Initials now match however you type them
+- A crafted sign-in link could send you to an outside site after you logged in. Signing in now only ever returns you to a PinPoint page
+- Symbols and markup typed into a comment or an issue description now reach notification emails as the characters you typed, instead of being turned into links or styled text
+
+---
+
 ## October 12, 2026
 
 ### New Features
