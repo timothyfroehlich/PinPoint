@@ -14,7 +14,7 @@ import {
 } from "~/lib/types";
 import { ISSUE_STATUS_VALUES } from "~/lib/issues/status";
 import { isProductionBuild } from "~/lib/runtime-env";
-import { BLOB_CONFIG } from "~/lib/blob/config";
+import { BLOB_CONFIG, MOCK_UPLOADS_URL_PREFIX } from "~/lib/blob/config";
 
 const uuidish = z
   .string()
@@ -73,40 +73,92 @@ export const assignIssueSchema = z.object({
   assignedTo: uuidish.nullable(),
 });
 
+const VERCEL_BLOB_HOST_SUFFIX = ".public.blob.vercel-storage.com";
+// uploadIssueImage writes every issue image under this prefix.
+const ISSUE_IMAGE_PATH_PREFIX = "issue-images/";
+
 /**
- * Common schema for image metadata from Vercel Blob
+ * The blob pathname a host-verified blobUrl names, or null when the URL names
+ * no issue image. Vercel Blob serves a blob at `/<pathname>`; the local mock
+ * store serves it at `/uploads/<pathname>`.
+ *
+ * The decoded pathname must sit under `issue-images/` and contain no `.`,
+ * `..` or empty segments, backslashes or control characters, so an encoded
+ * `%2F..%2F` cannot turn it into a path that leaves that prefix.
  */
-export const imageMetadataSchema = z.object({
-  blobUrl: z
-    .string()
-    .url()
-    .refine(
-      (url) => {
-        const parsedUrl = new URL(url);
-        const isVercelBlob = parsedUrl.hostname.endsWith(
-          ".public.blob.vercel-storage.com"
-        );
-        const allowLocalhostBlob =
-          process.env["MOCK_BLOB_STORAGE"] === "true" ||
-          (!isProductionBuild() && !process.env["BLOB_READ_WRITE_TOKEN"]);
-        const isLocalhost =
-          allowLocalhostBlob && parsedUrl.hostname === "localhost";
-        return isVercelBlob || isLocalhost;
-      },
-      {
-        message:
-          "Image URL must be from Vercel Blob storage or localhost (dev only)",
-      }
-    ),
-  blobPathname: z.string().min(1),
-  originalFilename: z.string().min(1),
-  fileSizeBytes: z
-    .number()
-    .int()
-    .positive()
-    .max(BLOB_CONFIG.MAX_FILE_SIZE_BYTES),
-  mimeType: z.string().startsWith("image/"),
-});
+function blobPathnameFromUrl(blobUrl: string): string | null {
+  const url = new URL(blobUrl);
+  const prefix = url.hostname.endsWith(VERCEL_BLOB_HOST_SUFFIX)
+    ? "/"
+    : MOCK_UPLOADS_URL_PREFIX;
+  if (!url.pathname.startsWith(prefix)) return null;
+  let pathname: string;
+  try {
+    pathname = decodeURIComponent(url.pathname.slice(prefix.length));
+  } catch (error) {
+    // decodeURIComponent throws URIError on a malformed escape.
+    if (error instanceof URIError) return null;
+    throw error;
+  }
+  if (!pathname.startsWith(ISSUE_IMAGE_PATH_PREFIX)) return null;
+  if (/[\\\p{Cc}]/u.test(pathname)) return null;
+  const segments = pathname.split("/");
+  if (segments.some((s) => s === "" || s === "." || s === "..")) return null;
+  return pathname;
+}
+
+/**
+ * Common schema for image metadata from Vercel Blob.
+ *
+ * The parsed `blobPathname` is derived from the host-verified `blobUrl`; the
+ * client's own `blobPathname` is required for compatibility but discarded, so
+ * a stored `issue_images.full_blob_pathname` always names the blob its row
+ * displays and never another one. (PP-9my0)
+ */
+export const imageMetadataSchema = z
+  .object({
+    blobUrl: z
+      .string()
+      .url()
+      .refine(
+        (url) => {
+          const parsedUrl = new URL(url);
+          const isVercelBlob = parsedUrl.hostname.endsWith(
+            VERCEL_BLOB_HOST_SUFFIX
+          );
+          const allowLocalhostBlob =
+            process.env["MOCK_BLOB_STORAGE"] === "true" ||
+            (!isProductionBuild() && !process.env["BLOB_READ_WRITE_TOKEN"]);
+          const isLocalhost =
+            allowLocalhostBlob && parsedUrl.hostname === "localhost";
+          return isVercelBlob || isLocalhost;
+        },
+        {
+          message:
+            "Image URL must be from Vercel Blob storage or localhost (dev only)",
+        }
+      ),
+    blobPathname: z.string().min(1),
+    originalFilename: z.string().min(1),
+    fileSizeBytes: z
+      .number()
+      .int()
+      .positive()
+      .max(BLOB_CONFIG.MAX_FILE_SIZE_BYTES),
+    mimeType: z.string().startsWith("image/"),
+  })
+  .transform((img, ctx) => {
+    const blobPathname = blobPathnameFromUrl(img.blobUrl);
+    if (blobPathname === null) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["blobUrl"],
+        message: "Image URL does not name a blob",
+      });
+      return z.NEVER;
+    }
+    return { ...img, blobPathname };
+  });
 
 export const imagesMetadataArraySchema = z.array(imageMetadataSchema);
 

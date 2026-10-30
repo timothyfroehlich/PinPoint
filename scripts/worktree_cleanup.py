@@ -182,7 +182,8 @@ def report_missing_target(worktree_path: Path) -> int:
 
 #: Upper bound for each `supabase`/`docker` call during teardown. With the
 #: remote backend these run over SSH, and a sleeping host or a lossy link would
-#: otherwise hang the WorktreeRemove hook and merge-pr.sh's reap indefinitely.
+#: otherwise hang the WorktreeRemove hook and the post-merge reap
+#: (`worktree_reap.py --apply --branch <branch>`) indefinitely.
 TEARDOWN_TIMEOUT_SECONDS = 120
 
 

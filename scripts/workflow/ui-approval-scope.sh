@@ -16,8 +16,8 @@
 # is claude-review-range.sh's, keyed on the "UI Approval" check instead of
 # "Claude Review": the commits since the newest earlier head whose UI Approval
 # passed, with main's changes left out. UI paths are the extended regexes in
-# ui-paths.txt, matched case-insensitively here, in merge-handoff.sh, and in the
-# ui-screenshot-reminder hook.
+# ui-paths.txt, matched case-insensitively here and in the ui-screenshot-reminder
+# hook.
 set -euo pipefail
 
 if [[ $# -ne 2 ]]; then

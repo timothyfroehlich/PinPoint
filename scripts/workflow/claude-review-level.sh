@@ -14,7 +14,7 @@
 # snapshots, test fixtures, binary files and feature specs, with test code counted
 # at half weight. Bands: low below 50, medium from 50 up to 1,500, high from 1,500
 # through 3,000. Above 3,000 the answer is `ask`: stop and ask Tim whether to review at
-# xhigh or max, or to split the PR. record-claude-review.sh accepts all five levels.
+# xhigh or max, or to split the PR.
 set -euo pipefail
 
 if [[ $# -eq 2 && "$1" == "--from" ]]; then
