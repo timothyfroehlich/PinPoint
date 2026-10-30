@@ -150,7 +150,7 @@ Always try local first — seconds vs minutes, full devtools. If a single-test r
 ### CI
 
 - **Check for conflicts first**: `gh pr view <PR> --json mergeable,mergeStateStatus`. `DIRTY`/`CONFLICTING` means GitHub silently skips workflow runs until you resolve. `pnpm run check` includes a `check:behind-main` warning.
-- **Merge gates** (ruleset `6326455`, enforced by GitHub): required checks `CI Gate`, `Claude Review`, and `UI Approval`; every conversation resolved; the branch up to date with `main` (`gh pr update-branch <PR>` merges `main` in; never `--rebase`). Vercel is not required. `BLOCKED` while E2E is still running is normal.
+- **Merge gates** (ruleset `6326455`, enforced by GitHub): required checks `CI Gate`, `Claude Review`, and `UI Approval`; every conversation resolved; the branch up to date with `main` (`gh pr update-branch <PR>` merges `main` in; never `--rebase`; with auto-merge armed, `.github/workflows/auto-update-branches.yaml` does it after each push to `main`). Vercel is not required. `BLOCKED` while E2E is still running is normal.
 
 ### Migration conflicts
 
