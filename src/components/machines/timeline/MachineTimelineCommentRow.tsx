@@ -147,7 +147,7 @@ export function MachineTimelineCommentRow({
           <div className="ml-auto flex shrink-0 items-center gap-2">
             {row.editedAt ? (
               <span
-                className="whitespace-nowrap italic text-muted-foreground/70"
+                className="whitespace-nowrap italic text-muted-foreground"
                 title={`Edited ${formatRelative(row.editedAt)}`}
               >
                 (edited)
