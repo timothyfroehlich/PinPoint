@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { Check, Download, ListFilter, MoreHorizontal } from "lucide-react";
 import { toast } from "sonner";
+import { downloadCsv } from "~/lib/export/download-csv";
 
 import { Button } from "~/components/ui/button";
 import {
@@ -57,7 +58,11 @@ export function MachineIssuesMenu({
         }
         return;
       }
-      triggerCsvDownload(result.value.csv, result.value.fileName);
+      if (!downloadCsv(result.value.csv, result.value.fileName)) {
+        toast.error(
+          "Download failed. Your browser may not support file downloads."
+        );
+      }
     } catch {
       toast.error("Export failed. Please try again.");
     } finally {
@@ -134,23 +139,4 @@ function ViewToggleItem({
       </Link>
     </DropdownMenuItem>
   );
-}
-
-/** Blob → download of a generated CSV. No-op when the browser lacks the API. */
-function triggerCsvDownload(csv: string, fileName: string): void {
-  if (typeof URL.createObjectURL !== "function") {
-    toast.error(
-      "Download failed. Your browser may not support file downloads."
-    );
-    return;
-  }
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
 }

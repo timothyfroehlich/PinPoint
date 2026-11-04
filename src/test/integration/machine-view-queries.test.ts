@@ -408,6 +408,7 @@ describe("machine view database pipeline", () => {
     expect(ownerOne.state.owner).toEqual(["me"]);
     expect(ownerOne.rows.map((row) => row.initials)).toEqual(["AAA", "BBB"]);
     expect(ownerOne.offersMe).toBe(true);
+    expect(ownerOne.signedIn).toBe(true);
     // Me is a shortcut, never a person among the options.
     expect(ownerOne.ownerOptions.map((option) => option.id)).not.toContain(
       "me"
@@ -420,6 +421,7 @@ describe("machine view database pipeline", () => {
     const anonymous = await load(null);
     expect(anonymous.state.owner).toEqual([]);
     expect(anonymous.offersMe).toBe(false);
+    expect(anonymous.signedIn).toBe(false);
     expect(anonymous.totalCount).toBe(anonymous.scopeCount);
   });
 

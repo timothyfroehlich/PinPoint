@@ -145,6 +145,7 @@ export default async function MachinesPage({
         savedViews={savedViews}
         title="Machines"
         actions={pageActions}
+        exportScope={{ kind: "all" }}
       />
     </PageContainer>
   );
