@@ -1,8 +1,6 @@
 import { notFound, redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { db } from "~/server/db";
-import { machines } from "~/server/db/schema";
+import { getMachineLocation } from "./_data";
 
 const uuidSchema = z.uuid();
 
@@ -27,10 +25,7 @@ export default async function LegacyMachineRedirectPage({
   // column is a 22P02 error, not an empty result.
   if (!uuidSchema.safeParse(id).success) notFound();
 
-  const machine = await db.query.machines.findFirst({
-    where: eq(machines.id, id),
-    columns: { initials: true },
-  });
+  const machine = await getMachineLocation(id);
 
   if (!machine) notFound();
 

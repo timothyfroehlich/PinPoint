@@ -2,11 +2,8 @@ import type React from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
-import { eq } from "drizzle-orm";
 import { z } from "zod";
 
-import { db } from "~/server/db";
-import { machineApronCards, machines, userProfiles } from "~/server/db/schema";
 import { createClient } from "~/lib/supabase/server";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { apronCardContent } from "~/lib/machines/apron-card";
@@ -17,6 +14,7 @@ import {
 import { buildMachineHubUrl } from "~/lib/machines/hub-url";
 import { resolveRequestUrl } from "~/lib/url";
 import { ApronCardPrintSheet } from "./ApronCardPrintSheet";
+import { getMachineWithApronCard, getPrinterProfile } from "./_data";
 
 export const metadata: Metadata = { title: "Apron card · PinPoint" };
 
@@ -42,29 +40,8 @@ export default async function ApronCardPrintPage({
   if (!user) notFound();
 
   const [profile, machine] = await Promise.all([
-    db.query.userProfiles.findFirst({
-      where: eq(userProfiles.id, user.id),
-      columns: { role: true },
-    }),
-    db.query.machines.findFirst({
-      where: eq(machines.initials, initials),
-      with: {
-        owner: { columns: { name: true } },
-        invitedOwner: { columns: { name: true } },
-        apronCards: {
-          where: eq(machineApronCards.id, cardId.data),
-        },
-        pinballmapTitle: {
-          columns: {
-            name: true,
-            machineGroupId: true,
-            groupName: true,
-            manufacturer: true,
-            opdbId: true,
-          },
-        },
-      },
-    }),
+    getPrinterProfile(user.id),
+    getMachineWithApronCard(initials, cardId.data),
   ]);
   const card = machine?.apronCards[0];
   if (

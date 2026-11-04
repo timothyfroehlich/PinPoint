@@ -5,9 +5,7 @@ import { getLoginUrl } from "~/lib/url";
 import { PageHeader } from "~/components/layout/PageHeader";
 import { CreateMachineForm } from "./create-machine-form";
 import { PageContainer } from "~/components/layout/PageContainer";
-import { db } from "~/server/db";
-import { pinballmapCatalog } from "~/server/db/schema";
-import { eq } from "drizzle-orm";
+import { getPrefillPinballmapTitle } from "./_data";
 import { Forbidden } from "~/components/errors/Forbidden";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 
@@ -64,10 +62,7 @@ export default async function NewMachinePage({
   const { title, pbm } = await searchParams;
   const pbmId = typeof pbm === "string" ? Number.parseInt(pbm, 10) : NaN;
   const initialPinballmap = Number.isSafeInteger(pbmId)
-    ? await db.query.pinballmapCatalog.findFirst({
-        columns: { pinballmapMachineId: true, name: true },
-        where: eq(pinballmapCatalog.pinballmapMachineId, pbmId),
-      })
+    ? await getPrefillPinballmapTitle(pbmId)
     : undefined;
   const accessLevel = getAccessLevel(role);
 
