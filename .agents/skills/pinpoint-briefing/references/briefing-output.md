@@ -20,8 +20,8 @@ Security beads: [X open `security`-labeled beads] — list by severity, or ✅ n
 Highlight: any with failing CI or stale > 7 days
 
 ## 🏗️ Main Branch Health
-[Last 5 post-submit runs: pass/fail summary]
-[Flag any failures with link]
+[Newest executed CI push-run on main's tip: pass/fail — or flag an all-cancelled window where nothing has tested the tip yet]
+[Flag with link when the tip's run did not pass]
 
 ## 🐛 New GitHub Issues (last 5 days)
 [List: #NNN Title (created X days ago) — [in beads / NOT TRACKED]]
