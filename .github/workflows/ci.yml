@@ -157,7 +157,6 @@ jobs:
               - '!.github/dependabot.yml'
               - '!.github/renovate.json'
               - '!.github/CODEOWNERS'
-              - '!.github/workflows/codex-reaction-witness.yaml'
               - '!.github/workflows/ownerless-renovate-issues.yaml'
               - '!.github/workflows/preview-control.yaml'
               - '!.github/workflows/preview-reaper.yaml'

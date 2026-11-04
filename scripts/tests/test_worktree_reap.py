@@ -505,7 +505,7 @@ def test_an_unreachable_gh_reaps_nothing_that_needed_it(world: World) -> None:
 
 def test_apply_reaps_through_cleanup_and_a_failure_fails_the_run(world: World) -> None:
     """Cleanup's stderr is the only record of what leaked; --quiet keeps it.
-    REAPED goes to stdout, where merge-pr.sh shows it next to `MERGED:`."""
+    REAPED goes to stdout, the post-merge step's record of what it reaped."""
     first = world.add_worktree("worktree-a")
     second = world.add_worktree("worktree-b")
     world.commit_in(world.add_worktree("feat/wip"), "wip.py", "1\n")
@@ -521,7 +521,7 @@ def test_apply_reaps_through_cleanup_and_a_failure_fails_the_run(world: World) -
 
 
 def test_branch_scopes_the_run_to_one_worktree_and_skips_orphans(world: World) -> None:
-    """merge-pr.sh reaps exactly the branch it just merged, nothing else."""
+    """The post-merge step reaps exactly the branch that just merged, nothing else."""
     target = world.add_worktree("feat/landed")
     world.set_prs("feat/landed", merged(40, world.commit_in(target, "a.py", "1\n")))
     world.add_worktree("worktree-idle")

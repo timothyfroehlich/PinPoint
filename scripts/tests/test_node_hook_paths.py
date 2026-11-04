@@ -105,9 +105,13 @@ def test_project_hooks_do_not_register_global_huddle_runtime() -> None:
     assert "huddle-service" not in registered
 
 
-def test_codex_forbids_raw_pr_merge_without_blanket_blocking_gh() -> None:
+def test_codex_prompts_on_pr_merge_without_blanket_blocking_gh() -> None:
+    """gh pr merge prompts (prefix rules cannot deny a later --admin flag), and
+    update-branch is allowed; neither rule widens into blocking all of gh."""
     compact_rules = re.sub(r"\s+", "", CODEX_RULES_PATH.read_text(encoding="utf-8"))
-    assert 'pattern=["gh","pr","merge"],decision="forbidden"' in compact_rules
+    assert 'pattern=["gh","pr","merge"],decision="prompt"' in compact_rules
+    assert 'pattern=["gh","pr","merge"],decision="allow"' not in compact_rules
+    assert 'pattern=["gh","pr","update-branch"],decision="allow"' in compact_rules
     assert 'pattern=["gh"],decision="forbidden"' not in compact_rules
 
 
