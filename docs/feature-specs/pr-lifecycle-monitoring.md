@@ -108,6 +108,7 @@
 - **8.19** Before asking for a UI sign-off, the owning agent shows the owner screenshots of the changed UI at the three review viewports, taken from the committed, pushed head, and offers the running app for hands-on review.
 - **8.20** The owning agent records a UI sign-off only on the owner's own approval and only for the commit he saw.
 - **8.21** The owner decides whether a pull request merges. On his explicit request, the owning agent merges it with a squash merge, or enables auto-merge so GitHub merges once the required checks pass; a branch behind the base branch is brought up to date by merging the base branch into it. Agents never bypass the ruleset.
+- **8.22** While auto-merge is enabled on a non-draft pull request from this repository, an automated workflow merges the base branch into it each time the base branch moves and the pull request is behind. A pull request whose update conflicts is left for its owning agent. Pull requests opened by bots are excluded.
 
 ---
 
@@ -143,6 +144,7 @@
 
 | Date | Amendment |
 | :-- | :-- |
+| 2026-10-30 | Add §8.22: pull requests with auto-merge enabled are kept up to date with the base branch automatically. |
 | 2026-10-25 | Replace the local review record with GitHub-native gates (§1, §2.1, §3.2–3.3, §7.2, §8): required checks CI Gate, Claude Review, and UI Approval plus resolved conversations and an up-to-date branch; Claude Review reviews the whole pull request first and then each push's new commits; UI Approval waits for the owner's sign-off on UI changes; the owner decides merges and agents merge natively on his request; the review watch phase and the migration-renumber coverage rule retire; the CI watch also waits for Claude Review and reports it with the unresolved thread count. |
 | 2026-10-06 | §8.12 also keeps coverage across a base-branch merge whose only resolution renumbers the branch's migrations with unchanged SQL. |
 | 2026-10-03 | Add xhigh and max review levels (Concepts, §8.14): above 3,000 weighted lines the owner chooses xhigh or max, or splits the pull request. |
