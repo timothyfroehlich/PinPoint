@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fitPrimaryFilters, planListHeader } from "./overflow";
+import { fitPrimaryFilters, planLineDrops, planListHeader } from "./overflow";
 
 describe("fitPrimaryFilters (list-views §8.1)", () => {
   const filterWidths = [120, 100, 110, 80];
@@ -165,5 +165,54 @@ describe("planListHeader (list-views §8.2, §8.3)", () => {
       pager: "hidden",
       compactEdit: true,
     });
+  });
+});
+
+describe("planLineDrops (machine-views §5.10)", () => {
+  const dropOrder = ["year", "manufacturer", "serviced", "owner"] as const;
+  // 80 kept + 40 + 70 + 90 + 60 = 340.
+  const segmentWidths = { manufacturer: 70, year: 40, owner: 60, serviced: 90 };
+
+  function dropped(available: number, keptWidth = 80): string[] {
+    return [
+      ...planLineDrops({ available, keptWidth, segmentWidths, dropOrder }),
+    ];
+  }
+
+  it("drops nothing when the whole line fits", () => {
+    expect(dropped(340)).toEqual([]);
+  });
+
+  it("drops segments in order, one at a time, until the rest fit", () => {
+    expect(dropped(339)).toEqual(["year"]);
+    expect(dropped(300)).toEqual(["year"]);
+    expect(dropped(299)).toEqual(["year", "manufacturer"]);
+    expect(dropped(139)).toEqual(["year", "manufacturer", "serviced", "owner"]);
+  });
+
+  it("never drops the kept part, so the line truncates past that", () => {
+    expect(dropped(10)).toEqual(["year", "manufacturer", "serviced", "owner"]);
+  });
+
+  it("skips segments the row does not show", () => {
+    expect(
+      planLineDrops({
+        available: 150,
+        keptWidth: 0,
+        segmentWidths: { manufacturer: 70, owner: 60, year: 40 },
+        dropOrder,
+      })
+    ).toEqual(new Set(["year"]));
+  });
+
+  it("drops every segment that does not fit when nothing is kept", () => {
+    expect(
+      planLineDrops({
+        available: 10,
+        keptWidth: 0,
+        segmentWidths,
+        dropOrder,
+      })
+    ).toEqual(new Set(["year", "manufacturer", "serviced", "owner"]));
   });
 });
