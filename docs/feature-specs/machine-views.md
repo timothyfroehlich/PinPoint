@@ -44,6 +44,9 @@
 - **3.12** The Primary Filters, in order, are Presence, Playability, Issue severity, Owner, Tag, and Collection. Machine View has no Secondary Filters. Tag and Collection follow collections-and-tags §12.
 - **3.13** Owner searches people by name and offers Me (signed-in people only) and Unassigned shortcuts.
 - **3.14** Every sortable field is offered in the List Header's sort control as well as by its column header.
+- **3.15** Export downloads a CSV of every machine matching the current View Configuration across all pages, within the Surface's scope, in the list's sort order.
+- **3.16** The CSV has these columns, in order, whatever fields are displayed: initials, name, full model, manufacturer, year, owner, Date Added, Presence, Playability, Open Issues, Last Serviced, and Last Activity. Name is the machine's title. Full model is the machine's catalog title, which names its edition. Dates are the site's calendar day. A missing value is left empty, and an unassigned owner is left empty.
+- **3.17** Export is offered to signed-in people only.
 
 ---
 
@@ -131,6 +134,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-13 | Export: a CSV of every machine the list matches, with initials, name, full model, manufacturer, year, owner, and the list's Date Added, Presence, Playability, Open Issues, Last Serviced, and Last Activity, for signed-in people (§3.15–§3.17). |
 | 2026-10-11 | Phone Compact rows become two lines: Playability dot, name, initials, and open-issue count first, then the Playability label, manufacturer, year, owner, and Last Serviced, dropping year, manufacturer, Last Serviced, then owner when crowded (§3.2, §5.3, §5.9, §5.10); the Playability label and Last Serviced age appear only when those fields are displayed, and no service history reads “never serviced” (§5.9); the count is colored “N open” text with no icon, or a muted “None open” (§5.3); the Playability dot differs by shape (§5.11). |
 | 2026-10-07 | Retired Owner Collections (preamble, 6.4); a person's machines are Machines filtered by Owner (collections-and-tags §6). |
 | 2026-10-05 | Built-in Views no longer set displayed fields or page size (§9.3). Tag and Collection Primary Filters (§3.12) and their `tag` and `collection` parameters (§4.1). |
