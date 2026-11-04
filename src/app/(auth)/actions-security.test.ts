@@ -4,7 +4,10 @@ import {
   signupAction,
   forgotPasswordAction,
   resetPasswordAction,
+  logoutAction,
 } from "./actions";
+import type * as ReportErrorModule from "~/lib/observability/report-error";
+import type * as SentryModule from "@sentry/nextjs";
 
 // Mock Next.js server modules
 vi.mock("next/headers", () => ({
@@ -39,12 +42,28 @@ vi.mock("~/lib/rate-limit", () => ({
   formatResetTime: vi.fn().mockReturnValue("0s"),
 }));
 
+// Spy on reportError without dropping serverActionError.
+vi.mock("~/lib/observability/report-error", async (importOriginal) => {
+  const actual = await importOriginal<typeof ReportErrorModule>();
+  return { ...actual, reportError: vi.fn() };
+});
+
+// serverActionError calls the module's own reportError, not the spy above, so
+// "stays out of Sentry" assertions also check captureException.
+vi.mock("@sentry/nextjs", async (importOriginal) => {
+  const actual = await importOriginal<typeof SentryModule>();
+  return { ...actual, captureException: vi.fn() };
+});
+
 // Mock Supabase
 vi.mock("~/lib/supabase/server", () => ({
   createClient: vi.fn(),
 }));
 
 import { createClient } from "~/lib/supabase/server";
+import { redirect } from "next/navigation";
+import { reportError } from "~/lib/observability/report-error";
+import * as Sentry from "@sentry/nextjs";
 
 describe("Auth Actions Security - Error Handling", () => {
   beforeEach(() => {
@@ -226,6 +245,9 @@ describe("Auth Actions Security - Error Handling", () => {
       expect(result.code).toBe("WEAK_PASSWORD");
       expect(result.message).toContain("data breach");
     }
+    // An expected user-facing error stays out of Sentry.
+    expect(reportError).not.toHaveBeenCalled();
+    expect(Sentry.captureException).not.toHaveBeenCalled();
   });
 
   it("resetPasswordAction should return SAME_PASSWORD for same_password error", async () => {
@@ -316,6 +338,84 @@ describe("Auth Actions Security - Error Handling", () => {
     expect(updateUserMock).toHaveBeenCalledWith({
       password: "NewPassword123!",
     });
+  });
+
+  it("resetPasswordAction reports a signOut error after the password changes", async () => {
+    const { AuthApiError } = await import("@supabase/supabase-js");
+    const signOutError = new AuthApiError("logout failed", 500, "unexpected");
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi
+          .fn()
+          .mockResolvedValue({ data: { user: { id: "user-123" } } }),
+        updateUser: vi.fn().mockResolvedValue({ error: null }),
+        signOut: vi.fn().mockResolvedValue({ error: signOutError }),
+      },
+    } as any);
+
+    const formData = new FormData();
+    formData.set("password", "NewPassword123!");
+    formData.set("confirmPassword", "NewPassword123!");
+
+    const result = await resetPasswordAction(undefined, formData);
+
+    // The password already changed, so no SERVER error reaches the user.
+    expect(result).toBeUndefined();
+    expect(reportError).toHaveBeenCalledWith(signOutError, {
+      action: "reset-password.signOut",
+      bestEffort: true,
+      userId: "user-123",
+    });
+    expect(redirect).toHaveBeenCalledWith("/login");
+  });
+
+  it("resetPasswordAction reports a thrown signOut and still redirects", async () => {
+    const signOutError = new Error("cookie store write failed");
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi
+          .fn()
+          .mockResolvedValue({ data: { user: { id: "user-123" } } }),
+        updateUser: vi.fn().mockResolvedValue({ error: null }),
+        signOut: vi.fn().mockRejectedValue(signOutError),
+      },
+    } as any);
+
+    const formData = new FormData();
+    formData.set("password", "NewPassword123!");
+    formData.set("confirmPassword", "NewPassword123!");
+
+    const result = await resetPasswordAction(undefined, formData);
+
+    // The password already changed, so no SERVER error reaches the user.
+    expect(result).toBeUndefined();
+    expect(reportError).toHaveBeenCalledWith(signOutError, {
+      action: "reset-password.signOut",
+      bestEffort: true,
+      userId: "user-123",
+    });
+    expect(redirect).toHaveBeenCalledWith("/login");
+  });
+
+  it("logoutAction reports a signOut error and skips the redirect", async () => {
+    const { AuthApiError } = await import("@supabase/supabase-js");
+    const signOutError = new AuthApiError("logout failed", 500, "unexpected");
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi
+          .fn()
+          .mockResolvedValue({ data: { user: { id: "user-123" } } }),
+        signOut: vi.fn().mockResolvedValue({ error: signOutError }),
+      },
+    } as any);
+
+    await logoutAction();
+
+    expect(reportError).toHaveBeenCalledWith(signOutError, {
+      action: "logout",
+      userId: "user-123",
+    });
+    expect(redirect).not.toHaveBeenCalled();
   });
 
   it("loginAction should return SERVER for network failures (AuthRetryableFetchError)", async () => {

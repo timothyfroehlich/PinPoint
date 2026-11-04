@@ -3,7 +3,8 @@
 `ssh` and `scp` are stubbed with fake executables on PATH so no real machine is
 touched. Every external command the script can invoke is stubbed - a partially
 stubbed harness is how a passing test still reaches the real world (the
-merge-pr.sh harness wrote six live huddle comments because `bd` was not stubbed).
+retired merge-script harness wrote six live huddle comments because `bd` was not
+stubbed).
 """
 
 import json

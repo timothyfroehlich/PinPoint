@@ -16,7 +16,7 @@ Dependabot:    [X open alerts] — link to any mergeable PRs
 Security beads: [X open `security`-labeled beads] — list by severity, or ✅ none open
 
 ## 📋 Open PRs
-[Table from pr-dashboard.sh: PR# | Title | CI | Merge Ready]
+[Table from pr-dashboard.sh: PR# | Title | CI | Review | UI | Merge]
 Highlight: any with failing CI or stale > 7 days
 
 ## 🏗️ Main Branch Health
