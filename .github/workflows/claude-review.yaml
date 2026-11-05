@@ -134,7 +134,7 @@ jobs:
       - name: Review
         id: review
         if: steps.range.outputs.mode != 'skip'
-        uses: anthropics/claude-code-action@aa8a7738e48bf30a40ee499ce818bef081c5ab5e  # ratchet:anthropics/claude-code-action@v1.0.257
+        uses: anthropics/claude-code-action@ae68417a745a5df4b2124873632bd73a2255e6f6  # ratchet:anthropics/claude-code-action@v1.0.259
         env:
           # Telemetry and error reporting stay off.
           CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
