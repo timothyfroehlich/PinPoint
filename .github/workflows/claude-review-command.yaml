@@ -15,7 +15,7 @@
 name: Claude Review Command
 
 on:
-  issue_comment:
+  issue_comment:  # zizmor: ignore[dangerous-triggers] author_association-gated; permissions {}; loads from main, runs no PR content
     types: [created]
 
 permissions: {}

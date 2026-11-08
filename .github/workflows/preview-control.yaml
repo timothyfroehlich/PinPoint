@@ -20,7 +20,12 @@
 name: Preview Controller
 
 on:
-  issue_comment:
+  # Accepted risk (PP-1wgj): the /preview flow checks out PR-head code and runs
+  # scripts/workflow/preview/preview-create.sh and preview-destroy.sh with prod
+  # Supabase + Vercel secrets. The only gate is comment author_association, which
+  # also admits read/triage COLLABORATORs — tighten to an explicit actor allowlist
+  # before adding any outside collaborator.
+  issue_comment:  # zizmor: ignore[dangerous-triggers] accepted risk; see note above
     types: [created]
 
 # Least privilege: we read the PR and write a sticky comment.
