@@ -1,4 +1,10 @@
 {
+  "git": {
+    "deploymentEnabled": {
+      "main": true,
+      "**": false
+    }
+  },
   "crons": [
     {
       "path": "/api/cron/cleanup-blobs",
