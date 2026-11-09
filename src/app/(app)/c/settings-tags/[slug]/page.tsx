@@ -2,7 +2,6 @@ import type React from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { cache } from "react";
 import { ClipboardList, Tag, Trophy } from "lucide-react";
 
 import { PageContainer } from "~/components/layout/PageContainer";
@@ -11,7 +10,6 @@ import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { getViewer } from "~/lib/auth/viewer";
 import { formatDate } from "~/lib/dates";
-import { getSettingsTagPage } from "~/lib/machines/settings-tag-queries";
 import {
   SETTINGS_TAGS_HREF,
   type SettingsTagPageSet,
@@ -22,19 +20,17 @@ import {
 } from "~/lib/machines/settings-tags";
 import { canManageSettingsTags } from "~/lib/permissions";
 import { getAccessLevel } from "~/lib/permissions/helpers";
-import { db } from "~/server/db";
+import { getSettingsTag } from "../_data";
 
 interface TagParams {
   params: Promise<{ slug: string }>;
 }
 
-const loadTag = cache((slug: string) => getSettingsTagPage(db, slug));
-
 export async function generateMetadata({
   params,
 }: TagParams): Promise<Metadata> {
   const { slug } = await params;
-  const tag = await loadTag(slug);
+  const tag = await getSettingsTag(slug);
   return {
     title: tag ? `${tag.name} | Settings tags | PinPoint` : "Settings tag",
   };
@@ -83,7 +79,7 @@ export default async function SettingsTagPage({
   params,
 }: TagParams): Promise<React.JSX.Element> {
   const { slug } = await params;
-  const [tag, viewer] = await Promise.all([loadTag(slug), getViewer()]);
+  const [tag, viewer] = await Promise.all([getSettingsTag(slug), getViewer()]);
   if (!tag) notFound();
   const { setCount, machineCount } = settingsTagPageCounts(tag);
   const canManage =

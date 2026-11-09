@@ -2,9 +2,6 @@ import type React from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getViewer } from "~/lib/auth/viewer";
-import { db } from "~/server/db";
-import { issues, userProfiles } from "~/server/db/schema";
-import { eq, asc, and, ne, notInArray, sql } from "drizzle-orm";
 import { IssueActivity } from "~/components/issues/IssueActivity";
 import { IssueDetails } from "~/components/issues/IssueDetails";
 import { InitialReport } from "~/components/issues/InitialReport";
@@ -21,11 +18,14 @@ import {
 } from "~/components/issues/IssueSectionTabs";
 import { getMachineOwnerId } from "~/lib/issues/owner";
 import { getMachineChoices } from "~/lib/machines/queries";
-import { CLOSED_STATUSES } from "~/lib/issues/status";
 import { formatIssueId, parseIssueNumber } from "~/lib/issues/utils";
 import type { IssueWithAllRelations } from "~/lib/types";
 import { EditableIssueTitle } from "./editable-issue-title";
-import { getIssueForDetail } from "./_data";
+import {
+  getAssigneeRoster,
+  getIssueForDetail,
+  getOtherOpenIssues,
+} from "./_data";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { OwnerRequirementsCallout } from "~/components/machines/OwnerRequirementsCallout";
 import {
@@ -59,44 +59,18 @@ export default async function IssueDetailPage({
 
   // CORE-PERF-003: parallelize what's safe before role is known; the roster
   // and machine-list fetches are gated below on permission.
-  const otherOpenIssues = and(
-    eq(issues.machineInitials, initials),
-    ne(issues.issueNumber, issueNum),
-    notInArray(issues.status, [...CLOSED_STATUSES])
-  );
-
-  const [issue, viewer, otherIssues, otherIssuesCount] = await Promise.all([
-    // Query issue with all relations; mentions carry current names
-    getIssueForDetail(initials, issueNum),
-    // The viewer's id and role, for permission-aware rendering and to gate
-    // the (potentially expensive + privacy-sensitive) assignee roster fetch
-    // below. A failed auth check renders as unauthenticated and is reported.
-    getViewer(),
-    // The machine's other open issues: the newest few, and how many in all
-    // (spec §10.5, §11.1).
-    db.query.issues.findMany({
-      where: otherOpenIssues,
-      columns: {
-        id: true,
-        issueNumber: true,
-        title: true,
-        status: true,
-        severity: true,
-        priority: true,
-        frequency: true,
-        machineInitials: true,
-        createdAt: true,
-        reporterName: true,
-      },
-      orderBy: (otherIssue, { desc }) => [desc(otherIssue.createdAt)],
-      limit: OTHER_ISSUES_LIMIT,
-    }),
-    db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(issues)
-      .where(otherOpenIssues)
-      .then((rows) => rows[0]?.count ?? 0),
-  ]);
+  const [issue, viewer, { issues: otherIssues, count: otherIssuesCount }] =
+    await Promise.all([
+      // Query issue with all relations; mentions carry current names
+      getIssueForDetail(initials, issueNum),
+      // The viewer's id and role, for permission-aware rendering and to gate
+      // the (potentially expensive + privacy-sensitive) assignee roster fetch
+      // below. A failed auth check renders as unauthenticated and is reported.
+      getViewer(),
+      // The machine's other open issues: the newest few, and how many in all
+      // (spec §10.5, §11.1).
+      getOtherOpenIssues(initials, issueNum, OTHER_ISSUES_LIMIT),
+    ]);
 
   if (!issue) {
     notFound();
@@ -130,15 +104,11 @@ export default async function IssueDetailPage({
   // permission skip the round-trip entirely.
   const [allUsers, allMachines] = await Promise.all([
     canTriage
-      ? db
-          .select({ id: userProfiles.id, name: userProfiles.name })
-          .from(userProfiles)
-          .where(notInArray(userProfiles.role, ["guest"]))
-          .orderBy(asc(userProfiles.name))
+      ? getAssigneeRoster()
       : Promise.resolve(issue.assignedToUser ? [issue.assignedToUser] : []),
     // Move lists machines not marked Removed (issue-detail §4.6).
     userCanReassign
-      ? getMachineChoices(db).then((rows) =>
+      ? getMachineChoices().then((rows) =>
           rows.map(({ initials, name }) => ({ initials, name }))
         )
       : Promise.resolve([]),
