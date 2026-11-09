@@ -147,7 +147,7 @@ Pass `--no-sensitive` for anything that must stay readable. Verify by pulling to
 
 Native Supabase auto-branching is **disabled** — no PR gets a preview by default (zero branches, zero cost). Previews are created on demand via PR comment commands and torn down on a TTL.
 
-- **Control surface = PR comments** (from authors with write access only):
+- **Control surface = PR comments** from the owner, org members or collaborators (any permission level), on PRs whose branch is in this repository. A fork PR is refused before checkout, because its head would run the preview scripts with the Supabase and Vercel secrets.
   - `/preview` — create (or restart after expiry) a branch, migrate + seed it, wire creds into the Vercel preview, and post a sticky status comment with the live URL + 48h expiry.
   - `/preview extend` — push expiry +48h (no DB work). `/preview stop` — tear down now.
   - Later pushes do not re-migrate the branch. After pushing a migration or seed change, comment `/preview` again — it resets the live branch and re-runs migrate + seed from the new head.
