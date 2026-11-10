@@ -11,8 +11,6 @@ interface InfoRailProps {
   owner: { id: string; name: string; avatarUrl: string | null } | null;
   invitedOwner: { name: string } | null;
   addedAt: Date;
-  /** Edit-machine control (dialog trigger or denied tooltip), shown in the owner card footer. */
-  editSlot?: React.ReactNode;
   /** Top scores card slot, rendered below Details. */
   topScoresSlot?: React.ReactNode;
   /** PinTips tip card slot (spec pintips 4.1), after Top scores. */
@@ -136,7 +134,7 @@ const LABEL =
 
 /**
  * InfoRail — the Info tab's reference cluster: Tags, then the Details card
- * (Model, Pinball Map standing, owner, Edit). The machine description is
+ * (Model, Pinball Map standing, owner). The machine description is
  * not here: it leads the main column, because a long one stretched this
  * 320px rail far past the main column's height. Renders as the desktop
  * right rail and folds inline on mobile (the caller controls placement + gap;
@@ -155,7 +153,6 @@ export function InfoRail({
   owner,
   invitedOwner,
   addedAt,
-  editSlot,
   topScoresSlot,
   tipSlot,
   modelName,
@@ -184,8 +181,7 @@ export function InfoRail({
 
       {/* Details — reading order: the machine's identity (Model + its Pinball
           Map standing), then the owner in a distinct panel
-          with an explicit role badge (name only, never email per CORE-SEC-007),
-          then the Edit-machine control.
+          with an explicit role badge (name only, never email per CORE-SEC-007).
 
           `@container` is here so the Config-issue warning can measure THIS card
           rather than the viewport (CORE-RESP-002). The card is 320px in the
@@ -346,8 +342,6 @@ export function InfoRail({
             <p className="text-sm text-muted-foreground">No owner assigned</p>
           )}
         </div>
-
-        {editSlot ? <div className="mt-4">{editSlot}</div> : null}
       </div>
 
       {topScoresSlot}

@@ -52,11 +52,11 @@ test.describe("Public Routes — Class-A Residuals", () => {
     // protected since /m/ is public.
     await expect(page).toHaveURL(`/m/${initials}`);
     await expect(page.getByRole("heading", { name })).toBeVisible();
+    // The Save button is absent entirely on the detail page (not merely hidden),
+    // so assert on the count: `toHaveCount(0)` subsumes a `not.toBeVisible()`
+    // check and, being web-first, retries instead of snapshotting once.
     await expect(
       page.getByRole("button", { name: "Save details" })
-    ).not.toBeVisible();
-    expect(
-      await page.getByRole("button", { name: "Save details" }).count()
-    ).toBe(0);
+    ).toHaveCount(0);
   });
 });
