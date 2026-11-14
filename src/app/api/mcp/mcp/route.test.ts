@@ -1,4 +1,8 @@
-import type { AuthInfo } from "@modelcontextprotocol/server";
+import {
+  type AuthInfo,
+  CLIENT_CAPABILITIES_META_KEY,
+  PROTOCOL_VERSION_META_KEY,
+} from "@modelcontextprotocol/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getMcpResourceUrl,
@@ -175,5 +179,56 @@ describe("MCP route boundary", () => {
         });
       }
     }
+  });
+
+  it("closes a subscriptions/listen stream right away because the tool list never changes", async () => {
+    verifyTokenMock.mockResolvedValue(AUTH);
+    const protocolVersion = "2026-07-28";
+
+    const response = await handleMcpRequest(
+      new Request("https://pinpoint.test/api/mcp/mcp", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${AUTH.token}`,
+          "Content-Type": "application/json",
+          Accept: "application/json, text/event-stream",
+          "mcp-protocol-version": protocolVersion,
+          "mcp-method": "subscriptions/listen",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 7,
+          method: "subscriptions/listen",
+          params: {
+            notifications: { toolsListChanged: true },
+            _meta: {
+              [PROTOCOL_VERSION_META_KEY]: protocolVersion,
+              [CLIENT_CAPABILITIES_META_KEY]: {},
+            },
+          },
+        }),
+      })
+    );
+
+    expect(response.status).toBe(200);
+    // If the server advertised tools.listChanged, this stream would stay open
+    // until Vercel's 60-second function limit killed it, and text() would hang.
+    const messages = (await response.text())
+      .split("\n")
+      .filter((line) => line.startsWith("data: "))
+      .map(
+        (line) =>
+          JSON.parse(line.slice(6)) as {
+            method?: string;
+            params?: { notifications?: unknown };
+            result?: { resultType?: string };
+          }
+      );
+
+    expect(messages[0]?.method).toBe(
+      "notifications/subscriptions/acknowledged"
+    );
+    expect(messages[0]?.params?.notifications).toEqual({});
+    expect(messages.at(-1)?.result?.resultType).toBe("complete");
   });
 });
