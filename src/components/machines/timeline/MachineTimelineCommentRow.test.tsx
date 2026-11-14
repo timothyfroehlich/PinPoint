@@ -183,6 +183,22 @@ describe("MachineTimelineCommentRow", () => {
     expect(screen.getByText(/\(edited\)/i)).toBeInTheDocument();
   });
 
+  it("renders the '(edited)' marker at full-opacity muted-foreground for AA contrast", () => {
+    // Regression guard (PP-u0pi / PP-fn28): the marker is real readable text,
+    // so it must not carry a faint opacity modifier — text-muted-foreground/70
+    // composites to only ~4.08:1 on --color-card, below the 4.5:1 AA floor.
+    render(
+      <MachineTimelineCommentRow
+        row={{ ...baseRow, editedAt: new Date("2026-05-18T09:00:00Z") }}
+        canEdit={false}
+        canDelete={false}
+      />
+    );
+    const marker = screen.getByText(/\(edited\)/i);
+    expect(marker).toHaveClass("text-muted-foreground");
+    expect(marker.className).not.toMatch(/text-muted-foreground\/\d+/);
+  });
+
   it("renders avatar fallback initials from the author name (no image URL)", () => {
     // jsdom never fires the image load event, so Radix Avatar keeps showing
     // the fallback — the initials are derived from authorName.
