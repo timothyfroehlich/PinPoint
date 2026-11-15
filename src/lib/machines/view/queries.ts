@@ -256,7 +256,10 @@ export function getLatestMachineActivityDates(
   return latestTimelineDates(tx, machineIds, false);
 }
 
-function publicRow(candidate: MachineViewCandidate): MachineViewRow {
+function publicRow(
+  candidate: MachineViewCandidate,
+  serviceDates: ReadonlyMap<string, Date>
+): MachineViewRow {
   const row: MachineViewRow = {
     id: candidate.id,
     initials: candidate.initials,
@@ -270,7 +273,7 @@ function publicRow(candidate: MachineViewCandidate): MachineViewRow {
     // Every row shows Playability, the open-issue count, and the service age
     // (machine-views §5.3, §5.9).
     health: candidate.health,
-    lastServicedAt: candidate.lastServicedAt,
+    lastServicedAt: serviceDates.get(candidate.id)?.toISOString() ?? null,
   };
   if (candidate.lastActivityAt !== undefined) {
     row.lastActivityAt = candidate.lastActivityAt;
@@ -301,11 +304,14 @@ export async function loadMachineViewFromDatabase(
   const machineInitials = baseRows.map((row) => row.initials);
   // Health loads for the whole scope on every request: the Summary Widgets
   // count it across the scope (machine-widgets §2.3) and every row carries it
-  // to the browser (machine-views §5.3), as every row carries its service
-  // date (§5.9). Activity dates load only when the sort needs them.
-  const [health, serviceDates, activityDates] = await Promise.all([
+  // to the browser (machine-views §5.3). Service and activity dates load for
+  // the whole scope only when the sort needs them; otherwise the shown page's
+  // service dates load after paging, below.
+  const [health, scopeServiceDates, activityDates] = await Promise.all([
     getMachineViewHealth(tx, machineInitials),
-    getLatestMachineServiceDates(tx, machineIds),
+    dependencyPlan.service
+      ? getLatestMachineServiceDates(tx, machineIds)
+      : Promise.resolve(null),
     dependencyPlan.activity
       ? getLatestMachineActivityDates(tx, machineIds)
       : Promise.resolve(new Map<string, Date>()),
@@ -333,8 +339,11 @@ export async function loadMachineViewFromDatabase(
           unplayable: 0,
           oldestOpenIssueAt: null,
         }),
-      lastServicedAt: serviceDates.get(machine.id)?.toISOString() ?? null,
     };
+    if (scopeServiceDates !== null) {
+      row.lastServicedAt =
+        scopeServiceDates.get(machine.id)?.toISOString() ?? null;
+    }
     if (dependencyPlan.activity) {
       row.lastActivityAt = activityDates.get(machine.id)?.toISOString() ?? null;
     }
@@ -357,9 +366,16 @@ export async function loadMachineViewFromDatabase(
     ),
   });
   const state = { ...validatedState, page: applied.page };
+  // Every shown row carries its service date (machine-views §5.9).
+  const serviceDates =
+    scopeServiceDates ??
+    (await getLatestMachineServiceDates(
+      tx,
+      applied.rows.map((row) => row.id)
+    ));
 
   return {
-    rows: applied.rows.map(publicRow),
+    rows: applied.rows.map((row) => publicRow(row, serviceDates)),
     scopeCount: baseRows.length,
     totalCount: applied.totalCount,
     summary: summarizeMachineView(candidates),

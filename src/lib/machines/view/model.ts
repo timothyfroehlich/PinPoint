@@ -14,7 +14,15 @@ import {
   type MachineStatus,
 } from "~/lib/machines/status";
 
-export interface MachineViewCandidate extends MachineViewRow {
+export interface MachineViewCandidate extends Omit<
+  MachineViewRow,
+  "lastServicedAt"
+> {
+  /**
+   * Loaded for the whole scope only to sort by Last Serviced; the shown
+   * page's rows get theirs after paging (machine-views §3.6).
+   */
+  lastServicedAt?: string | null;
   ownerId: string | null;
   canonicalModelName: string;
   legacyModelName: string;

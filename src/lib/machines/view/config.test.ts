@@ -50,11 +50,17 @@ function candidate(
 }
 
 describe("planMachineViewDependencies", () => {
-  it("loads activity dates only to sort by them", () => {
+  it("loads service and activity dates for the whole scope only to sort by them", () => {
+    expect(planMachineViewDependencies({ sort: "machine" })).toEqual({
+      service: false,
+      activity: false,
+    });
     expect(planMachineViewDependencies({ sort: "lastServiced" })).toEqual({
+      service: true,
       activity: false,
     });
     expect(planMachineViewDependencies({ sort: "lastActivity" })).toEqual({
+      service: false,
       activity: true,
     });
   });

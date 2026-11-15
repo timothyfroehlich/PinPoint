@@ -15,12 +15,13 @@ import {
 } from "~/lib/list-view/url-state";
 
 /**
- * Optional per-row enrichment a sort field needs. Health and service dates
- * are not: every load reads them, because the Summary Widgets
- * (machine-widgets §2.3) and every machine row (machine-views §5.3, §5.9)
- * always need them.
+ * Per-row enrichment the whole scope needs when a sort field orders by it.
+ * Health is not one: every load reads it for the whole scope, because the
+ * Summary Widgets (machine-widgets §2.3) and every machine row
+ * (machine-views §5.3) always need it. Service dates load for the shown
+ * page alone unless the sort needs them for the whole scope.
  */
-export type MachineViewDependency = "activity";
+export type MachineViewDependency = "service" | "activity";
 
 /** The owner filter value for machines with no owner (machine-views §4.2). */
 export const UNASSIGNED_OWNER_ID = UNASSIGNED_PERSON_ID;
@@ -83,7 +84,7 @@ export const MACHINE_VIEW_FIELDS: Record<
     label: "Last Serviced",
     preferredDirection: "desc",
     directionLabels: DATES,
-    dependencies: [],
+    dependencies: ["service"],
   },
   presence: {
     id: "presence",
@@ -277,13 +278,15 @@ export function getMachineViewPreset(
 }
 
 export interface MachineViewDependencyPlan {
+  /** Service dates for the whole scope, not only the shown page. */
+  service: boolean;
   activity: boolean;
 }
 
 /**
- * The optional enrichment the sort needs. No filter needs any: Playability
- * and Open Issue Severity read health, which every load includes, as it
- * includes service dates.
+ * The enrichment the sort needs for the whole scope. No filter needs any:
+ * Playability and Open Issue Severity read health, which every load
+ * includes.
  */
 export function planMachineViewDependencies(
   state: Pick<MachineViewState, "sort">
@@ -291,5 +294,8 @@ export function planMachineViewDependencies(
   const dependencies = new Set<MachineViewDependency>(
     MACHINE_VIEW_FIELDS[state.sort].dependencies
   );
-  return { activity: dependencies.has("activity") };
+  return {
+    service: dependencies.has("service"),
+    activity: dependencies.has("activity"),
+  };
 }

@@ -167,6 +167,52 @@ describe("machine view database pipeline", () => {
     expect(dates.get(alphaId)).toEqual(selected);
   });
 
+  it("gives every shown row its service date, and sorts the whole scope by it (machine-views §3.6, §5.9)", async () => {
+    const db = await getTestDb();
+    await db.insert(timelineEvents).values([
+      {
+        machineId: alphaId,
+        sourceType: "comment",
+        tag: "maintenance",
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+      {
+        machineId: gammaId,
+        sourceType: "comment",
+        tag: "maintenance",
+        createdAt: new Date("2026-03-01T00:00:00.000Z"),
+      },
+    ]);
+    const load = (
+      params: Record<string, string>
+    ): ReturnType<typeof loadMachineViewFromDatabase> =>
+      loadMachineViewFromDatabase(asDbOrTx(db), {
+        scope: { kind: "all" },
+        preset: "machines",
+        viewerId: null,
+        searchParams: new URLSearchParams({ presence: "all", ...params }),
+      });
+
+    // Sorted by name, the shown page's service dates load after paging.
+    const byName = await load({});
+    expect(
+      byName.rows.map((row) => [row.initials, row.lastServicedAt])
+    ).toEqual([
+      ["AAA", "2026-01-01T00:00:00.000Z"],
+      ["BBB", null],
+      ["CCC", "2026-03-01T00:00:00.000Z"],
+    ]);
+
+    // Sorted by Last Serviced, the whole scope's dates order the list.
+    const newest = await load({ sort: "lastServiced", dir: "desc" });
+    expect(newest.rows.map((row) => row.initials)).toEqual([
+      "CCC",
+      "AAA",
+      "BBB",
+    ]);
+    expect(newest.rows[0]?.lastServicedAt).toBe("2026-03-01T00:00:00.000Z");
+  });
+
   it("keeps all and collection scopes exact", async () => {
     const db = await getTestDb();
     const searchParams = new URLSearchParams({
