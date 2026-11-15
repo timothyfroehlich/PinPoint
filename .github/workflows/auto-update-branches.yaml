@@ -14,7 +14,9 @@
 # and the next one tried, when it conflicts with main or when a required check
 # already failed on its current head, so one stuck PR cannot stall the line. A
 # PR that is already up to date is the head of the line: nothing behind it is
-# touched until it merges. CI, Claude Review and UI Approval then run on the
+# touched until it merges, unless every required check on it has already passed
+# and it is still open (an unresolved conversation, say), in which case it is
+# skipped too. CI, Claude Review and UI Approval then run on the
 # updated head as on any push, and GitHub merges it once they pass. A clean merge
 # of main passes Claude Review and UI Approval without a new review or sign-off.
 #
@@ -27,8 +29,10 @@
 # regenerated lockfile (`@dependabot rebase`), not a textual merge
 # (pinpoint-pr-workflow Phase 4).
 #
-# A required check that fails after the update, with no later push to main, does
-# not start this workflow. Run it by hand (workflow_dispatch) to move the line.
+# Not covered: an up to date PR whose required checks are still pending or hung
+# stays the head of the line. A required check that fails after the update, with
+# no later push to main, does not start this workflow. Run it by hand
+# (workflow_dispatch) to move the line.
 #
 # Tokens: reads (PR list, check results, compare) use GITHUB_TOKEN. The update
 # itself uses an installation token of Tim's GitHub App, because a commit made
@@ -86,33 +90,45 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           APP_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          # The ruleset's required checks decide which failures count. If they
-          # cannot be read, no PR is skipped for a failed check.
+          # The ruleset's required checks decide which failures count. Without
+          # them a red PR would become the head of the line and stall it, so a
+          # failed read fails the job rather than guessing.
           required=$(gh api "repos/$GITHUB_REPOSITORY/rules/branches/main" \
             --jq '[.[] | select(.type == "required_status_checks")
-                   | .parameters.required_status_checks[].context]') || required="[]"
-          [[ "$required" != "[]" ]] || echo "::warning::could not read the required checks; failed checks do not skip a PR"
+                   | .parameters.required_status_checks[].context]') || required=""
+          if [[ -z "$required" || "$required" == "[]" ]]; then
+            echo "::error::could not read the required checks from the branch ruleset"
+            exit 1
+          fi
           # Armed PRs, oldest arming first: number, head, mergeable, count of
-          # required checks that failed on that head.
+          # required checks that failed on that head, and whether every required
+          # check has passed.
           prs=$(gh pr list --repo "$GITHUB_REPOSITORY" --base main --state open --limit 100 \
             --json number,author,isDraft,isCrossRepository,autoMergeRequest,headRefOid,mergeable,statusCheckRollup \
             | jq -r --argjson required "$required" '
                 [.[] | select(.autoMergeRequest != null and (.isDraft | not)
                               and (.isCrossRepository | not) and (.author.is_bot | not))]
                 | sort_by(.autoMergeRequest.enabledAt) | .[]
+                | . as $pr
                 | [.number, .headRefOid, .mergeable,
                    ([.statusCheckRollup[]?
                      | select((.name // .context) as $n | any($required[]; . == $n))
                      | select((.conclusion // .state // "")
-                              | IN("FAILURE", "TIMED_OUT", "STARTUP_FAILURE", "ERROR"))]
-                    | length)]
+                              | IN("FAILURE", "TIMED_OUT", "STARTUP_FAILURE", "ERROR",
+                                   "CANCELLED", "ACTION_REQUIRED"))]
+                    | length),
+                   (all($required[]; . as $r
+                        | any($pr.statusCheckRollup[]?;
+                              (.name // .context) == $r
+                              and ((.conclusion // .state // "")
+                                   | IN("SUCCESS", "SKIPPED", "NEUTRAL")))))]
                 | @tsv')
           {
             echo "## PRs set to merge, oldest first"
             [[ -n "$prs" ]] || echo "None."
           } >> "$GITHUB_STEP_SUMMARY"
           lead=""
-          while IFS=$'\t' read -r number head mergeable failed; do
+          while IFS=$'\t' read -r number head mergeable failed passed; do
             [[ -n "$number" ]] || continue
             if [[ -n "$lead" ]]; then
               line="#$number: waiting behind #$lead"
@@ -124,6 +140,12 @@ jobs:
               echo "::warning::$line"
             elif ! behind=$(gh api "repos/$GITHUB_REPOSITORY/compare/main...$head" --jq .behind_by); then
               line="#$number: skipped: could not compare with main"
+              echo "::warning::$line"
+            elif [[ "$behind" == 0 && "$passed" == true ]]; then
+              # Up to date with every required check green, yet still open: it
+              # waits on something this workflow cannot fix (an unresolved
+              # conversation), so the line moves past it.
+              line="#$number: skipped: up to date and checks passed but not merged"
               echo "::warning::$line"
             elif [[ "$behind" == 0 ]]; then
               lead="$number"
