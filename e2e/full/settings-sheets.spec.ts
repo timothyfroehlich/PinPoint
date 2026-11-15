@@ -17,7 +17,7 @@
 
 import type { Page } from "@playwright/test";
 import { test, expect } from "../support/fixtures.js";
-import { assertNoA11yViolations } from "../support/actions.js";
+import { assertNoA11yViolations, openListSearch } from "../support/actions.js";
 
 // The print page opens the print dialog on load; a test has no use for it.
 test.beforeEach(async ({ page }) => {
@@ -27,7 +27,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 async function addByInitials(page: Page, initials: string): Promise<void> {
-  const search = page.getByRole("searchbox", { name: "Search machines" });
+  const search = await openListSearch(page, "Search machines");
   await search.fill(initials);
   // The machine list renders as a table (role=row) on desktop and as a compact
   // card list (role=listitem, MachineViewCompactList) on phones; the off-
