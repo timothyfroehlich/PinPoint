@@ -15,7 +15,7 @@ const hookPath = path.resolve(
 );
 
 const MERGE_DENY = [
-  "Bash(gh pr merge*)",
+  "Bash(gh pr merge *--admin*)",
   "Bash(gh api *pulls/*/merge*)",
   "Bash(gh api *mergePullRequest*)",
   "Bash(gh api *enablePullRequestAutoMerge*)",
@@ -83,13 +83,15 @@ describe("verify-guard-stack.cjs", () => {
   });
 
   it("reports a missing merge deny rule", () => {
-    const deny = MERGE_DENY.filter((rule) => rule !== "Bash(gh pr merge*)");
+    const deny = MERGE_DENY.filter(
+      (rule) => rule !== "Bash(gh pr merge *--admin*)"
+    );
     const result = runWith(
       JSON.stringify({ hooks: WIRED, permissions: { deny } })
     );
     expect(result.status).toBe(0);
     expect(result.stdout).toContain(
-      "merge deny rules missing from permissions.deny: Bash(gh pr merge*)"
+      "merge deny rules missing from permissions.deny: Bash(gh pr merge *--admin*)"
     );
   });
 

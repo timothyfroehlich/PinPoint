@@ -20,7 +20,13 @@
 name: Preview Controller
 
 on:
-  issue_comment:
+  # Accepted risk (PP-1wgj): the /preview flow checks out PR-head code and runs
+  # scripts/workflow/preview/preview-create.sh and preview-destroy.sh with prod
+  # Supabase + Vercel secrets. Two gates keep that code trusted: the commenter's
+  # author_association (any collaborator, read and triage included), and the
+  # "Resolve PR head" step, which refuses a PR whose head is in a fork. Only
+  # branches in this repository, which take write access to push, ever run.
+  issue_comment:  # zizmor: ignore[dangerous-triggers] accepted risk; see note above
     types: [created]
 
 # Least privilege: we read the PR and write a sticky comment.
@@ -86,20 +92,26 @@ jobs:
       # Resolve the PR head BEFORE checkout so we can deploy the PR's code (on
       # issue_comment events checkout defaults to the repo's default branch).
       # gh uses the API, so no checkout is needed yet. The author gate above
-      # restricts this to OWNER/MEMBER/COLLABORATOR, so checking out PR head is
-      # safe (no untrusted code runs with our secrets).
+      # checks only who commented, not whose code the PR carries, so a fork PR
+      # is refused here: its head would run the preview scripts with our secrets.
       - name: Resolve PR head
         id: pr
         if: steps.parse.outputs.action != 'noop'
         env:
           PR_NUMBER: ${{ github.event.issue.number }}
         run: |
-          read -r head_ref head_sha < <(gh pr view "$PR_NUMBER" \
+          read -r head_ref head_sha cross_repo < <(gh pr view "$PR_NUMBER" \
             --repo "$GITHUB_REPOSITORY" \
-            --json headRefName,headRefOid \
-            --jq '"\(.headRefName) \(.headRefOid)"')
+            --json headRefName,headRefOid,isCrossRepository \
+            --jq '"\(.headRefName) \(.headRefOid) \(.isCrossRepository)"')
           if [[ -z "$head_ref" || -z "$head_sha" ]]; then
             echo "::error::Could not resolve head branch/SHA for PR #${PR_NUMBER}"
+            exit 1
+          fi
+          if [[ "$cross_repo" != "false" ]]; then
+            gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
+              --body "/preview is unavailable for pull requests from forks." || true
+            echo "::error::PR #${PR_NUMBER} comes from a fork; /preview runs only on branches in ${GITHUB_REPOSITORY}"
             exit 1
           fi
           echo "head_ref=${head_ref}" >> "$GITHUB_OUTPUT"
