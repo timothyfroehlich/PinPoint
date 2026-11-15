@@ -268,6 +268,11 @@
         "typescript/no-unsafe-argument": "off",
         "typescript/unbound-method": "off",
         "typescript/no-non-null-assertion": "off",
+        // no-unnecessary-condition is off for test files because
+        // tsconfig.tests.json extends tsconfig.base.json only (not
+        // @tsconfig/strictest), so noUncheckedIndexedAccess is unset and the
+        // defensive index checks tests rely on read as "unnecessary" to the
+        // type-aware rule. (PP-8xk7)
         "typescript/no-unnecessary-condition": "off",
         "pinpoint/no-restricted-disable-directives": "off"
       }
@@ -296,6 +301,17 @@
           }
         ],
         "pinpoint/no-test-com-literals": "warn",
+        // no-unnecessary-condition is off here for a DIFFERENT reason than the
+        // test block above: e2e/tsconfig.json DOES extend @tsconfig/strictest,
+        // so noUncheckedIndexedAccess is true and the index-access rationale
+        // does not apply. It is off because e2e uses concurrency-coordination
+        // flags mutated across async closures (e.g. `claimed` in
+        // support/page-helpers.ts), which the type-aware rule mis-reports as
+        // "always falsy" — a false positive, not dead code. Type-aware linting
+        // is enabled today via `options.typeAware: true` above (equivalent to
+        // --type-aware; needs the installed oxlint-tsgolint), so this disable is
+        // load-bearing in `pnpm run lint`/CI now: removing it fails the gate on
+        // page-helpers.ts. (PP-8xk7)
         "typescript/no-unnecessary-condition": "off",
         "pinpoint/no-restricted-disable-directives": "off"
       }

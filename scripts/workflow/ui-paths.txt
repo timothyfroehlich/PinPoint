@@ -1,0 +1,5 @@
+^src/app/.*\.tsx$
+^src/components/
+\.css$
+(^|/)tailwind[^/]*$
+(^|/)design-tokens?[^/]*$

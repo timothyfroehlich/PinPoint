@@ -13,10 +13,11 @@ const path = require("node:path");
 
 const ROOT = path.join(__dirname, "..", "..");
 
-// The raw merge channels agents must never use (PP-wi85).
+// The merge channels agents must never use: the admin bypass of the ruleset's
+// gates, and the raw API/MCP merges outside the documented `gh pr merge` path.
 // Keep in step with permissions.deny in .claude/settings.json.
 const REQUIRED_DENY = [
-  "Bash(gh pr merge*)",
+  "Bash(gh pr merge *--admin*)",
   "Bash(gh api *pulls/*/merge*)",
   "Bash(gh api *mergePullRequest*)",
   "Bash(gh api *enablePullRequestAutoMerge*)",
