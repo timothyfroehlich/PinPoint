@@ -120,8 +120,9 @@ function MachineIdentity({
  *
  * The count draws above the row link. An invisible `::before` makes its hit
  * area at least 44px wide (list-views §7.9), growing leftward into the gap
- * before it, and reaches up to the row's top edge. It stops at line 2, so a
- * tap on line 2 always opens the machine.
+ * before it, and reaches up through the row's 10px top padding to the row's
+ * top edge, never into the row above. It stops at line 2, so a tap on line
+ * 2 always opens the machine.
  */
 function OpenIssueCount({ row }: { row: MachineViewRow }): React.JSX.Element {
   const count = row.health.openIssues;
@@ -143,7 +144,7 @@ function OpenIssueCount({ row }: { row: MachineViewRow }): React.JSX.Element {
       className={cn(
         LIST_ROW_RAISED,
         "inline-flex items-center rounded-sm text-[13px] whitespace-nowrap underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        "before:absolute before:right-0 before:-top-3 before:bottom-0 before:w-full before:min-w-11",
+        "before:absolute before:right-0 before:-top-2.5 before:bottom-0 before:w-full before:min-w-11",
         severity?.iconColor ?? "text-foreground"
       )}
     >

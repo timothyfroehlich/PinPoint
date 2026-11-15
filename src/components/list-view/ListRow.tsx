@@ -90,10 +90,12 @@ export function ListRow({
             column keeps line 2's indent when a row has no dot. */}
         <span className="mt-1.5 flex size-2.5 shrink-0">{dot}</span>
         <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-start gap-2 text-[15px] leading-[22px]">
+          <div className="flex min-w-0 items-start gap-2.5 text-[15px] leading-[22px]">
             <div className="min-w-0 flex-1">{title}</div>
+            {/* A flex box, so its content's top is line 1's top: the row's
+                top padding (py-2.5) above it reaches the row's top edge. */}
             {titleEnd === undefined ? null : (
-              <div className="shrink-0">{titleEnd}</div>
+              <div className="flex shrink-0">{titleEnd}</div>
             )}
           </div>
           {details}

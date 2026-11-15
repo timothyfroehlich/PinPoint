@@ -426,6 +426,11 @@ describe("Machine rows", () => {
       "before:w-full",
       "before:min-w-11"
     );
+    // It reaches up through the row's 10px top padding and no further, so it
+    // never overlaps the row above; its box starts at line 1's top.
+    expect(count).toHaveClass("before:-top-2.5");
+    expect(screen.getByRole("listitem")).toHaveClass("py-2.5");
+    expect(count.parentElement).toHaveClass("flex");
     // It ends at the link's bottom, so line 2 stays the row link.
     expect(count).toHaveClass("before:bottom-0");
     expect(count).not.toContainElement(
