@@ -128,10 +128,9 @@ test.describe("Issue List Features - Extended", () => {
       .getByRole("button", { name: new RegExp(`^\\d+ ${levelPattern}$`) })
       .first();
     await expect(first).toBeVisible();
-    const label = ((await first.getAttribute("aria-label")) ?? "").replace(
-      /^\d+ /,
-      ""
-    );
+    const label = ((await first.textContent()) ?? "")
+      .trim()
+      .replace(/^\d+ /, "");
     const segment = severity.getByRole("button", {
       name: new RegExp(`^\\d+ ${label}$`),
     });
@@ -149,7 +148,7 @@ test.describe("Issue List Features - Extended", () => {
       .poll(
         async () => {
           const count = Number.parseInt(
-            (await segment.getAttribute("aria-label")) ?? "",
+            ((await segment.textContent()) ?? "").trim(),
             10
           );
           const showing = await resultCount(page).textContent();
