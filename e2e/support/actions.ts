@@ -820,6 +820,26 @@ export async function assertNoA11yViolations(
 
   const rulesToIgnore = Array.from(new Set([...defaultIgnore, ...ignoreRules]));
 
+  // Scan a settled page (PP-4bhb). Axe computes color contrast through
+  // opacity, so a surface dimmed while a request is in flight (ListView sets
+  // aria-busy and opacity-60 while its router transition is pending) or
+  // mid-fade fails color-contrast for every muted label on it at once.
+  await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
+  await page.evaluate(async () => {
+    // Infinite animations (spinners, skeleton pulses) never finish; paused
+    // ones never resolve. Wait only for finite ones in flight.
+    const inFlight = document
+      .getAnimations()
+      .filter(
+        (animation) =>
+          animation.playState === "running" &&
+          animation.effect?.getTiming().iterations !== Infinity
+      );
+    await Promise.all(
+      inFlight.map((animation) => animation.finished.catch(() => undefined))
+    );
+  });
+
   const builder = new AxeBuilder({ page });
   if (rulesToIgnore.length > 0) {
     builder.disableRules(rulesToIgnore);
