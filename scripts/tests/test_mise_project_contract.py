@@ -1159,7 +1159,10 @@ def test_pr_e2e_jobs_unsharded_and_browser_cache_wiring() -> None:
         assert f"\n  {removed}:\n" not in workflow, (
             f"{removed} is folded into another job"
         )
-    assert "uses: gitleaks/gitleaks-action@" in _workflow_job_block(workflow, "linters")
+    linters = _workflow_job_block(workflow, "linters")
+    # The CLI, not gitleaks-action, which needs a license key in an org repo.
+    assert '"$RUNNER_TEMP/gitleaks" git --redact' in linters
+    assert "gitleaks/gitleaks-action@" not in linters
     assert "- name: Run pnpm audit" in _workflow_job_block(workflow, "test-integration")
 
     comprehensive = _workflow_job_block(workflow, "test-e2e-comprehensive")

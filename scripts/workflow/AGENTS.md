@@ -61,7 +61,7 @@ Terminal JSON schema (`stdout`):
 ```json
 {
   "schema_version": 2,
-  "repository": "timothyfroehlich/PinPoint",
+  "repository": "minamaya/PinPoint",
   "pr": 1234,
   "phase": "ci",
   "expected_head": "40-char-sha",

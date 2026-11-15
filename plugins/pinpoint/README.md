@@ -9,8 +9,8 @@ The tools act on production data. There is no delete tool.
 
 ## Install
 
-In claude.ai: Customize > Plugins > Add > Add marketplace, enter `timothyfroehlich/PinPoint`, install **PinPoint**, then connect **pinpoint** on the plugin's Connectors tab.
+In claude.ai: Customize > Plugins > Add > Add marketplace, enter `minamaya/PinPoint`, install **PinPoint**, then connect **pinpoint** on the plugin's Connectors tab.
 
-In Claude Code: `claude plugin marketplace add timothyfroehlich/PinPoint`, then `claude plugin install pinpoint@pinpoint`.
+In Claude Code: `claude plugin marketplace add minamaya/PinPoint`, then `claude plugin install pinpoint@pinpoint`.
 
 A new Claude client must be allowlisted on the server before its calls succeed. The procedure is in [`docs/runbooks/mcp-oauth-claude.md`](../../docs/runbooks/mcp-oauth-claude.md).

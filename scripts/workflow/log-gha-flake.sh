@@ -39,7 +39,7 @@ set -euo pipefail
 #
 # Invoked via `bash …` — no executable bit required (committed mode 644).
 
-REPO_SLUG="timothyfroehlich/PinPoint"
+REPO_SLUG="minamaya/PinPoint"
 LOG_LABEL="gha-flake-log"
 WEEK_LABEL="gha-flake-week"
 VALID_CLASSES=(
