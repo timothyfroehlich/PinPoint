@@ -122,7 +122,9 @@
 
 ## Known divergences (code vs spec)
 
-_None — the current implementation matches this spec._
+| Requirement | Divergence | Resolution |
+| :-- | :-- | :-- |
+| §5.9 | Line 2 starts under the machine name, past the Playability dot's 10px dot and 10px gap, rather than spanning the row's full width; the owner avatar follows 6px after the previous part with no “·” (Tim, 2026-11-15). | Spec update to §5.9 pending Tim's approval of the exact wording (PP-jb9v.13). |
 
 ---
 
