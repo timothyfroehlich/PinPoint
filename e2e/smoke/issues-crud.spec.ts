@@ -121,8 +121,7 @@ test.describe("Issues System", () => {
         })
         .toBe(seededMachines.addamsFamily.initials);
 
-      // The shared view renders both compact and table markup. The accessible
-      // link query selects the mode currently shown instead of matching both.
+      // The row's title link is named by the machine's title alone.
       const addamsFamilyLink = page.getByRole("link", {
         name: "The Addams Family",
         exact: true,

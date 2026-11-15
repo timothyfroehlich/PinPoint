@@ -171,7 +171,6 @@ describe("machine view database pipeline", () => {
     const db = await getTestDb();
     const searchParams = new URLSearchParams({
       presence: "all",
-      columns: "machine",
     });
 
     const tx = asDbOrTx(db);
@@ -190,13 +189,18 @@ describe("machine view database pipeline", () => {
 
     expect(all.rows.map((row) => row.initials)).toEqual(["AAA", "BBB", "CCC"]);
     expect(collection.rows.map((row) => row.initials)).toEqual(["AAA", "CCC"]);
-    expect(all.rows.every((row) => row.lastServicedAt === undefined)).toBe(
+    // Every row carries its service date (machine-views §5.9); activity
+    // dates load only to sort by them.
+    expect(all.rows.every((row) => Object.hasOwn(row, "lastServicedAt"))).toBe(
+      true
+    );
+    expect(all.rows.every((row) => row.lastActivityAt === undefined)).toBe(
       true
     );
     expect(all.rows.every((row) => !Object.hasOwn(row, "ownerId"))).toBe(true);
   });
 
-  it("sends the identity line's manufacturer, year, and owner name whatever fields are displayed (§3.2, §3.3)", async () => {
+  it("sends the identity line's manufacturer, year, and owner name (§3.2, §3.3)", async () => {
     const db = await getTestDb();
     await db.insert(machines).values(
       createTestMachine({
@@ -213,7 +217,6 @@ describe("machine view database pipeline", () => {
       viewerId: null,
       searchParams: new URLSearchParams({
         presence: "all",
-        columns: "machine",
       }),
     });
 
@@ -232,7 +235,7 @@ describe("machine view database pipeline", () => {
     expect(JSON.stringify(result.rows)).not.toContain("@");
   });
 
-  it("sends health on every row for the phone Compact row, whatever fields are displayed (§5.3)", async () => {
+  it("sends health on every row (§5.3)", async () => {
     const db = await getTestDb();
     await db
       .insert(issues)
@@ -247,7 +250,6 @@ describe("machine view database pipeline", () => {
       viewerId: null,
       searchParams: new URLSearchParams({
         presence: "all",
-        columns: "machine",
       }),
     });
 
@@ -255,9 +257,9 @@ describe("machine view database pipeline", () => {
     expect(
       result.rows.map((row) => [
         row.initials,
-        row.health?.playability,
-        row.health?.openIssues,
-        row.health?.worstSeverity,
+        row.health.playability,
+        row.health.openIssues,
+        row.health.worstSeverity,
       ])
     ).toEqual([
       ["AAA", "unplayable", 1, "unplayable"],
@@ -346,7 +348,6 @@ describe("machine view database pipeline", () => {
       viewerId: null,
       searchParams: new URLSearchParams({
         owner: `${ownerTwoId},${invitedId},unassigned`,
-        columns: "machine",
       }),
     });
 
@@ -378,7 +379,6 @@ describe("machine view database pipeline", () => {
       viewerId: null,
       searchParams: new URLSearchParams({
         owner: `${ownerOneId},${ownerTwoId}`,
-        columns: "machine",
       }),
     });
 
@@ -399,7 +399,6 @@ describe("machine view database pipeline", () => {
         searchParams: new URLSearchParams({
           owner: "me",
           presence: "all",
-          columns: "machine",
         }),
       });
 
@@ -431,7 +430,6 @@ describe("machine view database pipeline", () => {
       viewerId: null,
       searchParams: new URLSearchParams({
         owner: `${ownerOneId},${randomUUID()},not-a-person`,
-        columns: "machine",
       }),
     });
 

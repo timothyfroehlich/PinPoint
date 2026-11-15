@@ -47,7 +47,6 @@ const state: MachineViewSavedState = {
   sort: "machine",
   dir: "asc",
   pageSize: 25,
-  columns: ["machine", "playability"],
 };
 
 const builtInViewIds = ["on-the-floor", "needs-attention"];

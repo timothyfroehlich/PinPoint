@@ -90,7 +90,6 @@ const brokenView: MachineViewSavedViewSummary = {
     sort: "machine",
     dir: "asc",
     pageSize: 25,
-    columns: presetState.columns,
   },
 };
 
@@ -201,30 +200,54 @@ describe("MachineView", () => {
     vi.restoreAllMocks();
   });
 
-  it("cycles sort direction and then restores the preset default", async () => {
+  it("sorts by every machine field from the sort control (machine-views §3.14)", async () => {
     const user = userEvent.setup();
     renderView();
-    const issueHeader = screen.getByRole("columnheader", {
-      name: /open issues/i,
-    });
-    const button = within(issueHeader).getByRole("button");
+    // No table: no column headers to sort by.
+    expect(screen.queryByRole("columnheader")).not.toBeInTheDocument();
 
-    await user.click(button);
+    await user.click(screen.getByTestId("list-sort-trigger"));
+    expect(
+      screen.getAllByRole("menuitemradio").map((item) => item.textContent)
+    ).toEqual(
+      expect.arrayContaining([
+        "Name",
+        "Playability",
+        "Open Issues",
+        "Last Serviced",
+        "Presence",
+        "Owner",
+        "Manufacturer",
+        "Year",
+        "Oldest Open Issue",
+        "Last Activity",
+        "Date Added",
+      ])
+    );
+    await user.click(
+      screen.getByRole("menuitemradio", { name: "Open Issues" })
+    );
     expect(navigation.replace).toHaveBeenLastCalledWith(
       "/m?sort=openIssues&dir=desc",
       { scroll: false }
     );
-    await user.click(button);
-    expect(navigation.replace).toHaveBeenLastCalledWith(
-      "/m?sort=openIssues&dir=asc",
-      { scroll: false }
-    );
-    await user.click(button);
-    expect(navigation.replace).toHaveBeenLastCalledWith("/m", {
-      scroll: false,
-    });
   });
 
+  it("shows the same two-line rows at every width, with page size alone in View options", async () => {
+    const user = userEvent.setup();
+    renderView();
+
+    const list = screen.getByRole("list", { name: "Machines list" });
+    expect(within(list).getAllByRole("listitem")).toHaveLength(1);
+    expect(list).not.toHaveClass("md:hidden");
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "View options" }));
+    expect(screen.queryAllByRole("menuitemcheckbox")).toHaveLength(0);
+    expect(
+      screen.getAllByRole("menuitemradio").map((item) => item.textContent)
+    ).toEqual(["25", "50", "100"]);
+  });
   it("searches without a placeholder, named for the list it searches (list-views §4.2)", () => {
     renderView();
     expect(
@@ -517,7 +540,7 @@ describe("MachineView", () => {
     );
   });
 
-  it("keeps a Built-in View's tab current when the page size or a field changes (list-views §1)", async () => {
+  it("keeps a Built-in View's tab current when the page size changes (list-views §1)", async () => {
     const user = userEvent.setup();
     const needsAttention = getMachineViewBuiltInViews("machines").find(
       (view) => view.id === "needs-attention"
@@ -538,11 +561,10 @@ describe("MachineView", () => {
       within(tabs).getByRole("link", { current: "page" });
 
     await user.click(screen.getByRole("button", { name: "View options" }));
-    await user.click(screen.getByRole("menuitemcheckbox", { name: "Owner" }));
     await user.click(screen.getByRole("menuitemradio", { name: "50" }));
 
     expect(navigation.replace).toHaveBeenLastCalledWith(
-      "/m?status=needs_service%2Cunplayable&sort=playability&dir=desc&pageSize=50&columns=machine%2Cplayability%2Cpresence%2CopenIssues%2ClastServiced%2ClastActivity%2Cowner&view=needs-attention",
+      "/m?status=needs_service%2Cunplayable&sort=playability&dir=desc&pageSize=50&view=needs-attention",
       { scroll: false }
     );
     expect(current()).toHaveTextContent(/^Needs attention$/);
@@ -554,7 +576,6 @@ describe("MachineView", () => {
       "Needs attention"
     );
   });
-
   it("leaves every view on a search or filter change: no tab current, Save view, no Discard (list-views §1, §5.2, §7.3)", async () => {
     const user = userEvent.setup();
     renderView();
@@ -582,24 +603,23 @@ describe("MachineView", () => {
     );
   });
 
-  it("applies a Built-in View tab keeping the fields and page size showing, adding Date Added for Recently added (list-views §1; machine-views §9.1)", async () => {
+  it("applies a Built-in View tab keeping the page size showing (list-views §1; machine-views §9.1)", async () => {
     const user = userEvent.setup();
-    const columns = [...presetState.columns, "owner" as const];
     navigation.searchParams = new URLSearchParams([
       ["q", "mars"],
       ["pageSize", "50"],
-      ["columns", columns.join(",")],
     ]);
     renderView({
       result: result({
-        state: { ...presetState, q: "mars", pageSize: 50, columns, page: 2 },
+        state: { ...presetState, q: "mars", pageSize: 50, page: 2 },
       }),
     });
     const tabs = screen.getByRole("navigation", { name: "Saved views" });
     const recentlyAdded = within(tabs).getByRole("link", {
       name: "Recently added",
     });
-    const url = `/m?presence=on_the_floor%2Coff_the_floor%2Con_loan%2Cpending_arrival&sort=dateAdded&dir=desc&pageSize=50&columns=${[...columns, "dateAdded"].join("%2C")}&view=recently-added`;
+    const url =
+      "/m?presence=on_the_floor%2Coff_the_floor%2Con_loan%2Cpending_arrival&sort=dateAdded&dir=desc&pageSize=50&view=recently-added";
 
     expect(recentlyAdded).toHaveAttribute("href", url);
     await user.click(recentlyAdded);
@@ -610,14 +630,12 @@ describe("MachineView", () => {
       within(tabs).getByRole("link", { current: "page" })
     ).toHaveTextContent(/^Recently added$/);
 
-    // The search is cleared; fields and page size stay.
+    // The search is cleared; the page size stays.
     await user.click(within(tabs).getByRole("link", { name: "On the floor" }));
-    expect(navigation.replace).toHaveBeenLastCalledWith(
-      `/m?pageSize=50&columns=${[...columns, "dateAdded"].join("%2C")}`,
-      { scroll: false }
-    );
+    expect(navigation.replace).toHaveBeenLastCalledWith("/m?pageSize=50", {
+      scroll: false,
+    });
   });
-
   it("drops a view reference the configuration has left when it rewrites the URL (list-views §9.6)", () => {
     navigation.searchParams = new URLSearchParams([
       ["q", "mars"],
@@ -834,29 +852,19 @@ describe("MachineView", () => {
     ).toHaveTextContent(/^Two owners$/);
   });
 
-  it("keeps the page for displayed fields and returns to page 1 for a new page size (list-views §4.7, §4.8)", async () => {
+  it("returns to page 1 for a new page size (list-views §4.7)", async () => {
     const user = userEvent.setup();
     navigation.searchParams = new URLSearchParams({ page: "3" });
     renderView({
       result: result({ state: { ...presetState, page: 3 }, totalCount: 100 }),
     });
-    const columns =
-      "machine%2Cplayability%2Cpresence%2CopenIssues%2ClastServiced%2ClastActivity%2Cowner";
 
     await user.click(screen.getByRole("button", { name: "View options" }));
-    await user.click(screen.getByRole("menuitemcheckbox", { name: "Owner" }));
-    expect(navigation.replace).toHaveBeenLastCalledWith(
-      `/m?page=3&columns=${columns}`,
-      { scroll: false }
-    );
-
     await user.click(screen.getByRole("menuitemradio", { name: "50" }));
-    expect(navigation.replace).toHaveBeenLastCalledWith(
-      `/m?pageSize=50&columns=${columns}`,
-      { scroll: false }
-    );
+    expect(navigation.replace).toHaveBeenLastCalledWith("/m?pageSize=50", {
+      scroll: false,
+    });
   });
-
   it("returns to page 1 when a filter changes (list-views §4.7)", async () => {
     const user = userEvent.setup();
     navigation.searchParams = new URLSearchParams({ page: "3" });
@@ -1217,19 +1225,5 @@ describe("MachineView", () => {
     expect(window.sessionStorage.getItem("pinpoint:list-return:/m")).toBe(
       "/m?q=mars&page=2"
     );
-  });
-
-  it("restores and updates the phone display preference", async () => {
-    const user = userEvent.setup();
-    window.localStorage.setItem("pinpoint:machine-view:mobile-mode", "table");
-    renderView();
-
-    expect(await screen.findByText(/scroll for more/i)).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Filters" }));
-    await user.click(await screen.findByRole("button", { name: /^Layout/ }));
-    await user.click(screen.getByRole("radio", { name: "Compact list" }));
-    expect(
-      window.localStorage.getItem("pinpoint:machine-view:mobile-mode")
-    ).toBe("compact");
   });
 });

@@ -36,6 +36,8 @@ function candidate(
     createdAt: "2026-01-01T00:00:00.000Z",
     canonicalModelName: "Attack from Mars",
     legacyModelName: "AFM Legacy",
+    health: health({}),
+    lastServicedAt: null,
     ...overrides,
   };
 }
