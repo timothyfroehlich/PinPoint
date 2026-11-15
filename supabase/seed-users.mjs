@@ -335,6 +335,9 @@ async function seedUsersAndData() {
     // 3. Seed Issues (18 issues with comprehensive permutations)
     console.log("\n🔧 Seeding issues...");
 
+    // About two thirds of the issues are assigned, spread across member+
+    // users (guests cannot be assigned); the rest stay unassigned so lists
+    // show both states. AFM-01 and GDZ-02 match their seeded timelines.
     const issueSeed = [
       // HD (Humpty Dumpty) - 1947
       {
@@ -359,6 +362,7 @@ async function seedUsersAndData() {
         severity: "major",
         priority: "medium",
         frequency: "intermittent",
+        assignedTo: userIds.technician,
         reportedBy: userIds.member,
       },
       // SC (Slick Chick) - 1963
@@ -386,6 +390,7 @@ async function seedUsersAndData() {
         severity: "major",
         priority: "high",
         frequency: "frequent",
+        assignedTo: userIds.member,
         reportedBy: userIds.guest,
       },
       {
@@ -398,6 +403,7 @@ async function seedUsersAndData() {
         severity: "cosmetic",
         priority: "low",
         frequency: "constant",
+        assignedTo: userIds.technician,
         reporterEmail: "anon@player.com",
       },
       // BK (Black Knight) - 1980
@@ -411,6 +417,7 @@ async function seedUsersAndData() {
         severity: "major",
         priority: "high",
         frequency: "constant",
+        assignedTo: userIds.admin,
         reportedBy: userIds.admin,
       },
       {
@@ -436,6 +443,7 @@ async function seedUsersAndData() {
         severity: "unplayable",
         priority: "high",
         frequency: "constant",
+        assignedTo: userIds.member,
         reportedBy: userIds.member,
       },
       {
@@ -448,6 +456,7 @@ async function seedUsersAndData() {
         severity: "major",
         priority: "high",
         frequency: "frequent",
+        assignedTo: userIds.admin,
         reportedBy: userIds.admin,
       },
       // TAF (The Addams Family) - 1992
@@ -474,6 +483,7 @@ async function seedUsersAndData() {
         severity: "major",
         priority: "medium",
         frequency: "frequent",
+        assignedTo: userIds.technician,
         invitedUserId: invitedUserId,
       },
       {
@@ -499,6 +509,7 @@ async function seedUsersAndData() {
         severity: "major",
         priority: "high",
         frequency: "intermittent",
+        assignedTo: userIds.member,
         reportedBy: userIds.member,
       },
       {
@@ -511,6 +522,7 @@ async function seedUsersAndData() {
         severity: "minor",
         priority: "low",
         frequency: "intermittent",
+        assignedTo: userIds.technician,
         reportedBy: userIds.guest,
       },
       // MM (Medieval Madness) - 1997
@@ -524,6 +536,7 @@ async function seedUsersAndData() {
         severity: "minor",
         priority: "medium",
         frequency: "constant",
+        assignedTo: userIds.admin,
         reportedBy: userIds.admin,
       },
       {
@@ -562,6 +575,7 @@ async function seedUsersAndData() {
         severity: "major",
         priority: "high",
         frequency: "intermittent",
+        assignedTo: userIds.technician,
         reportedBy: userIds.admin,
       },
       {
@@ -574,6 +588,7 @@ async function seedUsersAndData() {
         severity: "minor",
         priority: "medium",
         frequency: "intermittent",
+        assignedTo: userIds.admin,
         reportedBy: userIds.admin,
       },
       // Truly anonymous issue - no reporter info at all
@@ -587,6 +602,7 @@ async function seedUsersAndData() {
         severity: "minor",
         priority: "medium",
         frequency: "intermittent",
+        assignedTo: userIds.member,
       },
     ];
 
@@ -594,12 +610,12 @@ async function seedUsersAndData() {
       await sql`
         INSERT INTO issues (
           id, machine_initials, issue_number, title, description,
-          status, severity, priority, frequency, reported_by, invited_reported_by,
-          reporter_name, reporter_email, created_at, updated_at
+          status, severity, priority, frequency, assigned_to, reported_by,
+          invited_reported_by, reporter_name, reporter_email, created_at, updated_at
         ) VALUES (
           ${issue.id}, ${issue.initials}, ${issue.num}, ${issue.title}, ${wrapTextInProseMirror(issue.desc)},
           ${issue.status}, ${issue.severity}, ${issue.priority}, ${issue.frequency},
-          ${issue.reportedBy ?? null}, ${issue.invitedUserId ?? null},
+          ${issue.assignedTo ?? null}, ${issue.reportedBy ?? null}, ${issue.invitedUserId ?? null},
           ${issue.reporterName ?? null}, ${issue.reporterEmail ?? null}, NOW(), NOW()
         ) ON CONFLICT (id) DO UPDATE SET
           reported_by = EXCLUDED.reported_by,
@@ -608,6 +624,7 @@ async function seedUsersAndData() {
           reporter_email = EXCLUDED.reporter_email,
           priority = EXCLUDED.priority,
           frequency = EXCLUDED.frequency,
+          assigned_to = EXCLUDED.assigned_to,
           updated_at = NOW()
       `;
     }

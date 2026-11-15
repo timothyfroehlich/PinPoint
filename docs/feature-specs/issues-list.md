@@ -93,15 +93,7 @@
 
 ## Known divergences (code vs spec)
 
-| Requirement | Divergence | Resolution |
-| :-- | :-- | :-- |
-| 3.1, 3.9, 3.10 | Line 2 wraps between its parts instead of staying on one line and dropping age, priority, then assignee. | Issue rows implementation PR (PP-jb9v.12). |
-| 3.2, 3.8 | Line 1 leads with a status icon and carries the severity and priority pills; there is no status pill. | Issue rows implementation PR (PP-jb9v.12). |
-| 3.3 | Line 2 shows the status name and no priority pill, shows the issue ID on phones, and shows assignee initials only on phones. | Issue rows implementation PR (PP-jb9v.12). |
-| 3.4 | On desktop the row's right side shows the comment count and the assignee avatar. | Issue rows implementation PR (PP-jb9v.12). |
-| 3.11 | People allowed to change an issue can change status, severity, priority, and assignee from the row, and rows keep their place after a change. | Issue rows implementation PR (PP-jb9v.12). |
-| 3.12 | Only the title links to the issue; the rest of the row is not a link. | Issue rows implementation PR (PP-jb9v.12). |
-| 3.13 | Pills keep the design bible's chip border. | Issue rows implementation PR (PP-jb9v.12). |
+_None — the current implementation matches this spec._
 
 ---
 

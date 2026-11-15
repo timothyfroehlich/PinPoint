@@ -54,7 +54,7 @@ import {
   IssueSummaryRow,
   IssueSummaryWidgets,
 } from "./IssueSummaryWidgets";
-import { IssueViewRows, type IssueRowsViewer } from "./IssueViewRows";
+import { IssueViewRows } from "./IssueViewRows";
 
 const NOUN = { one: "issue", other: "issues" } as const;
 
@@ -85,8 +85,6 @@ interface IssueViewProps {
   title?: string | undefined;
   /** The Collection or Tag tab this list is on, for Export (issues-list §5.4). */
   exportScope?: IssueExportScope | undefined;
-  /** Who is looking, for per-row edit permissions (issues-list §3.5). */
-  viewer: IssueRowsViewer;
 }
 
 /**
@@ -99,7 +97,6 @@ export function IssueView({
   savedViews,
   title,
   exportScope,
-  viewer,
 }: IssueViewProps): React.JSX.Element {
   const rootRef = React.useRef<HTMLDivElement>(null);
   const summaryController = useSummaryWidgetsController(
@@ -257,12 +254,7 @@ export function IssueView({
           )
         }
       >
-        <IssueViewRows
-          rows={result.rows}
-          listKey={serializeIssueViewState(result.state).toString()}
-          users={result.people}
-          viewer={viewer}
-        />
+        <IssueViewRows rows={result.rows} />
       </ListView>
     </div>
   );

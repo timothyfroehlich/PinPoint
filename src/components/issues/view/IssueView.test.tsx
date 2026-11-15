@@ -52,12 +52,6 @@ vi.mock("~/app/(app)/issues/saved-view-actions", () => actions);
 vi.mock("~/app/(app)/issues/export-action", () => ({
   exportIssuesAction: exportAction,
 }));
-vi.mock("~/app/(app)/issues/actions", () => ({
-  updateIssueStatusAction: vi.fn(),
-  updateIssueSeverityAction: vi.fn(),
-  updateIssuePriorityAction: vi.fn(),
-  assignIssueAction: vi.fn(),
-}));
 vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
@@ -90,9 +84,7 @@ function row(overrides: Partial<IssueListRow> = {}): IssueListRow {
     machineInitials: "AFM",
     reporterName: null,
     assignedTo: null,
-    machine: { id: "machine-1", name: "Attack from Mars", ownerId: null },
-    reportedByUser: null,
-    invitedReporter: null,
+    machine: { id: "machine-1", name: "Attack from Mars" },
     assignedToUser: null,
     commentCount: 0,
     ...overrides,
@@ -151,7 +143,6 @@ function renderView(
       result={options.result ?? result()}
       savedViews={options.views ?? savedViews()}
       title={"title" in options ? options.title : "Issues"}
-      viewer={{ userId: ALEX, accessLevel: "member" }}
     />
   );
 }
