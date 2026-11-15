@@ -284,7 +284,7 @@ describe("PhoneListHeader", () => {
     );
   });
 
-  it("keeps the search field while it is at least 175px wide (§7.3)", () => {
+  it("keeps the search field while it is wider than 175px (§7.12, §8.7)", () => {
     // A 400px screen: 378 - views 142 - Filters 44 - two 8px gaps = 176.
     layOut(378, 142);
     renderHeader({});

@@ -634,8 +634,9 @@ interface PhoneListHeaderProps {
  * sheet, with an amber marker announced as "edited"; the search field; and a
  * Filters icon button showing how many filters differ from the Page Preset.
  *
- * When the field would be narrower than 175px it becomes a search icon
- * button between the views button and Filters. The header measures its own
+ * When the field would be narrower than 175px (§7.12), switching a pixel
+ * early per §8.7, it becomes a search icon button between the views button
+ * and Filters. The header measures its own
  * width and the views button's untruncated width (CORE-RESP-002 boundary),
  * so a long view name or the Edited marker turns it into an icon sooner.
  * The icon opens the field across the whole header, covering the views

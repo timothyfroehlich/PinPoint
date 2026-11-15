@@ -5,9 +5,11 @@ import {
   planListHeader,
 } from "./overflow";
 
-describe("phoneSearchAsIcon (list-views §7.3)", () => {
+describe("phoneSearchAsIcon (list-views §7.12, §8.7)", () => {
   // The views button: icon 16 + gap 8 + name + gap 8 + chevron 16.
   const openIssues = 48 + 94;
+  // Filters 44 plus two 8px gaps.
+  const besideField = 60;
   const fit = (available: number, viewsWidth: number): boolean =>
     phoneSearchAsIcon({ available, viewsWidth, filtersWidth: 44, gap: 8 });
 
@@ -16,22 +18,28 @@ describe("phoneSearchAsIcon (list-views §7.3)", () => {
     expect(fit(378, openIssues)).toBe(false);
   });
 
-  it("keeps a field exactly 175px wide, and one a rounding pixel short", () => {
-    expect(fit(175 + openIssues + 60, openIssues)).toBe(false);
-    expect(fit(174 + openIssues + 60, openIssues)).toBe(false);
+  it("switches a tolerance pixel early, so a field of exactly 175px is an icon", () => {
+    expect(fit(176 + openIssues + besideField, openIssues)).toBe(false);
+    expect(fit(175 + openIssues + besideField, openIssues)).toBe(true);
+    expect(fit(174 + openIssues + besideField, openIssues)).toBe(true);
   });
 
-  it("becomes an icon once the field would be narrower than 175px", () => {
-    expect(fit(173 + openIssues + 60, openIssues)).toBe(true);
-    // A 320px screen.
+  it("shows the icon on a 320px screen", () => {
+    // 320 - 22 padding = 298; 298 - 142 - 60 = 96.
     expect(fit(298, openIssues)).toBe(true);
   });
 
-  it("becomes an icon sooner for the Edited marker or a longer name", () => {
-    expect(fit(378, openIssues)).toBe(false);
-    // The Edited marker adds its 8px dot and an 8px gap.
+  it("switches sooner for the Edited marker", () => {
+    // The Edited marker adds its 8px dot and an 8px gap: 176 - 16 = 160.
     expect(fit(378, openIssues + 16)).toBe(true);
+    // Wide enough for the marker too: 394 - 158 - 60 = 176.
+    expect(fit(394, openIssues + 16)).toBe(false);
+  });
+
+  it("switches sooner for a longer view name", () => {
     expect(fit(378, 48 + 140)).toBe(true);
+    // 430 - 22 = 408; 408 - 188 - 60 = 160, still an icon on a large phone.
+    expect(fit(408, 48 + 140)).toBe(true);
   });
 });
 
