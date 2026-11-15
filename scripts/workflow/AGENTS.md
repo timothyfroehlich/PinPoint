@@ -6,7 +6,7 @@ Bash/Node/Python scripts for the GitHub PR lifecycle: CI monitoring, the PR dash
 
 Scripts are designed for the **PinPoint orchestrator workflow** where multiple subagents work in parallel worktrees. The orchestrator (or a human) uses these from the main repo to monitor and manage PRs created by agents.
 
-Merging is native GitHub. Ruleset `6326455` enforces the gates: required checks `CI Gate`, `Claude Review`, and `UI Approval`, every conversation resolved, and the branch up to date with `main`. Tim decides whether a PinPoint PR merges; after his explicit request the owning agent runs `gh pr merge <PR> --squash` (or `--auto --squash`), never `--admin` (AGENTS.md §2.2 "Process rules", `pinpoint-pr-workflow` Phase 4).
+Merging is native GitHub. Ruleset `6326455` enforces the gates: required checks `CI Gate`, `Claude Review`, and `UI Approval`, every conversation resolved, and merging through the merge queue. Tim decides whether a PinPoint PR merges; after his explicit request the owning agent runs `gh pr merge <PR> --squash` (or `--auto --squash`), never `--admin` (AGENTS.md §2.2 "Process rules", `pinpoint-pr-workflow` Phase 4).
 
 ## Codex Git Mutations
 
