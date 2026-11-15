@@ -300,6 +300,12 @@ def _assert_pnpm_lock_checksum_matches_package_json(
         "mise.lock pnpm checksum option must equal package.json#packageManager's "
         f"sha512, got {options.get('checksum')!r}"
     )
+    # The install script that swaps the registry stub for the native binary runs
+    # only when builds are allowed; a lock regenerated without it installs the stub.
+    assert options.get("allow_builds") == "true", (
+        'mise.lock pnpm entry must keep allow_builds = "true" so pnpm\'s install '
+        f"script runs, got {options.get('allow_builds')!r}"
+    )
 
 
 def _assert_mise_lock_coherent(
