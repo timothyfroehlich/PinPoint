@@ -182,9 +182,9 @@ gh pr merge <PR> --squash          # gates already pass
 gh pr merge <PR> --auto --squash   # GitHub merges once the required checks pass
 ```
 
-Use `--auto` when checks are still running. Say “merged” only after `gh pr view <PR> --json state` reads `MERGED`; an auto-merge that is armed but not yet merged is “queued to merge”.
+Use `--auto` when checks are still running or the branch is behind, and always when Tim asks for several merges at once. Say “merged” only after `gh pr view <PR> --json state` reads `MERGED`; an auto-merge that is armed but not yet merged is “queued to merge”.
 
-**Behind main.** The ruleset requires the branch up to date. Bring it current with `gh pr update-branch <PR>`, which merges `main` into the branch (never `--rebase`; AGENTS.md §5 Branches). The new head gets fresh CI and an incremental Claude Review.
+**Behind main.** The ruleset requires the branch up to date. Bring it current with `gh pr update-branch <PR>`, which merges `main` into the branch (never `--rebase`; AGENTS.md §5 Branches). The new head gets fresh CI; Claude Review and UI Approval pass a clean merge of `main` without a new review or sign-off. Once auto-merge is armed, the `Auto-update branches` workflow does this after every push to `main`, so a queue of armed PRs lands one after another without you. A PR whose update conflicts stays behind with a warning in that workflow's run; merge `main` in locally and resolve it. The workflow skips bot PRs (§4.3).
 
 **A refused merge means a gate is unmet.** Read `gh pr checks <PR> --required` and the unresolved conversations, fix what is missing, and merge again. `gh pr merge` is the one merge path: `--admin` is denied to agents (they act through Tim's account, and the ruleset's admin bypass is his), as are the raw API and MCP merge channels.
 
