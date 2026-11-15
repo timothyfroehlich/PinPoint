@@ -55,18 +55,33 @@ function renderRows(issues: IssueListRow[]): ReturnType<typeof render> {
   );
 }
 
-/** Line 2's text as shown, its screen-reader-only parts left out. */
-function line2Parts(row: HTMLElement): string[] {
+/** Line 2's two groups: the left (ID · machine, priority) and the right. */
+function line2Groups(row: HTMLElement): Element[] {
   const line = within(row).getByTestId("issue-machine").closest("div");
   if (!line) throw new Error("expected line 2");
-  return Array.from(line.children)
+  return Array.from(line.children);
+}
+
+/**
+ * A group's parts as shown, by test ID: screen-reader-only parts left out,
+ * and "·" separators shown as "·".
+ */
+function groupParts(group: Element): string[] {
+  return Array.from(group.children)
     .filter((part) => !part.classList.contains("sr-only"))
     .map((part) => {
-      const testId = part
-        .querySelector("[data-testid]")
-        ?.getAttribute("data-testid");
-      return testId ?? part.getAttribute("data-testid") ?? "";
+      const testId =
+        part.getAttribute("data-testid") ??
+        part.querySelector("[data-testid]")?.getAttribute("data-testid");
+      return testId ?? part.textContent;
     });
+}
+
+/** Line 2's parts as shown, both groups in order, separators left out. */
+function line2Parts(row: HTMLElement): string[] {
+  return line2Groups(row)
+    .flatMap(groupParts)
+    .filter((part) => part !== "·");
 }
 
 describe("Issue rows", () => {
@@ -147,6 +162,29 @@ describe("Issue rows", () => {
     expect(age).toHaveTextContent(/^2d agoUpdated 2 days ago$/);
   });
 
+  it("groups line 2: ID · machine and the priority left, the rest right-anchored", () => {
+    renderRows([makeIssue({ commentCount: 3 })]);
+    const groups = line2Groups(screen.getByRole("listitem"));
+    const [left, right] = groups;
+    if (!left || !right) throw new Error("expected 2 groups");
+
+    expect(groups).toHaveLength(2);
+    // A "·" separates only two plain-text items: the ID and the machine. No
+    // pill, avatar, or icon item has one beside it.
+    expect(groupParts(left)).toEqual([
+      "issue-id",
+      "·",
+      "issue-machine",
+      "issue-priority",
+    ]);
+    expect(groupParts(right)).toEqual([
+      "issue-assignee",
+      "issue-comment-count",
+      "issue-age",
+    ]);
+    expect(right.textContent).not.toContain("·");
+  });
+
   it("shows the comment count only when there are comments", () => {
     renderRows([
       makeIssue({ id: "a", commentCount: 0 }),
@@ -197,8 +235,10 @@ describe("Issue rows", () => {
 describe("Issue row line 2 fit (issues-list §3.9)", () => {
   /**
    * jsdom lays nothing out, so line 2 and each measured part get widths:
-   * ID 60, machine 120, priority 50, assignee 30, comments 40, age 90, with
-   * 6px gaps.
+   * ID 60, machine 120 (its "·" included), priority 50, assignee 30,
+   * comments 40, age 90. The left group (ID, machine, priority) has 6px gaps,
+   * the right group (assignee, comments, age) 8px gaps, and at least 12px
+   * separates the groups while the right one shows anything.
    */
   const PART_WIDTHS: Record<string, number> = {
     id: 60,
@@ -228,11 +268,12 @@ describe("Issue row line 2 fit (issues-list §3.9)", () => {
     vi.restoreAllMocks();
   });
 
-  // Each width is the parts' total plus the 16px fit tolerance.
+  // Each width is the parts' total plus the 16px fit tolerance. The left
+  // group is 60+6+120+6+50 = 242 with the priority, 186 without.
   it.each<[number, string[]]>([
-    // 60+120+50+30+40+90 + 5 gaps = 420.
+    // 242 + 12 + (30+8+40+8+90) = 430.
     [
-      436,
+      446,
       [
         "issue-id",
         "issue-machine",
@@ -244,7 +285,7 @@ describe("Issue row line 2 fit (issues-list §3.9)", () => {
     ],
     // The age drops first.
     [
-      435,
+      445,
       [
         "issue-id",
         "issue-machine",
@@ -253,12 +294,12 @@ describe("Issue row line 2 fit (issues-list §3.9)", () => {
         "issue-comment-count",
       ],
     ],
-    // 60+120+50+30+40 + 4 gaps = 324; then the comment count.
-    [339, ["issue-id", "issue-machine", "issue-priority", "issue-assignee"]],
-    // 60+120+50+30 + 3 gaps = 278; then the priority.
-    [293, ["issue-id", "issue-machine", "issue-assignee"]],
-    // 60+120+30 + 2 gaps = 222; the assignee goes last. The ID never drops.
-    [237, ["issue-id", "issue-machine"]],
+    // 242 + 12 + (30+8+40) = 332; then the comment count.
+    [347, ["issue-id", "issue-machine", "issue-priority", "issue-assignee"]],
+    // 242 + 12 + 30 = 284; then the priority.
+    [299, ["issue-id", "issue-machine", "issue-assignee"]],
+    // 186 + 12 + 30 = 228; the assignee goes last. The ID never drops.
+    [243, ["issue-id", "issue-machine"]],
     [120, ["issue-id", "issue-machine"]],
   ])("with comments, at %ipx shows %j", (lineWidth, expected) => {
     stubLayout(lineWidth);
@@ -267,8 +308,8 @@ describe("Issue row line 2 fit (issues-list §3.9)", () => {
   });
 
   it("without comments, drops the priority right after the age", () => {
-    // 60+120+50+30+90 + 4 gaps = 374: no comment part takes room.
-    stubLayout(390);
+    // 242 + 12 + (30+8+90) = 382: no comment part takes room.
+    stubLayout(398);
     renderRows([makeIssue()]);
     expect(line2Parts(screen.getByRole("listitem"))).toEqual([
       "issue-id",
@@ -279,14 +320,29 @@ describe("Issue row line 2 fit (issues-list §3.9)", () => {
     ]);
     cleanup();
 
-    // 60+120+50+30 + 3 gaps = 278.
-    stubLayout(293);
+    // 242 + 12 + 30 = 284.
+    stubLayout(299);
     renderRows([makeIssue()]);
     expect(line2Parts(screen.getByRole("listitem"))).toEqual([
       "issue-id",
       "issue-machine",
       "issue-assignee",
     ]);
+  });
+
+  it("keeps the right group after the left as its parts drop", () => {
+    stubLayout(347);
+    renderRows([makeIssue({ commentCount: 3 })]);
+    const [left, right] = line2Groups(screen.getByRole("listitem"));
+    if (!left || !right) throw new Error("expected 2 groups");
+
+    expect(groupParts(left)).toEqual([
+      "issue-id",
+      "·",
+      "issue-machine",
+      "issue-priority",
+    ]);
+    expect(groupParts(right)).toEqual(["issue-assignee"]);
   });
 
   it("keeps a dropped part readable to screen readers", () => {

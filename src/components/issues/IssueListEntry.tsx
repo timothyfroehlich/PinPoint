@@ -23,21 +23,29 @@ const DROP_ORDER = ["age", "comments", "priority", "assignee"] as const;
 type DroppablePart = (typeof DROP_ORDER)[number];
 type StatusGroup = keyof typeof STATUS_GROUPS;
 
-/** Line 2's column gap (`gap-1.5`); every part after the first leads with "·". */
-const LINE_GAP = 6;
+/** Line 2's parts in its right-anchored group, in display order. */
+const TRAILING_PARTS = ["assignee", "comments", "age"] as const;
+
+/** The gap between the left group's parts (`gap-1.5`). */
+const LEFT_GAP = 6;
+/** The gap between the right group's parts (`gap-2`). */
+const RIGHT_GAP = 8;
+/** The least room between the two groups (`pl-3`). */
+const GROUP_GAP = 12;
 /*
- * Line 2 lines its parts up on one text baseline. Centering them instead
- * puts the monospace issue ID about a pixel above the rest: SF Mono's
- * ascent and descent differ from the sans font's, so the ID's line box is a
- * fraction taller and centers off the shared baseline.
+ * The left group (ID · machine, then the priority pill) lines its parts up
+ * on one text baseline. Centering them instead puts the monospace issue ID
+ * about a pixel above the rest: SF Mono's ascent and descent differ from the
+ * sans font's, so the ID's line box is a fraction taller and centers off the
+ * shared baseline. A "·" separates only two plain-text items, so the only
+ * one is between the ID and the machine.
  */
-const LINE_CLASSES = "flex items-baseline gap-1.5";
+const LEFT_GROUP_CLASSES = "flex min-w-0 items-baseline gap-1.5";
 /*
- * One part: its "·" and its value. A part's baseline is its separator's, so
- * its text sits on line 2's baseline while a pill or avatar centers on the
- * separator.
+ * The right group (assignee, comment count, age) holds no plain text to
+ * share a baseline with, so its icons and avatar center on the line.
  */
-const PART_CLASSES = "flex items-center gap-1.5";
+const RIGHT_GROUP_CLASSES = "ml-auto flex shrink-0 items-center gap-2";
 
 /*
  * Pills on List View rows have no border (issues-list §3.13), a scoped
@@ -236,14 +244,16 @@ function UpdatedAge({
 }
 
 /**
- * Line 2 (issues-list §3.3, §3.9): the issue ID, the machine, the priority
- * pill, the assignee's initials, the comment count (when above zero), and
- * the age, on one line at every width. When the line does not fit it drops
- * the age, then the comment count, then the priority, then the assignee; the
- * ID never drops, and the machine name truncates only after all four are
- * gone. The component measures each part in a hidden lane and plans which
- * stay with the pure `fitLineParts`. A dropped part stays readable to screen
- * readers.
+ * Line 2 (issues-list §3.3, §3.9), on one line at every width, in two
+ * groups. The left group is the issue ID · the machine, then the priority
+ * pill. The right group sits at the line's end: the assignee's initials, the
+ * comment count (when above zero), and the age, at least 12px from the left
+ * group. When the line does not fit it drops the age, then the comment
+ * count, then the priority, then the assignee; the ID never drops, the right
+ * group stays at the line's end as its parts drop, and the machine name
+ * truncates only after all four are gone. The component measures each part
+ * in a hidden lane and plans which stay with the pure `fitLineParts`. A
+ * dropped part stays readable to screen readers.
  */
 function IssueRowDetails({
   issue,
@@ -253,18 +263,26 @@ function IssueRowDetails({
   const hasComments = issue.commentCount > 0;
   const lineRef = React.useRef<HTMLDivElement>(null);
   const laneRef = React.useRef<HTMLDivElement>(null);
+  // The age's text is empty until the shared ticker's first tick, then
+  // changes as time passes; keying the measurement on it re-measures the
+  // lane when it does, without waiting on a ResizeObserver callback (which a
+  // background tab may never deliver).
+  const now = useRelativeNow();
+  const ageText =
+    now === null ? "" : formatCompactAgeAgo(new Date(issue.updatedAt), now);
   const measured = useMeasuredWidths(
     lineRef,
     laneRef,
-    `${issue.id}:${hasComments}`
+    `${issue.id}:${hasComments}:${ageText}`
   );
   const priority = PRIORITY_CONFIG[issue.priority];
   const assigneeName = issue.assignedToUser?.name ?? null;
   const issueId = formatIssueId(issue.machineInitials, issue.issueNumber);
   // A row without comments has no comment part to drop.
-  const dropOrder = hasComments
-    ? DROP_ORDER
-    : DROP_ORDER.filter((part) => part !== "comments");
+  const withoutAbsentComments = <Part extends DroppablePart>(
+    parts: readonly Part[]
+  ): Part[] => parts.filter((part) => hasComments || part !== "comments");
+  const dropOrder = withoutAbsentComments(DROP_ORDER);
 
   const shown: ReadonlySet<DroppablePart> =
     measured && measured.available > 0
@@ -281,11 +299,18 @@ function IssueRowDetails({
             age: measured.widths["age"] ?? 0,
           },
           dropOrder,
-          gap: LINE_GAP,
+          gap: LEFT_GAP,
+          trailing: {
+            parts: withoutAbsentComments(TRAILING_PARTS),
+            gap: RIGHT_GAP,
+            groupGap: GROUP_GAP,
+          },
         })
       : new Set(dropOrder);
   const partClass = (part: DroppablePart): string =>
-    shown.has(part) ? cn(PART_CLASSES, "shrink-0") : "sr-only";
+    shown.has(part) ? "flex shrink-0" : "sr-only";
+  // The right group keeps its 12px lead only while it shows something.
+  const rightGroupShows = TRAILING_PARTS.some((part) => shown.has(part));
 
   const idText = (
     <span className="font-mono text-foreground/85">{issueId}</span>
@@ -298,16 +323,13 @@ function IssueRowDetails({
           taller hit area. */}
       <div
         ref={lineRef}
-        className={cn(
-          LINE_CLASSES,
-          "mt-0.5 min-w-0 overflow-x-clip text-[13px] leading-[1.4] whitespace-nowrap text-muted-foreground"
-        )}
+        className="mt-0.5 flex min-w-0 items-center overflow-x-clip text-[13px] leading-[1.4] whitespace-nowrap text-muted-foreground"
       >
-        <span className="shrink-0" data-testid="issue-id">
-          {idText}
-        </span>
-        <span className={cn(PART_CLASSES, "min-w-0")}>
-          <Separator />
+        <span className={LEFT_GROUP_CLASSES}>
+          <span className="shrink-0" data-testid="issue-id">
+            {idText}
+          </span>
+          <Separator className="shrink-0" />
           <Link
             href={`/m/${issue.machineInitials}`}
             className={cn(
@@ -320,37 +342,36 @@ function IssueRowDetails({
               {issue.machine.name}
             </span>
           </Link>
-        </span>
-        <span className={partClass("priority")}>
-          <Separator />
-          <RowPill
-            name="Priority"
-            label={priority.label}
-            styles={priority.styles}
-            testId="issue-priority"
-          />
-        </span>
-        <span className={partClass("assignee")}>
-          <Separator />
-          <AssigneeAvatar name={assigneeName} testId="issue-assignee" />
-        </span>
-        {hasComments && (
-          <span className={partClass("comments")}>
-            <Separator />
-            <CommentCount
-              count={issue.commentCount}
-              testId="issue-comment-count"
+          <span className={partClass("priority")}>
+            <RowPill
+              name="Priority"
+              label={priority.label}
+              styles={priority.styles}
+              testId="issue-priority"
             />
           </span>
-        )}
-        <span className={partClass("age")}>
-          <Separator />
-          <UpdatedAge updatedAt={issue.updatedAt} testId="issue-age" />
+        </span>
+        <span className={cn(RIGHT_GROUP_CLASSES, rightGroupShows && "pl-3")}>
+          <span className={partClass("assignee")}>
+            <AssigneeAvatar name={assigneeName} testId="issue-assignee" />
+          </span>
+          {hasComments && (
+            <span className={partClass("comments")}>
+              <CommentCount
+                count={issue.commentCount}
+                testId="issue-comment-count"
+              />
+            </span>
+          )}
+          <span className={partClass("age")}>
+            <UpdatedAge updatedAt={issue.updatedAt} testId="issue-age" />
+          </span>
         </span>
       </div>
 
       {/* Each part at its full width, out of the accessibility tree and the
-          tab order, clipped so it never widens the page. */}
+          tab order, clipped so it never widens the page. The machine part
+          carries the "·" before it; the groups' gaps come from the planner. */}
       <div
         ref={laneRef}
         aria-hidden="true"
@@ -361,42 +382,29 @@ function IssueRowDetails({
         </span>
         <span
           data-measure="machine"
-          className={cn(PART_CLASSES, "absolute w-max")}
+          className="absolute flex w-max items-baseline gap-1.5"
         >
           <Separator />
           <span className={MACHINE_LINK_CLASSES}>
             <span className={MACHINE_NAME_CLASSES}>{issue.machine.name}</span>
           </span>
         </span>
-        <span
-          data-measure="priority"
-          className={cn(PART_CLASSES, "absolute w-max")}
-        >
-          <Separator />
+        <span data-measure="priority" className="absolute flex w-max">
           <RowPill
             name="Priority"
             label={priority.label}
             styles={priority.styles}
           />
         </span>
-        <span
-          data-measure="assignee"
-          className={cn(PART_CLASSES, "absolute w-max")}
-        >
-          <Separator />
+        <span data-measure="assignee" className="absolute flex w-max">
           <AssigneeAvatar name={assigneeName} />
         </span>
         {hasComments && (
-          <span
-            data-measure="comments"
-            className={cn(PART_CLASSES, "absolute w-max")}
-          >
-            <Separator />
+          <span data-measure="comments" className="absolute flex w-max">
             <CommentCount count={issue.commentCount} />
           </span>
         )}
-        <span data-measure="age" className={cn(PART_CLASSES, "absolute w-max")}>
-          <Separator />
+        <span data-measure="age" className="absolute flex w-max">
           <UpdatedAge updatedAt={issue.updatedAt} />
         </span>
       </div>

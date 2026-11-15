@@ -161,11 +161,27 @@ export interface LineFitInput<Part extends string> {
   available: number;
   /** Widths of the parts that never drop, at their full width. */
   keptWidths: readonly number[];
-  /** Each droppable part's width, its leading separator included. */
+  /** Each droppable part's width, any leading separator included. */
   partWidths: Readonly<Record<Part, number>>;
   /** The droppable parts, the first to drop first. */
   dropOrder: readonly Part[];
+  /** The gap between the parts that lead the line. */
   gap: number;
+  /**
+   * Droppable parts in a right-anchored group at the line's end instead of
+   * after the kept parts. The group takes no room once all its parts drop.
+   */
+  trailing?: LineFitTrailingGroup<Part> | undefined;
+}
+
+/** A right-anchored group of droppable parts at a line's end. */
+export interface LineFitTrailingGroup<Part extends string> {
+  /** The group's parts, in display order. */
+  parts: readonly Part[];
+  /** The gap between the group's parts. */
+  gap: number;
+  /** The least room between the leading parts and the group. */
+  groupGap: number;
 }
 
 /**
@@ -180,14 +196,25 @@ export function fitLineParts<Part extends string>({
   partWidths,
   dropOrder,
   gap,
+  trailing,
 }: LineFitInput<Part>): ReadonlySet<Part> {
   const shown = new Set(dropOrder);
   const room = available - LINE_FIT_TOLERANCE;
-  const lineWidth = (): number =>
-    rowWidth(
-      [...keptWidths, ...[...shown].map((part) => partWidths[part])],
+  const trailingParts = trailing?.parts ?? [];
+  const widthsOf = (parts: readonly Part[]): number[] =>
+    parts.filter((part) => shown.has(part)).map((part) => partWidths[part]);
+  const lineWidth = (): number => {
+    const leading = rowWidth(
+      [
+        ...keptWidths,
+        ...widthsOf(dropOrder.filter((part) => !trailingParts.includes(part))),
+      ],
       gap
     );
+    const trailingWidths = widthsOf(trailingParts);
+    if (!trailing || trailingWidths.length === 0) return leading;
+    return leading + trailing.groupGap + rowWidth(trailingWidths, trailing.gap);
+  };
   for (const part of dropOrder) {
     if (lineWidth() <= room) break;
     shown.delete(part);

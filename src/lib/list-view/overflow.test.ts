@@ -46,6 +46,37 @@ describe("fitLineParts (issues-list §3.9)", () => {
   it("leaves nothing droppable when the kept parts alone overflow", () => {
     expect(shown(100)).toEqual([]);
   });
+
+  describe("with a right-anchored trailing group", () => {
+    // Leading: ID 60, machine 120, priority 50 with 6px gaps. Trailing:
+    // assignee 30, comments 40, age 90 with 8px gaps, 12px from the lead.
+    const trailing = {
+      parts: ["assignee", "comments", "age"] as const,
+      gap: 8,
+      groupGap: 12,
+    };
+    const shownWithGroup = (available: number): string[] =>
+      [...fitLineParts({ ...base, trailing, available })].sort();
+
+    it("counts each group's own gap and the gap between the groups", () => {
+      // (60+6+120+6+50) + 12 + (30+8+40+8+90) = 430.
+      expect(shownWithGroup(430 + LINE_FIT_TOLERANCE)).toEqual([
+        "age",
+        "assignee",
+        "comments",
+        "priority",
+      ]);
+      // 242 + 12 + (30+8+40) = 332.
+      expect(shownWithGroup(332 + LINE_FIT_TOLERANCE)).toEqual([
+        "assignee",
+        "comments",
+        "priority",
+      ]);
+      // 186 + 12 + 30 = 228.
+      expect(shownWithGroup(228 + LINE_FIT_TOLERANCE)).toEqual(["assignee"]);
+      expect(shownWithGroup(227 + LINE_FIT_TOLERANCE)).toEqual([]);
+    });
+  });
 });
 
 describe("fitPrimaryFilters (list-views §8.1)", () => {
