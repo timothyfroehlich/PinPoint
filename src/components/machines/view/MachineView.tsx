@@ -10,7 +10,6 @@ import {
   updateSavedMachineViewAction,
 } from "~/app/(app)/m/saved-view-actions";
 import {
-  ListSearchField,
   ListTitleRow,
   ListView,
   type ListDisplayModel,
@@ -300,18 +299,12 @@ export function MachineView({
           ) : undefined
         }
         summary={showSummary ? summary : undefined}
-        search={(placement) => (
-          <ListSearchField
-            id={
-              placement === "phone"
-                ? "machine-view-search-phone"
-                : "machine-view-search"
-            }
-            value={state.q}
-            onSearch={(q) => update({ q })}
-            label="Search machines"
-          />
-        )}
+        search={{
+          id: "machine-view-search",
+          label: "Search machines",
+          value: state.q,
+          onSearch: (q) => update({ q }),
+        }}
         primaryFilters={filters}
         views={views}
         sort={sort}

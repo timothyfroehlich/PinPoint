@@ -1,5 +1,39 @@
 import { describe, expect, it } from "vitest";
-import { fitPrimaryFilters, planListHeader } from "./overflow";
+import {
+  fitPrimaryFilters,
+  phoneSearchAsIcon,
+  planListHeader,
+} from "./overflow";
+
+describe("phoneSearchAsIcon (list-views §7.3)", () => {
+  // The views button: icon 16 + gap 8 + name + gap 8 + chevron 16.
+  const openIssues = 48 + 94;
+  const fit = (available: number, viewsWidth: number): boolean =>
+    phoneSearchAsIcon({ available, viewsWidth, filtersWidth: 44, gap: 8 });
+
+  it("keeps the field on a 400px screen with Open issues", () => {
+    // 400 - 16 left - 6 right padding = 378; 378 - 142 - 44 - 16 = 176.
+    expect(fit(378, openIssues)).toBe(false);
+  });
+
+  it("keeps a field exactly 175px wide, and one a rounding pixel short", () => {
+    expect(fit(175 + openIssues + 60, openIssues)).toBe(false);
+    expect(fit(174 + openIssues + 60, openIssues)).toBe(false);
+  });
+
+  it("becomes an icon once the field would be narrower than 175px", () => {
+    expect(fit(173 + openIssues + 60, openIssues)).toBe(true);
+    // A 320px screen.
+    expect(fit(298, openIssues)).toBe(true);
+  });
+
+  it("becomes an icon sooner for the Edited marker or a longer name", () => {
+    expect(fit(378, openIssues)).toBe(false);
+    // The Edited marker adds its 8px dot and an 8px gap.
+    expect(fit(378, openIssues + 16)).toBe(true);
+    expect(fit(378, 48 + 140)).toBe(true);
+  });
+});
 
 describe("fitPrimaryFilters (list-views §8.1)", () => {
   const filterWidths = [120, 100, 110, 80];

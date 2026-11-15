@@ -5,6 +5,7 @@ import { getPageRange } from "~/lib/list-view/pagination";
 import { cn } from "~/lib/utils";
 import { ListHeader } from "./ListHeader";
 import { ListPager, PhonePager } from "./ListPager";
+import { ListSearchField } from "./ListSearchField";
 import { ListToolbar } from "./ListToolbar";
 import { PhoneListHeader } from "./PhoneListHeader";
 import { ManageViewsDialog, SaveViewDialog } from "./SavedViewDialogs";
@@ -14,6 +15,7 @@ import {
   type ListFilterModel,
   type ListNoun,
   type ListPaginationModel,
+  type ListSearchModel,
   type ListSortModel,
   type ListViewsModel,
 } from "./types";
@@ -69,13 +71,13 @@ interface ListViewProps {
   /** The host's Summary Widgets (§3.1, §8.4). */
   summary?: React.ReactNode;
   /**
-   * The search field (§4.1, §4.2). It is mounted afresh whenever a view is
+   * The search (§4.1, §4.2). Its field is mounted afresh whenever a view is
    * applied or changes are discarded, so a search still waiting to run is
-   * dropped and never undoes that move. Rendered once per placement: the
-   * toolbar at md+ and the phone List Header below md (§7.3). CSS shows one,
-   * so each needs its own field id.
+   * dropped and never undoes that move. There is one field per placement:
+   * the toolbar at md+ and the phone List Header below md (§7.3). CSS shows
+   * one, so the phone field's id adds "-phone".
    */
-  search: (placement: "toolbar" | "phone") => React.ReactNode;
+  search: ListSearchModel;
   primaryFilters: readonly ListFilterModel[];
   secondaryFilters?: readonly ListFilterModel[] | undefined;
   views: ListViewsModel;
@@ -192,7 +194,13 @@ export function ListView({
       {summary}
       <ListToolbar
         search={
-          <React.Fragment key={searchEpoch}>{search("toolbar")}</React.Fragment>
+          <ListSearchField
+            key={searchEpoch}
+            id={search.id}
+            value={search.value}
+            onSearch={search.onSearch}
+            label={search.label}
+          />
         }
         primaryFilters={primaryFilters}
         secondaryFilters={secondaryFilters}
@@ -222,9 +230,8 @@ export function ListView({
           display={display}
           totalCount={pagination.totalCount}
           noun={noun}
-          search={
-            <React.Fragment key={searchEpoch}>{search("phone")}</React.Fragment>
-          }
+          search={search}
+          searchEpoch={searchEpoch}
           onResetAll={onResetAll}
           onSaveChanges={saveChanges}
           onSaveAsNew={openSaveAsNew}

@@ -164,6 +164,7 @@
 
 | Requirement | Divergence | Resolution |
 | :-- | :-- | :-- |
+| §7.3 | When the phone search field would be narrower than 175px, it is a search icon button between the views button and Filters; the icon opens the field across the whole List Header with a close button that clears the search, and the field stays open while it holds text. | PP-jb9v.15 (requirement text awaits approval) |
 | §7.2 | While the Summary Widgets stack, the title row holds a Summary Row toggle; on a Collection or Tag tab it sits on its own row between the page's tabs and search. | PP-jb9v.14 |
 
 ---

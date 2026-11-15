@@ -18,6 +18,16 @@ interface ListSearchFieldProps {
   onSearch: (query: string) => void;
   /** Accessible name, such as "Search machines" (§4.2). */
   label: string;
+  /** Focus and clear, for the phone List Header's search icon (§7.3). */
+  handleRef?: React.Ref<ListSearchFieldHandle> | undefined;
+  /** Called with the field's text whenever it changes, typing included. */
+  onTextChange?: ((text: string) => void) | undefined;
+}
+
+export interface ListSearchFieldHandle {
+  focus: () => void;
+  /** Empties the field and clears the list's search at once. */
+  clear: () => void;
 }
 
 /**
@@ -35,8 +45,18 @@ export function ListSearchField({
   value,
   onSearch,
   label,
+  handleRef,
+  onTextChange,
 }: ListSearchFieldProps): React.JSX.Element {
   const [text, setText] = React.useState(value);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  const onTextChangeRef = React.useRef(onTextChange);
+  React.useLayoutEffect(() => {
+    onTextChangeRef.current = onTextChange;
+  }, [onTextChange]);
+  React.useLayoutEffect(() => {
+    onTextChangeRef.current?.(text);
+  }, [text]);
   const submitted = React.useRef(value);
   const timeout = React.useRef<number | null>(null);
   const onSearchRef = React.useRef(onSearch);
@@ -69,6 +89,18 @@ export function ListSearchField({
 
   React.useEffect(() => clearPending, [clearPending]);
 
+  React.useImperativeHandle(
+    handleRef,
+    () => ({
+      focus: () => inputRef.current?.focus(),
+      clear: () => {
+        setText("");
+        submit("");
+      },
+    }),
+    [submit]
+  );
+
   function change(next: string): void {
     setText(next);
     clearPending();
@@ -85,6 +117,7 @@ export function ListSearchField({
         className="pointer-events-none absolute left-2.5 size-4 text-muted-foreground md:left-3"
       />
       <Input
+        ref={inputRef}
         id={id}
         type="search"
         value={text}

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { PhoneListHeader } from "./PhoneListHeader";
 import type {
   ListDisplayModel,
@@ -95,17 +95,20 @@ function renderHeader(
     views?: ListViewsModel;
     primary?: ListOptionsFilterModel[];
     secondary?: ListOptionsFilterModel[];
+    searchValue?: string;
   } = {}
 ): {
   onSaveChanges: ReturnType<typeof vi.fn>;
   onSaveAsNew: ReturnType<typeof vi.fn>;
   onManage: ReturnType<typeof vi.fn>;
+  onSearch: ReturnType<typeof vi.fn>;
 } {
   const handlers = {
     onSaveChanges: vi.fn(),
     onSaveAsNew: vi.fn(),
     onManage: vi.fn(),
   };
+  const onSearch = vi.fn();
   render(
     <PhoneListHeader
       views={options.views ?? views()}
@@ -115,13 +118,40 @@ function renderHeader(
       display={display}
       totalCount={12}
       noun={{ one: "issue", other: "issues" }}
-      search={<input type="search" aria-label="Search issues" />}
+      search={{
+        id: "issue-view-search",
+        label: "Search issues",
+        value: options.searchValue ?? "",
+        onSearch,
+      }}
+      searchEpoch={0}
       onResetAll={vi.fn()}
       {...handlers}
     />
   );
-  return handlers;
+  return { ...handlers, onSearch };
 }
+
+/**
+ * Lays the phone List Header out at `header` px wide with a views button
+ * `viewsButton` px wide untruncated; jsdom has no layout of its own.
+ */
+function layOut(header: number, viewsButton: number): void {
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
+    function (this: HTMLElement) {
+      const width = this.hasAttribute("data-list-phone-header")
+        ? header
+        : this.dataset.measure === "views"
+          ? viewsButton
+          : 0;
+      return DOMRect.fromRect({ width, height: 0 });
+    }
+  );
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("PhoneListHeader", () => {
   it("lists edit actions, Built-in Views, Saved Views, then Manage views (list-views §7.6)", async () => {
@@ -252,6 +282,104 @@ describe("PhoneListHeader", () => {
     expect(search.compareDocumentPosition(filters)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
     );
+  });
+
+  it("keeps the search field while it is at least 175px wide (§7.3)", () => {
+    // A 400px screen: 378 - views 142 - Filters 44 - two 8px gaps = 176.
+    layOut(378, 142);
+    renderHeader({});
+
+    expect(
+      screen.getByRole("searchbox", { name: "Search issues" })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("list-phone-search-trigger")
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows search as an icon between the views button and Filters when the field would be narrower (§7.3)", () => {
+    // A 375px screen: 353 - 142 - 44 - 16 = 151.
+    layOut(353, 142);
+    renderHeader({});
+
+    const icon = screen.getByTestId("list-phone-search-trigger");
+    expect(icon).toHaveAccessibleName("Search issues");
+    expect(
+      screen
+        .getByTestId("list-phone-views-trigger")
+        .compareDocumentPosition(icon)
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(
+      icon.compareDocumentPosition(
+        screen.getByTestId("list-phone-filters-trigger")
+      )
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(
+      screen.queryByRole("button", { name: "Close search" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("opens the field across the header from the icon, and closes it with ✕ back onto the icon (§7.3)", async () => {
+    const user = userEvent.setup();
+    layOut(353, 142);
+    const { onSearch } = renderHeader({});
+
+    await user.click(screen.getByTestId("list-phone-search-trigger"));
+    const field = screen.getByRole("searchbox", { name: "Search issues" });
+    expect(field).toHaveFocus();
+    expect(screen.getByTestId("list-phone-views-trigger")).toHaveClass(
+      "hidden"
+    );
+    expect(screen.getByTestId("list-phone-filters-trigger")).toHaveClass(
+      "hidden"
+    );
+    expect(
+      screen.queryByTestId("list-phone-search-trigger")
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Close search" }));
+    expect(screen.getByTestId("list-phone-search-trigger")).toHaveFocus();
+    expect(
+      screen.queryByRole("button", { name: "Close search" })
+    ).not.toBeInTheDocument();
+    // Nothing was searched, so there is nothing to clear.
+    expect(onSearch).not.toHaveBeenCalled();
+  });
+
+  it("keeps a field holding text open after blur, and closes an empty one (§7.3)", async () => {
+    const user = userEvent.setup();
+    layOut(353, 142);
+    renderHeader({});
+
+    await user.click(screen.getByTestId("list-phone-search-trigger"));
+    await user.type(
+      screen.getByRole("searchbox", { name: "Search issues" }),
+      "gate"
+    );
+    await user.click(document.body);
+    expect(
+      screen.getByRole("button", { name: "Close search" })
+    ).toBeInTheDocument();
+
+    await user.clear(screen.getByRole("searchbox", { name: "Search issues" }));
+    await user.click(document.body);
+    expect(screen.getByTestId("list-phone-search-trigger")).toBeInTheDocument();
+  });
+
+  it("opens with a search already in the URL, and ✕ clears it (§7.3)", async () => {
+    const user = userEvent.setup();
+    layOut(353, 142);
+    const { onSearch } = renderHeader({ searchValue: "gate" });
+
+    expect(
+      screen.getByRole("searchbox", { name: "Search issues" })
+    ).toHaveValue("gate");
+    await user.click(screen.getByRole("button", { name: "Close search" }));
+    expect(onSearch).toHaveBeenCalledWith("");
+    expect(screen.getByTestId("list-phone-search-trigger")).toHaveFocus();
+    expect(
+      screen.getByRole("searchbox", { name: "Search issues" })
+    ).toHaveValue("");
   });
 
   it("announces the Edited marker and the count of filters off their preset (§7.3, §7.4)", () => {
