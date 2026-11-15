@@ -838,20 +838,8 @@ export async function assertNoA11yViolations(
     // Silent catch if called outside of active test runner execution context
   }
 
-  // TEMP-INVENTORY (PP-qm17): log label-content-name-mismatch, do not fail.
-  for (const v of results.violations.filter(
-    (x) => x.id === "label-content-name-mismatch"
-  )) {
-    for (const n of v.nodes) {
-      console.log(
-        `LCNM\t${page.url()}\t${page.viewportSize()?.width ?? 0}\t${n.target.join(",")}\t${n.html.replace(/\s+/g, " ").slice(0, 400)}`
-      );
-    }
-  }
   const seriousOrCritical = results.violations.filter(
-    (v) =>
-      (v.impact === "serious" || v.impact === "critical") &&
-      v.id !== "label-content-name-mismatch"
+    (v) => v.impact === "serious" || v.impact === "critical"
   );
   const minorOrModerate = results.violations.filter(
     (v) => v.impact === "minor" || v.impact === "moderate" || !v.impact
