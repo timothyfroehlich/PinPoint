@@ -8,7 +8,9 @@
 # made after sign-off do not ask again; a later UI change waits again.
 #
 # Runs on drafts too: UI is approved while the PR is a draft, before E2E tests are
-# updated and before the PR is marked ready for Claude Review.
+# updated and before the PR is marked ready for Claude Review. Marking a draft
+# ready does not trigger it: the head is the same, so the run on that head already
+# holds the answer, and a new run would cancel one waiting for sign-off (PP-bg1u).
 #
 # How Tim approves: on GitHub (the run's "Review deployments"), or by telling the
 # owning session in Claude Code Desktop, or by clicking Approve in the orchestrator
@@ -27,7 +29,7 @@ name: UI Approval
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened]
 
 permissions: {}
 
