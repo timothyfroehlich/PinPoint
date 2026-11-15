@@ -1,7 +1,7 @@
 # PinPoint Non‑Negotiables
 
 **Last Updated**: 2026-10-06
-**Version**: 2.12 (CORE-ARCH-017 added: additive migrations merge first in their own PR, destructive ones last — PP-ncxx.6). Prior: 2.11 (CORE-TS-002 amended: a `*_VALUES` array is the single source for zod, Drizzle and TS unions — PP-az4d.13). Prior: 2.10 (CORE-ARCH-016 added: third-party HTTP goes through `~/lib/http/external` with a per-request timeout — PP-az4d.11). Prior: 2.9 (CORE-ARCH-013 added: Server Actions go through `createProtectedAction` — PP-az4d.4). Prior: 2.8 (CORE-ARCH-015 added: a caught error not returned to the user goes to `reportError`; cron routes use `runCron` — PP-az4d.3). Prior: 2.7 (CORE-ARCH-014 added: one write path per mutation; CORE-ARCH-010 amended: share load-bearing code at two copies, reuse existing helpers — PP-az4d.1)
+**Version**: 2.13 (CORE-ARCH-018 added: pages, layouts and components never import the database — PP-az4d.10). Prior: 2.12 (CORE-ARCH-017 added: additive migrations merge first in their own PR, destructive ones last — PP-ncxx.6). Prior: 2.11 (CORE-TS-002 amended: a `*_VALUES` array is the single source for zod, Drizzle and TS unions — PP-az4d.13). Prior: 2.10 (CORE-ARCH-016 added: third-party HTTP goes through `~/lib/http/external` with a per-request timeout — PP-az4d.11). Prior: 2.9 (CORE-ARCH-013 added: Server Actions go through `createProtectedAction` — PP-az4d.4). Prior: 2.8 (CORE-ARCH-015 added: a caught error not returned to the user goes to `reportError`; cron routes use `runCron` — PP-az4d.3). Prior: 2.7 (CORE-ARCH-014 added: one write path per mutation; CORE-ARCH-010 amended: share load-bearing code at two copies, reuse existing helpers — PP-az4d.1)
 
 > **Canonical catalog**: this document defines the canonical `CORE-*` rules for PinPoint. Portable skills (`.agents/skills/`) and agent context (`AGENTS.md`) cite rules by ID and provide domain/task-specific procedures.
 
@@ -44,6 +44,7 @@
 27. Server Actions are built with `createProtectedAction` / `createPublicAction` from `~/lib/actions` (CORE-ARCH-013)
 28. Third-party HTTP calls go through `~/lib/http/external` with a per-request timeout (CORE-ARCH-016)
 29. Additive migrations merge first in their own PR; destructive ones last (CORE-ARCH-017)
+30. Pages, layouts and components never import `~/server/db`; reads live in a `cache()`'d `_data.ts` loader or a `src/lib` read (CORE-ARCH-018)
 
 ---
 
@@ -458,6 +459,14 @@
 - **Why:** Migration numbers collide when several branches each carry an unmerged migration. The branch that merges second renumbers, and a hand renumber that keeps its older journal `when` is skipped by production's migrator with no record (PP-ncxx). A schema-only PR merges in hours, so its number is on main before other branches generate theirs. `migrate:production` also runs before `next build`, so each migration must already work with the code serving production; schema first, code second is that order.
 - **Do:** Once the feature spec settles the schema, ship the additive migration (new table, nullable column, index, enum value) with its `schema.ts` change in its own PR off main, ahead of the implementation PR. A subagent can own it while the implementation proceeds. Ship a destructive migration (drop, rename, NOT NULL, narrowed type) in its own PR after the code that stops reading the old shape is live. A schema change the implementation needs after the migration PR merged is a new migration, and its bead carries the `migration-correction` label. That label count measures whether specs settle schemas early enough.
 - **Don't:** Keep a migration on a feature branch until the feature merges.
+
+**CORE-ARCH-018:** Pages, layouts and components never import the database
+
+- **Severity:** Required
+- **Why:** A read written inline in a page or a component cannot be shared or request-deduped, so the same machine got loaded twice in one render (the Timeline tab re-queried what its layout already had), and copies of one query drifted across tabs. The 2026-10-05 audit (PP-az4d) found about twenty pages and layouts querying the database inline; PP-az4d.10 moved them.
+- **Do:** Put each read in a `cache()`'d loader in the route's `_data.ts`, or in a `src/lib/<domain>` read when more than one surface needs it. A `src/lib` read that takes the database handle as a required argument gets a one-line binding in `_data.ts`. The loaders to reuse are listed in `pinpoint-ui` § Data access.
+- **Don't:** Import `~/server/db` or `~/server/db/*` (the handle or the schema, types included) in any `.tsx` file under `src/app` or any file under `src/components`. Don't exempt a file to land a change; move its read.
+- **Enforced by:** a `no-restricted-imports` override in `.oxlintrc.json` over `src/app/**/*.tsx` and `src/components/**`. Its `excludeFiles` list is the only opt-out besides test files: it names files, never directories, and only shrinks (the four components still on it move in PP-az4d.34).
 
 ---
 

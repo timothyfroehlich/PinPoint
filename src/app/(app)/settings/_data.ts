@@ -1,7 +1,9 @@
 import "server-only";
 
+import { cache } from "react";
 import { and, count, eq, ne } from "drizzle-orm";
 
+import type { UserRole } from "~/lib/types";
 import { db } from "~/server/db";
 import {
   machines,
@@ -23,6 +25,22 @@ export async function getSettingsAccount(
     columns: { email: true, discordUserId: true },
   });
 }
+
+/**
+ * The fields the Connected Accounts section reads: the mirrored Discord id,
+ * which decides whether this user can receive DMs (the dispatcher reads it at
+ * delivery time), and the role that gates linking a Pinball Map account.
+ * `cache()`-wrapped per request.
+ */
+export const getConnectedAccountsProfile = cache(
+  async (
+    userId: string
+  ): Promise<{ discordUserId: string | null; role: UserRole } | undefined> =>
+    db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, userId),
+      columns: { discordUserId: true, role: true },
+    })
+);
 
 /**
  * The user's notification preferences. A user with no preferences row (an old
