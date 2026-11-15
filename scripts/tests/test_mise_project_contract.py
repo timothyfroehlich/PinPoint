@@ -6,7 +6,7 @@ Verifies that:
 3. mise.toml does not duplicate the pnpm version (idiomatic_version_file_enable_tools is used).
 4. mise.lock exists and captures resolved artifacts across platforms.
 5. mise rejects mismatched packageManager checksum suffixes (negative test).
-6. mise meets the minimum version requirement (>= 2026.8.11).
+6. mise meets the minimum version requirement (>= 2026.11.7).
 7. CI's required mise-only canary validates the locked toolchain and cache identity (PP-h2ui.8).
 8. CI and preview workflows use the shared mise setup without legacy setup actions (PP-h2ui.9).
 9. pnpm-lock.yaml stays one YAML document, because pnpm self-switching is off (PP-o961).
@@ -45,12 +45,14 @@ MISE_ACTION_PATH = REPO_ROOT / ".github" / "actions" / "setup-mise" / "action.ym
 PREVIEW_CONTROL_PATH = REPO_ROOT / ".github" / "workflows" / "preview-control.yaml"
 PREVIEW_REAPER_PATH = REPO_ROOT / ".github" / "workflows" / "preview-reaper.yaml"
 
-MINIMUM_MISE_VERSION = (2026, 8, 11)
+MINIMUM_MISE_VERSION = (2026, 11, 7)
 MISE_MANAGED_TOOLS = ("node", "python", "ruff", "supabase", "zizmor", "actionlint")
 EXPECTED_TOOL_BACKENDS = {
     "actionlint": "aqua:rhysd/actionlint",
     "node": "core:node",
-    "pnpm": "aqua:pnpm/pnpm",
+    # A packageManager checksum selects the npm backend whatever [tool_alias] says
+    # (PP-66o0); the lock entry carries the checksum, not per-platform artifacts.
+    "pnpm": "npm:pnpm",
     "python": "core:python",
     "ruff": "aqua:astral-sh/ruff",
     "supabase": "aqua:supabase/cli",
@@ -278,6 +280,28 @@ def _assert_platform_locks_coherent(
         )
 
 
+def _assert_pnpm_lock_checksum_matches_package_json(
+    entry: dict[str, object], package_data: dict[str, object]
+) -> None:
+    """Require the locked npm:pnpm checksum to be packageManager's sha512."""
+    package_manager = package_data.get("packageManager")
+    assert isinstance(package_manager, str)
+    match = re.fullmatch(
+        r"pnpm@\d+\.\d+\.\d+\+sha512\.([0-9a-f]{128})", package_manager
+    )
+    assert match, (
+        f"package.json#packageManager is not an integrity pin: {package_manager!r}"
+    )
+    options = entry.get("options")
+    assert isinstance(options, dict), (
+        f"mise.lock pnpm entry must carry an options table, got {options!r}"
+    )
+    assert options.get("checksum") == f"sha512:{match.group(1)}", (
+        "mise.lock pnpm checksum option must equal package.json#packageManager's "
+        f"sha512, got {options.get('checksum')!r}"
+    )
+
+
 def _assert_mise_lock_coherent(
     mise_data: dict[str, object],
     lock_data: dict[str, object],
@@ -318,6 +342,8 @@ def _assert_mise_lock_coherent(
             f"got {entry.get('backend')!r}"
         )
         _assert_platform_locks_coherent(tool, expected_version, entry)
+        if tool == "pnpm":
+            _assert_pnpm_lock_checksum_matches_package_json(entry, package_data)
 
 
 def test_mise_toml_exists_and_is_valid() -> None:
@@ -325,8 +351,15 @@ def test_mise_toml_exists_and_is_valid() -> None:
     data = tomllib.loads(MISE_TOML_PATH.read_text(encoding="utf-8"))
 
     # Top-level min_version must be enforced
-    assert data.get("min_version") == "2026.8.11", (
-        f"mise.toml must enforce min_version = '2026.8.11', got {data.get('min_version')!r}"
+    assert data.get("min_version") == "2026.11.7", (
+        f"mise.toml must enforce min_version = '2026.11.7', got {data.get('min_version')!r}"
+    )
+
+    # A pnpm alias is ignored once packageManager carries a checksum and would
+    # need an aqua lock entry that `mise lock` removes (PP-66o0).
+    assert "pnpm" not in data.get("tool_alias", {}), (
+        "mise.toml must not alias pnpm to another backend; the packageManager "
+        "checksum selects npm:pnpm and mise.lock records that backend"
     )
 
     # Managed development runtimes must remain exact pins. Their current values
@@ -546,6 +579,21 @@ def test_mise_cli_version_meets_minimum() -> None:
     )
 
 
+def test_ci_mise_version_meets_minimum() -> None:
+    """CI installs a mise at least as new as mise.toml's min_version (PP-66o0)."""
+    action = yaml.safe_load(MISE_ACTION_PATH.read_text(encoding="utf-8"))
+    install_step = next(
+        step
+        for step in action["runs"]["steps"]
+        if str(step.get("uses", "")).startswith("jdx/mise-action@")
+    )
+    ci_version = _parse_mise_version(install_step["with"]["version"])
+    assert ci_version >= MINIMUM_MISE_VERSION, (
+        f"setup-mise installs mise {install_step['with']['version']}, older than "
+        f"the minimum required {MINIMUM_MISE_VERSION}"
+    )
+
+
 def _selected_tool_entry(info: object) -> dict[str, object]:
     """Select the active entry, or the sole requested entry if uninstalled."""
     candidates = info if isinstance(info, list) else [info]
@@ -715,7 +763,7 @@ def test_negative_checksum_mismatch_rejected(tmp_path: Path) -> None:
     # Create an isolated sandbox with mise.toml and a package.json with a bad sha512
     test_mise_toml = tmp_path / "mise.toml"
     test_mise_toml.write_text(
-        'min_version = "2026.8.11"\n\n'
+        'min_version = "2026.11.7"\n\n'
         f'[tools]\nnode = "{node_version}"\n\n'
         '[settings]\nidiomatic_version_file_enable_tools = ["pnpm"]\n',
         encoding="utf-8",
