@@ -22,6 +22,9 @@ interface InlineEditableTextProps {
   /** Field can't be left empty: shows invalid styling while blank and marks the
    *  placeholder with a required hint when a commit is attempted empty. */
   required?: boolean;
+  /** Show the required-field error now, without waiting for a blur: the parent
+   *  knows a save is blocked on this field being blank. */
+  invalid?: boolean;
   placeholder?: string;
   className?: string;
   inputClassName?: string;
@@ -53,6 +56,7 @@ export function InlineEditableText({
   onValueChange,
   canEdit = true,
   required = false,
+  invalid = false,
   placeholder = "Click to edit…",
   className,
   inputClassName,
@@ -68,7 +72,7 @@ export function InlineEditableText({
   const isFocused = useRef(false);
 
   const isEmptyRequired = required && draft.trim() === "";
-  const showInvalid = isEmptyRequired && showRequiredError;
+  const showInvalid = isEmptyRequired && (showRequiredError || invalid);
   // Mark required fields up front (design-bible §683 asterisk convention):
   // a trailing " *" in the placeholder plus aria-required.
   const editPlaceholder = required ? `${placeholder} *` : placeholder;
