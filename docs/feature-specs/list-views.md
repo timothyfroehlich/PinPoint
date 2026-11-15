@@ -101,6 +101,7 @@
 - **7.9** Every phone control is at least 44px tall or wide.
 - **7.10** The phone List Header stays at the top of the screen, directly under the app header, while the title row and Summary Widgets scroll away and the rows scroll beneath it.
 - **7.11** A List View follows design-bible §3: nothing full-width is pinned above the tab bar.
+- **7.12** When the phone List Header's search field would be narrower than 175px, it shows as a search icon button with the field's accessible name instead. Tapping it opens the field across the whole List Header, covering the view button and Filters, with a close button that clears the search; the field stays open while it holds text.
 
 ---
 
@@ -209,6 +210,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-11-15 | On phones the search field becomes an icon when it would be narrower than 175px, opening across the List Header when tapped (§7.12). |
 | 2026-10-11 | §8 becomes the Collapse Order (§1): one set of ordered steps for every Surface, measured on each part's container with a small tolerance (§8.6–§8.8); page-header steps for the breadcrumb, description, page actions, and page tabs (§8.9–§8.13); Summary Widget, filter, List Header, table, and row steps (§8.14–§8.21); the phone layout and the narrow Collection or Tag header (§8.22, §8.23); 8.1–8.3 and 8.5 retired into §8.15–§8.19 and §8.24. The filter overflow is named More filters, and its badge counts only filters changed from the Page Preset (§1, §4.5, §4.10, §12.1). View tabs are quiet pills (§5.8). The List Header concept names its phone contents (§1). Page actions: at most three, ending with a ⋯ menu that reads Actions when labeled; they go from labeled outlined buttons to icon buttons, then fold into ⋯ in the page's order, at every width (§1, §3.2, §3.7–§3.10, §7.2). Export leaves the List Header for ⋯ (§1, §5.5). |
 | 2026-10-11 | Phone list chrome: search moves into the phone List Header with no search row (§7.1, §7.3); the pager follows the list instead of being pinned (§7.8); the phone List Header stays under the app header while the page above it scrolls away (§7.10); nothing full-width is pinned above the tab bar, per the site-wide design-bible §3 rule (§7.11). |
 | 2026-10-11 | The Summary Row toggle is gone with the collapsible Summary Widgets: removed from the title row and the Collection and Tag tabs (§7.2), retired the stacking rule (§8.4), and dropped Summary Row open state from Saved Views (§10.2); the first rows at 1440×900 sit below the always-shown Summary Widgets (§3.4). |

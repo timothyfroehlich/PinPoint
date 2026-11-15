@@ -76,7 +76,7 @@
 - **5.6** Open Issues values are right-aligned. A nonzero count is colored by the machine's worst open severity and links to that machine's issues (issues-list §7.4); zero remains neutral.
 - **5.7** Last Serviced displays a compact relative age. In the table, populated values link to `/m/{initials}/maintenance`. A machine without qualifying service history displays “Never”.
 - **5.8** Machine View exposes a stable machine-selection callback for a future inspection drawer without implementing drawer state or UI in this delivery.
-- **5.9** The second line of a Compact row spans the row's full width and never wraps: the Playability label in its Playability color, then manufacturer, year, and the owner as an initials avatar (an empty dashed circle when the machine has no owner), with the Last Serviced age at the right end of the line as a wrench icon and a short age such as “2h ago”. The Playability label and the Last Serviced age appear only when Playability and Last Serviced are among the displayed fields, so their data is loaded (§3.4); otherwise line 2 leaves them out. A machine with no qualifying service history shows the wrench icon and “never” in place of the age (§5.7).
+- **5.9** The second line of a Compact row starts under the machine name, past the Playability dot, as issue rows do (issues-list 3.1), runs to the row's right edge, and never wraps: the Playability label in its Playability color, then manufacturer, year, and the owner as an initials avatar (an empty dashed circle when the machine has no owner), with the Last Serviced age at the right end of the line as a wrench icon and a short age such as “2h ago”. The Playability label and the Last Serviced age appear only when Playability and Last Serviced are among the displayed fields, so their data is loaded (§3.4); otherwise line 2 leaves them out. A machine with no qualifying service history shows the wrench icon and “never” in place of the age (§5.7). A separator dot appears only between two plain-text items, so none sits before the owner avatar.
 - **5.10** When the Compact row's second line does not fit, it drops year, then manufacturer, then Last Serviced, then owner. The Playability label never drops.
 - **5.11** The Compact row's Playability dot differs by shape as well as color for each Playability.
 - **5.12** On phones the whole Compact row is a link to the machine. The open-issue count keeps its own link to the machine's issues (5.6), and the Last Serviced age on a Compact row is plain text.
@@ -139,6 +139,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-11-15 | A Compact row's second line starts under the machine name, past the Playability dot, and has no separator dot before the owner avatar (§5.9). |
 | 2026-10-13 | `/m`'s ⋯ holds Export (§6.7). |
 | 2026-10-13 | Export: a CSV of every machine the list matches, with initials, name, full model, manufacturer, year, owner, and the list's Date Added, Presence, Playability, Open Issues, Last Serviced, and Last Activity, for signed-in people (§3.15–§3.17). |
 | 2026-10-12 | Compact rows show the owner as an initials avatar and the Last Serviced age at the right end of line 2 as a wrench icon and “2h ago” (§5.9); Last Serviced links only in the table (§5.7); the whole Compact row links to the machine and its Last Serviced age is plain text (§5.12). |
