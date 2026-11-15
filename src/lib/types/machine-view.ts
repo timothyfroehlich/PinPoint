@@ -47,7 +47,6 @@ export interface MachineViewState {
   dir: MachineViewSortDirection;
   page: number;
   pageSize: MachineViewPageSize;
-  columns: MachineViewFieldId[];
 }
 
 export interface MachineViewOwnerOption {
@@ -75,8 +74,9 @@ export interface MachineViewRow {
   hasOwner: boolean;
   presence: MachinePresenceStatus;
   createdAt: string;
-  health?: MachineViewHealth;
-  lastServicedAt?: string | null;
+  health: MachineViewHealth;
+  /** The latest service date, which every load reads; null when never serviced. */
+  lastServicedAt: string | null;
   lastActivityAt?: string | null;
 }
 

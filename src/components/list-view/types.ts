@@ -156,23 +156,6 @@ export interface ListDisplayModel {
   pageSize: number;
   pageSizes: readonly number[];
   onPageSizeChange: (pageSize: number) => void;
-  /** Displayed fields, for hosts with columns (§5.6). */
-  fields?:
-    | {
-        options: readonly ListOption[];
-        selected: readonly string[];
-        onToggle: (value: string, checked: boolean) => void;
-      }
-    | undefined;
-  /** A phone-only presentation choice, such as Compact list or Table. */
-  layout?:
-    | {
-        label: string;
-        options: readonly ListOption[];
-        value: string;
-        onChange: (value: string) => void;
-      }
-    | undefined;
 }
 
 export interface ListPaginationModel {

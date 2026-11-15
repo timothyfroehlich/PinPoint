@@ -267,15 +267,11 @@ function publicRow(candidate: MachineViewCandidate): MachineViewRow {
     hasOwner: candidate.hasOwner,
     presence: candidate.presence,
     createdAt: candidate.createdAt,
+    // Every row shows Playability, the open-issue count, and the service age
+    // (machine-views §5.3, §5.9).
+    health: candidate.health,
+    lastServicedAt: candidate.lastServicedAt,
   };
-  // Every row carries health: the phone Compact row always shows Playability
-  // and the open-issue count, whatever fields are selected (§5.3).
-  if (candidate.health !== undefined) {
-    row.health = candidate.health;
-  }
-  if (candidate.lastServicedAt !== undefined) {
-    row.lastServicedAt = candidate.lastServicedAt;
-  }
   if (candidate.lastActivityAt !== undefined) {
     row.lastActivityAt = candidate.lastActivityAt;
   }
@@ -305,13 +301,11 @@ export async function loadMachineViewFromDatabase(
   const machineInitials = baseRows.map((row) => row.initials);
   // Health loads for the whole scope on every request: the Summary Widgets
   // count it across the scope (machine-widgets §2.3) and every row carries it
-  // to the browser (machine-views §5.3). Service and activity dates load only
-  // when a displayed field or the sort needs them.
+  // to the browser (machine-views §5.3), as every row carries its service
+  // date (§5.9). Activity dates load only when the sort needs them.
   const [health, serviceDates, activityDates] = await Promise.all([
     getMachineViewHealth(tx, machineInitials),
-    dependencyPlan.service
-      ? getLatestMachineServiceDates(tx, machineIds)
-      : Promise.resolve(new Map<string, Date>()),
+    getLatestMachineServiceDates(tx, machineIds),
     dependencyPlan.activity
       ? getLatestMachineActivityDates(tx, machineIds)
       : Promise.resolve(new Map<string, Date>()),
@@ -330,19 +324,17 @@ export async function loadMachineViewFromDatabase(
       createdAt: machine.createdAt.toISOString(),
       canonicalModelName: machine.canonicalModelName,
       legacyModelName: machine.legacyModelName,
+      health:
+        health.get(machine.initials) ??
+        healthFromSeverityCounts({
+          cosmetic: 0,
+          minor: 0,
+          major: 0,
+          unplayable: 0,
+          oldestOpenIssueAt: null,
+        }),
+      lastServicedAt: serviceDates.get(machine.id)?.toISOString() ?? null,
     };
-    row.health =
-      health.get(machine.initials) ??
-      healthFromSeverityCounts({
-        cosmetic: 0,
-        minor: 0,
-        major: 0,
-        unplayable: 0,
-        oldestOpenIssueAt: null,
-      });
-    if (dependencyPlan.service) {
-      row.lastServicedAt = serviceDates.get(machine.id)?.toISOString() ?? null;
-    }
     if (dependencyPlan.activity) {
       row.lastActivityAt = activityDates.get(machine.id)?.toISOString() ?? null;
     }

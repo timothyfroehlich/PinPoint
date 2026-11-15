@@ -15,12 +15,12 @@ import {
 } from "~/lib/list-view/url-state";
 
 /**
- * Optional per-row enrichment a field needs before it can display or sort.
- * Health is not one: every load reads it, because the Summary Widgets
- * (machine-widgets §2.3) and the phone Compact row (machine-views §5.3)
- * always need it.
+ * Optional per-row enrichment a sort field needs. Health and service dates
+ * are not: every load reads them, because the Summary Widgets
+ * (machine-widgets §2.3) and every machine row (machine-views §5.3, §5.9)
+ * always need them.
  */
-export type MachineViewDependency = "service" | "activity";
+export type MachineViewDependency = "activity";
 
 /** The owner filter value for machines with no owner (machine-views §4.2). */
 export const UNASSIGNED_OWNER_ID = UNASSIGNED_PERSON_ID;
@@ -83,7 +83,7 @@ export const MACHINE_VIEW_FIELDS: Record<
     label: "Last Serviced",
     preferredDirection: "desc",
     directionLabels: DATES,
-    dependencies: ["service"],
+    dependencies: [],
   },
   presence: {
     id: "presence",
@@ -136,16 +136,6 @@ export const MACHINE_VIEW_FIELDS: Record<
   },
 };
 
-/** Both Page Presets' displayed fields (machine-views §4.6). */
-const DEFAULT_COLUMNS: MachineViewFieldId[] = [
-  "machine",
-  "playability",
-  "presence",
-  "openIssues",
-  "lastServiced",
-  "lastActivity",
-];
-
 export interface MachineViewPreset {
   id: MachineViewPresetId;
   defaultState: MachineViewState;
@@ -171,7 +161,6 @@ export const MACHINE_VIEW_PRESETS: Record<
       dir: "asc",
       page: 1,
       pageSize: 25,
-      columns: DEFAULT_COLUMNS,
     },
   },
   collection: {
@@ -187,7 +176,6 @@ export const MACHINE_VIEW_PRESETS: Record<
       dir: "desc",
       page: 1,
       pageSize: 25,
-      columns: DEFAULT_COLUMNS,
     },
   },
 };
@@ -195,8 +183,8 @@ export const MACHINE_VIEW_PRESETS: Record<
 /**
  * Built-in Views (spec machine-views.md §9): named filters and sorting
  * PinPoint defines for each Page Preset, the same for every viewer. Applying
- * one keeps the displayed fields and page size already showing and adds the
- * fields it names (list-views §1); `state` is the view applied to the Page
+ * one keeps the page size already showing (list-views §1); `state` is the
+ * view applied to the Page
  * Preset, which is what a Default View opens. Ids are stable URL `view`
  * values; views that share a name share an id and appear in the same order
  * on every Surface (§9.6). Exactly one per preset is the Page Preset.
@@ -205,28 +193,20 @@ export interface MachineViewBuiltInViewDefinition {
   id: string;
   name: string;
   state: MachineViewSavedState;
-  /** Fields applying the view adds to those showing (§9.1). */
-  addsFields: readonly MachineViewFieldId[];
 }
 
 function builtIn(
   presetId: MachineViewPresetId,
   id: string,
   name: string,
-  overrides: Partial<Omit<MachineViewSavedState, "columns" | "pageSize">>,
-  addsFields: readonly MachineViewFieldId[] = []
+  overrides: Partial<Omit<MachineViewSavedState, "pageSize">>
 ): MachineViewBuiltInViewDefinition {
   const { page: _page, ...defaults } =
     MACHINE_VIEW_PRESETS[presetId].defaultState;
   return {
     id,
     name,
-    state: {
-      ...defaults,
-      ...overrides,
-      columns: [...defaults.columns, ...addsFields],
-    },
-    addsFields,
+    state: { ...defaults, ...overrides },
   };
 }
 
@@ -252,20 +232,14 @@ export const MACHINE_VIEW_BUILT_IN_VIEWS: Record<
     builtIn("machines", "all-machines", "All machines", {
       presence: "all",
     }),
-    builtIn(
-      "machines",
-      "recently-added",
-      "Recently added",
-      {
-        // Every presence state except Removed (machine-views §9.1).
-        presence: VALID_MACHINE_PRESENCE_STATUSES.filter(
-          (presence) => presence !== "removed"
-        ),
-        sort: "dateAdded",
-        dir: "desc",
-      },
-      ["dateAdded"]
-    ),
+    builtIn("machines", "recently-added", "Recently added", {
+      // Every presence state except Removed (machine-views §9.1).
+      presence: VALID_MACHINE_PRESENCE_STATUSES.filter(
+        (presence) => presence !== "removed"
+      ),
+      sort: "dateAdded",
+      dir: "desc",
+    }),
   ],
   collection: [
     builtIn("collection", "on-the-floor", "On the floor", {}),
@@ -303,32 +277,19 @@ export function getMachineViewPreset(
 }
 
 export interface MachineViewDependencyPlan {
-  service: boolean;
   activity: boolean;
 }
 
 /**
- * The optional enrichment the displayed fields and the sort need. No filter
- * needs any: Playability and Open Issue Severity read health, which every
- * load includes.
+ * The optional enrichment the sort needs. No filter needs any: Playability
+ * and Open Issue Severity read health, which every load includes, as it
+ * includes service dates.
  */
 export function planMachineViewDependencies(
-  state: MachineViewState
+  state: Pick<MachineViewState, "sort">
 ): MachineViewDependencyPlan {
-  const activeFields = new Set<MachineViewFieldId>([
-    ...state.columns,
-    state.sort,
-  ]);
-  const dependencies = new Set<MachineViewDependency>();
-
-  for (const field of activeFields) {
-    for (const dependency of MACHINE_VIEW_FIELDS[field].dependencies) {
-      dependencies.add(dependency);
-    }
-  }
-
-  return {
-    service: dependencies.has("service"),
-    activity: dependencies.has("activity"),
-  };
+  const dependencies = new Set<MachineViewDependency>(
+    MACHINE_VIEW_FIELDS[state.sort].dependencies
+  );
+  return { activity: dependencies.has("activity") };
 }

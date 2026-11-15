@@ -125,6 +125,7 @@
 | Requirement | Divergence | Resolution |
 | :-- | :-- | :-- |
 | §5.9 | Line 2 starts under the machine name, past the Playability dot's 10px dot and 10px gap, rather than spanning the row's full width; the owner avatar follows 6px after the previous part with no “·” (Tim, 2026-11-15). | Spec update to §5.9 pending Tim's approval of the exact wording (PP-jb9v.13). |
+| §3.1, §3.2, §3.4, §3.6, §3.14, §4.1, §4.6, §5.2–§5.5, §5.7, §5.9, §9.1 | Every width, desktop and tablet included, shows the two-line row §5.3 and §5.9 describe, with the same fields on every row; there is no table, phone Table mode, column headers, header sorting, or displayed-field choice. Sorting is the List Header's sort control alone. The `columns` URL parameter is ignored and never written, Recently added adds no field, every load reads health and Last Serviced, and the Last Serviced age is plain text with “never” for no history (Tim, 2026-11-15). | Spec update pending on the List View header specs branch (PP-jb9v.13). |
 
 ---
 

@@ -34,7 +34,6 @@ import {
   applyMachineBuiltInView,
   hasMachineViewConfiguration,
   isMachineViewField,
-  nextMachineViewSort,
   serializeMachineViewState,
   toMachineViewSavedState,
 } from "~/lib/machines/view/state";
@@ -53,18 +52,14 @@ import {
   MachineSummaryRow,
   MachineSummaryWidgets,
 } from "./MachineSummaryWidgets";
-import { MachineViewCompactList } from "./MachineViewCompactList";
-import { MachineViewTable } from "./MachineViewTable";
 import type {
   MachineRowAction,
   MachineSelectionHandler,
-} from "./field-catalog";
+} from "./MachineListEntry";
+import { MachineViewRows } from "./MachineViewRows";
 import { buildMachineFilters } from "./machine-filters";
 
-const MOBILE_MODE_STORAGE_KEY = "pinpoint:machine-view:mobile-mode";
 const NOUN = { one: "machine", other: "machines" } as const;
-
-type MobileMode = "compact" | "table";
 
 interface MachineViewProps {
   result: MachineViewResult;
@@ -132,7 +127,6 @@ export function MachineView({
   onBusyChange,
 }: MachineViewProps): React.JSX.Element {
   const rootRef = React.useRef<HTMLDivElement>(null);
-  const [mobileMode, setMobileMode] = React.useState<MobileMode>("compact");
   const summaryController = useSummaryWidgetsController(
     MACHINE_SUMMARY_STORAGE_KEY,
     MACHINE_SUMMARY_WIDGET_COUNT
@@ -141,13 +135,6 @@ export function MachineView({
   const serialize = React.useCallback(
     (next: MachineViewState, view: string | null): URLSearchParams =>
       serializeMachineViewState(next, preset, view),
-    [preset]
-  );
-  const applyBuiltIn = React.useCallback(
-    (
-      view: { id: string; state: MachineViewSavedState },
-      current: MachineViewSavedState
-    ): MachineViewSavedState => applyMachineBuiltInView(preset, view, current),
     [preset]
   );
   const { state, applied, edited, pagePresetName, isPending, update, views } =
@@ -160,29 +147,11 @@ export function MachineView({
       hasConfiguration: hasMachineViewConfiguration,
       toSaved: toMachineViewSavedState,
       withPage,
-      applyBuiltIn,
+      applyBuiltIn: applyMachineBuiltInView,
       defaultPageName: "Machines",
       actions: MACHINE_VIEW_ACTIONS,
     });
   React.useEffect(() => onBusyChange?.(isPending), [isPending, onBusyChange]);
-
-  React.useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem(MOBILE_MODE_STORAGE_KEY);
-      if (stored === "compact" || stored === "table") setMobileMode(stored);
-    } catch {
-      // Storage can be unavailable; Compact list is the default.
-    }
-  }, []);
-
-  function changeMobileMode(mode: MobileMode): void {
-    setMobileMode(mode);
-    try {
-      window.localStorage.setItem(MOBILE_MODE_STORAGE_KEY, mode);
-    } catch {
-      // Without storage the choice lasts for this page view.
-    }
-  }
 
   const filters = buildMachineFilters({
     state,
@@ -225,39 +194,12 @@ export function MachineView({
     },
   };
 
+  // View options holds page size only.
   const display: ListDisplayModel = {
     pageSize: state.pageSize,
     pageSizes: LIST_PAGE_SIZES,
     onPageSizeChange: (pageSize) => {
       if (isListPageSize(pageSize)) update({ pageSize });
-    },
-    fields: {
-      options: result.permittedFields
-        .filter((field) => field !== "machine")
-        .map((field) => ({
-          value: field,
-          label: MACHINE_VIEW_FIELDS[field].label,
-        })),
-      selected: state.columns.filter((field) => field !== "machine"),
-      // Displayed fields keep the page (§4.8).
-      onToggle: (value, checked) => {
-        if (!isMachineViewField(value)) return;
-        const columns = checked
-          ? [...new Set([...state.columns, value])]
-          : state.columns.filter((column) => column !== value);
-        update({ columns }, false);
-      },
-    },
-    layout: {
-      label: "Layout",
-      options: [
-        { value: "compact", label: "Compact list" },
-        { value: "table", label: "Table" },
-      ],
-      value: mobileMode,
-      onChange: (value) => {
-        if (value === "compact" || value === "table") changeMobileMode(value);
-      },
     },
   };
 
@@ -340,22 +282,8 @@ export function MachineView({
           )
         }
       >
-        {mobileMode === "compact" ? (
-          <MachineViewCompactList
-            rows={result.rows}
-            columns={state.columns}
-            onMachineSelect={onMachineSelect}
-            rowAction={rowAction}
-          />
-        ) : null}
-        <MachineViewTable
+        <MachineViewRows
           rows={result.rows}
-          state={state}
-          mobileMode={mobileMode}
-          onSort={(field) => {
-            const nextSort = nextMachineViewSort(state, field, preset);
-            update(nextSort);
-          }}
           onMachineSelect={onMachineSelect}
           rowAction={rowAction}
         />
