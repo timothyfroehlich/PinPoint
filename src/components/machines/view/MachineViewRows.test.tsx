@@ -256,6 +256,29 @@ describe("Machine rows", () => {
     expect(action.parentElement).toHaveClass("relative", "z-[2]");
   });
 
+  it("shows the added age in place of the service age while sorted by Date Added (§5.15)", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-01-04T00:00:00.000Z"));
+    render(
+      <RelativeTimeProvider>
+        <MachineViewRows rows={[machine()]} age="added" />
+      </RelativeTimeProvider>
+    );
+
+    const row = screen.getByRole("listitem");
+    expect(lineSummary(row)).toBe(
+      "Unplayable · Stern · 2019 [A] | added 3d ago"
+    );
+    expect(
+      within(row).queryByTestId("machine-row-service-age")
+    ).not.toBeInTheDocument();
+    const age = within(row).getByTestId("machine-row-added-age");
+    expect(age).toHaveAttribute("datetime", "2026-01-01T00:00:00.000Z");
+    // No wrench: the added age is words alone.
+    expect(age.querySelector("svg")).toBeNull();
+    expect(within(age).getByText("Added 3 days ago")).toHaveClass("sr-only");
+  });
+
   it("says “never” for a machine without service history", () => {
     renderRows([machine({ lastServicedAt: null })]);
 
@@ -278,7 +301,7 @@ describe("Machine rows", () => {
       manufacturer: 48,
       year: 42,
       owner: 26,
-      lastServiced: 60,
+      age: 60,
     };
     const row = machine({ lastServicedAt: null });
     // Each width is the parts' total plus the 16px fit tolerance.
@@ -306,7 +329,7 @@ describe("Machine rows", () => {
       manufacturer: 48,
       year: 42,
       owner: 26,
-      lastServiced: 60,
+      age: 60,
     });
     renderRows([machine({ lastServicedAt: null })]);
 

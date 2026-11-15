@@ -33,16 +33,19 @@ export type MachineSelectionHandler = (machineId: string) => void;
 /** Renders an action at the end of a machine row. */
 export type MachineRowAction = (row: MachineViewRow) => React.ReactNode;
 
-type DetailPart =
-  "playability" | "manufacturer" | "year" | "owner" | "lastServiced";
+/** Line 2's parts; `age` is the right-anchored age (§5.9, §5.15). */
+type DetailPart = "playability" | "manufacturer" | "year" | "owner" | "age";
 
 /** The order line 2 drops its parts in when crowded (§5.10). */
 const DROP_ORDER: readonly DetailPart[] = [
   "year",
   "manufacturer",
-  "lastServiced",
+  "age",
   "owner",
 ];
+
+/** Which age line 2 ends with (§5.9, §5.15). */
+export type MachineRowAge = "lastServiced" | "added";
 
 /** A machine's year, or "Unknown" when it has none (machine-views §3.3). */
 export function machineYearLabel(row: Pick<MachineViewRow, "year">): string {
@@ -63,6 +66,10 @@ const NEVER_SERVICED = { short: "never", spoken: "Never serviced" };
 
 function servicedSpoken(age: string): string {
   return `Serviced ${age}`;
+}
+
+function addedSpoken(age: string): string {
+  return `Added ${age}`;
 }
 
 /**
@@ -149,30 +156,44 @@ function OpenIssueCount({ row }: { row: MachineViewRow }): React.JSX.Element {
  * Line 2 (machine-views §5.9, §5.10), on one line at every width: the
  * Playability label, manufacturer, and year ("·" only between those), then
  * the owner's initials avatar; the service age (a wrench and "2h ago") is
- * right-anchored at the line's end. When the line does not fit it drops
- * the year, the manufacturer, the service age, then the owner. The service
- * age is plain text, never a link (§5.12).
+ * right-anchored at the line's end. While the list is sorted by Date
+ * Added, "added 3d ago" takes the service age's place, so the order is
+ * visible (§5.15). When the line does not fit it drops the year, the
+ * manufacturer, the age, then the owner. The age is plain text, never a
+ * link (§5.12).
  */
 function MachineRowDetails({
   row,
+  age,
 }: {
   row: MachineViewRow;
+  age: MachineRowAge;
 }): React.JSX.Element {
   const playability = row.health.playability;
   const playabilityLabel = getMachineStatusLabel(playability);
   const ownerName = row.hasOwner ? row.ownerName : null;
   const ownerLabel = ownerName === null ? "No owner" : `Owner: ${ownerName}`;
   const year = machineYearLabel(row);
-  const ageText = useRowAgeText(row.lastServicedAt);
-  const serviceAge = (testId?: string): React.JSX.Element => (
-    <RowAge
-      date={row.lastServicedAt}
-      icon={Wrench}
-      spoken={servicedSpoken}
-      empty={NEVER_SERVICED}
-      testId={testId}
-    />
+  const ageText = useRowAgeText(
+    age === "added" ? row.createdAt : row.lastServicedAt
   );
+  const rowAge = (testId?: string): React.JSX.Element =>
+    age === "added" ? (
+      <RowAge
+        date={row.createdAt}
+        prefix="added"
+        spoken={addedSpoken}
+        testId={testId === undefined ? undefined : "machine-row-added-age"}
+      />
+    ) : (
+      <RowAge
+        date={row.lastServicedAt}
+        icon={Wrench}
+        spoken={servicedSpoken}
+        empty={NEVER_SERVICED}
+        testId={testId}
+      />
+    );
 
   const leading: ListRowPart<DetailPart>[] = [
     {
@@ -196,9 +217,9 @@ function MachineRowDetails({
   ];
   const trailing: ListRowPart<DetailPart>[] = [
     {
-      key: "lastServiced",
-      node: serviceAge("machine-row-service-age"),
-      measure: serviceAge(),
+      key: "age",
+      node: rowAge("machine-row-service-age"),
+      measure: rowAge(),
     },
   ];
 
@@ -212,6 +233,7 @@ function MachineRowDetails({
         row.manufacturer,
         year,
         ownerName ?? "",
+        age,
         ageText,
       ].join("\n")}
       testId="machine-row-detail"
@@ -229,10 +251,12 @@ function MachineRowDetails({
  */
 export function MachineListEntry({
   row,
+  age,
   onMachineSelect,
   rowAction,
 }: {
   row: MachineViewRow;
+  age: MachineRowAge;
   onMachineSelect?: MachineSelectionHandler | undefined;
   rowAction?: MachineRowAction | undefined;
 }): React.JSX.Element {
@@ -249,7 +273,7 @@ export function MachineListEntry({
       }
       title={<MachineIdentity row={row} onMachineSelect={onMachineSelect} />}
       titleEnd={<OpenIssueCount row={row} />}
-      details={<MachineRowDetails row={row} />}
+      details={<MachineRowDetails row={row} age={age} />}
       action={rowAction ? rowAction(row) : undefined}
     />
   );

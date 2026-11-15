@@ -233,6 +233,21 @@ describe("MachineView", () => {
     );
   });
 
+  it("ends each row with the added age while sorted by Date Added (machine-views §5.15)", () => {
+    const { unmount } = renderView();
+    expect(screen.getByTestId("machine-row-service-age")).toBeInTheDocument();
+    expect(screen.queryByTestId("machine-row-added-age")).toBeNull();
+    unmount();
+
+    renderView({
+      result: result({
+        state: { ...presetState, sort: "dateAdded", dir: "desc" },
+      }),
+    });
+    expect(screen.getByTestId("machine-row-added-age")).toBeInTheDocument();
+    expect(screen.queryByTestId("machine-row-service-age")).toBeNull();
+  });
+
   it("shows the same two-line rows at every width, with page size alone in View options", async () => {
     const user = userEvent.setup();
     renderView();

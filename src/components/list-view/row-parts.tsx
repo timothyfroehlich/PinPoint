@@ -114,19 +114,23 @@ export function useRowAgeText(date: Date | string | null): string {
 }
 
 /**
- * An age with its icon: "2d ago" at every width, which screen readers hear
- * spelled out, as `spoken("2 days ago")`. With no date it shows `empty`,
- * such as a machine that was never serviced.
+ * An age, with its icon when it has one: "2d ago" at every width, or with a
+ * `prefix`, such as "added 2d ago". Screen readers hear it spelled out, as
+ * `spoken("2 days ago")`. With no date it shows `empty`, such as a machine
+ * that was never serviced.
  */
 export function RowAge({
   date,
   icon: Icon,
+  prefix,
   spoken,
   empty,
   testId,
 }: {
   date: Date | string | null;
-  icon: LucideIcon;
+  icon?: LucideIcon | undefined;
+  /** Words before the short age, such as "added". */
+  prefix?: string | undefined;
   /** The spoken words from the spelled-out age, such as "Updated 2 days ago". */
   spoken: (age: string) => string;
   /** What shows, and what screen readers hear, with no date. */
@@ -138,8 +142,16 @@ export function RowAge({
   const shown = useRowAgeText(date);
   const body = (
     <>
-      <Icon className="size-3.5 shrink-0" aria-hidden="true" />
-      <span aria-hidden="true">{date === null ? empty?.short : shown}</span>
+      {Icon === undefined ? null : (
+        <Icon className="size-3.5 shrink-0" aria-hidden="true" />
+      )}
+      <span aria-hidden="true">
+        {date === null
+          ? empty?.short
+          : prefix === undefined || shown === ""
+            ? shown
+            : `${prefix} ${shown}`}
+      </span>
       <span className="sr-only">
         {date === null
           ? empty?.spoken

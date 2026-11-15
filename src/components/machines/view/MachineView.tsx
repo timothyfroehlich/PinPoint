@@ -284,6 +284,7 @@ export function MachineView({
       >
         <MachineViewRows
           rows={result.rows}
+          age={state.sort === "dateAdded" ? "added" : "lastServiced"}
           onMachineSelect={onMachineSelect}
           rowAction={rowAction}
         />
