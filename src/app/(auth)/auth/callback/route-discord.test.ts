@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as NextServerModule from "next/server";
+import type * as UrlModule from "~/lib/url";
 
 const mocks = vi.hoisted(() => ({
   after: vi.fn<(task: () => Promise<void>) => void>(),
@@ -33,10 +34,9 @@ vi.mock("~/lib/supabase/env", () => ({
   }),
 }));
 
-vi.mock("~/lib/url", () => ({
+vi.mock("~/lib/url", async (importOriginal) => ({
+  ...(await importOriginal<typeof UrlModule>()),
   getSiteUrl: () => "http://localhost:3000",
-  isInternalUrl: (value: string) =>
-    value.startsWith("/") && !value.startsWith("//"),
 }));
 
 vi.mock("~/lib/discord/onboarding", () => ({

@@ -1,9 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { BLOB_CONFIG } from "~/lib/blob/config";
 import {
   updateIssueStatusSchema,
   updateIssueSeveritySchema,
   updateIssuePrioritySchema,
   assignIssueSchema,
+  imageMetadataSchema,
 } from "~/app/(app)/issues/schemas";
 
 describe("Issue Validation Schemas", () => {
@@ -116,6 +118,112 @@ describe("Issue Validation Schemas", () => {
       const result = assignIssueSchema.safeParse({
         issueId: "invalid",
         assignedTo: validUuid,
+      });
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe("imageMetadataSchema fileSizeBytes (PP-ysk3)", () => {
+    const base = {
+      blobUrl:
+        "https://teststore.public.blob.vercel-storage.com/issue-images/pending/img.jpg",
+      blobPathname: "issue-images/pending/img.jpg",
+      originalFilename: "img.jpg",
+      mimeType: "image/jpeg",
+    };
+
+    it.each([
+      ["a whole size within the limit", 12345, true],
+      ["exactly the limit", BLOB_CONFIG.MAX_FILE_SIZE_BYTES, true],
+      ["a fractional size", 1234.5, false],
+      ["a size above the limit", BLOB_CONFIG.MAX_FILE_SIZE_BYTES + 1, false],
+      ["a size above Postgres int4", 2 ** 31, false],
+      ["zero", 0, false],
+    ])("%s → success=%s", (_label, fileSizeBytes, expected) => {
+      const result = imageMetadataSchema.safeParse({ ...base, fileSizeBytes });
+      expect(result.success).toBe(expected);
+    });
+  });
+
+  // The stored pathname comes from the host-verified blobUrl, never from the
+  // client's blobPathname, so a row cannot name a blob it does not display.
+  // (PP-9my0)
+  describe("imageMetadataSchema blobPathname (PP-9my0)", () => {
+    const base = {
+      originalFilename: "img.jpg",
+      fileSizeBytes: 12345,
+      mimeType: "image/jpeg",
+    };
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("replaces a client pathname that names a different blob", () => {
+      const result = imageMetadataSchema.parse({
+        ...base,
+        blobUrl:
+          "https://teststore.public.blob.vercel-storage.com/issue-images/pending/1-img-abc.jpg",
+        blobPathname: "avatars/someone-else.png",
+      });
+      expect(result.blobPathname).toBe("issue-images/pending/1-img-abc.jpg");
+    });
+
+    it("decodes percent-escapes in the URL path", () => {
+      const result = imageMetadataSchema.parse({
+        ...base,
+        blobUrl:
+          "https://teststore.public.blob.vercel-storage.com/issue-images/pending/my%20img.jpg",
+        blobPathname: "issue-images/pending/my img.jpg",
+      });
+      expect(result.blobPathname).toBe("issue-images/pending/my img.jpg");
+    });
+
+    it("strips the mock store's /uploads/ prefix", () => {
+      vi.stubEnv("MOCK_BLOB_STORAGE", "true");
+      const result = imageMetadataSchema.parse({
+        ...base,
+        blobUrl: "http://localhost:3000/uploads/issue-images/pending/1-img.jpg",
+        blobPathname: "avatars/someone-else.png",
+      });
+      expect(result.blobPathname).toBe("issue-images/pending/1-img.jpg");
+    });
+
+    it.each([
+      [
+        "a Vercel Blob URL with no path",
+        "https://teststore.public.blob.vercel-storage.com/",
+      ],
+      [
+        "a mock URL outside /uploads/",
+        "http://localhost:3000/avatars/someone-else.png",
+      ],
+      [
+        "a malformed percent-escape",
+        "https://teststore.public.blob.vercel-storage.com/issue-images/bad%E0%A4%A.jpg",
+      ],
+      [
+        "a path outside issue-images/",
+        "https://teststore.public.blob.vercel-storage.com/user-avatars/someone.png",
+      ],
+      [
+        "encoded .. segments that leave issue-images/",
+        "https://teststore.public.blob.vercel-storage.com/issue-images/a%2F..%2F..%2Fuser-avatars%2Fy.png",
+      ],
+      [
+        "an encoded backslash",
+        "https://teststore.public.blob.vercel-storage.com/issue-images/a%5C..%5Cy.png",
+      ],
+      [
+        "an encoded empty segment",
+        "https://teststore.public.blob.vercel-storage.com/issue-images/a%2F%2Fy.png",
+      ],
+    ])("rejects %s", (_label, blobUrl) => {
+      vi.stubEnv("MOCK_BLOB_STORAGE", "true");
+      const result = imageMetadataSchema.safeParse({
+        ...base,
+        blobUrl,
+        blobPathname: "issue-images/pending/img.jpg",
       });
       expect(result.success).toBe(false);
     });

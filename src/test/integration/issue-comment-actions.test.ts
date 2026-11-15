@@ -61,6 +61,7 @@ import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 import {
   authUsers,
   issueComments,
+  issueImages,
   issues,
   machines,
   userProfiles,
@@ -525,6 +526,41 @@ describe("addCommentAction — integration (PP-x4li.1.4)", () => {
     });
   });
 
+  it("stores the pathname the blobUrl names, not the client's blobPathname (PP-9my0)", async () => {
+    await mockAuth(MEMBER_ID);
+    const { addCommentAction } = await import("~/app/(app)/issues/actions");
+
+    const blobUrl =
+      "https://test-blob.public.blob.vercel-storage.com/issue-images/pending/1-photo.jpg";
+    const formData = new FormData();
+    formData.append("issueId", issueId);
+    formData.append("comment", JSON.stringify(validCommentDoc));
+    formData.append(
+      "imagesMetadata",
+      JSON.stringify([
+        {
+          blobUrl,
+          blobPathname: "avatars/someone-else.png",
+          originalFilename: "photo.jpg",
+          fileSizeBytes: 1024,
+          mimeType: "image/jpeg",
+        },
+      ])
+    );
+
+    const result = await addCommentAction(undefined, formData);
+
+    expect(result.ok).toBe(true);
+    const db = await getTestDb();
+    const rows = await db
+      .select()
+      .from(issueImages)
+      .where(eq(issueImages.issueId, issueId));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.fullImageUrl).toBe(blobUrl);
+    expect(rows[0]?.fullBlobPathname).toBe("issue-images/pending/1-photo.jpg");
+  });
+
   it("returns UNAUTHORIZED when caller is not authenticated and leaves DB untouched", async () => {
     await mockAuth(null);
     const { addCommentAction } = await import("~/app/(app)/issues/actions");
@@ -611,7 +647,7 @@ describe("addCommentAction — integration (PP-x4li.1.4)", () => {
     const { addCommentAction } = await import("~/app/(app)/issues/actions");
 
     const excessiveImages = Array.from({ length: 5 }, (_, i) => ({
-      blobUrl: `https://test-blob.public.blob.vercel-storage.com/test-${i}.jpg`,
+      blobUrl: `https://test-blob.public.blob.vercel-storage.com/issue-images/test-${i}.jpg`,
       blobPathname: `issue-images/test-${i}.jpg`,
       originalFilename: `test-${i}.jpg`,
       fileSizeBytes: 1024,

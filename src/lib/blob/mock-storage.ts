@@ -7,8 +7,7 @@ import { isProductionBuild } from "~/lib/runtime-env";
  * `public/uploads` and served at `/uploads/<pathname>`.
  */
 
-/** URL path prefix that mock uploads are served from. */
-export const MOCK_UPLOADS_URL_PREFIX = "/uploads/";
+export { MOCK_UPLOADS_URL_PREFIX } from "~/lib/blob/config";
 
 /**
  * Whether uploads go to local disk instead of Vercel Blob.
