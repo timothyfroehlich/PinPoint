@@ -81,11 +81,11 @@ pnpm audit --audit-level=moderate 2>&1 | tail -20; true
 ### Group C: Main Branch CI
 
 ```bash
-gh run list --branch main --status completed --limit 5 \
+gh run list --branch main --workflow CI --event push --status completed --limit 20 \
   --json status,conclusion,name,createdAt,url
 ```
 
-Flag any `conclusion == "failure"`. A `cancelled` main run is usually one a newer merge superseded (main runs one at a time; `pinpoint-pr-workflow` 5.1). If the newest push run on main (`gh run list --branch main --workflow CI --event push --limit 1`) is `cancelled`, nothing has tested main's tip: flag it for Tim.
+Scope the query to the **`CI` workflow's completed `push` runs** and widen the window. Main runs one at a time (`pinpoint-pr-workflow` 5.1), so a merge burst leaves superseded runs `cancelled` — they never executed — and the old all-workflow `--limit 5` let those plus unrelated `skipped` runs crowd a real failure out of view entirely. Results come newest-first (by `createdAt`): walk them to the first run that is not `cancelled` — that is the run that actually tested main's current tip — and flag it whenever its `conclusion != "success"` (`failure`, `startup_failure`, and the like, not only `failure`). `--status completed` keeps in-progress runs (whose `conclusion` is still `null`) from being mistaken for a passing tip. If every run in the window is `cancelled`, nothing has tested main's tip yet — flag that for Tim too.
 
 ### Group D: New GitHub Issues (last 5 days)
 
