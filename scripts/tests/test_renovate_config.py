@@ -33,9 +33,17 @@ def test_renovate_cooldowns_fail_closed() -> None:
     package_rules = config["packageRules"]
     assert isinstance(package_rules, list)
     assert all(rule.get("matchManagers") == ["mise"] for rule in package_rules)
-    assert all(
-        "groupName" not in rule and "groupSlug" not in rule for rule in package_rules
-    )
+    # The only group is the minor/patch toolchain PR. It must not carry its own
+    # cooldown, take majors, or take the Supabase CLI, so every soak rule below
+    # keeps applying per tool.
+    grouped = [rule for rule in package_rules if "groupName" in rule]
+    assert len(grouped) == 1
+    assert all("groupSlug" not in rule for rule in package_rules)
+    group_rule = grouped[0]
+    assert group_rule["groupName"] == "toolchain"
+    assert group_rule["matchUpdateTypes"] == ["minor", "patch"]
+    assert "!supabase/cli" in group_rule["matchPackageNames"]
+    assert "minimumReleaseAge" not in group_rule
 
     supabase_rule = next(
         rule
