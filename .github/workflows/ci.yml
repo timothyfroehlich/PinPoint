@@ -272,10 +272,41 @@ jobs:
           persist-credentials: false
           fetch-depth: 0  # Gitleaks scans the commits, not the tree
 
+      # The gitleaks CLI, not gitleaks-action: the action refuses to run in a
+      # repository owned by an organization without a GITLEAKS_LICENSE key,
+      # and PinPoint moved to the minamaya org. The CLI needs no key. Same scan
+      # as the action: the commits this event introduces, merges skipped.
       - name: Gitleaks secret scan
-        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e  # ratchet:gitleaks/gitleaks-action@v3.0.0
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_VERSION: "8.30.1"
+          GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_AFTER: ${{ github.event.after }}
+          MQ_BASE: ${{ github.event.merge_group.base_sha }}
+          MQ_HEAD: ${{ github.event.merge_group.head_sha }}
+        run: |
+          set -euo pipefail
+          tarball="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSL -o "$RUNNER_TEMP/$tarball" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${tarball}"
+          echo "${GITLEAKS_SHA256}  $RUNNER_TEMP/$tarball" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$tarball" -C "$RUNNER_TEMP" gitleaks
+          case "$EVENT_NAME" in
+            pull_request) range="${PR_BASE}..${PR_HEAD}" ;;
+            merge_group) range="${MQ_BASE}..${MQ_HEAD}" ;;
+            push)
+              if [[ -z "$PUSH_BEFORE" || "$PUSH_BEFORE" =~ ^0+$ ]]; then
+                range="-1 ${PUSH_AFTER}"
+              else
+                range="${PUSH_BEFORE}..${PUSH_AFTER}"
+              fi ;;
+            *) range="-1 HEAD" ;;
+          esac
+          "$RUNNER_TEMP/gitleaks" git --redact --verbose --exit-code=2 \
+            --log-opts="--no-merges --first-parent ${range}" .
 
       - name: Install system linters
         run: |
