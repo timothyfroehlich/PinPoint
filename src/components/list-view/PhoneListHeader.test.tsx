@@ -366,6 +366,25 @@ describe("PhoneListHeader", () => {
     expect(screen.getByTestId("list-phone-search-trigger")).toBeInTheDocument();
   });
 
+  it("keeps an empty field open when the tab is backgrounded (§7.3)", async () => {
+    const user = userEvent.setup();
+    layOut(353, 142);
+    renderHeader({});
+
+    await user.click(screen.getByTestId("list-phone-search-trigger"));
+    const visibility = vi
+      .spyOn(document, "visibilityState", "get")
+      .mockReturnValue("hidden");
+    try {
+      screen.getByRole("searchbox", { name: "Search issues" }).blur();
+      expect(
+        screen.getByRole("button", { name: "Close search" })
+      ).toBeInTheDocument();
+    } finally {
+      visibility.mockRestore();
+    }
+  });
+
   it("opens with a search already in the URL, and ✕ clears it (§7.3)", async () => {
     const user = userEvent.setup();
     layOut(353, 142);

@@ -777,7 +777,10 @@ export function PhoneListHeader({
               : "min-w-24 flex-[1_1_96px]"
         )}
         onBlur={(event) => {
-          // An emptied field closes once focus leaves the header.
+          // An emptied field closes once focus leaves the header. Backgrounding
+          // the tab or app also blurs it; that isn't the person leaving, so
+          // the field stays open for when they come back.
+          if (document.visibilityState === "hidden") return;
           const next = event.relatedTarget;
           const staysInHeader =
             next instanceof Node && headerRef.current?.contains(next) === true;
