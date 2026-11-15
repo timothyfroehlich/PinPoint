@@ -118,7 +118,7 @@ export async function uploadIssueImage(formData: FormData): Promise<
       if (commentId) {
         const comment = await db.query.issueComments.findFirst({
           where: eq(issueComments.id, commentId),
-          columns: { issueId: true },
+          columns: { issueId: true, authorId: true },
         });
 
         if (!comment) {
@@ -126,6 +126,16 @@ export async function uploadIssueImage(formData: FormData): Promise<
         }
         if (comment.issueId !== issueId) {
           return err("VALIDATION", "Comment does not belong to this issue");
+        }
+        // Attaching an image changes the comment, so it takes the same
+        // permission as editing it: authors only, admins included. (PP-ne5y)
+        if (
+          !checkPermission("comments.edit", accessLevel, {
+            userId: user.id,
+            reporterId: comment.authorId,
+          })
+        ) {
+          return err("AUTH", "You can only attach images to your own comments");
         }
       }
     }

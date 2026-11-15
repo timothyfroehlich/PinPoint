@@ -41,7 +41,8 @@ DECLARE
   v_createrole boolean;
   v_createdb   boolean;
   v_config     text[];
-  v_public_tbl text;
+  v_public_rels int;
+  v_bad_rels   text;
   v_leaky_cols text;
   v_defacl     int;
 BEGIN
@@ -94,30 +95,64 @@ BEGIN
     RAISE WARNING 'no USAGE on schema public';
   END IF;
 
-  -- Sample a real table rather than trusting the grant statement: what matters
-  -- is what the role ended up holding. Exclude `collections`, which is
-  -- deliberately column-scoped (see below) and so fails a table-level check.
-  SELECT c.relname INTO v_public_tbl
+  -- Every relation in public, not a sample: what matters is what the role ended
+  -- up holding on each one, and a single grant can land on one table and not
+  -- another (a table created by a role the default privileges do not cover).
+  -- Probed by OID so a relation name never has to be re-resolved.
+  SELECT count(*) INTO v_public_rels
     FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-   WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relname <> 'collections'
-   ORDER BY c.relname LIMIT 1;
+   WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p');
 
-  IF v_public_tbl IS NULL THEN
-    RAISE WARNING 'no sampleable public table — public grants not verified (unmigrated database?)';
+  IF v_public_rels = 0 THEN
+    RAISE WARNING 'no public tables — public grants not verified (unmigrated database?)';
   ELSE
+    -- Readable: every table and view, except `collections`, which is
+    -- deliberately column-scoped (see below) and so fails a table-level check.
     checked := checked + 1;
-    IF NOT has_table_privilege('pinpoint_readonly', 'public.' || quote_ident(v_public_tbl), 'SELECT') THEN
+    SELECT string_agg(quote_ident(c.relname), ', ' ORDER BY c.relname)
+      INTO v_bad_rels
+      FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+     WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p', 'v', 'm')
+       AND c.relname <> 'collections'
+       AND NOT has_table_privilege('pinpoint_readonly', c.oid, 'SELECT');
+    IF v_bad_rels IS NOT NULL THEN
       failures := failures + 1;
-      RAISE WARNING 'cannot SELECT public.% — the public grant did not land', v_public_tbl;
+      RAISE WARNING 'cannot SELECT public table(s): % — the public grant did not land', v_bad_rels;
     END IF;
+  END IF;
 
-    checked := checked + 1;
-    IF has_table_privilege('pinpoint_readonly', 'public.' || quote_ident(v_public_tbl), 'INSERT')
-       OR has_table_privilege('pinpoint_readonly', 'public.' || quote_ident(v_public_tbl), 'UPDATE')
-       OR has_table_privilege('pinpoint_readonly', 'public.' || quote_ident(v_public_tbl), 'DELETE') THEN
-      failures := failures + 1;
-      RAISE WARNING 'holds a WRITE privilege on public.%', v_public_tbl;
-    END IF;
+  -- Never writable: every table and view in public AND readonly_auth. The
+  -- readonly_auth views are simple, auto-updatable, and run with their
+  -- owner's rights, so a write grant on one would write auth.users itself.
+  -- has_any_column_privilege also catches a column-level INSERT/UPDATE grant,
+  -- which has_table_privilege does not report. TRIGGER is listed because it
+  -- lets the role attach code to a production table.
+  checked := checked + 1;
+  SELECT string_agg(format('%I.%I', n.nspname, c.relname), ', ' ORDER BY n.nspname, c.relname)
+    INTO v_bad_rels
+    FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+   WHERE n.nspname IN ('public', 'readonly_auth') AND c.relkind IN ('r', 'p', 'v', 'f')
+     AND (has_table_privilege('pinpoint_readonly', c.oid, 'INSERT, UPDATE, DELETE, TRUNCATE, TRIGGER')
+          OR has_any_column_privilege('pinpoint_readonly', c.oid, 'INSERT, UPDATE'));
+  IF v_bad_rels IS NOT NULL THEN
+    failures := failures + 1;
+    RAISE WARNING 'holds a WRITE privilege on relation(s): %', v_bad_rels;
+  END IF;
+
+  -- nextval() and setval() are writes too: USAGE or UPDATE on a sequence.
+  checked := checked + 1;
+  SELECT string_agg(quote_ident(c.relname), ', ' ORDER BY c.relname)
+    INTO v_bad_rels
+    FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+   WHERE n.nspname = 'public' AND c.relkind = 'S'
+     -- CASE, not AND: the planner may evaluate the call before the relkind
+     -- filter, and has_sequence_privilege raises on a non-sequence OID.
+     AND CASE WHEN c.relkind = 'S'
+              THEN has_sequence_privilege('pinpoint_readonly', c.oid, 'USAGE, UPDATE')
+              ELSE false END;
+  IF v_bad_rels IS NOT NULL THEN
+    failures := failures + 1;
+    RAISE WARNING 'can advance or set public sequence(s): %', v_bad_rels;
   END IF;
 
   -- Future tables must be auto-readable. Asserting ALTER DEFAULT PRIVILEGES from
@@ -156,7 +191,9 @@ BEGIN
   -- Name-based sweep for any OTHER credential-shaped column the role can read in
   -- public — a future token/secret column that the blanket grant would expose.
   -- `*_vault_id` is deliberately allowed: it is a pointer, decryptable only with
-  -- vault access this role lacks.
+  -- vault access this role lacks. The pinballmap_state pair is the manual-refresh
+  -- rate-limit bucket (an integer count and its refill timestamp), not a
+  -- credential; exempted by exact name so a new column still trips the sweep.
   checked := checked + 1;
   SELECT string_agg(format('%I.%I', table_name, column_name), ', ')
     INTO v_leaky_cols
@@ -164,6 +201,9 @@ BEGIN
    WHERE table_schema = 'public'
      AND column_name ~* '(token|secret|password|hmac)'
      AND column_name !~* 'vault_id$'
+     AND (table_name, column_name) NOT IN (
+           ('pinballmap_state', 'refresh_tokens'),
+           ('pinballmap_state', 'refresh_tokens_at'))
      AND has_column_privilege('pinpoint_readonly',
            format('public.%I', table_name), column_name, 'SELECT');
   IF v_leaky_cols IS NOT NULL THEN
@@ -231,15 +271,23 @@ BEGIN
     RAISE WARNING 'readonly_auth exposes credential-shaped column(s): %', v_leaky_cols;
   END IF;
 
-  -- And the tables those columns live on stay unreachable directly. Guarded on
-  -- the table existing: a non-Supabase Postgres has no auth.flow_state, and a
-  -- has_table_privilege on a missing relation errors and would abort every check
-  -- above it in this block.
+  -- And the tables those columns live on (auth.flow_state holds plaintext OAuth
+  -- tokens) stay unreachable directly, even if USAGE on auth ever lands. Found
+  -- through pg_class and probed by OID, never by name: resolving `auth.<table>`
+  -- needs USAGE on auth, which this role deliberately lacks, so a to_regclass or
+  -- a name-based has_table_privilege raises `permission denied for schema auth`
+  -- when the check runs as pinpoint_readonly and aborts the whole block. A
+  -- non-Supabase Postgres has no auth schema and simply matches nothing.
   checked := checked + 1;
-  IF to_regclass('auth.flow_state') IS NOT NULL
-     AND has_table_privilege('pinpoint_readonly', 'auth.flow_state', 'SELECT') THEN
+  SELECT string_agg(quote_ident(c.relname), ', ' ORDER BY c.relname)
+    INTO v_bad_rels
+    FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+   WHERE n.nspname = 'auth' AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
+     AND (has_table_privilege('pinpoint_readonly', c.oid, 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, TRIGGER')
+          OR has_any_column_privilege('pinpoint_readonly', c.oid, 'SELECT, INSERT, UPDATE'));
+  IF v_bad_rels IS NOT NULL THEN
     failures := failures + 1;
-    RAISE WARNING 'can SELECT auth.flow_state — that is plaintext OAuth tokens';
+    RAISE WARNING 'holds a direct privilege on auth relation(s): % — auth must be reached only through readonly_auth', v_bad_rels;
   END IF;
 
   checked := checked + 1;

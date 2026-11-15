@@ -1,7 +1,7 @@
 import "server-only";
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
 
-import { log } from "~/lib/logger";
+import { reportError } from "~/lib/observability/report-error";
 import {
   dispatchNotification,
   getChannels,
@@ -280,16 +280,16 @@ export async function importPinballMapComments(): Promise<CommentImportResult> {
  * without waiting for the hourly sync.
  *
  * Best-effort: the change itself has already committed, and the next sync
- * imports anything this misses, so a failure is logged rather than reported to
- * the person who made the change.
+ * imports anything this misses, so a failure goes to Sentry (`bestEffort`)
+ * rather than to the person who made the change.
  */
 export async function importPinballMapCommentsAfterCoverageChange(): Promise<void> {
   try {
     await importPinballMapComments();
   } catch (error) {
-    log.error(
-      { err: error, action: "pinballmap.importComments" },
-      "Pinball Map comment import after a coverage change failed"
-    );
+    reportError(error, {
+      action: "pinballmap.importComments",
+      bestEffort: true,
+    });
   }
 }

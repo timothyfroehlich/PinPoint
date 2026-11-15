@@ -30,22 +30,38 @@ describe("request proxy", () => {
     vi.unstubAllEnvs();
   });
 
-  it("excludes static assets and the health endpoint from the matcher", () => {
+  describe("matcher", () => {
+    // Next tests the matcher against the pathname alone, never the query.
     const matcher = new RegExp(`^${config.matcher[0]}$`);
 
-    for (const path of [
+    it.each([
       "/_next/static/chunk.js",
-      "/_next/image?url=logo.png",
+      "/_next/static/css/app.css",
+      "/_next/image",
       "/favicon.ico",
       "/manifest.webmanifest",
       "/logo.svg",
+      "/images/machine.webp",
       "/api/health",
-    ]) {
-      expect(matcher.test(path), path).toBe(false);
-    }
-    expect(matcher.test("/login")).toBe(true);
-    expect(matcher.test("/manifestXwebmanifest")).toBe(true);
-    expect(matcher.test("/m/afm")).toBe(true);
+    ])("skips %s", (path) => {
+      expect(matcher.test(path)).toBe(false);
+    });
+
+    // A path that only starts with an excluded name still gets the nonce CSP
+    // and the session refresh (PP-5aev).
+    it.each([
+      "/login",
+      "/m/afm",
+      "/manifestXwebmanifest",
+      "/api/healthz",
+      "/api/health/db",
+      "/favicon.icoX",
+      "/manifest.webmanifest-x",
+      "/_next/imageX",
+      "/_next/staticX",
+    ])("runs on %s", (path) => {
+      expect(matcher.test(path)).toBe(true);
+    });
   });
 
   it("redirects a lowercase initials segment to the uppercase form", async () => {
