@@ -235,6 +235,25 @@ def test_preview_workflows_hold_no_job_level_secrets() -> None:
                 )
 
 
+def test_preview_control_refuses_fork_prs_before_checkout() -> None:
+    """The commenter gate does not vet the PR's code, so forks must stop early."""
+    workflow = yaml.safe_load(
+        (WORKFLOWS / "preview-control.yaml").read_text(encoding="utf-8")
+    )
+    (job,) = workflow["jobs"].values()
+    steps = job["steps"]
+    names = [step.get("name") for step in steps]
+    resolve = steps[names.index("Resolve PR head")]
+    assert "isCrossRepository" in resolve["run"]
+    assert 'if [[ "$cross_repo" != "false" ]]' in resolve["run"]
+    first_checkout = next(
+        i
+        for i, step in enumerate(steps)
+        if str(step.get("uses", "")).startswith("actions/checkout@")
+    )
+    assert names.index("Resolve PR head") < first_checkout
+
+
 def test_package_json_vercel_build_contract() -> None:
     pkg = json.loads(PACKAGE_JSON.read_text(encoding="utf-8"))
     scripts = pkg.get("scripts", {})

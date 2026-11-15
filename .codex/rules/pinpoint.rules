@@ -85,10 +85,11 @@ prefix_rule(pattern=["git", "worktree", "prune"], decision="prompt", justificati
 prefix_rule(pattern=["git", "stash", "drop"], decision="prompt", justification="Dropping a stash deletes preserved changes")
 prefix_rule(pattern=["git", "stash", "clear"], decision="prompt", justification="Clearing stashes deletes all preserved changes")
 
-# GitHub CLI. Read-only PR and run subcommands are approval-free. Raw merges skip
-# the merge gates and PR checkouts strand a worktree on a throwaway branch, so
-# both are forbidden; PinPoint merges go through merge-pr.sh, which prompts.
-# Every other gh command falls through to the default approval policy.
+# GitHub CLI. Read-only PR and run subcommands are approval-free. GitHub's
+# ruleset enforces the merge gates; `gh pr merge` prompts because prefix rules
+# cannot deny a later `--admin` flag, so a human stays in the loop. PR checkouts
+# strand a worktree on a throwaway branch, so they are forbidden. Every other gh
+# command falls through to the default approval policy.
 prefix_rule(
     pattern=["gh", "pr", ["list", "view", "checks", "diff"]],
     decision="allow",
@@ -103,9 +104,15 @@ prefix_rule(
 )
 prefix_rule(
     pattern=["gh", "pr", "merge"],
-    decision="forbidden",
-    justification="Raw merges skip the gates; after Tim's explicit request run bash scripts/workflow/merge-pr.sh <PR> --human, otherwise bash scripts/workflow/merge-handoff.sh <PR>",
-    match=["gh pr merge 2058 --squash", "gh pr merge 17 --repo owner/other --squash"],
+    decision="prompt",
+    justification="After Tim's explicit merge request: gh pr merge <PR> --squash or --auto --squash; never --admin",
+    match=["gh pr merge 2058 --squash", "gh pr merge 2058 --auto --squash", "gh pr merge 2058 --admin --squash"],
+)
+prefix_rule(
+    pattern=["gh", "pr", "update-branch"],
+    decision="allow",
+    justification="Merges main into the PR branch; never --rebase",
+    match=["gh pr update-branch 2058"],
 )
 prefix_rule(
     pattern=["gh", "pr", ["checkout", "co"]],
@@ -114,19 +121,10 @@ prefix_rule(
     match=["gh pr checkout 2058", "gh pr co 2058"],
 )
 prefix_rule(pattern=["gh", "co"], decision="forbidden", justification="gh co is gh pr checkout; use gh pr diff/view, or git worktree add")
-prefix_rule(
-    pattern=["bash", "scripts/workflow/merge-pr.sh"],
-    decision="prompt",
-    justification="Merging requires Tim's explicit request in the active task (PP-wi85)",
-    match=["bash scripts/workflow/merge-pr.sh 2058 --human"],
-)
-prefix_rule(pattern=["scripts/workflow/merge-pr.sh"], decision="prompt", justification="Merging requires Tim's explicit request in the active task (PP-wi85)")
-prefix_rule(pattern=["./scripts/workflow/merge-pr.sh"], decision="prompt", justification="Merging requires Tim's explicit request in the active task (PP-wi85)")
 # Trusted PinPoint workflow entry points and routine local validation.
 prefix_rule(pattern=["./scripts/workflow/pr-watch.py"], decision="allow", justification="Monitor a PinPoint pull request through the repository workflow")
 prefix_rule(pattern=["python3", "scripts/workflow/pr-watch.py"], decision="allow", justification="Monitor a PinPoint pull request through the repository workflow")
-prefix_rule(pattern=["bash", "scripts/workflow/merge-handoff.sh"], decision="allow", justification="Generate the read-only PinPoint merge handoff")
-prefix_rule(pattern=["bash", "scripts/workflow/request-codex-review.sh"], decision="allow", justification="Request the repository-required Codex review after CI")
+prefix_rule(pattern=["bash", "scripts/workflow/approve-ui.sh"], decision="allow", justification="Record Tim's own UI approval (chat or artifact click) on the PR head; never approve the ui-approval environment through the raw API")
 prefix_rule(pattern=["pnpm", "run", "check"], decision="allow", justification="Run PinPoint's static quality gate")
 prefix_rule(pattern=["pnpm", "run", "check:python"], decision="allow", justification="Run PinPoint's Python quality gate")
 prefix_rule(pattern=["pnpm", "run", "test"], decision="allow", justification="Run PinPoint's unit test suite")

@@ -1,9 +1,8 @@
 """Fail-closed tests for the PR dashboard.
 
-CI and merge state are parsed from one GraphQL snapshot. The Review column is the
-merge gate's own label (`_review_summary` in `_pr-gates.sh`), so these tests feed the
-gate's `gh` calls through the same fake `gh` and assert the four labels come through
-verbatim — and that a gate failure reads as `?`, never as green.
+Every column is parsed from one GraphQL snapshot. Review and UI are the head's
+`Claude Review` and `UI Approval` required checks, counted only when the GitHub
+Actions app ran them; anything the dashboard cannot read renders as `?`, never green.
 """
 
 import json
@@ -15,10 +14,8 @@ import pytest
 
 DASHBOARD = Path(__file__).parent.parent / "workflow" / "pr-dashboard.sh"
 HEAD = "a" * 40
-OLD = "b" * 40
-CODEX_BOT = "chatgpt-codex-connector[bot]"
-CODEX_APP = "chatgpt-codex-connector"
 OWNER = "timothyfroehlich"
+ACTIONS = "github-actions"
 
 
 def connection(nodes=(), *, has_next=False, cursor=None):
@@ -34,6 +31,7 @@ def check(
     conclusion="SUCCESS",
     completed_at="2026-08-30T12:00:00Z",
     started_at="2026-08-30T11:59:00Z",
+    app=ACTIONS,
 ):
     return {
         "__typename": "CheckRun",
@@ -42,36 +40,7 @@ def check(
         "conclusion": conclusion,
         "completedAt": completed_at,
         "startedAt": started_at,
-    }
-
-
-def review(sha=HEAD, state="APPROVED", login=CODEX_BOT):
-    """A REST review record, as `_review_evidence` reads it."""
-    return {
-        "user": {"login": login},
-        "state": state,
-        "submitted_at": "2026-08-30T12:00:00Z",
-        "commit_id": sha,
-    }
-
-
-def marker(sha=HEAD):
-    return {
-        "user": {"login": OWNER},
-        "body": f"<!-- pinpoint-review: {sha} -->\nreviewed by hand",
-        "updated_at": "2026-08-30T12:01:00Z",
-    }
-
-
-def clean_codex_comment(sha=HEAD[:10], app=CODEX_APP):
-    return {
-        "user": {"login": CODEX_BOT},
-        "performed_via_github_app": {"slug": app},
-        "body": (
-            "Codex Review: Didn't find any major issues.\n\n"
-            f"**Reviewed commit:** `{sha}`"
-        ),
-        "updated_at": "2026-08-30T12:01:00Z",
+        "checkSuite": {"app": {"slug": app}},
     }
 
 
@@ -118,32 +87,6 @@ def list_rule(nodes):
         "contains": ["pullRequests(first: 100"],
         "stdout": json.dumps(open_pr_response(nodes)),
     }
-
-
-def gate_rules(pr, *, reviews=(), comments=(), unresolved=0):
-    """Every `gh` call `_review_summary` makes for one PR, answered."""
-    threads = [{"isResolved": False}] * unresolved
-    return [
-        {
-            "contains": ["repo view", "nameWithOwner"],
-            "stdout": f"{OWNER}/PinPoint",
-        },
-        {"contains": [f"pr view {pr} --json headRefOid"], "stdout": HEAD},
-        {"contains": [f"pulls/{pr}/reviews"], "stdout": json.dumps(list(reviews))},
-        {"contains": [f"issues/{pr}/comments"], "stdout": json.dumps(list(comments))},
-        {
-            "contains": [f"pullRequest(number: {pr})", "reviewThreads"],
-            "stdout": json.dumps(
-                {
-                    "data": {
-                        "repository": {
-                            "pullRequest": {"reviewThreads": connection(threads)}
-                        }
-                    }
-                }
-            ),
-        },
-    ]
 
 
 @pytest.fixture
@@ -203,137 +146,251 @@ raise SystemExit(99)
     return invoke
 
 
-def review_column(result, row=0):
-    """The Review cell of the Nth data row (columns are fixed-width)."""
+def cells(result, row=0):
+    """The CI, Review, and UI cells of the Nth data row (columns are fixed-width)."""
     line = result.stdout.splitlines()[2 + row]
-    return line[61:79].strip()
+    return line[48:60].strip(), line[61:69].strip(), line[70:78].strip()
+
+
+def review_column(result, row=0):
+    return cells(result, row)[1]
+
+
+def ui_column(result, row=0):
+    return cells(result, row)[2]
+
+
+def required(name, **kwargs):
+    return check(name=name, **kwargs)
 
 
 # ---------------------------------------------------------------------------------
-# Review column: the gate's four labels, verbatim
+# Review and UI columns: the head's required checks, from the same snapshot
 # ---------------------------------------------------------------------------------
 
 
 @pytest.mark.unit
-def test_open_pr_list_is_one_graphql_request_plus_the_gate_per_pr(run_dashboard):
-    nodes = [pr_node(number) for number in range(1, 4)]
-    rules = [list_rule(nodes)]
-    for number in range(1, 4):
-        rules.extend(gate_rules(number, reviews=[review()]))
-    result, calls = run_dashboard(rules)
+def test_header_names_the_review_and_ui_columns(run_dashboard):
+    result, _calls = run_dashboard([list_rule([pr_node(1)])])
 
     assert result.returncode == 0, result.stderr
-    assert [review_column(result, row) for row in range(3)] == ["approved"] * 3
-    list_calls = [call for call in calls if "pullRequests(first: 100" in " ".join(call)]
-    assert len(list_calls) == 1
+    header = result.stdout.splitlines()[0]
+    assert header[61:69].strip() == "Review"
+    assert header[70:78].strip() == "UI"
 
 
 @pytest.mark.unit
-def test_exact_head_native_approval_is_approved(run_dashboard):
-    result, _calls = run_dashboard(
-        [list_rule([pr_node(1)]), *gate_rules(1, reviews=[review(login=CODEX_BOT)])]
+def test_open_pr_list_is_one_graphql_request(run_dashboard):
+    checks = [
+        check(),
+        required("Claude Review"),
+        required("UI Approval"),
+    ]
+    nodes = [pr_node(number, checks=checks) for number in range(1, 4)]
+    result, calls = run_dashboard([list_rule(nodes)])
+
+    assert result.returncode == 0, result.stderr
+    assert [cells(result, row) for row in range(3)] == [
+        ("All passed", "pass", "pass")
+    ] * 3
+    assert len(calls) == 1
+    assert "checkSuite { app { slug } }" in " ".join(calls[0])
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("status", "conclusion", "expected"),
+    [
+        ("COMPLETED", "SUCCESS", "pass"),
+        ("COMPLETED", "NEUTRAL", "pass"),
+        ("COMPLETED", "SKIPPED", "skipped"),
+        ("COMPLETED", "FAILURE", "fail"),
+        ("COMPLETED", "CANCELLED", "fail"),
+        ("COMPLETED", "TIMED_OUT", "fail"),
+        ("IN_PROGRESS", None, "pending"),
+        ("QUEUED", None, "pending"),
+        ("WAITING", None, "pending"),
+        ("COMPLETED", None, "?"),
+        ("COMPLETED", "SOMETHING_NEW", "?"),
+        ("MYSTERY", None, "?"),
+    ],
+)
+@pytest.mark.parametrize(
+    ("name", "column"), [("Claude Review", review_column), ("UI Approval", ui_column)]
+)
+def test_required_check_states(
+    run_dashboard, status, conclusion, expected, name, column
+):
+    node = pr_node(1, checks=[required(name, status=status, conclusion=conclusion)])
+    result, _calls = run_dashboard([list_rule([node])])
+
+    assert result.returncode == 0, result.stderr
+    assert column(result) == expected
+
+
+@pytest.mark.unit
+def test_absent_required_checks_render_a_dash(run_dashboard):
+    result, _calls = run_dashboard([list_rule([pr_node(1)])])
+
+    assert result.returncode == 0, result.stderr
+    assert cells(result) == ("All passed", "—", "—")
+
+
+@pytest.mark.unit
+def test_ui_reads_waiting_while_sign_off_waits_on_tim(run_dashboard):
+    node = pr_node(
+        1, checks=[required("Tim's UI sign-off", status="WAITING", conclusion=None)]
     )
+    result, _calls = run_dashboard([list_rule([node])])
 
     assert result.returncode == 0, result.stderr
-    assert review_column(result) == "approved"
+    assert ui_column(result) == "waiting"
 
 
 @pytest.mark.unit
-def test_stale_native_approval_is_stale_review(run_dashboard):
-    result, _calls = run_dashboard(
-        [list_rule([pr_node(1)]), *gate_rules(1, reviews=[review(sha=OLD)])]
+def test_ui_approval_result_wins_over_a_finished_sign_off(run_dashboard):
+    node = pr_node(
+        1,
+        checks=[
+            required("Tim's UI sign-off", status="COMPLETED", conclusion="SUCCESS"),
+            required("UI Approval", status="COMPLETED", conclusion="SUCCESS"),
+        ],
     )
+    result, _calls = run_dashboard([list_rule([node])])
 
     assert result.returncode == 0, result.stderr
-    assert review_column(result) == "stale review"
+    assert ui_column(result) == "pass"
 
 
 @pytest.mark.unit
-def test_unresolved_threads_are_changes_requested(run_dashboard):
-    result, _calls = run_dashboard(
-        [list_rule([pr_node(1)]), *gate_rules(1, reviews=[review()], unresolved=2)]
+def test_required_check_from_another_app_is_not_counted(run_dashboard):
+    lookalike = [
+        required("Claude Review", app="lookalike-app"),
+        required("UI Approval", app="lookalike-app"),
+    ]
+    result, _calls = run_dashboard([list_rule([pr_node(1, checks=lookalike)])])
+    assert (review_column(result), ui_column(result)) == ("—", "—")
+
+    # A newer pass from another app cannot override the Actions run's failure.
+    node = pr_node(
+        1,
+        checks=[
+            required(
+                "Claude Review",
+                conclusion="FAILURE",
+                started_at="2026-08-30T11:58:00Z",
+            ),
+            required(
+                "Claude Review",
+                app="lookalike-app",
+                started_at="2026-08-30T12:30:00Z",
+            ),
+        ],
     )
+    result, _calls = run_dashboard([list_rule([node])])
+    assert review_column(result) == "fail"
+
+
+@pytest.mark.unit
+def test_required_check_without_a_check_suite_is_not_counted(run_dashboard):
+    run = required("UI Approval")
+    del run["checkSuite"]
+    result, _calls = run_dashboard([list_rule([pr_node(1, checks=[run])])])
 
     assert result.returncode == 0, result.stderr
-    # Coverage wins the label; threads are the thread gate's business.
-    assert review_column(result) == "approved"
+    assert ui_column(result) == "—"
 
-    result, _calls = run_dashboard(
-        [list_rule([pr_node(1)]), *gate_rules(1, unresolved=2)]
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("older", "newer", "expected"),
+    [
+        ("FAILURE", "SUCCESS", "pass"),
+        ("SUCCESS", "FAILURE", "fail"),
+        ("SUCCESS", "CANCELLED", "fail"),
+    ],
+)
+def test_latest_required_check_rerun_wins(run_dashboard, older, newer, expected):
+    node = pr_node(
+        1,
+        checks=[
+            required(
+                "UI Approval", conclusion=older, started_at="2026-08-30T11:58:00Z"
+            ),
+            required(
+                "UI Approval", conclusion=newer, started_at="2026-08-30T11:59:00Z"
+            ),
+        ],
     )
-    assert review_column(result) == "changes requested"
-
-
-@pytest.mark.unit
-def test_no_evidence_is_not_reviewed(run_dashboard):
-    result, _calls = run_dashboard([list_rule([pr_node(1)]), *gate_rules(1)])
+    result, _calls = run_dashboard([list_rule([node])])
 
     assert result.returncode == 0, result.stderr
-    assert review_column(result) == "not reviewed"
+    assert ui_column(result) == expected
 
 
 @pytest.mark.unit
-def test_pending_codex_request_is_still_not_reviewed(run_dashboard):
-    request = {
-        "user": {"login": OWNER},
-        "body": f"@codex review\n<!-- pinpoint-codex-review-head: {HEAD} -->",
-        "created_at": "2026-08-30T12:01:00Z",
+def test_unordered_required_check_reruns_fail_closed(run_dashboard):
+    node = pr_node(
+        1,
+        checks=[
+            required(
+                "Claude Review", conclusion="FAILURE", completed_at="", started_at=""
+            ),
+            required(
+                "Claude Review", conclusion="SUCCESS", completed_at="", started_at=""
+            ),
+        ],
+    )
+    result, _calls = run_dashboard([list_rule([node])])
+
+    assert result.returncode == 0, result.stderr
+    assert review_column(result) == "?"
+
+
+@pytest.mark.unit
+def test_required_check_on_a_later_checks_page_is_counted(run_dashboard):
+    node = pr_node(4, checks_has_next=True, checks_cursor="CHK_CURSOR")
+    later_page = {
+        "data": {
+            "repository": {
+                "pullRequest": {
+                    "commits": {
+                        "nodes": [
+                            {
+                                "commit": {
+                                    "statusCheckRollup": {
+                                        "contexts": connection(
+                                            [
+                                                required("Claude Review"),
+                                                required(
+                                                    "UI Approval",
+                                                    status="WAITING",
+                                                    conclusion=None,
+                                                ),
+                                            ]
+                                        )
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        }
     }
-    result, _calls = run_dashboard(
-        [list_rule([pr_node(1)]), *gate_rules(1, comments=[request])]
-    )
-
-    assert result.returncode == 0, result.stderr
-    assert review_column(result) == "not reviewed"
-
-
-@pytest.mark.unit
-def test_trusted_clean_codex_comment_is_approved_and_lookalike_is_not(run_dashboard):
-    result, _calls = run_dashboard(
-        [list_rule([pr_node(1)]), *gate_rules(1, comments=[clean_codex_comment()])]
-    )
-    assert review_column(result) == "approved"
-
-    result, _calls = run_dashboard(
+    result, calls = run_dashboard(
         [
-            list_rule([pr_node(1)]),
-            *gate_rules(1, comments=[clean_codex_comment(app="lookalike-app")]),
+            list_rule([node]),
+            {
+                "contains": ['contexts(first: 100, after: "CHK_CURSOR")'],
+                "stdout": json.dumps(later_page),
+            },
         ]
     )
-    assert review_column(result) == "not reviewed"
 
-
-@pytest.mark.unit
-def test_local_review_marker_is_not_coverage(run_dashboard):
-    # Only a review record and Codex cover a head; a retired local marker pinned to head
-    # reads as not reviewed.
-    result, _calls = run_dashboard(
-        [list_rule([pr_node(1)]), *gate_rules(1, comments=[marker()])]
-    )
-    assert review_column(result) == "not reviewed"
-
-
-@pytest.mark.unit
-def test_gate_failure_renders_review_unknown_not_green(run_dashboard):
-    rules = [list_rule([pr_node(9)])]
-    rules.extend(
-        rule
-        for rule in gate_rules(9, reviews=[review()])
-        if "issues/9/comments" not in rule["contains"]
-    )
-    rules.append(
-        {
-            "contains": ["issues/9/comments"],
-            "stderr": "HTTP 403: API rate limit exceeded",
-            "exit": 1,
-        }
-    )
-    result, _calls = run_dashboard(rules)
-
-    assert result.returncode == 0
-    row = result.stdout.splitlines()[2]
-    assert "All passed" in row
-    assert review_column(result) == "?"
+    assert result.returncode == 0, result.stderr
+    assert cells(result) == ("2/3 running", "pass", "pending")
+    assert len(calls) == 2
 
 
 @pytest.mark.unit
@@ -352,7 +409,14 @@ def test_no_open_prs_preserves_compact_cli_output(run_dashboard):
 
 @pytest.mark.unit
 def test_checks_pagination_rate_limit_renders_ci_unknown_not_green(run_dashboard):
-    node = pr_node(5, checks_has_next=True, checks_cursor="CHK_CURSOR")
+    # The first page already carries passing required checks; an incomplete
+    # snapshot still cannot show them, because a later page could hold a rerun.
+    node = pr_node(
+        5,
+        checks=[check(), required("Claude Review"), required("UI Approval")],
+        checks_has_next=True,
+        checks_cursor="CHK_CURSOR",
+    )
     result, _calls = run_dashboard(
         [
             list_rule([node]),
@@ -361,26 +425,24 @@ def test_checks_pagination_rate_limit_renders_ci_unknown_not_green(run_dashboard
                 "stderr": "HTTP 403: API rate limit exceeded",
                 "exit": 1,
             },
-            *gate_rules(5, reviews=[review()]),
         ]
     )
 
     assert result.returncode == 0
     row = result.stdout.splitlines()[2]
     assert "All passed" not in row
-    assert row[48:60].strip() == "?"
-    assert review_column(result) == "approved"
+    assert cells(result) == ("?", "?", "?")
 
 
 @pytest.mark.unit
 def test_missing_checks_cursor_is_unknown_without_a_speculative_call(run_dashboard):
     node = pr_node(6, checks_has_next=True, checks_cursor=None)
-    result, calls = run_dashboard([list_rule([node]), *gate_rules(6)])
+    result, calls = run_dashboard([list_rule([node])])
 
     assert result.returncode == 0
     row = result.stdout.splitlines()[2]
     assert "All passed" not in row
-    assert row[48:60].strip() == "?"
+    assert cells(result) == ("?", "?", "?")
     assert not any("after:" in " ".join(call) for call in calls)
 
 
@@ -389,13 +451,12 @@ def test_malformed_check_context_is_unknown_while_review_remains_usable(
     run_dashboard,
 ):
     result, _calls = run_dashboard(
-        [list_rule([pr_node(8, checks=[{}])]), *gate_rules(8, reviews=[review()])]
+        [list_rule([pr_node(8, checks=[{}, required("Claude Review")])])]
     )
 
     assert result.returncode == 0
     row = result.stdout.splitlines()[2]
-    assert row[48:60].strip() == "?"
-    assert review_column(result) == "approved"
+    assert cells(result) == ("?", "pass", "—")
     assert "All passed" not in row
 
 
@@ -416,7 +477,7 @@ def test_superseded_cancelled_check_does_not_override_replacement(run_dashboard)
             ),
         ],
     )
-    result, _calls = run_dashboard([list_rule([node]), *gate_rules(10)])
+    result, _calls = run_dashboard([list_rule([node])])
 
     assert result.returncode == 0
     row = result.stdout.splitlines()[2]
@@ -454,7 +515,7 @@ def test_latest_authoritative_ci_gate_rerun_wins(
             ),
         ],
     )
-    result, _calls = run_dashboard([list_rule([node]), *gate_rules(13)])
+    result, _calls = run_dashboard([list_rule([node])])
 
     assert result.returncode == 0
     assert expected in result.stdout.splitlines()[2]
@@ -469,7 +530,7 @@ def test_multiple_ci_gates_without_timestamps_fail_closed(run_dashboard):
             check(conclusion="SUCCESS", completed_at="", started_at=""),
         ],
     )
-    result, _calls = run_dashboard([list_rule([node]), *gate_rules(14)])
+    result, _calls = run_dashboard([list_rule([node])])
 
     assert result.returncode == 0
     row = result.stdout.splitlines()[2]
@@ -486,7 +547,7 @@ def test_non_authoritative_cancelled_check_still_fails_closed(run_dashboard):
             check(name="Lint", conclusion="SUCCESS"),
         ],
     )
-    result, _calls = run_dashboard([list_rule([node]), *gate_rules(12)])
+    result, _calls = run_dashboard([list_rule([node])])
 
     assert result.returncode == 0
     assert "1 FAILED" in result.stdout.splitlines()[2]
@@ -500,9 +561,7 @@ def test_non_authoritative_cancelled_check_still_fails_closed(run_dashboard):
 @pytest.mark.unit
 @pytest.mark.parametrize("merge_state", ["DIRTY", "DRAFT", "HAS_HOOKS"])
 def test_valid_merge_states_remain_visible(run_dashboard, merge_state):
-    result, _calls = run_dashboard(
-        [list_rule([pr_node(11, merge_state=merge_state)]), *gate_rules(11)]
-    )
+    result, _calls = run_dashboard([list_rule([pr_node(11, merge_state=merge_state)])])
 
     assert result.returncode == 0
     assert merge_state in result.stdout.splitlines()[2]

@@ -26,6 +26,10 @@
 -- app never reads it, and the registry's membership test is "PinPoint is broken
 -- without this".
 --
+-- With this URL in .env.local beside a local POSTGRES_URL (a worktree's own
+-- stack), a bare `query-readonly.mjs` refuses rather than guess: pass `--prod`
+-- for production or `--local` for the local database.
+--
 -- Why this exists: agents investigating a bug need to read production, including
 -- `auth.users`. Handing them the service-role string means every read carries
 -- write authority, and the only thing standing between a typo and a mutation is

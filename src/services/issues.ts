@@ -123,7 +123,9 @@ export interface CreateIssueParams {
    * Client-generated UUID, stable across submission retries. When present and a
    * row already carries this key, createIssue returns the existing issue
    * verbatim — no second counter increment, no second notification plan — so a
-   * retried submission cannot create a duplicate. (PP-2053.7)
+   * retried submission cannot create a duplicate. (PP-2053.7) The match is
+   * scoped to the same reporter and machine, so a reused key never returns
+   * another reporter's issue. (PP-ysk3)
    */
   idempotencyKey?: string | null;
   /**
@@ -275,6 +277,16 @@ export async function createIssue({
   // Resolve channels outside the transaction to avoid an HTTP round-trip
   // (Supabase Vault RPC) inside the DB connection window (PP-rfc).
   const channels = await getChannels();
+  // A key matches only this reporter's prior submission for this machine, the
+  // way addIssueComment scopes by author and issue. Without the scope, one
+  // requester could replay another's key and land in their retry branch.
+  // (PP-ysk3)
+  const sameSubmission = (key: string): SQL | undefined =>
+    and(
+      eq(issues.idempotencyKey, key),
+      eq(issues.machineInitials, machineInitials),
+      reportedBy ? eq(issues.reportedBy, reportedBy) : isNull(issues.reportedBy)
+    );
   const result = await db.transaction(async (tx) => {
     // 0. Idempotency dedup (PP-2053.7). A retried submission carries the same
     //    client-generated key. If a row already exists for it, return that row
@@ -286,7 +298,7 @@ export async function createIssue({
     //    idempotency lookup ahead of the rate limiter; deferred as a follow-up.)
     if (idempotencyKey) {
       const existing = await tx.query.issues.findFirst({
-        where: eq(issues.idempotencyKey, idempotencyKey),
+        where: sameSubmission(idempotencyKey),
       });
       if (existing) {
         log.info(
@@ -361,9 +373,11 @@ export async function createIssue({
       // that won the race with an empty delivery plan — no duplicate, no second
       // dispatch. (A genuine insert failure can't reach here: only the partial
       // unique index triggers DO NOTHING, and it only exists for non-NULL keys.)
+      // The index is global but the lookup is scoped, so a key held by another
+      // reporter finds no winner and the submission fails below. (PP-ysk3)
       if (idempotencyKey) {
         const winner = await tx.query.issues.findFirst({
-          where: eq(issues.idempotencyKey, idempotencyKey),
+          where: sameSubmission(idempotencyKey),
         });
         if (winner) {
           log.info(
