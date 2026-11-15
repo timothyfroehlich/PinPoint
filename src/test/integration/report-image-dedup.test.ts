@@ -150,7 +150,8 @@ function makeFormData(opts: {
 
 // blobUrl must satisfy imageMetadataSchema's refine: a Vercel Blob host.
 const TEST_IMAGE = {
-  blobUrl: "https://teststore.public.blob.vercel-storage.com/img1.jpg",
+  blobUrl:
+    "https://teststore.public.blob.vercel-storage.com/issue-images/pending/img1.jpg",
   blobPathname: "images/img1.jpg",
   fileSizeBytes: 12345,
   mimeType: "image/jpeg",
@@ -158,7 +159,8 @@ const TEST_IMAGE = {
 };
 
 const RETRY_IMAGE = {
-  blobUrl: "https://teststore.public.blob.vercel-storage.com/img2.jpg",
+  blobUrl:
+    "https://teststore.public.blob.vercel-storage.com/issue-images/pending/img2.jpg",
   blobPathname: "images/img2.jpg",
   fileSizeBytes: 9999,
   mimeType: "image/jpeg",
@@ -225,6 +227,28 @@ describe("report action — idempotent retry image handling (PP-u0v1)", () => {
     expect(linked[0]?.fullImageUrl).toBe(TEST_IMAGE.blobUrl);
     // No blob cleanup on fresh insert.
     expectNoBlobDeletes();
+  });
+
+  it("stores the pathname the blobUrl names, not the client's blobPathname (PP-9my0)", async () => {
+    const db = await getTestDb();
+
+    await submitPublicIssueAction(
+      { error: "" },
+      makeFormData({
+        machineId,
+        idempotencyKey: randomUUID(),
+        imagesMetadata: [
+          { ...TEST_IMAGE, blobPathname: "avatars/someone-else.png" },
+        ],
+      })
+    );
+
+    const linked = await db
+      .select()
+      .from(issueImages)
+      .where(eq(issueImages.fullImageUrl, TEST_IMAGE.blobUrl));
+    expect(linked).toHaveLength(1);
+    expect(linked[0]?.fullBlobPathname).toBe("issue-images/pending/img1.jpg");
   });
 
   it("idempotent retry does NOT add duplicate issueImages rows (PP-u0v1)", async () => {

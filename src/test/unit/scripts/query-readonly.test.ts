@@ -551,6 +551,21 @@ describe("verify-readonly-role.sql — asserts privileges, not statements", () =
     // has_*_privilege on a missing relation/schema errors and would discard
     // every check before it in the DO block. Guarded on existence.
     expect(sql).toMatch(/to_regnamespace\('vault'\)/i);
-    expect(sql).toMatch(/to_regclass\('auth\.flow_state'\)/i);
+  });
+
+  it("never resolves an auth.* name, which needs the USAGE the role lacks", () => {
+    // Run as pinpoint_readonly, to_regclass('auth.x') or a name-based
+    // has_table_privilege raises `permission denied for schema auth` and aborts
+    // the whole DO block (PP-c97h). Auth relations are found through pg_class
+    // and probed by OID instead.
+    expect(sql).not.toMatch(/'auth\.\w+'/i);
+    expect(sql).toMatch(/nspname\s*=\s*'auth'/i);
+  });
+
+  it("checks write privileges on every public relation, not a sample", () => {
+    expect(sql).not.toMatch(/LIMIT\s+1/i);
+    expect(sql).toMatch(
+      /has_any_column_privilege\('pinpoint_readonly',\s*c\.oid/
+    );
   });
 });

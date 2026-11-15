@@ -65,21 +65,19 @@ Reviewers read agent skills. Consult the relevant one for the area a PR touches 
 
 ## How review runs
 
-**The reviewer is a local Claude Code `/code-review`**, run by the PR's owning agent on the exact head after current-head CI succeeds, at the level `scripts/workflow/claude-review-level.sh` picks from the diff size. The author fixes or declines every finding and re-reviews each new head until a round is clean, then posts a **review record**: a SHA-pinned comment from Tim's account listing every finding and its disposition. That record is what covers the head.
-
-A PR cannot merge without review coverage of its **current head commit**, with every thread resolved. Until the subscription ends, exact-head Codex evidence still counts; a PR with none merges only when Tim explicitly directs a forced merge. Any push other than a clean merge of `main` requires a new review round and record. **If you're reviewing, assume the commit you were handed is the one the author intends to be final.** Full author-side rules: `.agents/skills/pinpoint-pr-workflow/SKILL.md` Phase 3.4.
+**The reviewer is `Claude Review`**, a required CI check (`.github/workflows/claude-review.yaml`) that reads this rubric from `main`. It reviews the whole PR when it is marked ready, then each later push's new commits, and posts findings as inline comments. A comment starting with `/claude-review` re-runs it on the current head. A local `/code-review` by the owning agent is optional, useful before marking a large change ready. **If you're reviewing, assume the commit you were handed is the one the author intends to be final.** Full author-side rules: `.agents/skills/pinpoint-pr-workflow/SKILL.md` Phase 3.4.
 
 ## Review mechanics
 
-Sign every review comment or reply with your agent name (`—Claude`, `—Gemini`, `—Codex`, `—Antigravity`). If you decline to act on a comment (Tim's or another agent's), don't leave it silent: reply with one sentence explaining why, then resolve the thread. Every comment gets a fix or a reply — never a silent ignore.
+Sign every review comment or reply with your agent name (`—Claude`, `—Gemini`, `—Codex`, `—Antigravity`). If you decline to act on a comment (Tim's or another agent's), don't leave it silent: reply with one sentence explaining why, then resolve the thread. Every comment gets a fix or a reply — never a silent ignore. The ruleset requires every conversation resolved before merge.
 
 ## The PinPoint merge boundary
 
-Reviewers never merge a PinPoint PR merely by reviewing it. Tim decides whether to merge (PP-wi85). An owning agent may run the gate-enforced `bash scripts/workflow/merge-pr.sh <PR> --human` only after his explicit request in the active task; “merge it” counts when the target PR is unambiguous. The script rechecks CI, exact-head review, threads, and conflicts. Raw channels (`gh pr merge`, `gh api PUT .../merge`, MCP `merge_pull_request`) remain off-limits to agents because they skip those gates.
+Reviewers never merge a PinPoint PR merely by reviewing it. Tim decides whether to merge. GitHub's ruleset `6326455` enforces the gates natively: required checks `CI Gate`, `Claude Review`, and `UI Approval`, every conversation resolved, and the branch up to date with `main`.
 
-Claude Code (`permissions.ask` in `.claude/settings.json`) and Codex (`.codex/rules/pinpoint.rules`) show an approval prompt before the guarded script runs. Tim’s explicit request in the task authorizes the agent in any harness to pass `--human`; that additional prompt is not a reason to refuse or ask him to type a command. Antigravity may not prompt. If the target is ambiguous, clarify it first. If any gate fails, stop and report it; bypass flags need separate explicit authorization.
+When Tim explicitly asks to merge an unambiguous PR, the owning agent runs `gh pr merge <PR> --squash` (or `--auto --squash`) and verifies the result; if the target is ambiguous, clarify it first. A refused merge means a gate is unmet: fix the gate. `--admin` is Tim's own emergency bypass and is denied to agents, as are the raw API and MCP merge channels.
 
-Without an explicit merge request, hand off a GitHub-ready PR with CI green, exact-head review coverage, zero unresolved threads, the `ready-for-review` label, and a passing `UI Approval` check. When Tim explicitly requests the merge, run the guarded script in any harness and verify the result.
+Without an explicit merge request, report the PR as ready: its URL and `gh pr checks <PR> --required`.
 
 ## Pointers, not copies
 

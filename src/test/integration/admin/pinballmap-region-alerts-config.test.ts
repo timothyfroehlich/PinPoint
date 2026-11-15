@@ -11,6 +11,7 @@ import { eq } from "drizzle-orm";
 import { pinballmapState } from "~/server/db/schema";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import type * as RegionAlertsModule from "~/lib/pinballmap/region-alerts";
+import type * as ReportErrorModule from "~/lib/observability/report-error";
 
 const ADMIN_ID = "5d9e7234-b866-4ce4-8419-d2e27d014acf";
 
@@ -56,10 +57,17 @@ vi.mock("~/server/db", async () => {
   return { db: await getTestDb() };
 });
 
+// Spy on reportError without dropping the module's other exports.
+vi.mock("~/lib/observability/report-error", async (importOriginal) => {
+  const actual = await importOriginal<typeof ReportErrorModule>();
+  return { ...actual, reportError: vi.fn() };
+});
+
 import {
   saveRegionAlertConfigAction,
   sendRegionAlertTestAction,
 } from "~/app/(app)/admin/integrations/pinballmap/actions";
+import { reportError } from "~/lib/observability/report-error";
 
 describe("Pinball Map Region Alerts Admin Configuration", () => {
   setupTestDb();
@@ -371,6 +379,43 @@ describe("Pinball Map Region Alerts Admin Configuration", () => {
       });
 
       expect(bootstrapRegionMock).toHaveBeenCalledWith("austin");
+      fetchSpy.mockRestore();
+    });
+
+    it("reports a failed bootstrap best-effort and still saves the config", async () => {
+      const bootstrapError = new Error("PinballMap fetchRegionLmxes failed");
+      bootstrapRegionMock.mockRejectedValueOnce(bootstrapError);
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            id: "123456789012345678",
+            permissions: "2048",
+          }),
+          { status: 200 }
+        )
+      );
+
+      const res = await saveRegionAlertConfigAction({
+        region: "portland",
+        alertChannelId: "123456789012345678",
+      });
+
+      expect(res).toMatchObject({ ok: true });
+      expect(reportError).toHaveBeenCalledWith(
+        bootstrapError,
+        expect.objectContaining({
+          action: "saveRegionAlertConfigAction.bootstrapRegion",
+          region: "portland",
+          bestEffort: true,
+        })
+      );
+      const db = await getTestDb();
+      const [updated] = await db
+        .select()
+        .from(pinballmapState)
+        .where(eq(pinballmapState.id, "singleton"));
+      expect(updated?.regionAlertRegion).toBe("portland");
+
       fetchSpy.mockRestore();
     });
 
