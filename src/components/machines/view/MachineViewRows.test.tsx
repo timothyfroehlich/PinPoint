@@ -226,6 +226,18 @@ describe("Machine rows", () => {
     ).toHaveClass("relative", "z-[2]");
   });
 
+  it("raises the Playability dot and owner avatar above the row link, so their tooltips show", () => {
+    renderRows([machine()]);
+    const row = within(screen.getByRole("listitem"));
+
+    const dot = row.getByRole("img", { name: "Unplayable" });
+    expect(dot).toHaveAttribute("title", "Unplayable");
+    expect(dot).toHaveClass("relative", "z-[2]");
+    const owner = row.getByRole("img", { name: "Owner: Alex" });
+    expect(owner).toHaveAttribute("title", "Owner: Alex");
+    expect(owner).toHaveClass("relative", "z-[2]");
+  });
+
   it("calls the selection handler instead of navigating when a Surface picks machines", () => {
     const onMachineSelect = vi.fn();
     render(

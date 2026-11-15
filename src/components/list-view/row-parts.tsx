@@ -3,6 +3,7 @@
 import type React from "react";
 import type { LucideIcon } from "lucide-react";
 import { useRelativeNow } from "~/components/issues/RelativeTimeProvider";
+import { LIST_ROW_RAISED } from "~/components/list-view/ListRow";
 import { formatCompactAgeAgo, formatSpokenAgeAgo } from "~/lib/dates";
 import { cn } from "~/lib/utils";
 
@@ -27,7 +28,8 @@ const DOT_SHAPES: Record<ListRowDotShape, string> = {
 
 /**
  * A row's leading dot: an image named `label`, drawn in `colorClass` (a text
- * color). Every shape sits in the same 10px box.
+ * color). Every shape sits in the same 10px box. It draws above the row
+ * link, so its tooltip shows; a click on it opens nothing.
  */
 export function ListRowDot({
   shape,
@@ -46,6 +48,7 @@ export function ListRowDot({
       aria-label={label}
       title={label}
       className={cn(
+        LIST_ROW_RAISED,
         "inline-flex size-2.5 shrink-0 items-center justify-center",
         colorClass
       )}
@@ -73,7 +76,8 @@ export function nameInitials(name: string): string {
 /**
  * A person's initials in a 20px circle, or an empty dashed circle when there
  * is nobody (issues-list §3.7, machine-views §5.9). The image is named
- * `label`. Names only, never email addresses (CORE-SEC-007).
+ * `label`. It draws above the row link, so its tooltip shows; a click on it
+ * opens nothing. Names only, never email addresses (CORE-SEC-007).
  */
 export function InitialsAvatar({
   name,
@@ -90,6 +94,7 @@ export function InitialsAvatar({
       aria-label={label}
       title={label}
       className={cn(
+        LIST_ROW_RAISED,
         "inline-flex size-5 shrink-0 items-center justify-center rounded-full text-[9px] leading-none font-bold",
         name === null
           ? "border border-dashed border-muted-foreground/60"

@@ -210,6 +210,18 @@ describe("Issue rows", () => {
     expect(row.getAllByRole("link")).toHaveLength(2);
   });
 
+  it("raises the status dot and assignee avatar above the row link, so their tooltips show", () => {
+    renderRows([makeIssue()]);
+    const row = within(screen.getByRole("listitem"));
+
+    const dot = row.getByTestId("issue-status-dot");
+    expect(dot).toHaveAttribute("title", "Status: In Progress");
+    expect(dot).toHaveClass("relative", "z-[2]");
+    const assignee = row.getByTestId("issue-assignee");
+    expect(assignee).toHaveAttribute("title", "Unassigned");
+    expect(assignee).toHaveClass("relative", "z-[2]");
+  });
+
   it("announces an unassigned issue as Unassigned and an assignee by name and initials", () => {
     renderRows([
       makeIssue({ id: "a" }),
