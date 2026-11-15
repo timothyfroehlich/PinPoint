@@ -291,10 +291,13 @@ async function refreshLocationNames(
     const client = await getPinballMapClient();
     locations = await client.fetchRegionLocations(region);
   } catch (err) {
-    log.warn(
-      { err, region, action: "pinballmap.regionAlerts" },
-      "Region locations lookup failed; using last-known venue names"
-    );
+    // Tolerated: cached names still label events, and an unnamed one waits.
+    reportError(err, {
+      region,
+      action: "pinballmap.regionAlerts",
+      step: "fetchRegionLocations",
+      bestEffort: true,
+    });
     return { names: cached, succeeded: false };
   }
 
@@ -726,10 +729,13 @@ async function resolveMachineNames(
     await refreshCatalog();
     refreshed = await getCatalogNames(machineIds);
   } catch (err) {
-    log.warn(
-      { err, missing, action: "pinballmap.regionAlerts" },
-      "Catalog refresh failed; keeping unnamed alerts pending"
-    );
+    // Tolerated: the unnamed events stay pending until a later refresh.
+    reportError(err, {
+      missing,
+      action: "pinballmap.regionAlerts",
+      step: "refreshCatalog",
+      bestEffort: true,
+    });
     return names;
   }
 
@@ -837,15 +843,13 @@ export async function runRegionMachineAlerts(opts?: {
       observed = await client.fetchRegionLmxes(region);
     } catch (error) {
       if (!(error instanceof RegionPayloadTooLargeError)) throw error;
-      log.error(
-        {
-          region,
-          observedAtLeast: error.observedAtLeast,
-          ceiling: MAX_REGION_ENTRIES,
-          action: "pinballmap.regionAlerts",
-        },
-        "PinballMap region payload is implausibly large; aborting without writing"
-      );
+      reportError(error, {
+        region,
+        observedAtLeast: error.observedAtLeast,
+        ceiling: MAX_REGION_ENTRIES,
+        action: "pinballmap.regionAlerts",
+        step: "fetchRegionLmxes",
+      });
       return noop(region, "implausible_payload", error.observedAtLeast);
     }
     // An empty payload is a bad read (outage, wrong region slug), not "the region
