@@ -21,11 +21,7 @@ export function TagChip({
   return (
     <Link
       href={href}
-      aria-label={`${name}, ${
-        empty
-          ? "no machines"
-          : `${String(machineCount)} ${machineCount === 1 ? "machine" : "machines"}`
-      }`}
+      aria-label={`${name}, ${String(machineCount)} ${machineCount === 1 ? "machine" : "machines"}`}
       className={cn(
         "inline-flex h-9 max-w-full items-center gap-1.5 rounded-full border bg-background px-2.5 text-[13px] font-medium transition-colors hover:border-primary motion-reduce:transition-none md:h-8",
         empty
@@ -33,7 +29,7 @@ export function TagChip({
           : "border-outline-variant text-foreground"
       )}
     >
-      <span className="truncate">{name}</span>
+      <span className="truncate">{name}</span>{" "}
       <span
         aria-hidden="true"
         className="text-xs font-normal tabular-nums text-muted-foreground"

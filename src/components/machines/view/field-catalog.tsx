@@ -178,7 +178,7 @@ export function OpenIssueCount({
   return (
     <Link
       href={machineIssuesHref(row.initials)}
-      aria-label={`View ${issues} for ${row.title}${worstLabel}`}
+      aria-label={`${issues} for ${row.title}${worstLabel}`}
       {...(severity === null
         ? {}
         : { title: `Worst severity: ${severity.label}` })}
@@ -207,10 +207,10 @@ function LastServiced({ row }: { row: MachineViewRow }): React.JSX.Element {
   return (
     <Link
       href={`/m/${row.initials}/maintenance`}
-      aria-label={`View service history for ${row.title}`}
       className="inline-flex rounded-sm text-xs font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <RelativeAge value={row.lastServicedAt} />
+      <span className="sr-only">, service history for {row.title}</span>
     </Link>
   );
 }

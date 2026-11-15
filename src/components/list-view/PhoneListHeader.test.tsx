@@ -252,7 +252,7 @@ describe("PhoneListHeader", () => {
       "Broken games, edited"
     );
     expect(
-      screen.getByRole("button", { name: "Filters, 2 active" })
+      screen.getByRole("button", { name: "2 active filters" })
     ).toBeInTheDocument();
   });
 

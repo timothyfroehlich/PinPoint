@@ -182,8 +182,8 @@ function DefaultToggle({
         aria-pressed={isDefault}
         aria-label={
           isDefault
-            ? `Stop opening ${view.name} by default`
-            : `Open ${view.name} by default`
+            ? `Default: ${view.name}, stop opening by default`
+            : `Make default: ${view.name}`
         }
         onClick={() => run(() => views.actions.setDefault(target))}
         className={cn(

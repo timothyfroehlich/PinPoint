@@ -359,11 +359,12 @@ describe("MachineView", () => {
     });
     const [bottom] = screen.getAllByRole("navigation", { name: "Pagination" });
     if (!bottom) throw new Error("bottom pager missing");
-    expect(
-      within(bottom).getByRole("button", { name: "Page 1" })
-    ).toHaveAttribute("aria-current", "page");
+    expect(within(bottom).getByRole("button", { name: /^1$/ })).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
 
-    await user.click(within(bottom).getByRole("button", { name: "Page 3" }));
+    await user.click(within(bottom).getByRole("button", { name: /^3$/ }));
     expect(navigation.replace).toHaveBeenLastCalledWith("/m?page=3", {
       scroll: false,
     });
@@ -415,10 +416,10 @@ describe("MachineView", () => {
 
   it("lists Segments in spec order and shows the playable figure as the Summary Row (machine-widgets §2.4)", () => {
     renderView();
-    const names = (widget: string): (string | null)[] =>
+    const names = (widget: string): string[] =>
       within(screen.getByRole("region", { name: widget }))
         .getAllByRole("button")
-        .map((button) => button.getAttribute("aria-label"));
+        .map((button) => (button.textContent ?? "").trim());
 
     // Presence leads with On the Floor and has no Removed Segment (§3.2);
     // Playability runs worst first (§4.2). Zero Segments are left out (widgets §5.5).
@@ -999,7 +1000,7 @@ describe("MachineView", () => {
     const dialog = await openManageViews(user);
     await user.click(
       within(dialog).getByRole("button", {
-        name: "Open Service due by default",
+        name: "Make default: Service due",
       })
     );
 
@@ -1201,7 +1202,7 @@ describe("MachineView", () => {
     });
 
     expect(
-      screen.getByRole("button", { name: "Filters, 2 active" })
+      screen.getByRole("button", { name: "2 active filters" })
     ).toBeInTheDocument();
     expect(screen.getByTestId("list-phone-views-trigger")).toHaveAccessibleName(
       "Views"

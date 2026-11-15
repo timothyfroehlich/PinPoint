@@ -204,6 +204,7 @@ export function IssueSectionTabList({
                   data-testid="other-issues-count"
                   aria-hidden="true"
                 >
+                  {" "}
                   {otherIssuesCount}
                 </span>
                 {/* Read as "Other issues, 2 open", not a bare number. */}

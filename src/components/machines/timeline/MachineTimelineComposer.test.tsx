@@ -158,11 +158,14 @@ describe("MachineTimelineComposer", () => {
     expect(screen.getByTestId("toolbar-state")).toHaveTextContent(
       "toolbar-off"
     );
-    const toggle = screen.getByRole("button", { name: /show formatting/i });
+    const toggle = screen.getByRole("button", { name: "Aa Formatting" });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
     await user.click(toggle);
     expect(screen.getByTestId("toolbar-state")).toHaveTextContent("toolbar-on");
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
     // Two-way: pressing again hides it (lossless toggle).
-    await user.click(screen.getByRole("button", { name: /hide formatting/i }));
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByTestId("toolbar-state")).toHaveTextContent(
       "toolbar-off"
     );

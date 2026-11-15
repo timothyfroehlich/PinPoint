@@ -175,7 +175,7 @@ export function LineupPushAction({
       <Slots error={null}>
         <PinballMapLink
           locationUrl={locationUrl}
-          label={`${PUSH_LABEL[tag]}: ${game}, on pinballmap.com`}
+          label={`Open Pinball Map, ${PUSH_LABEL[tag].toLowerCase()}: ${game}`}
         />
       </Slots>
     );
@@ -320,7 +320,7 @@ export function LineupEntryActions({
         ) : (
           <PinballMapLink
             locationUrl={locationUrl}
-            label={`Remove ${game} on pinballmap.com`}
+            label={`Open Pinball Map, ${PUSH_LABEL.to_remove.toLowerCase()}: ${game}`}
           />
         )
       ) : null}

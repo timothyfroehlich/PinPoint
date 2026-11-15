@@ -315,7 +315,7 @@ function TabContent({
   const badge = tab.badge && tab.badge.count > 0 ? tab.badge : undefined;
   return (
     <>
-      <span className={cn(truncate && "min-w-0 truncate")}>{tab.label}</span>
+      <span className={cn(truncate && "min-w-0 truncate")}>{tab.label}</span>{" "}
       {badge && (
         <span
           className={cn(

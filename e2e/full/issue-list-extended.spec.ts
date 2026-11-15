@@ -71,12 +71,12 @@ test.describe("Issue List Features - Extended", () => {
     await expect(row).toBeVisible();
 
     // 1. Test Priority Inline Edit (Low -> High)
-    await row.getByRole("button", { name: "Priority: Low, change" }).click();
+    await row.getByRole("button", { name: "Low, change priority" }).click();
     await page.getByRole("menuitemradio", { name: "High" }).click();
 
     // Verify optimistic update
     await expect(
-      row.getByRole("button", { name: "Priority: High, change" })
+      row.getByRole("button", { name: "High, change priority" })
     ).toBeVisible();
 
     // Verify persistence after reload; the search stays in the URL.
@@ -85,7 +85,7 @@ test.describe("Issue List Features - Extended", () => {
 
     const rowAfterReload = issueRow();
     await expect(
-      rowAfterReload.getByRole("button", { name: "Priority: High, change" })
+      rowAfterReload.getByRole("button", { name: "High, change priority" })
     ).toBeVisible();
 
     // 2. Test Assignee Inline Edit (Unassigned -> Admin)
@@ -192,7 +192,9 @@ test.describe("Issue List Features - Extended", () => {
       issues.getByRole("link", { name: seededIssue("TAF").title })
     ).toBeVisible();
     await expect(
-      issues.getByRole("button", { name: /^Severity: (?!Major,)/ })
+      issues.getByRole("button", {
+        name: /^(?!Major, change severity).*, change severity$/,
+      })
     ).toHaveCount(0);
   });
 

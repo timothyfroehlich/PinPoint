@@ -462,7 +462,9 @@ describe("IssueView", () => {
       }),
     });
 
-    await user.click(screen.getByRole("button", { name: /^Filters/ }));
+    await user.click(
+      screen.getByRole("button", { name: /^(?:Filters|\d+ active filters?)$/ })
+    );
     await user.click(await screen.findByRole("button", { name: "Reset all" }));
     expect(navigation.replace).toHaveBeenLastCalledWith(
       "/issues?q=gate&sort=created&dir=asc",

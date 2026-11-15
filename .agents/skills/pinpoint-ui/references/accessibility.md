@@ -36,7 +36,22 @@ For **disabled controls** that need a "why disabled" explanation, the tooltip-on
 
 Icon-only buttons need an `aria-label`, and the decorative icon inside gets `aria-hidden="true"` so AT reads the label rather than the glyph.
 
-The judgement call worth stating: **on an editable cell, name the field, not just its current value.** `aria-label="Open"` tells a screen-reader user what the value is; `aria-label="Status: Open — change status"` tells them what the control does and which field it belongs to. A trigger whose accessible name is only its value is indistinguishable from a label.
+### Accessible name starts with the visible text (CORE-A11Y-007)
+
+A control that shows text has an accessible name that **starts with that text**, word for word and in the same order; extra context goes after it. Voice-control users say what they see ("click Major"), and axe's `label-content-name-mismatch` rule, which `assertNoA11yViolations` enforces, fails a name that does not contain the visible words. So an editable status pill showing "Major" is `aria-label="Major, change severity"`, not `"Severity: Major, change"`.
+
+Choose the fix in this order:
+
+1. **Drop the `aria-label`** when the visible text is already a good name.
+2. **Build the label from the variables that render the text**, then append context: `aria-label={`${issues} for ${row.title}`}` where the link shows `{count} open`. The two cannot drift.
+3. **Keep the visible text as the name** and put context in visually hidden text after it (`<RelativeAge/><span className="sr-only">, service history for {title}</span>`) or in `aria-describedby`.
+
+What trips the check, and why it is easy to miss:
+
+- **Axe joins sibling elements with no space.** `<span>9</span><span>On the Floor</span>` is visible text "9On the Floor", so even `aria-label="9 On the Floor"` fails. Inside a flex or inline-flex container, put `{" "}` between the siblings: whitespace between flex items is not rendered, so nothing visible changes, and both axe and screen readers then read separate words. Outside a flex container a space would render; restructure instead.
+- **`aria-hidden` text still counts** as visible text (it is on screen); `sr-only` text does not.
+- **Combobox triggers are exempt** (Radix `SelectTrigger`, `role="combobox"` buttons), as are icon-only controls, which keep their `aria-label`.
+- Text hidden at a breakpoint (`max-md:hidden`) is checked only where it shows.
 
 ### Label-to-control association (especially Radix `<Select>`)
 

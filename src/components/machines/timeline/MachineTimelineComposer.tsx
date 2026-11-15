@@ -138,13 +138,13 @@ export function MachineTimelineComposer({
           pressed={fullMode}
           onPressedChange={setFullMode}
           disabled={pending}
-          aria-label={fullMode ? "Hide formatting" : "Show formatting"}
+          aria-label="Aa Formatting"
           title={fullMode ? "Hide formatting" : "Show formatting"}
           className="gap-1.5 text-muted-foreground data-[state=on]:text-foreground"
         >
           <span className="text-base font-semibold leading-none tracking-tight">
             Aa
-          </span>
+          </span>{" "}
           {/* Bare "Aa" in a narrow composer (iOS-style); the word appears
               once the composer card is wide enough (e.g. the centered desktop
               sheet) so it reads more explicitly. Container query, not viewport

@@ -253,7 +253,7 @@ function FieldPill({
       trigger={
         <button
           type="button"
-          aria-label={`${name}: ${label}, change`}
+          aria-label={`${label}, change ${name.toLowerCase()}`}
           className={cn(
             "group/pill inline-flex cursor-pointer rounded-full align-middle focus-visible:outline-none disabled:cursor-not-allowed",
             // 24px pill → 44px tall; its width already exceeds 44px.
@@ -332,6 +332,12 @@ function AssigneeControl({
   className: string;
 }): React.JSX.Element {
   const who = name === null ? "Unassigned" : `Assigned to ${name}`;
+  // The avatar shows these initials as visible text, so the name starts with them.
+  const avatarInitials = name === null ? "" : nameInitials(name);
+  const changeName =
+    avatarInitials === ""
+      ? `${who}, change assignee`
+      : `${avatarInitials}, ${who}, change assignee`;
   const avatar = (
     <AssigneeAvatar
       name={name}
@@ -368,7 +374,7 @@ function AssigneeControl({
       trigger={
         <button
           type="button"
-          aria-label={`${who}, change assignee`}
+          aria-label={changeName}
           title={who}
           className={cn(
             "inline-flex items-center justify-center rounded-full",

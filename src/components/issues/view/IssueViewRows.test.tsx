@@ -167,8 +167,8 @@ describe("Issue row editing permissions (issues-list §3.5)", () => {
     const row = within(screen.getByRole("listitem"));
     return [
       ["Status", /^Status: .*, change$/],
-      ["Severity", /^Severity: .*, change$/],
-      ["Priority", /^Priority: .*, change$/],
+      ["Severity", /^.+, change severity$/],
+      ["Priority", /^.+, change priority$/],
       ["Assignee", /, change assignee$/],
     ]
       .filter(([, name]) => row.queryAllByRole("button", { name }).length > 0)
@@ -230,7 +230,7 @@ describe("Issue row editing permissions (issues-list §3.5)", () => {
     });
 
     await user.click(
-      screen.getByRole("button", { name: "Priority: Low, change" })
+      screen.getByRole("button", { name: "Low, change priority" })
     );
     await user.click(screen.getByRole("menuitemradio", { name: "High" }));
 
@@ -240,7 +240,7 @@ describe("Issue row editing permissions (issues-list §3.5)", () => {
     expect(formData.get("issueId")).toBe("issue-1");
     expect(formData.get("priority")).toBe("high");
     expect(
-      await screen.findByRole("button", { name: "Priority: High, change" })
+      await screen.findByRole("button", { name: "High, change priority" })
     ).toBeInTheDocument();
   });
 });

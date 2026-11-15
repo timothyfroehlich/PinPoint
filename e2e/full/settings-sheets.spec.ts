@@ -147,7 +147,7 @@ test.describe("Print settings sheets", () => {
     page,
   }) => {
     await page.goto("/c/tags/location/front-room");
-    await page.getByRole("link", { name: "Print settings sheets" }).click();
+    await page.getByRole("link", { name: "Settings sheets" }).click();
     await expect(page).toHaveURL(/\/m\/settings-sheets/);
     const run = page.getByRole("region", { name: "In this print run" });
     // Front room's seeded machines: Attack from Mars and others On the Floor,
