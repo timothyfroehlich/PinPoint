@@ -307,8 +307,12 @@ function IssueRowDetails({
           },
         })
       : new Set(dropOrder);
+  // A dropped part is `sr-only`: a 1px clipped box, but its contents keep
+  // their full width inside it. Left at its static position in the
+  // right-anchored group, that content would run past the row's right edge,
+  // so `left-0` pins the box to the row's start.
   const partClass = (part: DroppablePart): string =>
-    shown.has(part) ? "flex shrink-0" : "sr-only";
+    shown.has(part) ? "flex shrink-0" : "sr-only left-0";
   // The right group keeps its 12px lead only while it shows something.
   const rightGroupShows = TRAILING_PARTS.some((part) => shown.has(part));
 
