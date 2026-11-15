@@ -8,11 +8,19 @@ on:
     branches:
       - main
       - claude/**
+  # The merge queue's run: main plus every PR ahead in the queue plus this one,
+  # tested together before any of them lands. CI Gate is required here too, so
+  # the jobs a PR runs (path filter included) run again on the combined commit;
+  # the filter diffs the whole group against main (merge_group.base_sha).
+  merge_group:
+    types: [checks_requested]
 
 permissions: read-all  # zizmor: ignore[excessive-permissions]
 
 # PR runs: a new push cancels the run in progress. Main runs: one at a time,
-# never cancelled mid-run.
+# never cancelled mid-run. Merge-queue runs each get their own ref
+# (gh-readonly-queue/main/pr-<n>-<sha>), so they never share a group and are
+# never cancelled here; the queue itself discards a group it no longer needs.
 #
 # A PR push supersedes the one before it — same branch, same question, and the
 # older answer is worthless — so cancelling saves runners with nothing lost.
@@ -81,9 +89,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
         with:
           persist-credentials: false
-          # Push runs diff back past `before` (next step); PR runs use the API.
-          # Strings, because a bare 0 is falsy in an expression.
-          fetch-depth: ${{ github.event_name == 'push' && '0' || '1' }}
+          # Push runs diff back past `before` (next step) and merge-queue runs
+          # diff the group against merge_group.base_sha, both with git; PR runs
+          # use the API. Strings, because a bare 0 is falsy in an expression.
+          fetch-depth: ${{ github.event_name != 'pull_request' && '0' || '1' }}
 
       # Main runs one at a time and a newer merge cancels the waiting run (see
       # the concurrency block), so this push's `before` can skip merges whose
@@ -387,7 +396,7 @@ jobs:
       - name: Run pnpm audit
         if: ${{ !cancelled() && needs.changes.outputs.deps == 'true' }}
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
         run: |
           # Writes "<id> <package>: <title>" per high/critical advisory in the
           # lockfile at $1 to $RUNNER_TEMP/$2.ids; fails when there is no report.
@@ -459,7 +468,9 @@ jobs:
   test-e2e-smoke:
     name: E2E Smoke Tests (Chromium, Mobile Chrome)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'pull_request' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
+    if: >-
+      ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group')
+      && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
     needs: changes
     timeout-minutes: 20
     steps:
@@ -521,7 +532,9 @@ jobs:
   test-e2e-full-chromium:
     name: E2E Full Tests (Chromium), Supabase integration
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'pull_request' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
+    if: >-
+      ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group')
+      && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
     needs: changes
     timeout-minutes: 20
     steps:
@@ -796,7 +809,10 @@ jobs:
   #
   # Fails if any job it needs failed or was cancelled; `skipped` passes.
   #   - Path-filtered jobs skip on docs-only PRs, and test-e2e-comprehensive
-  #     skips on pull_request events, so `skipped` must pass.
+  #     skips on pull_request and merge_group events, so `skipped` must pass.
+  #     Because a skip passes, every job a PR runs must also be allowed to run
+  #     on merge_group; an event check that leaves merge_group out would make
+  #     the queue's verdict a silent pass.
   #   - `cancelled` fails because a job that hits its timeout-minutes reports
   #     `cancelled` — a hung E2E run must not leave the gate green (PP-jxhy).
   #   - `changes` is listed so a failure there, which skips the jobs that
