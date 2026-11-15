@@ -1142,7 +1142,10 @@ def test_pr_e2e_jobs_unsharded_and_browser_cache_wiring() -> None:
         full.index("--config=playwright.config.full.ts --project=chromium"),
     ]
     assert order == sorted(order)
-    assert "if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}" in full
+    assert (
+        full.count("if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}")
+        == 2
+    )
 
     # The merged-away jobs stay merged, and main still checks migrations.
     for removed in (

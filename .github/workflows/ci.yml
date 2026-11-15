@@ -564,12 +564,13 @@ jobs:
       - name: Verify migration metadata integrity
         run: pnpm run check:migrations
 
+      # This step and the next run whenever Supabase is up, even after an
+      # earlier check failed, so one red step never hides another verdict.
       # Runs test:ensure-schema first, so a stale test schema fails here.
       - name: Run Supabase integration tests
+        if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
         run: pnpm run test:integration:supabase
 
-      # Runs even when the integration tests failed, so one red step never
-      # hides the other suite's verdict.
       - name: Run Full Tests (Chromium)
         if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
         env:
