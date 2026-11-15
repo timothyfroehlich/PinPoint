@@ -82,6 +82,7 @@
 - **5.12** At every width the whole machine row is a link to the machine. The open-issue count keeps its own link to the machine's issues (5.6), and the Last Serviced age is plain text.
 - **5.13** A machine row's fields are fixed: the Playability dot and label, name, initials, open-issue count, manufacturer, year, owner avatar, and Last Serviced age. No other field appears on the row, and Machine View has no columns, column headers, or choice of displayed fields; View options holds page size only (list-views §5.6).
 - **5.14** Machine rows and issue rows share one row structure (list-views §6.4): a leading dot column, then line 1, then line 2 starting past the dot, with a left group and a group anchored to the right end of the line. On a machine row the left group is the Playability label, manufacturer, year, and owner avatar, and the right group is the Last Serviced age.
+- **5.15** While the list is sorted by Date Added, the right end of a machine row's second line shows how long ago the machine was added (for example “added 3d ago”) in place of the Last Serviced age, so the order is visible.
 
 ---
 
@@ -146,6 +147,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-11-15 | While sorted by Date Added, a machine row shows its added age in place of the Last Serviced age (§5.15). |
 | 2026-11-15 | Machine View drops its table at every width: one two-line machine row on `/m` and every Collection and Tag Machines tab (§5.3), with fixed fields (§5.13) on the row structure issue rows share (§5.14); retired the desktop table, phone Table mode, and column headers (§5.2, §5.4, §5.5), the Display Mode and Displayed Field concepts (§1), and default fields (§4.6); presets set no fields (§2.3); sorting only in the sort control (§3.14); `columns` leaves the URL and old URLs ignore it (§4.1); the whole row links at every width and Last Serviced never links (§5.7, §5.12); Compact qualifiers dropped (§3.2, §5.9–§5.11); health and service data always load, activity only for its sort or Export (§3.1, §3.4, §3.6, §3.7, §3.16); Recently added no longer adds Date Added (§9.1). |
 | 2026-11-15 | A Compact row's second line starts under the machine name, past the Playability dot, and has no separator dot before the owner avatar (§5.9). |
 | 2026-10-13 | `/m`'s ⋯ holds Export (§6.7). |
