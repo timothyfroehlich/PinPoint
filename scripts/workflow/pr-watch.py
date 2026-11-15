@@ -47,7 +47,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from gh_cli import run_gh  # noqa: E402
 
-REPO_OWNER = "timothyfroehlich"
+REPO_OWNER = "minamaya"
 REPO_NAME = "PinPoint"
 CI_GATE_NAME = "CI Gate"
 CLAUDE_REVIEW_NAME = "Claude Review"
