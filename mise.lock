@@ -170,98 +170,98 @@ url = "https://github.com/astral-sh/python-build-standalone/releases/download/20
 provenance = "github-attestations"
 
 [[tools.ruff]]
-version = "0.17.1"
+version = "0.17.3"
 backend = "aqua:astral-sh/ruff"
-specifiers = ["0.17.1"]
+specifiers = ["0.17.3"]
 
 [tools.ruff."platforms.linux-arm64"]
-checksum = "sha256:d3ead1f0ed779e777a034ccd9286be6bd9bd3cdaba732ff9797f8288a283e9e2"
-url = "https://github.com/astral-sh/ruff/releases/download/0.17.1/ruff-aarch64-unknown-linux-gnu.tar.gz"
-url_api = "https://api.github.com/repos/astral-sh/ruff/releases/assets/644283344"
+checksum = "sha256:3f4639152c0e42bb5938e6c23d53d527a38f3133e000102934518f90529fa299"
+url = "https://github.com/astral-sh/ruff/releases/download/0.17.3/ruff-aarch64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/astral-sh/ruff/releases/assets/679956412"
 provenance = "github-attestations"
 
 [tools.ruff."platforms.linux-arm64-musl"]
-checksum = "sha256:255404ccf2f7950ff6aad8858321a6f416fe2a840ae4e37dfb4c21cb8774f325"
-url = "https://github.com/astral-sh/ruff/releases/download/0.17.1/ruff-aarch64-unknown-linux-musl.tar.gz"
-url_api = "https://api.github.com/repos/astral-sh/ruff/releases/assets/644283356"
+checksum = "sha256:650d5991fea0baf8a5ee17672a3b20c45ac238ac85fa09077d66ef0cec31cdcf"
+url = "https://github.com/astral-sh/ruff/releases/download/0.17.3/ruff-aarch64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/astral-sh/ruff/releases/assets/679956417"
 provenance = "github-attestations"
 
 [tools.ruff."platforms.linux-x64"]
-checksum = "sha256:a293ac937715ae6fb6b64da86761598379e6149f40fbc00fde9ba8a2a562ac65"
-url = "https://github.com/astral-sh/ruff/releases/download/0.17.1/ruff-x86_64-unknown-linux-gnu.tar.gz"
-url_api = "https://api.github.com/repos/astral-sh/ruff/releases/assets/644283613"
+checksum = "sha256:2b0890f5a55900af741f133918c2656919bbf18c2ab7741b4ca8403a90e647a9"
+url = "https://github.com/astral-sh/ruff/releases/download/0.17.3/ruff-x86_64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/astral-sh/ruff/releases/assets/679956535"
 provenance = "github-attestations"
 
 [tools.ruff."platforms.linux-x64-musl"]
-checksum = "sha256:2d9878b5e6a3d0dedadbfc01a64bfe54e72f560adbfd235937cd29e1fc9238e3"
-url = "https://github.com/astral-sh/ruff/releases/download/0.17.1/ruff-x86_64-unknown-linux-musl.tar.gz"
-url_api = "https://api.github.com/repos/astral-sh/ruff/releases/assets/644283622"
+checksum = "sha256:85e76bbb60e708a22624b31efb227e8bdaa6978177b93c146d352de4caf37ba1"
+url = "https://github.com/astral-sh/ruff/releases/download/0.17.3/ruff-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/astral-sh/ruff/releases/assets/679956563"
 provenance = "github-attestations"
 
 [tools.ruff."platforms.macos-arm64"]
-checksum = "sha256:1c8e6e36538eaa0b996378a20c226403c4ca6369ac24884751b024d3a9530b86"
-url = "https://github.com/astral-sh/ruff/releases/download/0.17.1/ruff-aarch64-apple-darwin.tar.gz"
-url_api = "https://api.github.com/repos/astral-sh/ruff/releases/assets/644283324"
+checksum = "sha256:118f7121aa838785672bf612487f755a89108bb5f44e0f3df96c5967a72614f9"
+url = "https://github.com/astral-sh/ruff/releases/download/0.17.3/ruff-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/astral-sh/ruff/releases/assets/679956403"
 provenance = "github-attestations"
 
 [tools.ruff."platforms.macos-x64"]
-checksum = "sha256:88ee16f88dba9d440e06375f46898ec85baf578042ad086764d5a33558bb6e17"
-url = "https://github.com/astral-sh/ruff/releases/download/0.17.1/ruff-x86_64-apple-darwin.tar.gz"
-url_api = "https://api.github.com/repos/astral-sh/ruff/releases/assets/644283566"
+checksum = "sha256:17f95b1bee24d70de62ffe5beec7f71bb541c7e3d147a1c3d84f7cd6525f6fdf"
+url = "https://github.com/astral-sh/ruff/releases/download/0.17.3/ruff-x86_64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/astral-sh/ruff/releases/assets/679956517"
 provenance = "github-attestations"
 
 [tools.ruff."platforms.windows-x64"]
-checksum = "sha256:a841fb7e59680508b9394bfea32e369b3907cc6620a491c65d8d1f479498db82"
-url = "https://github.com/astral-sh/ruff/releases/download/0.17.1/ruff-x86_64-pc-windows-msvc.zip"
-url_api = "https://api.github.com/repos/astral-sh/ruff/releases/assets/644283579"
+checksum = "sha256:a84d9ac74af8ef5bac84a1888a1634df18e6e985e2f930d35c052beacd00e813"
+url = "https://github.com/astral-sh/ruff/releases/download/0.17.3/ruff-x86_64-pc-windows-msvc.zip"
+url_api = "https://api.github.com/repos/astral-sh/ruff/releases/assets/679956524"
 provenance = "github-attestations"
 
 [[tools.supabase]]
-version = "2.122.0"
+version = "2.122.1"
 backend = "aqua:supabase/cli"
-specifiers = ["2.122.0"]
+specifiers = ["2.122.1"]
 
 [tools.supabase."platforms.linux-arm64"]
-checksum = "sha256:8980b46044aba0863f26a1b4134a498d2c74df0dadf24289bb4faa86729511cc"
+checksum = "sha256:f672614c2cb876b37d63a28d9ab4442406cdcae9843e15ddc7a4a1538785b30f"
 checksum_source = "mise-versions"
-url = "https://github.com/supabase/cli/releases/download/v2.122.0/supabase_linux_arm64.tar.gz"
-url_api = "https://api.github.com/repos/supabase/cli/releases/assets/668850044"
+url = "https://github.com/supabase/cli/releases/download/v2.122.1/supabase_linux_arm64.tar.gz"
+url_api = "https://api.github.com/repos/supabase/cli/releases/assets/701808386"
 
 [tools.supabase."platforms.linux-arm64-musl"]
-checksum = "sha256:8980b46044aba0863f26a1b4134a498d2c74df0dadf24289bb4faa86729511cc"
+checksum = "sha256:f672614c2cb876b37d63a28d9ab4442406cdcae9843e15ddc7a4a1538785b30f"
 checksum_source = "mise-versions"
-url = "https://github.com/supabase/cli/releases/download/v2.122.0/supabase_linux_arm64.tar.gz"
-url_api = "https://api.github.com/repos/supabase/cli/releases/assets/668850044"
+url = "https://github.com/supabase/cli/releases/download/v2.122.1/supabase_linux_arm64.tar.gz"
+url_api = "https://api.github.com/repos/supabase/cli/releases/assets/701808386"
 
 [tools.supabase."platforms.linux-x64"]
-checksum = "sha256:59ed066847b98d7461c60e9109d40cab6b9756177ce06ebb05b51338519f5136"
+checksum = "sha256:3e54b98e5ead7be0a3b0753526833d4cc9a55304e4d57da0d72f1efc342738ea"
 checksum_source = "mise-versions"
-url = "https://github.com/supabase/cli/releases/download/v2.122.0/supabase_linux_amd64.tar.gz"
-url_api = "https://api.github.com/repos/supabase/cli/releases/assets/668850237"
+url = "https://github.com/supabase/cli/releases/download/v2.122.1/supabase_linux_amd64.tar.gz"
+url_api = "https://api.github.com/repos/supabase/cli/releases/assets/701808587"
 
 [tools.supabase."platforms.linux-x64-musl"]
-checksum = "sha256:59ed066847b98d7461c60e9109d40cab6b9756177ce06ebb05b51338519f5136"
+checksum = "sha256:3e54b98e5ead7be0a3b0753526833d4cc9a55304e4d57da0d72f1efc342738ea"
 checksum_source = "mise-versions"
-url = "https://github.com/supabase/cli/releases/download/v2.122.0/supabase_linux_amd64.tar.gz"
-url_api = "https://api.github.com/repos/supabase/cli/releases/assets/668850237"
+url = "https://github.com/supabase/cli/releases/download/v2.122.1/supabase_linux_amd64.tar.gz"
+url_api = "https://api.github.com/repos/supabase/cli/releases/assets/701808587"
 
 [tools.supabase."platforms.macos-arm64"]
-checksum = "sha256:fe87a5f9781d5423dbd5ebba2d5a6e1a541d01754d14941c574952e5695eaab0"
+checksum = "sha256:e97582f76237d1dd4cb27f5051e8a98587733f98837d43d74d2e3330436d7c79"
 checksum_source = "mise-versions"
-url = "https://github.com/supabase/cli/releases/download/v2.122.0/supabase_darwin_arm64.tar.gz"
-url_api = "https://api.github.com/repos/supabase/cli/releases/assets/668849778"
+url = "https://github.com/supabase/cli/releases/download/v2.122.1/supabase_darwin_arm64.tar.gz"
+url_api = "https://api.github.com/repos/supabase/cli/releases/assets/701807993"
 
 [tools.supabase."platforms.macos-x64"]
-checksum = "sha256:8be7d5bb00091e67618d12fb0a4a1bb10624c69435ecd5b9b95d91d571cc34d8"
+checksum = "sha256:7f66e9752148698def07ff784f804ee9e0cf1926da4894c5fd646790f07aeeeb"
 checksum_source = "mise-versions"
-url = "https://github.com/supabase/cli/releases/download/v2.122.0/supabase_darwin_amd64.tar.gz"
-url_api = "https://api.github.com/repos/supabase/cli/releases/assets/668849898"
+url = "https://github.com/supabase/cli/releases/download/v2.122.1/supabase_darwin_amd64.tar.gz"
+url_api = "https://api.github.com/repos/supabase/cli/releases/assets/701808204"
 
 [tools.supabase."platforms.windows-x64"]
-checksum = "sha256:f891d9bb641f7fa28fd9c61ea0f31be4964254bc84be9ff66f2376b6aaa7a9ed"
+checksum = "sha256:6e32eab587815e90d892f4c85b152be153db122fe94f6aee2f6b3d9bea827e56"
 checksum_source = "mise-versions"
-url = "https://github.com/supabase/cli/releases/download/v2.122.0/supabase_windows_amd64.tar.gz"
-url_api = "https://api.github.com/repos/supabase/cli/releases/assets/668850578"
+url = "https://github.com/supabase/cli/releases/download/v2.122.1/supabase_windows_amd64.tar.gz"
+url_api = "https://api.github.com/repos/supabase/cli/releases/assets/701808962"
 
 [[tools.zizmor]]
 version = "1.30.1"
