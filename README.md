@@ -1,6 +1,6 @@
 # PinPoint: Issue Tracking for Pinball Collectives
 
-[![CI](https://github.com/timothyfroehlich/PinPoint/actions/workflows/ci.yml/badge.svg)](https://github.com/timothyfroehlich/PinPoint/actions/workflows/ci.yml)
+[![CI](https://github.com/minamaya/PinPoint/actions/workflows/ci.yml/badge.svg)](https://github.com/minamaya/PinPoint/actions/workflows/ci.yml)
 
 PinPoint is an issue tracker built for the **Austin Pinball Collective**.
 It helps keep games playable by making it easy to report problems, see what’s broken, and coordinate repairs.
@@ -106,7 +106,7 @@ migrations remain with their existing owners.
 ### Local Setup (Short Version)
 
 ```bash
-git clone https://github.com/timothyfroehlich/PinPoint.git
+git clone https://github.com/minamaya/PinPoint.git
 cd PinPoint
 
 mise install --locked           # installs pinned Node, Python, Ruff, Supabase CLI, and pnpm
