@@ -374,11 +374,12 @@ def test_dependency_updates_trigger_deps_filter(
     assert has_deps, f"Dependency file {file_path} was not flagged as deps=True"
 
 
-def test_setup_job_gates_on_code_or_deps(ci_workflow: dict) -> None:
-    """The setup job must gate on both code and deps."""
-    setup_if = ci_workflow["jobs"]["setup"]["if"]
-    assert "needs.changes.outputs.code == 'true'" in setup_if
-    assert "needs.changes.outputs.deps == 'true'" in setup_if
+def test_integration_job_gates_on_code_or_deps(ci_workflow: dict) -> None:
+    """Integration (which also runs pnpm audit) gates on code or deps, on every event."""
+    integration_if = ci_workflow["jobs"]["test-integration"]["if"]
+    assert "needs.changes.outputs.code == 'true'" in integration_if
+    assert "needs.changes.outputs.deps == 'true'" in integration_if
+    assert "event_name" not in integration_if
 
 
 def test_push_change_detection_reaches_back_to_the_last_passing_main_run(

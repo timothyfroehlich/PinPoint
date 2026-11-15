@@ -562,7 +562,7 @@ def test_empty_test_list_is_not_green(tmp_path: Path) -> None:
 
 def _comprehensive_job() -> str:
     ci = _ci_yml()
-    return ci.split("\n  test-e2e-comprehensive:\n", 1)[1].split("\n  gitleaks:", 1)[0]
+    return ci.split("\n  test-e2e-comprehensive:\n", 1)[1].split("\n  ci-gate:", 1)[0]
 
 
 def _step(job: str, name_prefix: str) -> str:
@@ -684,7 +684,7 @@ def test_job_timeout_exceeds_the_sum_of_step_budgets() -> None:
     that lands on main misses it and pays a full install.
     """
     ci = _ci_yml()
-    job = ci.split("test-e2e-comprehensive:", 1)[1].split("\n  gitleaks:", 1)[0]
+    job = ci.split("test-e2e-comprehensive:", 1)[1].split("\n  ci-gate:", 1)[0]
     job_timeout = int(
         next(
             line.split("timeout-minutes:")[1]
@@ -718,18 +718,12 @@ def test_ci_gate_fails_on_cancelled_or_failed_jobs() -> None:
     # e.g. - test-integration does not pass vacuously by matching - test-integration-supabase.
     for job in (
         "changes",
-        "setup",
         "static",
         "linters",
-        "gitleaks",
         "test-integration",
-        "test-migrations",
-        "test-integration-supabase",
         "test-e2e-smoke",
-        "test-e2e-smoke-mobile-chrome",
         "test-e2e-full-chromium",
         "test-e2e-comprehensive",
-        "pnpm-audit",
     ):
         assert re.search(rf"^\s+- {re.escape(job)}$", needs_block, re.M), (
             f"ci-gate must declare need: {job}"

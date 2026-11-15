@@ -999,21 +999,14 @@ def test_ci_jobs_share_runtime_aware_dependency_cache() -> None:
     """Producer and consumers must agree on the composite action's cache key."""
     workflow = CI_WORKFLOW_PATH.read_text(encoding="utf-8")
     dependency_jobs = (
-        "setup",
         "static",
         "test-integration",
-        "test-migrations",
-        "test-integration-supabase",
         "test-e2e-smoke",
-        "test-e2e-smoke-mobile-chrome",
         "test-e2e-full-chromium",
         "test-e2e-comprehensive",
     )
     supabase_jobs = {
-        "test-migrations",
-        "test-integration-supabase",
         "test-e2e-smoke",
-        "test-e2e-smoke-mobile-chrome",
         "test-e2e-full-chromium",
         "test-e2e-comprehensive",
     }
@@ -1116,27 +1109,58 @@ def test_offline_python_and_ruff_resolution() -> None:
     )
 
 
-def test_pr_e2e_shards_and_browser_cache_wiring() -> None:
-    """PR E2E jobs shard by the matrix and never save the shared browser cache.
+def test_pr_e2e_jobs_unsharded_and_browser_cache_wiring() -> None:
+    """PR E2E is two unsharded jobs that never save the shared browser cache.
 
-    A `--shard` denominator out of step with the matrix silently drops tests,
-    a shared artifact name makes the shards' uploads collide, and a PR-scoped
-    browser save would spread one cache entry per PR. Only main's comprehensive
-    job saves. (PP-yva7.2, PP-yva7.4.)
+    Each E2E job pays ~130s of setup and build before its first test, so a
+    shard costs a runner slot and that 130s again for under two minutes of
+    tests; under the account's 20-job cap the queueing costs more than the
+    split saves (PP-bg1u). Smoke runs both projects in one process; Full also
+    carries the Supabase integration tests and the migration metadata check,
+    which used to be jobs of their own. A PR-scoped browser save would spread
+    one cache entry per PR; only main's comprehensive job saves (PP-yva7.4).
     """
     workflow = CI_WORKFLOW_PATH.read_text(encoding="utf-8")
-    for job_name in (
-        "test-e2e-smoke",
-        "test-e2e-smoke-mobile-chrome",
-        "test-e2e-full-chromium",
-    ):
-        job = _workflow_job_block(workflow, job_name)
-        assert "fail-fast: false" in job, job_name
-        assert "SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}" in job, job_name
-        assert '--shard="$SHARD"' in job, job_name
-        assert "-shard-${{ matrix.shard }}" in job, f"{job_name} artifact name"
+    smoke = _workflow_job_block(workflow, "test-e2e-smoke")
+    full = _workflow_job_block(workflow, "test-e2e-full-chromium")
+    for job_name, job in (("test-e2e-smoke", smoke), ("test-e2e-full-chromium", full)):
+        assert "matrix" not in job, f"{job_name} must not shard"
+        assert "--shard" not in job, f"{job_name} must not shard"
         assert "uses: $/.github/actions/setup-playwright" in job, job_name
         assert "save-cache" not in job, f"{job_name} must not save the browser cache"
+
+    assert '--project=chromium --project="Mobile Chrome"' in smoke
+    assert "name: playwright-report-smoke\n" in smoke
+    assert "name: playwright-report-full-chromium\n" in full
+
+    # Full runs every check the removed Supabase jobs ran, after Supabase is
+    # up, and runs E2E even when an earlier check is red.
+    order = [
+        full.index("uses: $/.github/actions/setup-supabase"),
+        full.index("run: pnpm run check:migrations"),
+        full.index("run: pnpm run test:integration:supabase"),
+        full.index("--config=playwright.config.full.ts --project=chromium"),
+    ]
+    assert order == sorted(order)
+    assert (
+        full.count("if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}")
+        == 2
+    )
+
+    # The merged-away jobs stay merged, and main still checks migrations.
+    for removed in (
+        "setup",
+        "gitleaks",
+        "pnpm-audit",
+        "test-migrations",
+        "test-integration-supabase",
+        "test-e2e-smoke-mobile-chrome",
+    ):
+        assert f"\n  {removed}:\n" not in workflow, (
+            f"{removed} is folded into another job"
+        )
+    assert "uses: gitleaks/gitleaks-action@" in _workflow_job_block(workflow, "linters")
+    assert "- name: Run pnpm audit" in _workflow_job_block(workflow, "test-integration")
 
     comprehensive = _workflow_job_block(workflow, "test-e2e-comprehensive")
     # One leg saves; six would race to upload the same key.
@@ -1152,3 +1176,5 @@ def test_pr_e2e_shards_and_browser_cache_wiring() -> None:
         in comprehensive
     )
     assert workflow.count("save-cache:") == 1
+    # Main has no PR E2E jobs, so one comprehensive leg checks the migrations.
+    assert "run: pnpm run check:migrations" in comprehensive
