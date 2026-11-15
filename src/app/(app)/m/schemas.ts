@@ -10,10 +10,11 @@ import { VALID_MACHINE_PRESENCE_STATUSES } from "~/lib/machines/presence";
 import { OPDB_DISPLAY_TYPES, OPDB_MACHINE_TYPES } from "~/lib/opdb/types";
 
 /**
- * One hand-entered credit list (designers or artists, PP-wqit.14). The form
- * posts one FormData entry per name, in order. Names are trimmed but never
- * split on punctuation (machine-editing spec 3.5); blank entries are dropped
- * later by `normalizeCreditNames`, which also stores an empty list as null.
+ * One hand-entered credit list (designers, artists, or programmers,
+ * PP-wqit.14). The form posts one FormData entry per name, in order. Names
+ * are trimmed but never split on punctuation (machine-editing spec 3.5);
+ * blank entries are dropped later by `normalizeCreditNames`, which also
+ * stores an empty list as null.
  */
 const creditNamesField = z
   .array(z.string().trim().max(100, "Names must be less than 100 characters"))
@@ -25,8 +26,8 @@ const creditNamesField = z
  * The picker submits `pinballmapMachineId`; the "not on PinballMap" choice
  * submits `pinballmapExcluded` (+ optional reason) and, since PP-3bbr, the
  * hand-entered manual model — `modelName` / `manufacturer` / `year`, and since
- * PP-wqit.14 `type` / `display` / `playerCount` / `designers` / `artists` — for
- * a game the catalog cannot cover.
+ * PP-wqit.14 `type` / `display` / `playerCount` / `designers` / `artists`, and
+ * `programmers` (PP-j6wh) — for a game the catalog cannot cover.
  *
  * **For a LINKED machine model metadata is still not taken from the client** —
  * the server derives it from the catalog mirror. These are read only on
@@ -89,6 +90,7 @@ const pinballmapLinkFields = {
     .optional(),
   designers: creditNamesField,
   artists: creditNamesField,
+  programmers: creditNamesField,
 };
 
 /**

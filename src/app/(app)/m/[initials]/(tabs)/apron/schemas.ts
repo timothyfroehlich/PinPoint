@@ -51,6 +51,7 @@ const savedCardSchema = z.object({
   tipEnabled: z.boolean(),
   designEnabled: z.boolean(),
   artEnabled: z.boolean(),
+  codeEnabled: z.boolean(),
 });
 
 /**

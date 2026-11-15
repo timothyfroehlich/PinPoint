@@ -234,9 +234,10 @@ export const getMachinePinTips = cache(
 );
 
 /**
- * The machine's design and art credits (spec apron-cards 10.1): from the
- * stored OPDB record of its Pinball Map catalog title, or, for an uncataloged
- * machine, from its hand-entered designers and artists. Never contacts OPDB.
+ * The machine's design, art, and code credits (spec apron-cards 10.1): from
+ * the stored OPDB record of its Pinball Map catalog title, or, for an
+ * uncataloged machine, from its hand-entered designers, artists, and
+ * programmers. Never contacts OPDB.
  *
  * A separate lookup rather than part of `getMachineForLayout`: only the Info
  * tab and the apron card read credits, and an alias ID falls back to its
@@ -252,11 +253,12 @@ export function getMachineCredits(machine: {
   pinballmapExcluded: boolean;
   designers: readonly string[] | null;
   artists: readonly string[] | null;
+  programmers: readonly string[] | null;
   pinballmapTitle: { opdbId: string | null } | null;
 }): Promise<MachineCredits> {
   if (machine.pinballmapExcluded) {
     return Promise.resolve(
-      creditsFromNames(machine.designers, machine.artists)
+      creditsFromNames(machine.designers, machine.artists, machine.programmers)
     );
   }
   const opdbId = machine.pinballmapTitle?.opdbId ?? null;
@@ -284,6 +286,7 @@ export async function getMachineApronCards(
       tipEnabled: true,
       designEnabled: true,
       artEnabled: true,
+      codeEnabled: true,
     },
     orderBy: (cards, { asc }) => [asc(cards.createdAt), asc(cards.id)],
   });

@@ -15,17 +15,21 @@ const person = (
 });
 
 describe("creditsFromPeople", () => {
-  it("splits design and art in OPDB's index order", () => {
+  it("splits design, art, and code in OPDB's index order", () => {
     // Funhouse, as OPDB lists it (2026-09-25).
     const credits = creditsFromPeople([
       person("John Youssi", "art", 2),
       person("Larry DeMar", "design", 1),
       person("Pat Lawlor", "design", 0),
       person("Chris Granner", "music", 3),
+      person("Brian Eddy", "software", 5),
+      person("Larry DeMar", "software", 4),
     ]);
+    // OPDB calls the code credit `software`.
     expect(credits).toEqual({
       design: ["Pat Lawlor", "Larry DeMar"],
       art: ["John Youssi"],
+      code: ["Larry DeMar", "Brian Eddy"],
     });
   });
 
@@ -34,7 +38,11 @@ describe("creditsFromPeople", () => {
       person("Doug Watson", "design", 0),
       person("Doug Watson", "art", 1),
     ]);
-    expect(credits).toEqual({ design: ["Doug Watson"], art: ["Doug Watson"] });
+    expect(credits).toEqual({
+      design: ["Doug Watson"],
+      art: ["Doug Watson"],
+      code: [],
+    });
   });
 
   it("drops blank and repeated names within a role", () => {
@@ -53,8 +61,13 @@ describe("creditsFromNames", () => {
     expect(
       creditsFromNames(
         [" Steve Kordek", "Wayne Neyens", "Steve Kordek", ""],
-        null
+        null,
+        ["Larry DeMar ", "", "Larry DeMar"]
       )
-    ).toEqual({ design: ["Steve Kordek", "Wayne Neyens"], art: [] });
+    ).toEqual({
+      design: ["Steve Kordek", "Wayne Neyens"],
+      art: [],
+      code: ["Larry DeMar"],
+    });
   });
 });

@@ -1,10 +1,6 @@
-import {
-  differenceInCalendarDays,
-  formatDistanceToNow,
-  intervalToDuration,
-  isToday,
-  isYesterday,
-} from "date-fns";
+import { formatDistanceToNow, intervalToDuration } from "date-fns";
+
+import { SITE_TIME_ZONE, siteDayOf } from "~/lib/time-zone";
 
 /**
  * Two-tier grouping for the machine timeline (PP-0x98 V2 design):
@@ -45,28 +41,52 @@ function toDate(date: Date | string | number | null | undefined): Date {
 // Module-level formatters. Intl.DateTimeFormat construction is expensive,
 // and these helpers render per-row in list views — hoisting lets every call
 // reuse the same instance.
-const MEDIUM_DATE_FORMATTER = new Intl.DateTimeFormat(undefined, {
+//
+// Every formatter pins the locale and the site time zone (PP-4v3i): the
+// server (UTC on Vercel) and the viewer's browser then print the same text,
+// so client components hydrate without a mismatch and an evening event reads
+// as the day it happened in Austin.
+const MEDIUM_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
   dateStyle: "medium",
+  timeZone: SITE_TIME_ZONE,
 });
-const MEDIUM_DATE_TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
+const MEDIUM_DATE_TIME_FORMATTER = new Intl.DateTimeFormat("en-US", {
   dateStyle: "medium",
   timeStyle: "short",
+  timeZone: SITE_TIME_ZONE,
 });
-// Long weekday: "Monday", "Tuesday", … — used by `formatDayGroup` for dates
-// within the past week. Cheaper than re-allocating per row in long timelines.
-const WEEKDAY_FORMATTER = new Intl.DateTimeFormat(undefined, {
+// "Monday", "Tuesday", … — Tier-1 (day) banner label for 2–6 days back.
+const WEEKDAY_FORMATTER = new Intl.DateTimeFormat("en-US", {
   weekday: "long",
+  timeZone: SITE_TIME_ZONE,
 });
 // "May 2026" — Tier-2 (month) banner label.
-const MONTH_YEAR_FORMATTER = new Intl.DateTimeFormat(undefined, {
+const MONTH_YEAR_FORMATTER = new Intl.DateTimeFormat("en-US", {
   month: "long",
   year: "numeric",
+  timeZone: SITE_TIME_ZONE,
+});
+// "Oct 2026" — a short month and year (profile "Member since").
+const SHORT_MONTH_YEAR_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  year: "numeric",
+  timeZone: SITE_TIME_ZONE,
 });
 // "May 14" — inline date chip on Tier-2 rows.
-const MONTH_DAY_FORMATTER = new Intl.DateTimeFormat(undefined, {
+const MONTH_DAY_FORMATTER = new Intl.DateTimeFormat("en-US", {
   month: "short",
   day: "numeric",
+  timeZone: SITE_TIME_ZONE,
 });
+
+// "Oct 4, 2026" for a calendar day that carries no zone. Formatted at UTC
+// midnight in UTC, so the day prints exactly as written.
+const CALENDAR_DAY_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  dateStyle: "medium",
+  timeZone: "UTC",
+});
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Relative time label: "3 minutes ago", "2 days ago", etc.
@@ -138,7 +158,7 @@ export function formatCompactAgeAgo(
 }
 
 /**
- * Medium date only: "Apr 18, 2026" (locale-aware via Intl).
+ * Medium date only, on the site's calendar: "Apr 18, 2026".
  */
 export function formatDate(date: Date | string | number): string {
   const d = toDate(date);
@@ -146,7 +166,7 @@ export function formatDate(date: Date | string | number): string {
 }
 
 /**
- * Medium date + short time: "Apr 18, 2026, 3:45 PM" (locale-aware via Intl).
+ * Medium date + short time, on the site's clock: "Apr 18, 2026, 3:45 PM".
  */
 export function formatDateTime(date: Date | string | number): string {
   const d = toDate(date);
@@ -154,78 +174,90 @@ export function formatDateTime(date: Date | string | number): string {
 }
 
 /**
- * Day-group heading label for chronological lists. Follows the pattern used
- * by GitHub/Linear/Slack activity feeds: a familiar word for recent days,
- * an absolute date for older history.
- *
- * - Today / Yesterday — for the calendar day match
- * - Day of week (Monday, Tuesday, …) — for 2–6 calendar days back
- * - Absolute medium date — for 7+ days back
- *
- * Uses server-local time. Edge case: a 2026-05-19 23:59 timestamp loaded by
- * a 2026-05-20 00:01 viewer renders as "Yesterday" relative to the server
- * clock, which may be 1h ahead of the viewer. Acceptable for V1.
- *
- * Used standalone by callers that only want the single-tier label. The
- * timeline page uses {@link formatTimelineBucket} for two-tier rollup.
+ * Short month and year, on the site's calendar: "Oct 2026".
  */
-export function formatDayGroup(date: Date | string | number): string {
-  const d = toDate(date);
-  if (isToday(d)) return "Today";
-  if (isYesterday(d)) return "Yesterday";
-  const daysBack = differenceInCalendarDays(new Date(), d);
-  if (daysBack >= 2 && daysBack <= 6) return WEEKDAY_FORMATTER.format(d);
-  return formatDate(d);
+export function formatMonthYear(date: Date | string | number): string {
+  return SHORT_MONTH_YEAR_FORMATTER.format(toDate(date));
 }
 
 /**
- * Two-tier bucket assignment for a single timeline row's timestamp.
+ * A calendar day with no zone attached, as a medium date: "Oct 4, 2026".
  *
- * Returns either a `day` bucket (matches {@link formatDayGroup} for the
- * last 7 days) or a `month` bucket (month-name + year for anything older,
- * with an inline `rowDateLabel` so the row can show its exact date).
+ * Takes `YYYY-MM-DD`, optionally followed by a wall-clock time
+ * ("2026-10-04 21:34:46", as iScored sends its venue-local timestamps), and
+ * prints that day as written — never shifted through a time zone. Returns
+ * null when `value` does not start with a real day.
+ */
+export function formatCalendarDay(value: string): string | null {
+  const match = /^(\d{4}-\d{2}-\d{2})(?:$|[ T])/.exec(value);
+  if (!match) return null;
+  const midnight = new Date(`${match[1]}T00:00:00Z`);
+  if (Number.isNaN(midnight.getTime())) return null;
+  if (midnight.toISOString().slice(0, 10) !== match[1]) return null;
+  return CALENDAR_DAY_FORMATTER.format(midnight);
+}
+
+/**
+ * Whether `date` falls on the site's current calendar day (America/Chicago),
+ * regardless of the server's or browser's own zone.
+ *
+ * `now` is injectable for testing.
+ */
+export function isSiteToday(
+  date: Date | string | number,
+  now: Date | number = new Date()
+): boolean {
+  return siteDayOf(toDate(date)) === siteDayOf(now);
+}
+
+/** Whole site calendar days from `earlier` to `later` (`YYYY-MM-DD` each). */
+function siteDaysBetween(earlier: string, later: string): number {
+  return Math.round(
+    (Date.parse(`${later}T00:00:00Z`) - Date.parse(`${earlier}T00:00:00Z`)) /
+      DAY_MS
+  );
+}
+
+/**
+ * Two-tier bucket assignment for a single timeline row's timestamp, on the
+ * site's calendar (America/Chicago):
+ *
+ * - `day` bucket for the last 7 calendar days: "Today", "Yesterday", then the
+ *   weekday name for 2–6 days back.
+ * - `month` bucket for anything older: month name + year, with an inline
+ *   `rowDateLabel` so the row can show its exact date.
  *
  * The `key` uniquely identifies the bucket within a single render pass —
  * the page's grouping loop starts a new bucket whenever `key` changes.
  * Using `key` rather than `label` is important: two different calendar
  * days can both currently render as `"Tuesday"` if you scroll across a
  * week boundary in a long history, so label-based grouping would collide.
+ *
+ * `now` is injectable for testing.
  */
 export function formatTimelineBucket(
-  date: Date | string | number
+  date: Date | string | number,
+  now: Date | number = new Date()
 ): TimelineBucket {
   const d = toDate(date);
-  if (isToday(d)) {
+  const day = siteDayOf(d);
+  const daysBack = siteDaysBetween(day, siteDayOf(now));
+  if (daysBack >= 0 && daysBack <= 6) {
     return {
-      key: `day-${ymd(d)}`,
-      label: "Today",
-      tier: "day",
-    };
-  }
-  if (isYesterday(d)) {
-    return {
-      key: `day-${ymd(d)}`,
-      label: "Yesterday",
-      tier: "day",
-    };
-  }
-  const daysBack = differenceInCalendarDays(new Date(), d);
-  if (daysBack >= 2 && daysBack <= 6) {
-    return {
-      key: `day-${ymd(d)}`,
-      label: WEEKDAY_FORMATTER.format(d),
+      key: `day-${day}`,
+      label:
+        daysBack === 0
+          ? "Today"
+          : daysBack === 1
+            ? "Yesterday"
+            : WEEKDAY_FORMATTER.format(d),
       tier: "day",
     };
   }
   return {
-    key: `month-${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+    key: `month-${day.slice(0, 7)}`,
     label: MONTH_YEAR_FORMATTER.format(d),
     tier: "month",
     rowDateLabel: MONTH_DAY_FORMATTER.format(d),
   };
-}
-
-/** Server-local YYYY-MM-DD for stable per-calendar-day grouping keys. */
-function ymd(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }

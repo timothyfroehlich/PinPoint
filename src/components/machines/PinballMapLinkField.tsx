@@ -103,6 +103,7 @@ interface PinballMapLinkFieldProps {
   defaultPlayerCount?: number | null;
   defaultDesigners?: readonly string[] | null;
   defaultArtists?: readonly string[] | null;
+  defaultProgrammers?: readonly string[] | null;
   /**
    * What APC calls this cabinet, shown as the Model name field's PLACEHOLDER
    * (spec 2.4). Suggested, never pre-filled: a blank model name already means
@@ -278,6 +279,7 @@ export function PinballMapLinkField({
   defaultPlayerCount = null,
   defaultDesigners = null,
   defaultArtists = null,
+  defaultProgrammers = null,
   machineName = "",
   disabled = false,
   onDirty,
@@ -293,6 +295,7 @@ export function PinballMapLinkField({
   const playerCountId = useId();
   const designersId = useId();
   const artistsId = useId();
+  const programmersId = useId();
   const headingId = useId();
   const sourceLabelId = useId();
 
@@ -335,6 +338,9 @@ export function PinballMapLinkField({
     ...(defaultDesigners ?? []),
   ]);
   const [artists, setArtists] = useState<string[]>([...(defaultArtists ?? [])]);
+  const [programmers, setProgrammers] = useState<string[]>([
+    ...(defaultProgrammers ?? []),
+  ]);
   // Nothing is auto-filled, so anything in these three fields is the user's
   // (spec 2.4). PP-3bbr.2 had to track whether the model name was seeded or
   // typed, because a seeded value would otherwise have fired the overwrite
@@ -348,7 +354,8 @@ export function PinballMapLinkField({
     display !== null ||
     playerCount.trim().length > 0 ||
     designers.length > 0 ||
-    artists.length > 0;
+    artists.length > 0 ||
+    programmers.length > 0;
 
   /**
    * A catalog pick waiting on the "you'll lose what you typed" confirm.
@@ -815,6 +822,24 @@ export function PinballMapLinkField({
                 disabled={disabled}
                 onChange={(next) => {
                   setArtists(next);
+                  onDirty?.();
+                }}
+              />
+            </ModelField>
+            <ModelField
+              label="Programmers"
+              htmlFor={programmersId}
+              wide
+              className="order-2 @xl:order-none"
+            >
+              <NameListInput
+                id={programmersId}
+                name="programmers"
+                itemLabel="programmer"
+                value={programmers}
+                disabled={disabled}
+                onChange={(next) => {
+                  setProgrammers(next);
                   onDirty?.();
                 }}
               />

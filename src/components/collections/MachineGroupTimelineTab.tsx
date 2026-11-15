@@ -1,12 +1,12 @@
 import type React from "react";
 import Link from "next/link";
-import { isToday } from "date-fns";
 
 import { CollectionMachineFilter } from "~/components/collections/CollectionMachineFilter";
 import { MachineTimelineFilter } from "~/components/machines/timeline/MachineTimelineFilter";
 import { TimelineBucketBanner } from "~/components/machines/timeline/TimelineBucketBanner";
 import { TimelineRow } from "~/components/machines/timeline/TimelineRow";
 import { bucketTimelineRows } from "~/lib/timeline/bucket-rows";
+import { isSiteToday } from "~/lib/dates";
 import { getMachineTimeline } from "~/lib/timeline/machine-events";
 import {
   DEFAULT_TIMELINE_TAGS,
@@ -14,7 +14,7 @@ import {
   type TimelineTag,
 } from "~/lib/timeline/machine-tags";
 import { db } from "~/server/db";
-import type { CollectionMachine } from "~/lib/collections/owner";
+import type { CollectionMachine } from "~/lib/collections/types";
 
 interface MachineGroupTimelineTabProps {
   machines: CollectionMachine[];
@@ -31,7 +31,7 @@ function csvParam(value: string | string[] | undefined): string | undefined {
 const PAGE_SIZE = 25;
 
 /**
- * Machine group Timeline tab, shared by Collections, Owner Collections, and
+ * Machine group Timeline tab, shared by Collections and
  * tags (spec collections-and-tags 4.5).
  *
  * Combined chronological feed across the group's machine set, adapted
@@ -143,7 +143,7 @@ export async function MachineGroupTimelineTab({
             const showRelativeTime =
               group.bucket.tier === "day" &&
               firstEntry !== undefined &&
-              isToday(firstEntry.row.createdAt);
+              isSiteToday(firstEntry.row.createdAt);
             return (
               <section key={group.bucket.key} className="pt-6 first:pt-0">
                 <TimelineBucketBanner bucket={group.bucket} />

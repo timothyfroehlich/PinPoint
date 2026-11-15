@@ -1,6 +1,7 @@
 import type React from "react";
 import Link from "next/link";
 
+import { ownerMachinesHref } from "~/lib/machines/links";
 import { PROFILE_MACHINE_CAP_MOBILE } from "~/lib/profiles/queries";
 
 interface OwnedMachinesProps {
@@ -56,10 +57,10 @@ export function OwnedMachines({
         })}
       </div>
       <Link
-        href={`/c/owner/${ownerId}`}
+        href={ownerMachinesHref(ownerId)}
         className="mt-2 inline-block text-sm text-primary hover:underline"
       >
-        {hasMore ? `View all ${total} →` : "View full collection →"}
+        {hasMore ? `View all ${total} →` : "View in Machines →"}
       </Link>
     </section>
   );

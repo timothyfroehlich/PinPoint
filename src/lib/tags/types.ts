@@ -1,4 +1,4 @@
-import type { CollectionMachine } from "~/lib/collections/owner";
+import type { CollectionMachine } from "~/lib/collections/types";
 
 /** Every tag type, in the order the tag browse and a machine's page list them. */
 export const TAG_TYPE_IDS = [

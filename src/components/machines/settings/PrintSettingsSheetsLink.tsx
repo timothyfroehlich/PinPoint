@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ClipboardList } from "lucide-react";
 
 import { Button } from "~/components/ui/button";
-import type { CollectionMachine } from "~/lib/collections/owner";
+import type { CollectionMachine } from "~/lib/collections/types";
 
 /**
  * Opens Print settings sheets with a group's machines On the Floor already

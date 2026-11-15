@@ -1,7 +1,8 @@
 "use client";
 
 import type React from "react";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import Link from "next/link";
 import {
   ChevronRight,
   ChevronDown,
@@ -61,13 +62,14 @@ import { NoteSection } from "~/components/machines/settings/NoteSection";
 import { SoftwareSettingsSection } from "~/components/machines/settings/SoftwareSettingsSection";
 import { TableSection } from "~/components/machines/settings/TableSection";
 import { DipBankSection } from "~/components/machines/settings/DipBankSection";
+import { SettingsTagPicker } from "~/components/machines/settings/SettingsTagPicker";
+import { builtinSlotOf, settingsTagHref } from "~/lib/machines/settings-tags";
 import {
   type AddSectionSpec,
-  BUILTIN_SETTINGS_TAG_NAMES,
-  BUILTIN_SETTINGS_TAGS,
   type SettingsPreferredSlot,
   type SettingsSection,
   type SettingsSetData,
+  type SettingsTagRef,
 } from "~/lib/machines/settings-types";
 
 interface SettingsSetCardProps {
@@ -82,15 +84,21 @@ interface SettingsSetCardProps {
    *  OwnerBadge the issue pages use, so "who touched this" reads consistently
    *  across the app. Computed by the parent against the machine's owner id. */
   updatedByIsOwner: boolean;
-  /** Unsaved set (temp id). Preferred/Duplicate/Publish target a persisted row,
+  /** Unsaved set (temp id). Tags/Duplicate/Publish target a persisted row,
    *  so they are disabled until the first save. */
   isNew: boolean;
+  /** Every settings tag, for the tag picker (House and Tournament first). */
+  allTags: SettingsTagRef[];
+  /** The viewer may create settings tags from the picker (spec §3.3). */
+  canCreateTags: boolean;
   onMoveSection: (sectionId: string, direction: "up" | "down") => void;
   onToggleExpand: () => void;
-  /** Make this set the preferred set for the slot, or clear it. */
+  /** Make this set the default set for the slot, or clear it. */
   onTogglePreferred: (slot: SettingsPreferredSlot) => void;
-  /** Apply or remove a built-in settings tag. */
-  onToggleTag: (slot: SettingsPreferredSlot) => void;
+  /** Apply or remove a settings tag. */
+  onToggleTag: (tag: SettingsTagRef, applied: boolean) => void;
+  /** Create a settings tag and apply it; resolves to an error or null. */
+  onCreateTag: (name: string) => Promise<string | null>;
   /** Turn this personal set into a community set (one-way). */
   onMakeCommunity: () => void;
   onRename: (newName: string) => void;
@@ -251,10 +259,13 @@ export function SettingsSetCard({
   canEdit,
   updatedByIsOwner,
   isNew,
+  allTags,
+  canCreateTags,
   onMoveSection,
   onToggleExpand,
   onTogglePreferred,
   onToggleTag,
+  onCreateTag,
   onMakeCommunity,
   onRename,
   onNameBlur,
@@ -304,6 +315,9 @@ export function SettingsSetCard({
 
   // Set-level delete confirms via AlertDialog (design bible §17).
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  // "Edit tags…" hands focus to the picker, not back to the ⋮ trigger.
+  const openingPickerRef = useRef(false);
 
   // Render one section's body. `canEdit` is passed through — all fields are
   // always-live for permitted users (PP-43q3 pivot).
@@ -383,14 +397,14 @@ export function SettingsSetCard({
     }
   }
 
-  // Badges lead the title (after the chevron): the preferred markers (one of
-  // each per machine), then the kind, then the set's built-in tags. A preferred
-  // set already implies its tag, so that tag's plain badge is dropped.
-  const hasTag = (slot: SettingsPreferredSlot): boolean =>
-    set.tags.some((t) => t.slug === slot);
-  const isPreferredIn = (slot: SettingsPreferredSlot): boolean =>
-    slot === "house" ? set.isPreferredHouse : set.isPreferredTournament;
+  // Badges lead the title (after the chevron): the default-set markers (one of
+  // each per machine), the kind, then the House and Tournament tags. A default
+  // set already implies its tag, so that tag's plain badge is dropped. Custom
+  // tags link to their pages: they close the badge row when the name is an
+  // input, and follow the viewer's disclosure button otherwise (a link cannot
+  // sit inside a button).
   const isPreferred = set.isPreferredHouse || set.isPreferredTournament;
+  const appliedSlugs = new Set(set.tags.map((t) => t.slug));
 
   const preferredHouseBadge = set.isPreferredHouse && (
     <Tooltip>
@@ -400,12 +414,12 @@ export function SettingsSetCard({
             className="border-warning/30 bg-warning/10 text-warning"
             variant="outline"
           >
-            ★<span className="max-md:hidden">&nbsp;Preferred House</span>
-            <span className="sr-only md:hidden">Preferred House</span>
+            ★<span className="max-md:hidden">&nbsp;Default House</span>
+            <span className="sr-only md:hidden">Default House</span>
           </Badge>
         </span>
       </TooltipTrigger>
-      <TooltipContent>The machine's preferred House set</TooltipContent>
+      <TooltipContent>The machine's default House set</TooltipContent>
     </Tooltip>
   );
 
@@ -418,12 +432,12 @@ export function SettingsSetCard({
             variant="outline"
           >
             <Trophy className="size-3" aria-hidden="true" />
-            <span className="max-md:hidden">&nbsp;Preferred Tournament</span>
-            <span className="sr-only md:hidden">Preferred Tournament</span>
+            <span className="max-md:hidden">&nbsp;Default Tournament</span>
+            <span className="sr-only md:hidden">Default Tournament</span>
           </Badge>
         </span>
       </TooltipTrigger>
-      <TooltipContent>The machine's preferred Tournament set</TooltipContent>
+      <TooltipContent>The machine's default Tournament set</TooltipContent>
     </Tooltip>
   );
 
@@ -438,12 +452,13 @@ export function SettingsSetCard({
     </Badge>
   );
 
-  const tagBadges = set.tags
-    .filter(
-      (t) =>
-        !(t.slug === "house" && set.isPreferredHouse) &&
-        !(t.slug === "tournament" && set.isPreferredTournament)
-    )
+  const builtinTagBadges = set.tags
+    .filter((t) => {
+      const slot = builtinSlotOf(t.slug);
+      if (slot === "house") return !set.isPreferredHouse;
+      if (slot === "tournament") return !set.isPreferredTournament;
+      return false;
+    })
     .map((t) => (
       <Badge
         key={t.slug}
@@ -461,6 +476,22 @@ export function SettingsSetCard({
       </Badge>
     ));
 
+  const customTags = set.tags.filter((t) => builtinSlotOf(t.slug) === null);
+  const customTagChips = customTags.length > 0 && (
+    <span className="inline-flex flex-wrap items-center gap-1">
+      {customTags.map((t) => (
+        <Badge
+          key={t.slug}
+          asChild
+          variant="outline"
+          className="border-secondary/35 bg-secondary/10 text-secondary hover:bg-secondary/20"
+        >
+          <Link href={settingsTagHref(t.slug)}>{t.name}</Link>
+        </Badge>
+      ))}
+    </span>
+  );
+
   // The set name — always-live input for permitted users, plain text for
   // viewers. Edits buffer into the working copy via onRename; auto-save debounce
   // handles persistence. The input is always present for permitted users so
@@ -474,7 +505,8 @@ export function SettingsSetCard({
           {preferredHouseBadge}
           {preferredTournamentBadge}
           {kindBadge}
-          {tagBadges}
+          {builtinTagBadges}
+          {canEdit && customTagChips}
         </span>
         <InlineEditableText
           value={set.name}
@@ -533,7 +565,11 @@ export function SettingsSetCard({
               onClick={onToggleExpand}
               aria-expanded={isExpanded}
               aria-label={`${set.name || "Unnamed"} settings set`}
-              className="-mx-1 flex max-w-full grow items-center gap-2.5 rounded px-1 text-left transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring max-md:shrink-0 md:flex-1 motion-reduce:transition-none"
+              className={cn(
+                "-mx-1 flex max-w-full items-center gap-2.5 rounded px-1 text-left transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring max-md:shrink-0 motion-reduce:transition-none",
+                // Custom tag links follow the name, so the button stops there.
+                customTags.length === 0 && "grow md:flex-1"
+              )}
             >
               <ChevronIcon
                 className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 motion-reduce:transition-none"
@@ -542,81 +578,87 @@ export function SettingsSetCard({
               {headerTitle}
             </button>
           )}
+          {!canEdit && customTagChips}
 
-          {/* Set-level ⋮ menu — shown when the viewer has any action on it. */}
+          {/* Set-level ⋮ menu — shown when the viewer has any action on it.
+              The tag picker opens beside it on desktop. */}
           {hasMenu && (
-            <span className="ml-auto flex shrink-0 items-center">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-7 shrink-0 text-muted-foreground"
-                    aria-label="More options for this set"
+            <SettingsTagPicker
+              open={pickerOpen}
+              onOpenChange={setPickerOpen}
+              setName={set.name || "Unnamed set"}
+              tags={allTags}
+              appliedSlugs={appliedSlugs}
+              defaults={{
+                house: set.isPreferredHouse,
+                tournament: set.isPreferredTournament,
+              }}
+              canCreate={canCreateTags}
+              onToggleTag={onToggleTag}
+              onToggleDefault={onTogglePreferred}
+              onCreate={onCreateTag}
+            >
+              <span className="ml-auto flex shrink-0 items-center">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7 shrink-0 text-muted-foreground max-md:size-11"
+                      aria-label="More options for this set"
+                    >
+                      <MoreVertical className="size-4" aria-hidden="true" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    onCloseAutoFocus={(event) => {
+                      if (openingPickerRef.current) {
+                        openingPickerRef.current = false;
+                        event.preventDefault();
+                      }
+                    }}
                   >
-                    <MoreVertical className="size-4" aria-hidden="true" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {/* These act on a persisted row, so they're disabled until an
-                      unsaved (temp-id) set is first saved. */}
-                  {set.canCurate &&
-                    BUILTIN_SETTINGS_TAGS.filter(hasTag).map((slot) => (
+                    {/* These act on a persisted row, so they're disabled until
+                        an unsaved (temp-id) set is first saved. */}
+                    {set.canCurate && (
                       <DropdownMenuItem
-                        key={`preferred-${slot}`}
                         disabled={isNew}
                         onSelect={() => {
-                          onTogglePreferred(slot);
+                          openingPickerRef.current = true;
+                          setPickerOpen(true);
                         }}
                       >
-                        {isPreferredIn(slot)
-                          ? `Unset preferred ${BUILTIN_SETTINGS_TAG_NAMES[slot]}`
-                          : `Set as preferred ${BUILTIN_SETTINGS_TAG_NAMES[slot]}`}
+                        Edit tags…
                       </DropdownMenuItem>
-                    ))}
-                  {/* A preferred set keeps its slot's tag (spec §4.2). */}
-                  {set.canCurate &&
-                    BUILTIN_SETTINGS_TAGS.filter(
-                      (slot) => !isPreferredIn(slot)
-                    ).map((slot) => (
+                    )}
+                    {set.canMakeCommunity && (
                       <DropdownMenuItem
-                        key={`tag-${slot}`}
                         disabled={isNew}
+                        onSelect={onMakeCommunity}
+                      >
+                        Make community set
+                      </DropdownMenuItem>
+                    )}
+                    {set.canCurate && (
+                      <DropdownMenuItem disabled={isNew} onSelect={onDuplicate}>
+                        Duplicate
+                      </DropdownMenuItem>
+                    )}
+                    {set.canDelete && (
+                      <DropdownMenuItem
+                        className="text-destructive-text focus:text-destructive-text"
                         onSelect={() => {
-                          onToggleTag(slot);
+                          setDeleteDialogOpen(true);
                         }}
                       >
-                        {hasTag(slot)
-                          ? `Remove ${BUILTIN_SETTINGS_TAG_NAMES[slot]} tag`
-                          : `Tag as ${BUILTIN_SETTINGS_TAG_NAMES[slot]}`}
+                        Delete
                       </DropdownMenuItem>
-                    ))}
-                  {set.canMakeCommunity && (
-                    <DropdownMenuItem
-                      disabled={isNew}
-                      onSelect={onMakeCommunity}
-                    >
-                      Make community set
-                    </DropdownMenuItem>
-                  )}
-                  {set.canCurate && (
-                    <DropdownMenuItem disabled={isNew} onSelect={onDuplicate}>
-                      Duplicate
-                    </DropdownMenuItem>
-                  )}
-                  {set.canDelete && (
-                    <DropdownMenuItem
-                      className="text-destructive-text focus:text-destructive-text"
-                      onSelect={() => {
-                        setDeleteDialogOpen(true);
-                      }}
-                    >
-                      Delete
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </span>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </span>
+            </SettingsTagPicker>
           )}
         </div>
 

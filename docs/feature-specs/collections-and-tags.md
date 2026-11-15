@@ -165,9 +165,7 @@
 
 ## Known divergences (code vs spec)
 
-| Requirement | Divergence | Resolution |
-| :-- | :-- | :-- |
-| 6.4–6.5 | Owner Collection pages still exist, and links to a person's machines open them. | PP-jb9v.6 |
+_None — the current implementation matches this spec._
 
 ---
 

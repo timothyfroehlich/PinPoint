@@ -13,7 +13,7 @@ import {
   canViewCollection,
 } from "~/lib/permissions/collections";
 import { isEditorCollaborator } from "~/lib/collections/collaborators";
-import { getViewer } from "~/lib/collections/viewer";
+import { getViewer } from "~/lib/auth/viewer";
 import { db } from "~/server/db";
 
 export interface CollectionForLayout {

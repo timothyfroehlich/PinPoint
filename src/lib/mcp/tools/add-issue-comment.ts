@@ -1,6 +1,5 @@
 import "server-only";
 
-import type { McpServer } from "@modelcontextprotocol/server";
 import { after } from "next/server";
 import { z } from "zod";
 
@@ -11,11 +10,11 @@ import { addIssueComment } from "~/services/issues";
 
 import {
   contentAddressedUuid,
+  defineTool,
   issueUrl,
   McpToolError,
   resolveIssue,
   retryWindowPart,
-  runTool,
   type ToolOutcome,
   WRITE_TOOL_ANNOTATIONS,
 } from "./shared";
@@ -102,22 +101,13 @@ export async function runAddIssueComment(
   };
 }
 
-export function registerAddIssueComment(server: McpServer): void {
-  server.registerTool(
-    "add_issue_comment",
-    {
-      title: "Comment on an issue",
-      description:
-        "Add a comment to an existing issue. Requires machine (initials or UUID), issue number, and comment text.",
-      inputSchema: addIssueCommentSchema,
-      annotations: WRITE_TOOL_ANNOTATIONS,
-    },
-    (args, extra) =>
-      runTool(
-        "add_issue_comment",
-        extra,
-        (ctx) => runAddIssueComment(args, ctx),
-        { mutates: true }
-      )
-  );
-}
+export const addIssueCommentTool = defineTool({
+  name: "add_issue_comment",
+  title: "Comment on an issue",
+  description:
+    "Add a comment to an existing issue. Requires machine (initials or UUID), issue number, and comment text.",
+  inputSchema: addIssueCommentSchema,
+  annotations: WRITE_TOOL_ANNOTATIONS,
+  mutates: true,
+  run: runAddIssueComment,
+});

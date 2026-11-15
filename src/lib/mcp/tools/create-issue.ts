@@ -1,6 +1,5 @@
 import "server-only";
 
-import type { McpServer } from "@modelcontextprotocol/server";
 import { after } from "next/server";
 import { z } from "zod";
 import { ISSUE_TITLE_MAX, issueTitleSchema } from "~/lib/issues/title";
@@ -17,11 +16,11 @@ import { createIssue, MachineRemovedError } from "~/services/issues";
 
 import {
   contentAddressedUuid,
+  defineTool,
   issueUrl,
   McpToolError,
   resolveMachine,
   retryWindowPart,
-  runTool,
   type ToolOutcome,
   WRITE_TOOL_ANNOTATIONS,
 } from "./shared";
@@ -146,19 +145,13 @@ export async function runCreateIssue(
   };
 }
 
-export function registerCreateIssue(server: McpServer): void {
-  server.registerTool(
-    "create_issue",
-    {
-      title: "Create issue",
-      description:
-        "File a new issue on a machine. Requires machine (initials or UUID) and title; accepts optional description, severity, priority, and frequency.",
-      inputSchema: createIssueSchema,
-      annotations: WRITE_TOOL_ANNOTATIONS,
-    },
-    (args, extra) =>
-      runTool("create_issue", extra, (ctx) => runCreateIssue(args, ctx), {
-        mutates: true,
-      })
-  );
-}
+export const createIssueTool = defineTool({
+  name: "create_issue",
+  title: "Create issue",
+  description:
+    "File a new issue on a machine. Requires machine (initials or UUID) and title; accepts optional description, severity, priority, and frequency.",
+  inputSchema: createIssueSchema,
+  annotations: WRITE_TOOL_ANNOTATIONS,
+  mutates: true,
+  run: runCreateIssue,
+});

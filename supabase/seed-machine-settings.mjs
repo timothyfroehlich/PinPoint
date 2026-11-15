@@ -23,7 +23,7 @@
  * different installs, DIP and table differences, one set preferred for both, a
  * missing preferred House or Tournament set, no sets at all (The Addams
  * Family), a machine on loan (Spider-Man), and a custom "Bat City 2025" tag
- * that finds one set on one machine and two on another.
+ * that finds one set on most machines and two on another (CUSTOM_SETTINGS_TAGS).
  *
  * The data shape mirrors the `SettingsSection` union in
  * src/lib/machines/settings-types.ts. Persisted rows do NOT carry the
@@ -252,7 +252,7 @@ function buildSets(afmId, ownerId, techId) {
       isCommunity: true,
       isPreferredHouse: false,
       isPreferredTournament: true,
-      tags: ["tournament"],
+      tags: ["tournament", "bat-city-2025"],
       createdBy: techId,
       description: doc(
         "Shared setup the crew keeps current for the Tuesday league night — mirrors the owner's competition floor but with a shorter ball saver for pace."
@@ -330,7 +330,7 @@ function buildSets(afmId, ownerId, techId) {
       isCommunity: true,
       isPreferredHouse: false,
       isPreferredTournament: false,
-      tags: ["house"],
+      tags: ["house", "kids-night"],
       createdBy: techId,
       description: doc(
         "Everyday casual setup for open play — a little more forgiving than the competition floor. Kept current by the crew."
@@ -398,6 +398,18 @@ function buildSets(afmId, ownerId, techId) {
 // ---------------------------------------------------------------------------
 
 const BAT_CITY_TAG = { slug: "bat-city-2025", name: "Bat City 2025" };
+/**
+ * Custom settings tags (machine-settings §3): Bat City 2025 sits on several
+ * machines — on a default Tournament set, on one machine's only tagged set,
+ * and on two sets of one machine with no default between them; Kids night is
+ * on one set; Texas Pinball Fest carries no sets, so the Settings tags page
+ * shows an empty tag.
+ */
+const CUSTOM_SETTINGS_TAGS = [
+  BAT_CITY_TAG,
+  { slug: "kids-night", name: "Kids night" },
+  { slug: "texas-pinball-fest", name: "Texas Pinball Fest" },
+];
 
 function software(baseline, rows) {
   return {
@@ -520,7 +532,7 @@ const SHEET_SETS = {
     ),
     sheetSet(
       "Competition",
-      ["tournament"],
+      ["tournament", BAT_CITY_TAG.slug],
       [
         software("Competition Install", [
           ["S-08", "Ball Save Time", "3 s"],
@@ -769,16 +781,22 @@ async function run() {
 
     // Built-in House and Tournament tags. Migration 0106 inserts them, but the
     // fast reset truncates tables without re-running migrations, so make sure.
-    // Bat City 2025 is a custom tag for printing settings sheets by tag.
+    // The custom tags demo settings tag pages and printing sheets by tag.
     await sql`
       INSERT INTO settings_tags (slug, name, is_builtin)
-      VALUES ('house', 'House', true), ('tournament', 'Tournament', true),
-        (${BAT_CITY_TAG.slug}, ${BAT_CITY_TAG.name}, false)
+      VALUES ('house', 'House', true), ('tournament', 'Tournament', true)
       ON CONFLICT (slug) DO NOTHING
     `;
+    for (const tag of CUSTOM_SETTINGS_TAGS) {
+      await sql`
+        INSERT INTO settings_tags (slug, name, is_builtin)
+        VALUES (${tag.slug}, ${tag.name}, false)
+        ON CONFLICT (slug) DO NOTHING
+      `;
+    }
     const tagRows = await sql`
       SELECT id, slug FROM settings_tags
-      WHERE slug IN ('house', 'tournament', ${BAT_CITY_TAG.slug})
+      WHERE slug IN ${sql(["house", "tournament", ...CUSTOM_SETTINGS_TAGS.map((t) => t.slug)])}
     `;
     const tagIdBySlug = new Map(tagRows.map((t) => [t.slug, t.id]));
 

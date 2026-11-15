@@ -21,7 +21,7 @@
 - **2.1** Machine View on Machines and on every Collection and Tag page shows the Presence Widget and the Playability Widget, in that order.
 - **2.2** _Retired 2026-10-02_ with the Filtered population (widgets §3.1). The old `presenceWidget` and `playabilityWidget` parameters are ignored and dropped from the URL. Number kept so older citations don't dangle.
 - **2.3** The widgets use only Machine View's base rows and health enrichment (machine-views §3.4) and never load service or activity enrichment.
-- **2.4** The Summary Row shows how many of the population's On the Floor machines are playable out of all its On the Floor machines; Operational and Needs Service machines are playable. On narrow phones it may show only the figures, but screen readers still hear the full wording.
+- **2.4** _Retired 2026-10-11_ with the Summary Row (widgets §1). Number kept so older citations don't dangle.
 
 ---
 
@@ -49,7 +49,9 @@
 
 ## Known divergences (code vs spec)
 
-_None — the current implementation matches this spec._
+| Requirement | Divergence | Resolution |
+| :-- | :-- | :-- |
+| §2.4 (retired) | Machine View still shows a Summary Row with the playable figure while its widgets stack. | PP-jb9v.14 |
 
 ---
 
@@ -57,6 +59,7 @@ _None — the current implementation matches this spec._
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-11 | Retired the Summary Row figures with the Summary Row (§2.4). |
 | 2026-10-07 | Owner Collections retired; the widgets appear on every Collection and Tag page (2.1). |
 | 2026-10-04 | Retired the widget headlines (§3.1, §4.1); the Summary Row states the playable figure itself (§2.4). |
 | 2026-10-02 | Retired the Widget Population parameters (§2.2). The Summary Row shows only the Playability headline (§2.4); Presence leads with On the Floor, its default filter, and no longer counts Removed machines (§3.1, §3.2); Playability runs worst first (§4.2). |

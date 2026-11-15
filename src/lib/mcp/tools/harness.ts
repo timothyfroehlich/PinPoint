@@ -2,8 +2,10 @@ import "server-only";
 
 import type {
   CallToolResult,
+  McpServer,
   ServerContext,
 } from "@modelcontextprotocol/server";
+import type { z } from "zod";
 
 import { logMcpToolCall } from "~/lib/mcp/audit";
 import {
@@ -134,4 +136,105 @@ export async function runTool(
       "Internal error running the tool. The failure has been logged."
     );
   }
+}
+
+type McpToolConfig = NonNullable<Parameters<McpServer["registerTool"]>[1]>;
+export type ToolAnnotations = NonNullable<McpToolConfig["annotations"]>;
+
+/** A registered tool definition with its name and registration callback. */
+export interface ToolDefinition {
+  name: string;
+  register: (server: McpServer) => void;
+}
+
+/** Input configuration passed to {@link defineTool}. */
+export interface DefineToolWithSchemaOptions<TShape extends z.ZodRawShape> {
+  name: string;
+  title: string;
+  description: string;
+  inputSchema: z.ZodObject<TShape>;
+  annotations?: ToolAnnotations;
+  mutates?: boolean;
+  run: (
+    args: z.infer<z.ZodObject<TShape>>,
+    ctx: McpAuthContext
+  ) => Promise<ToolOutcome>;
+}
+
+export interface DefineToolWithoutSchemaOptions {
+  name: string;
+  title: string;
+  description: string;
+  inputSchema?: undefined;
+  annotations?: ToolAnnotations;
+  mutates?: boolean;
+  run: (args: undefined, ctx: McpAuthContext) => Promise<ToolOutcome>;
+}
+
+/**
+ * Define a tool with typed args inferred from its inputSchema.
+ */
+export function defineTool<TShape extends z.ZodRawShape>(
+  options: DefineToolWithSchemaOptions<TShape>
+): ToolDefinition;
+export function defineTool(
+  options: DefineToolWithoutSchemaOptions
+): ToolDefinition;
+export function defineTool<TShape extends z.ZodRawShape>(
+  options: DefineToolWithSchemaOptions<TShape> | DefineToolWithoutSchemaOptions
+): ToolDefinition {
+  const runOptions =
+    options.mutates !== undefined ? { mutates: options.mutates } : {};
+
+  if (options.inputSchema !== undefined) {
+    const inputSchema = options.inputSchema;
+    const run = options.run;
+    return {
+      name: options.name,
+      register: (server: McpServer) => {
+        server.registerTool(
+          options.name,
+          {
+            title: options.title,
+            description: options.description,
+            inputSchema,
+            ...(options.annotations !== undefined && {
+              annotations: options.annotations,
+            }),
+          },
+          (args, ctx) =>
+            runTool(
+              options.name,
+              ctx,
+              (authCtx: McpAuthContext) => run(args, authCtx),
+              runOptions
+            )
+        );
+      },
+    };
+  }
+
+  const run = options.run;
+  return {
+    name: options.name,
+    register: (server: McpServer) => {
+      server.registerTool(
+        options.name,
+        {
+          title: options.title,
+          description: options.description,
+          ...(options.annotations !== undefined && {
+            annotations: options.annotations,
+          }),
+        },
+        (ctx) =>
+          runTool(
+            options.name,
+            ctx,
+            (authCtx: McpAuthContext) => run(undefined, authCtx),
+            runOptions
+          )
+      );
+    },
+  };
 }

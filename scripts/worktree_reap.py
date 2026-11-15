@@ -36,7 +36,9 @@ makes that part UNKNOWN: it is printed and nothing is removed on its strength. A
 0 (orchestration-status.sh shows its report); `--apply` exits 1 when a removal
 failed or anything it would have acted on was UNKNOWN.
 
-`--branch` limits the run to one worktree and skips orphans (merge-pr.sh).
+`--branch` limits the run to one worktree and skips orphans: the post-merge step
+(`python3 scripts/worktree_reap.py --apply --branch <branch>`) the agent runs
+after its PR merges.
 `--quiet` prints one nudge line (the SessionStart hook). A dry run gives all
 its gh/docker calls a shared time budget, so an unreachable remote daemon reads
 as UNKNOWN instead of stalling the hook or the briefing; `--apply` has none, so
@@ -363,7 +365,7 @@ def run_cleanup(path: str, quiet: bool) -> bool:
             file=sys.stderr,
         )
         return False
-    print(f"REAPED: {path}")  # stdout: merge-pr.sh shows it next to `MERGED:`
+    print(f"REAPED: {path}")  # stdout: the post-merge step's record of the reap
     return True
 
 
@@ -632,7 +634,7 @@ def main() -> int:
         for v in group:
             log(f"  - {v.branch or '(detached)'} [{v.reason}]\n      {v.path}")
 
-    # Orphans; --branch (merge-pr.sh) is about one worktree only.
+    # Orphans; --branch (the post-merge step) is about one worktree only.
     daemons: list[Daemon] = []
     orphans: list[tuple[Daemon, str, Project]] = []
     slots: dict[str, int] = {}

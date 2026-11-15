@@ -6,7 +6,7 @@
  * input, and revalidate the machine's pages.
  *
  * Save model: whole-set save-on-Done. `saveSettingsSetAction` upserts the
- * entire set; Delete / Duplicate / MakeCommunity / Tag / Preferred are instant
+ * entire set; Delete / Duplicate / MakeCommunity / Tag / Default are instant
  * single-set ops.
  */
 
@@ -57,7 +57,8 @@ const preferredSchema = z.object({
 });
 const tagSchema = z.object({
   id: z.uuid(),
-  tag: slotSchema,
+  // A built-in tag by slot, or any settings tag by id (spec §3.1).
+  tag: z.union([slotSchema, z.object({ tagId: z.uuid() })]),
   applied: z.boolean(),
 });
 const settingsInstructionsSchema = z.object({
@@ -217,7 +218,7 @@ export async function makeCommunitySettingsSetAction(
   return { success: true };
 }
 
-/** Apply or remove the House or Tournament tag. */
+/** Apply or remove a settings tag on a set (spec §3.4). */
 export async function setSettingsSetTagAction(
   input: z.input<typeof tagSchema>
 ): Promise<ActionResult> {
@@ -237,7 +238,7 @@ export async function setSettingsSetTagAction(
   return { success: true };
 }
 
-/** Make a set the machine's preferred House or Tournament set, or clear it. */
+/** Make a set the machine's default House or Tournament set, or clear it. */
 export async function setPreferredSettingsSetAction(
   input: z.input<typeof preferredSchema>
 ): Promise<ActionResult> {

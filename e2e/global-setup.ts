@@ -423,6 +423,15 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
     return;
   } catch {
     console.warn("⚠️  Fast reset failed, falling back to full reset...");
+    // Both full-reset paths restart the auth container, which drops the
+    // tcp_tw_reuse setting setup-supabase / the crabbox job applied. Under a
+    // production build that can bring back lost-session failures (PP-izj5),
+    // so say so where the run's annotations will show it.
+    if (process.env["PLAYWRIGHT_WEB_SERVER"] === "start") {
+      console.warn(
+        "::warning::Full reset restarts the Supabase auth container and drops tcp_tw_reuse; lost-session failures in this run may be port exhaustion (PP-izj5)."
+      );
+    }
   }
 
   // 5. Full reset fallback (fresh checkout with empty database). A remote

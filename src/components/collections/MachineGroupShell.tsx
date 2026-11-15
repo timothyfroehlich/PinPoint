@@ -2,7 +2,7 @@ import type React from "react";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { CollectionHeader } from "~/components/collections/CollectionHeader";
 import { CollectionTabStrip } from "~/components/collections/CollectionTabStrip";
-import type { CollectionMachine } from "~/lib/collections/owner";
+import type { CollectionMachine } from "~/lib/collections/types";
 import { summarizeCollection } from "~/lib/collections/summary";
 import { getMachineViewHealth } from "~/lib/machines/view/queries";
 import { db } from "~/server/db";
@@ -12,7 +12,7 @@ interface MachineGroupShellProps {
   /** Line above the title, e.g. a tag's breadcrumb. */
   eyebrow?: React.ReactNode;
   machines: CollectionMachine[];
-  /** Route prefix the tabs hang off, e.g. `/c/owner/<id>`. */
+  /** Route prefix the tabs hang off, e.g. `/c/<id>`. */
   basePath: string;
   action?: React.ReactNode;
   /**
@@ -25,7 +25,7 @@ interface MachineGroupShellProps {
 
 /**
  * The header and Overview / Issues / Timeline tab strip shared by every
- * machine group page: Collections, Owner Collections, and tags
+ * machine group page: Collections and tags
  * (spec collections-and-tags 4.1–4.2).
  */
 export async function MachineGroupShell({

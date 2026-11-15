@@ -35,6 +35,12 @@ export interface IscoredScore {
   gameName: string;
   playerName: string;
   score: number;
+  /**
+   * When the score was posted, as iScored sends it: the venue's wall-clock
+   * time with no zone, e.g. "2026-10-04 21:34:46". Not UTC (PP-4v3i: the
+   * APC gameroom's scores cluster 18:00–22:00), so display its day as written
+   * (`formatCalendarDay`), never via `new Date`.
+   */
   date: string;
   rank: number;
 }

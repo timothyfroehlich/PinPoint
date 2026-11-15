@@ -1,4 +1,5 @@
 import path from "path";
+import { isProductionBuild } from "~/lib/runtime-env";
 
 /**
  * Local stand-in for Vercel Blob, used when no blob token is configured
@@ -6,8 +7,7 @@ import path from "path";
  * `public/uploads` and served at `/uploads/<pathname>`.
  */
 
-/** URL path prefix that mock uploads are served from. */
-export const MOCK_UPLOADS_URL_PREFIX = "/uploads/";
+export { MOCK_UPLOADS_URL_PREFIX } from "~/lib/blob/config";
 
 /**
  * Whether uploads go to local disk instead of Vercel Blob.
@@ -21,10 +21,7 @@ export function shouldUseMockBlobStorage(): boolean {
     return true;
   }
 
-  return (
-    process.env.NODE_ENV !== "production" &&
-    !process.env["BLOB_READ_WRITE_TOKEN"]
-  );
+  return !isProductionBuild() && !process.env["BLOB_READ_WRITE_TOKEN"];
 }
 
 /** Absolute directory that mock uploads are stored in. */

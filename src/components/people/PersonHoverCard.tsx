@@ -8,6 +8,7 @@ import {
   HoverCardContent,
 } from "~/components/ui/hover-card";
 import { Avatar, AvatarImage, AvatarFallback } from "~/components/ui/avatar";
+import { ownerMachinesHref } from "~/lib/machines/links";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -103,7 +104,7 @@ function PersonHoverCardLink({
         </div>
         {data !== null && data.machineCount > 0 ? (
           <Link
-            href={`/c/owner/${userId}`}
+            href={ownerMachinesHref(userId)}
             className="text-muted-foreground mt-2 block text-xs hover:underline"
           >
             Owns {data.machineCount} machine

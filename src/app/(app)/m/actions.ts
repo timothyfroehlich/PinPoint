@@ -194,6 +194,7 @@ function readPbmLinkFormFields(formData: FormData): {
   playerCount: string | undefined;
   designers: string[] | undefined;
   artists: string[] | undefined;
+  programmers: string[] | undefined;
 } {
   const idRaw = formData.get("pinballmapMachineId");
   const nonEmpty = (key: string): string | undefined => {
@@ -226,6 +227,7 @@ function readPbmLinkFormFields(formData: FormData): {
     // manual model, so no entries means the person removed every name.
     designers: nameList("designers"),
     artists: nameList("artists"),
+    programmers: nameList("programmers"),
   };
 }
 

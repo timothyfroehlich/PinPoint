@@ -19,8 +19,8 @@ import { ISSUE_TITLE_MAX_MESSAGE, issueTitleSchema } from "~/lib/issues/title";
 import { ISSUE_SEVERITY_VALUES } from "~/lib/types";
 
 import { formatIssueId } from "~/lib/issues/utils";
-import { log } from "~/lib/logger";
 import { dispatchNotification } from "~/lib/notifications";
+import { serverActionError } from "~/lib/observability/report-error";
 import { getUserAccessLevel } from "~/lib/permissions/access";
 import { checkPermission } from "~/lib/permissions/helpers";
 import { convertedIssueDescription } from "~/lib/pinballmap/comment-conversion";
@@ -159,16 +159,12 @@ export async function convertPinballMapCommentAction(
     if (error instanceof MachineRemovedError) {
       return err("VALIDATION", error.message);
     }
-    log.error(
-      {
-        err: error,
-        conditionId,
-        machineId,
-        action: "convertPinballMapComment",
-      },
-      "Converting a Pinball Map comment to an issue failed"
+    return serverActionError(
+      error,
+      "SERVER",
+      "Could not convert the comment. Try again.",
+      { action: "convertPinballMapComment", conditionId, machineId }
     );
-    return err("SERVER", "Could not convert the comment. Try again.");
   }
   // Outside the try: `redirect` works by throwing.
   redirect(createdUrl);

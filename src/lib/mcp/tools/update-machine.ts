@@ -1,6 +1,5 @@
 import "server-only";
 
-import type { McpServer } from "@modelcontextprotocol/server";
 import { after } from "next/server";
 import { z } from "zod";
 
@@ -18,12 +17,12 @@ import {
 } from "~/services/machines";
 
 import {
+  defineTool,
   getOwnerNamesByMachine,
   machineUrl,
   McpToolError,
   resolveMachine,
   resolveOwner,
-  runTool,
   type ToolOutcome,
   WRITE_TOOL_ANNOTATIONS,
 } from "./shared";
@@ -491,19 +490,13 @@ export async function runUpdateMachine(
   };
 }
 
-export function registerUpdateMachine(server: McpServer): void {
-  server.registerTool(
-    "update_machine",
-    {
-      title: "Update a machine",
-      description:
-        "Update one or more fields on a machine: name, availability (presenceStatus), owner, Pinball Map link and lineup setting (intent), Insider Connected setting, or iScored link. Supply machine (initials or UUID) and at least one field to change. Returns applied changes.",
-      inputSchema: updateMachineSchema,
-      annotations: WRITE_TOOL_ANNOTATIONS,
-    },
-    (args, extra) =>
-      runTool("update_machine", extra, (ctx) => runUpdateMachine(args, ctx), {
-        mutates: true,
-      })
-  );
-}
+export const updateMachineTool = defineTool({
+  name: "update_machine",
+  title: "Update a machine",
+  description:
+    "Update one or more fields on a machine: name, availability (presenceStatus), owner, Pinball Map link and lineup setting (intent), Insider Connected setting, or iScored link. Supply machine (initials or UUID) and at least one field to change. Returns applied changes.",
+  inputSchema: updateMachineSchema,
+  annotations: WRITE_TOOL_ANNOTATIONS,
+  mutates: true,
+  run: runUpdateMachine,
+});

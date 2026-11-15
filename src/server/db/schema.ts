@@ -292,13 +292,14 @@ export const machines = pgTable(
     // what OPDB would supply for a catalog title. Same rule as `model_name` —
     // set only on an uncataloged machine (CHECK below), so the Type, Display
     // and Player Count tags and the apron credits never see two sources.
-    // Designers and artists are ordered name lists; an empty list is stored
-    // as NULL so the CHECK has one "no value" to test.
+    // Designers, artists, and programmers are ordered name lists; an empty
+    // list is stored as NULL so the CHECK has one "no value" to test.
     type: text("type", { enum: OPDB_MACHINE_TYPES }),
     display: text("display", { enum: OPDB_DISPLAY_TYPES }),
     playerCount: integer("player_count"),
     designers: text("designers").array(),
     artists: text("artists").array(),
+    programmers: text("programmers").array(),
     opdbId: text("opdb_id"),
     ipdbId: integer("ipdb_id"),
     // iScored game link (PP-h2bu.2). Nullable string identifier for the game
@@ -325,7 +326,7 @@ export const machines = pgTable(
     ),
     manualModelRequiresExcludedCheck: check(
       "machines_manual_model_requires_excluded",
-      sql`pinballmap_excluded OR (type IS NULL AND display IS NULL AND player_count IS NULL AND designers IS NULL AND artists IS NULL)`
+      sql`pinballmap_excluded OR (type IS NULL AND display IS NULL AND player_count IS NULL AND designers IS NULL AND artists IS NULL AND programmers IS NULL)`
     ),
     typeCheck: check(
       "machines_type_check",
@@ -341,7 +342,7 @@ export const machines = pgTable(
     ),
     creditListsNotEmptyCheck: check(
       "machines_credit_lists_not_empty",
-      sql`(designers IS NULL OR cardinality(designers) > 0) AND (artists IS NULL OR cardinality(artists) > 0)`
+      sql`(designers IS NULL OR cardinality(designers) > 0) AND (artists IS NULL OR cardinality(artists) > 0) AND (programmers IS NULL OR cardinality(programmers) > 0)`
     ),
     // Intent On presupposes a catalog link — you can only appear on the public
     // map as a recognized title. Off and `no_sync` are fine unmatched: they are
@@ -403,6 +404,9 @@ export const machineApronCards = pgTable(
     // "Unknown".
     designEnabled: boolean("design_enabled").notNull().default(true),
     artEnabled: boolean("art_enabled").notNull().default(true),
+    // Whether the card shows its Code credit row (§10.5). Off by default:
+    // most games before the DMD era carry no software credit in OPDB.
+    codeEnabled: boolean("code_enabled").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -1431,10 +1435,9 @@ export const machineSettingsSetTags = pgTable(
  * wrote it; the host re-validates it whenever it is read (§10.14).
  *
  * The SQL table keeps its original Machine View name; renaming it would break
- * the deployment that still serves while a new one migrates. The three
- * `legacy*` columns are that deployment's per-Surface ownership. The expand
- * migration (0098) merged every row onto the Machines Surface and pins them
- * there; nothing in this runtime reads them, and PP-jb9v.5 drops them.
+ * the deployment that still serves while a new one migrates. Rows were owned
+ * per Surface until 0098 merged them onto List Hosts; 0111 dropped those
+ * per-Surface columns.
  */
 export const savedViews = pgTable(
   "machine_view_saved_views",
@@ -1443,7 +1446,7 @@ export const savedViews = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => userProfiles.id, { onDelete: "cascade" }),
-    host: text("host", { enum: LIST_HOSTS }).notNull().default("machines"),
+    host: text("host", { enum: LIST_HOSTS }).notNull(),
     name: text("name").notNull(),
     state: jsonb("state").$type<unknown>().notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -1453,27 +1456,11 @@ export const savedViews = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
-    legacySurface: text("surface", {
-      enum: ["machines", "collection", "owner"],
-    })
-      .notNull()
-      .default("machines"),
-    legacyCollectionId: uuid("collection_id").references(() => collections.id, {
-      onDelete: "cascade",
-    }),
-    legacyOwnerCollectionUserId: uuid("owner_collection_user_id").references(
-      () => userProfiles.id,
-      { onDelete: "cascade" }
-    ),
   },
   (t) => ({
     hostCheck: check(
       "machine_view_saved_views_host_check",
       sql`${t.host} IN ('machines', 'issues')`
-    ),
-    legacySurfaceCheck: check(
-      "machine_view_saved_views_legacy_surface_check",
-      sql`${t.legacySurface} = 'machines' AND ${t.legacyCollectionId} IS NULL AND ${t.legacyOwnerCollectionUserId} IS NULL`
     ),
     nameNotBlank: check(
       "machine_view_saved_views_name_not_blank",
@@ -1492,8 +1479,8 @@ export const savedViews = pgTable(
  * An account's Default View on one List Host (spec list-views.md §10.9): one
  * of its Saved Views of that host or a Built-in View id. Only the host's main
  * page opens it (§10.10). Deleting the Saved View deletes the row, leaving the
- * host without a default (§10.13). Like {@link savedViews}, the SQL name and
- * the `legacy*` columns predate List Hosts; PP-jb9v.5 drops the columns.
+ * host without a default (§10.13). Like {@link savedViews}, the SQL name
+ * predates List Hosts.
  */
 export const savedViewDefaults = pgTable(
   "machine_view_defaults",
@@ -1501,7 +1488,7 @@ export const savedViewDefaults = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => userProfiles.id, { onDelete: "cascade" }),
-    host: text("host", { enum: LIST_HOSTS }).notNull().default("machines"),
+    host: text("host", { enum: LIST_HOSTS }).notNull(),
     savedViewId: uuid("saved_view_id").references(() => savedViews.id, {
       onDelete: "cascade",
     }),
@@ -1509,27 +1496,11 @@ export const savedViewDefaults = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
-    legacySurface: text("surface", {
-      enum: ["machines", "collection", "owner"],
-    })
-      .notNull()
-      .default("machines"),
-    legacyCollectionId: uuid("collection_id").references(() => collections.id, {
-      onDelete: "cascade",
-    }),
-    legacyOwnerCollectionUserId: uuid("owner_collection_user_id").references(
-      () => userProfiles.id,
-      { onDelete: "cascade" }
-    ),
   },
   (t) => ({
     hostCheck: check(
       "machine_view_defaults_host_check",
       sql`${t.host} IN ('machines', 'issues')`
-    ),
-    legacySurfaceCheck: check(
-      "machine_view_defaults_legacy_surface_check",
-      sql`${t.legacySurface} = 'machines' AND ${t.legacyCollectionId} IS NULL AND ${t.legacyOwnerCollectionUserId} IS NULL`
     ),
     targetCheck: check(
       "machine_view_defaults_target_check",

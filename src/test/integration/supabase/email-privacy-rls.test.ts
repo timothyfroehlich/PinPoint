@@ -9,8 +9,10 @@ import { withUserContext } from "~/server/db/utils/rls";
  * Integration tests for Email Privacy Row Level Security (RLS)
  *
  * These tests verify that:
- * 1. Administrators can see all emails in public_profiles_view.
- * 2. Members can ONLY see their own email in public_profiles_view.
+ * 1. Through the REST API, public_profiles_view returns only the caller's own
+ *    row, admin or not (user_profiles has an own-row SELECT policy, PP-7ruw).
+ * 2. Under session context, the view's CASE shows admins every email and
+ *    members only their own.
  * 3. Anonymous users cannot see any emails.
  */
 
@@ -86,10 +88,9 @@ describe("Email Privacy RLS Integration", () => {
     await adminClient.auth.admin.deleteUser(memberUser.id);
   });
 
-  it("Administrator can see all email addresses", async () => {
-    // We use the adminClient (service_role) which bypasses RLS,
-    // but the policy itself uses user_profiles role check.
-    // To test the policy correctly, we need a client authenticated as the admin.
+  it("Administrator sees only their own row through the REST view", async () => {
+    // The view is security_invoker, so the caller's own-row SELECT policy on
+    // user_profiles limits it to one row even for an admin (PP-7ruw).
     const authenticatedAdminClient = createClient(supabaseUrl, supabaseAnonKey);
     await authenticatedAdminClient.auth.signInWithPassword({
       email: adminUser.email,
@@ -101,26 +102,16 @@ describe("Email Privacy RLS Integration", () => {
       .select("id, email");
 
     expect(error).toBeNull();
-    const adminRecord = data?.find((r) => r.id === adminUser.id);
-    const memberRecord = data?.find((r) => r.id === memberUser.id);
-
-    expect(adminRecord?.email).toBe(adminUser.email);
-    expect(memberRecord?.email).toBe(memberUser.email);
+    expect(data).toEqual([{ id: adminUser.id, email: adminUser.email }]);
   });
 
-  it("Member can ONLY see their own email address", async () => {
+  it("Member sees only their own row and email through the REST view", async () => {
     const { data, error } = await memberClient
       .from("public_profiles_view")
       .select("id, email");
 
     expect(error).toBeNull();
-    const myRecord = data?.find((r) => r.id === memberUser.id);
-    const otherRecord = data?.find((r) => r.id === adminUser.id);
-
-    // Should see own email
-    expect(myRecord?.email).toBe(memberUser.email);
-    // Should NOT see other's email (masked to null by view)
-    expect(otherRecord?.email).toBeNull();
+    expect(data).toEqual([{ id: memberUser.id, email: memberUser.email }]);
   });
 
   it("Anonymous user cannot see any rows from public_profiles_view", async () => {
@@ -233,23 +224,13 @@ describe("Email Privacy RLS Integration", () => {
       expect(data).toHaveLength(0);
     });
 
-    it("user with user_metadata.role='admin' but user_profiles.role='member' cannot see other emails", async () => {
+    it("user with user_metadata.role='admin' but user_profiles.role='member' sees only their own row in public_profiles_view", async () => {
       const { data, error } = await spoofedClient
         .from("public_profiles_view")
         .select("id, email");
 
       expect(error).toBeNull();
-
-      // Should see own email
-      const ownProfile = data?.find((r) => r.id === spoofedUser.id);
-      expect(ownProfile?.email).toBe(spoofedUser.email);
-
-      // Should NOT see other users' emails (metadata 'admin' is ignored)
-      const otherProfiles = data?.filter((r) => r.id !== spoofedUser.id) ?? [];
-      expect(otherProfiles.length).toBeGreaterThan(0);
-      otherProfiles.forEach((profile) => {
-        expect(profile.email).toBeNull();
-      });
+      expect(data).toEqual([{ id: spoofedUser.id, email: spoofedUser.email }]);
     });
   });
 
@@ -283,10 +264,8 @@ describe("Email Privacy RLS Integration", () => {
       const ownProfile = profiles.find((p) => p.id === memberUser.id);
       expect(ownProfile?.email).toBe(memberUser.email);
 
-      // Note: RLS on SELECT * from a table doesn't mask columns - it filters ROWS.
-      // However, our policy for user_profiles is applied to UPDATE/DELETE.
-      // SELECT is generally public for user_profiles (except sensitive fields).
-      // The email privacy is enforced by the public_profiles_view.
+      // The Drizzle connection has BYPASSRLS, so this reads every row; the
+      // REST roles are limited to their own row by the user_profiles policy.
     });
 
     it("should enforce context isolation between transactions", async () => {

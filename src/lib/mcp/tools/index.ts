@@ -2,19 +2,45 @@ import "server-only";
 
 import type { McpServer } from "@modelcontextprotocol/server";
 
-import { registerAddIssueComment } from "./add-issue-comment";
-import { registerAddMachine } from "./add-machine";
-import { registerCreateIssue } from "./create-issue";
-import { registerCreateSettingsSet } from "./create-settings-set";
-import { registerGetIssue } from "./get-issue";
-import { registerGetMachine } from "./get-machine";
-import { registerListIssues } from "./list-issues";
-import { registerListMachines } from "./list-machines";
-import { registerListSettingsSets } from "./list-settings-sets";
-import { registerSearchPinballmapCatalog } from "./search-pinballmap-catalog";
-import { registerUpdateIssue } from "./update-issue";
-import { registerUpdateMachine } from "./update-machine";
-import { registerUpdateSettingsSet } from "./update-settings-set";
+import { addIssueCommentTool } from "./add-issue-comment";
+import { addMachineTool } from "./add-machine";
+import { createIssueTool } from "./create-issue";
+import { createSettingsSetTool } from "./create-settings-set";
+import { getIssueTool } from "./get-issue";
+import { getMachineTool } from "./get-machine";
+import { type ToolDefinition } from "./harness";
+import { listIssuesTool } from "./list-issues";
+import { listMachinesTool } from "./list-machines";
+import { listSettingsSetsTool } from "./list-settings-sets";
+import { searchPinballmapCatalogTool } from "./search-pinballmap-catalog";
+import { updateIssueTool } from "./update-issue";
+import { updateMachineTool } from "./update-machine";
+import { updateSettingsSetTool } from "./update-settings-set";
+
+/**
+ * The complete catalog of PinPoint MCP tools. Defined as an array so every tool
+ * is registered by definition — a tool cannot exist in the array without being
+ * registered on the server.
+ *
+ * A tool defined in `src/lib/mcp/tools/*.ts` that is not listed here is
+ * unreachable no matter how complete its handler is, which is what the
+ * "registers every tool in the catalog" integration test pins.
+ */
+export const PINPOINT_TOOLS: readonly ToolDefinition[] = [
+  listMachinesTool,
+  getMachineTool,
+  listIssuesTool,
+  getIssueTool,
+  searchPinballmapCatalogTool,
+  addMachineTool,
+  updateMachineTool,
+  createIssueTool,
+  addIssueCommentTool,
+  updateIssueTool,
+  listSettingsSetsTool,
+  createSettingsSetTool,
+  updateSettingsSetTool,
+];
 
 /**
  * Register the MCP tool catalog (spec §"Tool catalog") on an McpServer. Reads
@@ -26,22 +52,10 @@ import { registerUpdateSettingsSet } from "./update-settings-set";
  * (list, create, update), plus the PinballMap catalog lookup that identifies a
  * machine's title.
  *
- * This function is the catalog — a tool that ships without a call here is
- * unreachable no matter how complete its handler is, which is what the
- * "registers every tool in the catalog" integration test pins.
+ * This function registers every tool in {@link PINPOINT_TOOLS} on the server.
  */
 export function registerPinpointTools(server: McpServer): void {
-  registerListMachines(server);
-  registerGetMachine(server);
-  registerListIssues(server);
-  registerGetIssue(server);
-  registerSearchPinballmapCatalog(server);
-  registerAddMachine(server);
-  registerUpdateMachine(server);
-  registerCreateIssue(server);
-  registerAddIssueComment(server);
-  registerUpdateIssue(server);
-  registerListSettingsSets(server);
-  registerCreateSettingsSet(server);
-  registerUpdateSettingsSet(server);
+  for (const tool of PINPOINT_TOOLS) {
+    tool.register(server);
+  }
 }

@@ -54,7 +54,7 @@ export async function getMyCollections(
 
 /**
  * Count the machines owned by `ownerId`, leaving out Removed ones (PP-s363).
- * A dedicated count rather than `getOwnerCollection`, which eagerly loads every machine and its open issues.
+ * A dedicated count rather than loading every owned machine.
  */
 export async function getOwnedMachineCount(
   tx: DbTransaction = db,

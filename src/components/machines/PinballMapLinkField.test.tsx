@@ -199,6 +199,10 @@ describe("PinballMapLinkField — manual model entry", () => {
     const designers = screen.getByLabelText("Designers");
     await user.type(designers, "Python Anghelo, Jr.{Enter}");
     await user.type(screen.getByLabelText("Artists"), "Greg Freres");
+    await user.type(
+      screen.getByLabelText("Programmers"),
+      "Lyman F. Sheats Jr.{Enter}"
+    );
     // Leaving the box adds the name, so a name typed before Save still posts.
     await user.tab();
 
@@ -214,6 +218,7 @@ describe("PinballMapLinkField — manual model entry", () => {
       "Python Anghelo, Jr.",
     ]);
     expect(data.getAll("artists")).toEqual(["Greg Freres"]);
+    expect(data.getAll("programmers")).toEqual(["Lyman F. Sheats Jr."]);
   });
 
   it("removes one name at a time", async () => {

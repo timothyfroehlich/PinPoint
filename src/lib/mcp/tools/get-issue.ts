@@ -1,6 +1,5 @@
 import "server-only";
 
-import type { McpServer } from "@modelcontextprotocol/server";
 import { and, count, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
@@ -15,11 +14,11 @@ import { db } from "~/server/db";
 import { issueComments, userProfiles } from "~/server/db/schema";
 
 import {
+  defineTool,
   issueUrl,
   McpToolError,
   resolveIssue,
   READ_ONLY_TOOL_ANNOTATIONS,
-  runTool,
   type ToolOutcome,
 } from "./shared";
 import type { McpAuthContext } from "~/lib/mcp/verify-token";
@@ -183,17 +182,12 @@ export async function runGetIssue(
   };
 }
 
-export function registerGetIssue(server: McpServer): void {
-  server.registerTool(
-    "get_issue",
-    {
-      title: "Get issue detail",
-      description:
-        "Get full details for an issue by machine (initials or UUID) and issue number: title, description, status, severity, priority, frequency, reporter/assignee names, timestamps, and recent comment thread.",
-      inputSchema: getIssueSchema,
-      annotations: READ_ONLY_TOOL_ANNOTATIONS,
-    },
-    (args, extra) =>
-      runTool("get_issue", extra, (ctx) => runGetIssue(args, ctx))
-  );
-}
+export const getIssueTool = defineTool({
+  name: "get_issue",
+  title: "Get issue detail",
+  description:
+    "Get full details for an issue by machine (initials or UUID) and issue number: title, description, status, severity, priority, frequency, reporter/assignee names, timestamps, and recent comment thread.",
+  inputSchema: getIssueSchema,
+  annotations: READ_ONLY_TOOL_ANNOTATIONS,
+  run: runGetIssue,
+});

@@ -4,6 +4,7 @@ import {
   type ListFilterModel,
   type ListOption,
 } from "~/components/list-view/types";
+import { formatCalendarDay } from "~/lib/dates";
 import {
   FREQUENCY_CONFIG,
   OPEN_STATUSES,
@@ -65,15 +66,8 @@ export const STATUS_FILTER_GROUP_NAMES: Record<
 /** The status groups in the Status filter's order. */
 const STATUS_FILTER_GROUPS = ["new", "in_progress", "closed"] as const;
 
-const dayFormat = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric",
-  year: "numeric",
-  timeZone: "UTC",
-});
-
 function formatDay(day: string): string {
-  return dayFormat.format(new Date(`${day}T00:00:00Z`));
+  return formatCalendarDay(day) ?? day;
 }
 
 /** How a Created or Updated range reads on its control (list-views §4.3). */

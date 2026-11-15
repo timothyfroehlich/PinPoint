@@ -125,6 +125,7 @@ export interface ApronCardContent {
   credits: MachineCredits;
   designEnabled: boolean;
   artEnabled: boolean;
+  codeEnabled: boolean;
   /** Whether the machine has PinTips, which adds the playing tips row (5.4). */
   hasPinTips: boolean;
 }
@@ -152,6 +153,7 @@ export interface ApronCardSettings {
   tipEnabled: boolean;
   designEnabled: boolean;
   artEnabled: boolean;
+  codeEnabled: boolean;
 }
 
 /** A machine's saved card as the Apron card tab reads it (spec §11). */
@@ -188,7 +190,12 @@ export function groupedEdition(
 /** Identity lines and credits — everything on a card but its settings. */
 export type ApronCardIdentity = Omit<
   ApronCardContent,
-  "description" | "tip" | "tipEnabled" | "designEnabled" | "artEnabled"
+  | "description"
+  | "tip"
+  | "tipEnabled"
+  | "designEnabled"
+  | "artEnabled"
+  | "codeEnabled"
 >;
 
 export function apronCardIdentity(
@@ -232,6 +239,8 @@ export function cardFaceContent(
     tipEnabled: card?.tipEnabled ?? false,
     designEnabled: card?.designEnabled ?? true,
     artEnabled: card?.artEnabled ?? true,
+    // Off by default (spec 10.5): most games carry no code credit.
+    codeEnabled: card?.codeEnabled ?? false,
   };
 }
 
@@ -252,14 +261,20 @@ export function apronCardContent(
 export const APRON_CREDIT_MAX_NAMES = 2;
 
 export interface ApronCreditRow {
-  label: "Design" | "Art";
+  label: "Design" | "Art" | "Code";
   /** The names, or "Unknown" when the role has none (spec 10.4). */
   text: string;
 }
 
-/** The identity panel's credit rows, Design then Art, for enabled roles. */
+/**
+ * The identity panel's credit rows, Design, Art, then Code, for enabled roles
+ * (spec 10.2).
+ */
 export function apronCreditRows(
-  content: Pick<ApronCardContent, "credits" | "designEnabled" | "artEnabled">
+  content: Pick<
+    ApronCardContent,
+    "credits" | "designEnabled" | "artEnabled" | "codeEnabled"
+  >
 ): ApronCreditRow[] {
   const rows: ApronCreditRow[] = [];
   const row = (label: ApronCreditRow["label"], names: string[]): void => {
@@ -270,6 +285,7 @@ export function apronCreditRows(
   };
   if (content.designEnabled) row("Design", content.credits.design);
   if (content.artEnabled) row("Art", content.credits.art);
+  if (content.codeEnabled) row("Code", content.credits.code);
   return rows;
 }
 

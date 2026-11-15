@@ -48,13 +48,6 @@ const KIND: Record<
   },
 };
 
-/** The confirming person's own calendar date, `YYYY-MM-DD`. */
-function localToday(): string {
-  const now = new Date();
-  const pad = (n: number): string => String(n).padStart(2, "0");
-  return `${String(now.getFullYear())}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-}
-
 function plural(n: number, one: string, many: string): string {
   return `${String(n)} ${n === 1 ? one : many}`;
 }
@@ -100,10 +93,8 @@ export function ConfirmLineupButton({
 
   function confirm(): void {
     setError(null);
-    const formData = new FormData();
-    formData.set("today", localToday());
     startConfirm(async () => {
-      const result = await confirmPinballmapLineupAction(undefined, formData);
+      const result = await confirmPinballmapLineupAction();
       if (!result.ok) {
         setError(result.message);
         // A refused token marks the link for relinking and revalidates the

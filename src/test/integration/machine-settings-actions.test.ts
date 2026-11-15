@@ -896,8 +896,256 @@ describe("Machine settings Server Actions", () => {
     ).toEqual({ success: false, error: "Forbidden" });
     expect(await tagSlugs(set.id)).toEqual(["house", "tournament"]);
 
+    // §3.1: a custom tag goes on any set on any machine, named by id.
+    const custom = await makeSettingsTag("Bat City 2025");
+    await mockAuth(owner.id);
+    expect(
+      await setSettingsSetTagAction({
+        id: set.id,
+        tag: { tagId: custom.id },
+        applied: true,
+      })
+    ).toEqual({ success: true });
+    expect(await tagSlugs(set.id)).toEqual([
+      "bat-city-2025",
+      "house",
+      "tournament",
+    ]);
+    await mockAuth(otherOwner.id);
+    expect(
+      await setSettingsSetTagAction({
+        id: set.id,
+        tag: { tagId: custom.id },
+        applied: false,
+      })
+    ).toEqual({ success: false, error: "Forbidden" });
+    await mockAuth(tech.id);
+    expect(
+      await setSettingsSetTagAction({
+        id: set.id,
+        tag: { tagId: randomUUID() },
+        applied: true,
+      })
+    ).toEqual({ success: false, error: "Settings tag not found" });
+
     // Tagging never changes contents, so the set's version is untouched.
     expect((await reload(set.id))?.updatedAt.getTime()).toBe(old.getTime());
+
+    // §5.1: the event names the tag.
+    const tagged = await db
+      .select({ eventData: timelineEvents.eventData })
+      .from(timelineEvents)
+      .where(eq(timelineEvents.machineId, machine.id));
+    expect(tagged.map((e) => e.eventData)).toContainEqual({
+      kind: "settings_set_tagged",
+      setName: "A set",
+      tagName: "Bat City 2025",
+      added: true,
+    });
+  });
+
+  // -- §3.3 settings tags ----------------------------------------------------
+
+  const loadTagActions = () => import("~/app/(app)/c/settings-tags/actions");
+
+  /** Create a custom settings tag as a technician, through the action. */
+  async function makeSettingsTag(name: string) {
+    const tech = await makeUser("technician");
+    await mockAuth(tech.id);
+    const { createSettingsTagAction } = await loadTagActions();
+    const created = await createSettingsTagAction({ name });
+    if (!created.ok) throw new Error(`tag setup failed: ${created.message}`);
+    return created.value;
+  }
+
+  it("§3.3 create: technicians and admins create a tag with a slug from its name; members, owners, and anonymous visitors are refused", async () => {
+    const { createSettingsTagAction } = await loadTagActions();
+    const owner = await makeUser("member");
+    await makeMachine(owner.id);
+
+    await mockAuth(null);
+    expect(await createSettingsTagAction({ name: "Nope" })).toMatchObject({
+      ok: false,
+      code: "UNAUTHORIZED",
+    });
+    await mockAuth(owner.id);
+    expect(await createSettingsTagAction({ name: "Nope" })).toMatchObject({
+      ok: false,
+      code: "FORBIDDEN",
+    });
+
+    const tech = await makeUser("technician");
+    await mockAuth(tech.id);
+    expect(
+      await createSettingsTagAction({ name: "  Bat   City 2025 " })
+    ).toMatchObject({
+      ok: true,
+      value: { slug: "bat-city-2025", name: "Bat City 2025" },
+    });
+
+    const admin = await makeUser("admin");
+    await mockAuth(admin.id);
+    expect(await createSettingsTagAction({ name: "Kids night" })).toMatchObject(
+      { ok: true, value: { slug: "kids-night" } }
+    );
+
+    const db = await getTestDb();
+    const names = await db
+      .select({ name: settingsTags.name })
+      .from(settingsTags)
+      .where(eq(settingsTags.isBuiltin, false));
+    expect(names.map((n) => n.name).sort()).toEqual([
+      "Bat City 2025",
+      "Kids night",
+    ]);
+  });
+
+  it("§3.3 names are unique ignoring capitalization and extra whitespace, at most 20 characters; a slug collision gets a suffix", async () => {
+    await makeSettingsTag("Bat City 2025");
+    const { createSettingsTagAction } = await loadTagActions();
+
+    expect(await createSettingsTagAction({ name: " bat  CITY 2025" })).toEqual({
+      ok: false,
+      code: "CONFLICT",
+      message: "“Bat City 2025” already exists",
+    });
+    expect(await createSettingsTagAction({ name: "house" })).toEqual({
+      ok: false,
+      code: "CONFLICT",
+      message: "“House” already exists",
+    });
+    expect(
+      await createSettingsTagAction({ name: "x".repeat(21) })
+    ).toMatchObject({ ok: false, code: "VALIDATION" });
+    expect(await createSettingsTagAction({ name: "   " })).toMatchObject({
+      ok: false,
+      code: "VALIDATION",
+    });
+
+    // A different name with the same slug base takes the next free slug.
+    expect(
+      await createSettingsTagAction({ name: "Bat City 2025!" })
+    ).toMatchObject({ ok: true, value: { slug: "bat-city-2025-2" } });
+  });
+
+  it("§3.3 rename keeps the slug, refuses a taken name, and leaves House and Tournament alone", async () => {
+    const tag = await makeSettingsTag("Bat City");
+    await makeSettingsTag("Kids night");
+    const { renameSettingsTagAction } = await loadTagActions();
+
+    expect(
+      await renameSettingsTagAction({ tagId: tag.id, name: "Bat City 2025" })
+    ).toEqual({ ok: true, value: undefined });
+    const db = await getTestDb();
+    expect(
+      await db.query.settingsTags.findFirst({
+        where: eq(settingsTags.id, tag.id),
+        columns: { slug: true, name: true },
+      })
+    ).toEqual({ slug: "bat-city", name: "Bat City 2025" });
+
+    expect(
+      await renameSettingsTagAction({ tagId: tag.id, name: "kids  NIGHT" })
+    ).toEqual({
+      ok: false,
+      code: "CONFLICT",
+      message: "“Kids night” already exists",
+    });
+    // Changing only its capitalization is the same tag, not a clash.
+    expect(
+      await renameSettingsTagAction({ tagId: tag.id, name: "bat city 2025" })
+    ).toEqual({ ok: true, value: undefined });
+
+    const builtin = await ensureBuiltinSettingsTags();
+    expect(
+      await renameSettingsTagAction({ tagId: builtin.house, name: "Home" })
+    ).toEqual({
+      ok: false,
+      code: "VALIDATION",
+      message: "House is built in and can't be changed.",
+    });
+
+    const member = await makeUser("member");
+    await mockAuth(member.id);
+    expect(
+      await renameSettingsTagAction({ tagId: tag.id, name: "Mine" })
+    ).toMatchObject({ ok: false, code: "FORBIDDEN" });
+  });
+
+  it("§3.3 delete takes the tag off every set, keeps the sets, and records each removal; built-ins and non-managers are refused", async () => {
+    const db = await getTestDb();
+    const machineA = await makeMachine();
+    const machineB = await makeMachine();
+    const setA = await insertSet(machineA.id, { name: "A finals" });
+    const setB = await insertSet(machineB.id, { name: "B finals" });
+    const tag = await makeSettingsTag("Bat City 2025");
+    await db.insert(machineSettingsSetTags).values([
+      { setId: setA.id, tagId: tag.id },
+      { setId: setB.id, tagId: tag.id },
+    ]);
+    const { deleteSettingsTagAction } = await loadTagActions();
+
+    const builtin = await ensureBuiltinSettingsTags();
+    expect(
+      await deleteSettingsTagAction({ tagId: builtin.tournament })
+    ).toMatchObject({ ok: false, code: "VALIDATION" });
+
+    const member = await makeUser("member");
+    await mockAuth(member.id);
+    expect(await deleteSettingsTagAction({ tagId: tag.id })).toMatchObject({
+      ok: false,
+      code: "FORBIDDEN",
+    });
+
+    const admin = await makeUser("admin");
+    await mockAuth(admin.id);
+    expect(await deleteSettingsTagAction({ tagId: tag.id })).toEqual({
+      ok: true,
+      value: undefined,
+    });
+    expect(
+      await db.query.settingsTags.findFirst({
+        where: eq(settingsTags.id, tag.id),
+      })
+    ).toBeUndefined();
+    expect(await tagSlugs(setA.id)).toEqual(["house"]);
+    expect(await tagSlugs(setB.id)).toEqual(["house"]);
+    expect(await reload(setA.id)).toBeDefined();
+
+    const removed = await db
+      .select({
+        machineId: timelineEvents.machineId,
+        eventData: timelineEvents.eventData,
+      })
+      .from(timelineEvents)
+      .where(eq(timelineEvents.authorId, admin.id));
+    expect(removed).toEqual(
+      expect.arrayContaining([
+        {
+          machineId: machineA.id,
+          eventData: {
+            kind: "settings_set_tagged",
+            setName: "A finals",
+            tagName: "Bat City 2025",
+            added: false,
+          },
+        },
+        {
+          machineId: machineB.id,
+          eventData: {
+            kind: "settings_set_tagged",
+            setName: "B finals",
+            tagName: "Bat City 2025",
+            added: false,
+          },
+        },
+      ])
+    );
+
+    expect(await deleteSettingsTagAction({ tagId: tag.id })).toMatchObject({
+      ok: false,
+      code: "NOT_FOUND",
+    });
   });
 
   // -- §4 preferred sets -----------------------------------------------------
@@ -922,8 +1170,7 @@ describe("Machine settings Server Actions", () => {
       })
     ).toEqual({
       success: false,
-      error:
-        "Only a set tagged Tournament can be the preferred Tournament set.",
+      error: "Only a set tagged Tournament can be the default Tournament set.",
     });
     expect((await reload(set.id))?.isPreferredTournament).toBe(false);
 
@@ -947,7 +1194,19 @@ describe("Machine settings Server Actions", () => {
       })
     ).toEqual({
       success: false,
-      error: "Unset the preferred House set before removing its tag.",
+      error: "Clear the default House set before removing its tag.",
+    });
+    // The lock holds when the tag is named by id too.
+    const builtin = await ensureBuiltinSettingsTags();
+    expect(
+      await setSettingsSetTagAction({
+        id: set.id,
+        tag: { tagId: builtin.house },
+        applied: false,
+      })
+    ).toEqual({
+      success: false,
+      error: "Clear the default House set before removing its tag.",
     });
     expect(await tagSlugs(set.id)).toEqual(["house"]);
 
