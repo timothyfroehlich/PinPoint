@@ -3,7 +3,6 @@ import {
   hasCookieConsent,
   storeChangelogSeen,
   storeCookieConsent,
-  storeLastIssuesPath,
 } from "./client";
 
 describe("client cookie utilities", () => {
@@ -31,32 +30,9 @@ describe("client cookie utilities", () => {
     vi.unstubAllGlobals();
   });
 
-  describe("storeLastIssuesPath", () => {
-    it("sets cookie with correct name and value", () => {
-      storeLastIssuesPath("/issues?q=test");
-
-      expect(cookieSetter).toHaveBeenCalledTimes(1);
-      const cookieString = cookieSetter.mock.calls[0][0];
-      expect(cookieString).toContain("lastIssuesPath=");
-      expect(cookieString).toContain(encodeURIComponent("/issues?q=test"));
-    });
-
-    it("sets cookie with 1 year max-age", () => {
-      storeLastIssuesPath("/issues");
-
-      const cookieString = cookieSetter.mock.calls[0][0];
-      expect(cookieString).toContain("max-age=31536000"); // 1 year in seconds
-    });
-
-    it("sets SameSite=Lax", () => {
-      storeLastIssuesPath("/issues");
-
-      const cookieString = cookieSetter.mock.calls[0][0];
-      expect(cookieString).toContain("SameSite=Lax");
-    });
-
+  describe("storeCookieConsent", () => {
     it("does not set Secure flag on http", () => {
-      storeLastIssuesPath("/issues");
+      storeCookieConsent();
 
       const cookieString = cookieSetter.mock.calls[0][0];
       expect(cookieString).not.toContain("Secure");
@@ -65,23 +41,12 @@ describe("client cookie utilities", () => {
     it("sets Secure flag on https", () => {
       vi.stubGlobal("location", { protocol: "https:" });
 
-      storeLastIssuesPath("/issues");
+      storeCookieConsent();
 
       const cookieString = cookieSetter.mock.calls[0][0];
       expect(cookieString).toContain("Secure");
     });
 
-    it("encodes special characters in path", () => {
-      storeLastIssuesPath("/issues?q=test&severity=major");
-
-      const cookieString = cookieSetter.mock.calls[0][0];
-      expect(cookieString).toContain(
-        encodeURIComponent("/issues?q=test&severity=major")
-      );
-    });
-  });
-
-  describe("storeCookieConsent", () => {
     it("sets cookie with correct name and value", () => {
       storeCookieConsent();
 
@@ -117,7 +82,7 @@ describe("client cookie utilities", () => {
     it("returns true when consent cookie exists among other cookies", () => {
       Object.defineProperty(document, "cookie", {
         set: cookieSetter,
-        get: () => "cookieConsent=true; lastIssuesPath=%2Fissues",
+        get: () => "cookieConsent=true; changelogSeen=3",
         configurable: true,
       });
 

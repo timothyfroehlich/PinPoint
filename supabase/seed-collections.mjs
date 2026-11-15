@@ -18,18 +18,16 @@
  * allowlist costs nothing and closes the "prod env loaded in this shell" path.
  */
 
-import postgres from "postgres";
+import {
+  createScriptClient,
+  resolveScriptDatabaseUrl,
+} from "../scripts/lib/pg-client.mjs";
 
 import { assertLocalDatabase } from "../scripts/assert-local-db.mjs";
 
 // Pooled POSTGRES_URL (:6543, IPv4) like the other seed scripts — NOT the
 // :5432 non-pooling URL, which is IPv6 and unreachable from CI runners.
-const databaseUrl = process.env.POSTGRES_URL;
-
-if (!databaseUrl) {
-  console.error("❌ POSTGRES_URL is not defined");
-  process.exit(1);
-}
+const databaseUrl = resolveScriptDatabaseUrl();
 
 // Before the client is constructed and before any network call: loopback only.
 assertLocalDatabase(databaseUrl);
@@ -50,7 +48,7 @@ const MACHINE_NAMES = [
 ];
 
 async function run() {
-  const sql = postgres(databaseUrl);
+  const sql = createScriptClient(databaseUrl);
   try {
     const [admin] = await sql`
       SELECT id FROM user_profiles WHERE email = 'admin@test.com' LIMIT 1

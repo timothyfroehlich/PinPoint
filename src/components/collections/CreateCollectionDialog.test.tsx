@@ -9,6 +9,37 @@ vi.mock("~/app/(app)/c/collections/actions", () => ({
   createCollectionAction: (input: unknown) => createAction(input),
 }));
 
+// The real editor is a dynamic TipTap import. Swap it for an uncontrolled
+// textarea that starts from `content` and pushes a ProseMirror-shaped doc
+// through the same onChange contract.
+vi.mock("~/components/editor/RichTextEditorDynamic", () => ({
+  RichTextEditor: ({
+    content,
+    onChange,
+    ariaLabel,
+  }: {
+    content: { content?: { content?: { text?: string }[] }[] } | null;
+    onChange: (doc: unknown) => void;
+    ariaLabel: string;
+  }) => (
+    <textarea
+      aria-label={ariaLabel}
+      defaultValue={content?.content?.[0]?.content?.[0]?.text ?? ""}
+      onChange={(e) => onChange(paragraphDoc(e.target.value))}
+    />
+  ),
+}));
+
+function paragraphDoc(text: string): {
+  type: "doc";
+  content: { type: string; content: { type: string; text: string }[] }[];
+} {
+  return {
+    type: "doc",
+    content: [{ type: "paragraph", content: [{ type: "text", text }] }],
+  };
+}
+
 // The multi-select is the shared MultiSelect (Popover + cmdk) — jsdom stubs.
 class MockResizeObserver {
   observe = vi.fn();
@@ -34,17 +65,22 @@ describe("CreateCollectionDialog", () => {
     push.mockReset();
   });
 
-  it("creates with the typed name and navigates to the new collection", async () => {
+  it("creates with the typed name and description and navigates to the new collection", async () => {
     createAction.mockResolvedValue({ success: true, data: { id: "new-id" } });
     render(<CreateCollectionDialog allMachines={allMachines} />);
 
     await userEvent.click(screen.getByTestId("create-collection-trigger"));
     await userEvent.type(screen.getByLabelText(/name/i), "Tournament Bank");
+    await userEvent.type(
+      screen.getByRole("textbox", { name: "Description" }),
+      "Thursday league"
+    );
     await userEvent.click(screen.getByTestId("create-collection-submit"));
 
     await waitFor(() =>
       expect(createAction).toHaveBeenCalledWith({
         name: "Tournament Bank",
+        description: paragraphDoc("Thursday league"),
         machineIds: [],
       })
     );

@@ -104,14 +104,6 @@ describe("AddCommentForm", () => {
     mockUseActionState.mockReturnValue([undefined, vi.fn(), false]);
   });
 
-  it("renders correctly", () => {
-    render(<AddCommentForm issueId="123" userId="user-1" />);
-    // "Add Comment" text is present when not pending
-    expect(
-      screen.getByRole("button", { name: "Add Comment" })
-    ).toBeInTheDocument();
-  });
-
   it("names the quick composer's formatting toggle by its visible text (WCAG 2.5.3)", () => {
     render(<AddCommentForm issueId="123" userId="user-1" quick />);
     expect(

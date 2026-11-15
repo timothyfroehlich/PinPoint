@@ -1,4 +1,4 @@
-import type { ImageMetadata } from "~/types/images";
+import type { ImageMetadata } from "~/lib/types/images";
 import { BLOB_CONFIG, type AllowedMimeType } from "./config";
 
 /**

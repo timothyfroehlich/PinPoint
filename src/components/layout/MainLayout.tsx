@@ -1,25 +1,19 @@
 import type React from "react";
-import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import {
-  notifications,
-  userProfiles,
-  issues,
-  machines,
-} from "~/server/db/schema";
+import { notifications, issues, machines } from "~/server/db/schema";
 import { eq, desc, inArray } from "drizzle-orm";
 import { type EnrichedNotification } from "~/components/notifications/NotificationList";
-import { ensureUserProfile } from "~/lib/auth/profile";
+import { getHealedViewer } from "~/lib/auth/viewer";
 import { AppHeader } from "./AppHeader";
 import { BottomTabBar } from "./BottomTabBar";
 import changelogMeta from "@content/changelog-meta.json";
-import { getLastIssuesPath, getChangelogSeen } from "~/lib/cookies/preferences";
+import { getChangelogSeen } from "~/lib/cookies/preferences";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import {
   reportModePath,
   resolveDefaultReportMode,
 } from "~/lib/report/default-mode";
-import type { ReportMode } from "~/lib/types/user";
+import { LIST_PAGER_SLOT_ID } from "~/components/list-view/pager-slot";
 import { QuickSearchProvider } from "./QuickSearch";
 
 export async function MainLayout({
@@ -28,10 +22,7 @@ export async function MainLayout({
   children: React.ReactNode;
 }): Promise<React.JSX.Element> {
   // Read user preferences from cookies (server-side)
-  const [issuesPath, changelogSeen] = await Promise.all([
-    getLastIssuesPath(),
-    getChangelogSeen(),
-  ]);
+  const changelogSeen = await getChangelogSeen();
 
   // Compute unread changelog count from metadata file
   const newChangelogCount = Math.max(
@@ -39,24 +30,15 @@ export async function MainLayout({
     changelogMeta.totalEntries - changelogSeen
   );
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Shares the request's getUser() and profile read with the page
+  // (getViewer), and heals a missing profile row.
+  const { userId, profile: userProfile } = await getHealedViewer();
 
   let enrichedNotifications: EnrichedNotification[] = [];
-  let userProfile:
-    | {
-        name: string;
-        role: "guest" | "member" | "technician" | "admin";
-        mobileReportMode: ReportMode;
-        desktopReportMode: ReportMode;
-      }
-    | undefined;
 
-  if (user) {
+  if (userId) {
     const userNotifications = await db.query.notifications.findMany({
-      where: eq(notifications.userId, user.id),
+      where: eq(notifications.userId, userId),
       orderBy: [desc(notifications.createdAt)],
       limit: 20,
     });
@@ -119,36 +101,10 @@ export async function MainLayout({
         issueNumber,
       };
     });
-
-    userProfile = await db.query.userProfiles.findFirst({
-      where: eq(userProfiles.id, user.id),
-      columns: {
-        name: true,
-        role: true,
-        mobileReportMode: true,
-        desktopReportMode: true,
-      },
-    });
-
-    if (!userProfile) {
-      // Auto-heal profile if missing (e.g. after DB reset)
-      await ensureUserProfile(user);
-
-      // Refetch profile after healing
-      userProfile = await db.query.userProfiles.findFirst({
-        where: eq(userProfiles.id, user.id),
-        columns: {
-          name: true,
-          role: true,
-          mobileReportMode: true,
-          desktopReportMode: true,
-        },
-      });
-    }
   }
 
   const canMultiple =
-    Boolean(user) &&
+    Boolean(userId) &&
     checkPermission("issues.report.quick", getAccessLevel(userProfile?.role));
   const mobileReportHref = reportModePath(
     resolveDefaultReportMode(
@@ -170,12 +126,11 @@ export async function MainLayout({
       <div className="flex h-full flex-col bg-background text-foreground">
         {/* Unified AppHeader — always rendered, adapts at md: breakpoint */}
         <AppHeader
-          isAuthenticated={!!user}
+          isAuthenticated={!!userId}
           userName={userProfile?.name ?? "User"}
           role={userProfile?.role}
-          userId={user?.id}
+          userId={userId}
           notifications={enrichedNotifications}
-          issuesPath={issuesPath}
           newChangelogCount={newChangelogCount}
           reportHref={desktopReportHref}
         />
@@ -199,14 +154,13 @@ export async function MainLayout({
           <div className="@container px-4 sm:px-8 lg:px-10 pb-[calc(88px+env(safe-area-inset-bottom))] [&:has([data-machine-scan-hub])]:pb-0 md:pb-0">
             {children}
           </div>
+          {/* A List View's phone pager renders here, outside the size
+              container above (list-views §7.8; see LIST_PAGER_SLOT_ID). */}
+          <div id={LIST_PAGER_SLOT_ID} />
         </main>
 
         {/* Fixed bottom tab bar — mobile only (md:hidden is applied inside the component) */}
-        <BottomTabBar
-          role={userProfile?.role}
-          issuesPath={issuesPath}
-          reportHref={mobileReportHref}
-        />
+        <BottomTabBar role={userProfile?.role} reportHref={mobileReportHref} />
       </div>
     </QuickSearchProvider>
   );

@@ -584,6 +584,7 @@ describe("updateMachineAction intent carry-over (PGlite)", () => {
     fd.append("designers", " Steve Ritchie ");
     fd.append("designers", "");
     fd.append("artists", "John Youssi");
+    fd.append("programmers", "Larry DeMar");
     expectOk(await updateMachineAction(undefined, fd));
 
     const row = await db.query.machines.findFirst({
@@ -598,6 +599,7 @@ describe("updateMachineAction intent carry-over (PGlite)", () => {
     expect(row?.playerCount).toBe(4);
     expect(row?.designers).toEqual(["Lawlor, Pat", "Steve Ritchie"]);
     expect(row?.artists).toEqual(["John Youssi"]);
+    expect(row?.programmers).toEqual(["Larry DeMar"]);
   });
 
   it("stores an emptied credit list as null", async () => {

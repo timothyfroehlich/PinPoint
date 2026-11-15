@@ -1,6 +1,5 @@
 // sm-structural-allow-file: dev-only design system showcase, viewport breakpoints intentional for preview grids
 import type React from "react";
-import { redirect } from "next/navigation";
 import { IssueBadge } from "~/components/issues/IssueBadge";
 import { IssueBadgeGrid } from "~/components/issues/IssueBadgeGrid";
 import { IssueCard } from "~/components/issues/IssueCard";
@@ -19,11 +18,6 @@ import { Inbox, SearchX, Plus } from "lucide-react";
  * Dev-only — useful for visual consistency auditing and design iteration.
  */
 export default function DesignSystemPage(): React.JSX.Element {
-  // Gate to development only
-  if (process.env["VERCEL_ENV"] === "production") {
-    redirect("/dashboard");
-  }
-
   return (
     <div className="max-w-6xl mx-auto py-10 space-y-16">
       {/* Page Header */}

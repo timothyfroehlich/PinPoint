@@ -1,9 +1,11 @@
 import "server-only";
+import { DISCORD_API, DISCORD_TIMEOUT_MS } from "~/lib/discord/api";
+import {
+  safeFetch as externalFetch,
+  withRetryAfter,
+} from "~/lib/http/external";
 import { log } from "~/lib/logger";
 import { assertNotInTransaction } from "~/server/db/transaction-context";
-
-const DISCORD_API = "https://discord.com/api/v10";
-const MAX_RETRY_AFTER_SECONDS = 5;
 
 /**
  * Outcome of any Discord message send.
@@ -117,10 +119,21 @@ async function openDmChannel(
   });
   if (!res.ok) return { ok: false, result: await classify(res) };
 
-  const json = (await res.json()) as { id?: string };
-  if (!json.id)
+  // The request deadline also covers this body read, so a body that stalls
+  // rejects here; like a body without an id, that is a transient failure,
+  // never a throw out of sendDm.
+  let body: unknown;
+  try {
+    body = await res.json();
+  } catch {
     return { ok: false, result: { ok: false, reason: "transient" } };
-  return { ok: true, channelId: json.id };
+  }
+  const id =
+    typeof body === "object" && body !== null && "id" in body ? body.id : null;
+  if (typeof id !== "string" || id.length === 0) {
+    return { ok: false, result: { ok: false, reason: "transient" } };
+  }
+  return { ok: true, channelId: id };
 }
 
 async function postMessage(
@@ -148,23 +161,17 @@ async function postMessage(
       body: JSON.stringify(payload),
     });
 
-  let res = await send();
-  if (res.status === 429) {
-    const retryAfterSec = parseRetryAfter(res);
-    if (retryAfterSec > MAX_RETRY_AFTER_SECONDS) {
-      log.warn(
-        {
-          retryAfterSec,
-          action: "sendDm.rateLimit",
-        },
-        "Discord retry-after exceeds inline retry budget"
-      );
-      return { ok: false, reason: "rate_limited" };
-    }
-    await sleep(retryAfterSec * 1000);
-    res = await send();
-    if (res.status === 429) return { ok: false, reason: "rate_limited" };
-  }
+  const sent = await withRetryAfter(send, (retryAfterSec) => {
+    log.warn(
+      {
+        retryAfterSec,
+        action: "sendDm.rateLimit",
+      },
+      "Discord retry-after exceeds inline retry budget"
+    );
+  });
+  if (sent.rateLimited) return { ok: false, reason: "rate_limited" };
+  const res = sent.response;
   if (!res.ok) return classify(res);
   return { ok: true };
 }
@@ -244,13 +251,14 @@ async function readDiscordErrorCode(res: Response): Promise<number | null> {
   }
 }
 
-async function safeFetch(url: string, init: RequestInit): Promise<Response> {
-  try {
-    return await fetch(url, init);
-  } catch (err) {
-    log.warn({ err, url, action: "sendDm.fetch" }, "Discord fetch failed");
-    return new Response(null, { status: 599 });
-  }
+function safeFetch(url: string, init: RequestInit): Promise<Response> {
+  return externalFetch(url, init, {
+    timeoutMs: DISCORD_TIMEOUT_MS,
+    networkErrorLog: {
+      fields: { url, action: "sendDm.fetch" },
+      message: "Discord fetch failed",
+    },
+  });
 }
 
 function authHeaders(botToken: string): Record<string, string> {
@@ -258,19 +266,4 @@ function authHeaders(botToken: string): Record<string, string> {
     Authorization: `Bot ${botToken}`,
     "Content-Type": "application/json",
   };
-}
-
-function parseRetryAfter(res: Response): number {
-  const header = res.headers.get("retry-after");
-  if (header) {
-    const n = Number.parseFloat(header);
-    if (Number.isFinite(n)) return n;
-  }
-  return 1;
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    globalThis.setTimeout(resolve, ms);
-  });
 }

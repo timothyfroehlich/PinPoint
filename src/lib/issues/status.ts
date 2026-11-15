@@ -82,6 +82,7 @@ export const NEW_STATUSES = STATUS_GROUPS.new;
 export const IN_PROGRESS_STATUSES = STATUS_GROUPS.in_progress;
 export const CLOSED_STATUSES = STATUS_GROUPS.closed;
 export const OPEN_STATUS_GROUPS = ["new", "in_progress"] as const;
+export type OpenStatusGroup = (typeof OPEN_STATUS_GROUPS)[number];
 
 // Convenience exports for common groupings
 export const OPEN_STATUSES = [

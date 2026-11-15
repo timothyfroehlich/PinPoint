@@ -93,12 +93,12 @@ a blank Full-E2E cell is often correct by design) is in the
 
 ## Collections & tags
 
-| Feature surface                    | Unit | Integration | Smoke | Full E2E | Representative tests                                                                                                                                                     |
-| ---------------------------------- | :--: | :---------: | :---: | :------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Collections CRUD & view            |  ✓   |      ✓      |   ✓   |    ✓     | `components/collections/CreateCollectionDialog.test.tsx`, `collections-actions.test.ts`, `e2e/smoke/collection-view.spec.ts`, `e2e/full/collection-edit-sharing.spec.ts` |
-| Collaborators & share / view links |  ✓   |      ✓      |       |    ✓     | `components/collections/CollectionShareDialog.test.tsx`, `collections-collaborators.test.ts`, `e2e/full/collection-edit-sharing.spec.ts`                                 |
-| Owner collections                  |      |      ✓      |       |          | `collections-owner.test.ts`, `collections-user.test.ts`                                                                                                                  |
-| Tags (OPDB / manufacturer)         |  ✓   |      ✓      |       |          | `lib/tags/opdb.test.ts`, `opdb-tags.test.ts`, `manufacturer-tags.test.ts`                                                                                                |
+| Feature surface                    | Unit | Integration | Smoke | Full E2E | Representative tests                                                                                                                                                                             |
+| ---------------------------------- | :--: | :---------: | :---: | :------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Collections CRUD & view            |  ✓   |      ✓      |   ✓   |    ✓     | `components/collections/CreateCollectionDialog.test.tsx`, `collections-actions.test.ts`, `collections-user.test.ts`, `e2e/smoke/collections.spec.ts`, `e2e/full/collection-edit-sharing.spec.ts` |
+| Collaborators & share / view links |  ✓   |      ✓      |       |    ✓     | `components/collections/CollectionShareDialog.test.tsx`, `collections-collaborators.test.ts`, `e2e/full/collection-edit-sharing.spec.ts`                                                         |
+| A person's machines (Owner filter) |  ✓   |      ✓      |   ✓   |          | `test/unit/components/profiles/owned-machines.test.tsx`, `issue-export-scope.test.ts`, `e2e/smoke/owner-machines.spec.ts`                                                                        |
+| Tags (OPDB / manufacturer)         |  ✓   |      ✓      |       |          | `lib/tags/opdb.test.ts`, `opdb-tags.test.ts`, `manufacturer-tags.test.ts`                                                                                                                        |
 
 ## PinballMap integration
 
@@ -175,27 +175,27 @@ a blank Full-E2E cell is often correct by design) is in the
 
 ## MCP server & API routes
 
-| Feature surface                         | Unit | Integration | Smoke | Full E2E | Representative tests                                                                                     |
-| --------------------------------------- | :--: | :---------: | :---: | :------: | -------------------------------------------------------------------------------------------------------- |
-| MCP tools (create / update issue, etc.) |  ✓   |      ✓      |       |          | `lib/mcp/tools/create-issue.test.ts`, `lib/mcp/verify-token.test.ts`, `mcp-tools.test.ts`                |
-| API routes (search, logs, cleanup)      |  ✓   |      ✓      |       |          | `api/quick-search/route.test.ts`, `api/client-logs.route.test.ts`, `api/test-data/cleanup/route.test.ts` |
+| Feature surface                         | Unit | Integration | Smoke | Full E2E | Representative tests                                                                                 |
+| --------------------------------------- | :--: | :---------: | :---: | :------: | ---------------------------------------------------------------------------------------------------- |
+| MCP tools (create / update issue, etc.) |  ✓   |      ✓      |       |          | `lib/mcp/tools/create-issue.test.ts`, `lib/mcp/verify-token.test.ts`, `mcp-tools.test.ts`            |
+| API routes (search, logs, mock uploads) |  ✓   |      ✓      |       |          | `api/quick-search/route.test.ts`, `api/client-logs.route.test.ts`, `uploads/[...path]/route.test.ts` |
 
 ## Cross-cutting: permissions & roles
 
 | Feature surface                   | Unit | Integration | Smoke | Full E2E | Representative tests                                                                                                                                         |
 | --------------------------------- | :--: | :---------: | :---: | :------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Permission matrix / role defaults |  ✓   |      ✓      |   ✓   |    ✓     | `test/unit/permissions-matrix.test.ts`, `issue-detail-permissions.test.ts`, `e2e/smoke/issue-detail-permissions.spec.ts`, `e2e/full/technician-role.spec.ts` |
-| Resource predicates & RLS         |  ✓   |      ✓      |       |          | `lib/permissions/machines.test.ts`, `supabase/email-privacy-rls.test.ts`, `protected-action-pilots.test.ts`                                                  |
+| Resource predicates & RLS         |  ✓   |      ✓      |       |          | `lib/permissions/machines.test.ts`, `supabase/email-privacy-rls.test.ts`, `supabase/profiles-issues-rls.test.ts`, `protected-action-pilots.test.ts`          |
 
 ## Shared UI primitives & utilities
 
-| Feature surface                           | Unit | Integration | Smoke | Full E2E | Representative tests                                                                                               |
-| ----------------------------------------- | :--: | :---------: | :---: | :------: | ------------------------------------------------------------------------------------------------------------------ |
-| UI primitives (button, input, selects…)   |  ✓   |             |       |          | `components/ui/button.test.tsx`, `components/ui/multi-select.test.tsx`, `components/ui/date-range-picker.test.tsx` |
-| Form scaffolding (save / cancel / revert) |  ✓   |             |       |          | `components/save-cancel-buttons.test.tsx`, `test/unit/components/InlineEditableFieldPresets.test.tsx`              |
-| Rich text / TipTap / markdown             |  ✓   |             |       |    ✓     | `lib/tiptap/render.test.ts`, `lib/markdown.test.ts`, `e2e/full/rich-text.spec.ts`                                  |
-| Pure utilities (dates, url, result…)      |  ✓   |             |       |          | `lib/dates.test.ts`, `lib/url.test.ts`, `lib/result.test.ts`, `lib/sanitize-html-config.test.ts`                   |
-| Rate limiting / DB errors                 |  ✓   |      ✓      |       |          | `lib/rate-limit.test.ts`, `lib/db/postgres-errors.test.ts`, `transaction-tripwire.test.ts`                         |
+| Feature surface                           | Unit | Integration | Smoke | Full E2E | Representative tests                                                                                  |
+| ----------------------------------------- | :--: | :---------: | :---: | :------: | ----------------------------------------------------------------------------------------------------- |
+| UI primitives (button, input, selects…)   |  ✓   |             |       |          | `components/ui/button.test.tsx`, `components/ui/multi-select.test.tsx`                                |
+| Form scaffolding (save / cancel / revert) |  ✓   |             |       |          | `components/save-cancel-buttons.test.tsx`, `test/unit/components/InlineEditableFieldPresets.test.tsx` |
+| Rich text / TipTap / markdown             |  ✓   |             |       |    ✓     | `lib/tiptap/render.test.ts`, `lib/markdown.test.ts`, `e2e/full/rich-text.spec.ts`                     |
+| Pure utilities (dates, url, result…)      |  ✓   |             |       |          | `lib/dates.test.ts`, `lib/url.test.ts`, `lib/result.test.ts`, `lib/sanitize-html-config.test.ts`      |
+| Rate limiting / DB errors                 |  ✓   |      ✓      |       |          | `lib/rate-limit.test.ts`, `lib/db/postgres-errors.test.ts`, `transaction-tripwire.test.ts`            |
 
 ## Observability, config & tooling
 

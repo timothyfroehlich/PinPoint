@@ -8,7 +8,7 @@ import * as Sentry from "@sentry/nextjs";
 import { toast } from "sonner";
 import { ImageIcon, Loader2 } from "lucide-react";
 import { updateProfileAction, type UpdateProfileResult } from "./actions";
-import { uploadAvatarAction } from "~/server/actions/avatar";
+import { uploadAvatarAction } from "~/app/(app)/u/[id]/avatar-action";
 import { compressImage } from "~/lib/blob/compression";
 import { validateImageFile } from "~/lib/blob/validation";
 import { getUploadErrorMessage } from "~/components/images/upload-error-message";

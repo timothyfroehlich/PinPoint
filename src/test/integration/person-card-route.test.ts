@@ -8,28 +8,16 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { getTestDb, setupTestDb } from "~/test/setup/pglite";
-import { userProfiles, machines } from "~/server/db/schema";
+import { setupTestDb } from "~/test/setup/pglite";
+import { signInAs } from "~/test/helpers/mock-auth";
+import { seedMachine, seedUser } from "~/test/helpers/seed";
 
 vi.mock("server-only", () => ({}));
-
-vi.mock("~/server/db", async () => {
-  const { getTestDb } = await import("~/test/setup/pglite");
-  return { db: await getTestDb() };
-});
 
 const VIEWER = "00000000-0000-0000-0000-0000000000d0";
 const TARGET = "00000000-0000-0000-0000-0000000000d1";
 
-vi.mock("~/lib/supabase/server", () => ({
-  createClient: () =>
-    Promise.resolve({
-      auth: {
-        getUser: () =>
-          Promise.resolve({ data: { user: { id: VIEWER } }, error: null }),
-      },
-    }),
-}));
+vi.mock("~/lib/supabase/server", () => import("~/test/helpers/mock-auth"));
 
 const { GET } = await import("~/app/api/users/[id]/card/route");
 
@@ -41,18 +29,23 @@ describe("GET /api/users/[id]/card", () => {
   setupTestDb();
 
   beforeEach(async () => {
-    const db = await getTestDb();
-    await db.insert(userProfiles).values({
-      id: TARGET,
-      email: "t@example.com",
-      firstName: "Tar",
-      lastName: "Get",
-      role: "technician",
-      pronouns: "she/they",
+    signInAs(VIEWER);
+    await seedUser(
+      {
+        id: TARGET,
+        email: "t@example.com",
+        firstName: "Tar",
+        lastName: "Get",
+        role: "technician",
+        pronouns: "she/they",
+      },
+      { authUser: false }
+    );
+    await seedMachine({
+      initials: "CARD1",
+      name: "CardMachine",
+      ownerId: TARGET,
     });
-    await db
-      .insert(machines)
-      .values({ initials: "CARD1", name: "CardMachine", ownerId: TARGET });
   });
 
   it("returns the card payload for an existing profile", async () => {

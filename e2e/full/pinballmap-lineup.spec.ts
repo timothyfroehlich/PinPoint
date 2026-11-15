@@ -48,7 +48,6 @@ test.describe("Pinball Map lineup page (PP-o355.65)", () => {
 
     test("reaches the page from the machines list and the admin menu, and every row leads where it says", async ({
       page,
-      request,
     }) => {
       const toAddInitials = getTestMachineInitials();
       const unlinkedInitials = getTestMachineInitials();
@@ -119,16 +118,8 @@ test.describe("Pinball Map lineup page (PP-o355.65)", () => {
           addRow.getByRole("button", { name: "Add to Pinball Map" })
         ).toBeVisible();
 
-        // The badge on /m shows the same count as the page.
-        const summary =
-          (await page.getByTestId("pbm-lineup-summary").textContent()) ?? "";
-        const pageCount = /(\d+) to review/.exec(summary)?.[1];
+        // Entry point 2: the admin menu item, from the machines list.
         await page.goto("/m");
-        await expect(
-          page.getByTestId("pinball-map-lineup-to-review")
-        ).toContainText(String(pageCount));
-
-        // Entry point 2: the admin menu item.
         await page.getByTestId("user-menu-button").click();
         await page
           .getByRole("menuitem", { name: "Pinball Map lineup" })
@@ -159,7 +150,7 @@ test.describe("Pinball Map lineup page (PP-o355.65)", () => {
           new RegExp(`/m/${unlinkedInitials}/edit$`)
         );
       } finally {
-        await cleanupTestEntities(request, {
+        await cleanupTestEntities({
           machineInitials: [toAddInitials, unlinkedInitials],
         });
         await deletePinballMapCatalogEntries([toAddTitleId, entryTitleId]);

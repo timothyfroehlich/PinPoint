@@ -1,8 +1,9 @@
 import { z } from "zod";
+import { USER_ROLES } from "~/lib/types";
 
 export const updateUserRoleSchema = z.object({
   userId: z.string().uuid(),
-  newRole: z.enum(["guest", "member", "technician", "admin"]),
+  newRole: z.enum(USER_ROLES),
   userType: z.enum(["active", "invited"]),
 });
 

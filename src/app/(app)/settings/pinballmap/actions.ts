@@ -10,7 +10,7 @@ import {
 } from "~/lib/pinballmap/user-credentials";
 import { checkPinballMapLinkLimit } from "~/lib/rate-limit";
 import { type Result, err, ok } from "~/lib/result";
-import { getViewer } from "~/lib/collections/viewer";
+import { getViewer } from "~/lib/auth/viewer";
 import { serverActionError } from "~/lib/observability/report-error";
 
 /**

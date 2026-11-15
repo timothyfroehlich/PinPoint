@@ -61,6 +61,7 @@ async function probeBotToken(token: string): Promise<ValidateBotTokenResult> {
       },
       "Discord token validation failed"
     );
+    reportError(error, { action: "probeBotToken", bestEffort: true });
     return { ok: false, reason: "transient" };
   }
 }
@@ -104,6 +105,7 @@ async function probeServerMembership(
       },
       "Discord server validation failed"
     );
+    reportError(error, { action: "probeServerMembership", bestEffort: true });
     return { ok: false, reason: "transient" };
   }
 }
@@ -133,6 +135,7 @@ async function resolveTokenForValidation(
       },
       "Failed to read saved Discord token from Vault"
     );
+    reportError(error, { action: "resolveTokenForValidation" });
     return { ok: false, reason: "transient" };
   }
 }

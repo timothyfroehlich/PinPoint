@@ -3,6 +3,7 @@
 import type React from "react";
 import { useMemo } from "react";
 import Link from "next/link";
+import { useListReturnHref } from "~/components/list-view/use-list-return-href";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { AlertCircle } from "lucide-react";
@@ -27,7 +28,6 @@ interface AppHeaderProps {
   /** Authenticated user's id — passed through to the user menu's "My Machines" link. */
   userId?: string | undefined;
   notifications: EnrichedNotification[];
-  issuesPath: string;
   newChangelogCount: number;
   reportHref?: string;
 }
@@ -45,20 +45,28 @@ export function AppHeader({
   role,
   userId,
   notifications,
-  issuesPath,
   newChangelogCount,
   reportHref = "/report/detailed",
 }: AppHeaderProps): React.JSX.Element {
   const pathname = usePathname();
+  // Returning to Machines or Issues reopens its last view this tab session
+  // (list-views §11.1).
+  const machinesPath = useListReturnHref("/m");
+  const issuesPath = useListReturnHref("/issues");
 
   const navLinks = useMemo(
     () =>
       NAV_ITEMS.map((item) => {
-        const href = item.href === "/issues" ? issuesPath : item.href;
-        const active = isNavItemActive(item.href, pathname, issuesPath);
+        const href =
+          item.href === "/issues"
+            ? issuesPath
+            : item.href === "/m"
+              ? machinesPath
+              : item.href;
+        const active = isNavItemActive(item.href, pathname);
         return { ...item, href, active };
       }),
-    [pathname, issuesPath]
+    [pathname, issuesPath, machinesPath]
   );
 
   return (
@@ -73,7 +81,7 @@ export function AppHeader({
           aria-label="PinPoint"
         >
           <Image
-            src="/logo-pinpoint-transparent.png"
+            src="/logo-pinpoint.svg"
             alt=""
             aria-hidden="true"
             width={32}

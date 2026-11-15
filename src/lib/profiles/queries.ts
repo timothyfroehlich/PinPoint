@@ -12,6 +12,7 @@ import {
 } from "~/lib/timeline/machine-events";
 import { CLOSED_STATUSES, OPEN_STATUSES } from "~/lib/issues/status";
 import { machineNotRemoved } from "~/lib/machines/queries";
+import type { UserRole } from "~/lib/types";
 
 export const PROFILE_MACHINE_CAP = 8;
 /** Mobile shows fewer; the extra desktop cards are CSS-hidden below `@lg`. */
@@ -25,7 +26,7 @@ export interface ProfileRow {
   avatarUrl: string | null;
   bio: string | null;
   pronouns: string | null;
-  role: "guest" | "member" | "technician" | "admin";
+  role: UserRole;
   createdAt: Date;
 }
 

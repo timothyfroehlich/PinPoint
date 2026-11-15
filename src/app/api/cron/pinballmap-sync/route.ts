@@ -1,10 +1,10 @@
-import { NextResponse } from "next/server";
+import type { NextResponse } from "next/server";
 import {
   syncLocationSnapshot,
   getPinballMapState,
 } from "~/lib/pinballmap/state";
 import { reconcileAfterSync } from "~/lib/pinballmap/sync";
-import { assertCronAuthorized } from "~/lib/cron/auth";
+import { runCron } from "~/lib/cron/run-cron";
 import { log } from "~/lib/logger";
 
 /**
@@ -24,61 +24,58 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 export async function GET(request: Request): Promise<NextResponse> {
-  const denied = assertCronAuthorized(request);
-  if (denied) return denied;
-
-  const state = await getPinballMapState();
-  if (state?.locationId === null || state?.locationId === undefined) {
-    return NextResponse.json({ ok: true, skipped: "not_configured" });
-  }
-
-  // Automated hourly refresh — the sanctioned one-call/hour path, exempt from
-  // the manual-refresh throttle (PP-hbi0, CORE-PBM-001).
-  const result = await syncLocationSnapshot({ trigger: "cron" });
-  if (!result.ok) {
-    if (result.reason === "superseded") {
-      log.info(
-        { action: "pinballmap.syncLocationSnapshot" },
-        "PinballMap snapshot sync was superseded by a location change"
-      );
-      return NextResponse.json({ ok: true, skipped: "superseded" });
+  return runCron(request, "pinballmap.syncLocationSnapshot", async () => {
+    const state = await getPinballMapState();
+    if (state?.locationId === null || state?.locationId === undefined) {
+      return { ok: true, skipped: "not_configured" };
     }
-    if (result.reason === "busy") {
-      log.info(
-        { action: "pinballmap.syncLocationSnapshot" },
-        "PinballMap snapshot sync deferred while a configuration-sensitive mutation is running"
-      );
-      return NextResponse.json({ ok: true, skipped: "busy" });
+
+    // Automated hourly refresh — the sanctioned one-call/hour path, exempt from
+    // the manual-refresh throttle (PP-hbi0, CORE-PBM-001).
+    const result = await syncLocationSnapshot({ trigger: "cron" });
+    if (!result.ok) {
+      if (result.reason === "superseded") {
+        log.info(
+          { action: "pinballmap.syncLocationSnapshot" },
+          "PinballMap snapshot sync was superseded by a location change"
+        );
+        return { ok: true, skipped: "superseded" };
+      }
+      if (result.reason === "busy") {
+        log.info(
+          { action: "pinballmap.syncLocationSnapshot" },
+          "PinballMap snapshot sync deferred while a configuration-sensitive mutation is running"
+        );
+        return { ok: true, skipped: "busy" };
+      }
+      // The cron path is never throttled, but narrow defensively for type safety.
+      const error =
+        result.reason === "throttled"
+          ? "throttled"
+          : result.reason === "not_configured"
+            ? "not_configured"
+            : result.error;
+      // A failed sync is a returned result, not a throw. Throw it so `runCron`
+      // reports it to Sentry and answers with the shared failure status.
+      throw new Error(`PinballMap snapshot sync failed: ${error}`);
     }
-    // The cron path is never throttled, but narrow defensively for type safety.
-    const error =
-      result.reason === "throttled"
-        ? "throttled"
-        : result.reason === "not_configured"
-          ? "not_configured"
-          : result.error;
-    log.error(
-      { err: error, action: "pinballmap.syncLocationSnapshot" },
-      "PinballMap snapshot sync failed"
+
+    const { abandonmentsCleared, commentCopiesImported } =
+      await reconcileAfterSync();
+    log.info(
+      {
+        machineCount: result.machineCount,
+        abandonmentsCleared,
+        commentCopiesImported,
+        action: "pinballmap.syncLocationSnapshot",
+      },
+      "PinballMap snapshot synced"
     );
-    return NextResponse.json({ ok: false, error }, { status: 502 });
-  }
-
-  const { abandonmentsCleared, commentCopiesImported } =
-    await reconcileAfterSync();
-  log.info(
-    {
+    return {
+      ok: true,
       machineCount: result.machineCount,
       abandonmentsCleared,
       commentCopiesImported,
-      action: "pinballmap.syncLocationSnapshot",
-    },
-    "PinballMap snapshot synced"
-  );
-  return NextResponse.json({
-    ok: true,
-    machineCount: result.machineCount,
-    abandonmentsCleared,
-    commentCopiesImported,
+    };
   });
 }

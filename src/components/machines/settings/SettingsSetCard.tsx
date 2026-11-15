@@ -1,7 +1,8 @@
 "use client";
 
 import type React from "react";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import Link from "next/link";
 import {
   ChevronRight,
   ChevronDown,
@@ -61,38 +62,45 @@ import { NoteSection } from "~/components/machines/settings/NoteSection";
 import { SoftwareSettingsSection } from "~/components/machines/settings/SoftwareSettingsSection";
 import { TableSection } from "~/components/machines/settings/TableSection";
 import { DipBankSection } from "~/components/machines/settings/DipBankSection";
+import { SettingsTagPicker } from "~/components/machines/settings/SettingsTagPicker";
+import { builtinSlotOf, settingsTagHref } from "~/lib/machines/settings-tags";
 import {
   type AddSectionSpec,
+  type SettingsPreferredSlot,
   type SettingsSection,
   type SettingsSetData,
+  type SettingsTagRef,
 } from "~/lib/machines/settings-types";
 
 interface SettingsSetCardProps {
   set: SettingsSetData;
   isExpanded: boolean;
-  /** Per-set permission to edit (owner/community rules). Governs whether
-   *  always-live field inputs, section kebabs/grips, the set kebab, "Add
-   *  section", Publish, and Tournament tagging render. Read-only viewers see
-   *  none of it. */
+  /** Per-set permission to edit the set's contents (machine-settings spec
+   *  §2.2–§2.3). Governs whether always-live field inputs, section kebabs/grips,
+   *  and "Add section" render. The ⋮ menu's other items carry their own rights
+   *  on `set` (canCurate, canMakeCommunity, canDelete). */
   canEdit: boolean;
-  /** Whether this viewer may set the set as the Owner's default (owner/admin on
-   *  an owner set). Gates the "Set as Owner's default" menu item specifically —
-   *  a community set is never eligible even to an editor. */
-  canSetDefault: boolean;
   /** The last editor IS the machine owner — the audit line carries the same
    *  OwnerBadge the issue pages use, so "who touched this" reads consistently
    *  across the app. Computed by the parent against the machine's owner id. */
   updatedByIsOwner: boolean;
-  /** Unsaved set (temp id). Preferred/Duplicate/Publish target a persisted row,
+  /** Unsaved set (temp id). Tags/Duplicate/Publish target a persisted row,
    *  so they are disabled until the first save. */
   isNew: boolean;
+  /** Every settings tag, for the tag picker (House and Tournament first). */
+  allTags: SettingsTagRef[];
+  /** The viewer may create settings tags from the picker (spec §3.3). */
+  canCreateTags: boolean;
   onMoveSection: (sectionId: string, direction: "up" | "down") => void;
   onToggleExpand: () => void;
-  onTogglePreferred: () => void;
-  /** Toggle the non-exclusive Tournament tag. */
-  onToggleTournament: () => void;
-  /** Publish / unpublish the set (private draft ↔ public). */
-  onTogglePublish: () => void;
+  /** Make this set the default set for the slot, or clear it. */
+  onTogglePreferred: (slot: SettingsPreferredSlot) => void;
+  /** Apply or remove a settings tag. */
+  onToggleTag: (tag: SettingsTagRef, applied: boolean) => void;
+  /** Create a settings tag and apply it; resolves to an error or null. */
+  onCreateTag: (name: string) => Promise<string | null>;
+  /** Turn this personal set into a community set (one-way). */
+  onMakeCommunity: () => void;
   onRename: (newName: string) => void;
   /** Called after the set-name blur so the parent can flush the auto-save
    *  debounce (plain-text blur path — Task 6 Step 9). */
@@ -249,14 +257,16 @@ export function SettingsSetCard({
   set,
   isExpanded,
   canEdit,
-  canSetDefault,
   updatedByIsOwner,
   isNew,
+  allTags,
+  canCreateTags,
   onMoveSection,
   onToggleExpand,
   onTogglePreferred,
-  onToggleTournament,
-  onTogglePublish,
+  onToggleTag,
+  onCreateTag,
+  onMakeCommunity,
   onRename,
   onNameBlur,
   onDuplicate,
@@ -280,6 +290,7 @@ export function SettingsSetCard({
   onSectionBlurFlush,
 }: SettingsSetCardProps): React.JSX.Element {
   const ChevronIcon = isExpanded ? ChevronDown : ChevronRight;
+  const hasMenu = set.canCurate || set.canMakeCommunity || set.canDelete;
 
   // The description block sits flush under the header as a subtitle. At rest
   // an empty description renders nothing (InlineMarkdownField returns null),
@@ -304,6 +315,9 @@ export function SettingsSetCard({
 
   // Set-level delete confirms via AlertDialog (design bible §17).
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  // "Edit tags…" hands focus to the picker, not back to the ⋮ trigger.
+  const openingPickerRef = useRef(false);
 
   // Render one section's body. `canEdit` is passed through — all fields are
   // always-live for permitted users (PP-43q3 pivot).
@@ -383,9 +397,16 @@ export function SettingsSetCard({
     }
   }
 
-  // Badges lead the title (after the chevron). "Owner's default" is exclusive
-  // (one per machine); "Tournament" is non-exclusive and can coexist with it.
-  const preferredBadge = set.isPreferred && (
+  // Badges lead the title (after the chevron): the default-set markers (one of
+  // each per machine), the kind, then the House and Tournament tags. A default
+  // set already implies its tag, so that tag's plain badge is dropped. Custom
+  // tags link to their pages: they close the badge row when the name is an
+  // input, and follow the viewer's disclosure button otherwise (a link cannot
+  // sit inside a button).
+  const isPreferred = set.isPreferredHouse || set.isPreferredTournament;
+  const appliedSlugs = new Set(set.tags.map((t) => t.slug));
+
+  const preferredHouseBadge = set.isPreferredHouse && (
     <Tooltip>
       <TooltipTrigger asChild>
         <span>
@@ -393,58 +414,82 @@ export function SettingsSetCard({
             className="border-warning/30 bg-warning/10 text-warning"
             variant="outline"
           >
-            ★<span className="max-md:hidden">&nbsp;Owner's default</span>
-            <span className="sr-only md:hidden">Owner's default</span>
+            ★<span className="max-md:hidden">&nbsp;Default House</span>
+            <span className="sr-only md:hidden">Default House</span>
           </Badge>
         </span>
       </TooltipTrigger>
-      <TooltipContent>
-        {canEdit
-          ? "Owner's default set — change in the ⋮ menu"
-          : "Owner's default set"}
-      </TooltipContent>
+      <TooltipContent>The machine's default House set</TooltipContent>
     </Tooltip>
   );
 
-  const tournamentBadge = set.isTournament && (
+  const preferredTournamentBadge = set.isPreferredTournament && (
     <Tooltip>
       <TooltipTrigger asChild>
         <span>
           <Badge
-            className="border-primary/30 bg-primary/10 text-primary"
+            className="border-primary bg-primary text-primary-foreground"
             variant="outline"
           >
             <Trophy className="size-3" aria-hidden="true" />
-            <span className="max-md:hidden">&nbsp;Tournament</span>
-            <span className="sr-only md:hidden">Tournament</span>
+            <span className="max-md:hidden">&nbsp;Default Tournament</span>
+            <span className="sr-only md:hidden">Default Tournament</span>
           </Badge>
         </span>
       </TooltipTrigger>
-      <TooltipContent>
-        {canEdit ? "Tournament set — change in the ⋮ menu" : "Tournament set"}
-      </TooltipContent>
+      <TooltipContent>The machine's default Tournament set</TooltipContent>
     </Tooltip>
   );
 
-  // Kind / visibility chip. A private draft is flagged prominently so its
-  // creator knows it isn't shared yet; the ★ Owner's default badge already
-  // implies an owner set, so the default gets no extra kind chip.
-  const kindBadge = !set.isPublic ? (
+  const kindBadge = set.isCommunity ? (
+    <Badge variant="secondary">Community</Badge>
+  ) : (
     <Badge
       className="border-outline-variant bg-muted text-muted-foreground"
       variant="outline"
     >
-      Private draft
+      Personal
     </Badge>
-  ) : set.isPreferred ? null : set.isOwnerSet ? (
-    <Badge
-      className="border-warning/25 bg-warning/5 text-warning"
-      variant="outline"
-    >
-      Owner
-    </Badge>
-  ) : (
-    <Badge variant="secondary">Community</Badge>
+  );
+
+  const builtinTagBadges = set.tags
+    .filter((t) => {
+      const slot = builtinSlotOf(t.slug);
+      if (slot === "house") return !set.isPreferredHouse;
+      if (slot === "tournament") return !set.isPreferredTournament;
+      return false;
+    })
+    .map((t) => (
+      <Badge
+        key={t.slug}
+        className={
+          t.slug === "tournament"
+            ? "border-primary/30 bg-primary/10 text-primary"
+            : "border-outline-variant text-muted-foreground"
+        }
+        variant="outline"
+      >
+        {t.slug === "tournament" && (
+          <Trophy className="size-3" aria-hidden="true" />
+        )}
+        {t.name}
+      </Badge>
+    ));
+
+  const customTags = set.tags.filter((t) => builtinSlotOf(t.slug) === null);
+  const customTagChips = customTags.length > 0 && (
+    <span className="inline-flex flex-wrap items-center gap-1">
+      {customTags.map((t) => (
+        <Badge
+          key={t.slug}
+          asChild
+          variant="outline"
+          className="border-secondary/35 bg-secondary/10 text-secondary hover:bg-secondary/20"
+        >
+          <Link href={settingsTagHref(t.slug)}>{t.name}</Link>
+        </Badge>
+      ))}
+    </span>
   );
 
   // The set name — always-live input for permitted users, plain text for
@@ -456,13 +501,13 @@ export function SettingsSetCard({
     // <div>-in-<button> nesting when the user is a viewer.
     <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
       <span className="min-w-0 text-sm font-semibold text-foreground [overflow-wrap:anywhere]">
-        {(preferredBadge || tournamentBadge || kindBadge) && (
-          <span className="mr-2 inline-flex flex-wrap items-center gap-1 align-middle">
-            {preferredBadge}
-            {kindBadge}
-            {tournamentBadge}
-          </span>
-        )}
+        <span className="mr-2 inline-flex flex-wrap items-center gap-1 align-middle">
+          {preferredHouseBadge}
+          {preferredTournamentBadge}
+          {kindBadge}
+          {builtinTagBadges}
+          {canEdit && customTagChips}
+        </span>
         <InlineEditableText
           value={set.name}
           onValueChange={onRename}
@@ -483,7 +528,7 @@ export function SettingsSetCard({
       className={cn(
         "gap-0 overflow-hidden transition-colors duration-150 motion-reduce:transition-none",
         "max-md:rounded-none max-md:border-0 max-md:bg-transparent max-md:shadow-none max-md:-mx-4 sm:max-md:-mx-8",
-        set.isPreferred
+        isPreferred
           ? "border-warning/40 ring-1 ring-warning/30 max-md:ring-0"
           : "border-outline-variant",
         "max-md:border-t-2 max-md:border-t-outline-variant"
@@ -520,7 +565,11 @@ export function SettingsSetCard({
               onClick={onToggleExpand}
               aria-expanded={isExpanded}
               aria-label={`${set.name || "Unnamed"} settings set`}
-              className="-mx-1 flex max-w-full grow items-center gap-2.5 rounded px-1 text-left transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring max-md:shrink-0 md:flex-1 motion-reduce:transition-none"
+              className={cn(
+                "-mx-1 flex max-w-full items-center gap-2.5 rounded px-1 text-left transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring max-md:shrink-0 motion-reduce:transition-none",
+                // Custom tag links follow the name, so the button stops there.
+                customTags.length === 0 && "grow md:flex-1"
+              )}
             >
               <ChevronIcon
                 className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 motion-reduce:transition-none"
@@ -529,69 +578,91 @@ export function SettingsSetCard({
               {headerTitle}
             </button>
           )}
+          {!canEdit && customTagChips}
 
-          {/* Set-level ⋮ menu — permitted users only. */}
-          {canEdit && (
-            <span className="ml-auto flex shrink-0 items-center">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-7 shrink-0 text-muted-foreground"
-                    aria-label="More options for this set"
-                  >
-                    <MoreVertical className="size-4" aria-hidden="true" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {/* These act on a persisted row, so they're disabled until an
-                      unsaved (temp-id) set is first saved. The Owner's default
-                      is always public, so it gets no Publish toggle. */}
-                  {!set.isPreferred && (
-                    <DropdownMenuItem
-                      disabled={isNew}
-                      onSelect={onTogglePublish}
+          {/* Set-level ⋮ menu — shown when the viewer has any action on it.
+              The tag picker opens beside it on desktop. */}
+          {hasMenu && (
+            <SettingsTagPicker
+              open={pickerOpen}
+              onOpenChange={setPickerOpen}
+              setName={set.name || "Unnamed set"}
+              tags={allTags}
+              appliedSlugs={appliedSlugs}
+              defaults={{
+                house: set.isPreferredHouse,
+                tournament: set.isPreferredTournament,
+              }}
+              canCreate={canCreateTags}
+              onToggleTag={onToggleTag}
+              onToggleDefault={onTogglePreferred}
+              onCreate={onCreateTag}
+            >
+              <span className="ml-auto flex shrink-0 items-center">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7 shrink-0 text-muted-foreground max-md:size-11"
+                      aria-label="More options for this set"
                     >
-                      {set.isPublic ? "Make private" : "Publish"}
-                    </DropdownMenuItem>
-                  )}
-                  {canSetDefault && (
-                    <DropdownMenuItem
-                      disabled={isNew}
-                      onSelect={onTogglePreferred}
-                    >
-                      {set.isPreferred
-                        ? "Unset owner's default"
-                        : "Set as owner's default"}
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuItem
-                    disabled={isNew}
-                    onSelect={onToggleTournament}
-                  >
-                    {set.isTournament
-                      ? "Remove Tournament tag"
-                      : "Tag as Tournament"}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem disabled={isNew} onSelect={onDuplicate}>
-                    Duplicate
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className="text-destructive-text focus:text-destructive-text"
-                    onSelect={() => {
-                      setDeleteDialogOpen(true);
+                      <MoreVertical className="size-4" aria-hidden="true" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    onCloseAutoFocus={(event) => {
+                      if (openingPickerRef.current) {
+                        openingPickerRef.current = false;
+                        event.preventDefault();
+                      }
                     }}
                   >
-                    Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </span>
+                    {/* These act on a persisted row, so they're disabled until
+                        an unsaved (temp-id) set is first saved. */}
+                    {set.canCurate && (
+                      <DropdownMenuItem
+                        disabled={isNew}
+                        onSelect={() => {
+                          openingPickerRef.current = true;
+                          setPickerOpen(true);
+                        }}
+                      >
+                        Edit tags…
+                      </DropdownMenuItem>
+                    )}
+                    {set.canMakeCommunity && (
+                      <DropdownMenuItem
+                        disabled={isNew}
+                        onSelect={onMakeCommunity}
+                      >
+                        Make community set
+                      </DropdownMenuItem>
+                    )}
+                    {set.canCurate && (
+                      <DropdownMenuItem disabled={isNew} onSelect={onDuplicate}>
+                        Duplicate
+                      </DropdownMenuItem>
+                    )}
+                    {set.canDelete && (
+                      <DropdownMenuItem
+                        className="text-destructive-text focus:text-destructive-text"
+                        onSelect={() => {
+                          setDeleteDialogOpen(true);
+                        }}
+                      >
+                        Delete
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </span>
+            </SettingsTagPicker>
           )}
         </div>
 
-        {canEdit && (
+        {set.canDelete && (
           <AlertDialog
             open={deleteDialogOpen}
             onOpenChange={setDeleteDialogOpen}

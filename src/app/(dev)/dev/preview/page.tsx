@@ -1,5 +1,4 @@
 import type React from "react";
-import { redirect } from "next/navigation";
 import { PreviewClient } from "./preview-client";
 
 /**
@@ -7,9 +6,5 @@ import { PreviewClient } from "./preview-client";
  * The actual UI is in preview-client.tsx (client component).
  */
 export default function PreviewPage(): React.JSX.Element {
-  if (process.env["VERCEL_ENV"] === "production") {
-    redirect("/dashboard");
-  }
-
   return <PreviewClient />;
 }

@@ -2,7 +2,7 @@
 
 **Status: draft.**
 
-**What this document is.** The requirements for grouping machines in PinPoint: hand-curated Collections, ownership-derived Owner Collections, and public Tags. It describes the intended final state only; what the code does or used to do lives solely in the Known divergences table. Each requirement is numbered for citation. When code and spec disagree, either the code is wrong or this document gets amended — never silently neither.
+**What this document is.** The requirements for grouping machines in PinPoint: hand-curated Collections and public Tags. It describes the intended final state only; what the code does or used to do lives solely in the Known divergences table. Each requirement is numbered for citation. When code and spec disagree, either the code is wrong or this document gets amended — never silently neither.
 
 **Related records.** `docs/feature-specs/machine-views.md` (the shared machine listing every group's Overview uses), `docs/feature-specs/pinballmap.md` (catalog matching and uncataloged machines, which determine the current manufacturer), epic PP-wqit.
 
@@ -10,9 +10,9 @@
 
 ## 1. Concepts
 
-- **Machine Group** — any named set of machines PinPoint can show as one unit with Overview, Issues, and Timeline tabs. Collections, Owner Collections, and Tags are Machine Groups; each defines its own membership, visibility, and curation.
+- **Machine Group** — any named set of machines PinPoint can show as one unit with Overview, Issues, and Timeline tabs. Collections and Tags are Machine Groups; each defines its own membership, visibility, and curation.
 - **Collection** — a Machine Group a member creates and curates by hand. Membership is exactly the machines someone added. Private to its owner unless shared.
-- **Owner Collection** — the Machine Group of every machine one person owns. Membership follows machine ownership; nobody curates it and it cannot be edited or shared.
+- **Owner Collection** — _Retired 2026-10-07._ A person's machines are the Machines list filtered by Owner, and their machines' issues are the Issues list filtered by Machine owner (§6.4).
 - **Editor** — a signed-in account the owner has granted edit access to one Collection. Editor access belongs to the account, never to a link.
 - **View Link** — a Collection's secret, revocable URL that grants read-only access to anyone holding it, signed in or not.
 - **Tag** — a public Machine Group whose name describes something about its machines. A tag belongs to at most one tag type. Every automatic tag belongs to one.
@@ -27,10 +27,11 @@
 - **2.1** A signed-in member, technician, or admin can create a Collection. Guests and anonymous visitors cannot.
 - **2.2** A Collection has a required name of at most 120 characters. Names need not be unique, even for one owner.
 - **2.3** A Collection's machines are exactly the ones added to it. Adding or removing a machine never changes the machine itself.
-- **2.4** Renaming a Collection and changing its machines save together as one change; a failed save changes nothing.
+- **2.4** Renaming a Collection, changing its description, and changing its machines save together as one change; a failed save changes nothing.
 - **2.5** A Collection can include machines in any presence state.
 - **2.6** Only the owner can delete a Collection. Deleting it removes the Collection, its machine list, its Editors, and its View Link; the machines and their issues are unaffected. Deletion asks for confirmation and cannot be undone.
 - **2.7** The machine choice for adding to a Collection leaves out Removed machines, except ones already in the Collection.
+- **2.8** A Collection can have a description: optional formatted text with bold, italic, headings, lists, and links. It is written when the Collection is created or edited.
 
 ---
 
@@ -39,11 +40,11 @@
 - **3.1** A Collection is private by default. Its owner, its Editors, and admins can open it by its address; anyone else gets the same not-found response as a Collection that does not exist.
 - **3.2** A Collection's address alone never grants access. A person whose access is revoked gets the not-found response on their next visit.
 - **3.3** The owner can turn on a View Link. Anyone with the link, including anonymous visitors, can see the Collection's Overview, Issues, and Timeline, and nothing else.
-- **3.4** Turning a View Link off revokes every copy of it immediately. Turning it back on restores the same link. A View Link has no expiry.
+- **3.4** Turning a View Link off revokes every copy of it immediately. Turning it back on creates a new link; copies of the earlier link stay revoked. A View Link has no expiry.
 - **3.5** A View Link never leaks through the Referer header of pages reached from it.
 - **3.6** A View Link grants read-only access. Viewers who arrive through one see edit, share, or delete controls only when they already hold that access themselves.
 - **3.7** The owner can grant Editor access to named signed-in accounts and revoke it. Guests cannot be Editors, and the owner cannot grant access to themselves.
-- **3.8** The owner and Editors can rename the Collection and change its machines. Only the owner can delete it, change its View Link, or manage Editors. Admins can view any Collection but cannot edit or manage one they do not own.
+- **3.8** The owner and Editors can rename the Collection, change its description, and change its machines. Only the owner can delete it, change its View Link, or manage Editors. Admins can view any Collection but cannot edit or manage one they do not own.
 - **3.9** Collection surfaces identify people by name only, never by email address.
 
 ---
@@ -56,6 +57,7 @@
 - **4.4** The Issues tab shows only issues on the group's machines. Its filters can narrow that set but never widen it.
 - **4.5** The Timeline tab shows one chronological feed across the group's machines, each entry labeled with its machine. Its filters can narrow that set but never widen it. The feed is read-only.
 - **4.6** An empty Collection shows people who can edit it a way to add machines, and shows everyone else that the Collection has no machines yet.
+- **4.7** A Collection's description appears under its header on every tab, to everyone who can open the Collection, including through its View Link. A description longer than three lines shows its first three with a Show more control. A Collection without a description shows nothing there.
 
 ---
 
@@ -63,17 +65,17 @@
 
 - **5.1** A signed-in person has a My Collections page listing Collections they own and Collections they are an Editor of, as separate groups ordered by name.
 - **5.2** Each listed Collection shows its machine count, leaving out Removed machines. Collections shared with the person also show the owner's name and their Editor access.
-- **5.3** When the person owns at least one machine, My Collections also links to their Owner Collection.
+- **5.3** When the person owns at least one machine, My Collections also links to their machines (§6.4).
 - **5.4** My Collections offers Collection creation and opens the new Collection once it is created.
 - **5.5** My Collections requires sign-in.
 
 ---
 
-## 6. Owner Collections
+## 6. A Person's Machines
 
-- **6.1** Every person who owns at least one machine has an Owner Collection named for them.
-- **6.2** An Owner Collection is public: anyone, including anonymous visitors, can open it.
-- **6.3** An Owner Collection has no edit, share, add-machine, or delete controls, and no action can change its membership except changing machine ownership.
+- **6.1–6.3** _Retired 2026-10-07._ Owner Collections were replaced by the Owner filter (6.4). Numbers kept so older citations don't dangle.
+- **6.4** A person's machines are the Machines list filtered to Owner = that person, and their machines' issues are the Issues list filtered to Machine owner = that person. Every link to a person's machines, from My Collections, the account menu, a profile, or a person's hover card, opens the Machines list filtered this way.
+- **6.5** An old Owner Collection link opens the matching filtered list: its Overview and Timeline tabs open Machines filtered to that owner, and its Issues tab opens Issues filtered to that machine owner.
 
 ---
 
@@ -117,12 +119,12 @@
 
 - **10.1** _Retired 2026-10-02._ Hand-applied tags are now §11. Number kept so older citations don't dangle.
 - **10.2** _Retired 2026-10-02._ Exclusive hand-applied tag types are now §11.5–11.7. Number kept so older citations don't dangle.
-- **10.3** Collection descriptions are deferred.
+- **10.3** _Retired 2026-10-05._ Collection descriptions are now 2.8 and 4.7. Number kept so older citations don't dangle.
 - **10.4** Saving a Collection reached through a View Link to My Collections is deferred.
 - **10.5** A public directory of Collections is deferred.
 - **10.6** Adding a machine to a Collection from the machine's own page is deferred.
 - **10.7** Writing notes from a Machine Group's Timeline is deferred.
-- **10.8** Merging one hand-applied tag into another is deferred.
+- **10.8** _Retired 2026-10-06._ Merging hand-applied tags is now 11.17–11.19. Number kept so older citations don't dangle.
 
 ---
 
@@ -144,16 +146,26 @@
 - **11.14** The tag browse and a machine's page list hand-applied tag types after the automatic ones, ordered by name, followed by tags with no tag type. Tags within each group are ordered by name, subject to 11.13.
 - **11.15** A technician or admin can create a tag from a machine's page while tagging that machine. The tag has no tag type unless they choose one, and it is applied to that machine.
 - **11.16** A technician or admin can move a hand-applied tag into a hand-applied tag type, from one tag type to another, or out of its tag type. A move is blocked if the tag's name is already taken where it is going, or if it would leave a machine holding two tags of an exclusive tag type.
+- **11.17** A technician or admin can merge a hand-applied tag into another hand-applied tag, in any tag type or none. Every machine holding the merged tag holds the target tag afterward, and the merged tag is deleted. The merge asks for confirmation and cannot be undone.
+- **11.18** A merge is blocked if it would leave a machine holding two tags of an exclusive tag type.
+- **11.19** Links to a merged tag's page, including its Issues and Timeline tabs, open the target tag's page.
+
+---
+
+## 12. Filtering Lists by Tag and Collection
+
+- **12.1** The Machines and Issues lists can be filtered by Tag and by Collection (machine-views §3.12, issues-list §4.3). An issue matches when its machine does.
+- **12.2** The Tag filter offers every tag, automatic and hand-applied, grouped by tag type in the tag browse's order (7.3, 11.14), with a search box that narrows the tags by name. Tag type headings label their group and cannot be selected. Hand-applied tags with no machines are offered too.
+- **12.3** A machine matches the Tag filter when, for every tag type with a selected tag, it holds at least one of that type's selected tags. Tags with no tag type count as one group. Selecting Front room, Back room, and Solid State matches machines in Front room or Back room that are also Solid State.
+- **12.4** The Collection filter offers the Collections listed in the viewer's My Collections (§5), with a search box that narrows them by name, and appears only to signed-in people. A machine matches when it belongs to any selected Collection.
+- **12.5** A filtered tag or Collection stays selected in links and Saved Views when it is renamed or, for a tag, moved to another tag type. A filtered tag that is merged is replaced by the tag it was merged into. A deleted tag or Collection, or a Collection the viewer can no longer open, drops out of the filter (list-views §9.3, §10.14).
+- **12.6** Tag and Collection are filters only; neither list gains a Tag or Collection field.
 
 ---
 
 ## Known divergences (code vs spec)
 
-| Requirement | Divergence | Resolution |
-| :-- | :-- | :-- |
-| 6.2 | Owner Collections require sign-in. | PP-wqit.9 |
-| 11.4, 11.10, 11.15 | A machine's page lists its hand-applied tags but has no control to apply or remove them, so machine owners cannot tag their machines and nobody can create a tag while tagging a machine. | PP-wqit.3 |
-| 11.7, 11.16 | A tag type's exclusivity is fixed when it is created, and a tag cannot move into, between, or out of tag types. | PP-wqit.3, PP-wqit.4 |
+_None — the current implementation matches this spec._
 
 ---
 
@@ -161,6 +173,11 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-07 | Retired Owner Collections: a person's machines and their issues are the Machines and Issues lists filtered by owner, and old Owner Collection links open those lists (§1, 5.3, §6). |
+| 2026-10-06 | Added merging one hand-applied tag into another (11.17–11.19, 12.5); retired deferred item 10.8. |
+| 2026-10-05 | Added Collection descriptions, written by the owner and Editors and shown under the header on every tab (2.4, 2.8, 3.8, 4.7); retired deferred item 10.3. |
+| 2026-10-05 | Turning a View Link back on creates a new link instead of restoring the earlier one (3.4). |
+| 2026-10-05 | Added Tag and Collection filters on the Machines and Issues lists (§12). |
 | 2026-10-03 | Removed machines are archived: left out of the add-machine choice (2.7), header counts (4.2), Collection counts (5.2), and tag counts (7.9); 7.2 drops its every-presence default, which machine-views §9.2 now sets. |
 | 2026-10-02 | Added hand-applied tags, with or without a hand-applied tag type, curated by technicians and admins and applied by machine owners to their own machines. Tag types can be exclusive. Names are capped at 20 characters. The tag browse lists hand-applied tags with no machines. Retired deferred items 10.1–10.2 and deferred tag merging. |
 | 2026-09-26 | Uncataloged machines join Type, Display, and Player Count tags through hand-entered values. |

@@ -15,7 +15,6 @@ import type { MachinePresenceStatus } from "~/lib/machines/presence";
 import {
   compareLineup,
   deriveTitleIntent,
-  lineupToReviewCount,
   type LineupCatalogTitle,
   type LineupComparison,
   type LineupMachineInput,
@@ -138,7 +137,7 @@ describe("deriveTitleIntent (§1 Title intent)", () => {
 });
 
 describe("compareLineup status (§2.4, §2.5)", () => {
-  it("is not configured without a tracked location, and counts nothing", () => {
+  it("is not configured without a tracked location", () => {
     const result = compareLineup({
       configured: false,
       snapshot: snapshot([entry(1, 10)]),
@@ -146,7 +145,6 @@ describe("compareLineup status (§2.4, §2.5)", () => {
       catalog: [],
     });
     expect(result).toEqual({ status: "not_configured" });
-    expect(lineupToReviewCount(result)).toBe(0);
   });
 
   it("is waiting without a stored lineup", () => {
@@ -157,7 +155,6 @@ describe("compareLineup status (§2.4, §2.5)", () => {
       catalog: [],
     });
     expect(result).toEqual({ status: "waiting" });
-    expect(lineupToReviewCount(result)).toBe(0);
   });
 });
 
@@ -506,6 +503,5 @@ describe("to review count (§4.1)", () => {
     expect(result.sections.pinball_map_only).toHaveLength(2);
     expect(result.sections.availability_conflict).toHaveLength(1);
     expect(result.toReview).toBe(5);
-    expect(lineupToReviewCount(result)).toBe(5);
   });
 });

@@ -6,6 +6,7 @@
 
 import "@testing-library/jest-dom/vitest";
 import { EventEmitter } from "node:events";
+import { afterEach } from "vitest";
 
 import { installMemoryStorageIfMissing } from "~/test/memory-storage";
 
@@ -53,6 +54,22 @@ if (typeof window !== "undefined") {
 
     globalThis.PointerEvent = PointerEvent as any;
   }
+
+  // Radix FocusScope (dialogs, popovers, sheets, menus) schedules a
+  // setTimeout(0) on unmount that dispatches a CustomEvent on its container.
+  // RTL's auto-cleanup unmounts in its own afterEach, so the last test's timer
+  // can fire after Vitest tears down the file's jsdom environment; the event
+  // and the container then belong to different realms and Vitest fails the
+  // run with an unhandled "parameter 1 is not of type 'Event'" (PP-wqit.17).
+  // Wait one macrotask after each test so that timer runs while jsdom is
+  // alive. Vitest's default `sequence.hooks: "stack"` runs this hook after
+  // the test file's own afterEach hooks, including RTL's cleanup. The real
+  // setTimeout is captured here so a test that leaves fake timers installed
+  // cannot hang this hook.
+  const realSetTimeout = globalThis.setTimeout;
+  afterEach(async () => {
+    await new Promise((resolve) => realSetTimeout(resolve, 0));
+  });
 
   // Mock scrollIntoView
   window.HTMLElement.prototype.scrollIntoView = function () {};

@@ -65,6 +65,12 @@ export const MACHINE_EVENT_ICONS: Record<
   settings_set_updated: { Icon: Settings, colorClass: "text-muted-foreground" },
   settings_set_deleted: { Icon: Trash2, colorClass: "text-muted-foreground" },
   settings_set_preferred: { Icon: Star, colorClass: "text-warning" },
+  settings_set_tagged: { Icon: Settings, colorClass: "text-muted-foreground" },
+  settings_set_made_community: {
+    Icon: Settings,
+    colorClass: "text-muted-foreground",
+  },
+  settings_preferred_changed: { Icon: Star, colorClass: "text-warning" },
 
   // Pinball Map (PP-o355.12, PP-o355.21). Same icon for both kinds: they are
   // the same topic to a reader scanning the timeline, and the sentence beside

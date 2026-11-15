@@ -1,8 +1,5 @@
 import type React from "react";
-import { eq } from "drizzle-orm";
-import { db } from "~/server/db";
-import { userProfiles } from "~/server/db/schema";
-import { createClient } from "~/lib/supabase/server";
+import { getViewer } from "~/lib/auth/viewer";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import {
   getRecentIssuesAction,
@@ -29,20 +26,9 @@ export default async function DetailedReportPage({
   }>;
 }): Promise<React.JSX.Element> {
   const machinesListPromise = getReportMachines();
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { userId, role } = await getViewer();
 
-  let userProfile;
-  if (user) {
-    userProfile = await db.query.userProfiles.findFirst({
-      where: eq(userProfiles.id, user.id),
-      columns: { role: true },
-    });
-  }
-
-  const accessLevel = getAccessLevel(userProfile?.role);
+  const accessLevel = getAccessLevel(role);
   const assignees = await getReportAssignees(accessLevel);
   const machinesList = await machinesListPromise;
   const params = await searchParams;
@@ -64,7 +50,7 @@ export default async function DetailedReportPage({
     <UnifiedReportForm
       machinesList={machinesList}
       defaultMachineId={defaultMachineId}
-      userAuthenticated={Boolean(user)}
+      userAuthenticated={userId !== undefined}
       accessLevel={accessLevel}
       assignees={assignees}
       initialError={typeof params.error === "string" ? params.error : undefined}
@@ -72,7 +58,8 @@ export default async function DetailedReportPage({
       initialMachineInitials={selectedMachine?.initials ?? ""}
       source={params.source === "apron" ? "apron" : undefined}
       canMultiple={
-        Boolean(user) && checkPermission("issues.report.quick", accessLevel)
+        userId !== undefined &&
+        checkPermission("issues.report.quick", accessLevel)
       }
     />
   );

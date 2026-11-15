@@ -15,7 +15,7 @@
  * period (§3.4).
  */
 
-export const ACTIVITY_SUMMARY_TIME_ZONE = "America/Chicago";
+import { SITE_TIME_ZONE } from "~/lib/time-zone";
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -29,7 +29,7 @@ interface WallHour {
 }
 
 const wallHourFormat = new Intl.DateTimeFormat("en-US", {
-  timeZone: ACTIVITY_SUMMARY_TIME_ZONE,
+  timeZone: SITE_TIME_ZONE,
   year: "numeric",
   month: "numeric",
   day: "numeric",
@@ -147,7 +147,7 @@ export function scheduledPeriodStart(
 // ─── Display ───────────────────────────────────────────────────────────
 
 const periodPartsFormat = new Intl.DateTimeFormat("en-US", {
-  timeZone: ACTIVITY_SUMMARY_TIME_ZONE,
+  timeZone: SITE_TIME_ZONE,
   month: "short",
   day: "numeric",
   hour: "numeric",
@@ -189,7 +189,7 @@ export function formatSummaryPeriod(start: Date, end: Date): string {
 /** "Sep 28, 2026", in Central time — the lineup date a stale section names (§5.8). */
 export function formatLineupDate(value: Date): string {
   return new Intl.DateTimeFormat("en-US", {
-    timeZone: ACTIVITY_SUMMARY_TIME_ZONE,
+    timeZone: SITE_TIME_ZONE,
     month: "short",
     day: "numeric",
     year: "numeric",

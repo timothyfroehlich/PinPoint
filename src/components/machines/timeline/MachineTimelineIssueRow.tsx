@@ -3,12 +3,12 @@
 import type React from "react";
 import Link from "next/link";
 
+import { TimelineRowTime } from "./TimelineRowTime";
 import {
   MachineAttributionLine,
   type MachineLabel,
 } from "./MachineAttributionLine";
 import { IssueBadge } from "~/components/issues/IssueBadge";
-import { RelativeTime } from "~/components/issues/RelativeTime";
 import { formatIssueId } from "~/lib/issues/utils";
 import { STATUS_CONFIG } from "~/lib/issues/status";
 import { MACHINE_EVENT_ICONS } from "~/lib/timeline/machine-event-icons";
@@ -103,7 +103,7 @@ export function MachineTimelineIssueRow({
   // `<RelativeTime>` ticks every 60s so the label stays accurate while the
   // page is open; a raw formatRelative() would freeze at first render.
   const rightMeta: React.ReactNode = showRelativeTime ? (
-    <RelativeTime value={row.createdAt} />
+    <TimelineRowTime value={row.createdAt} />
   ) : (
     rowDateLabel
   );
@@ -259,6 +259,13 @@ interface IssueRowBadgesProps {
   eventData: IssueEventData;
 }
 
+/**
+ * Rows under 320px wide (phones) drop the strip badge's 100px minimum width so
+ * the verb keeps its room, padding the label clear of the badge's absolutely
+ * placed icon instead (PP-xw8s).
+ */
+const NARROW_ROW_BADGE = "min-w-0 pl-5 @[320px]:min-w-[100px] @[320px]:pl-2";
+
 function IssueRowBadges({
   eventData,
 }: IssueRowBadgesProps): React.JSX.Element | null {
@@ -271,6 +278,7 @@ function IssueRowBadges({
           type="severity"
           value={eventData.severity}
           variant="strip"
+          className={NARROW_ROW_BADGE}
         />
       );
     }
@@ -298,6 +306,7 @@ function IssueRowBadges({
         type="status"
         value={eventData.closedAsStatus}
         variant="strip"
+        className={NARROW_ROW_BADGE}
       />
     );
   }

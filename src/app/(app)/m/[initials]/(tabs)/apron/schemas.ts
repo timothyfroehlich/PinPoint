@@ -40,7 +40,10 @@ const savedCardSchema = z.object({
       APRON_CARD_NAME_MAX,
       `Card names are limited to ${APRON_CARD_NAME_MAX} characters`
     ),
-  size: z.enum(["stern", "wpc"], { error: "Every card needs an apron size" }),
+  size: z.enum(
+    ["stern", "wpc", "bally", "williams-em", "gottlieb-em", "bally-em"],
+    { error: "Every card needs an apron size" }
+  ),
   template: z.enum(["standard", "side-rail", "header-band"]),
   useCustomDescription: z.boolean(),
   description: cardText,
@@ -48,6 +51,7 @@ const savedCardSchema = z.object({
   tipEnabled: z.boolean(),
   designEnabled: z.boolean(),
   artEnabled: z.boolean(),
+  codeEnabled: z.boolean(),
 });
 
 /**

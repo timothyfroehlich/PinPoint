@@ -11,6 +11,37 @@ vi.mock("~/app/(app)/c/collections/actions", () => ({
   deleteCollectionAction: (input: unknown) => deleteAction(input),
 }));
 
+// The real editor is a dynamic TipTap import. Swap it for an uncontrolled
+// textarea that starts from `content` and pushes a ProseMirror-shaped doc
+// through the same onChange contract.
+vi.mock("~/components/editor/RichTextEditorDynamic", () => ({
+  RichTextEditor: ({
+    content,
+    onChange,
+    ariaLabel,
+  }: {
+    content: { content?: { content?: { text?: string }[] }[] } | null;
+    onChange: (doc: unknown) => void;
+    ariaLabel: string;
+  }) => (
+    <textarea
+      aria-label={ariaLabel}
+      defaultValue={content?.content?.[0]?.content?.[0]?.text ?? ""}
+      onChange={(e) => onChange(paragraphDoc(e.target.value))}
+    />
+  ),
+}));
+
+function paragraphDoc(text: string): {
+  type: "doc";
+  content: { type: string; content: { type: string; text: string }[] }[];
+} {
+  return {
+    type: "doc",
+    content: [{ type: "paragraph", content: [{ type: "text", text }] }],
+  };
+}
+
 // The multi-select is the shared MultiSelect (Popover + cmdk) — jsdom stubs.
 class MockResizeObserver {
   observe = vi.fn();
@@ -31,11 +62,14 @@ const allMachines = [
   { id: "m2", initials: "BB", name: "Beta" },
 ];
 
+const savedDescription = paragraphDoc("Saved description");
+
 function renderDialog(canDelete = true): void {
   render(
     <EditCollectionDialog
       collectionId="c1"
       currentName="My Faves"
+      currentDescription={savedDescription}
       allMachines={allMachines}
       currentIds={["m1"]}
       canDelete={canDelete}
@@ -51,7 +85,7 @@ describe("EditCollectionDialog", () => {
     refresh.mockReset();
   });
 
-  it("Save persists name + machines together and refreshes on success", async () => {
+  it("Save persists name, description, and machines together and refreshes on success", async () => {
     updateAction.mockResolvedValue({ success: true });
     renderDialog();
 
@@ -62,10 +96,40 @@ describe("EditCollectionDialog", () => {
       expect(updateAction).toHaveBeenCalledWith({
         collectionId: "c1",
         name: "My Faves",
+        description: savedDescription,
         machineIds: ["m1"],
       })
     );
     await waitFor(() => expect(refresh).toHaveBeenCalled());
+  });
+
+  it("saves an edited description, and a cancelled edit doesn't carry into the next open", async () => {
+    updateAction.mockResolvedValue({ success: true });
+    renderDialog();
+
+    // Edit, then cancel: the draft is discarded.
+    await userEvent.click(screen.getByTestId("collection-edit-trigger"));
+    const editor = screen.getByRole("textbox", { name: "Description" });
+    await userEvent.clear(editor);
+    await userEvent.type(editor, "Abandoned draft");
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    // Reopen: the editor and the payload start from the saved description.
+    await userEvent.click(screen.getByTestId("collection-edit-trigger"));
+    const reopened = screen.getByRole("textbox", { name: "Description" });
+    expect(reopened).toHaveValue("Saved description");
+    await userEvent.clear(reopened);
+    await userEvent.type(reopened, "New description");
+    await userEvent.click(screen.getByTestId("collection-save"));
+
+    await waitFor(() =>
+      expect(updateAction).toHaveBeenCalledWith({
+        collectionId: "c1",
+        name: "My Faves",
+        description: paragraphDoc("New description"),
+        machineIds: ["m1"],
+      })
+    );
   });
 
   it("shows the error message when the save fails and does not refresh", async () => {

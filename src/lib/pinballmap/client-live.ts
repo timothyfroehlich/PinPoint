@@ -5,6 +5,11 @@ import {
   TokenizerError,
   TokenType,
 } from "@streamparser/json";
+import {
+  NETWORK_ERROR_STATUS,
+  safeFetch as externalFetch,
+  withRetryAfter,
+} from "~/lib/http/external";
 import { log } from "~/lib/logger";
 import { assertNotInTransaction } from "~/server/db/transaction-context";
 import {
@@ -71,7 +76,16 @@ import type {
  * path label, never the full URL.
  */
 
-const MAX_RETRY_AFTER_SECONDS = 5;
+/**
+ * Per-attempt request budgets (PP-az4d.25). Reads of one location or one
+ * region's lists are small; the catalog is a multi-MB bulk download, matching
+ * the OPDB and PinTips exports. Writes get more room than reads because a
+ * timed-out write may still land at PinballMap and we would report it as
+ * `transient`: only a write that would otherwise hang should be cut off.
+ */
+const PBM_READ_TIMEOUT_MS = 15_000;
+const PBM_CATALOG_TIMEOUT_MS = 60_000;
+const PBM_WRITE_TIMEOUT_MS = 20_000;
 
 type WriteReason = PbmWriteFailureReason;
 
@@ -107,21 +121,24 @@ function credsHeaders(credentials: PbmCredentials): Record<string, string> {
 
 /**
  * The only `fetch` that can reach PinballMap. Never logs credentialed URLs, and
- * turns network failures into a 599 response rather than a throw. The one thing
- * it throws for is being called outside production, which is a PinPoint bug,
- * not a network condition (see `assertPinballMapNetworkAllowed`).
+ * turns network failures and timeouts into a 599 response rather than a throw
+ * (`~/lib/http/external`). The one thing it throws for is being called outside
+ * production, which is a PinPoint bug, not a network condition (see
+ * `assertPinballMapNetworkAllowed`).
  */
 async function safeFetch(
   url: string,
   init: RequestInit,
   label: string,
-  apiToken: string | null
+  apiToken: string | null,
+  timeoutMs: number
 ): Promise<Response> {
-  // Outside the try on purpose: the catch below turns errors into a 599, and
-  // this refusal must not read as a flaky network.
+  // Before the shared fetch on purpose: it turns errors into a 599, and this
+  // refusal must not read as a flaky network.
   assertPinballMapNetworkAllowed(init.method ?? "GET", label);
-  try {
-    return await fetch(url, {
+  return externalFetch(
+    url,
+    {
       ...init,
       headers: {
         "User-Agent": PBM_USER_AGENT,
@@ -130,27 +147,15 @@ async function safeFetch(
         ...(apiToken ? { "X-Api-Token": apiToken } : {}),
         ...(init.headers ?? {}),
       },
-    });
-  } catch (err) {
-    log.warn(
-      { err, label, action: "pinballmap.fetch" },
-      "PinballMap fetch failed"
-    );
-    return new Response(null, { status: 599 });
-  }
-}
-
-function parseRetryAfter(res: Response): number {
-  const header = res.headers.get("retry-after");
-  if (header) {
-    const n = Number.parseFloat(header);
-    if (Number.isFinite(n)) return n;
-  }
-  return 1;
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => globalThis.setTimeout(resolve, ms));
+    },
+    {
+      timeoutMs,
+      networkErrorLog: {
+        fields: { label, action: "pinballmap.fetch" },
+        message: "PinballMap fetch failed",
+      },
+    }
+  );
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -280,22 +285,21 @@ async function writeRequest(
   apiToken: string | null
 ): Promise<WriteOutcome> {
   const init: RequestInit = { method, headers: credsHeaders(credentials) };
-  let res = await safeFetch(url, init, label, apiToken);
-  if (res.status === 429) {
-    const retryAfter = parseRetryAfter(res);
-    if (retryAfter > MAX_RETRY_AFTER_SECONDS) {
+  const sent = await withRetryAfter(
+    () => safeFetch(url, init, label, apiToken, PBM_WRITE_TIMEOUT_MS),
+    (retryAfter) => {
       log.warn(
         { retryAfter, label, action: "pinballmap.rateLimit" },
         "PinballMap retry-after exceeds inline budget"
       );
-      return writeFailure("rate_limited");
     }
-    await sleep(retryAfter * 1000);
-    res = await safeFetch(url, init, label, apiToken);
-    if (res.status === 429) return writeFailure("rate_limited");
-  }
+  );
+  if (sent.rateLimited) return writeFailure("rate_limited");
+  const res = sent.response;
   // Network error (599) or server error: retry later.
-  if (res.status === 599 || res.status >= 500) return writeFailure("transient");
+  if (res.status === NETWORK_ERROR_STATUS || res.status >= 500) {
+    return writeFailure("transient");
+  }
 
   const body = await readBody(res);
   const message = pbmErrorMessage(body);
@@ -316,17 +320,23 @@ function toWriteResult(outcome: WriteOutcome): PbmWriteResult {
   return outcome.ok ? { ok: true } : outcome;
 }
 
+interface ReadOptions {
+  timeoutMs: number;
+  query?: Record<string, string>;
+}
+
 async function readResponse(
   path: string,
   label: string,
   apiToken: string | null,
-  query?: Record<string, string>
+  { timeoutMs, query }: ReadOptions
 ): Promise<Response> {
   const res = await safeFetch(
     buildUrl(path, query),
     { method: "GET" },
     label,
-    apiToken
+    apiToken,
+    timeoutMs
   );
   if (!res.ok) {
     const reason =
@@ -368,9 +378,9 @@ async function readJson(
   path: string,
   label: string,
   apiToken: string | null,
-  query?: Record<string, string>
+  options: ReadOptions
 ): Promise<unknown> {
-  const res = await readResponse(path, label, apiToken, query);
+  const res = await readResponse(path, label, apiToken, options);
   // A 200 with a non-JSON body (e.g. an HTML maintenance/edge page during an
   // outage) is a read failure, not a crash — surface it as a structured error.
   let data: unknown;
@@ -396,7 +406,8 @@ async function readRegionLmxes(
   const res = await readResponse(
     `/region/${regionSegment(region)}/location_machine_xrefs.json`,
     label,
-    apiToken
+    apiToken,
+    { timeoutMs: PBM_READ_TIMEOUT_MS }
   );
   const reader = res.body?.getReader();
   if (!reader) {
@@ -538,7 +549,8 @@ export function createLiveClient(apiToken: string | null): PinballMapClient {
       const raw = await readJson(
         `/locations/${locationId}.json`,
         "fetchLocation",
-        apiToken
+        apiToken,
+        { timeoutMs: PBM_READ_TIMEOUT_MS }
       );
       return parseLocation(raw, new Date().toISOString());
     },
@@ -547,7 +559,9 @@ export function createLiveClient(apiToken: string | null): PinballMapClient {
       assertNotInTransaction("pinballmap.fetchCatalog");
       // Full payload (no `no_details`): that flag omits `ipdb_id`, which we
       // store on the machine record (vendored llms.txt §no_details).
-      const raw = await readJson(`/machines.json`, "fetchCatalog", apiToken);
+      const raw = await readJson(`/machines.json`, "fetchCatalog", apiToken, {
+        timeoutMs: PBM_CATALOG_TIMEOUT_MS,
+      });
       return parseCatalog(raw);
     },
 
@@ -575,7 +589,7 @@ export function createLiveClient(apiToken: string | null): PinballMapClient {
         `/region/${regionSegment(region)}/locations.json`,
         "fetchRegionLocations",
         apiToken,
-        { no_details: "1" }
+        { timeoutMs: PBM_READ_TIMEOUT_MS, query: { no_details: "1" } }
       );
       return parseRegionLocations(raw);
     },
@@ -585,14 +599,17 @@ export function createLiveClient(apiToken: string | null): PinballMapClient {
       const raw = await readJson(
         `/machine_groups.json`,
         "fetchMachineGroups",
-        apiToken
+        apiToken,
+        { timeoutMs: PBM_READ_TIMEOUT_MS }
       );
       return parseMachineGroups(raw);
     },
 
     async fetchRegions(): Promise<PinballMapRegion[]> {
       assertNotInTransaction("pinballmap.fetchRegions");
-      const raw = await readJson("/regions.json", "fetchRegions", apiToken);
+      const raw = await readJson("/regions.json", "fetchRegions", apiToken, {
+        timeoutMs: PBM_READ_TIMEOUT_MS,
+      });
       return parseRegions(raw);
     },
 
@@ -606,10 +623,11 @@ export function createLiveClient(apiToken: string | null): PinballMapClient {
         buildUrl(`/users/auth_details.json`),
         { method: "POST", body: new URLSearchParams({ login, password }) },
         "authDetails",
-        apiToken
+        apiToken,
+        PBM_WRITE_TIMEOUT_MS
       );
       if (res.status === 429) return { ok: false, reason: "rate_limited" };
-      if (res.status === 599 || res.status >= 500) {
+      if (res.status === NETWORK_ERROR_STATUS || res.status >= 500) {
         return { ok: false, reason: "transient" };
       }
       const body = await readBody(res);

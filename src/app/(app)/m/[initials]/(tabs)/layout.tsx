@@ -1,9 +1,6 @@
 import type React from "react";
 import { notFound } from "next/navigation";
-import { eq } from "drizzle-orm";
-import { createClient } from "~/lib/supabase/server";
-import { db } from "~/server/db";
-import { userProfiles } from "~/server/db/schema";
+import { getViewer } from "~/lib/auth/viewer";
 import {
   getAccessLevel,
   canAccessMachineManage,
@@ -27,10 +24,7 @@ export default async function MachineDetailLayout({
 }): Promise<React.JSX.Element> {
   const { initials } = await params;
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { userId, role } = await getViewer();
 
   const { machine } = await getMachineForLayout(initials);
 
@@ -47,19 +41,14 @@ export default async function MachineDetailLayout({
   // Manage is reachable either as the full editing surface or as the read-only
   // Pinball Map surface (spec 4.9). The route repeats both checks so a deep link
   // remains guarded; mutation controls keep their own narrower capabilities.
-  const currentUserProfile = user
-    ? await db.query.userProfiles.findFirst({
-        where: eq(userProfiles.id, user.id),
-        columns: { role: true },
-      })
-    : null;
   const ownershipContext: OwnershipContext = {
-    userId: user?.id,
+    userId,
     machineOwnerId: machine.ownerId ?? undefined,
   };
-  const accessLevel = getAccessLevel(currentUserProfile?.role);
+  const accessLevel = getAccessLevel(role);
   const canManage =
-    user !== null && canAccessMachineManage(accessLevel, ownershipContext);
+    userId !== undefined &&
+    canAccessMachineManage(accessLevel, ownershipContext);
 
   return (
     <PageContainer size="standard">

@@ -1,9 +1,6 @@
 import type React from "react";
-import { eq } from "drizzle-orm";
-import { db } from "~/server/db";
-import { userProfiles } from "~/server/db/schema";
 import { resolveDefaultMachineId } from "../default-machine";
-import { createClient } from "~/lib/supabase/server";
+import { getViewer } from "~/lib/auth/viewer";
 import { getAccessLevel } from "~/lib/permissions/helpers";
 import { getRecentIssuesAction, type RecentIssueData } from "../actions";
 import { getReportMachines } from "../report-data";
@@ -36,22 +33,11 @@ export default async function PublicReportPage({
   const machinesListPromise = getReportMachines();
 
   // Auth context for the form
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { userId, role } = await getViewer();
 
-  let userProfile;
-  if (user) {
-    userProfile = await db.query.userProfiles.findFirst({
-      where: eq(userProfiles.id, user.id),
-      columns: { role: true },
-    });
-  }
-
-  const accessLevel = getAccessLevel(userProfile?.role);
+  const accessLevel = getAccessLevel(role);
   const canMultiple =
-    Boolean(user) && checkPermission("issues.report.quick", accessLevel);
+    userId !== undefined && checkPermission("issues.report.quick", accessLevel);
 
   const machinesList = await machinesListPromise;
 

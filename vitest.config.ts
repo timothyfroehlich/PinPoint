@@ -59,6 +59,10 @@ export default defineConfig(({ mode }) => {
               "src/test/integration/**/*.test.tsx",
             ],
             exclude: ["src/test/integration/supabase/**"],
+            // Forwards `~/server/db` to worker-scoped PGlite for every file
+            // in this project; merged after the root setup file. A file opts
+            // out with its own vi.mock or vi.unmock("~/server/db").
+            setupFiles: ["./src/test/setup/integration-db.ts"],
           },
         },
         {
@@ -82,11 +86,11 @@ export default defineConfig(({ mode }) => {
     },
     resolve: {
       alias: {
-        "~": path.resolve(__dirname, "./src"),
+        "~": path.resolve(import.meta.dirname, "./src"),
         // server-only is a Next.js convention that errors in client bundles.
         // In Vitest (Node.js), we resolve it to an empty module.
         "server-only": path.resolve(
-          __dirname,
+          import.meta.dirname,
           "./src/test/mocks/server-only.ts"
         ),
       },

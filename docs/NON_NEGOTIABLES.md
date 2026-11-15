@@ -1,7 +1,7 @@
 # PinPoint Non‑Negotiables
 
-**Last Updated**: 2026-09-26
-**Version**: 2.6 (CORE-TEST-007..010 added: failure-first regressions, no test-only seams, one owner per contract, failing tests are evidence — PP-wptk)
+**Last Updated**: 2026-10-06
+**Version**: 2.12 (CORE-ARCH-017 added: additive migrations merge first in their own PR, destructive ones last — PP-ncxx.6). Prior: 2.11 (CORE-TS-002 amended: a `*_VALUES` array is the single source for zod, Drizzle and TS unions — PP-az4d.13). Prior: 2.10 (CORE-ARCH-016 added: third-party HTTP goes through `~/lib/http/external` with a per-request timeout — PP-az4d.11). Prior: 2.9 (CORE-ARCH-013 added: Server Actions go through `createProtectedAction` — PP-az4d.4). Prior: 2.8 (CORE-ARCH-015 added: a caught error not returned to the user goes to `reportError`; cron routes use `runCron` — PP-az4d.3). Prior: 2.7 (CORE-ARCH-014 added: one write path per mutation; CORE-ARCH-010 amended: share load-bearing code at two copies, reuse existing helpers — PP-az4d.1)
 
 > **Canonical catalog**: this document defines the canonical `CORE-*` rules for PinPoint. Portable skills (`.agents/skills/`) and agent context (`AGENTS.md`) cite rules by ID and provide domain/task-specific procedures.
 
@@ -32,13 +32,18 @@
 15. Email addresses never displayed outside admin / settings (CORE-SEC-007)
 16. Permissions go through `checkPermission()`; matrix must match enforcement (CORE-ARCH-008)
 17. Mock third-party SDKs at their boundary; no live external services in E2E (CORE-TEST-006)
-18. Rule of Three before abstracting (CORE-ARCH-010)
+18. Rule of Three before abstracting; reuse helpers that already exist (CORE-ARCH-010)
 19. Baseline Widely available is the browser-support floor; look up patterns via the modern-web-guidance catalog (CORE-UI-005/006)
 20. Forms ship with the correct input `type`, `autocomplete` token, `:user-invalid` styling, and visible required indicators (CORE-FORM-001..006)
 21. Accessibility floor: skip link, semantic table markup, `motion-reduce:` paired with animations, no `<div role="button">`, `title` is not a tooltip (CORE-A11Y-001..006)
 22. Image priority and preconnect discipline: `priority` is for the LCP candidate only; preconnect to known image origins (CORE-PERF-003)
 23. External side effects (HTTP, email, Discord, blob, Vault RPC) never run inside a DB transaction; deliver them post-commit (CORE-ARCH-011)
 24. A bug-fix regression test fails on the pre-fix code; tests reach production through real callers' seams (CORE-TEST-007/008)
+25. A mutation with more than one entry point lives in `src/services`; entry points parse, authorize, and call it (CORE-ARCH-014)
+26. A caught error that is not returned to the user goes to `reportError`, never to a bare `log.error`; cron routes use `runCron` (CORE-ARCH-015)
+27. Server Actions are built with `createProtectedAction` / `createPublicAction` from `~/lib/actions` (CORE-ARCH-013)
+28. Third-party HTTP calls go through `~/lib/http/external` with a per-request timeout (CORE-ARCH-016)
+29. Additive migrations merge first in their own PR; destructive ones last (CORE-ARCH-017)
 
 ---
 
@@ -55,8 +60,8 @@
 
 - **Severity:** High
 - **Why:** Divergent shapes cause bugs
-- **Do:** Reuse domain types from `~/lib/types`
-- **Don't:** Declare look‑alike types in multiple places
+- **Do:** Reuse domain types from `~/lib/types`. A value set with a `*_VALUES` array (`ISSUE_SEVERITY_VALUES`, `USER_ROLES`, `NOTIFICATION_TYPE_VALUES`, `ISSUE_STATUS_VALUES`) has that array as its single source: `z.enum(X_VALUES)`, Drizzle `text(..., { enum: X_VALUES })`, and `type X = (typeof X_VALUES)[number]` all derive from it. Give a new value set its array before a second site needs the list.
+- **Don't:** Declare look‑alike types in multiple places. Restate a value set's literals by hand in a union, `z.enum([...])`, or Drizzle `enum: [...]`, and cast an array (`as unknown as [T, ...T[]]`) to fit a Drizzle enum: pass the `as const` array as is.
 
 **CORE-TS-003:** DB vs App boundary
 
@@ -324,7 +329,7 @@
 - **Why:** An export, flag, bypass parameter, or wrapper that exists only for a test is production surface with no production caller. It ships, it can be misused, and it keeps the test coupled to internals the real boundary already exposes.
 - **Do:** Test through the seam production callers use (the Server Action, route handler, service function, or rendered component). When a helper's branches matter, reach them through that boundary's inputs.
 - **Don't:** Export an internal helper, add an `isTest`/bypass parameter, or add an injection hook solely so a unit or integration test can reach it.
-- **Scope:** The E2E harness is not a seam under this rule. Surfaces that exist to drive a browser suite against a running app and are refused in production — the dev-autologin opt-out (`x-skip-autologin` / `skip_autologin`) and `/api/test-data/cleanup` — are owned by `pinpoint-e2e`.
+- **Scope:** The E2E harness is not a seam under this rule. Surfaces that exist to drive a browser suite against a running app and are refused in production — the dev-autologin opt-out (`x-skip-autologin` / `skip_autologin`) and the mock-upload route (`src/app/uploads/[...path]/route.ts`) — are owned by `pinpoint-e2e`.
 
 **CORE-TEST-009:** One primary test owner per contract
 
@@ -400,9 +405,9 @@
 **CORE-ARCH-010:** Rule of Three before abstracting
 
 - **Severity:** Required
-- **Why:** Premature abstractions invented for the first or second use case usually fit one of those shapes badly and force the third to bend. Pre-beta code with no scale data can't predict the right shape.
-- **Do:** Wait until you have three concrete instances before extracting a helper, hook, or service abstraction. Inline duplication is cheaper than the wrong abstraction.
-- **Don't:** Build a DAL, service layer, error hierarchy, or shared hook because you "might need it later." Don't refactor on the second duplication.
+- **Why:** Premature abstractions invented for the first or second use case usually fit one of those shapes badly and force the third to bend. Two exceptions. Load-bearing code — a transaction, an auth gate, a notification sequence — drifts when copied, and the drift ships as a defect, so it is shared at two copies. And the rule limits _creating_ abstractions, never using them: the 2026-10-05 audit (PP-az4d) found most Server Actions hand-rolling the auth that `createProtectedAction` already provides, and the web machine edit re-implementing `src/services/machines.ts` (see CORE-ARCH-014).
+- **Do:** Wait until you have three concrete instances before extracting a helper, hook, or abstraction for ordinary code; inline duplication is cheaper than the wrong abstraction. Share at two copies when the duplicated code is large or load-bearing. Before writing a helper, search `src/services`, `src/lib`, and the owning skill for one that exists, and use it.
+- **Don't:** Build a DAL, error hierarchy, or shared hook because you "might need it later." Don't refactor ordinary code on the second duplication. Don't re-implement a helper that exists because adopting it means touching more code.
 
 **CORE-ARCH-011:** External side effects never run inside a DB transaction
 
@@ -417,6 +422,42 @@
 - **Why:** PinPoint does not support JavaScript-disabled browsers, and a visibly broken control is an acceptable outcome when JavaScript fails to load — the user can see something is wrong and retry. What is not acceptable is a control that reports success for an action it could not perform: the user walks away believing the change was saved. Visible breakage is recoverable; false confirmation is not. Replaces the progressive-enhancement non-negotiable retired on 2026-07-27 (see the Rule IDs appendix), after an audit found that only ~7 of ~28 submission surfaces worked without JavaScript and that the public `/report` entry point — the rule's flagship surface — was unconditionally broken. Audit and reasoning: `docs/superpowers/specs/2026-07-27-core-arch-002-scope-design.md` (PP-nw80).
 - **Do:** When a control cannot perform its action — a dependency is unavailable, JavaScript is not running, a precondition is unmet — let it visibly do nothing, or surface a real error. Rely on server-side validation to reject submissions that could not have carried valid input.
 - **Don't:** Render a success message, toast, or confirmation for a submission whose input could not have been collected. Don't wire a save control that submits unchanged state and confirms it as a change.
+
+**CORE-ARCH-013:** Server Actions go through `createProtectedAction`
+
+- **Severity:** Required
+- **Why:** A hand-rolled Server Action repeats the authentication, validation, permission, redirect, and error-reporting sequence, and each copy drifts: the 2026-10-05 audit (PP-az4d) found three different redirect checks, two validation error codes, and permission checks that ran before or after the resource load depending on the file. `createProtectedAction` (`~/lib/actions`) runs the sequence once.
+- **Do:** Build every exported Server Action with `createProtectedAction`, or `createPublicAction` when signed-out visitors may call it. The worked example and the option list live in `pinpoint-ui` § Server Actions.
+- **Don't:** Call `auth.getUser()`, `safeParse`, or `checkPermission()` by hand in a new Server Action. Exceptions: the signed-out auth flows (login, signup, forgot and reset password) and the redirect-only OAuth and consent actions.
+- **Enforced by:** `src/test/lint/protected-action-ratchet.test.ts` fails when an exported Server Action outside its allowlist is built without the pipeline, and when an allowlisted action is migrated or deleted. The allowlist only shrinks (PP-az4d.4).
+
+**CORE-ARCH-014:** One write path per mutation
+
+- **Severity:** Required
+- **Why:** Two implementations of one mutation drift, and the same change then behaves differently depending on where it came from. The 2026-10-05 audit (PP-az4d) found the web machine edit (`updateMachineAction` in `src/app/(app)/m/actions.ts`) re-implementing `updateMachineOwner` and `updateMachineName` from `src/services/machines.ts`, which the MCP tools call. The two paths had already diverged on ownership notifications: the action awaited `dispatchNotification` inline, while the service plans in the transaction and dispatches after commit. PP-az4d.7 consolidates them.
+- **Do:** Put a mutation reachable from more than one entry point — a web Server Action, an MCP tool, a cron route — in `src/services`. Each entry point parses its input, authorizes the caller, and calls the service. Adding a second entry point to a mutation that lives in one entry point moves the mutation into `src/services` first.
+- **Don't:** Copy a service's transaction, event, or notification logic into an entry point.
+
+**CORE-ARCH-015:** A caught error that is not returned to the user goes to `reportError`
+
+- **Severity:** Required
+- **Why:** Sentry's auto-capture sees only _uncaught_ exceptions. A `catch` that logs and returns a clean response hides the failure from monitoring; a Vercel log line that ages out is the only evidence the job ran badly (PP-a5y). Five of seven cron routes (`cleanup-blobs`, `pinballmap-sync`, `refresh-catalog`, `refresh-opdb`, `refresh-pintips`) did exactly this, while the other two already called `reportError` (PP-az4d.3).
+- **Do:** Send every caught error that is not returned to the user through `reportError(err, { action: "<area.operation>" })` from `~/lib/observability/report-error`: one call captures to Sentry and writes the structured log. A Server Action that also returns an `err` Result uses `serverActionError(...)`. Write each cron route as `return runCron(request, "<action>", async () => ({ ok: true, ... }))` from `~/lib/cron/run-cron`: it applies the `CRON_SECRET` gate, reports any thrown failure, and answers with the single failure status (500). A cron job that fails by returning a result value throws that failure inside the callback. An error tolerated by design is still reported, with `bestEffort: true` in the context.
+- **Don't:** Pair `catch` with a bare `log.error`. Don't add `try`/`catch` to a cron route; `runCron` owns it.
+
+**CORE-ARCH-016:** Third-party HTTP calls go through `~/lib/http/external` with a timeout
+
+- **Severity:** Required
+- **Why:** `fetch` has no deadline of its own. A third party that accepts the connection and never answers holds the request until the platform kills the function: a Server Action spins with no result, and a cron run dies without reporting. PinballMap and Discord had no timeout until PP-az4d.11, while iScored, OPDB and PinTips each set their own. Both clients had also copied the network-error fallback and the 429 retry, and copies drift.
+- **Do:** Send each server-side request to a third-party API through `safeFetch(url, init, { timeoutMs, networkErrorLog })` from `~/lib/http/external`, and wrap a send that may hit a 429 in `withRetryAfter`. Name each `timeoutMs` as a constant in the client, chosen per endpoint class; it bounds one attempt, headers and body together, so a retry gets a fresh budget. A timeout and a network failure both arrive as the synthetic 599 (`NETWORK_ERROR_STATUS`), so classify that one status. An integration guard such as `assertPinballMapNetworkAllowed` runs before the call, outside the 599 conversion. SDK clients (Supabase, Resend, Vercel Blob) own their transport and are out of scope.
+- **Don't:** Call `fetch` directly for a third-party API, or send one without a timeout.
+
+**CORE-ARCH-017:** Additive migrations merge first, in their own PR; destructive migrations merge last
+
+- **Severity:** Required
+- **Why:** Migration numbers collide when several branches each carry an unmerged migration. The branch that merges second renumbers, and a hand renumber that keeps its older journal `when` is skipped by production's migrator with no record (PP-ncxx). A schema-only PR merges in hours, so its number is on main before other branches generate theirs. `migrate:production` also runs before `next build`, so each migration must already work with the code serving production; schema first, code second is that order.
+- **Do:** Once the feature spec settles the schema, ship the additive migration (new table, nullable column, index, enum value) with its `schema.ts` change in its own PR off main, ahead of the implementation PR. A subagent can own it while the implementation proceeds. Ship a destructive migration (drop, rename, NOT NULL, narrowed type) in its own PR after the code that stops reading the old shape is live. A schema change the implementation needs after the migration PR merged is a new migration, and its bead carries the `migration-correction` label. That label count measures whether specs settle schemas early enough.
+- **Don't:** Keep a migration on a feature branch until the feature merges.
 
 ---
 
@@ -480,7 +521,7 @@
 - **Do:** Use Tailwind breakpoint classes or container queries
 - **Don't:** `window.innerWidth`, `window.matchMedia`, `useMediaQuery` hooks
 - **Boundary:** Component-local geometry observation with `ResizeObserver` is allowed when JavaScript must derive behavior or semantic DOM state that CSS cannot expose (for example, which links belong in an overflow menu). It must not be used to restyle a component based on viewport-like breakpoints; CSS still owns presentation.
-- **Sanctioned exception** (a behavior swap CSS can't express, not styling): `use-is-mobile` (PP-43q3). Its consumers: machine settings swap inline cell editing for a bottom-sheet editor; `ConfirmingDeleteButton` swaps the arm/confirm-tap delete for a modal confirm; on the issue detail page (read once in `IssueSections` via `IsMobileProvider`), `IssueFieldRow` swaps the anchored field menu for a bottom-sheet picker, `AssigneePicker` swaps its popover for a bottom sheet, `IssueSectionPanel` carries `tabpanel` roles only while the mobile tabs exist, and `EditableIssueTitle` swaps blur-to-cancel for explicit Save and Cancel. The former `use-table-responsive-columns` exception (PP-rs9) is gone: issue rows are two lines at every width (PP-jb9v).
+- **Sanctioned exception** (a behavior swap CSS can't express, not styling): `use-is-mobile` (PP-43q3). Its consumers: machine settings swap inline cell editing for a bottom-sheet editor, and a set's tag picker swaps its popover for a bottom sheet; `ConfirmingDeleteButton` swaps the arm/confirm-tap delete for a modal confirm; on the issue detail page (read once in `IssueSections` via `IsMobileProvider`), `IssueFieldRow` swaps the anchored field menu for a bottom-sheet picker, `AssigneePicker` swaps its popover for a bottom sheet, `IssueSectionPanel` carries `tabpanel` roles only while the mobile tabs exist, and `EditableIssueTitle` swaps blur-to-cancel for explicit Save and Cancel. The former `use-table-responsive-columns` exception (PP-rs9) is gone: issue rows are two lines at every width (PP-jb9v).
 
 **CORE-RESP-003:** sm: is padding only
 
@@ -515,6 +556,7 @@
 - **Why:** Web platform features evolve faster than LLM training data refreshes. Memorizing patterns produces stale code. The Google Chrome `modern-web-guidance` plugin ships ~90 prescriptive guides — searchable by use case, each with Baseline status — and is the canonical reference for "what's the right way to do X today."
 - **Do:** At the start of any non-trivial UI work, search the catalog: `npx -y modern-web-guidance@latest search "<query>"`. Retrieve specific guides by id with `retrieve "<id>,<id2>"`. Check the guide's Browser Support section against CORE-UI-005 before adopting any recommendation.
 - **Don't:** Implement ad-hoc patterns when a Widely-available primitive exists for the same job. Don't pre-emptively pull every guide into context; search per task.
+- **Caveat — a guide's Baseline tier can lag the real Newly → Widely promotion:** Newly → Widely is pure elapsed time (Widely = 30 months after the Baseline low date, no new browser release required), so the catalog can still read "Newly available" after a feature has already crossed into Widely. That lag only ever under-reports — an unnecessary opt-in, never a gate bypass — so MWG's tier is not authoritative on its own. When a guide reads "Newly" for a feature whose Baseline low date is already more than 30 months past and that tier would gate a decision (adopt directly vs. opt-in per CORE-UI-005), confirm against a second source — `web-features`, caniuse, the Baseline dashboard (webstatus.dev), or MDN — before treating it as below the floor. (Casework: `:has()`, PP-l7fj.)
 - **Reference:** Plugin is installed at `~/.claude/plugins/marketplaces/googlechrome/skills/modern-web-guidance/`.
 
 ---
@@ -591,7 +633,7 @@
 - **Severity:** Required
 - **Why:** `:user-invalid` (Baseline Widely available) flips a CSS pseudo-class on form controls only **after** the user has interacted with them — no premature red rings on page load, no JS state mirroring, no event listeners. The shared `<Input>` already has `aria-invalid:` styling; pair it with `:user-invalid:` and the browser does the rest.
 - **Do:** `src/components/ui/input.tsx` and `textarea.tsx` carry the equivalent of `[&:user-invalid]:border-destructive [&:user-invalid]:ring-destructive/40` so every input automatically picks up post-interaction invalid styling. Add to the primitive once — don't copy this per form. (`select.tsx` is a Radix trigger, not a native form control, so the `:user-invalid` pseudo-class does not apply to it — it uses `aria-invalid:` styling only.)
-- **Don't:** Hand-roll `useState` + `onBlur` to mirror invalid state. Don't paint inputs red on initial render.
+- **Don't:** Hand-roll `useState` + `onBlur` to mirror invalid state. Don't paint inputs red on initial render. Don't reach for Tailwind's `peer-invalid` variant — it matches from first render, painting the premature red rings `:user-invalid` exists to avoid; it is the obvious Tailwind-native choice and the wrong one.
 - **Reference:** modern-web-guidance `validate-input-after-interaction`.
 - **Status:** Implemented in `input.tsx` and `textarea.tsx` (PP-kqbk.2). `select.tsx` is out of scope — see the Do note.
 
@@ -684,7 +726,7 @@ If all Yes → ship it. Perfect is the enemy of done.
 - CORE‑SEC‑001..010: Security
 - CORE‑PERF‑001..003: Performance (incl. image priority + preconnect)
 - CORE‑TEST‑001..006: Testing
-- CORE‑ARCH‑001, 004..012: Architecture (002, 003 retired)
+- CORE‑ARCH‑001, 004..016: Architecture (002, 003 retired)
 - CORE‑RESP‑001..004: Responsive framework
 - CORE‑UI‑001..006: UI & styling + Browser support / MWG catalog (005, 006)
 - CORE‑A11Y‑001..006: Accessibility floor

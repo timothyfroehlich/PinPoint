@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from "react";
 import { ChevronsUpDown, Plus } from "lucide-react";
-import type { UserStatus } from "~/lib/types";
+import type { UserRole, UserStatus } from "~/lib/types";
 import { InviteUserDialog } from "~/components/users/InviteUserDialog";
 import { compareUnifiedUsers } from "~/lib/users/comparators";
 import { Button } from "~/components/ui/button";
@@ -54,7 +54,7 @@ export interface OwnerSelectUser {
   lastName: string;
   machineCount: number;
   status: UserStatus;
-  role: "guest" | "member" | "technician" | "admin";
+  role: UserRole;
 }
 
 interface OwnerSelectProps {

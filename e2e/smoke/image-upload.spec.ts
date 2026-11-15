@@ -19,8 +19,8 @@ const __dirname = dirname(__filename);
 const IMAGE_UPLOAD_PREFIX = "E2E Image Upload";
 
 test.describe("Image Upload Reporting", () => {
-  test.afterEach(async ({ request }) => {
-    await cleanupTestEntities(request, {
+  test.afterEach(async () => {
+    await cleanupTestEntities({
       issueTitlePrefix: IMAGE_UPLOAD_PREFIX,
     });
   });

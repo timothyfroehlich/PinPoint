@@ -48,7 +48,7 @@ export interface ApronStressFixture {
   stresses: string;
   /** OPDB id for a real machine; null for a synthetic case. */
   opdbId: string | null;
-  /** Credits are OPDB's, with both credit rows on (spec §10.5 default). */
+  /** Credits are OPDB's, with all three credit rows on. */
   content: ApronCardContent;
   textFill?: ApronFixtureTextFill;
   knownIssues?: readonly ApronKnownIssue[];
@@ -56,7 +56,7 @@ export interface ApronStressFixture {
 
 const LONG_OWNER = "Maximiliana Featherstonehaugh-Worthington";
 
-const NO_CREDITS: MachineCredits = { design: [], art: [] };
+const NO_CREDITS: MachineCredits = { design: [], art: [], code: [] };
 
 const noText = {
   description: [],
@@ -66,8 +66,9 @@ const noText = {
 
 // Generic card copy — no machine-specific rules, so it makes no claims about
 // a real game — long enough to overflow the text region of any plausible
-// apron size. The harness fails loudly if a size ever fits all of it.
-const FILL_WORDS = [
+// apron size. It runs twice so the tallest cards still overflow.
+// The harness fails loudly if a size ever fits all of it.
+const FILL_SENTENCES = [
   "Start a game with the button on the front of the cabinet, then plunge the ball with a firm, full pull.",
   "Watch the display between balls for the next goal, and ask a member at the front desk if the rules are unclear.",
   "Nudge gently: the tilt is set to league standard, and a tilt ends your ball, not the whole game.",
@@ -77,13 +78,17 @@ const FILL_WORDS = [
   "Post your score after every game to keep the league standings current and to climb the collective's leaderboard.",
   "Members keep this machine running on volunteer time, so please treat it gently and leave drinks off the glass.",
   "Owners and technicians read every report, and the machine page shows when an issue is fixed or still open.",
-].join(" ");
+  "Leave the coin door closed while you play; the service buttons inside reset audits that the owner tracks.",
+  "If the flippers feel weak or sticky, stop playing and file a report rather than slapping the buttons harder.",
+  "Thank you for playing, and for helping keep the collective's games in good shape for everyone who visits.",
+];
+const FILL_WORDS = [...FILL_SENTENCES, ...FILL_SENTENCES].join(" ");
 
 /** A fixture as written: card content without credits, plus OPDB credits. */
 type FixtureSource = Omit<ApronStressFixture, "content"> & {
   content: Omit<
     ApronCardContent,
-    "credits" | "designEnabled" | "artEnabled" | "hasPinTips"
+    "credits" | "designEnabled" | "artEnabled" | "codeEnabled" | "hasPinTips"
   >;
   credits: MachineCredits;
 };
@@ -105,6 +110,7 @@ const FIXTURE_SOURCES: readonly FixtureSource[] = [
     credits: {
       design: ["Steve Ritchie", "Dwight Sullivan", "Greg Freres"],
       art: ["Greg Freres"],
+      code: ["Dwight Sullivan", "Matt Coriale"],
     },
   },
   {
@@ -119,7 +125,11 @@ const FIXTURE_SOURCES: readonly FixtureSource[] = [
       ownerName: "Jordan Lee",
       ...noText,
     },
-    credits: { design: ["Mark Ritchie", "Doug Watson"], art: ["Doug Watson"] },
+    credits: {
+      design: ["Mark Ritchie", "Doug Watson"],
+      art: ["Doug Watson"],
+      code: ["Brian Eddy"],
+    },
   },
   {
     id: "black-knight-sor-premium",
@@ -142,6 +152,16 @@ const FIXTURE_SOURCES: readonly FixtureSource[] = [
         "Harrison Drake",
         "Danai Kittivathana",
         "George Gomez",
+      ],
+      code: [
+        "Lyman F. Sheats Jr.",
+        "Mike Kyzivat",
+        "Waison Cheng",
+        "Tanio Klyce",
+        "Corey Stup",
+        "Tim Sexton",
+        "Brett Rubin",
+        "Mark Guidarelli",
       ],
     },
   },
@@ -168,6 +188,14 @@ const FIXTURE_SOURCES: readonly FixtureSource[] = [
         "Jack E. Haeger",
         "Greg Freres",
         "Steven Martin",
+      ],
+      code: [
+        "Dwight Sullivan",
+        "Mike Kyzivat",
+        "Waison Cheng",
+        "Tanio Klyce",
+        "Corey Stup",
+        "James T. Sullivan",
       ],
     },
   },
@@ -198,7 +226,7 @@ const FIXTURE_SOURCES: readonly FixtureSource[] = [
       ownerName: "Jordan Lee",
       ...noText,
     },
-    credits: { design: ["John Borg"], art: [] },
+    credits: { design: ["John Borg"], art: [], code: [] },
   },
   {
     id: "rocky-bullwinkle",
@@ -213,7 +241,11 @@ const FIXTURE_SOURCES: readonly FixtureSource[] = [
       ownerName: "Jordan Lee",
       ...noText,
     },
-    credits: { design: ["Tim Seckel"], art: ["Kevin O'Connor"] },
+    credits: {
+      design: ["Tim Seckel"],
+      art: ["Kevin O'Connor"],
+      code: ["Kristina Donofrio", "John Carpenter", "Lonnie D. Ropp"],
+    },
   },
   {
     id: "harlem-globetrotters",
@@ -227,7 +259,7 @@ const FIXTURE_SOURCES: readonly FixtureSource[] = [
       ownerName: "Jordan Lee",
       ...noText,
     },
-    credits: { design: ["Greg Kmiec"], art: ["Greg Freres"] },
+    credits: { design: ["Greg Kmiec"], art: ["Greg Freres"], code: [] },
   },
   {
     id: "lights-camera-action",
@@ -245,6 +277,7 @@ const FIXTURE_SOURCES: readonly FixtureSource[] = [
     credits: {
       design: ["Jon Norris"],
       art: ["Constantino Mitchell", "Brian R. Johnson", "Jeanine Mitchell"],
+      code: ["John Buras"],
     },
   },
   {
@@ -262,6 +295,7 @@ const FIXTURE_SOURCES: readonly FixtureSource[] = [
     credits: {
       design: ["John Borg", "Lonnie D. Ropp"],
       art: ["Jerry Vanderstelt", "Kevin O'Connor"],
+      code: ["Lonnie D. Ropp"],
     },
   },
   {
@@ -276,7 +310,7 @@ const FIXTURE_SOURCES: readonly FixtureSource[] = [
       ownerName: "Jordan Lee",
       ...noText,
     },
-    credits: { design: ["Harry Williams"], art: ["Bob Timm"] },
+    credits: { design: ["Harry Williams"], art: ["Bob Timm"], code: [] },
   },
   {
     id: "no-metadata",
@@ -304,7 +338,11 @@ const FIXTURE_SOURCES: readonly FixtureSource[] = [
       ownerName: "Jordan Lee",
       ...noText,
     },
-    credits: { design: ["Pat Lawlor", "Larry DeMar"], art: ["John Youssi"] },
+    credits: {
+      design: ["Pat Lawlor", "Larry DeMar"],
+      art: ["John Youssi"],
+      code: ["Larry DeMar", "Brian Eddy"],
+    },
     textFill: { field: "description", at: "limit", words: FILL_WORDS },
   },
   {
@@ -323,7 +361,11 @@ const FIXTURE_SOURCES: readonly FixtureSource[] = [
       ),
       tipEnabled: true,
     },
-    credits: { design: ["Mark Ritchie"], art: ["Python Anghelo"] },
+    credits: {
+      design: ["Mark Ritchie"],
+      art: ["Python Anghelo"],
+      code: ["Ed Boon"],
+    },
     textFill: { field: "description", at: "limit", words: FILL_WORDS },
   },
   {
@@ -342,7 +384,11 @@ const FIXTURE_SOURCES: readonly FixtureSource[] = [
       ),
       tipEnabled: true,
     },
-    credits: { design: ["Mark Ritchie"], art: ["Python Anghelo"] },
+    credits: {
+      design: ["Mark Ritchie"],
+      art: ["Python Anghelo"],
+      code: ["Ed Boon"],
+    },
     textFill: { field: "description", at: "over", words: FILL_WORDS },
   },
 ];
@@ -355,6 +401,9 @@ export const APRON_STRESS_FIXTURES: readonly ApronStressFixture[] =
       credits,
       designEnabled: true,
       artEnabled: true,
+      // All three credit rows on — the tallest identity panel (spec 10.2) —
+      // even though Code is off by default on a real card (10.5).
+      codeEnabled: true,
       // Every fixture carries the playing tips row, the tallest action column.
       hasPinTips: true,
     },

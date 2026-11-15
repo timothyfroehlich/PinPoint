@@ -1,6 +1,6 @@
 import type React from "react";
 import { redirect, notFound } from "next/navigation";
-import { createClient } from "~/lib/supabase/server";
+import { getViewer } from "~/lib/auth/viewer";
 import { getLoginUrl } from "~/lib/url";
 import { reportError } from "~/lib/observability/report-error";
 import { db } from "~/server/db";
@@ -25,21 +25,21 @@ import { PageHeader } from "~/components/layout/PageHeader";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { DefaultReportModeForm } from "./reporting/default-report-mode-form";
 export default async function SettingsPage(): Promise<React.JSX.Element> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { userId, profile } = await getViewer();
 
-  if (!user) {
+  if (!userId) {
     redirect(getLoginUrl("/settings"));
   }
 
-  // Fetch user profile
-  const profile = await db.query.userProfiles.findFirst({
-    where: eq(userProfiles.id, user.id),
+  // The viewer carries role and report modes; this page alone also needs the
+  // account's email and Discord link. Email stays out of the shared viewer
+  // (CORE-SEC-007).
+  const account = await db.query.userProfiles.findFirst({
+    where: eq(userProfiles.id, userId),
+    columns: { email: true, discordUserId: true },
   });
 
-  if (!profile) {
+  if (!profile || !account) {
     // Data-integrity anomaly: auth.users row exists but handle_new_user trigger
     // did not create the user_profiles row. Redirecting to login would send the
     // authenticated user into an infinite loop (login → already-authed → /settings
@@ -47,21 +47,21 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
     // render a 404 rather than looping.
     reportError(new Error("Authenticated user has no user_profiles row"), {
       action: "settings-page.missing-profile",
-      userId: user.id,
+      userId,
     });
     notFound();
   }
 
   // Fetch notification preferences
   let preferences = await db.query.notificationPreferences.findFirst({
-    where: eq(notificationPreferences.userId, user.id),
+    where: eq(notificationPreferences.userId, userId),
   });
 
   // Create default preferences if they don't exist (fallback for old users)
   if (!preferences) {
     [preferences] = await db
       .insert(notificationPreferences)
-      .values({ userId: user.id })
+      .values({ userId })
       .returning();
   }
 
@@ -77,8 +77,8 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
     db
       .select({ count: count() })
       .from(machines)
-      .where(eq(machines.ownerId, user.id)),
-    getReassignmentTargets(user.id),
+      .where(eq(machines.ownerId, userId)),
+    getReassignmentTargets(userId),
   ]);
 
   const ownedMachineCount = ownedMachinesResult[0]?.count ?? 0;
@@ -86,7 +86,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
   // Discord integration state for the preferences form (PP-2n5). Only need
   // the boolean here — skip the Vault decrypt that getDiscordConfig() does.
   const discordIntegrationEnabled = await isDiscordIntegrationConfigured();
-  const userHasDiscord = profile.discordUserId !== null;
+  const userHasDiscord = account.discordUserId !== null;
   const canMultiple = checkPermission(
     "issues.report.quick",
     getAccessLevel(profile.role)
@@ -99,9 +99,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
       await db
         .select({ count: count() })
         .from(userProfiles)
-        .where(
-          and(eq(userProfiles.role, "admin"), ne(userProfiles.id, user.id))
-        )
+        .where(and(eq(userProfiles.role, "admin"), ne(userProfiles.id, userId)))
     )[0]?.count === 0;
 
   return (
@@ -114,7 +112,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
             Profile Settings
           </h2>
           <Link
-            href={`/u/${user.id}`}
+            href={`/u/${userId}`}
             className="text-primary text-sm hover:underline"
           >
             View your public profile →
@@ -180,7 +178,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
               discordNotifyOnPinballMapComment:
                 preferences.discordNotifyOnPinballMapComment,
             }}
-            isInternalAccount={isInternalAccount(profile.email)}
+            isInternalAccount={isInternalAccount(account.email)}
             discordIntegrationEnabled={discordIntegrationEnabled}
             userHasDiscord={userHasDiscord}
           />
@@ -193,7 +191,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
             Authentication
           </h2>
           <div className="mb-6">
-            <AccountEmail email={profile.email} />
+            <AccountEmail email={account.email} />
           </div>
           <p className="text-pretty text-sm text-muted-foreground mb-4">
             Change your account password.

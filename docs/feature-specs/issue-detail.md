@@ -57,7 +57,7 @@
 - **4.1** The header's first row is the Issue ID chip followed by the machine's name, which links to the machine page. On mobile the ⋯ menu (§4.5) ends this row, so the title below has the full width.
 - **4.2** The title follows, as the page's heading, shown in full and wrapping onto as many lines as it needs. No title is cut off, including older titles longer than the current limit.
 - **4.3** On desktop an Edit title button sits beside the title and is always visible — never revealed only on hover. On mobile, Edit title is in the ⋯ menu (§4.5).
-- **4.4** Edit title edits the title in place. On desktop, Enter saves, Escape cancels, and leaving the field cancels unless the save just failed. On mobile, Save and Cancel buttons sit under the field, the keyboard's Done key saves, and leaving the field keeps the edit open. An empty or unchanged title saves nothing. A title holds at most 60 characters, the same limit as when the issue is reported. An older title over 60 characters is never shortened automatically; it saves only once edited down to 60 or fewer.
+- **4.4** Edit title edits the title in place. On desktop, Enter saves, Escape cancels, and leaving the field cancels unless the save just failed. On mobile, Save and Cancel buttons sit under the field, the keyboard's Done key saves, and leaving the field keeps the edit open. An empty or unchanged title saves nothing. A title holds at most 60 characters, the same limit as when the issue is reported. An older title over 60 characters is never shortened automatically; it saves only once edited down to 60 or fewer. A title is one line: reporting, editing, converting a Pinball Map comment, and MCP all save a line break, tab, or run of spaces as a single space.
 - **4.5** On desktop a labeled Move button sits beside Edit title. On mobile a ⋯ menu at the end of the header's first row holds Edit title and Move to another machine, offering only the actions the viewer can use.
 - **4.6** Move opens a dialog that lists every other machine not marked Removed, warns that the issue's URL will change, and on confirmation moves the issue and opens it at its new URL. The issue takes the next number on the destination machine; its old number is not reused.
 - **4.7** The summary line sits under the title and states the assignee (or Unassigned), status, severity, and priority, each with its icon, with priority worded as "<level> priority". It wraps onto a second line when it doesn't fit. It is read-only.
@@ -130,7 +130,7 @@
 
 - **10.1** Other issues lists the machine's open issues other than this one — an open issue is one whose status is outside the Closed group — each as the same issue card the machine page's Open Issues card uses, in the same compact presentation, and each opening its issue. Closed issues never appear.
 - **10.2** On desktop the list's heading is **Other issues**. On mobile the Other issues tab has no heading of its own. Neither ever includes the machine's name.
-- **10.3** The list carries a **See all** link that opens the issue list at `/issues` with only the machine filter set to this machine and no other filtering: every status (closed included) and the machine shown even when it is not On the Floor (`/issues?machine=<initials>&status=all&include_inactive_machines=true`).
+- **10.3** The list carries a **See all** link that opens the issue list at `/issues` with only the machine filter set to this machine and no other filtering: every status (closed included) and the machine shown even when it is not On the Floor (`/issues?machine=<initials>&status=all&presence=all`).
 - **10.4** The list carries no link to the machine page and no explanatory copy; the header's machine link serves as the way to the machine.
 - **10.5** The list shows the five newest open issues, newest first; See all covers the rest.
 - **10.6** With no other open issues, the list shows a No other open issues message, on the mobile tab and in the desktop section alike.
@@ -184,7 +184,6 @@ None.
 | :-- | :-- | :-- |
 | §4.6 | Move lists Removed machines. | PP-s363 |
 | §5.4 | The report's photos include every photo on the issue, so a comment's photos also appear in the initial report. | PP-buwx |
-| §2.2 | A number with trailing characters (`/i/1abc`, `/i/1.5`) is read as its leading digits and shows issue 1 instead of Issue not found. | PP-xlod |
 | §2.5–§2.6 | Email and in-app notification links are the bare issue URL; only Discord links add the comment's anchor, and field-change notifications carry no system event id to anchor to. | PP-4g43 |
 
 ---
@@ -195,6 +194,8 @@ Changes to this document. Divergence-table rows are working state and are not lo
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-05 | §4.4: a title is one line; every write path saves line breaks and runs of whitespace as a single space. |
+| 2026-10-04 | The link to a machine's other issues uses the canonical Machine Presence parameter (§10.3). |
 | 2026-10-03 | §7.5 names a person in a system event by their current name, or Former user once their account is deleted. |
 | 2026-10-03 | §4.6 Move leaves out Removed machines. |
 | 2026-10-02 | §8.7 keeps an unposted comment draft, with its photos, until it posts. |

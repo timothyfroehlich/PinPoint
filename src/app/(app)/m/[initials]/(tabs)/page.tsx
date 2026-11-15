@@ -1,9 +1,9 @@
 import type React from "react";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
-import { createClient } from "~/lib/supabase/server";
+import { getViewer } from "~/lib/auth/viewer";
 import { db } from "~/server/db";
-import { machines, userProfiles } from "~/server/db/schema";
+import { machines } from "~/server/db/schema";
 import { deriveMachineStatus } from "~/lib/machines/status";
 import { RichTextDisplay } from "~/components/editor/RichTextDisplay";
 import { docIsEmpty, docToPlainText } from "~/lib/tiptap/types";
@@ -36,16 +36,19 @@ import { getTopScoresForMachine } from "~/lib/iscored";
 import { TopScoresCard } from "~/components/machines/TopScoresCard";
 import { InfoHero } from "./info-hero";
 import { InfoRail } from "./info-rail";
-import { getTagsForMachine } from "~/lib/tags/tags";
+import { getTagsForMachine, listTags } from "~/lib/tags/tags";
+import { toTagEditorGroups } from "~/lib/tags/editor";
+import { isRemoved } from "~/lib/machines/presence";
+import { MachineTagEditor } from "~/components/tags/MachineTagEditor";
 
 /**
  * Machine Info Tab (default route for /m/[initials]/) — the QR-scanning
  * player's landing (redesign PP-5sgt.2).
  *
  * Reading order (both breakpoints): Hero (status + presence + Report button +
- * known-issues peek) → Description (when set) → reference cluster (Details
- * card: Model / Pinball Map + owner, then Top Scores / Tags) → recent-activity
- * peek. Desktop is a main column + 320px rail; mobile folds the rail inline
+ * known-issues peek) → Description (when set) → reference cluster (Tags, then
+ * the Details card: Model / Pinball Map + owner, then Top Scores) →
+ * recent-activity peek. Desktop is a main column + 320px rail; mobile folds the rail inline
  * after the hero.
  *
  * Maintainer/owner-private tools (QR code, Owner's Requirements) live on the
@@ -59,19 +62,9 @@ export default async function MachineInfoTab({
 }): Promise<React.JSX.Element> {
   const { initials } = await params;
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { userId, role } = await getViewer();
 
-  const currentUserProfile = user
-    ? await db.query.userProfiles.findFirst({
-        where: eq(userProfiles.id, user.id),
-        columns: { role: true },
-      })
-    : null;
-
-  const accessLevel = getAccessLevel(currentUserProfile?.role);
+  const accessLevel = getAccessLevel(role);
 
   const { machine } = await getMachineForLayout(initials);
   if (!machine) {
@@ -81,14 +74,14 @@ export default async function MachineInfoTab({
   const openIssues = machine.issues;
 
   const ownershipContext: OwnershipContext = {
-    userId: user?.id,
+    userId,
     machineOwnerId: machine.ownerId ?? undefined,
   };
 
   // Who may post timeline notes; their unposted note is kept as a draft.
   const composerUserId =
-    user && checkPermission("machines.timeline.comment.add", accessLevel)
-      ? user.id
+    userId && checkPermission("machines.timeline.comment.add", accessLevel)
+      ? userId
       : null;
 
   const machineStatus = deriveMachineStatus(openIssues);
@@ -216,14 +209,34 @@ export default async function MachineInfoTab({
   // tab layout and the route-level deep-link guard.
   const canOpenManage = canAccessMachineManage(accessLevel, ownershipContext);
 
-  const [topScores, tags, credits, pinTips] = await Promise.all([
+  // Owners tag their own machines; technicians and admins any (spec 11.4,
+  // 11.10). Only `tags.manage` holders create tags while tagging (11.15).
+  const canTag = checkPermission("tags.apply", accessLevel, ownershipContext);
+  const canCreateTags = checkPermission("tags.manage", accessLevel);
+
+  const [topScores, tags, tagGroups, credits, pinTips] = await Promise.all([
     machine.iscoredGameId
       ? getTopScoresForMachine(machine.iscoredGameId, 3)
       : Promise.resolve([]),
     getTagsForMachine(db, machine.id),
+    // Request-deduped with the read above; only an editor needs every tag.
+    canTag ? listTags(db) : Promise.resolve(null),
     getMachineCredits(machine),
     getMachinePinTips(machine.pinballmapTitle?.opdbId ?? null),
   ]);
+
+  const tagEditor =
+    tagGroups === null ? null : (
+      <MachineTagEditor
+        machineId={machine.id}
+        groups={toTagEditorGroups(tagGroups)}
+        appliedTagIds={tags.flatMap((tag) =>
+          tag.kind === "hand" ? [tag.id] : []
+        )}
+        canCreate={canCreateTags}
+        countsThisMachine={!isRemoved(machine.presenceStatus)}
+      />
+    );
 
   const rail = (
     <InfoRail
@@ -233,6 +246,7 @@ export default async function MachineInfoTab({
       modelName={modelName}
       manufacturer={machine.currentManufacturer}
       tags={tags.map((tag) => ({ name: tag.name, href: tag.href }))}
+      tagsEditSlot={tagEditor}
       year={machine.year}
       credits={credits}
       topScoresSlot={
@@ -268,7 +282,7 @@ export default async function MachineInfoTab({
   );
 
   // Single grid in DOM reading order: Hero → Description → reference rail
-  // (Details card: Model / Pinball Map + owner, then Top Scores / Tags) →
+  // (Tags, then the Details card: Model / Pinball Map + owner, Top Scores) →
   // recent activity. On mobile it's one flex column (the rail folds inline
   // after the description). On desktop the rail is pinned to the 320px right column, spanning the main column's rows;
   // everything else auto-flows down column 1. Rendered once so test ids stay

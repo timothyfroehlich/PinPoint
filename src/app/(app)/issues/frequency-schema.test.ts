@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { exportFiltersSchema } from "./export-schema";
 import { updateIssueFrequencySchema } from "./schemas";
-import { parseIssueFilters } from "~/lib/issues/filters";
+import { parseIssueViewState } from "~/lib/issues/view/state";
 
 describe("Not specified frequency across issue surfaces", () => {
   it("accepts the value for issue editing", () => {
@@ -12,14 +11,10 @@ describe("Not specified frequency across issue surfaces", () => {
     expect(result.success).toBe(true);
   });
 
-  it("preserves the value in list and export filters", () => {
-    const filter = { frequency: ["not_specified"] };
-    expect(exportFiltersSchema.parse(filter).frequency).toEqual(
-      filter.frequency
-    );
+  it("preserves the value in the list's Frequency filter", () => {
     expect(
-      parseIssueFilters(new URLSearchParams("frequency=not_specified"))
+      parseIssueViewState(new URLSearchParams("frequency=not_specified"))
         .frequency
-    ).toEqual(filter.frequency);
+    ).toEqual(["not_specified"]);
   });
 });

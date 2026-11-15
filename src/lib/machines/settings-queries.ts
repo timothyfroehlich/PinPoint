@@ -3,11 +3,18 @@ import { eq } from "drizzle-orm";
 import { type DbTransaction } from "~/server/db";
 import { machineSettingsSets } from "~/server/db/schema";
 import { type AccessLevel } from "~/lib/permissions/matrix";
-import { canEditSet, canSetOwnerDefault, canViewSet } from "~/lib/permissions";
-import type {
-  SettingsSection,
-  SettingsSetData,
+import { siteDayOf } from "~/lib/time-zone";
+import {
+  canDeleteSet,
+  canEditSet,
+  canMakeCommunity,
+  canManageMachineSettings,
+} from "~/lib/permissions";
+import {
+  type SettingsSection,
+  type SettingsSetData,
 } from "~/lib/machines/settings-types";
+import { compareSettingsTags } from "~/lib/machines/settings-tags";
 
 /**
  * Re-derive the client-only `_key` render keys that were stripped before
@@ -37,7 +44,7 @@ function withRenderKeys(sections: SettingsSection[]): SettingsSection[] {
   });
 }
 
-/** Who is asking — determines set visibility and each set's `canEdit`. */
+/** Who is asking — determines each set's per-viewer rights. */
 export interface SettingsSetsViewer {
   /** The authed user's id, or null for an anonymous visitor. */
   viewerId: string | null;
@@ -48,10 +55,10 @@ export interface SettingsSetsViewer {
 }
 
 /**
- * Load the settings sets for a machine that the given viewer may SEE, as the
- * client view-model: public sets + the owner's default + the viewer's own
- * private drafts. Owner's default first, then oldest-created. Each row carries
- * a per-viewer `canEdit`. `updatedBy` resolves to the editor's display NAME
+ * Load every settings set on a machine as the client view-model (spec §2.5:
+ * every set is visible to everyone who can open the machine). Default House
+ * first, then default Tournament, then oldest-created. Each row carries the
+ * viewer's rights. `updatedBy` resolves to the editor's display NAME
  * (CORE-SEC-007: never an email).
  */
 export async function getMachineSettingsSets(
@@ -64,38 +71,44 @@ export async function getMachineSettingsSets(
     columns: {
       id: true,
       name: true,
-      isPreferred: true,
-      isOwnerSet: true,
-      isPublic: true,
-      isTournament: true,
+      isPreferredHouse: true,
+      isPreferredTournament: true,
+      isCommunity: true,
       createdBy: true,
       description: true,
       sections: true,
       updatedBy: true,
       updatedAt: true,
     },
-    with: { updatedByUser: { columns: { name: true } } },
-    orderBy: (s, { asc, desc }) => [desc(s.isPreferred), asc(s.createdAt)],
+    with: {
+      updatedByUser: { columns: { name: true } },
+      tags: {
+        columns: {},
+        with: { tag: { columns: { id: true, slug: true, name: true } } },
+      },
+    },
+    orderBy: (s, { asc, desc }) => [
+      desc(s.isPreferredHouse),
+      desc(s.isPreferredTournament),
+      asc(s.createdAt),
+    ],
   });
 
-  return rows
-    .map((row) => ({
-      auth: {
-        isOwnerSet: row.isOwnerSet,
-        isPublic: row.isPublic,
-        isPreferred: row.isPreferred,
-        createdById: row.createdBy,
-      },
-      row,
-    }))
-    .filter(({ auth }) => canViewSet(auth, viewer.viewerId, viewer.access))
-    .map(({ auth, row }) => ({
+  const canCurate = canManageMachineSettings(
+    viewer.machineOwnerId,
+    viewer.viewerId,
+    viewer.access
+  );
+
+  return rows.map((row) => {
+    const auth = { isCommunity: row.isCommunity, createdById: row.createdBy };
+    return {
       id: row.id,
       name: row.name,
-      isPreferred: row.isPreferred,
-      isOwnerSet: row.isOwnerSet,
-      isPublic: row.isPublic,
-      isTournament: row.isTournament,
+      isPreferredHouse: row.isPreferredHouse,
+      isPreferredTournament: row.isPreferredTournament,
+      isCommunity: row.isCommunity,
+      tags: row.tags.map((t) => t.tag).sort(compareSettingsTags),
       createdById: row.createdBy,
       canEdit: canEditSet(
         auth,
@@ -103,16 +116,19 @@ export async function getMachineSettingsSets(
         viewer.viewerId,
         viewer.access
       ),
-      canSetDefault: canSetOwnerDefault(
+      canDelete: canDeleteSet(
         auth,
         viewer.machineOwnerId,
         viewer.viewerId,
         viewer.access
       ),
+      canMakeCommunity: canMakeCommunity(auth, viewer.viewerId, viewer.access),
+      canCurate,
       description: row.description ?? null,
       sections: withRenderKeys(row.sections),
       updatedBy: row.updatedByUser?.name ?? "Unknown",
       updatedById: row.updatedBy,
-      updatedAt: row.updatedAt.toISOString().slice(0, 10),
-    }));
+      updatedAt: siteDayOf(row.updatedAt),
+    };
+  });
 }

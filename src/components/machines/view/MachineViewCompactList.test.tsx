@@ -51,7 +51,7 @@ describe("MachineViewCompactList", () => {
     expect(count).toHaveTextContent(/^2 open$/);
     expect(count).toHaveClass(SEVERITY_CONFIG.unplayable.iconColor);
     expect(count.getAttribute("href")).toBe(
-      "/issues?machine=EHOH&include_inactive_machines=true"
+      "/issues?machine=EHOH&presence=all"
     );
 
     // Owner, Manufacturer, Year, and service age appear only in Table mode.

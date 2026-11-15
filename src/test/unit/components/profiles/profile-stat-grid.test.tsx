@@ -10,7 +10,7 @@ describe("ProfileStatGrid", () => {
         comments={9}
         machinesOwned={4}
         fixed={2}
-        collectionHref="/c/owner/x"
+        machinesHref="/m?owner=x"
       />
     );
     expect(screen.getByText("Issues reported")).toBeInTheDocument();
@@ -22,18 +22,18 @@ describe("ProfileStatGrid", () => {
     expect(screen.getByText("2")).toBeInTheDocument();
   });
 
-  it("links the machines tile to the collection", () => {
+  it("links the machines tile to the person's machines", () => {
     render(
       <ProfileStatGrid
         reported={0}
         comments={0}
         machinesOwned={3}
         fixed={0}
-        collectionHref="/c/owner/x"
+        machinesHref="/m?owner=x"
       />
     );
     expect(
       screen.getByRole("link", { name: /machines owned/i })
-    ).toHaveAttribute("href", "/c/owner/x");
+    ).toHaveAttribute("href", "/m?owner=x");
   });
 });

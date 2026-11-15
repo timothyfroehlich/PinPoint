@@ -11,32 +11,38 @@ on:
 
 permissions: read-all  # zizmor: ignore[excessive-permissions]
 
-# Cancel superseded PR runs; never cancel a push to main.
+# PR runs: a new push cancels the run in progress. Main runs: one at a time,
+# never cancelled mid-run.
 #
 # A PR push supersedes the one before it — same branch, same question, and the
 # older answer is worthless — so cancelling saves runners with nothing lost.
-# A push to main is the opposite: each one is a distinct commit whose result is
-# the thing we want, and `test-e2e-comprehensive` takes ~30 minutes to produce
-# it. Under a shared `${{ github.ref }}` group every merge cancelled the
-# previous merge's run, so on any evening with more than one merge per half
-# hour that job was cancelled far more often than it finished — leaving the
-# same silent non-verdict PP-jxhy set out to remove, reached by a different
-# route. (Observed on run 31755670441: Smoke evaluated clean, then the Full
-# step was cancelled 30 minutes in by two later merges, and both the Full
-# evaluate and the gating step skipped.)
 #
-# Appending the SHA on `push` gives every main commit its own group, so main
-# runs neither cancel nor queue behind each other. Pull-request runs keep the
-# ref-based group and the old behaviour exactly.
+# Main shares one group with `cancel-in-progress: false`. A running main run
+# always finishes, so the post-merge comprehensive verdict is never cut off
+# mid-suite (run 31755670441 lost its Full verdict that way under PP-tbhv's
+# original shared group with cancel-in-progress). GitHub keeps at most one
+# more run waiting: a newer push to main cancels the waiting run before it
+# starts and waits in its place. Commits in a merge burst therefore get no run
+# of their own. The next run that executes covers them: the `changes` job's
+# code filter diffs against the last main commit a run passed on, not this
+# push's `before`, so their code still selects E2E. (Dependency changes are
+# audited on their PRs; the push audit stays per push.) A red result may come
+# from any commit since the last passing one, and while main stays red every
+# main run repeats the jobs the red range selects.
 #
-# Not job-level `concurrency` on that job: job-level groups govern queueing
-# between jobs, they do not exempt a job from the workflow-level cancel. Not
-# `cancel-in-progress: false` either — main runs would then serialize, so one
-# 30-minute comprehensive job delays the next main run by up to 30 minutes and
-# they pile up. (PP-tbhv.)
+# A re-run joins this group too: re-running a main run while a newer merge's
+# run is waiting cancels that waiting run.
+#
+# This replaces per-SHA groups (PP-tbhv), which never cancelled but let every
+# merge run at once — up to 10 concurrent main runs in a day, each holding
+# runners under the account's 20-job cap while PR jobs queued. A main run takes
+# ~15-20 minutes (the comprehensive legs run in parallel, PP-yva7.3), so a
+# merge normally waits at most one run before a run covering it starts (a
+# hung run holds the slot until its job timeouts end it).
+# (PP-yva7.7.)
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'push' && github.sha || '' }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # Detect which files changed so non-website PRs skip the expensive jobs
@@ -65,19 +71,61 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       code: ${{ steps.set-code.outputs.code }}
-      deps: ${{ steps.deps-filter.outputs.deps }}
+      deps: ${{ steps.base.outputs.force == 'true' && 'true' || steps.deps-filter.outputs.deps }}
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
+        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2  # ratchet:step-security/harden-runner@v2.22.2
         with:
           egress-policy: audit
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
         with:
           persist-credentials: false
+          # Push runs diff back past `before` (next step); PR runs use the API.
+          # Strings, because a bare 0 is falsy in an expression.
+          fetch-depth: ${{ github.event_name == 'push' && '0' || '1' }}
+
+      # Main runs one at a time and a newer merge cancels the waiting run (see
+      # the concurrency block), so this push's `before` can skip merges whose
+      # run never started. Diffing against the last main commit a run PASSED on
+      # makes every change since then select the jobs that test it: a merge
+      # whose run was cancelled while waiting, cancelled mid-run, or failed
+      # before E2E ran (in setup, say) is still covered by the next run. Each
+      # passing run covered everything since the one before it, so the chain
+      # holds. (PP-yva7.7.)
+      - name: Find the last main commit CI passed on
+        id: base
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # No narrower fallback: diffing from `before` could skip a superseded
+          # merge, and a run that passed that way would become the next base.
+          # When the base is unknown, every job runs instead.
+          # A run being re-run is in progress, so status=success already leaves
+          # it out; the select also ignores any other passing run of this same
+          # commit, so the diff is never empty against itself.
+          if ! sha=$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?branch=main&event=push&status=success&per_page=5" \
+            --jq "[.workflow_runs[] | select(.head_sha != \"$GITHUB_SHA\")][0].head_sha // empty"); then
+            echo "::warning::Could not list main's CI runs; running every job."
+            echo "force=true" >> "$GITHUB_OUTPUT"
+          elif [ -z "$sha" ]; then
+            echo "::warning::No passing main run found; running every job."
+            echo "force=true" >> "$GITHUB_OUTPUT"
+          elif ! git merge-base --is-ancestor "$sha" HEAD; then
+            echo "::warning::Last passing main run ($sha) is not an ancestor of this commit (a re-run of an older commit?); running every job."
+            echo "force=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Diffing against $sha, the last main commit CI passed on."
+            echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          fi
+
       - id: filter
         uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d  # ratchet:dorny/paths-filter@v4.0.3
         with:
+          base: ${{ steps.base.outputs.sha }}
           predicate-quantifier: "every"
           filters: |
             has_code:
@@ -109,7 +157,6 @@ jobs:
               - '!.github/dependabot.yml'
               - '!.github/renovate.json'
               - '!.github/CODEOWNERS'
-              - '!.github/workflows/codex-reaction-witness.yaml'
               - '!.github/workflows/ownerless-renovate-issues.yaml'
               - '!.github/workflows/preview-control.yaml'
               - '!.github/workflows/preview-reaper.yaml'
@@ -117,6 +164,8 @@ jobs:
       # so deps=true when ANY changed file is a dependency file (not ALL).
       - id: deps-filter
         uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d  # ratchet:dorny/paths-filter@v4.0.3
+        # Per push, not reached back: the push audit compares against
+        # `before`, and every lockfile change was already audited on its PR.
         with:
           filters: |
             deps:
@@ -126,8 +175,9 @@ jobs:
         id: set-code
         env:
           HAS_CODE: ${{ steps.filter.outputs.has_code }}
+          FORCE: ${{ steps.base.outputs.force }}
         run: |
-          if [ "$HAS_CODE" = "true" ]; then
+          if [ "$HAS_CODE" = "true" ] || [ "$FORCE" = "true" ]; then
             echo "code=true" >> "$GITHUB_OUTPUT"
           else
             echo "code=false" >> "$GITHUB_OUTPUT"
@@ -142,7 +192,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
+        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2  # ratchet:step-security/harden-runner@v2.22.2
         with:
           egress-policy: audit
 
@@ -200,7 +250,7 @@ jobs:
     if: needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true'
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
+        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2  # ratchet:step-security/harden-runner@v2.22.2
         with:
           egress-policy: audit
 
@@ -228,7 +278,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
+        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2  # ratchet:step-security/harden-runner@v2.22.2
         with:
           egress-policy: audit
 
@@ -245,7 +295,7 @@ jobs:
       - name: Setup locked Python toolchain
         uses: $/.github/actions/setup-mise
         with:
-          install-args: "--locked python ruff zizmor"
+          install-args: "--locked python ruff zizmor actionlint"
           cache-pnpm: "false"
 
       - name: Install Python test dependencies
@@ -260,14 +310,9 @@ jobs:
       # actionlint reads .github/actionlint.yaml, which ignores the
       # self-repository `uses: $/...` references until rhysd/actionlint#711.
       - name: Action lint
-        env:
-          ACTIONLINT_VERSION: "1.7.11"
         run: |
-          dl="https://raw.githubusercontent.com/rhysd/actionlint"
-          dl="${dl}/main/scripts/download-actionlint.bash"
-          bash <(curl -sL "$dl") "$ACTIONLINT_VERSION"
           find .github/workflows \( -name '*.yml' -o -name '*.yaml' \) \
-            ! -name '*.lock.yml' -print0 | xargs -0 ./actionlint
+            ! -name '*.lock.yml' -print0 | xargs -0 actionlint
 
       - name: Ruff check
         run: ruff check scripts/
@@ -306,7 +351,7 @@ jobs:
     needs: setup
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
+        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2  # ratchet:step-security/harden-runner@v2.22.2
         with:
           egress-policy: audit
 
@@ -350,7 +395,7 @@ jobs:
     needs: setup
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
+        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2  # ratchet:step-security/harden-runner@v2.22.2
         with:
           egress-policy: audit
 
@@ -394,14 +439,20 @@ jobs:
           set +a
           pnpm run test:ensure-schema
 
+  # The Supabase integration and E2E jobs need only `changes`, so they start
+  # within a minute of the run instead of after static, integration and
+  # migrations finish (~5 minutes in). They install dependencies themselves on
+  # a node_modules cache miss, so they never depended on `setup`'s output.
+  # Nothing passes unchecked: CI Gate still needs every job. The cost is runner
+  # time spent on E2E in a run that static goes on to fail. (PP-yva7.1.)
   test-integration-supabase:
     name: Supabase Integration Tests
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
-    needs: [changes, setup, static, linters, test-integration, test-migrations]
+    needs: changes
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
+        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2  # ratchet:step-security/harden-runner@v2.22.2
         with:
           egress-policy: audit
 
@@ -438,15 +489,31 @@ jobs:
     # E2E Smoke Tests (Chromium Only)
     #
     # Runs smoke tests with chromium browser only for fast feedback.
+    #
+    # This and its two PR siblings each split into 2 Playwright shards
+    # (`--shard`); GitHub appends the shard number to the job name. The name
+    # itself stays a plain string, because a skipped matrix job never expands its
+    # matrix and would show the raw expression. The smoke jobs use
+    # playwright.config.ts, which sets fullyParallel, so smoke splits by test and
+    # comes out even (51/51 tests; ~200s per shard against ~420s unsplit).
+    # playwright.config.full.ts does not, so Full splits by file and runs uneven
+    # (62/57 tests, 396s/267s on the first run). Each shard runs auth-setup itself
+    # and gets its own database. Every extra shard pays ~2 minutes of job setup
+    # and the dev server's first-compile cost again, and takes another slot under
+    # the account's concurrent-job cap. (PP-yva7.2.)
     # ==============================================================================
     name: E2E Smoke Tests (Chromium)
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
-    needs: [changes, setup, static, linters, test-integration, test-migrations]
+    needs: changes
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
+        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2  # ratchet:step-security/harden-runner@v2.22.2
         with:
           egress-policy: audit
 
@@ -472,35 +539,32 @@ jobs:
         if: steps.cache-restore.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
 
-      - name: Cache Playwright browsers
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
-        id: playwright-cache
+      - name: Setup Playwright browsers
+        uses: $/.github/actions/setup-playwright
         with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-
-      - name: Install Playwright browsers
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium
+          browsers: chromium
 
       - name: Setup Supabase
         uses: $/.github/actions/setup-supabase
 
       - name: Run Smoke Tests (Chromium)
         env:
+          SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
           MOCK_BLOB_STORAGE: "true"
+          # Production server: the webServer runs `next build && next start`
+          # inside this step, after Setup Supabase exported the NEXT_PUBLIC_*
+          # values the build inlines. See playwright.config.ts (PP-izj5).
+          PLAYWRIGHT_WEB_SERVER: "start"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
           UNSUBSCRIBE_SIGNING_SECRET: "ci-test-only-not-a-real-secret-0000000000000000000000000000000000"
-        run: pnpm exec playwright test e2e/smoke --project=chromium
+        run: pnpm exec playwright test e2e/smoke --project=chromium --shard="$SHARD"
 
       - name: Upload Playwright report
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # ratchet:actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # ratchet:actions/upload-artifact@v7.0.2
         with:
-          name: playwright-report-smoke-chromium
+          name: playwright-report-smoke-chromium-shard-${{ matrix.shard }}
           path: playwright-report/
           retention-days: 7
 
@@ -513,11 +577,15 @@ jobs:
     name: E2E Smoke Tests (Mobile Chrome)
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
-    needs: [changes, setup, static, linters, test-integration, test-migrations]
+    needs: changes
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
+        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2  # ratchet:step-security/harden-runner@v2.22.2
         with:
           egress-policy: audit
 
@@ -543,35 +611,32 @@ jobs:
         if: steps.cache-restore.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
 
-      - name: Cache Playwright browsers
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
-        id: playwright-cache
+      - name: Setup Playwright browsers
+        uses: $/.github/actions/setup-playwright
         with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-
-      - name: Install Playwright browsers
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium
+          browsers: chromium
 
       - name: Setup Supabase
         uses: $/.github/actions/setup-supabase
 
       - name: Run Smoke Tests (Mobile Chrome)
         env:
+          SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
           MOCK_BLOB_STORAGE: "true"
+          # Production server: the webServer runs `next build && next start`
+          # inside this step, after Setup Supabase exported the NEXT_PUBLIC_*
+          # values the build inlines. See playwright.config.ts (PP-izj5).
+          PLAYWRIGHT_WEB_SERVER: "start"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
           UNSUBSCRIBE_SIGNING_SECRET: "ci-test-only-not-a-real-secret-0000000000000000000000000000000000"
-        run: pnpm exec playwright test e2e/smoke --project="Mobile Chrome"
+        run: pnpm exec playwright test e2e/smoke --project="Mobile Chrome" --shard="$SHARD"
 
       - name: Upload Playwright report
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # ratchet:actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # ratchet:actions/upload-artifact@v7.0.2
         with:
-          name: playwright-report-smoke-mobile-chrome
+          name: playwright-report-smoke-mobile-chrome-shard-${{ matrix.shard }}
           path: playwright-report/
           retention-days: 7
 
@@ -584,11 +649,15 @@ jobs:
     name: E2E Full Tests (Chromium)
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
-    needs: [changes, setup, static, linters, test-integration, test-migrations]
+    needs: changes
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
+        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2  # ratchet:step-security/harden-runner@v2.22.2
         with:
           egress-policy: audit
 
@@ -614,35 +683,32 @@ jobs:
         if: steps.cache-restore.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
 
-      - name: Cache Playwright browsers
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
-        id: playwright-cache
+      - name: Setup Playwright browsers
+        uses: $/.github/actions/setup-playwright
         with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-
-      - name: Install Playwright browsers
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium
+          browsers: chromium
 
       - name: Setup Supabase
         uses: $/.github/actions/setup-supabase
 
       - name: Run Full Tests (Chromium)
         env:
+          SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
           MOCK_BLOB_STORAGE: "true"
+          # Production server: the webServer runs `next build && next start`
+          # inside this step, after Setup Supabase exported the NEXT_PUBLIC_*
+          # values the build inlines. See playwright.config.ts (PP-izj5).
+          PLAYWRIGHT_WEB_SERVER: "start"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
           UNSUBSCRIBE_SIGNING_SECRET: "ci-test-only-not-a-real-secret-0000000000000000000000000000000000"
-        run: pnpm exec playwright test --config=playwright.config.full.ts --project=chromium
+        run: pnpm exec playwright test --config=playwright.config.full.ts --project=chromium --shard="$SHARD"
 
       - name: Upload Playwright report
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # ratchet:actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # ratchet:actions/upload-artifact@v7.0.2
         with:
-          name: playwright-report-full-chromium
+          name: playwright-report-full-chromium-shard-${{ matrix.shard }}
           path: playwright-report/
           retention-days: 7
 
@@ -652,28 +718,75 @@ jobs:
     #
     # Runs the full E2E suite across all browsers after merging to main.
     # Not a required check for PR merge — runs only on push to main.
+    #
+    # Six parallel legs: Smoke in 2 shards, Full in 4. Each leg runs chromium,
+    # Mobile Chrome and Mobile Safari together, in one Playwright process
+    # against its own database, for the spec files
+    # scripts/workflow/e2e-shard-files.py assigns it. Sharding by file, not
+    # with Playwright's --shard, keeps all three browsers of a spec on one
+    # database — the cross-project seeded-state check this job exists for
+    # (pinpoint-e2e skill, PP-168u). --shard splits in project order and would
+    # put each browser on a different leg. Before the split one runner ran
+    # Smoke then Full serially, ~35 minutes of tests; the validation run on
+    # #2421 took 7-13 minutes of tests per leg, and Smoke 1/2 is the long pole
+    # because responsive-overflow.spec.ts is one file of 117 tests. (PP-yva7.3.)
     # ==============================================================================
+    # A plain name: GitHub appends the matrix values ("(smoke, 1, 2)"), and this
+    # job is skipped on every PR, where a matrix expression in the name would
+    # show unexpanded.
     name: E2E Comprehensive Tests (Post-Merge)
     runs-on: ubuntu-latest
-    # Explicit code/deps guard mirrors the three PR E2E siblings, rather than
-    # leaning on the `setup`-skip cascade to keep it off docs-only main pushes —
-    # an implicit guard a future refactor could break. (PP-x0ke.)
+    # Explicit code/deps guard mirrors the three PR E2E siblings. It is the
+    # only thing keeping this job off docs-only main pushes: like them it
+    # needs only `changes`, so no skipped upstream job cascades a skip. (PP-x0ke.)
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
-    needs: [changes, setup, static, linters, test-integration, test-migrations]
-    # Backstop only — the real limits are per-step (see the comment above the
-    # Playwright steps). Must stay above setup + both step timeouts, or a job
+    needs: changes
+    # Backstop only — the real limit is the Playwright step's own timeout (see
+    # the comment there). Must stay above setup + that timeout, or a job
     # cancellation silently swallows the verdict again. (PP-jxhy.)
     #
-    # 25 + 40 of step budget = 65, so this leaves 25 minutes for setup. Sized
-    # for the COLD-cache case, not the warm one: both caches key on
-    # `hashFiles('pnpm-lock.yaml')`, so every dependency bump that lands on
-    # main — the most frequent push there is — misses both and the job pays
-    # `pnpm install --frozen-lockfile` plus a full chromium+webkit browser
-    # download, realistically 8-12 minutes against ~2.5 warm.
-    timeout-minutes: 90
+    # 35 minutes of step budget (5 to select files, 30 to run) leaves 25 for
+    # setup. Sized for the COLD-cache
+    # case, not the warm one: the node_modules cache keys on the lockfile, so
+    # every dependency bump that lands on main — the most frequent push there
+    # is — misses it and the leg pays `pnpm install --frozen-lockfile`, plus a
+    # full chromium+webkit browser download whenever that bump moves
+    # Playwright itself.
+    timeout-minutes: 60
+    # Job-level so the shard-selection `--list` loads the suite with the same
+    # environment as the run; a spec that reads one of these at load time
+    # would otherwise be weighed, or listed, differently from how it runs.
+    env:
+      CONFIG: playwright.config.${{ matrix.suite }}.ts
+      MOCK_BLOB_STORAGE: "true"
+      UNSUBSCRIBE_SIGNING_SECRET: "ci-test-only-not-a-real-secret-0000000000000000000000000000000000"
+    strategy:
+      # Every leg must report: one red leg must not cancel the others and
+      # leave their parts of main's verdict unknown.
+      fail-fast: false
+      matrix:
+        include:
+          - suite: smoke
+            shard: 1
+            total: 2
+          - suite: smoke
+            shard: 2
+            total: 2
+          - suite: full
+            shard: 1
+            total: 4
+          - suite: full
+            shard: 2
+            total: 4
+          - suite: full
+            shard: 3
+            total: 4
+          - suite: full
+            shard: 4
+            total: 4
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
+        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2  # ratchet:step-security/harden-runner@v2.22.2
         with:
           egress-policy: audit
 
@@ -699,151 +812,96 @@ jobs:
         if: steps.cache-restore.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
 
-      - name: Cache Playwright browsers
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
-        id: playwright-cache
+      # Always, even on a cache hit: the cache holds browser binaries, not the
+      # apt packages WebKit needs. Installed once here, so the setup action
+      # skips its own --with-deps on a miss.
+      - name: Install Playwright system dependencies
+        run: pnpm exec playwright install-deps chromium webkit
+
+      - name: Setup Playwright browsers
+        uses: $/.github/actions/setup-playwright
         with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-all-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-all-
-            ${{ runner.os }}-playwright-chromium-
-
-      - name: Install Playwright system dependencies (WebKit)
-        run: pnpm exec playwright install-deps webkit
-
-      - name: Install Playwright browsers
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium webkit
+          browsers: chromium webkit
+          with-deps: "false"
+          # One leg saves; the others would race to upload the same key.
+          save-cache: ${{ matrix.suite == 'full' && matrix.shard == 1 }}
 
       - name: Setup Supabase
         uses: $/.github/actions/setup-supabase
 
-      # Each Playwright step carries its OWN timeout-minutes, deliberately.
+      # Lists the suite with the same config and projects the run uses, so the
+      # assignment covers exactly the files the run would load. Every leg
+      # computes the same assignment, so the legs partition the suite. Not
+      # continue-on-error: a leg that cannot pick its files has no verdict and
+      # must fail. After Setup Supabase because spec support modules read its
+      # environment at import (e2e/support/supabase-admin.ts throws without it).
+      - name: Select this shard's spec files
+        timeout-minutes: 5
+        env:
+          SHARD: ${{ matrix.shard }}/${{ matrix.total }}
+          PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ runner.temp }}/e2e-list.json
+        run: |
+          # --list exits non-zero on a spec load error; the shard script prints
+          # those errors from the report, so run it before failing on status.
+          list_status=0
+          pnpm exec playwright test --config="$CONFIG" \
+            --project=chromium --project="Mobile Chrome" \
+            --project="Mobile Safari" --list --reporter=json >/dev/null || list_status=$?
+          python3 scripts/workflow/e2e-shard-files.py \
+            "$RUNNER_TEMP/e2e-list.json" "$SHARD" >"$RUNNER_TEMP/e2e-shard.txt"
+          if [ "$list_status" -ne 0 ]; then
+            echo "::error::playwright --list exited $list_status"
+            exit "$list_status"
+          fi
+          cat "$RUNNER_TEMP/e2e-shard.txt"
+
+      # The Playwright step carries its OWN timeout-minutes, deliberately.
       # A job-level timeout cancels the job outright: the evaluate step never
       # runs, and the run reports `cancelled` — which reads as "superseded by a
       # newer push" rather than "main is broken". That is exactly how run
       # 31430839981 hid ten real failures. A step-level timeout paired with
       # `continue-on-error: true` instead marks the step failed and lets the
-      # job carry on to its verdict. The job timeout below is only a backstop
-      # and must stay comfortably above the sum of these. (PP-jxhy.)
+      # job carry on to its verdict. The job timeout above is only a backstop
+      # and must stay comfortably above this one. (PP-jxhy.) 30 minutes, not
+      # the ~13 a green leg takes: on a red main every failure costs a locator
+      # timeout plus retries (120s and 3 retries on Mobile Safari), and a leg
+      # that times out reports no verdict at all.
       #
-      # Budget, measured on run 31430839981: setup ~2.5m, smoke ~13m,
-      # full ~24m on a green main (it burned 30m unfinished on a red one,
-      # because each failure costs a 30s locator timeout plus retries).
-      - name: Run Comprehensive Smoke Tests (all browsers)
+      # continue-on-error is also what keeps Mobile Safari non-gating: a red
+      # WebKit spec fails this step, and the evaluate step below decides.
+      - name: Run Comprehensive ${{ matrix.suite }} Tests (all browsers)
         continue-on-error: true
-        timeout-minutes: 25
+        timeout-minutes: 30
         env:
-          MOCK_BLOB_STORAGE: "true"
+          # Production server: the webServer runs `next build && next start`
+          # inside this step, after Setup Supabase exported the NEXT_PUBLIC_*
+          # values the build inlines. See playwright.config.ts (PP-izj5).
+          PLAYWRIGHT_WEB_SERVER: "start"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
-          # Per-run filename, NOT a shared results.json. The reporter writes
-          # once at the end, so a run that dies leaves the PREVIOUS run's file
-          # in place and the next evaluate step reads it as its own verdict —
-          # a false green. Distinct paths make "missing" unambiguous.
-          PLAYWRIGHT_JSON_OUTPUT_NAME: playwright-report/results-smoke.json
-          UNSUBSCRIBE_SIGNING_SECRET: "ci-test-only-not-a-real-secret-0000000000000000000000000000000000"
+          PLAYWRIGHT_JSON_OUTPUT_NAME: playwright-report/results.json
         run: |
-          rm -f playwright-report/results-smoke.json
-          pnpm exec playwright test --config=playwright.config.smoke.ts \
+          rm -f playwright-report/results.json
+          pnpm exec playwright test --config="$CONFIG" \
             --project=chromium --project="Mobile Chrome" \
-            --project="Mobile Safari" --workers=3
+            --project="Mobile Safari" --workers=3 \
+            --test-list "$RUNNER_TEMP/e2e-shard.txt"
 
-      # Copied out because the Full run's HTML reporter calls removeFolders()
-      # on `playwright-report/` in its own onEnd, wiping everything the Smoke
-      # run left there. The verdict itself is unaffected — Smoke is evaluated
-      # below, before Full starts — but without this the uploaded artifact
-      # would contain no trace of the Smoke run at all.
-      - name: Preserve Smoke report
-        if: always()
-        run: |
-          mkdir -p e2e-verdicts
-          cp playwright-report/results-smoke.json e2e-verdicts/ 2>/dev/null || \
-            echo "no smoke report to preserve"
-
-      # When the Smoke step hits its timeout-minutes, GitHub kills the
-      # Playwright runner but not its webServer: `next dev` is spawned in its
-      # own process group and survives, still bound to :3000. Full's webServer
-      # then refuses to start ("http://localhost:3000/api/health is already
-      # used") and reports zero specs, so one systemic Smoke failure hid the
-      # entire Full verdict (run 36071532799, PP-2fuv). A clean Smoke run tears
-      # its own server down, which makes this a no-op on the green path.
-      #
-      # Scoped to whatever is LISTENING on the port — not a process-name kill.
-      # continue-on-error so a cleanup problem cannot skip Full: if the port is
-      # still held, Full fails on its own and the Full evaluate reports it.
-      # Smoke's verdict is untouched either way: a timed-out Smoke leaves no
-      # results-smoke.json, which its evaluate step already treats as a failure.
-      - name: Free the Smoke web server port
-        if: always()
-        continue-on-error: true
-        run: |
-          port="${PORT:-3000}"
-          for attempt in 1 2 3 4 5; do
-            # iproute2's `ss` ships on every Ubuntu runner (lsof is not guaranteed).
-            pids=$(ss -Hltnp "sport = :$port" | grep -o 'pid=[0-9]*' | cut -d= -f2 | sort -u || true)
-            if [ -z "$pids" ]; then
-              echo "port $port is free"
-              exit 0
-            fi
-            echo "attempt $attempt: stopping listener(s) on :$port: $pids"
-            # shellcheck disable=SC2086  # word-split the PID list on purpose
-            if [ "$attempt" -lt 3 ]; then kill $pids || true; else kill -9 $pids || true; fi
-            sleep 2
-          done
-          echo "::error::port $port is still held after cleanup; the Full run will not get a clean web server."
-          ss -Hltnp "sport = :$port" || true
-          exit 1
-
-      # Both evaluate steps are continue-on-error so that a gating Smoke
-      # failure does not abort the job before Full ever runs. Letting the
-      # script's `exit 1` end the step here would mean one red smoke spec
-      # leaves main's full-suite health unknown for that commit — the same
-      # class of missing verdict this PR exists to remove. The dedicated gate
-      # step after both suites is what actually fails the job.
-      - name: Evaluate gating browser results (Smoke)
-        id: verdict-smoke
-        continue-on-error: true
-        run: bash scripts/workflow/evaluate-e2e-results.sh Smoke playwright-report/results-smoke.json
-
-      - name: Run Comprehensive Full Tests (all browsers)
-        continue-on-error: true
-        timeout-minutes: 40
+      # The only step that fails the leg on test results. A missing report, an
+      # empty or all-skipped run, run-level errors, and an assigned file
+      # missing from the report all fail it, not just red gating specs
+      # (evaluate-e2e-results.sh header).
+      - name: Evaluate gating browser results
         env:
-          MOCK_BLOB_STORAGE: "true"
-          PLAYWRIGHT_STDOUT: "pipe"
-          PLAYWRIGHT_STDERR: "pipe"
-          PLAYWRIGHT_JSON_OUTPUT_NAME: playwright-report/results-full.json
-          UNSUBSCRIBE_SIGNING_SECRET: "ci-test-only-not-a-real-secret-0000000000000000000000000000000000"
-        run: |
-          rm -f playwright-report/results-full.json
-          pnpm exec playwright test --config=playwright.config.full.ts \
-            --project=chromium --project="Mobile Chrome" \
-            --project="Mobile Safari" --workers=3
-
-      - name: Evaluate gating browser results (Full)
-        id: verdict-full
-        continue-on-error: true
-        run: bash scripts/workflow/evaluate-e2e-results.sh Full playwright-report/results-full.json
-
-      # The only step that fails the job. Both suites have produced a verdict
-      # by now, so a red Smoke and a red Full are both visible on the same run
-      # instead of the first one hiding the second.
-      - name: Gate on E2E verdicts
-        if: steps.verdict-smoke.outcome == 'failure' || steps.verdict-full.outcome == 'failure'
-        run: |
-          echo "::error::E2E comprehensive: Smoke=${{ steps.verdict-smoke.outcome }} Full=${{ steps.verdict-full.outcome }} — see the evaluate steps above."
-          exit 1
+          LABEL: ${{ matrix.suite }} ${{ matrix.shard }}/${{ matrix.total }}
+        run: bash scripts/workflow/evaluate-e2e-results.sh "$LABEL" playwright-report/results.json "$RUNNER_TEMP/e2e-shard.txt"
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # ratchet:actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # ratchet:actions/upload-artifact@v7.0.2
         with:
-          name: playwright-report-comprehensive
-          path: |
-            playwright-report/
-            e2e-verdicts/
+          name: playwright-report-comprehensive-${{ matrix.suite }}-${{ matrix.shard }}
+          path: playwright-report/
           retention-days: 7
 
   gitleaks:
@@ -851,7 +909,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
+        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2  # ratchet:step-security/harden-runner@v2.22.2
         with:
           egress-policy: audit
 
@@ -877,7 +935,7 @@ jobs:
     if: needs.changes.outputs.deps == 'true'
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
+        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2  # ratchet:step-security/harden-runner@v2.22.2
         with:
           egress-policy: audit
 
@@ -950,8 +1008,8 @@ jobs:
   #     skips on pull_request events, so `skipped` must pass.
   #   - `cancelled` fails because a job that hits its timeout-minutes reports
   #     `cancelled` — a hung E2E run must not leave the gate green (PP-jxhy).
-  #   - `changes` and `setup` are listed so a failure there, which skips every
-  #     downstream job, cannot pass as a skip.
+  #   - `changes` and `setup` are listed so a failure there, which skips the
+  #     jobs that need it, cannot pass as a skip.
   #
   # On push to main this also carries the post-merge full-matrix verdict
   # (test-e2e-comprehensive, PP-x0ke): a red or hung run turns CI Gate red on
@@ -977,7 +1035,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # ratchet:step-security/harden-runner@v2.21.1
+        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2  # ratchet:step-security/harden-runner@v2.22.2
         with:
           egress-policy: audit
 

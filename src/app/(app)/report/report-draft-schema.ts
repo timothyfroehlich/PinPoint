@@ -7,7 +7,7 @@ import {
 } from "~/lib/issues/status";
 import type { IssueSeverity, IssuePriority, IssueFrequency } from "~/lib/types";
 import { proseMirrorDocValueSchema } from "~/lib/tiptap/types";
-import type { ImageMetadata } from "~/types/images";
+import type { ImageMetadata } from "~/lib/types/images";
 import { isValidImageMetadata } from "~/lib/blob/validation";
 
 /**

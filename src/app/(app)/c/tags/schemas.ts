@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Result } from "~/lib/result";
 import { tagNameSchema, tagTypeNameSchema } from "~/lib/tags/names";
+import type { TagConflictMachine } from "~/lib/tags/types";
 
 /**
  * Input schemas for the tag Server Actions (spec collections-and-tags §11).
@@ -46,6 +47,31 @@ export const setMachineTagSchema = z.object({
   applied: z.boolean(),
 });
 
+/** Make a hand-applied tag type exclusive or not (spec 11.7). */
+export const setTagTypeExclusiveSchema = z.object({
+  tagTypeId: z.uuid(),
+  exclusive: z.boolean(),
+});
+
+/** Move a hand-applied tag to a hand-applied tag type, or to none (11.16). */
+export const moveTagSchema = z.object({
+  tagId: z.uuid(),
+  /** The destination tag type's id, or null for no tag type. */
+  tagTypeId: z.uuid().nullable(),
+});
+
+/** Merge a hand-applied tag into another hand-applied tag (spec 11.17). */
+export const mergeTagSchema = z
+  .object({
+    /** The tag merged away, which is deleted. */
+    tagId: z.uuid(),
+    /** The tag its machines and links go to. */
+    targetTagId: z.uuid(),
+  })
+  .refine((input) => input.tagId !== input.targetTagId, {
+    message: "Pick another tag",
+  });
+
 export type TagActionCode =
   | "UNAUTHORIZED"
   | "FORBIDDEN"
@@ -55,3 +81,14 @@ export type TagActionCode =
   | "SERVER";
 
 export type TagActionResult<T = undefined> = Result<T, TagActionCode>;
+
+/**
+ * A tag action that can be refused because machines would hold two tags of
+ * an exclusive tag type (11.7, 11.16); the refusal lists those machines.
+ */
+export type TagConflictResult<T = undefined> = Result<
+  T,
+  TagActionCode,
+  // `| undefined` lets the plain refusals (sign-in, not found) pass through.
+  { machines: TagConflictMachine[] } | undefined
+>;

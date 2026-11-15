@@ -17,14 +17,18 @@ import {
   foreignKey,
 } from "drizzle-orm/pg-core";
 import { citext } from "~/server/db/citext";
+import { ISSUE_STATUS_VALUES } from "~/lib/issues/status-values";
+import { VALID_MACHINE_PRESENCE_STATUSES } from "~/lib/machines/presence";
+import { NOTIFICATION_TYPE_VALUES } from "~/lib/notifications/events";
 import {
-  ISSUE_STATUS_VALUES,
-  type IssueStatus,
-} from "~/lib/issues/status-values";
+  ISSUE_FREQUENCY_VALUES,
+  ISSUE_PRIORITY_VALUES,
+  ISSUE_SEVERITY_VALUES,
+} from "~/lib/types/issue-values";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 import { type TimelineEventData } from "~/lib/timeline/types";
 import { type MachineTimelineEventData } from "~/lib/timeline/machine-event-types";
-import { type TimelineEventSourceType } from "~/lib/timeline/machine-events";
+import { type TimelineEventSourceType } from "~/lib/timeline/machine-event-types";
 import { type TimelineTag } from "~/lib/timeline/machine-tags";
 import { type SettingsSection } from "~/lib/machines/settings-types";
 import type { LocationSnapshot } from "~/lib/pinballmap/types";
@@ -39,7 +43,7 @@ import {
   type OpdbPerson,
 } from "~/lib/opdb/types";
 import { PINTIP_CATEGORIES } from "~/lib/pintips/types";
-import { REPORT_MODE_VALUES } from "~/lib/types/user";
+import { REPORT_MODE_VALUES, USER_ROLES } from "~/lib/types/user";
 import { LIST_HOSTS } from "~/lib/types/list-view";
 
 /**
@@ -113,9 +117,7 @@ export const userProfiles = pgTable(
     bio: text("bio"),
     pronouns: text("pronouns"),
     discordUserId: text("discord_user_id").unique(),
-    role: text("role", { enum: ["guest", "member", "technician", "admin"] })
-      .notNull()
-      .default("guest"), // Default for new signups (no invitation)
+    role: text("role", { enum: USER_ROLES }).notNull().default("guest"), // Default for new signups (no invitation)
     mobileReportMode: text("mobile_report_mode", {
       enum: REPORT_MODE_VALUES,
     })
@@ -175,9 +177,7 @@ export const invitedUsers = pgTable(
       .generatedAlwaysAs(sql`btrim(first_name || ' ' || last_name)`)
       .notNull(),
     email: citext("email").notNull().unique(),
-    role: text("role", { enum: ["guest", "member", "technician", "admin"] })
-      .notNull()
-      .default("member"), // Default for invited users (trusted)
+    role: text("role", { enum: USER_ROLES }).notNull().default("member"), // Default for invited users (trusted)
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -234,13 +234,7 @@ export const machines = pgTable(
       "settings_instructions"
     ).$type<ProseMirrorDoc>(),
     presenceStatus: text("presence_status", {
-      enum: [
-        "on_the_floor",
-        "off_the_floor",
-        "on_loan",
-        "pending_arrival",
-        "removed",
-      ],
+      enum: VALID_MACHINE_PRESENCE_STATUSES,
     })
       .notNull()
       .default("on_the_floor"),
@@ -298,13 +292,14 @@ export const machines = pgTable(
     // what OPDB would supply for a catalog title. Same rule as `model_name` —
     // set only on an uncataloged machine (CHECK below), so the Type, Display
     // and Player Count tags and the apron credits never see two sources.
-    // Designers and artists are ordered name lists; an empty list is stored
-    // as NULL so the CHECK has one "no value" to test.
+    // Designers, artists, and programmers are ordered name lists; an empty
+    // list is stored as NULL so the CHECK has one "no value" to test.
     type: text("type", { enum: OPDB_MACHINE_TYPES }),
     display: text("display", { enum: OPDB_DISPLAY_TYPES }),
     playerCount: integer("player_count"),
     designers: text("designers").array(),
     artists: text("artists").array(),
+    programmers: text("programmers").array(),
     opdbId: text("opdb_id"),
     ipdbId: integer("ipdb_id"),
     // iScored game link (PP-h2bu.2). Nullable string identifier for the game
@@ -331,7 +326,7 @@ export const machines = pgTable(
     ),
     manualModelRequiresExcludedCheck: check(
       "machines_manual_model_requires_excluded",
-      sql`pinballmap_excluded OR (type IS NULL AND display IS NULL AND player_count IS NULL AND designers IS NULL AND artists IS NULL)`
+      sql`pinballmap_excluded OR (type IS NULL AND display IS NULL AND player_count IS NULL AND designers IS NULL AND artists IS NULL AND programmers IS NULL)`
     ),
     typeCheck: check(
       "machines_type_check",
@@ -347,7 +342,7 @@ export const machines = pgTable(
     ),
     creditListsNotEmptyCheck: check(
       "machines_credit_lists_not_empty",
-      sql`(designers IS NULL OR cardinality(designers) > 0) AND (artists IS NULL OR cardinality(artists) > 0)`
+      sql`(designers IS NULL OR cardinality(designers) > 0) AND (artists IS NULL OR cardinality(artists) > 0) AND (programmers IS NULL OR cardinality(programmers) > 0)`
     ),
     // Intent On presupposes a catalog link — you can only appear on the public
     // map as a recognized title. Off and `no_sync` are fine unmatched: they are
@@ -389,7 +384,9 @@ export const machineApronCards = pgTable(
       .references(() => machines.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     // Every saved card has a size (§4.3).
-    size: text("size", { enum: ["stern", "wpc"] }).notNull(),
+    size: text("size", {
+      enum: ["stern", "wpc", "bally", "williams-em", "gottlieb-em", "bally-em"],
+    }).notNull(),
     // Which layout the card face uses (§1, §5.5); new cards start on Standard.
     template: text("template", {
       enum: ["standard", "side-rail", "header-band"],
@@ -407,6 +404,9 @@ export const machineApronCards = pgTable(
     // "Unknown".
     designEnabled: boolean("design_enabled").notNull().default(true),
     artEnabled: boolean("art_enabled").notNull().default(true),
+    // Whether the card shows its Code credit row (§10.5). Off by default:
+    // most games before the DMD era carry no software credit in OPDB.
+    codeEnabled: boolean("code_enabled").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -426,6 +426,30 @@ export const machineApronCards = pgTable(
       t.machineId,
       t.name
     ),
+  })
+).enableRLS();
+
+/**
+ * Apron card print queue (spec apron-cards §13): each member's own list of
+ * saved cards waiting to be printed. A row is one queued card; deleting the
+ * card or the member removes it (§13.3).
+ */
+export const apronCardPrintQueue = pgTable(
+  "apron_card_print_queue",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => userProfiles.id, { onDelete: "cascade" }),
+    cardId: uuid("card_id")
+      .notNull()
+      .references(() => machineApronCards.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.userId, t.cardId] }),
+    cardIdIdx: index("idx_apron_card_print_queue_card_id").on(t.cardId),
   })
 ).enableRLS();
 
@@ -604,10 +628,6 @@ export const pinTips = pgTable(
  * seven days. `generation` distinguishes each confirmed absent -> present return,
  * while `missedRuns` requires two consecutive successful absences before removal.
  * The separate event table below owns delivery and retry state.
- *
- * `announcedAt` is retained for migrate-before-build compatibility with the old
- * additions-only runtime. New generation-zero additions keep it in sync until
- * delivered; newer generations use only the event queue.
  */
 export const pinballmapRegionSeenMachines = pgTable(
   "pinballmap_region_seen_machines",
@@ -628,17 +648,9 @@ export const pinballmapRegionSeenMachines = pgTable(
     isPresent: boolean("is_present").notNull().default(true),
     missedRuns: integer("missed_runs").notNull().default(0),
     generation: integer("generation").notNull().default(0),
-    // Legacy additions-only delivery state; see the table comment above.
-    announcedAt: timestamp("announced_at", { withTimezone: true }),
   },
   (t) => ({
     pk: primaryKey({ columns: [t.region, t.lmxId] }),
-    // The job's hot read: "what is still waiting to be announced for this
-    // region". Partial, because the announced rows are the overwhelming majority
-    // and are never scanned again.
-    pendingIdx: index("idx_pinballmap_region_seen_pending")
-      .on(t.region, t.firstSeenAt)
-      .where(sql`announced_at is null`),
   })
 ).enableRLS();
 
@@ -759,21 +771,17 @@ export const issues = pgTable(
     // Status values imported from single source of truth
     // Based on _issue-status-redesign/README.md - Final design with 11 statuses
     status: text("status", {
-      enum: ISSUE_STATUS_VALUES as unknown as [IssueStatus, ...IssueStatus[]],
+      enum: ISSUE_STATUS_VALUES,
     })
       .notNull()
       .default("new"),
-    severity: text("severity", {
-      enum: ["cosmetic", "minor", "major", "unplayable"],
-    })
+    severity: text("severity", { enum: ISSUE_SEVERITY_VALUES })
       .notNull()
       .default("minor"),
-    priority: text("priority", { enum: ["low", "medium", "high"] })
+    priority: text("priority", { enum: ISSUE_PRIORITY_VALUES })
       .notNull()
       .default("medium"),
-    frequency: text("frequency", {
-      enum: ["not_specified", "intermittent", "frequent", "constant"],
-    })
+    frequency: text("frequency", { enum: ISSUE_FREQUENCY_VALUES })
       .notNull()
       .default("intermittent"),
     reportedBy: uuid("reported_by").references(() => userProfiles.id),
@@ -1054,8 +1062,9 @@ export const timelineEventPeople = pgTable(
  * adjustments, DIP banks, rubbers, post positions, notes). The whole ordered
  * body lives in one `sections` JSONB array (a discriminated union — see
  * `~/lib/machines/settings-types`) so sections of any kind reorder freely;
- * `description` is a ProseMirror doc. At most one set per machine may be
- * `is_preferred`, enforced by a partial unique index.
+ * `description` is a ProseMirror doc. Kind, tags, and the two preferred sets
+ * follow docs/feature-specs/machine-settings.md; partial unique indexes keep
+ * one preferred House and one preferred Tournament set per machine.
  */
 export const machineSettingsSets = pgTable(
   "machine_settings_sets",
@@ -1070,20 +1079,18 @@ export const machineSettingsSets = pgTable(
       .$type<SettingsSection[]>()
       .notNull()
       .default([]),
-    // The machine owner's canonical set. Exactly one per machine (partial
-    // unique index below). Always an owner set + public.
-    isPreferred: boolean("is_preferred").notNull().default(false),
-    // Kind (drives who may EDIT — see ~/lib/permissions/settings):
-    // true = owner set (created by the machine owner; only owner + admin edit,
-    // protected from techs). false = community set (co-edited by technicians+
-    // and the machine owner). Captured at creation; stored not derived, so it
-    // survives machine-ownership transfer.
-    isOwnerSet: boolean("is_owner_set").notNull().default(false),
-    // Visibility (drives who may SEE): false = private draft (creator only),
-    // true = public. New sets are born private drafts.
-    isPublic: boolean("is_public").notNull().default(false),
-    // The orthogonal "Tournament" tag. Tagging requires edit rights on the set.
-    isTournament: boolean("is_tournament").notNull().default(false),
+    // The machine's preferred House set (spec machine-settings.md §4). At most
+    // one per machine (partial unique index below); always a community set
+    // carrying the House settings tag. The column keeps its original name.
+    isPreferredHouse: boolean("is_preferred").notNull().default(false),
+    // The machine's preferred Tournament set — same rules, Tournament tag.
+    isPreferredTournament: boolean("is_preferred_tournament")
+      .notNull()
+      .default(false),
+    // Kind (spec §2): false = personal set (only its author edits), true =
+    // community set (technicians, the machine owner, and admins edit). New sets
+    // start personal; the change to community is one-way.
+    isCommunity: boolean("is_community").notNull().default(false),
     createdBy: uuid("created_by").references(() => userProfiles.id, {
       onDelete: "set null",
     }),
@@ -1104,7 +1111,17 @@ export const machineSettingsSets = pgTable(
     // exclusive-Preferred guarantee (the action also clears-then-sets).
     onePreferredPerMachine: uniqueIndex("uniq_machine_settings_preferred")
       .on(t.machineId)
-      .where(sql`${t.isPreferred}`),
+      .where(sql`${t.isPreferredHouse}`),
+    onePreferredTournamentPerMachine: uniqueIndex(
+      "uniq_machine_settings_preferred_tournament"
+    )
+      .on(t.machineId)
+      .where(sql`${t.isPreferredTournament}`),
+    // A preferred set is always a community set (spec §4.2).
+    preferredIsCommunity: check(
+      "machine_settings_sets_preferred_is_community",
+      sql`${t.isCommunity} OR NOT (${t.isPreferredHouse} OR ${t.isPreferredTournament})`
+    ),
     // Indexes on the created_by and updated_by FK columns (PP-o60s.5): prod
     // advisor flagged them as unindexed_foreign_keys. Both FK to user_profiles
     // with ON DELETE SET NULL, so a profile delete scans this table on each FK.
@@ -1328,6 +1345,87 @@ export const machineTags = pgTable(
 ).enableRLS();
 
 /**
+ * The slug of a hand-applied tag that was merged away, and the tag it was
+ * merged into (spec collections-and-tags 11.19): links to the old page open
+ * the target's. A tag page resolves by slug alone, so a new tag never takes a
+ * slug listed here. Deleting the target drops its aliases.
+ */
+export const tagSlugAliases = pgTable(
+  "tag_slug_aliases",
+  {
+    slug: text("slug").primaryKey(),
+    tagId: uuid("tag_id")
+      .notNull()
+      .references(() => tags.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    slugFormat: check("tag_slug_aliases_slug_format", TAG_SLUG_FORMAT(t.slug)),
+    tagIdx: index("idx_tag_slug_aliases_tag").on(t.tagId),
+  })
+).enableRLS();
+
+/**
+ * Settings tags (spec machine-settings.md §3): system-wide, public labels on
+ * settings sets, separate from machine tags. House and Tournament are built-in
+ * (`is_builtin`, fixed slugs `house` / `tournament`) and always exist; every
+ * reader resolves them by slug through `ensureBuiltinSettingsTags`. Names follow
+ * the machine-tag rules: normalized, at most 20 characters, unique ignoring case.
+ */
+export const settingsTags = pgTable(
+  "settings_tags",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    slug: text("slug").notNull(),
+    name: text("name").notNull(),
+    isBuiltin: boolean("is_builtin").notNull().default(false),
+    createdBy: uuid("created_by").references(() => userProfiles.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    nameNormalized: check(
+      "settings_tags_name_normalized",
+      TAG_NAME_IS_NORMALIZED(t.name)
+    ),
+    slugFormat: check("settings_tags_slug_format", TAG_SLUG_FORMAT(t.slug)),
+    slugUnique: unique("uq_settings_tags_slug").on(t.slug),
+    nameUnique: uniqueIndex("uq_settings_tags_name").on(sql`lower(${t.name})`),
+    createdByIdx: index("idx_settings_tags_created_by").on(t.createdBy),
+  })
+).enableRLS();
+
+/** Which settings tags each settings set carries (spec §3.5: any number). */
+export const machineSettingsSetTags = pgTable(
+  "machine_settings_set_tags",
+  {
+    setId: uuid("set_id")
+      .notNull()
+      .references(() => machineSettingsSets.id, { onDelete: "cascade" }),
+    tagId: uuid("tag_id")
+      .notNull()
+      .references(() => settingsTags.id, { onDelete: "cascade" }),
+    addedAt: timestamp("added_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    addedBy: uuid("added_by").references(() => userProfiles.id, {
+      onDelete: "set null",
+    }),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.setId, t.tagId] }),
+    // "Sets carrying tag X" (tag pages, sheets by tag) is one indexed lookup.
+    tagIdx: index("idx_machine_settings_set_tags_tag").on(t.tagId),
+    addedByIdx: index("idx_machine_settings_set_tags_added_by").on(t.addedBy),
+  })
+).enableRLS();
+
+/**
  * Personal Saved Views (spec list-views.md §10, PP-jb9v.3).
  *
  * A row belongs to one account (`user_id`) and one List Host (`host`):
@@ -1337,10 +1435,9 @@ export const machineTags = pgTable(
  * wrote it; the host re-validates it whenever it is read (§10.14).
  *
  * The SQL table keeps its original Machine View name; renaming it would break
- * the deployment that still serves while a new one migrates. The three
- * `legacy*` columns are that deployment's per-Surface ownership. The expand
- * migration (0098) merged every row onto the Machines Surface and pins them
- * there; nothing in this runtime reads them, and PP-jb9v.5 drops them.
+ * the deployment that still serves while a new one migrates. Rows were owned
+ * per Surface until 0098 merged them onto List Hosts; 0111 dropped those
+ * per-Surface columns.
  */
 export const savedViews = pgTable(
   "machine_view_saved_views",
@@ -1349,7 +1446,7 @@ export const savedViews = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => userProfiles.id, { onDelete: "cascade" }),
-    host: text("host", { enum: LIST_HOSTS }).notNull().default("machines"),
+    host: text("host", { enum: LIST_HOSTS }).notNull(),
     name: text("name").notNull(),
     state: jsonb("state").$type<unknown>().notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -1359,27 +1456,11 @@ export const savedViews = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
-    legacySurface: text("surface", {
-      enum: ["machines", "collection", "owner"],
-    })
-      .notNull()
-      .default("machines"),
-    legacyCollectionId: uuid("collection_id").references(() => collections.id, {
-      onDelete: "cascade",
-    }),
-    legacyOwnerCollectionUserId: uuid("owner_collection_user_id").references(
-      () => userProfiles.id,
-      { onDelete: "cascade" }
-    ),
   },
   (t) => ({
     hostCheck: check(
       "machine_view_saved_views_host_check",
       sql`${t.host} IN ('machines', 'issues')`
-    ),
-    legacySurfaceCheck: check(
-      "machine_view_saved_views_legacy_surface_check",
-      sql`${t.legacySurface} = 'machines' AND ${t.legacyCollectionId} IS NULL AND ${t.legacyOwnerCollectionUserId} IS NULL`
     ),
     nameNotBlank: check(
       "machine_view_saved_views_name_not_blank",
@@ -1398,8 +1479,8 @@ export const savedViews = pgTable(
  * An account's Default View on one List Host (spec list-views.md §10.9): one
  * of its Saved Views of that host or a Built-in View id. Only the host's main
  * page opens it (§10.10). Deleting the Saved View deletes the row, leaving the
- * host without a default (§10.13). Like {@link savedViews}, the SQL name and
- * the `legacy*` columns predate List Hosts; PP-jb9v.5 drops the columns.
+ * host without a default (§10.13). Like {@link savedViews}, the SQL name
+ * predates List Hosts.
  */
 export const savedViewDefaults = pgTable(
   "machine_view_defaults",
@@ -1407,7 +1488,7 @@ export const savedViewDefaults = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => userProfiles.id, { onDelete: "cascade" }),
-    host: text("host", { enum: LIST_HOSTS }).notNull().default("machines"),
+    host: text("host", { enum: LIST_HOSTS }).notNull(),
     savedViewId: uuid("saved_view_id").references(() => savedViews.id, {
       onDelete: "cascade",
     }),
@@ -1415,27 +1496,11 @@ export const savedViewDefaults = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
-    legacySurface: text("surface", {
-      enum: ["machines", "collection", "owner"],
-    })
-      .notNull()
-      .default("machines"),
-    legacyCollectionId: uuid("collection_id").references(() => collections.id, {
-      onDelete: "cascade",
-    }),
-    legacyOwnerCollectionUserId: uuid("owner_collection_user_id").references(
-      () => userProfiles.id,
-      { onDelete: "cascade" }
-    ),
   },
   (t) => ({
     hostCheck: check(
       "machine_view_defaults_host_check",
       sql`${t.host} IN ('machines', 'issues')`
-    ),
-    legacySurfaceCheck: check(
-      "machine_view_defaults_legacy_surface_check",
-      sql`${t.legacySurface} = 'machines' AND ${t.legacyCollectionId} IS NULL AND ${t.legacyOwnerCollectionUserId} IS NULL`
     ),
     targetCheck: check(
       "machine_view_defaults_target_check",
@@ -1519,17 +1584,7 @@ export const notifications = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => userProfiles.id, { onDelete: "cascade" }),
-    type: text("type", {
-      enum: [
-        "issue_assigned",
-        "issue_status_changed",
-        "new_comment",
-        "new_issue",
-        "machine_ownership_changed",
-        "mentioned",
-        "pinballmap_comment",
-      ],
-    }).notNull(),
+    type: text("type", { enum: NOTIFICATION_TYPE_VALUES }).notNull(),
     resourceId: uuid("resource_id").notNull(), // Generic reference to issue or machine
     resourceType: text("resource_type", {
       enum: ["issue", "machine"],
@@ -1755,9 +1810,23 @@ export const machineApronCardsRelations = relations(
   })
 );
 
+export const apronCardPrintQueueRelations = relations(
+  apronCardPrintQueue,
+  ({ one }) => ({
+    user: one(userProfiles, {
+      fields: [apronCardPrintQueue.userId],
+      references: [userProfiles.id],
+    }),
+    card: one(machineApronCards, {
+      fields: [apronCardPrintQueue.cardId],
+      references: [machineApronCards.id],
+    }),
+  })
+);
+
 export const machineSettingsSetsRelations = relations(
   machineSettingsSets,
-  ({ one }) => ({
+  ({ one, many }) => ({
     machine: one(machines, {
       fields: [machineSettingsSets.machineId],
       references: [machines.id],
@@ -1765,6 +1834,25 @@ export const machineSettingsSetsRelations = relations(
     updatedByUser: one(userProfiles, {
       fields: [machineSettingsSets.updatedBy],
       references: [userProfiles.id],
+    }),
+    tags: many(machineSettingsSetTags),
+  })
+);
+
+export const settingsTagsRelations = relations(settingsTags, ({ many }) => ({
+  sets: many(machineSettingsSetTags),
+}));
+
+export const machineSettingsSetTagsRelations = relations(
+  machineSettingsSetTags,
+  ({ one }) => ({
+    set: one(machineSettingsSets, {
+      fields: [machineSettingsSetTags.setId],
+      references: [machineSettingsSets.id],
+    }),
+    tag: one(settingsTags, {
+      fields: [machineSettingsSetTags.tagId],
+      references: [settingsTags.id],
     }),
   })
 );

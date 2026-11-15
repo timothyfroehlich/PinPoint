@@ -1,16 +1,16 @@
 import "server-only";
-import { Buffer } from "node:buffer";
-import { createHmac, timingSafeEqual } from "node:crypto";
-import sanitizeHtml from "sanitize-html";
-import { log } from "~/lib/logger";
-import { NON_TEXT_TAGS } from "~/lib/sanitize-html-config";
 import { isInternalAccount } from "~/lib/auth/internal-accounts";
 import { getSiteUrl } from "~/lib/url";
+import { generateUnsubscribeToken } from "~/lib/notifications/unsubscribe-token";
 import { getThreadingHeaders } from "~/lib/notifications/email-threading";
 import { buildResourceUrl } from "~/lib/notifications/resource-url";
 import { reportError } from "~/lib/observability/report-error";
 import { escapeHtml } from "~/lib/markdown";
 import { pinballmapLocationUrl } from "~/lib/pinballmap/public-url";
+import {
+  EMAIL_PREFERENCE_COLUMNS,
+  shouldDeliverForChannel,
+} from "./should-deliver";
 import type {
   DeliveryChannel,
   NotificationPreferencesRow,
@@ -21,88 +21,14 @@ import type { NotificationType } from "~/lib/notifications/dispatch";
 import type { RecipientReason } from "~/lib/notifications/events";
 
 /**
- * Strict sanitization policy for email notifications.
- * Prevents remote images, tracking pixels, and complex HTML.
+ * Every value interpolated into an email body is plain text: titles, machine
+ * names, and statuses are stored as text, and issue descriptions and comments
+ * arrive flattened by `docToPlainText`. Escaping them means markup a reporter
+ * types (including an anonymous public reporter) shows as the characters they
+ * typed, never as a link or styled text in the recipient's inbox. (PP-40qy)
  */
-const EMAIL_SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
-  allowedTags: [
-    "h2",
-    "h3",
-    "p",
-    "ul",
-    "ol",
-    "li",
-    "strong",
-    "em",
-    "b",
-    "i",
-    "a",
-    "span",
-    "br",
-    "blockquote",
-    "hr",
-    "code",
-    "pre",
-    "s",
-  ],
-  nonTextTags: [...NON_TEXT_TAGS],
-  allowedAttributes: {
-    a: ["href"],
-    span: ["style"],
-  },
-};
-
-let warnedMissingSecret = false;
-
-/**
- * Returns the HMAC signing secret for unsubscribe tokens.
- * Uses UNSUBSCRIBE_SIGNING_SECRET, which must be set independently of the
- * Supabase service role key so that Supabase key rotation does not invalidate
- * outstanding unsubscribe URLs.
- *
- * Logs once in production if the secret is missing — without it, unsubscribe
- * links are omitted from outgoing emails and any incoming /api/unsubscribe
- * request will reject, which is a CAN-SPAM compliance risk worth surfacing.
- */
-function getUnsubscribeSigningSecret(): string {
-  const secret = process.env["UNSUBSCRIBE_SIGNING_SECRET"] ?? "";
-  if (!secret && !warnedMissingSecret) {
-    warnedMissingSecret = true;
-    if (process.env["VERCEL_ENV"] === "production") {
-      log.error(
-        { action: "unsubscribe.signingSecretMissing" },
-        "UNSUBSCRIBE_SIGNING_SECRET not set in production — unsubscribe links " +
-          "will be omitted from outgoing emails and incoming requests will reject."
-      );
-    }
-  }
-  return secret;
-}
-
-/**
- * Generate an HMAC-signed unsubscribe token for a user.
- * Uses UNSUBSCRIBE_SIGNING_SECRET as the signing secret.
- */
-export function generateUnsubscribeToken(userId: string): string {
-  const secret = getUnsubscribeSigningSecret();
-  if (!secret) {
-    return "";
-  }
-  return createHmac("sha256", secret)
-    .update(userId + ":unsubscribe")
-    .digest("hex");
-}
-
-/**
- * Verify an unsubscribe token against a userId.
- */
-export function verifyUnsubscribeToken(userId: string, token: string): boolean {
-  const expected = generateUnsubscribeToken(userId);
-  if (!expected || token.length === 0) return false;
-  const expectedBuf = Buffer.from(expected, "utf-8");
-  const tokenBuf = Buffer.from(token, "utf-8");
-  if (expectedBuf.length !== tokenBuf.length) return false;
-  return timingSafeEqual(expectedBuf, tokenBuf);
+function plainTextToHtml(value: string): string {
+  return escapeHtml(value).replace(/\r?\n/g, "<br/>");
 }
 
 function getEmailFooter(userId?: string): string {
@@ -239,36 +165,26 @@ export function getEmailHtml({
       body = "You have been assigned to this issue.";
       break;
     case "issue_status_changed":
-      body = `Status changed to: <strong>${newStatus ? sanitizeHtml(newStatus, EMAIL_SANITIZE_OPTIONS) : ""}</strong>`;
+      body = `Status changed to: <strong>${escapeHtml(newStatus ?? "")}</strong>`;
       break;
     case "new_comment": {
-      const sanitizedComment = commentContent
-        ? sanitizeHtml(commentContent, EMAIL_SANITIZE_OPTIONS)
-        : "";
-      body = `New comment:<br/><blockquote>${sanitizedComment}</blockquote>`;
+      const comment = plainTextToHtml(commentContent ?? "");
+      body = `New comment:<br/><blockquote>${comment}</blockquote>`;
       break;
     }
     case "mentioned": {
-      const sanitizedComment = commentContent
-        ? sanitizeHtml(commentContent, EMAIL_SANITIZE_OPTIONS)
-        : "";
-      body = `You were mentioned in an issue${sanitizedComment ? `:<br/><blockquote>${sanitizedComment}</blockquote>` : "."}`;
+      const comment = plainTextToHtml(commentContent ?? "");
+      body = `You were mentioned in an issue${comment ? `:<br/><blockquote>${comment}</blockquote>` : "."}`;
       break;
     }
     case "machine_ownership_changed":
       body = newStatus?.includes("removed")
-        ? `You have been <strong>removed</strong> as an owner of <strong>${machineName ? sanitizeHtml(machineName, EMAIL_SANITIZE_OPTIONS) : "a machine"}</strong>. You will no longer receive notifications for new issues on this machine.`
-        : `You have been <strong>added</strong> as an owner of <strong>${machineName ? sanitizeHtml(machineName, EMAIL_SANITIZE_OPTIONS) : "a machine"}</strong>. You will receive notifications for new issues reported on this machine.`;
+        ? `You have been <strong>removed</strong> as an owner of <strong>${machineName ? escapeHtml(machineName) : "a machine"}</strong>. You will no longer receive notifications for new issues on this machine.`
+        : `You have been <strong>added</strong> as an owner of <strong>${machineName ? escapeHtml(machineName) : "a machine"}</strong>. You will receive notifications for new issues reported on this machine.`;
       break;
     case "pinballmap_comment": {
-      // Pinball Map comments are plain text typed on pinballmap.com, so they
-      // are escaped rather than sanitized as HTML: markup in a comment shows
-      // as the characters the person typed.
       const commenter = escapeHtml(actorName ?? "A Pinball Map user");
-      const comment = escapeHtml(commentContent ?? "").replace(
-        /\r?\n/g,
-        "<br/>"
-      );
+      const comment = plainTextToHtml(commentContent ?? "");
       const attribution =
         pinballmapLocationId === undefined
           ? "Pinball Map"
@@ -283,18 +199,9 @@ export function getEmailHtml({
   const eventLabel = getEventTypeLabel(type);
 
   const siteUrl = getSiteUrl();
-  const sanitizedMachineName = machineName
-    ? sanitizeHtml(machineName, EMAIL_SANITIZE_OPTIONS)
-    : "";
-  const machinePrefix = sanitizedMachineName
-    ? `[${sanitizedMachineName}] `
-    : "";
-  const sanitizedIssueTitle = issueTitle
-    ? sanitizeHtml(issueTitle, EMAIL_SANITIZE_OPTIONS)
-    : "";
-  const sanitizedIssueId = formattedIssueId
-    ? sanitizeHtml(formattedIssueId, EMAIL_SANITIZE_OPTIONS)
-    : "";
+  const machinePrefix = machineName ? `[${escapeHtml(machineName)}] ` : "";
+  const escapedIssueTitle = escapeHtml(issueTitle ?? "");
+  const escapedIssueId = escapeHtml(formattedIssueId ?? "");
 
   // Machine-ownership emails are about a machine, not an issue — pointing them
   // at the global issue list under a "View Issue" label was the email half of
@@ -316,17 +223,16 @@ export function getEmailHtml({
       ? "View Machine"
       : "View Issue";
 
-  const sanitizedDescription =
+  const description =
     (type === "new_issue" || type === "issue_assigned") && issueDescription
-      ? sanitizeHtml(issueDescription, EMAIL_SANITIZE_OPTIONS)
+      ? plainTextToHtml(issueDescription)
       : "";
-  const showDescription = !!sanitizedDescription;
 
   return `
-      <h2>${machinePrefix}${sanitizedIssueId ? `${sanitizedIssueId}: ` : ""}${sanitizedIssueTitle}${isPinballMapComment && machineInitials ? sanitizeHtml(machineInitials, EMAIL_SANITIZE_OPTIONS) : ""}</h2>
+      <h2>${machinePrefix}${escapedIssueId ? `${escapedIssueId}: ` : ""}${escapedIssueTitle}${isPinballMapComment && machineInitials ? escapeHtml(machineInitials) : ""}</h2>
       ${eventLabel ? `<h3 style="color: #555; font-weight: 600; margin-bottom: 8px;">${eventLabel}</h3>` : ""}
       <div>${body}</div>
-      ${showDescription ? `<blockquote>${sanitizedDescription}</blockquote>` : ""}
+      ${description ? `<blockquote>${description}</blockquote>` : ""}
       <p><a href="${resourceUrl}">${resourceLinkLabel}</a></p>
       ${getEmailFooter(userId)}
     `;
@@ -339,28 +245,12 @@ export const emailChannel: DeliveryChannel = {
     type: NotificationType,
     recipientReason?: RecipientReason
   ): boolean {
-    if (!prefs.emailEnabled) return false;
-    switch (type) {
-      case "issue_assigned":
-        return prefs.emailNotifyOnAssigned;
-      case "issue_status_changed":
-        return prefs.emailNotifyOnStatusChange;
-      case "new_comment":
-        return prefs.emailNotifyOnNewComment;
-      case "new_issue":
-        if (recipientReason === "global_watcher") {
-          return prefs.emailWatchNewIssuesGlobal;
-        }
-        if (recipientReason) return prefs.emailNotifyOnNewIssue;
-        return prefs.emailNotifyOnNewIssue || prefs.emailWatchNewIssuesGlobal;
-      case "machine_ownership_changed":
-        // Critical event — preferences cannot opt out (only main switch can).
-        return true;
-      case "mentioned":
-        return prefs.emailNotifyOnMentioned;
-      case "pinballmap_comment":
-        return prefs.emailNotifyOnPinballMapComment;
-    }
+    return shouldDeliverForChannel(
+      EMAIL_PREFERENCE_COLUMNS,
+      prefs,
+      type,
+      recipientReason
+    );
   },
   async deliver(ctx: ChannelContext): Promise<DeliveryResult> {
     if (!ctx.email || isInternalAccount(ctx.email)) {

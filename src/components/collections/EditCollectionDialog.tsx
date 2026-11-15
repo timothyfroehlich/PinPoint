@@ -28,29 +28,32 @@ import {
   deleteCollectionAction,
   updateCollectionAction,
 } from "~/app/(app)/c/collections/actions";
+import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 
 interface Props {
   collectionId: string;
   currentName: string;
+  currentDescription: ProseMirrorDoc | null;
   allMachines: { id: string; initials: string; name: string }[];
   currentIds: string[];
   /**
    * Owner-only: show the "Delete collection" control. Editor collaborators can
-   * edit content (name + machines) but cannot delete, so the layout passes
+   * edit content (name, description, machines) but cannot delete, so the layout passes
    * `false` for them (PP-wqit.7).
    */
   canDelete: boolean;
 }
 
 /**
- * "Edit collection" modal: renames the collection and edits its machine set in
- * one place, saved together via `updateCollectionAction`. Available to the owner
+ * "Edit collection" modal: renames the collection, edits its description, and
+ * edits its machine set in one place, saved together via `updateCollectionAction`. Available to the owner
  * and editor collaborators; the footer "Delete collection" button is owner-only
  * (gated by `canDelete`).
  */
 export function EditCollectionDialog({
   collectionId,
   currentName,
+  currentDescription,
   allMachines,
   currentIds,
   canDelete,
@@ -58,6 +61,9 @@ export function EditCollectionDialog({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(currentName);
+  const [description, setDescription] = useState<ProseMirrorDoc | null>(
+    currentDescription
+  );
   const [selected, setSelected] = useState<string[]>(currentIds);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<{
@@ -73,11 +79,12 @@ export function EditCollectionDialog({
   useEffect(() => {
     if (open) {
       setName(currentName);
+      setDescription(currentDescription);
       setSelected(currentIds);
       setSaveError(null);
       setDeleteError(null);
     }
-  }, [open, currentName, currentIds]);
+  }, [open, currentName, currentDescription, currentIds]);
 
   function save(): void {
     setSaveError(null);
@@ -85,6 +92,7 @@ export function EditCollectionDialog({
       const result = await updateCollectionAction({
         collectionId,
         name,
+        description,
         machineIds: selected,
       });
       if (!result.success) setSaveError(result.error);
@@ -121,13 +129,16 @@ export function EditCollectionDialog({
         <DialogHeader>
           <DialogTitle>Edit collection</DialogTitle>
           <DialogDescription>
-            Rename the collection and choose which machines belong to it.
+            Rename the collection, describe it, and choose which machines belong
+            to it.
           </DialogDescription>
         </DialogHeader>
 
         <CollectionFields
           name={name}
           onNameChange={setName}
+          initialDescription={currentDescription}
+          onDescriptionChange={setDescription}
           selected={selected}
           onSelectedChange={setSelected}
           allMachines={allMachines}

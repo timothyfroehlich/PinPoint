@@ -10,7 +10,7 @@ const verifyTokenMock = vi.hoisted(() =>
   vi.fn<(uid: string, token: string) => boolean>()
 );
 
-vi.mock("~/lib/notifications/channels/email-channel", () => ({
+vi.mock("~/lib/notifications/unsubscribe-token", () => ({
   verifyUnsubscribeToken: verifyTokenMock,
 }));
 

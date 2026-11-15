@@ -1,26 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
-import { authUsers, userProfiles } from "~/server/db/schema";
-import { createTestUser } from "~/test/helpers/factories";
+import { userProfiles } from "~/server/db/schema";
+import { signInAs } from "~/test/helpers/mock-auth";
+import { seedUser } from "~/test/helpers/seed";
 
 const ME = "00000000-0000-0000-0000-0000000000b1";
 
-// Route the production `db` import to the PGlite worker instance.
-vi.mock("~/server/db", async () => {
-  const { getTestDb } = await import("~/test/setup/pglite");
-  return { db: await getTestDb() };
-});
-
-vi.mock("~/lib/supabase/server", () => ({
-  createClient: () =>
-    Promise.resolve({
-      auth: {
-        getUser: () =>
-          Promise.resolve({ data: { user: { id: ME } }, error: null }),
-      },
-    }),
-}));
+vi.mock("~/lib/supabase/server", () => import("~/test/helpers/mock-auth"));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
@@ -34,16 +21,14 @@ describe("updateProfileAction", () => {
   setupTestDb();
 
   beforeEach(async () => {
-    const db = await getTestDb();
-    await db.insert(authUsers).values({ id: ME, email: "me@example.com" });
-    await db.insert(userProfiles).values(
-      createTestUser({
-        id: ME,
-        firstName: "Old",
-        lastName: "Name",
-        role: "member",
-      })
-    );
+    await seedUser({
+      id: ME,
+      email: "me@example.com",
+      firstName: "Old",
+      lastName: "Name",
+      role: "member",
+    });
+    signInAs(ME);
   });
 
   it("updates the caller's own profile fields and redirects to the read view", async () => {

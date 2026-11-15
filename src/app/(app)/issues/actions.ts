@@ -1,8 +1,9 @@
 /**
  * Issue Server Actions
  *
- * Server-side mutations for issue CRUD operations.
- * All actions require authentication (CORE-SEC-001).
+ * Server-side mutations for issue CRUD operations, each built on the protected
+ * action pipeline (CORE-ARCH-013): authenticate, validate, load, check the
+ * permission, then run the handler.
  */
 
 "use server";
@@ -10,17 +11,27 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { type z } from "zod";
+import { z } from "zod";
 import { eq } from "drizzle-orm";
-import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { issues, issueComments, issueImages } from "~/server/db/schema";
 import { log } from "~/lib/logger";
 import { BLOB_CONFIG } from "~/lib/blob/config";
+import { reportError } from "~/lib/observability/report-error";
 import {
-  reportError,
-  serverActionError,
-} from "~/lib/observability/report-error";
+  createProtectedAction,
+  formFields,
+  revalidateMachine,
+  type ActionContext,
+  type PermissionId,
+  type PermissionRequirement,
+  type ProtectedActionResult,
+  type ResourceContext,
+} from "~/lib/actions";
+import {
+  getIssueAuthContext,
+  type IssueAuthContext,
+} from "~/lib/issues/auth-context";
 import {
   updateIssueStatusSchema,
   updateIssueSeveritySchema,
@@ -49,154 +60,181 @@ import {
 } from "~/services/issues";
 import { dispatchNotification } from "~/lib/notifications";
 import { checkPermission } from "~/lib/permissions/helpers";
-import { getUserAccessLevel } from "~/lib/permissions/access";
 import {
   type ProseMirrorDoc,
   docToPlainText,
-  proseMirrorDocSchema,
+  proseMirrorDocValueSchema,
 } from "~/lib/tiptap/types";
 
-const NEXT_REDIRECT_DIGEST_PREFIX = "NEXT_REDIRECT;";
-
-const toOptionalString = (value: FormDataEntryValue | null): string | null =>
-  typeof value === "string" ? value : null;
-
-const isNextRedirectError = (error: unknown): error is { digest: string } => {
-  if (typeof error !== "object" || error === null || !("digest" in error)) {
-    return false;
-  }
-
-  const { digest } = error as { digest?: unknown };
-  return (
-    typeof digest === "string" && digest.startsWith(NEXT_REDIRECT_DIGEST_PREFIX)
-  );
-};
-
-export type UpdateIssueStatusResult = Result<
+export type UpdateIssueStatusResult = ProtectedActionResult<
   { issueId: string },
-  "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
+  "NOT_FOUND"
 >;
 
-export type UpdateIssueSeverityResult = Result<
+export type UpdateIssueSeverityResult = ProtectedActionResult<
   { issueId: string },
-  "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
+  "NOT_FOUND"
 >;
 
-export type UpdateIssuePriorityResult = Result<
+export type UpdateIssuePriorityResult = ProtectedActionResult<
   { issueId: string },
-  "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
+  "NOT_FOUND"
 >;
 
-export type UpdateIssueFrequencyResult = Result<
+export type UpdateIssueFrequencyResult = ProtectedActionResult<
   { issueId: string },
-  "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
+  "NOT_FOUND"
 >;
 
-export type AssignIssueResult = Result<
+export type AssignIssueResult = ProtectedActionResult<
   { issueId: string },
-  "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
+  "NOT_FOUND"
 >;
 
-export type AddCommentResult = Result<
-  { issueId: string; commentId: string },
-  "VALIDATION" | "UNAUTHORIZED" | "SERVER"
->;
+export type AddCommentResult = ProtectedActionResult<{
+  issueId: string;
+  commentId: string;
+}>;
 
-export type EditCommentResult = Result<
+export type EditCommentResult = ProtectedActionResult<
   { commentId: string },
-  "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
+  "NOT_FOUND"
 >;
 
-export type DeleteCommentResult = Result<
+export type DeleteCommentResult = ProtectedActionResult<
   { commentId: string },
-  "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
+  "NOT_FOUND"
 >;
 
-export type UpdateIssueTitleResult = Result<
+export type UpdateIssueTitleResult = ProtectedActionResult<
   { issueId: string },
-  "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
+  "NOT_FOUND"
 >;
 
-export type ReassignIssueMachineResult = Result<
+export type ReassignIssueMachineResult = ProtectedActionResult<
   { issueId: string },
-  "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
+  "NOT_FOUND"
 >;
+
+type IssueContext = ResourceContext<ActionContext, IssueAuthContext>;
+
+/** Load the issue an `issueId` input names, for an ownership permission check. */
+const loadIssue = ({
+  issueId,
+}: {
+  issueId: string;
+}): Promise<Result<IssueAuthContext, "NOT_FOUND">> =>
+  getIssueAuthContext(issueId);
+
+/** Require `permission` with the caller's ownership of the loaded issue. */
+const issuePermission =
+  (permission: PermissionId) =>
+  (
+    _input: unknown,
+    { user, resource }: IssueContext
+  ): PermissionRequirement => ({
+    permission,
+    ownershipContext: {
+      userId: user.id,
+      reporterId: resource.reportedBy,
+      machineOwnerId: resource.machineOwnerId,
+    },
+  });
+
+/** Revalidate the issue's page and its machine's page. */
+function revalidateIssue(issue: IssueAuthContext): void {
+  revalidateMachine(issue.machineInitials, [`i/${issue.issueNumber}`]);
+}
 
 /**
- * Update Issue Status Action
- *
- * Updates issue status and creates timeline event.
- *
- * @param formData - Form data with issueId and status
+ * Parse a comment's ProseMirror JSON as part of schema validation, so a bad
+ * document is a VALIDATION result before anything is loaded.
  */
-export async function updateIssueStatusAction(
-  _prevState: UpdateIssueStatusResult | undefined,
-  formData: FormData
-): Promise<UpdateIssueStatusResult> {
-  // Auth check
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return err("UNAUTHORIZED", "Unauthorized");
-  }
-
-  // Validate input
-  const rawData = {
-    issueId: toOptionalString(formData.get("issueId")),
-    status: toOptionalString(formData.get("status")),
-  };
-
-  const validation = updateIssueStatusSchema.safeParse(rawData);
-  if (!validation.success) {
-    const firstError = validation.error.issues[0];
-    return err("VALIDATION", firstError?.message ?? "Invalid input");
-  }
-
-  const { issueId, status } = validation.data;
-
+function parseCommentDoc(
+  commentJson: string,
+  ctx: z.RefinementCtx
+): ProseMirrorDoc {
+  let parsed: unknown;
   try {
-    // Get current issue to check old status
-    const currentIssue = await db.query.issues.findFirst({
-      where: eq(issues.id, issueId),
-      columns: {
-        status: true,
-        machineInitials: true,
-        issueNumber: true,
-        reportedBy: true,
-        assignedTo: true,
-      },
-      with: {
-        machine: {
-          columns: { ownerId: true },
-        },
-      },
-    });
+    parsed = JSON.parse(commentJson);
+  } catch (e) {
+    log.error({ e, commentJson }, "Failed to parse comment JSON");
+    ctx.addIssue({ code: "custom", message: "Invalid comment format" });
+    return z.NEVER;
+  }
 
-    if (!currentIssue) {
-      return err("NOT_FOUND", "Issue not found");
-    }
+  const doc = proseMirrorDocValueSchema.safeParse(parsed);
+  if (!doc.success) {
+    ctx.addIssue({ code: "custom", message: "Invalid comment format" });
+    return z.NEVER;
+  }
+  if (docToPlainText(doc.data).length === 0) {
+    ctx.addIssue({ code: "custom", message: "Comment cannot be empty" });
+    return z.NEVER;
+  }
+  if (JSON.stringify(doc.data).length > 100_000) {
+    ctx.addIssue({ code: "custom", message: "Comment is too long." });
+    return z.NEVER;
+  }
+  return doc.data;
+}
 
-    // Permission check
-    const accessLevel = await getUserAccessLevel(user.id);
-    const ownershipCtx = {
-      userId: user.id,
-      reporterId: currentIssue.reportedBy,
-      machineOwnerId: currentIssue.machine.ownerId,
-    };
+const addCommentInputSchema = addCommentSchema.transform(
+  ({ comment, ...rest }, ctx) => ({
+    ...rest,
+    comment: parseCommentDoc(comment, ctx),
+  })
+);
 
-    if (
-      !checkPermission("issues.update.reporting", accessLevel, ownershipCtx)
-    ) {
-      return err(
-        "UNAUTHORIZED",
-        "You do not have permission to update this issue"
-      );
-    }
+const editCommentInputSchema = editCommentSchema.transform(
+  ({ comment, ...rest }, ctx) => ({
+    ...rest,
+    comment: parseCommentDoc(comment, ctx),
+  })
+);
 
-    // Update status
+/**
+ * Load a comment for an edit or delete. System comments (audit events) are
+ * never editable, whoever asks.
+ */
+async function loadUserComment(
+  commentId: string,
+  systemCommentMessage: string
+): Promise<
+  Result<
+    {
+      authorId: string | null;
+      issue: { machineInitials: string; issueNumber: number };
+    },
+    "NOT_FOUND" | "FORBIDDEN"
+  >
+> {
+  const comment = await db.query.issueComments.findFirst({
+    where: eq(issueComments.id, commentId),
+    columns: { authorId: true, isSystem: true },
+    with: {
+      issue: { columns: { machineInitials: true, issueNumber: true } },
+    },
+  });
+
+  if (!comment) {
+    return err("NOT_FOUND", "Comment not found");
+  }
+  if (comment.isSystem) {
+    return err("FORBIDDEN", systemCommentMessage);
+  }
+  return ok({ authorId: comment.authorId, issue: comment.issue });
+}
+
+const updateIssueStatusProtected = createProtectedAction({
+  actionName: "updateIssueStatus",
+  schema: updateIssueStatusSchema,
+  mapInput: (formData: FormData) => formFields(formData, ["issueId", "status"]),
+  load: loadIssue,
+  permission: issuePermission("issues.update.reporting"),
+  forbiddenMessage: "You do not have permission to update this issue",
+  serverErrorMessage: "Failed to update status",
+  handler: async ({ issueId, status }, { user, resource: issue }) => {
     const { deliveryPlan } = await updateIssueStatus({
       issueId,
       status,
@@ -205,367 +243,108 @@ export async function updateIssueStatusAction(
     // Deliver post-commit, after the response (PP-2053.3).
     after(() => dispatchNotification(deliveryPlan));
 
-    const issuePath = `/m/${currentIssue.machineInitials}/i/${currentIssue.issueNumber}`;
-    revalidatePath(issuePath);
-    revalidatePath(`/m/${currentIssue.machineInitials}`);
-
+    revalidateIssue(issue);
     return ok({ issueId });
-  } catch (error) {
-    if (isNextRedirectError(error)) {
-      throw error;
-    }
-    return serverActionError(error, "SERVER", "Failed to update status", {
-      action: "updateIssueStatus",
-    });
-  }
+  },
+});
+
+/** Update an issue's status and record the timeline event. */
+export async function updateIssueStatusAction(
+  _prevState: UpdateIssueStatusResult | undefined,
+  formData: FormData
+): Promise<UpdateIssueStatusResult> {
+  return await updateIssueStatusProtected(formData);
 }
 
-/**
- * Update Issue Severity Action
- *
- * Updates issue severity and creates timeline event.
- *
- * @param formData - Form data with issueId and severity
- */
+const updateIssueSeverityProtected = createProtectedAction({
+  actionName: "updateIssueSeverity",
+  schema: updateIssueSeveritySchema,
+  mapInput: (formData: FormData) =>
+    formFields(formData, ["issueId", "severity"]),
+  load: loadIssue,
+  permission: issuePermission("issues.update.reporting"),
+  forbiddenMessage: "You do not have permission to update this issue",
+  serverErrorMessage: "Failed to update severity",
+  handler: async ({ issueId, severity }, { user, resource: issue }) => {
+    await updateIssueSeverity({ issueId, severity, userId: user.id });
+
+    revalidateIssue(issue);
+    return ok({ issueId });
+  },
+});
+
+/** Update an issue's severity and record the timeline event. */
 export async function updateIssueSeverityAction(
   _prevState: UpdateIssueSeverityResult | undefined,
   formData: FormData
 ): Promise<UpdateIssueSeverityResult> {
-  // Auth check
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return err("UNAUTHORIZED", "Unauthorized");
-  }
-
-  // Validate input
-  const rawData = {
-    issueId: toOptionalString(formData.get("issueId")),
-    severity: toOptionalString(formData.get("severity")),
-  };
-
-  const validation = updateIssueSeveritySchema.safeParse(rawData);
-  if (!validation.success) {
-    const firstError = validation.error.issues[0];
-    return err("VALIDATION", firstError?.message ?? "Invalid input");
-  }
-
-  const { issueId, severity } = validation.data;
-
-  try {
-    // Get current issue to check old severity
-    const currentIssue = await db.query.issues.findFirst({
-      where: eq(issues.id, issueId),
-      columns: {
-        severity: true,
-        machineInitials: true,
-        issueNumber: true,
-        reportedBy: true,
-        assignedTo: true,
-      },
-      with: {
-        machine: {
-          columns: { ownerId: true },
-        },
-      },
-    });
-
-    if (!currentIssue) {
-      return err("NOT_FOUND", "Issue not found");
-    }
-
-    // Permission check
-    const accessLevel = await getUserAccessLevel(user.id);
-    const ownershipCtx = {
-      userId: user.id,
-      reporterId: currentIssue.reportedBy,
-      machineOwnerId: currentIssue.machine.ownerId,
-    };
-
-    if (
-      !checkPermission("issues.update.reporting", accessLevel, ownershipCtx)
-    ) {
-      return err(
-        "UNAUTHORIZED",
-        "You do not have permission to update this issue"
-      );
-    }
-
-    // Update severity
-    await updateIssueSeverity({
-      issueId,
-      severity,
-      userId: user.id,
-    });
-
-    const issuePath = `/m/${currentIssue.machineInitials}/i/${currentIssue.issueNumber}`;
-    revalidatePath(issuePath);
-    revalidatePath(`/m/${currentIssue.machineInitials}`);
-
-    return ok({ issueId });
-  } catch (error) {
-    if (isNextRedirectError(error)) {
-      throw error;
-    }
-    return serverActionError(error, "SERVER", "Failed to update severity", {
-      action: "updateIssueSeverity",
-    });
-  }
+  return await updateIssueSeverityProtected(formData);
 }
 
-/**
- * Update Issue Frequency Action
- */
+const updateIssueFrequencyProtected = createProtectedAction({
+  actionName: "updateIssueFrequency",
+  schema: updateIssueFrequencySchema,
+  mapInput: (formData: FormData) =>
+    formFields(formData, ["issueId", "frequency"]),
+  load: loadIssue,
+  permission: issuePermission("issues.update.reporting"),
+  forbiddenMessage: "You do not have permission to update this issue",
+  serverErrorMessage: "Failed to update frequency",
+  handler: async ({ issueId, frequency }, { user, resource: issue }) => {
+    await updateIssueFrequency({ issueId, frequency, userId: user.id });
+
+    revalidatePath(`/m/${issue.machineInitials}/i/${issue.issueNumber}`);
+    return ok({ issueId });
+  },
+});
+
+/** Update an issue's frequency and record the timeline event. */
 export async function updateIssueFrequencyAction(
   _prevState: UpdateIssueFrequencyResult | undefined,
   formData: FormData
 ): Promise<UpdateIssueFrequencyResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return err("UNAUTHORIZED", "Unauthorized");
-
-  const rawData = {
-    issueId: toOptionalString(formData.get("issueId")),
-    frequency: toOptionalString(formData.get("frequency")),
-  };
-
-  const validation = updateIssueFrequencySchema.safeParse(rawData);
-  if (!validation.success) {
-    return err(
-      "VALIDATION",
-      validation.error.issues[0]?.message ?? "Invalid input"
-    );
-  }
-
-  const { issueId, frequency } = validation.data;
-
-  try {
-    const currentIssue = await db.query.issues.findFirst({
-      where: eq(issues.id, issueId),
-      columns: {
-        machineInitials: true,
-        issueNumber: true,
-        reportedBy: true,
-        assignedTo: true,
-      },
-      with: {
-        machine: {
-          columns: { ownerId: true },
-        },
-      },
-    });
-
-    if (!currentIssue) return err("NOT_FOUND", "Issue not found");
-
-    // Permission check
-    const accessLevel = await getUserAccessLevel(user.id);
-    const ownershipCtx = {
-      userId: user.id,
-      reporterId: currentIssue.reportedBy,
-      machineOwnerId: currentIssue.machine.ownerId,
-    };
-
-    if (
-      !checkPermission("issues.update.reporting", accessLevel, ownershipCtx)
-    ) {
-      return err(
-        "UNAUTHORIZED",
-        "You do not have permission to update this issue"
-      );
-    }
-
-    // Update frequency
-    await updateIssueFrequency({
-      issueId,
-      frequency,
-      userId: user.id,
-    });
-
-    revalidatePath(
-      `/m/${currentIssue.machineInitials}/i/${currentIssue.issueNumber}`
-    );
-    return ok({ issueId });
-  } catch (error: unknown) {
-    return serverActionError(error, "SERVER", "Failed to update frequency", {
-      action: "updateIssueFrequency",
-    });
-  }
+  return await updateIssueFrequencyProtected(formData);
 }
 
-/**
- * Update Issue Priority Action
- *
- * Updates issue priority and creates timeline event.
- *
- * @param _prevState - Previous action state (unused, required for useActionState)
- * @param formData - Form data with issueId and priority
- */
+const updateIssuePriorityProtected = createProtectedAction({
+  actionName: "updateIssuePriority",
+  schema: updateIssuePrioritySchema,
+  mapInput: (formData: FormData) =>
+    formFields(formData, ["issueId", "priority"]),
+  load: loadIssue,
+  permission: issuePermission("issues.update.triage"),
+  forbiddenMessage: "You do not have permission to update this issue",
+  serverErrorMessage: "Failed to update priority",
+  handler: async ({ issueId, priority }, { user, resource: issue }) => {
+    await updateIssuePriority({ issueId, priority, userId: user.id });
+
+    revalidateIssue(issue);
+    return ok({ issueId });
+  },
+});
+
+/** Update an issue's priority and record the timeline event. */
 export async function updateIssuePriorityAction(
   _prevState: UpdateIssuePriorityResult | undefined,
   formData: FormData
 ): Promise<UpdateIssuePriorityResult> {
-  // Auth check
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return err("UNAUTHORIZED", "Unauthorized");
-  }
-
-  // Validate input
-  const rawData = {
-    issueId: toOptionalString(formData.get("issueId")),
-    priority: toOptionalString(formData.get("priority")),
-  };
-
-  const validation = updateIssuePrioritySchema.safeParse(rawData);
-  if (!validation.success) {
-    const firstError = validation.error.issues[0];
-    return err("VALIDATION", firstError?.message ?? "Invalid input");
-  }
-
-  const { issueId, priority } = validation.data;
-
-  try {
-    // Get current issue to check old priority
-    const currentIssue = await db.query.issues.findFirst({
-      where: eq(issues.id, issueId),
-      columns: {
-        priority: true,
-        machineInitials: true,
-        issueNumber: true,
-        reportedBy: true,
-        assignedTo: true,
-      },
-      with: {
-        machine: {
-          columns: { ownerId: true },
-        },
-      },
-    });
-
-    if (!currentIssue) {
-      return err("NOT_FOUND", "Issue not found");
-    }
-
-    // Permission check
-    const accessLevel = await getUserAccessLevel(user.id);
-    const ownershipCtx = {
-      userId: user.id,
-      reporterId: currentIssue.reportedBy,
-      machineOwnerId: currentIssue.machine.ownerId,
-    };
-
-    if (!checkPermission("issues.update.triage", accessLevel, ownershipCtx)) {
-      return err(
-        "UNAUTHORIZED",
-        "You do not have permission to update this issue"
-      );
-    }
-
-    // Update priority
-    await updateIssuePriority({
-      issueId,
-      priority,
-      userId: user.id,
-    });
-
-    const issuePath = `/m/${currentIssue.machineInitials}/i/${currentIssue.issueNumber}`;
-    revalidatePath(issuePath);
-    revalidatePath(`/m/${currentIssue.machineInitials}`);
-
-    return ok({ issueId });
-  } catch (error) {
-    if (isNextRedirectError(error)) {
-      throw error;
-    }
-    return serverActionError(error, "SERVER", "Failed to update priority", {
-      action: "updateIssuePriority",
-    });
-  }
+  return await updateIssuePriorityProtected(formData);
 }
 
-/**
- * Assign Issue Action
- *
- * Assigns issue to a user and creates timeline event.
- *
- * @param formData - Form data with issueId and assignedTo
- */
-export async function assignIssueAction(
-  _prevState: AssignIssueResult | undefined,
-  formData: FormData
-): Promise<AssignIssueResult> {
-  // Auth check
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return err("UNAUTHORIZED", "Unauthorized");
-  }
-
-  // Validate input
-  const assignedToValue = toOptionalString(formData.get("assignedTo"));
-  const rawData = {
-    issueId: toOptionalString(formData.get("issueId")),
-    assignedTo:
-      assignedToValue && assignedToValue.length > 0 ? assignedToValue : null,
-  };
-
-  const validation = assignIssueSchema.safeParse(rawData);
-  if (!validation.success) {
-    const firstError = validation.error.issues[0];
-    return err("VALIDATION", firstError?.message ?? "Invalid input");
-  }
-
-  const { issueId, assignedTo } = validation.data;
-
-  try {
-    // Get current issue
-    const currentIssue = await db.query.issues.findFirst({
-      where: eq(issues.id, issueId),
-      columns: {
-        machineInitials: true,
-        issueNumber: true,
-        reportedBy: true,
-        assignedTo: true,
-      },
-      with: {
-        machine: {
-          columns: { ownerId: true },
-        },
-      },
-    });
-
-    if (!currentIssue) {
-      return err("NOT_FOUND", "Issue not found");
-    }
-
-    // Permission check
-    const accessLevel = await getUserAccessLevel(user.id);
-    const ownershipCtx = {
-      userId: user.id,
-      reporterId: currentIssue.reportedBy,
-      machineOwnerId: currentIssue.machine.ownerId,
-    };
-
-    if (!checkPermission("issues.update.triage", accessLevel, ownershipCtx)) {
-      return err(
-        "UNAUTHORIZED",
-        "You do not have permission to update this issue"
-      );
-    }
-
-    // Assign issue via service
+const assignIssueProtected = createProtectedAction({
+  actionName: "assignIssue",
+  schema: assignIssueSchema,
+  mapInput: (formData: FormData) => {
+    const fields = formFields(formData, ["issueId", "assignedTo"]);
+    // An empty assignee field means "unassign".
+    const assignedTo = fields["assignedTo"];
+    return { ...fields, assignedTo: assignedTo === "" ? null : assignedTo };
+  },
+  load: loadIssue,
+  permission: issuePermission("issues.update.triage"),
+  forbiddenMessage: "You do not have permission to update this issue",
+  serverErrorMessage: "Failed to assign issue",
+  handler: async ({ issueId, assignedTo }, { user, resource: issue }) => {
     const { deliveryPlan } = await assignIssue({
       issueId,
       assignedTo,
@@ -574,108 +353,63 @@ export async function assignIssueAction(
     // Deliver post-commit, after the response (PP-2053.3).
     after(() => dispatchNotification(deliveryPlan));
 
-    const issuePath = `/m/${currentIssue.machineInitials}/i/${currentIssue.issueNumber}`;
-    revalidatePath(issuePath);
-    revalidatePath(`/m/${currentIssue.machineInitials}`);
-
+    revalidateIssue(issue);
     return ok({ issueId });
-  } catch (error) {
-    if (isNextRedirectError(error)) {
-      throw error;
-    }
-    return serverActionError(error, "SERVER", "Failed to assign issue", {
-      action: "assignIssue",
-    });
-  }
+  },
+});
+
+/** Assign an issue to a user, or unassign it, and record the timeline event. */
+export async function assignIssueAction(
+  _prevState: AssignIssueResult | undefined,
+  formData: FormData
+): Promise<AssignIssueResult> {
+  return await assignIssueProtected(formData);
 }
 
-/**
- * Adds a comment to an issue.
- */
-export async function addCommentAction(
-  _prevState: AddCommentResult | undefined,
-  formData: FormData
-): Promise<AddCommentResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return err("UNAUTHORIZED", "Unauthorized");
-  }
-
-  const accessLevel = await getUserAccessLevel(user.id);
-  if (!checkPermission("comments.add", accessLevel)) {
-    return err("UNAUTHORIZED", "You do not have permission to add comments");
-  }
-
-  const validation = addCommentSchema.safeParse({
-    issueId: toOptionalString(formData.get("issueId")),
-    comment: toOptionalString(formData.get("comment")),
-    imagesMetadata: toOptionalString(formData.get("imagesMetadata")),
-    idempotencyKey: toOptionalString(formData.get("idempotencyKey")),
-  });
-
-  if (!validation.success) {
-    return err(
-      "VALIDATION",
-      validation.error.issues[0]?.message ?? "Invalid input"
-    );
-  }
-
-  const {
-    issueId,
-    comment: commentJson,
-    imagesMetadata: imagesMetadataStr,
-    idempotencyKey,
-  } = validation.data;
-
-  // Parse comment JSON
-  let comment: ProseMirrorDoc;
-  try {
-    comment = JSON.parse(commentJson) as ProseMirrorDoc;
-  } catch (e) {
-    log.error({ e, commentJson }, "Failed to parse comment JSON");
-    return err("VALIDATION", "Invalid comment format");
-  }
-
-  if (!proseMirrorDocSchema.safeParse(comment).success) {
-    return err("VALIDATION", "Invalid comment format");
-  }
-  if (docToPlainText(comment).length === 0) {
-    return err("VALIDATION", "Comment cannot be empty");
-  }
-  if (JSON.stringify(comment).length > 100_000) {
-    return err("VALIDATION", "Comment is too long.");
-  }
-
-  let imagesMetadata: z.infer<typeof imagesMetadataArraySchema> = [];
-  if (imagesMetadataStr) {
-    try {
-      imagesMetadata = imagesMetadataArraySchema.parse(
-        JSON.parse(imagesMetadataStr)
-      );
-    } catch (e) {
-      log.error({ err: e, issueId }, "Failed to parse comment images metadata");
-      reportError(e, {
-        action: "parseCommentImagesMetadata",
-        issueId,
-        bestEffort: true,
-      });
-      // Non-blocking — the comment still posts, but images are silently dropped
+const addCommentProtected = createProtectedAction({
+  actionName: "addComment",
+  schema: addCommentInputSchema,
+  mapInput: (formData: FormData) =>
+    formFields(formData, [
+      "issueId",
+      "comment",
+      "imagesMetadata",
+      "idempotencyKey",
+    ]),
+  permission: "comments.add",
+  forbiddenMessage: "You do not have permission to add comments",
+  serverErrorMessage: "Failed to add comment",
+  handler: async (
+    { issueId, comment, imagesMetadata: imagesMetadataJson, idempotencyKey },
+    { user }
+  ) => {
+    let imagesMetadata: z.infer<typeof imagesMetadataArraySchema> = [];
+    if (imagesMetadataJson) {
+      try {
+        imagesMetadata = imagesMetadataArraySchema.parse(
+          JSON.parse(imagesMetadataJson)
+        );
+      } catch (e) {
+        log.error(
+          { err: e, issueId },
+          "Failed to parse comment images metadata"
+        );
+        reportError(e, {
+          action: "parseCommentImagesMetadata",
+          issueId,
+          bestEffort: true,
+        });
+        // Non-blocking — the comment still posts, but images are silently dropped
+      }
     }
-  }
 
-  if (imagesMetadata.length > BLOB_CONFIG.LIMITS.COMMENT_MAX) {
-    return err(
-      "VALIDATION",
-      `Too many images. Maximum ${BLOB_CONFIG.LIMITS.COMMENT_MAX} images allowed per comment.`
-    );
-  }
+    if (imagesMetadata.length > BLOB_CONFIG.LIMITS.COMMENT_MAX) {
+      return err(
+        "VALIDATION",
+        `Too many images. Maximum ${BLOB_CONFIG.LIMITS.COMMENT_MAX} images allowed per comment.`
+      );
+    }
 
-  let commentId: string;
-  try {
     const { comment: posted, deliveryPlan } = await addIssueComment({
       issueId,
       content: comment,
@@ -683,181 +417,79 @@ export async function addCommentAction(
       imagesMetadata,
       idempotencyKey: idempotencyKey ?? null,
     });
-    commentId = posted.id;
     // Deliver post-commit, after the response (PP-2053.3).
     after(() => dispatchNotification(deliveryPlan));
-  } catch (error) {
-    return serverActionError(error, "SERVER", "Failed to add comment", {
-      action: "addComment",
-    });
-  }
 
-  // We need issue context for revalidation
-  // This is a bit inefficient, but necessary for correct revalidation paths
-  const issue = await db.query.issues.findFirst({
-    where: eq(issues.id, issueId),
-    columns: { machineInitials: true, issueNumber: true },
-  });
-
-  if (issue) {
-    revalidatePath(`/m/${issue.machineInitials}/i/${issue.issueNumber}`);
-  }
-  return ok({ issueId, commentId });
-}
-
-/**
- * Edits a comment on an issue.
- */
-export async function editCommentAction(
-  _prevState: EditCommentResult | undefined,
-  formData: FormData
-): Promise<EditCommentResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return err("UNAUTHORIZED", "Unauthorized");
-  }
-
-  const validation = editCommentSchema.safeParse({
-    commentId: toOptionalString(formData.get("commentId")),
-    comment: toOptionalString(formData.get("comment")),
-  });
-
-  if (!validation.success) {
-    return err(
-      "VALIDATION",
-      validation.error.issues[0]?.message ?? "Invalid input"
-    );
-  }
-
-  const { commentId, comment: commentJson } = validation.data;
-
-  // Parse comment JSON
-  let comment: ProseMirrorDoc;
-  try {
-    comment = JSON.parse(commentJson) as ProseMirrorDoc;
-  } catch (e) {
-    log.error({ e, commentJson }, "Failed to parse comment JSON");
-    return err("VALIDATION", "Invalid comment format");
-  }
-
-  if (!proseMirrorDocSchema.safeParse(comment).success) {
-    return err("VALIDATION", "Invalid comment format");
-  }
-  if (docToPlainText(comment).length === 0) {
-    return err("VALIDATION", "Comment cannot be empty");
-  }
-  if (JSON.stringify(comment).length > 100_000) {
-    return err("VALIDATION", "Comment is too long.");
-  }
-
-  try {
-    const existingComment = await db.query.issueComments.findFirst({
-      where: eq(issueComments.id, commentId),
-    });
-
-    if (!existingComment) {
-      return err("NOT_FOUND", "Comment not found");
-    }
-
-    // System comments (audit events) cannot be edited
-    if (existingComment.isSystem) {
-      return err("UNAUTHORIZED", "System comments cannot be edited");
-    }
-
-    const accessLevel = await getUserAccessLevel(user.id);
-    if (
-      !checkPermission("comments.edit", accessLevel, {
-        userId: user.id,
-        reporterId: existingComment.authorId,
-      })
-    ) {
-      return err("UNAUTHORIZED", "You can only edit your own comments");
-    }
-
-    await updateIssueComment({
-      commentId,
-      content: comment,
-    });
-
-    // Revalidate the issue page
     const issue = await db.query.issues.findFirst({
-      where: eq(issues.id, existingComment.issueId),
+      where: eq(issues.id, issueId),
       columns: { machineInitials: true, issueNumber: true },
     });
     if (issue) {
       revalidatePath(`/m/${issue.machineInitials}/i/${issue.issueNumber}`);
     }
+    return ok({ issueId, commentId: posted.id });
+  },
+});
 
-    return ok({ commentId });
-  } catch (error) {
-    return serverActionError(error, "SERVER", "Failed to edit comment", {
-      action: "editComment",
-    });
-  }
+/** Add a comment to an issue. */
+export async function addCommentAction(
+  _prevState: AddCommentResult | undefined,
+  formData: FormData
+): Promise<AddCommentResult> {
+  return await addCommentProtected(formData);
 }
 
-/**
- * Deletes a comment from an issue.
- */
-export async function deleteCommentAction(
-  _prevState: DeleteCommentResult | undefined,
-  formData: FormData
-): Promise<DeleteCommentResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+const editCommentProtected = createProtectedAction({
+  actionName: "editComment",
+  schema: editCommentInputSchema,
+  mapInput: (formData: FormData) =>
+    formFields(formData, ["commentId", "comment"]),
+  load: ({ commentId }) =>
+    loadUserComment(commentId, "System comments cannot be edited"),
+  permission: (_input, { user, resource: existing }) => ({
+    permission: "comments.edit",
+    ownershipContext: { userId: user.id, reporterId: existing.authorId },
+  }),
+  forbiddenMessage: "You can only edit your own comments",
+  serverErrorMessage: "Failed to edit comment",
+  handler: async ({ commentId, comment }, { resource: existing }) => {
+    await updateIssueComment({ commentId, content: comment });
 
-  if (!user) {
-    return err("UNAUTHORIZED", "Unauthorized");
-  }
-
-  const validation = deleteCommentSchema.safeParse({
-    commentId: toOptionalString(formData.get("commentId")),
-  });
-
-  if (!validation.success) {
-    return err(
-      "VALIDATION",
-      validation.error.issues[0]?.message ?? "Invalid input"
+    revalidatePath(
+      `/m/${existing.issue.machineInitials}/i/${existing.issue.issueNumber}`
     );
-  }
+    return ok({ commentId });
+  },
+});
 
-  const { commentId } = validation.data;
+/** Edit the caller's own comment on an issue. */
+export async function editCommentAction(
+  _prevState: EditCommentResult | undefined,
+  formData: FormData
+): Promise<EditCommentResult> {
+  return await editCommentProtected(formData);
+}
 
-  try {
-    const existingComment = await db.query.issueComments.findFirst({
-      where: eq(issueComments.id, commentId),
-    });
-
-    if (!existingComment) {
-      return err("NOT_FOUND", "Comment not found");
-    }
-
-    // System comments (audit events) cannot be deleted
-    if (existingComment.isSystem) {
-      return err("UNAUTHORIZED", "System comments cannot be deleted");
-    }
-
-    const accessLevel = await getUserAccessLevel(user.id);
-    const canDeleteOwn = checkPermission("comments.delete", accessLevel, {
-      userId: user.id,
-      reporterId: existingComment.authorId,
-    });
-    const canDeleteAny = checkPermission("comments.delete.any", accessLevel);
-    if (!canDeleteOwn && !canDeleteAny) {
-      return err(
-        "UNAUTHORIZED",
-        "You can only delete your own comments, or you must be an admin"
-      );
-    }
-
+const deleteCommentProtected = createProtectedAction({
+  actionName: "deleteComment",
+  schema: deleteCommentSchema,
+  mapInput: (formData: FormData) => formFields(formData, ["commentId"]),
+  load: ({ commentId }) =>
+    loadUserComment(commentId, "System comments cannot be deleted"),
+  // Admins may delete any comment; everyone else only their own.
+  permission: (_input, { user, accessLevel, resource: existing }) =>
+    checkPermission("comments.delete.any", accessLevel)
+      ? { permission: "comments.delete.any" }
+      : {
+          permission: "comments.delete",
+          ownershipContext: { userId: user.id, reporterId: existing.authorId },
+        },
+  forbiddenMessage:
+    "You can only delete your own comments, or you must be an admin",
+  serverErrorMessage: "Failed to delete comment",
+  handler: async ({ commentId }, { user, resource: existing }) => {
     // Instead of deleting, convert to an audit trail event
-    const isOwnComment = existingComment.authorId === user.id;
+    const isOwnComment = existing.authorId === user.id;
 
     const now = new Date();
 
@@ -893,184 +525,84 @@ export async function deleteCommentAction(
       "Comment converted to audit trail"
     );
 
-    // Revalidate the issue page
-    const issue = await db.query.issues.findFirst({
-      where: eq(issues.id, existingComment.issueId),
-      columns: { machineInitials: true, issueNumber: true },
-    });
-    if (issue) {
-      revalidatePath(`/m/${issue.machineInitials}/i/${issue.issueNumber}`);
-    }
-
+    revalidatePath(
+      `/m/${existing.issue.machineInitials}/i/${existing.issue.issueNumber}`
+    );
     return ok({ commentId });
-  } catch (error) {
-    return serverActionError(error, "SERVER", "Failed to delete comment", {
-      action: "deleteComment",
-    });
-  }
+  },
+});
+
+/** Delete a comment, leaving an audit-trail event in its place. */
+export async function deleteCommentAction(
+  _prevState: DeleteCommentResult | undefined,
+  formData: FormData
+): Promise<DeleteCommentResult> {
+  return await deleteCommentProtected(formData);
 }
 
+const updateIssueTitleProtected = createProtectedAction({
+  actionName: "updateIssueTitle",
+  schema: updateIssueTitleSchema,
+  mapInput: (formData: FormData) => formFields(formData, ["issueId", "title"]),
+  load: loadIssue,
+  permission: issuePermission("issues.update.reporting"),
+  forbiddenMessage: "You do not have permission to edit this issue title",
+  serverErrorMessage: "Failed to update title",
+  handler: async ({ issueId, title }, { user, resource: issue }) => {
+    await updateIssueTitle({ issueId, title, userId: user.id });
+
+    revalidateIssue(issue);
+    return ok({ issueId });
+  },
+});
+
 /**
- * Update Issue Title Action
- *
- * Updates the title of an issue with permission checks.
- * Members and admins can edit any title. Guests can only edit their own.
+ * Update an issue's title. Members and admins can edit any title; guests only
+ * their own.
  */
 export async function updateIssueTitleAction(
   _prevState: UpdateIssueTitleResult | undefined,
   formData: FormData
 ): Promise<UpdateIssueTitleResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return err("UNAUTHORIZED", "Unauthorized");
-  }
-
-  const rawData = {
-    issueId: toOptionalString(formData.get("issueId")),
-    title: toOptionalString(formData.get("title")),
-  };
-
-  const validation = updateIssueTitleSchema.safeParse(rawData);
-  if (!validation.success) {
-    const firstError = validation.error.issues[0];
-    return err("VALIDATION", firstError?.message ?? "Invalid input");
-  }
-
-  const { issueId, title } = validation.data;
-
-  try {
-    const currentIssue = await db.query.issues.findFirst({
-      where: eq(issues.id, issueId),
-      columns: {
-        machineInitials: true,
-        issueNumber: true,
-        reportedBy: true,
-        assignedTo: true,
-      },
-      with: {
-        machine: {
-          columns: { ownerId: true },
-        },
-      },
-    });
-
-    if (!currentIssue) {
-      return err("NOT_FOUND", "Issue not found");
-    }
-
-    // Permission check
-    const accessLevel = await getUserAccessLevel(user.id);
-    const ownershipCtx = {
-      userId: user.id,
-      reporterId: currentIssue.reportedBy,
-      machineOwnerId: currentIssue.machine.ownerId,
-    };
-
-    if (
-      !checkPermission("issues.update.reporting", accessLevel, ownershipCtx)
-    ) {
-      return err(
-        "UNAUTHORIZED",
-        "You do not have permission to edit this issue title"
-      );
-    }
-
-    await updateIssueTitle({ issueId, title, userId: user.id });
-
-    const issuePath = `/m/${currentIssue.machineInitials}/i/${currentIssue.issueNumber}`;
-    revalidatePath(issuePath);
-    revalidatePath(`/m/${currentIssue.machineInitials}`);
-
-    return ok({ issueId });
-  } catch (error) {
-    if (isNextRedirectError(error)) {
-      throw error;
-    }
-    return serverActionError(error, "SERVER", "Failed to update title", {
-      action: "updateIssueTitle",
-    });
-  }
+  return await updateIssueTitleProtected(formData);
 }
 
-/**
- * Reassign Issue Machine Action
- *
- * Moves an issue from one machine to another. Reserves a fresh issue number
- * on the destination machine; the old number on the source becomes a permanent
- * gap. On success the action calls `redirect()` server-side to navigate the
- * user to `/m/<to>/i/<N>` — the function never returns an `ok` Result, only
- * `err` Results for failure cases. (Visiting the old `/m/<from>/i/<N>` URL
- * after a move now redirects to `/m/<from>` because the issue is no longer
- * found there.)
- */
-export async function reassignIssueMachineAction(
-  _prevState: ReassignIssueMachineResult | undefined,
-  formData: FormData
-): Promise<ReassignIssueMachineResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return err("UNAUTHORIZED", "Unauthorized");
-  }
-
-  const validation = reassignIssueMachineSchema.safeParse({
-    issueId: toOptionalString(formData.get("issueId")),
-    newMachineInitials: toOptionalString(formData.get("newMachineInitials")),
-  });
-
-  if (!validation.success) {
-    const firstError = validation.error.issues[0];
-    return err("VALIDATION", firstError?.message ?? "Invalid input");
-  }
-
-  const { issueId, newMachineInitials } = validation.data;
-
-  try {
-    const currentIssue = await db.query.issues.findFirst({
-      where: eq(issues.id, issueId),
-      columns: {
-        machineInitials: true,
-        reportedBy: true,
-      },
-      with: {
-        machine: { columns: { ownerId: true } },
-      },
-    });
-
-    if (!currentIssue) {
-      return err("NOT_FOUND", "Issue not found");
-    }
-
-    const accessLevel = await getUserAccessLevel(user.id);
-    const ownershipCtx = {
-      userId: user.id,
-      reporterId: currentIssue.reportedBy,
-      machineOwnerId: currentIssue.machine.ownerId,
-    };
-
-    if (!checkPermission("issues.reassign", accessLevel, ownershipCtx)) {
-      return err(
-        "UNAUTHORIZED",
-        "You do not have permission to reassign this issue"
-      );
-    }
-
-    if (newMachineInitials === currentIssue.machineInitials) {
+const reassignIssueMachineProtected = createProtectedAction({
+  actionName: "reassignIssueMachine",
+  schema: reassignIssueMachineSchema,
+  mapInput: (formData: FormData) =>
+    formFields(formData, ["issueId", "newMachineInitials"]),
+  load: loadIssue,
+  permission: issuePermission("issues.reassign"),
+  forbiddenMessage: "You do not have permission to reassign this issue",
+  serverErrorMessage: "Failed to reassign issue",
+  handler: async (
+    { issueId, newMachineInitials },
+    { user, resource: issue }
+  ) => {
+    if (newMachineInitials === issue.machineInitials) {
       return err("VALIDATION", "Issue is already on this machine");
     }
 
-    const result = await reassignIssueMachine({
-      issueId,
-      newMachineInitials,
-      userId: user.id,
-    });
+    let result: Awaited<ReturnType<typeof reassignIssueMachine>>;
+    try {
+      result = await reassignIssueMachine({
+        issueId,
+        newMachineInitials,
+        userId: user.id,
+      });
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message.startsWith("Machine not found")
+      ) {
+        return err("NOT_FOUND", "Destination machine not found");
+      }
+      if (error instanceof MachineRemovedError) {
+        return err("VALIDATION", error.message);
+      }
+      throw error;
+    }
 
     // Skip revalidating the current `/m/<from>/i/<N>` — we redirect away from
     // it, and an extra invalidation just adds latency.
@@ -1081,22 +613,21 @@ export async function reassignIssueMachineAction(
     // by `router.push`: returning normally lets Next.js refresh the current
     // page first, which now renders not-found and server-redirects to
     // `/m/<from>` — unmounting the form before the client navigation runs.
+    // The pipeline rethrows the redirect signal.
     redirect(`/m/${result.toInitials}/i/${result.toIssueNumber.toString()}`);
-  } catch (error) {
-    if (isNextRedirectError(error)) {
-      throw error;
-    }
-    if (
-      error instanceof Error &&
-      error.message.startsWith("Machine not found")
-    ) {
-      return err("NOT_FOUND", "Destination machine not found");
-    }
-    if (error instanceof MachineRemovedError) {
-      return err("VALIDATION", error.message);
-    }
-    return serverActionError(error, "SERVER", "Failed to reassign issue", {
-      action: "reassignIssueMachine",
-    });
-  }
+  },
+});
+
+/**
+ * Move an issue to another machine. Reserves a fresh issue number on the
+ * destination; the old number on the source becomes a permanent gap. On
+ * success it calls `redirect()` server-side to `/m/<to>/i/<N>`, so it only ever
+ * returns `err` Results. (Visiting the old `/m/<from>/i/<N>` URL afterwards
+ * redirects to `/m/<from>`, because the issue is no longer found there.)
+ */
+export async function reassignIssueMachineAction(
+  _prevState: ReassignIssueMachineResult | undefined,
+  formData: FormData
+): Promise<ReassignIssueMachineResult> {
+  return await reassignIssueMachineProtected(formData);
 }

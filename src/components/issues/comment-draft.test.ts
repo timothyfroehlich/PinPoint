@@ -7,7 +7,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
-import type { ImageMetadata } from "~/types/images";
+import type { ImageMetadata } from "~/lib/types/images";
 import type * as DraftModuleNamespace from "./comment-draft";
 
 type DraftModule = typeof DraftModuleNamespace;

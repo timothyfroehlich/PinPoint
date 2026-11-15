@@ -123,7 +123,9 @@ export interface CreateIssueParams {
    * Client-generated UUID, stable across submission retries. When present and a
    * row already carries this key, createIssue returns the existing issue
    * verbatim — no second counter increment, no second notification plan — so a
-   * retried submission cannot create a duplicate. (PP-2053.7)
+   * retried submission cannot create a duplicate. (PP-2053.7) The match is
+   * scoped to the same reporter and machine, so a reused key never returns
+   * another reporter's issue. (PP-ysk3)
    */
   idempotencyKey?: string | null;
   /**
@@ -275,6 +277,16 @@ export async function createIssue({
   // Resolve channels outside the transaction to avoid an HTTP round-trip
   // (Supabase Vault RPC) inside the DB connection window (PP-rfc).
   const channels = await getChannels();
+  // A key matches only this reporter's prior submission for this machine, the
+  // way addIssueComment scopes by author and issue. Without the scope, one
+  // requester could replay another's key and land in their retry branch.
+  // (PP-ysk3)
+  const sameSubmission = (key: string): SQL | undefined =>
+    and(
+      eq(issues.idempotencyKey, key),
+      eq(issues.machineInitials, machineInitials),
+      reportedBy ? eq(issues.reportedBy, reportedBy) : isNull(issues.reportedBy)
+    );
   const result = await db.transaction(async (tx) => {
     // 0. Idempotency dedup (PP-2053.7). A retried submission carries the same
     //    client-generated key. If a row already exists for it, return that row
@@ -286,7 +298,7 @@ export async function createIssue({
     //    idempotency lookup ahead of the rate limiter; deferred as a follow-up.)
     if (idempotencyKey) {
       const existing = await tx.query.issues.findFirst({
-        where: eq(issues.idempotencyKey, idempotencyKey),
+        where: sameSubmission(idempotencyKey),
       });
       if (existing) {
         log.info(
@@ -361,9 +373,11 @@ export async function createIssue({
       // that won the race with an empty delivery plan — no duplicate, no second
       // dispatch. (A genuine insert failure can't reach here: only the partial
       // unique index triggers DO NOTHING, and it only exists for non-NULL keys.)
+      // The index is global but the lookup is scoped, so a key held by another
+      // reporter finds no winner and the submission fails below. (PP-ysk3)
       if (idempotencyKey) {
         const winner = await tx.query.issues.findFirst({
-          where: eq(issues.idempotencyKey, idempotencyKey),
+          where: sameSubmission(idempotencyKey),
         });
         if (winner) {
           log.info(
@@ -1229,6 +1243,80 @@ export async function assignIssue({
   });
 }
 
+/** The reporting fields an issue page changes with one picker each. */
+interface ReportingFieldValues {
+  severity: IssueSeverity;
+  priority: IssuePriority;
+  frequency: IssueFrequency;
+}
+
+type ReportingField = keyof ReportingFieldValues;
+
+const REPORTING_FIELD_EVENT = {
+  severity: "severity_changed",
+  priority: "priority_changed",
+  frequency: "frequency_changed",
+} as const satisfies Record<ReportingField, TimelineEventData["type"]>;
+
+/**
+ * Change one reporting field and record its Activity event in one
+ * transaction, so the field never changes without its event (PP-az4d.2).
+ * Nothing here notifies, so the transaction holds only DB writes
+ * (CORE-ARCH-011). Setting the current value is a no-op with no event.
+ */
+async function updateIssueReportingField<F extends ReportingField>(
+  issueId: string,
+  field: F,
+  value: ReportingFieldValues[F],
+  userId: string
+): Promise<{ oldValue: string; newValue: string }> {
+  const result = await db.transaction(async (tx) => {
+    const currentIssue = await tx.query.issues.findFirst({
+      where: eq(issues.id, issueId),
+      columns: { severity: true, priority: true, frequency: true },
+    });
+
+    if (!currentIssue) {
+      throw new Error("Issue not found");
+    }
+
+    const oldValue: string = currentIssue[field];
+
+    if (oldValue === value) {
+      return { oldValue, newValue: value, changed: false };
+    }
+
+    await tx
+      .update(issues)
+      .set({ [field]: value, updatedAt: new Date() })
+      .where(eq(issues.id, issueId));
+
+    await createTimelineEvent(
+      issueId,
+      { type: REPORTING_FIELD_EVENT[field], from: oldValue, to: value },
+      tx,
+      userId
+    );
+
+    return { oldValue, newValue: value, changed: true };
+  });
+
+  if (result.changed) {
+    log.info(
+      {
+        issueId,
+        field,
+        oldValue: result.oldValue,
+        newValue: result.newValue,
+        action: "updateIssueReportingField",
+      },
+      `Issue ${field} updated`
+    );
+  }
+
+  return { oldValue: result.oldValue, newValue: result.newValue };
+}
+
 /**
  * Update issue severity
  */
@@ -1241,51 +1329,13 @@ export async function updateIssueSeverity({
   oldSeverity: string;
   newSeverity: string;
 }> {
-  // Get current issue to check old severity
-  const currentIssue = await db.query.issues.findFirst({
-    where: eq(issues.id, issueId),
-    columns: { severity: true, machineInitials: true },
-  });
-
-  if (!currentIssue) {
-    throw new Error("Issue not found");
-  }
-
-  const oldSeverity = currentIssue.severity;
-
-  // No-op: skip if severity hasn't changed
-  if (oldSeverity === severity) {
-    return { issueId, oldSeverity, newSeverity: severity };
-  }
-
-  // Update severity
-  await db
-    .update(issues)
-    .set({
-      severity,
-      updatedAt: new Date(),
-    })
-    .where(eq(issues.id, issueId));
-
-  // Create timeline event
-  await createTimelineEvent(
+  const { oldValue, newValue } = await updateIssueReportingField(
     issueId,
-    { type: "severity_changed", from: oldSeverity, to: severity },
-    db,
+    "severity",
+    severity,
     userId
   );
-
-  log.info(
-    {
-      issueId,
-      oldSeverity,
-      newSeverity: severity,
-      action: "updateIssueSeverity",
-    },
-    "Issue severity updated"
-  );
-
-  return { issueId, oldSeverity, newSeverity: severity };
+  return { issueId, oldSeverity: oldValue, newSeverity: newValue };
 }
 
 /**
@@ -1300,51 +1350,13 @@ export async function updateIssuePriority({
   oldPriority: string;
   newPriority: string;
 }> {
-  // Get current issue to check old priority
-  const currentIssue = await db.query.issues.findFirst({
-    where: eq(issues.id, issueId),
-    columns: { priority: true, machineInitials: true },
-  });
-
-  if (!currentIssue) {
-    throw new Error("Issue not found");
-  }
-
-  const oldPriority = currentIssue.priority;
-
-  // No-op: skip if priority hasn't changed
-  if (oldPriority === priority) {
-    return { issueId, oldPriority, newPriority: priority };
-  }
-
-  // Update priority
-  await db
-    .update(issues)
-    .set({
-      priority,
-      updatedAt: new Date(),
-    })
-    .where(eq(issues.id, issueId));
-
-  // Create timeline event
-  await createTimelineEvent(
+  const { oldValue, newValue } = await updateIssueReportingField(
     issueId,
-    { type: "priority_changed", from: oldPriority, to: priority },
-    db,
+    "priority",
+    priority,
     userId
   );
-
-  log.info(
-    {
-      issueId,
-      oldPriority,
-      newPriority: priority,
-      action: "updateIssuePriority",
-    },
-    "Issue priority updated"
-  );
-
-  return { issueId, oldPriority, newPriority: priority };
+  return { issueId, oldPriority: oldValue, newPriority: newValue };
 }
 
 /**
@@ -1359,51 +1371,13 @@ export async function updateIssueFrequency({
   oldFrequency: string;
   newFrequency: string;
 }> {
-  // Get current issue to check old frequency
-  const currentIssue = await db.query.issues.findFirst({
-    where: eq(issues.id, issueId),
-    columns: { frequency: true, machineInitials: true },
-  });
-
-  if (!currentIssue) {
-    throw new Error("Issue not found");
-  }
-
-  const oldFrequency = currentIssue.frequency;
-
-  // No-op: skip if frequency hasn't changed
-  if (oldFrequency === frequency) {
-    return { issueId, oldFrequency, newFrequency: frequency };
-  }
-
-  // Update frequency
-  await db
-    .update(issues)
-    .set({
-      frequency,
-      updatedAt: new Date(),
-    })
-    .where(eq(issues.id, issueId));
-
-  // Create timeline event
-  await createTimelineEvent(
+  const { oldValue, newValue } = await updateIssueReportingField(
     issueId,
-    { type: "frequency_changed", from: oldFrequency, to: frequency },
-    db,
+    "frequency",
+    frequency,
     userId
   );
-
-  log.info(
-    {
-      issueId,
-      oldFrequency,
-      newFrequency: frequency,
-      action: "updateIssueFrequency",
-    },
-    "Issue frequency updated"
-  );
-
-  return { issueId, oldFrequency, newFrequency: frequency };
+  return { issueId, oldFrequency: oldValue, newFrequency: newValue };
 }
 
 /**

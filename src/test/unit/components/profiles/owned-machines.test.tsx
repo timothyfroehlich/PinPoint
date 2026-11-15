@@ -27,6 +27,21 @@ describe("OwnedMachines", () => {
     );
   });
 
+  it("links every owned machine to the Machines list filtered to the owner when uncapped (collections-and-tags 6.4)", () => {
+    render(
+      <OwnedMachines
+        machines={machines}
+        total={2}
+        hasMore={false}
+        ownerId="x"
+        openCounts={new Map()}
+      />
+    );
+    expect(
+      screen.getByRole("link", { name: /view in machines/i })
+    ).toHaveAttribute("href", "/m?owner=x");
+  });
+
   it("returns null when nothing is owned", () => {
     const { container } = render(
       <OwnedMachines
@@ -40,7 +55,7 @@ describe("OwnedMachines", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("shows 'View all N' when capped", () => {
+  it("shows 'View all N' when capped, linking to the Machines list filtered to the owner (collections-and-tags 6.4)", () => {
     render(
       <OwnedMachines
         machines={machines}
@@ -52,7 +67,7 @@ describe("OwnedMachines", () => {
     );
     expect(screen.getByRole("link", { name: /view all 9/i })).toHaveAttribute(
       "href",
-      "/c/owner/x"
+      "/m?owner=x"
     );
   });
 });

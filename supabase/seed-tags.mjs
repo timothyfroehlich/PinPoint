@@ -17,17 +17,15 @@
  * POSTGRES_URL before a client is constructed.
  */
 
-import postgres from "postgres";
+import {
+  createScriptClient,
+  resolveScriptDatabaseUrl,
+} from "../scripts/lib/pg-client.mjs";
 
 import { assertLocalDatabase } from "../scripts/assert-local-db.mjs";
 
 // Pooled POSTGRES_URL like the other seed scripts.
-const databaseUrl = process.env.POSTGRES_URL;
-
-if (!databaseUrl) {
-  console.error("❌ POSTGRES_URL is not defined");
-  process.exit(1);
-}
+const databaseUrl = resolveScriptDatabaseUrl();
 
 assertLocalDatabase(databaseUrl);
 
@@ -89,7 +87,7 @@ const UNTYPED_TAGS = [
 ];
 
 async function run() {
-  const sql = postgres(databaseUrl);
+  const sql = createScriptClient(databaseUrl);
   try {
     const [admin] = await sql`
       SELECT id FROM user_profiles WHERE email = 'admin@test.com' LIMIT 1

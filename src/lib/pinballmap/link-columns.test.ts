@@ -346,13 +346,19 @@ describe("hand-entered type, display, players and credits", () => {
     "stores $label through the excluded-model boundary",
     async ({ names, expected }) => {
       const result = await resolvePbmLinkColumnsForUpdate(
-        { pinballmapExcluded: true, designers: names, artists: names },
+        {
+          pinballmapExcluded: true,
+          designers: names,
+          artists: names,
+          programmers: names,
+        },
         stored
       );
       expect(result.ok).toBe(true);
       if (!result.ok) throw new Error(result.message);
       expect(result.columns.designers).toEqual(expected);
       expect(result.columns.artists).toEqual(expected);
+      expect(result.columns.programmers).toEqual(expected);
     }
   );
 

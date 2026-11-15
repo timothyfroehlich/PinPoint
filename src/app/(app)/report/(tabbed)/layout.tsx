@@ -1,8 +1,5 @@
 import type React from "react";
-import { eq } from "drizzle-orm";
-import { db } from "~/server/db";
-import { userProfiles } from "~/server/db/schema";
-import { createClient } from "~/lib/supabase/server";
+import { getViewer } from "~/lib/auth/viewer";
 import { getAccessLevel } from "~/lib/permissions/helpers";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
@@ -26,20 +23,9 @@ export default async function ReportLayout({
 }): Promise<React.JSX.Element> {
   const machinesListPromise = getReportMachines();
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { role } = await getViewer();
 
-  let userProfile;
-  if (user) {
-    userProfile = await db.query.userProfiles.findFirst({
-      where: eq(userProfiles.id, user.id),
-      columns: { role: true },
-    });
-  }
-
-  const accessLevel = getAccessLevel(userProfile?.role);
+  const accessLevel = getAccessLevel(role);
   // Assignees for whoever can assign (matrix-gated — includes technicians, who
   // the old hand-rolled admin/member check dropped). Deduped with page.tsx's
   // call via React cache(); anonymous reporters get [] and no assignee control.

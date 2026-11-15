@@ -94,7 +94,9 @@ vi.mock("~/server/db", () => ({
         ),
       },
     },
-    transaction: vi.fn((cb: any) => cb((globalThis as any).testDb)),
+    // A real PGlite transaction, so a failure mid-transaction rolls back and
+    // the tests can observe atomicity (PP-az4d.2).
+    transaction: vi.fn((cb: any) => (globalThis as any).testDb.transaction(cb)),
   },
 }));
 
@@ -457,6 +459,57 @@ describe("Issue Service Functions (Integration)", () => {
       expect(a.issue.idempotencyKey).toBeNull();
       expect(b.issue.idempotencyKey).toBeNull();
       expect(b.issue.id).not.toBe(a.issue.id);
+    });
+
+    // A replayed key must never put a different reporter in the original
+    // reporter's retry branch: the caller would act on that issue as its own
+    // retry. (PP-ysk3)
+    it.each([
+      ["a member's key replayed anonymously", "member", "anonymous"],
+      ["an anonymous key replayed by a member", "anonymous", "member"],
+      ["a member's key replayed by another member", "member", "otherMember"],
+    ] as const)("%s is not deduped", async (_label, holder, replayer) => {
+      const db = await getTestDb();
+      const [otherUser] = await db
+        .insert(userProfiles)
+        .values(
+          createTestUser({
+            id: "00000000-0000-0000-0000-0000000000c3",
+            role: "member",
+          })
+        )
+        .returning();
+      const reporterFor = {
+        member: testUser.id as string,
+        otherMember: otherUser.id,
+        anonymous: null,
+      };
+      const sharedKey = "44444444-4444-4444-8444-444444444444";
+
+      const original = await createIssue({
+        title: "Original",
+        machineInitials: testMachine.initials,
+        severity: "minor" as const,
+        reportedBy: reporterFor[holder],
+        idempotencyKey: sharedKey,
+      });
+      expect(original.deduped).toBe(false);
+
+      await expect(
+        createIssue({
+          title: "Replay",
+          machineInitials: testMachine.initials,
+          severity: "minor" as const,
+          reportedBy: reporterFor[replayer],
+          idempotencyKey: sharedKey,
+        })
+      ).rejects.toThrow("Issue creation failed");
+
+      const rows = await db.query.issues.findMany({
+        where: eq(issues.idempotencyKey, sharedKey),
+      });
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.id).toBe(original.issue.id);
     });
   });
 
@@ -1561,6 +1614,66 @@ describe("Issue Service Functions (Integration)", () => {
   });
 
   // -----------------------------------------------------------------------
+  // Severity / priority / frequency atomicity (PP-az4d.2). The field write and
+  // its Activity event commit together: if the event insert fails, the field
+  // keeps its old value. An actor id with no user_profiles row makes the
+  // event insert fail on the issue_comments.author_id foreign key.
+  // -----------------------------------------------------------------------
+  describe("reporting-field updates are atomic with their Activity event", () => {
+    const missingActorId = "00000000-0000-0000-0000-0000000000ff";
+
+    it.each([
+      {
+        field: "severity" as const,
+        before: "minor",
+        run: (issueId: string) =>
+          updateIssueSeverity({
+            issueId,
+            severity: "unplayable",
+            userId: missingActorId,
+          }),
+      },
+      {
+        field: "priority" as const,
+        before: "low",
+        run: (issueId: string) =>
+          updateIssuePriority({
+            issueId,
+            priority: "high",
+            userId: missingActorId,
+          }),
+      },
+      {
+        field: "frequency" as const,
+        before: "intermittent",
+        run: (issueId: string) =>
+          updateIssueFrequency({
+            issueId,
+            frequency: "constant",
+            userId: missingActorId,
+          }),
+      },
+    ])(
+      "leaves $field unchanged when the Activity event insert fails",
+      async ({ field, before, run }) => {
+        const db = await getTestDb();
+
+        await expect(run(testIssue.id)).rejects.toThrow();
+
+        const issue = await db.query.issues.findFirst({
+          where: eq(issues.id, testIssue.id),
+        });
+        expect(issue?.[field]).toBe(before);
+
+        const events = await db.query.issueComments.findMany({
+          where: eq(issueComments.issueId, testIssue.id),
+        });
+        expect(events.filter((e) => e.isSystem)).toHaveLength(0);
+      }
+    );
+  });
+
+  // -----------------------------------------------------------------------
   // assignIssue no-op (block 13 from source)
   //
   // The target already has "should no-op when assignment unchanged" in the
@@ -1694,8 +1807,7 @@ describe("Issue Service Functions (Integration)", () => {
       const issue = await db.query.issues.findFirst({
         where: eq(issues.id, testIssue.id),
       });
-      // This file's db.transaction is a pass-through mock, so the counter
-      // rollback is not observable here; quick-report-action covers it.
+      // quick-report-action covers the destination counter rollback.
       expect(issue?.machineInitials).not.toBe("KP");
     });
 

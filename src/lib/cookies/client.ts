@@ -2,7 +2,6 @@
 
 import {
   COOKIE_CONSENT_KEY,
-  LAST_ISSUES_PATH_KEY,
   CHANGELOG_SEEN_KEY,
   PREFERENCE_MAX_AGE_SECONDS,
 } from "./constants";
@@ -23,15 +22,6 @@ function setClientCookie(name: string, value: string, maxAge: number): void {
     typeof window !== "undefined" && window.location.protocol === "https:";
   /* oxlint-enable typescript/prefer-optional-chain -- end of the SSR-guard expression */
   document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=${maxAge}; SameSite=Lax${secure ? "; Secure" : ""}`;
-}
-
-/**
- * Stores the last issues path in a cookie (client-side, synchronous).
- * This is faster than a server action and ensures the cookie is
- * available immediately for the next navigation.
- */
-export function storeLastIssuesPath(path: string): void {
-  setClientCookie(LAST_ISSUES_PATH_KEY, path, PREFERENCE_MAX_AGE_SECONDS);
 }
 
 /**

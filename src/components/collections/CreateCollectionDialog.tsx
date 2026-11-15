@@ -16,13 +16,14 @@ import {
   DialogTrigger,
 } from "~/components/ui/dialog";
 import { createCollectionAction } from "~/app/(app)/c/collections/actions";
+import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 
 interface Props {
   allMachines: { id: string; initials: string; name: string }[];
 }
 
 /**
- * "New collection" modal: name + machine set in one step, so a collection can
+ * "New collection" modal: name, description, and machine set in one step, so a collection can
  * be created with its machines already attached. Shares the form body with the
  * edit dialog via {@link CollectionFields}; navigates to the new collection on
  * success.
@@ -33,6 +34,7 @@ export function CreateCollectionDialog({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
+  const [description, setDescription] = useState<ProseMirrorDoc | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -41,6 +43,7 @@ export function CreateCollectionDialog({
   useEffect(() => {
     if (open) {
       setName("");
+      setDescription(null);
       setSelected([]);
       setError(null);
     }
@@ -51,6 +54,7 @@ export function CreateCollectionDialog({
     startTransition(async () => {
       const result = await createCollectionAction({
         name,
+        description,
         machineIds: selected,
       });
       if (!result.success) setError(result.error);
@@ -85,6 +89,8 @@ export function CreateCollectionDialog({
         <CollectionFields
           name={name}
           onNameChange={setName}
+          initialDescription={null}
+          onDescriptionChange={setDescription}
           selected={selected}
           onSelectedChange={setSelected}
           allMachines={allMachines}

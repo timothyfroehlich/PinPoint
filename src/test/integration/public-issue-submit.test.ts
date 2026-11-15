@@ -1,5 +1,6 @@
 /**
- * Integration Tests: submitPublicIssueAction — assignedTo permission handling
+ * Integration Tests: submitPublicIssueAction — assignedTo permission handling,
+ * plus Removed machines and single-line titles (PP-61u5)
  *
  * Wave 3 RECLASS (PP-x4li.1.3): migrated 5 blocks from
  * src/test/unit/public-issue-security.test.ts that used mocked db.query
@@ -365,6 +366,35 @@ describe("submitPublicIssueAction — anonymous and guest status/priority enforc
     expect(persisted.status).toBe("new");
     expect(persisted.priority).toBe("medium");
   });
+
+  it("does not expose sensitive database error messages to client on unexpected error", async () => {
+    const owner = await seedUser("member");
+    const machine = await seedMachine(owner.id);
+
+    const issuesService = await import("~/services/issues");
+    const spy = vi
+      .spyOn(issuesService, "createIssue")
+      .mockRejectedValueOnce(
+        new Error(
+          "duplicate key value violates unique constraint 'users_email_key'"
+        )
+      );
+
+    try {
+      const result = await submitPublicIssueAction(
+        { error: "" },
+        makeFormData({ machineId: machine.id })
+      );
+
+      expect(result).toHaveProperty("error");
+      expect(result.error).toBe(
+        "Unable to submit the issue. Please try again."
+      );
+      expect(result.error).not.toContain("duplicate key");
+    } finally {
+      spy.mockRestore();
+    }
+  });
 });
 
 describe("submitPublicIssueAction — Removed machines (integration)", () => {
@@ -395,5 +425,31 @@ describe("submitPublicIssueAction — Removed machines (integration)", () => {
         where: eq(issues.machineInitials, machine.initials),
       })
     ).toEqual([]);
+  });
+});
+
+describe("submitPublicIssueAction — single-line titles (integration)", () => {
+  setupTestDb();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("stores a multi-line title as one line (PP-61u5)", async () => {
+    const reporter = await seedUser("member");
+    const machine = await seedMachine(reporter.id);
+    mockGetUser.mockResolvedValue({ data: { user: { id: reporter.id } } });
+
+    const formData = makeFormData({ machineId: machine.id });
+    formData.set("title", "  Left flipper\r\nweak\n\tafter warm-up ");
+    const result = await submitPublicIssueAction({ error: "" }, formData);
+
+    expect(result).toMatchObject({ success: true });
+    const db = await getTestDb();
+    const row = await db.query.issues.findFirst({
+      where: eq(issues.machineInitials, machine.initials),
+      columns: { title: true },
+    });
+    expect(row?.title).toBe("Left flipper weak after warm-up");
   });
 });

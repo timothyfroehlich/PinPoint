@@ -2,18 +2,14 @@ import type React from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
-import { isToday } from "date-fns";
 
 import { MachineTimelineActionsRow } from "~/components/machines/timeline/MachineTimelineActionsRow";
 import { TimelineBucketBanner } from "~/components/machines/timeline/TimelineBucketBanner";
 import { TimelineRow } from "~/components/machines/timeline/TimelineRow";
 import { bucketTimelineRows } from "~/lib/timeline/bucket-rows";
-import {
-  type AccessLevel,
-  checkPermission,
-  getAccessLevel,
-} from "~/lib/permissions/index";
-import { createClient } from "~/lib/supabase/server";
+import { isSiteToday } from "~/lib/dates";
+import { checkPermission, getAccessLevel } from "~/lib/permissions/index";
+import { getViewer } from "~/lib/auth/viewer";
 import { getMachineTimeline } from "~/lib/timeline/machine-events";
 import {
   DEFAULT_TIMELINE_TAGS,
@@ -21,7 +17,7 @@ import {
   type TimelineTag,
 } from "~/lib/timeline/machine-tags";
 import { db } from "~/server/db";
-import { machines, userProfiles } from "~/server/db/schema";
+import { machines } from "~/server/db/schema";
 
 interface PageProps {
   params: Promise<{ initials: string }>;
@@ -74,24 +70,10 @@ export default async function MachineTimelinePage({
     : [];
 
   // Resolve current user + access level for canDelete + composer gating.
-  // CORE-SSR-001/002 (Supabase SSR): createClient() -> auth.getUser() with
-  // no logic between.
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const currentUserId = user?.id ?? null;
-
-  // Load access level only if authenticated — unauthenticated users can't
-  // delete or post anything.
-  let accessLevel: AccessLevel = "unauthenticated";
-  if (currentUserId) {
-    const profile = await db.query.userProfiles.findFirst({
-      where: eq(userProfiles.id, currentUserId),
-      columns: { role: true },
-    });
-    accessLevel = getAccessLevel(profile?.role ?? null);
-  }
+  // Unauthenticated users can't delete or post anything.
+  const viewer = await getViewer();
+  const currentUserId = viewer.userId ?? null;
+  const accessLevel = getAccessLevel(viewer.role);
 
   // Who may post timeline notes; their unposted note is kept as a draft.
   const composerUserId =
@@ -185,7 +167,7 @@ export default async function MachineTimelinePage({
             const showRelativeTime =
               group.bucket.tier === "day" &&
               firstEntry !== undefined &&
-              isToday(firstEntry.row.createdAt);
+              isSiteToday(firstEntry.row.createdAt);
             return (
               <section key={group.bucket.key} className="pt-6 first:pt-0">
                 <TimelineBucketBanner bucket={group.bucket} />

@@ -21,11 +21,14 @@ import {
   invitedUsers,
   machineWatchers,
   machines,
+  notifications,
   timelineEvents,
   userProfiles,
 } from "~/server/db/schema";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import type * as NotificationsModule from "~/lib/notifications";
+import { getChannels } from "~/lib/notifications";
+import { inAppChannel } from "~/lib/notifications/channels/in-app-channel";
 
 vi.mock("~/server/db", async () => {
   const { getTestDb } = await import("~/test/setup/pglite");
@@ -321,6 +324,36 @@ describe("machine mutation services (PP-u4ab.1)", () => {
       expect(await watcher(seed.id, oldOwnerId)).toBeUndefined();
       expect((await watcher(seed.id, newOwnerId))?.watchMode).toBe("subscribe");
       expect(await eventKinds(seed.id)).toContain("owner_changed");
+    });
+
+    it("notifies the removed and the added owner, but not the actor", async () => {
+      // The web edit form and the MCP tool both reach this through
+      // `updateMachine`; the in-app rows are written in its transaction.
+      vi.mocked(getChannels).mockResolvedValueOnce([inAppChannel]);
+      const actorId = await makeUser("admin");
+      const oldOwnerId = await makeUser("member");
+      const newOwnerId = await makeUser("member");
+      const seed = await seedMachine({ ownerId: oldOwnerId });
+
+      await updateMachineOwner({
+        machineId: seed.id,
+        actorUserId: actorId,
+        current: await snapshotOf(seed.id),
+        newOwner: { ownerId: newOwnerId, invitedOwnerId: null },
+      });
+
+      const db = await getTestDb();
+      const rows = await db
+        .select({ userId: notifications.userId, type: notifications.type })
+        .from(notifications)
+        .where(eq(notifications.resourceId, seed.id));
+      expect(rows).toHaveLength(2);
+      expect(rows).toEqual(
+        expect.arrayContaining([
+          { userId: oldOwnerId, type: "machine_ownership_changed" },
+          { userId: newOwnerId, type: "machine_ownership_changed" },
+        ])
+      );
     });
 
     it("clears the owner and removes the watcher", async () => {

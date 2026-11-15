@@ -17,7 +17,7 @@ const pushMock = vi.fn();
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: pushMock, replace: pushMock }),
   useSearchParams: () => new URLSearchParams("page=3"),
-  usePathname: () => "/c/owner/u1/timeline",
+  usePathname: () => "/c/c1/timeline",
 }));
 
 describe("CollectionMachineFilter", () => {
@@ -57,6 +57,6 @@ describe("CollectionMachineFilter", () => {
       screen.getByRole("combobox", { name: /filter by machine/i })
     );
     await user.click(screen.getByText("Godzilla"));
-    expect(pushMock).toHaveBeenCalledWith("/c/owner/u1/timeline");
+    expect(pushMock).toHaveBeenCalledWith("/c/c1/timeline");
   });
 });

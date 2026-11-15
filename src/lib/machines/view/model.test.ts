@@ -234,9 +234,8 @@ describe("summarizeMachineView", () => {
     }),
   ];
 
-  it("divides presence without counting Removed machines (machine-widgets §3.1, §3.2)", () => {
+  it("divides presence without counting Removed machines (machine-widgets §3.2)", () => {
     expect(summarizeMachineView(rows).presence).toEqual({
-      total: 4,
       byPresence: {
         on_the_floor: 3,
         off_the_floor: 1,

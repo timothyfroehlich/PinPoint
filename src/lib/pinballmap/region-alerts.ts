@@ -24,7 +24,7 @@ import {
 } from "./catalog";
 import { getPinballMapClient } from "./client";
 import { PBM_AUSTIN_REGION, normalizeRegion } from "./config";
-import { getPinballMapState } from "./state";
+import { PINBALLMAP_STATE_ID, getPinballMapState } from "./state";
 import { formatRegionAlertMessage } from "./region-alert-message";
 import type { RegionAlertEntry } from "./region-alert-message";
 import { MAX_REGION_ENTRIES, RegionPayloadTooLargeError } from "./types";
@@ -45,8 +45,8 @@ import type { PinballmapRuntimeState } from "~/lib/types";
  *
  * Deliberate properties:
  * - **No flood on bootstrap.** The first run for a region back-fills the whole
- *   region with `announcedAt` already stamped, so seeding a few thousand existing
- *   entries posts nothing.
+ *   region as present membership without queuing any event, so seeding a few
+ *   thousand existing entries posts nothing.
  * - **No side effects in a transaction** (CORE-ARCH-011). Transactions cover only
  *   membership and event-queue database work — never HTTP, Discord, or PBM reads.
  *   The region fetch happens before detection, and the Discord post strictly after
@@ -65,6 +65,12 @@ import type { PinballmapRuntimeState } from "~/lib/types";
  * - **Confirmed returns are additions.** PBM may revive the same LMX id inside
  *   seven days. `generation` makes that absent -> present transition announceable
  *   without forgetting earlier removal/addition delivery state.
+ * - **No cap on how much one run may change** (PP-3fq4). A run that adds or
+ *   removes many machines is announced like any other. A change-count guard
+ *   cannot tell a venue closing from a bad response, and the one this replaced
+ *   failed both ways at once: it silently accepted one oversized response, then
+ *   discarded every correct response after it as incomplete. A bad PBM response
+ *   may post spurious changes; that is the accepted cost.
  */
 
 /**
@@ -101,18 +107,6 @@ const PENDING_READ_LIMIT = 500;
 const RUN_LEASE_MS = 10 * 60 * 1000;
 
 /**
- * How many entries one non-bootstrap run may discover before it is read as a
- * re-sync against a bad seen-set rather than as real arrivals.
- *
- * Austin gains 1-3 machines on a busy DAY and measured 487 total entries, so 50
- * sits roughly 20x above any believable hour and an order of magnitude below the
- * region. The number only has to separate "a venue added a bank of games" from
- * "our seen-set was seeded from a truncated payload"; those differ by two orders
- * of magnitude, so its exact value is not load-bearing.
- */
-const REBOOTSTRAP_THRESHOLD = 50;
-
-/**
  * Minimum gap between on-demand catalog refreshes triggered by an unknown machine
  * id (see {@link resolveMachineNames}).
  *
@@ -138,7 +132,6 @@ export interface RegionAlertRun {
     | "not_configured"
     | "empty_payload"
     | "implausible_payload"
-    | "incomplete_payload"
     | "location_cache_unavailable"
     | "already_running"
     | null;
@@ -162,7 +155,6 @@ function noop(
     | "not_configured"
     | "empty_payload"
     | "implausible_payload"
-    | "incomplete_payload"
     | "location_cache_unavailable"
     | "already_running",
   observed = 0
@@ -299,10 +291,13 @@ async function refreshLocationNames(
     const client = await getPinballMapClient();
     locations = await client.fetchRegionLocations(region);
   } catch (err) {
-    log.warn(
-      { err, region, action: "pinballmap.regionAlerts" },
-      "Region locations lookup failed; using last-known venue names"
-    );
+    // Tolerated: cached names still label events, and an unnamed one waits.
+    reportError(err, {
+      region,
+      action: "pinballmap.regionAlerts",
+      step: "fetchRegionLocations",
+      bestEffort: true,
+    });
     return { names: cached, succeeded: false };
   }
 
@@ -368,42 +363,6 @@ interface SnapshotResult {
   bootstrapped: boolean;
   discovered: number;
   removed: number;
-  rebootstrapped: boolean;
-  incompleteMissing: number;
-}
-
-/**
- * Synchronize the old additions-only delivery column into the new event queue.
- * This is idempotent and covers a rolling deploy where the old runtime inserts or
- * settles a generation-zero addition after the migration backfill ran.
- */
-async function synchronizeLegacyEvents(region: string): Promise<void> {
-  await db.transaction(async (tx) => {
-    await tx.execute(sql`
-      insert into ${pinballmapRegionAlertEvents}
-        (region, lmx_id, generation, event_type, location_id,
-         pinballmap_machine_id, detected_at)
-      select region, lmx_id, 0, 'added', location_id,
-             pinballmap_machine_id, first_seen_at
-      from ${pinballmapRegionSeenMachines}
-      where region = ${region}
-        and generation = 0
-        and announced_at is null
-      on conflict (region, lmx_id, generation, event_type) do nothing
-    `);
-    await tx.execute(sql`
-      update ${pinballmapRegionAlertEvents} as event
-      set announced_at = membership.announced_at
-      from ${pinballmapRegionSeenMachines} as membership
-      where event.region = ${region}
-        and event.region = membership.region
-        and event.lmx_id = membership.lmx_id
-        and event.generation = 0
-        and event.event_type = 'added'
-        and event.announced_at is null
-        and membership.announced_at is not null
-    `);
-  });
 }
 
 /** Apply one validated full-region snapshot using only database work. */
@@ -440,7 +399,6 @@ async function applySnapshot(
               lmxId: entry.lmxId,
               locationId: entry.locationId,
               pinballmapMachineId: entry.machineId,
-              announcedAt: now,
             }))
           )
           .onConflictDoNothing()
@@ -453,42 +411,12 @@ async function applySnapshot(
           .set({ removalTrackingInitializedAt: now })
           .where(eq(pinballmapRegionAlertState.region, region));
       }
-      return {
-        bootstrapped: true,
-        discovered,
-        removed: 0,
-        rebootstrapped: false,
-        incompleteMissing: 0,
-      };
+      return { bootstrapped: true, discovered, removed: 0 };
     }
 
     const missing = current.filter(
       (row) => row.isPresent && !observedById.has(row.lmxId)
     );
-    if (missing.length > REBOOTSTRAP_THRESHOLD) {
-      return {
-        bootstrapped: false,
-        discovered: 0,
-        removed: 0,
-        rebootstrapped: false,
-        incompleteMissing: missing.length,
-      };
-    }
-
-    // Rolling-deploy compatibility. This is database-only and stays inside the
-    // same transaction as detection (CORE-ARCH-011).
-    await tx.execute(sql`
-      insert into ${pinballmapRegionAlertEvents}
-        (region, lmx_id, generation, event_type, location_id,
-         pinballmap_machine_id, detected_at)
-      select region, lmx_id, 0, 'added', location_id,
-             pinballmap_machine_id, first_seen_at
-      from ${pinballmapRegionSeenMachines}
-      where region = ${region}
-        and generation = 0
-        and announced_at is null
-      on conflict (region, lmx_id, generation, event_type) do nothing
-    `);
 
     const currentById = new Map(current.map((row) => [row.lmxId, row]));
     const newEntries = observed.filter(
@@ -497,8 +425,6 @@ async function applySnapshot(
     const returningEntries = observed.filter(
       (entry) => currentById.get(entry.lmxId)?.isPresent === false
     );
-    const rebootstrapped =
-      newEntries.length + returningEntries.length > REBOOTSTRAP_THRESHOLD;
     const detectedAt = new Date();
 
     const additions: RegionAlertTransition[] = [];
@@ -511,7 +437,6 @@ async function applySnapshot(
             lmxId: entry.lmxId,
             locationId: entry.locationId,
             pinballmapMachineId: entry.machineId,
-            announcedAt: rebootstrapped ? detectedAt : null,
           }))
         )
         .onConflictDoNothing()
@@ -603,11 +528,11 @@ async function applySnapshot(
     }
 
     // Confirm removals on the first run where a machine is absent from the snapshot.
-    // If removal tracking is being initialized or if the run rebootstrapped, missing
-    // entries are marked not present without generating announcement events.
+    // If removal tracking is being initialized, missing entries are marked not
+    // present without generating announcement events.
     let removals: RegionAlertTransition[] = [];
     if (missing.length > 0) {
-      if (initializeRemovals || rebootstrapped) {
+      if (initializeRemovals) {
         await tx
           .update(pinballmapRegionSeenMachines)
           .set({ isPresent: false, missedRuns: 1 })
@@ -649,7 +574,7 @@ async function applySnapshot(
       }
     }
 
-    const events = [...(rebootstrapped ? [] : additions), ...removals];
+    const events = [...additions, ...removals];
     for (let i = 0; i < events.length; i += INSERT_CHUNK) {
       await tx
         .insert(pinballmapRegionAlertEvents)
@@ -678,8 +603,6 @@ async function applySnapshot(
       bootstrapped: false,
       discovered: additions.length,
       removed: removals.length,
-      rebootstrapped,
-      incompleteMissing: 0,
     };
   });
 }
@@ -727,24 +650,6 @@ async function markAnnounced(
           )
         )
       );
-
-    const legacyAdditions = events.filter(
-      (event) => event.eventType === "added" && event.generation === 0
-    );
-    if (legacyAdditions.length > 0) {
-      await tx
-        .update(pinballmapRegionSeenMachines)
-        .set({ announcedAt })
-        .where(
-          and(
-            eq(pinballmapRegionSeenMachines.region, region),
-            inArray(
-              pinballmapRegionSeenMachines.lmxId,
-              legacyAdditions.map((event) => event.lmxId)
-            )
-          )
-        );
-    }
   });
 }
 
@@ -824,10 +729,13 @@ async function resolveMachineNames(
     await refreshCatalog();
     refreshed = await getCatalogNames(machineIds);
   } catch (err) {
-    log.warn(
-      { err, missing, action: "pinballmap.regionAlerts" },
-      "Catalog refresh failed; keeping unnamed alerts pending"
-    );
+    // Tolerated: the unnamed events stay pending until a later refresh.
+    reportError(err, {
+      missing,
+      action: "pinballmap.regionAlerts",
+      step: "refreshCatalog",
+      bestEffort: true,
+    });
     return names;
   }
 
@@ -891,7 +799,7 @@ export async function runRegionMachineAlerts(opts?: {
       await db
         .insert(pinballmapState)
         .values({
-          id: "singleton",
+          id: PINBALLMAP_STATE_ID,
           regionAlertStatus: "not_configured",
           regionAlertLastStatusDetail: null,
         })
@@ -911,7 +819,7 @@ export async function runRegionMachineAlerts(opts?: {
     await db
       .insert(pinballmapState)
       .values({
-        id: "singleton",
+        id: PINBALLMAP_STATE_ID,
         regionAlertStatus: "needs_discord",
         regionAlertLastStatusDetail: "Discord bot token not configured",
       })
@@ -935,15 +843,13 @@ export async function runRegionMachineAlerts(opts?: {
       observed = await client.fetchRegionLmxes(region);
     } catch (error) {
       if (!(error instanceof RegionPayloadTooLargeError)) throw error;
-      log.error(
-        {
-          region,
-          observedAtLeast: error.observedAtLeast,
-          ceiling: MAX_REGION_ENTRIES,
-          action: "pinballmap.regionAlerts",
-        },
-        "PinballMap region payload is implausibly large; aborting without writing"
-      );
+      reportError(error, {
+        region,
+        observedAtLeast: error.observedAtLeast,
+        ceiling: MAX_REGION_ENTRIES,
+        action: "pinballmap.regionAlerts",
+        step: "fetchRegionLmxes",
+      });
       return noop(region, "implausible_payload", error.observedAtLeast);
     }
     // An empty payload is a bad read (outage, wrong region slug), not "the region
@@ -1008,21 +914,6 @@ export async function runRegionMachineAlerts(opts?: {
     }
 
     const snapshot = await applySnapshot(region, observed, initializeRemovals);
-    if (snapshot.incompleteMissing > 0) {
-      reportError(
-        new Error(
-          "PinballMap region payload is implausibly incomplete; discarded without updating membership"
-        ),
-        {
-          region,
-          observed: observed.length,
-          missing: snapshot.incompleteMissing,
-          threshold: REBOOTSTRAP_THRESHOLD,
-          action: "pinballmap.regionAlerts",
-        }
-      );
-      return noop(region, "incomplete_payload", observed.length);
-    }
 
     const base = {
       region,
@@ -1033,40 +924,6 @@ export async function runRegionMachineAlerts(opts?: {
       removed: snapshot.removed,
     } as const;
 
-    // A run that "discovers" a large fraction of the whole region did not witness
-    // an arrival — it re-synced against a seen-set that was wrong. The way there is
-    // a TRUNCATED first payload: the empty and implausibly-large guards above catch
-    // 0 and >20k, but nothing catches PBM returning a partial region (an upstream
-    // default change, a partial outage). Bootstrap on 5 of 487 entries, and the
-    // next run reads the other 482 as brand-new and posts "482 new machines" — the
-    // exact flood the bootstrap stamp exists to prevent, and a Discord post is
-    // immutable.
-    //
-    // `discovered` is the right signal because it counts rows INSERTED this run.
-    // A genuine backlog behaves differently: a long Discord outage leaves many rows
-    // PENDING while each run still discovers only the day's 1-3, so draining one is
-    // untouched by this guard.
-    //
-    // Treated as a re-bootstrap rather than an abort: the rows are stamped
-    // announced so the region self-heals to a correct seen-set on the next tick,
-    // and it is reported, because a silent re-bootstrap would hide a real upstream
-    // change.
-    if (snapshot.rebootstrapped) {
-      reportError(
-        new Error(
-          "PinballMap region alert re-bootstrapped: one run discovered an implausible share of the region"
-        ),
-        {
-          region,
-          discovered: snapshot.discovered,
-          observed: observed.length,
-          threshold: REBOOTSTRAP_THRESHOLD,
-          action: "pinballmap.regionAlerts",
-        }
-      );
-    }
-
-    await synchronizeLegacyEvents(region);
     const pending = await readPending(region);
     if (pending.length > 0 && !locationNamesFresh) {
       locationNames = (await refreshLocationNames(region, locationNames)).names;
@@ -1168,7 +1025,7 @@ export async function runRegionMachineAlerts(opts?: {
         })
         .where(
           and(
-            eq(pinballmapState.id, "singleton"),
+            eq(pinballmapState.id, PINBALLMAP_STATE_ID),
             eq(pinballmapState.regionAlertRegion, region),
             eq(pinballmapState.regionAlertChannelId, channelId)
           )
@@ -1206,7 +1063,7 @@ export async function runRegionMachineAlerts(opts?: {
       })
       .where(
         and(
-          eq(pinballmapState.id, "singleton"),
+          eq(pinballmapState.id, PINBALLMAP_STATE_ID),
           eq(pinballmapState.regionAlertRegion, region),
           eq(pinballmapState.regionAlertChannelId, channelId)
         )
@@ -1286,11 +1143,10 @@ export async function bootstrapRegion(
         .set({
           isPresent: false,
           missedRuns: 0,
-          announcedAt: sql`coalesce(${pinballmapRegionSeenMachines.announcedAt}, ${now})`,
         })
         .where(eq(pinballmapRegionSeenMachines.region, region));
 
-      // 2. Upsert observed machines: mark present, refresh locations and machines, and set announcedAt
+      // 2. Upsert observed machines: mark present, and refresh locations and machines
       for (let i = 0; i < observed.length; i += INSERT_CHUNK) {
         const inserted = await tx
           .insert(pinballmapRegionSeenMachines)
@@ -1300,7 +1156,6 @@ export async function bootstrapRegion(
               lmxId: entry.lmxId,
               locationId: entry.locationId,
               pinballmapMachineId: entry.machineId,
-              announcedAt: now,
               isPresent: true,
               missedRuns: 0,
             }))
@@ -1315,7 +1170,6 @@ export async function bootstrapRegion(
               pinballmapMachineId: sql`excluded.pinballmap_machine_id`,
               isPresent: true,
               missedRuns: 0,
-              announcedAt: sql`coalesce(${pinballmapRegionSeenMachines.announcedAt}, ${now})`,
             },
           })
           .returning({ lmxId: pinballmapRegionSeenMachines.lmxId });

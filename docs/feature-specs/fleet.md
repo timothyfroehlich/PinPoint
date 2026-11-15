@@ -88,7 +88,7 @@
 | :-- | :-- | :-- |
 | §2.1 `/fleet` route | Route does not exist | Implementation of route |
 | §3.2 Sticky first column & sticky header | No sticky table layout component | Sticky table component |
-| §4.1–§4.5 Filter toolbar & URL state | No `/fleet` filter toolbar; the machine list's filters (`MachineViewToolbar`) have no PBM sync-state axis | Fleet filter toolbar |
+| §4.1–§4.5 Filter toolbar & URL state | No `/fleet` filter toolbar; the machine list's filters (Machine View on List View) have no PBM sync-state axis | Fleet filter toolbar |
 | §5.1 PBM column group & near-miss detection | Dashboard table not yet built | Dashboard table implementation |
 | §6.1 Responsive per-machine inspection surface | No per-machine inspection pane/drawer built | Inspection surface component |
 

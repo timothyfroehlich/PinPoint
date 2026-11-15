@@ -99,7 +99,8 @@ export function isUserTag(tag: TimelineTag): tag is UserTag {
  *
  *   - lifecycle → machine history (added / renamed / owner / presence)
  *   - issue     → issue activity, matches the `issue_opened` event icon
- *   - settings  → settings-set changes
+ *   - settings  → settings sets created, deleted, or made preferred
+ *   - settings_edit → settings-set edits, tagging, made community
  *   - pinballmap → imported Pinball Map comments
  */
 const RESERVED_TAG_DECORATION: Record<
@@ -116,6 +117,11 @@ const RESERVED_TAG_DECORATION: Record<
     badgeClass: "border-secondary/40 bg-secondary/15 text-secondary",
   },
   settings: {
+    Icon: Settings,
+    badgeClass:
+      "border-outline-variant bg-surface-variant/30 text-muted-foreground",
+  },
+  settings_edit: {
     Icon: Settings,
     badgeClass:
       "border-outline-variant bg-surface-variant/30 text-muted-foreground",

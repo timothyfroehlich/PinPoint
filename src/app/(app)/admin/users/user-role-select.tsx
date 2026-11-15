@@ -9,13 +9,14 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { errorMessage } from "~/lib/errors";
+import type { UserRole } from "~/lib/types";
 import { updateUserRole } from "./actions";
 import { toast } from "sonner";
 
 interface UserRoleSelectProps {
   userId: string;
   userName: string;
-  currentRole: "guest" | "member" | "technician" | "admin";
+  currentRole: UserRole;
   currentUserId: string;
   userType?: "active" | "invited";
 }
@@ -29,9 +30,7 @@ export function UserRoleSelect({
 }: UserRoleSelectProps): React.JSX.Element {
   const [isPending, startTransition] = React.useTransition();
 
-  const handleRoleChange = (
-    newRole: "guest" | "member" | "technician" | "admin"
-  ): void => {
+  const handleRoleChange = (newRole: UserRole): void => {
     if (
       userType === "active" &&
       userId === currentUserId &&

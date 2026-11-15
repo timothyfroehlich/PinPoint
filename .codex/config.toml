@@ -28,3 +28,6 @@ approval_mode = "auto"
 
 [mcp_servers.pinpoint.tools.search_pinballmap_catalog]
 approval_mode = "auto"
+
+[mcp_servers.pinpoint.tools.list_settings_sets]
+approval_mode = "auto"

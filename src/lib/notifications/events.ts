@@ -1,14 +1,17 @@
 import type { IssueStatus } from "~/lib/issues/status";
 import type { IssueFrequency, IssueSeverity } from "~/lib/types";
 
-export type NotificationType =
-  | "issue_assigned"
-  | "issue_status_changed"
-  | "new_comment"
-  | "new_issue"
-  | "machine_ownership_changed"
-  | "mentioned"
-  | "pinballmap_comment";
+export const NOTIFICATION_TYPE_VALUES = [
+  "issue_assigned",
+  "issue_status_changed",
+  "new_comment",
+  "new_issue",
+  "machine_ownership_changed",
+  "mentioned",
+  "pinballmap_comment",
+] as const;
+
+export type NotificationType = (typeof NOTIFICATION_TYPE_VALUES)[number];
 
 export type NotificationChannelKey = "email" | "in_app" | "discord";
 

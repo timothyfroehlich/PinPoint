@@ -11,6 +11,7 @@ import {
 } from "vitest";
 import { usePathname } from "next/navigation";
 import { openFeedbackForm } from "~/components/feedback/FeedbackWidget";
+import { rememberListUrl } from "~/lib/list-view/return-to-list";
 import { BottomTabBar } from "./BottomTabBar";
 
 vi.mock("next/navigation", () => ({
@@ -86,12 +87,14 @@ describe("BottomTabBar", () => {
     expect(issuesLink).toHaveAttribute("aria-current", "page");
   });
 
-  it("uses issuesPath prop for the Issues tab link", () => {
-    render(<BottomTabBar issuesPath="/issues?status=open" />);
+  it("reopens the last Issues list this tab session used (list-views §11.1)", () => {
+    rememberListUrl("/issues", "/issues?status=all");
+    render(<BottomTabBar />);
     expect(screen.getByRole("link", { name: /issues/i })).toHaveAttribute(
       "href",
-      "/issues?status=open"
+      "/issues?status=all"
     );
+    window.sessionStorage.clear();
   });
 
   it("opens the More sheet when More button is clicked", async () => {

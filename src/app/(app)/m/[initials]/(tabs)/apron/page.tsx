@@ -1,12 +1,9 @@
 import type React from "react";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
 
 import { ApronCardTab } from "~/components/machines/apron/ApronCardTab";
-import { createClient } from "~/lib/supabase/server";
-import { db } from "~/server/db";
-import { userProfiles } from "~/server/db/schema";
+import { getViewer } from "~/lib/auth/viewer";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { apronCardIdentity } from "~/lib/machines/apron-card";
 import { buildMachineHubUrl } from "~/lib/machines/hub-url";
@@ -17,6 +14,7 @@ import {
   getMachineForLayout,
   getMachinePinTips,
 } from "~/app/(app)/m/[initials]/_data";
+import { getQueuedApronCardIds } from "~/app/(app)/m/apron-cards/_data";
 
 /**
  * Machine Apron card tab (/m/[initials]/apron) — the machine's saved apron
@@ -33,31 +31,25 @@ export default async function MachineApronCardPage({
   const { machine } = await getMachineForLayout(initials);
   if (!machine) notFound();
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const profile = user
-    ? await db.query.userProfiles.findFirst({
-        where: eq(userProfiles.id, user.id),
-        columns: { role: true },
-      })
-    : null;
-  const accessLevel = getAccessLevel(profile?.role);
+  const { userId, role } = await getViewer();
+  const accessLevel = getAccessLevel(role);
   // Deep-link guard: the tab is hidden from anyone who cannot export (§9.3).
   if (!checkPermission("machines.apron.export", accessLevel)) {
     redirect(`/m/${initials}`);
   }
   const canEdit = checkPermission("machines.edit", accessLevel, {
-    userId: user?.id,
+    userId,
     machineOwnerId: machine.ownerId ?? undefined,
   });
 
-  const [savedCards, credits, pinTips] = await Promise.all([
+  const [savedCards, credits, pinTips, queuedIds] = await Promise.all([
     getMachineApronCards(machine.id),
     getMachineCredits(machine),
     getMachinePinTips(machine.pinballmapTitle?.opdbId ?? null),
+    // The export permission above implies a signed-in member (§13.1).
+    userId ? getQueuedApronCardIds(userId) : Promise.resolve([]),
   ]);
+  const machineCardIds = new Set(savedCards.map((card) => card.id));
 
   return (
     <ApronCardTab
@@ -71,6 +63,8 @@ export default async function MachineApronCardPage({
         machine.initials
       )}
       canEdit={canEdit}
+      queuedCardIds={queuedIds.filter((id) => machineCardIds.has(id))}
+      queueCount={queuedIds.length}
     />
   );
 }

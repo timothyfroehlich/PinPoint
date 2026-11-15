@@ -24,7 +24,13 @@ export function OtherIssues({
   machineName,
   machineInitials,
 }: OtherIssuesProps): React.JSX.Element {
-  const seeAllHref = `/issues?machine=${encodeURIComponent(machineInitials)}&status=all&include_inactive_machines=true`;
+  // Every status and every presence state: the machine's issues and nothing
+  // else filtered (§10.3).
+  const seeAllHref = `/issues?${new URLSearchParams({
+    machine: machineInitials,
+    status: "all",
+    presence: "all",
+  }).toString()}`;
 
   return (
     <section

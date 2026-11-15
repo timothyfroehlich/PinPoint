@@ -8,7 +8,7 @@ import type {
   MachinePinTips,
 } from "~/app/(app)/m/[initials]/_data";
 import { PinTipCard } from "~/app/(app)/m/[initials]/pin-tip-card";
-import { formatCompactAge, formatDate } from "~/lib/dates";
+import { formatCalendarDay, formatCompactAge } from "~/lib/dates";
 import type { IscoredScore } from "~/lib/iscored/types";
 import {
   getIssueSeverityLabel,
@@ -44,9 +44,10 @@ const cardClass = "rounded-xl border border-outline-variant bg-card px-4 py-3";
 const labelClass =
   "text-[11px] font-bold uppercase tracking-wider text-muted-foreground";
 
+// iScored dates are the venue's wall-clock time with no zone, so print their
+// day as written rather than converting it.
 function displayScoreDate(date: string): string {
-  const parsed = new Date(date);
-  return Number.isNaN(parsed.getTime()) ? date : formatDate(parsed);
+  return formatCalendarDay(date) ?? date;
 }
 
 /**

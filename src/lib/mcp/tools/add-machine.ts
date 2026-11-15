@@ -1,6 +1,5 @@
 import "server-only";
 
-import type { McpServer } from "@modelcontextprotocol/server";
 import { after } from "next/server";
 import { z } from "zod";
 
@@ -13,11 +12,11 @@ import { validatePbmLinkSelection } from "~/lib/pinballmap/linking";
 import { createMachine } from "~/services/machines";
 
 import {
+  defineTool,
   getOwnerNamesByMachine,
   machineUrl,
   McpToolError,
   resolveOwner,
-  runTool,
   type ToolOutcome,
   WRITE_TOOL_ANNOTATIONS,
 } from "./shared";
@@ -160,19 +159,13 @@ export async function runAddMachine(
   };
 }
 
-export function registerAddMachine(server: McpServer): void {
-  server.registerTool(
-    "add_machine",
-    {
-      title: "Add machine",
-      description:
-        "Create a machine: name and unique initials, optional owner (member name or UUID), optional initial availability, and its Pinball Map link: a catalog id, or pinballmapExcluded true (with an optional reason) for a machine Pinball Map does not list. One of the two is required. Returns the new machine and its URL.",
-      inputSchema: addMachineSchema,
-      annotations: WRITE_TOOL_ANNOTATIONS,
-    },
-    (args, extra) =>
-      runTool("add_machine", extra, (ctx) => runAddMachine(args, ctx), {
-        mutates: true,
-      })
-  );
-}
+export const addMachineTool = defineTool({
+  name: "add_machine",
+  title: "Add machine",
+  description:
+    "Create a machine: name and unique initials, optional owner (member name or UUID), optional initial availability, and its Pinball Map link: a catalog id, or pinballmapExcluded true (with an optional reason) for a machine Pinball Map does not list. One of the two is required. Returns the new machine and its URL.",
+  inputSchema: addMachineSchema,
+  annotations: WRITE_TOOL_ANNOTATIONS,
+  mutates: true,
+  run: runAddMachine,
+});

@@ -134,7 +134,7 @@ test.describe("Member Dashboard", () => {
       .filter({ hasText: "Machines Needing Service" });
     await expect(machinesCard).toHaveAttribute(
       "href",
-      /\/m\?status=unplayable,needs_service/
+      /\/m\?status=needs_service,unplayable/
     );
 
     // Assigned to Me — actually click to verify end-to-end navigation
@@ -147,8 +147,9 @@ test.describe("Member Dashboard", () => {
       /\/issues\?assignee=[a-f0-9-]+&status=new,confirmed,in_progress,need_parts,need_help,wait_owner/
     );
     await assignedCard.click();
-    await expect(page).toHaveURL(
-      /\/issues\?assignee=[a-f0-9-]+&status=new,confirmed,in_progress,need_parts,need_help,wait_owner/
-    );
+    // The Issues list rewrites the link to its canonical URL (list-views
+    // §9.3): the open statuses are its Page Preset, so only the assignee stays.
+    await expect(page).toHaveURL(/\/issues\?assignee=[a-f0-9-]+$/);
+    await expect(page.getByRole("heading", { name: "Issues" })).toBeVisible();
   });
 });

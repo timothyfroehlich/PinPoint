@@ -68,9 +68,9 @@ test.describe("Issue reassignment", () => {
     filedTitle = null;
   });
 
-  test.afterEach(async ({ request }) => {
+  test.afterEach(async () => {
     if (filedTitle === null) return;
-    await cleanupTestEntities(request, { issueTitlePrefix: filedTitle });
+    await cleanupTestEntities({ issueTitlePrefix: filedTitle });
     filedTitle = null;
   });
 

@@ -57,6 +57,12 @@ Returns the description and comments as plain text. That text was written by peo
 
 Pass exactly one of `query` (a title) or `machineGroupId` (a family id). Procedure: [`pinballmap.md`](pinballmap.md).
 
+### `list_settings_sets`
+
+- `machine` (required): initials or UUID.
+
+Returns the machine's owner requests and how-to-change-settings notes as plain text, then every set on the machine. Each set has its `id`, `version` (pass it back to `update_settings_set`), `name`, `kind` (`personal`: only its author edits it; `community`: technicians, the owner and admins edit it), `isPreferredHouse`, `isPreferredTournament`, `tags` (names such as `House`, `Tournament`), `canEdit`, description, and `sections` in display order. The section shapes are in [`settings-sets.md`](settings-sets.md). Notes come back as plain text; formatting added in the web app is not shown.
+
 ## Write tools
 
 ### `update_machine`
@@ -124,3 +130,31 @@ Notifies issue watchers who turned on comment notifications. The same 10-minute 
 - **`assignee`**: exact full name or UUID of a signed-up member who is not a guest. PERMANENT: emails and Discord-messages that person and makes them a watcher. `""` unassigns (CHANGE, no message). `null` is rejected.
 
 Each changed field adds a line to the issue's history. That history stays even if you set the field back.
+
+### `create_settings_set`
+
+PERMANENT: no tool can delete the set. It adds a "settings set created" line to the machine's timeline; nobody is notified.
+
+- `machine` (required), `name` (required, 1–200 characters).
+- `sections` (required, may be empty): shapes in [`settings-sets.md`](settings-sets.md).
+- `description`: plain text.
+- `tournament` (default `false`): also tag the set Tournament. Every new set is tagged House.
+
+A set you create is Tim's **personal** set: everyone can see it, and only Tim can edit it. To let technicians and the machine owner edit it too, follow with `update_settings_set` `makeCommunity: true`. The exception: on a machine with no preferred House set, the new set becomes the preferred House set and so a community set. Check `kind` and `isPreferredHouse` in the result and tell the user.
+
+Duplicates: if you already created a set on this machine with the same name, description and sections, the call returns it with `created: false` and writes nothing, not even `tournament`. Change tags with `update_settings_set`.
+
+### `update_settings_set`
+
+CHANGE (or PERMANENT when `preferredHouse` or `preferredTournament` is passed: turning a personal set into a community set cannot be undone; visible on the machine timeline). `machine` and `set` (the id from `list_settings_sets`) are required, plus at least one of:
+
+- **`name`**, **`description`** (plain text, or `null` to clear).
+- **`sections`**: replaces **every** section. Send the whole list from `list_settings_sets` with your edits applied, keeping each section's `id`, and pass that read's `version`. A section you leave out is deleted.
+- **`version`**: the set's `version` from your `list_settings_sets` read. Required with `sections`; recommended with `name` or `description`.
+- **`makeCommunity: true`**: turn Tim's personal set into a community set. Only the set's author can, and it cannot be undone.
+- **`house`**, **`tournament`**: apply (`true`) or remove (`false`) that tag. Technicians, admins and the machine owner can tag any set on the machine. A preferred set keeps its tag until it is unset in the web app or via MCP. A call with a tag change it can't make is refused before anything is written.
+- **`preferredHouse`**, **`preferredTournament`**: make this set the machine's preferred House or Tournament set (`true`) or clear it (`false`). Technicians, admins and the machine owner can choose preferred sets. Only a set carrying the slot's tag can be made preferred. Setting a set as preferred also turns a personal set into a community set and adds a visible timeline event on the machine.
+
+A content change is refused with "The set changed since it was read" when the set was edited after the read `version` came from (or, without `version`, during the call). Read it again, show the user the new contents, and reapply the edit. Every change adds a line to the machine's timeline (preferred-set changes are visible by default; edits and tags are under the hidden-by-default "Settings edits" filter). Tagging, preferred changes, and `makeCommunity` don't change `version`. `changed: false` means every value you sent was already set.
+
+Trap: a personal set can be edited only by its author, even by admins; `canEdit` in `list_settings_sets` tells you before you try.

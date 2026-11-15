@@ -11,6 +11,7 @@ import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { ISSUE_FREQUENCY_VALUES, type IssueFrequency } from "~/lib/types";
+import { FREQUENCY_CONFIG } from "~/lib/issues/status";
 import { cn } from "~/lib/utils";
 import {
   getRecentIssuesAction,
@@ -37,13 +38,6 @@ interface QuickReportFormProps {
 }
 
 const FALLBACK_ENTRY = defaultEntry("00000000-0000-0000-0000-000000000000");
-
-const FREQUENCY_LABELS: Record<IssueFrequency, string> = {
-  not_specified: "Not specified",
-  intermittent: "Intermittent",
-  frequent: "Frequent",
-  constant: "Constant",
-};
 
 const recentIssuesCache = new Map<string, RecentIssueData[]>();
 
@@ -92,7 +86,7 @@ function FrequencyChoices({
                   <span className="size-2 rounded-full bg-primary" />
                 ) : null}
               </span>
-              <span>{FREQUENCY_LABELS[option]}</span>
+              <span>{FREQUENCY_CONFIG[option].label}</span>
             </label>
           );
         })}

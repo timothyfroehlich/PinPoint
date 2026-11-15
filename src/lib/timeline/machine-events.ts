@@ -23,7 +23,10 @@
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
-import type { MachineTimelineEventData } from "~/lib/timeline/machine-event-types";
+import type {
+  MachineTimelineEventData,
+  TimelineEventSourceType,
+} from "~/lib/timeline/machine-event-types";
 import { tagSchema, type TimelineTag } from "~/lib/timeline/machine-tags";
 import {
   resolvePerson,
@@ -41,7 +44,7 @@ import {
   userProfiles,
 } from "~/server/db/schema";
 
-type SystemSourceType = "lifecycle" | "issue";
+type SystemSourceType = Extract<TimelineEventSourceType, "lifecycle" | "issue">;
 
 /**
  * A person attached to a timeline event (PP-tv9l). Stored as a stable id
@@ -51,13 +54,6 @@ type SystemSourceType = "lifecycle" | "issue";
  */
 export type TimelinePersonRef =
   { role: string; userId: string } | { role: string; invitedId: string };
-
-/**
- * All valid values for `timeline_events.source_type`. Used as the column's
- * `$type` annotation in the schema so reads/writes are statically checked.
- */
-export type TimelineEventSourceType =
-  SystemSourceType | "comment" | "pinballmap";
 
 export interface CreateTimelineEventArgs {
   sourceType: SystemSourceType;
@@ -129,22 +125,35 @@ export async function createMachineTimelineEvent(
   return row.id;
 }
 
-/** The settings-set lifecycle event kinds (PP-43q3), tagged `settings`. */
-export type SettingsSetEventKind =
-  | "settings_set_created"
-  | "settings_set_updated"
-  | "settings_set_deleted"
-  | "settings_set_preferred";
+/** The settings-set events emitted today (machine-settings spec §5.1). */
+export type SettingsSetEvent = Extract<
+  MachineTimelineEventData,
+  {
+    kind:
+      | "settings_set_created"
+      | "settings_set_updated"
+      | "settings_set_deleted"
+      | "settings_set_tagged"
+      | "settings_set_made_community"
+      | "settings_preferred_changed";
+  }
+>;
+
+/** §5.2: these show by default (`settings`); the rest are `settings_edit`. */
+const SHOWN_SETTINGS_KINDS: ReadonlySet<SettingsSetEvent["kind"]> = new Set([
+  "settings_set_created",
+  "settings_set_deleted",
+  "settings_preferred_changed",
+]);
 
 /**
- * Emit a settings-set lifecycle event under the (default-off) `settings` tag.
- * Pass the actor and a snapshot of the set's name. Compose inside the settings
- * action's transaction so the event and the mutation commit together.
+ * Emit a settings-set event. Names in the payload are snapshots. Compose inside
+ * the settings write's transaction so the event and the mutation commit
+ * together.
  */
 export async function emitSettingsSetEvent(
   machineId: string,
-  kind: SettingsSetEventKind,
-  setName: string,
+  event: SettingsSetEvent,
   actorId: string,
   tx: DbTransaction = db
 ): Promise<void> {
@@ -152,8 +161,8 @@ export async function emitSettingsSetEvent(
     machineId,
     {
       sourceType: "lifecycle",
-      tag: "settings",
-      eventData: { kind, setName },
+      tag: SHOWN_SETTINGS_KINDS.has(event.kind) ? "settings" : "settings_edit",
+      eventData: event,
       actorId,
     },
     tx

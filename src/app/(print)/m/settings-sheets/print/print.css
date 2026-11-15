@@ -1,0 +1,70 @@
+/* Settings sheet print route (PP-k3km, settings-sheets §2.8, §3.1). On
+ * screen: a toolbar above a Letter page. On paper: only the sheet, flowing
+ * across as many pages as it needs. The root layout's full-height,
+ * overflow-hidden body is undone so nothing clips. */
+@page {
+  size: letter;
+  margin: 0.5in;
+}
+
+.settings-sheet-print {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  height: 100%;
+  overflow: auto;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.settings-sheet-print__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  max-width: 8.5in;
+}
+
+/* The screen paper is a Letter page: 8.5in wide with the 0.5in print margin
+ * drawn as padding, so the screen wraps text where paper will. Narrower
+ * screens scroll it sideways rather than reflow it. */
+.settings-sheet-print__paper {
+  flex-shrink: 0;
+  width: 8.5in;
+  min-height: 11in;
+  box-sizing: border-box;
+  padding: 0.5in;
+  background: #ffffff;
+  box-shadow: 0 6px 28px rgba(0, 0, 0, 0.55);
+}
+
+@media print {
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+  }
+
+  .settings-sheet-print__toolbar {
+    display: none;
+  }
+
+  .settings-sheet-print {
+    display: block;
+    height: auto;
+    overflow: visible;
+    padding: 0;
+  }
+
+  .settings-sheet-print__paper {
+    width: auto;
+    min-height: 0;
+    padding: 0;
+    box-shadow: none;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}

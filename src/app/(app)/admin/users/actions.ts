@@ -15,7 +15,9 @@ import { sendInviteEmail } from "~/lib/email/invite";
 import { requireSiteUrl } from "~/lib/url";
 import { inviteUserSchema, updateUserRoleSchema } from "./schema";
 import { log } from "~/lib/logger";
+import { serverActionError } from "~/lib/observability/report-error";
 import { errorMessage } from "~/lib/errors";
+import type { UserRole } from "~/lib/types";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { type Result, ok, err } from "~/lib/result";
 
@@ -186,7 +188,7 @@ async function verifyAdmin(userId: string): Promise<void> {
 
 export async function updateUserRole(
   userId: string,
-  newRole: "guest" | "member" | "technician" | "admin",
+  newRole: UserRole,
   userType: "active" | "invited" = "active"
 ): Promise<void> {
   const supabase = await createClient();
@@ -407,17 +409,11 @@ export async function inviteUser(
       lastName: validated.lastName,
     });
   } catch (error) {
-    log.error(
-      {
-        action: "inviteUser",
-        err: errorMessage(error, "Unknown"),
-        stack: error instanceof Error ? error.stack : undefined,
-      },
-      "Invite user failed"
-    );
-    return err(
+    return serverActionError(
+      error,
       "SERVER",
-      "An unexpected error occurred while inviting the user."
+      "An unexpected error occurred while inviting the user.",
+      { action: "inviteUser" }
     );
   }
 }

@@ -2,136 +2,56 @@ import { describe, it, expect } from "vitest";
 
 import {
   type SettingsSetAuth,
-  canViewSet,
+  canDeleteSet,
   canEditSet,
-  canSetOwnerDefault,
+  canMakeCommunity,
 } from "./settings";
 
 const OWNER = "owner-1";
 const TECH = "tech-1";
 const OTHER = "member-2";
 
-// Set factory — defaults to a public community set.
-function set(overrides: Partial<SettingsSetAuth> = {}): SettingsSetAuth {
-  return {
-    isOwnerSet: false,
-    isPublic: true,
-    isPreferred: false,
-    createdById: TECH,
-    ...overrides,
-  };
-}
+const personal = (createdById: string | null): SettingsSetAuth => ({
+  isCommunity: false,
+  createdById,
+});
+const community: SettingsSetAuth = { isCommunity: true, createdById: TECH };
 
-describe("canViewSet", () => {
-  it("shows public sets to everyone, including anonymous", () => {
-    expect(canViewSet(set({ isPublic: true }), null, "unauthenticated")).toBe(
-      true
+describe("canEditSet (machine-settings §2.2–§2.3)", () => {
+  it("a personal set is editable by its author only — not the owner, a technician, or an admin", () => {
+    const set = personal(TECH);
+    expect(canEditSet(set, OWNER, TECH, "technician")).toBe(true);
+    expect(canEditSet(set, OWNER, OWNER, "member")).toBe(false);
+    expect(canEditSet(set, OWNER, "tech-2", "technician")).toBe(false);
+    expect(canEditSet(set, OWNER, "admin-9", "admin")).toBe(false);
+  });
+
+  it("a guest or anonymous viewer is never the author, even with a matching id", () => {
+    expect(canEditSet(personal(OWNER), OWNER, OWNER, "guest")).toBe(false);
+    expect(canEditSet(personal(OWNER), OWNER, OWNER, "unauthenticated")).toBe(
+      false
     );
   });
 
-  it("shows the owner's default to everyone even when not public", () => {
-    expect(
-      canViewSet(
-        set({ isPublic: false, isPreferred: true }),
-        null,
-        "unauthenticated"
-      )
-    ).toBe(true);
-  });
-
-  it("hides a private draft from everyone but its creator", () => {
-    const draft = set({ isPublic: false, createdById: TECH });
-    expect(canViewSet(draft, OTHER, "member")).toBe(false);
-    expect(canViewSet(draft, TECH, "technician")).toBe(true);
-  });
-
-  it("lets admin see a private draft they didn't create", () => {
-    expect(
-      canViewSet(
-        set({ isPublic: false, createdById: TECH }),
-        "admin-9",
-        "admin"
-      )
-    ).toBe(true);
-  });
-});
-
-describe("canEditSet", () => {
-  it("owner set: editable by the machine owner and admin, NOT technicians", () => {
-    const ownerSet = set({ isOwnerSet: true, createdById: OWNER });
-    expect(canEditSet(ownerSet, OWNER, OWNER, "member")).toBe(true); // member-owner
-    expect(canEditSet(ownerSet, OWNER, "admin-9", "admin")).toBe(true);
-    expect(canEditSet(ownerSet, OWNER, TECH, "technician")).toBe(false);
-  });
-
-  it("community set: editable by technicians, the owner, and admin", () => {
-    const community = set({ isOwnerSet: false });
-    expect(canEditSet(community, OWNER, TECH, "technician")).toBe(true);
-    expect(canEditSet(community, OWNER, OWNER, "member")).toBe(true); // owner
+  it("a community set is editable by technicians, the machine owner, and admins — not other members", () => {
+    expect(canEditSet(community, OWNER, "tech-2", "technician")).toBe(true);
+    expect(canEditSet(community, OWNER, OWNER, "member")).toBe(true);
     expect(canEditSet(community, OWNER, "admin-9", "admin")).toBe(true);
-  });
-
-  it("community set: a plain non-owner member cannot edit", () => {
-    expect(canEditSet(set({ isOwnerSet: false }), OWNER, OTHER, "member")).toBe(
-      false
-    );
-  });
-
-  it("unowned machine: an owner-kind set stays technician-editable", () => {
-    // The 0060 backfill marks every pre-existing preferred set as an owner set,
-    // including on machines with no owner — those must not become admin-only.
-    const ownerSet = set({ isOwnerSet: true, isPreferred: true });
-    expect(canEditSet(ownerSet, null, TECH, "technician")).toBe(true);
-    expect(canEditSet(ownerSet, null, OTHER, "member")).toBe(false);
-  });
-
-  it("private draft: only its creator (a tech) can edit — not other techs", () => {
-    const draft = set({ isPublic: false, createdById: TECH });
-    expect(canEditSet(draft, OWNER, TECH, "technician")).toBe(true);
-    expect(canEditSet(draft, OWNER, "tech-2", "technician")).toBe(false); // can't even see it
-  });
-
-  it("an unauthenticated or guest user cannot edit even if ID matches owner (PP-leli.8)", () => {
-    const ownerSet = set({ isOwnerSet: true, createdById: OWNER });
-    expect(canEditSet(ownerSet, OWNER, OWNER, "unauthenticated")).toBe(false);
-    expect(canEditSet(ownerSet, OWNER, OWNER, "guest")).toBe(false);
+    expect(canEditSet(community, OWNER, OTHER, "member")).toBe(false);
   });
 });
 
-describe("canSetOwnerDefault", () => {
-  it("owner/admin may set an owner set as default", () => {
-    const ownerSet = set({ isOwnerSet: true, createdById: OWNER });
-    expect(canSetOwnerDefault(ownerSet, OWNER, OWNER, "member")).toBe(true);
-    expect(canSetOwnerDefault(ownerSet, OWNER, "admin-9", "admin")).toBe(true);
+describe("canDeleteSet (machine-settings §2.2)", () => {
+  it("an admin can delete someone else's personal set they cannot edit", () => {
+    expect(canDeleteSet(personal(TECH), OWNER, "admin-9", "admin")).toBe(true);
+    expect(canDeleteSet(personal(TECH), OWNER, OWNER, "member")).toBe(false);
   });
+});
 
-  it("a community set is never eligible to be the default", () => {
-    expect(
-      canSetOwnerDefault(set({ isOwnerSet: false }), OWNER, OWNER, "member")
-    ).toBe(false);
-  });
-
-  it("a technician cannot set the owner's default", () => {
-    expect(
-      canSetOwnerDefault(
-        set({ isOwnerSet: true, createdById: OWNER }),
-        OWNER,
-        TECH,
-        "technician"
-      )
-    ).toBe(false);
-  });
-
-  it("an unauthenticated or guest user cannot set default even if ID matches owner (PP-leli.8)", () => {
-    const ownerSet = set({ isOwnerSet: true, createdById: OWNER });
-    expect(canSetOwnerDefault(ownerSet, OWNER, OWNER, "unauthenticated")).toBe(
-      false
-    );
-    expect(canSetOwnerDefault(ownerSet, OWNER, OWNER, "guest")).toBe(false);
-  });
-
-  it("a technician who owns the machine can set default on their own machine (PP-leli.8)", () => {
-    const ownerSet = set({ isOwnerSet: true, createdById: TECH });
-    expect(canSetOwnerDefault(ownerSet, TECH, TECH, "technician")).toBe(true);
+describe("canMakeCommunity (machine-settings §2.4)", () => {
+  it("only the author of a personal set can make it a community set", () => {
+    expect(canMakeCommunity(personal(TECH), TECH, "technician")).toBe(true);
+    expect(canMakeCommunity(personal(TECH), "admin-9", "admin")).toBe(false);
+    expect(canMakeCommunity(community, TECH, "technician")).toBe(false);
   });
 });

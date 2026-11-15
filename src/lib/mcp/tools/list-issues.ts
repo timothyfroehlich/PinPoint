@@ -1,6 +1,5 @@
 import "server-only";
 
-import type { McpServer } from "@modelcontextprotocol/server";
 import { and, count, eq, inArray, type SQL } from "drizzle-orm";
 import { z } from "zod";
 
@@ -17,6 +16,7 @@ import { issues, machines } from "~/server/db/schema";
 import { ISSUE_SEVERITY_VALUES } from "~/lib/types";
 
 import {
+  defineTool,
   issueUrl,
   McpToolError,
   presenceFilterSchema,
@@ -24,7 +24,6 @@ import {
   resolveAssigneeFilter,
   resolveMachine,
   resolvePresence,
-  runTool,
   type ToolOutcome,
 } from "./shared";
 import type { McpAuthContext } from "~/lib/mcp/verify-token";
@@ -215,17 +214,12 @@ export async function runListIssues(
  * `update_issue` writes every field this tool filters on — `status` (which is
  * also the DEFAULT filter), `severity`, and `assignee`.
  */
-export function registerListIssues(server: McpServer): void {
-  server.registerTool(
-    "list_issues",
-    {
-      title: "List issues",
-      description:
-        "List issues across the entire collection or on a specific machine. Supports filtering by machine (initials/UUID), status ('open', 'closed', or specific statuses), severity, assignee, and machine presence. Issues on Removed machines are left out unless 'machine' names one or presence includes 'removed'. Returns paginated results with total count and hasMore.",
-      inputSchema: listIssuesSchema,
-      annotations: READ_ONLY_TOOL_ANNOTATIONS,
-    },
-    (args, extra) =>
-      runTool("list_issues", extra, (ctx) => runListIssues(args, ctx))
-  );
-}
+export const listIssuesTool = defineTool({
+  name: "list_issues",
+  title: "List issues",
+  description:
+    "List issues across the entire collection or on a specific machine. Supports filtering by machine (initials/UUID), status ('open', 'closed', or specific statuses), severity, assignee, and machine presence. Issues on Removed machines are left out unless 'machine' names one or presence includes 'removed'. Returns paginated results with total count and hasMore.",
+  inputSchema: listIssuesSchema,
+  annotations: READ_ONLY_TOOL_ANNOTATIONS,
+  run: runListIssues,
+});

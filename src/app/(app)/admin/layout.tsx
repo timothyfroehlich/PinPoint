@@ -1,8 +1,5 @@
-import { createClient } from "~/lib/supabase/server";
+import { getViewer } from "~/lib/auth/viewer";
 import { redirect } from "next/navigation";
-import { db } from "~/server/db";
-import { userProfiles } from "~/server/db/schema";
-import { eq } from "drizzle-orm";
 import type React from "react";
 import { Forbidden } from "~/components/errors/Forbidden";
 import { getLoginUrl } from "~/lib/url";
@@ -13,22 +10,14 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }): Promise<React.JSX.Element> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { userId, role } = await getViewer();
 
-  if (!user) {
+  if (!userId) {
     redirect(getLoginUrl("/admin"));
   }
 
-  const profile = await db.query.userProfiles.findFirst({
-    where: eq(userProfiles.id, user.id),
-    columns: { role: true },
-  });
-
-  if (!checkPermission("admin.access", getAccessLevel(profile?.role))) {
-    return <Forbidden role={profile?.role ?? null} />;
+  if (!checkPermission("admin.access", getAccessLevel(role))) {
+    return <Forbidden role={role} />;
   }
 
   return <>{children}</>;

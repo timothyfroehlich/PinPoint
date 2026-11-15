@@ -1,6 +1,20 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isProductionBuild, isVercelProduction } from "~/lib/runtime-env";
 import { getSupabaseEnv } from "~/lib/supabase/env";
+
+/**
+ * Shared collection views (Wave 0b): /c/<handle> and its Issues and Timeline
+ * tabs, where the handle is a collection uuid or a view token (32 base64url
+ * characters, `generateViewToken`). They open for anonymous visitors: a valid
+ * view token grants read access, and the in-page resolver 404s any other
+ * handle, so opening the route publicly reveals nothing. Owner-only siblings
+ * such as /c/collections match neither handle shape and stay gated. Do not
+ * name a new /c/ route with exactly 32 of [A-Za-z0-9_-]: it would match the
+ * token shape and open publicly.
+ */
+const COLLECTION_VIEW_PATH =
+  /^\/c\/(?:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|[A-Za-z0-9_-]{32})(?:\/(?:issues|timeline))?$/;
 
 /**
  * Updates the Supabase session for the request
@@ -18,13 +32,8 @@ export async function updateSession(
     request,
   });
 
-  const {
-    VERCEL_ENV,
-    NODE_ENV,
-    DEV_AUTOLOGIN_ENABLED,
-    DEV_AUTOLOGIN_EMAIL,
-    DEV_AUTOLOGIN_PASSWORD,
-  } = process.env;
+  const { DEV_AUTOLOGIN_ENABLED, DEV_AUTOLOGIN_EMAIL, DEV_AUTOLOGIN_PASSWORD } =
+    process.env;
 
   const { url: supabaseUrl, publishableKey: supabaseKey } = getSupabaseEnv();
 
@@ -66,8 +75,9 @@ export async function updateSession(
     return isTruthy(header) || isTruthy(cookie) || isOff(query);
   };
 
-  const isProductionEnv =
-    VERCEL_ENV === "production" || NODE_ENV === "production";
+  // Any production build is off-limits, Vercel previews and the E2E
+  // production build included.
+  const isProductionEnv = isVercelProduction() || isProductionBuild();
   const autologinEnv = DEV_AUTOLOGIN_ENABLED;
   const autologinEnabled =
     !isProductionEnv &&
@@ -100,18 +110,6 @@ export async function updateSession(
   // Protected routes logic
   const path = request.nextUrl.pathname;
 
-  // Shared collection views (Wave 0b) live at /c/<handle> — a uuid or view
-  // token — and must open for anonymous visitors (a valid view token grants
-  // read access; the in-page resolver 404s a missing/invalid handle, so opening
-  // the route publicly reveals nothing). Exclude the owner-only siblings, which
-  // stay auth-gated: /c/collections (the "My Collections" list) and /c/owner/*.
-  const isPublicCollectionView =
-    path.startsWith("/c/") &&
-    path !== "/c/collections" &&
-    !path.startsWith("/c/collections/") &&
-    path !== "/c/owner" &&
-    !path.startsWith("/c/owner/");
-
   const isPublic =
     path === "/" ||
     path === "/m" ||
@@ -119,11 +117,15 @@ export async function updateSession(
     // Legacy id-addressed links redirect to public /m/<initials> pages.
     path.startsWith("/machines/") ||
     path.startsWith("/issues") ||
-    isPublicCollectionView ||
-    // Tags are always public (spec collections-and-tags 7.1), whatever the
-    // collection rules above become.
+    // /c/ is an allowlist: a route added under /c/ stays gated until it is
+    // opted in here (CORE-SEC-001, PP-u79s).
+    COLLECTION_VIEW_PATH.test(path) ||
+    // Tags are always public (spec collections-and-tags 7.1).
     path === "/c/tags" ||
     path.startsWith("/c/tags/") ||
+    // Settings tag pages are public (spec machine-settings 3.6, 3.7).
+    path === "/c/settings-tags" ||
+    path.startsWith("/c/settings-tags/") ||
     path.startsWith("/login") ||
     path.startsWith("/signup") ||
     path.startsWith("/forgot-password") ||

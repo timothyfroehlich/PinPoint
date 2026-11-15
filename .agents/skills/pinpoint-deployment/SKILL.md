@@ -73,6 +73,17 @@ PinPoint uses **Drizzle ORM** for schema definition and migrations, plus a **sep
 - **Commit everything together**: `schema.ts`, the new `drizzle/` files (`.sql` **and** `_snapshot.json`), and the updated `src/test/setup/schema.sql`.
 - **Production and preview are `db:migrate` only.** Never `db:reset`, never `drizzle-kit push` against them. (AGENTS.md §7.)
 
+## Migration PRs (CORE-ARCH-017)
+
+A migration ships in its own PR, not on the feature branch.
+
+1. Branch off main once the spec settles the schema. Claim the next migration number with the merge orchestrator before generating.
+2. Change `schema.ts`, `pnpm exec drizzle-kit generate --name <change>`, `pnpm run test:_generate-schema`, `pnpm run db:reset`. Commit the `.sql`, its snapshot, the journal and `schema.sql` together.
+3. Open the PR, get it reviewed, hand it to the orchestrator. The implementation branch merges main once it lands.
+4. A later schema change for the same feature is a new migration PR. Label its bead: `bd label add <bead> migration-correction`. `bd list --label migration-correction` is the running count.
+
+Destructive changes follow the same steps, after the PR that removes the last reader of the old shape is live.
+
 ## Local stack won't start on an SELinux host (resolved, PP-9mg0)
 
 **Fixed by the CLI pin bump to 2.113.0 (#1837). Recorded because the symptom is unrecognizable from its error message, and the trigger was a CLI version — so an older CLI reintroduces it.**

@@ -11,28 +11,6 @@ describe("OwnerBadge", () => {
     expect(badge).toHaveTextContent(/^Owner$/);
   });
 
-  it("renders with default size", () => {
-    render(<OwnerBadge />);
-
-    const badge = screen.getByTestId("owner-badge");
-    expect(badge).toHaveClass("gap-1");
-  });
-
-  it("renders with small size", () => {
-    render(<OwnerBadge size="sm" />);
-
-    const badge = screen.getByTestId("owner-badge");
-    expect(badge).toHaveClass("text-[10px]");
-    expect(badge).toHaveClass("px-1.5");
-  });
-
-  it("applies custom className", () => {
-    render(<OwnerBadge className="custom-class" />);
-
-    const badge = screen.getByTestId("owner-badge");
-    expect(badge).toHaveClass("custom-class");
-  });
-
   describe("inline tone", () => {
     // The machine-settings audit line is 12px muted copy; a filled pill there
     // shouts over the text it annotates (PP-tn6t review), so the inline tone

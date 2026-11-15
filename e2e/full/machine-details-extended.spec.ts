@@ -54,8 +54,10 @@ test.describe("Machine Details - Extended", () => {
       .locator(".ProseMirror");
     await textarea.fill("Please handle with care - vintage machine");
 
-    // The display updates optimistically. Wait for the save to finish before
-    // reloading, or the navigation can abort the Server Action in Firefox.
+    // The display updates optimistically. Wait for the Server Action response
+    // to arrive before navigating, or the navigation can abort the action in
+    // Firefox. We check saveResponse.ok() rather than awaiting saveResponse.finished()
+    // because streaming RSC responses under next-start can hang finished() (PP-ujw4).
     const [saveResponse] = await Promise.all([
       page.waitForResponse(
         (response) =>
@@ -65,23 +67,18 @@ test.describe("Machine Details - Extended", () => {
       page.getByTestId("machine-owner-requirements-save").click(),
     ]);
     expect(saveResponse.ok()).toBe(true);
-    await saveResponse.finished();
 
-    // Verify it saved
+    // Verify the saved value survived the server round-trip across a fresh reload
+    // before navigating onwards to the issue page.
+    await page.reload();
     await expect(
       page.getByTestId("machine-owner-requirements-display")
     ).toContainText("Please handle with care - vintage machine");
-
-    // Now navigate to an issue for this machine to check the callout. The
-    // issues list lives on the Service tab and renders cards flat (no
-    // expando wrapper to expand).
-    await page.goto(maintenancePath);
-
-    // Verify the saved value survived the server round-trip, then follow the
-    // issue link and wait for arrival before asserting the callout.
     await expect(
-      page.getByTestId("machine-owner-requirements-display")
-    ).toContainText("Please handle with care - vintage machine");
+      page.getByTestId("machine-owner-requirements-edit")
+    ).toBeVisible();
+
+    // Follow the issue link and wait for arrival before asserting the callout.
     const firstIssueLink = page
       .getByRole("region", { name: /^Open Issues/ })
       .getByRole("link")

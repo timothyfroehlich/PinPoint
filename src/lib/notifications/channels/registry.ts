@@ -1,5 +1,6 @@
 import { getDiscordConfig } from "~/lib/discord/config";
 import { log } from "~/lib/logger";
+import { reportError } from "~/lib/observability/report-error";
 import { SideEffectInTransactionError } from "~/server/db/transaction-context";
 import { createDiscordChannel } from "./discord-channel";
 import { emailChannel } from "./email-channel";
@@ -41,6 +42,7 @@ export async function getChannels(): Promise<readonly NotificationChannel[]> {
       },
       "Discord channel registration skipped — getDiscordConfig threw"
     );
+    reportError(err, { action: "getChannels.discord", bestEffort: true });
   }
   return channels;
 }

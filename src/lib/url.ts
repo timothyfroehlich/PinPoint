@@ -1,4 +1,5 @@
 import { log } from "~/lib/logger";
+import { isProductionRuntime } from "~/lib/runtime-env";
 
 /**
  * Retrieves the canonical site URL.
@@ -56,8 +57,10 @@ export function resolveRequestUrl(headers: Headers): string {
 export function requireSiteUrl(action: string): string {
   const url = getSiteUrl();
 
-  // In production, we must have a real domain.
-  if (process.env.NODE_ENV === "production") {
+  // In production, we must have a real domain. A local production build run
+  // for E2E (`next start` with VERCEL_ENV=development) legitimately uses
+  // localhost, so this keys on the deployment, not on NODE_ENV alone.
+  if (isProductionRuntime()) {
     // If we resolved to localhost, that's definitely an error in production.
     if (
       url.startsWith("http://localhost") ||
@@ -72,14 +75,31 @@ export function requireSiteUrl(action: string): string {
   return url;
 }
 
+// Placeholder origin for resolving a candidate path; never sent anywhere.
+const INTERNAL_URL_BASE = "http://pinpoint.invalid";
+
+// URL parsers treat "\" as "/" and strip tabs and newlines, so "/\host" and
+// "/<tab>/host" resolve as protocol-relative URLs to another host. Other
+// control characters are refused too; a plain space is percent-encoded and
+// stays in the path.
+const UNSAFE_URL_CHARS = /[\\\p{Cc}]/u;
+
 /**
  * Validates that a redirect URL is safe (internal to the application).
- * Prevents open redirect vulnerabilities by ensuring it starts with / but not //.
+ * Prevents open redirect vulnerabilities: the URL must be a root-relative path
+ * with no backslash or control characters, and must resolve to the same origin
+ * it was resolved against.
  */
 export function isInternalUrl(url: string | null | undefined): url is string {
   if (!url) return false;
-  // Allow paths starting with / but not // (absolute protocol-relative)
-  return url.startsWith("/") && !url.startsWith("//");
+  if (!url.startsWith("/") || url.startsWith("//")) return false;
+  if (UNSAFE_URL_CHARS.test(url)) return false;
+
+  try {
+    return new URL(url, INTERNAL_URL_BASE).origin === INTERNAL_URL_BASE;
+  } catch {
+    return false;
+  }
 }
 
 /**

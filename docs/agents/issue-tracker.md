@@ -16,6 +16,19 @@ Use `bd --actor <agent-name>` for every mutation so the audit trail names the
 agent that made it; Codex uses `Codex`. Use `bd --json` when another tool needs
 to parse the result. Do not use markdown TODO files as durable task tracking.
 
+## Beads that introduce a shared helper
+
+A bead that introduces a helper for gradual adoption (a few pilot call sites
+now, the rest later) delivers, in its acceptance criteria:
+
+- a pointer to the helper in its owning skill under `.agents/skills/`, and
+- either a ratchet test (the count of call sites still bypassing the helper
+  only goes down) or a follow-up bead that migrates the remaining call sites.
+
+The case: PP-leli.7 shipped `createProtectedAction` with pilots and neither,
+so no skill named it and later Server Actions kept hand-rolling their auth
+(PP-az4d).
+
 ## Wayfinding operations
 
 For a Wayfinder map, create the map as a `decision` bead with the

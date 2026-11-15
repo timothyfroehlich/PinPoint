@@ -27,20 +27,18 @@ Two conventions that come with the picker pattern:
 - **Export the filterable list separately from the popover wrapper.** Contexts that already own their own chrome (a dialog, a sheet) should render the list without a redundant nested popover. `MachineCombobox` splits exactly this way.
 - **Support native form submission** via an optional hidden input, so a picker can sit in a Server Action form without a bespoke bridge.
 
-### Date ranges: native mobile, custom desktop
+### Date ranges: two native date fields
 
-Every product date range uses the shared `DateRangePicker`. Below `md`, it
-renders two visible, labelled native `input[type="date"]` fields so the browser
-supplies the familiar platform picker. At `md` and above, it renders the Radix
-Popover with the two-month `Calendar`. The shared component owns both trees and
-switches them with CSS; call sites supply only the label, value, and change
-handler.
+A date range filter (the List View's Created and Updated, `FilterPicker`) is
+two visible, labelled native `input[type="date"]` fields, From and To, at every
+width, so the browser supplies the familiar platform picker. New date range
+surfaces reuse that control rather than adding a calendar widget.
 
-Treat the native values as local calendar dates. Format and parse
-`YYYY-MM-DD` without passing the date-only string to the `Date` constructor,
-which interprets that shape as UTC and can shift the displayed day. New date
-range surfaces extend this component rather than wiring `Calendar` or native
-date fields independently.
+Treat the values as calendar days on the site clock (America/Chicago,
+`~/lib/time-zone`). Format and parse `YYYY-MM-DD` without passing the
+date-only string to the `Date` constructor, which interprets that shape as UTC
+and can shift the displayed day; `formatCalendarDay` in `~/lib/dates` prints
+one as written.
 
 ### Other standing rules
 

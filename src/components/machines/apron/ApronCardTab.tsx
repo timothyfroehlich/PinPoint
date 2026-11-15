@@ -38,6 +38,7 @@ import {
   APRON_CARD_SIZES,
   APRON_CARD_TEMPLATES,
   apronCardPixelSize,
+  isApronCardSize,
   isApronCardTemplate,
   cardFaceContent,
   type ApronCardIdentity,
@@ -57,9 +58,9 @@ import { saveApronCardsAction } from "~/app/(app)/m/[initials]/(tabs)/apron/acti
 import { APRON_CARDS_MAX } from "~/app/(app)/m/[initials]/(tabs)/apron/schemas";
 import { DeleteCardDialog, RenameCardDialog } from "./ApronCardDialogs";
 import {
-  ApronCardExportMenu,
+  ApronCardExportDialog,
   type ExportableApronCard,
-} from "./ApronCardExportMenu";
+} from "./ApronCardExportDialog";
 import { ApronCardPreview } from "./ApronCardPreview";
 
 // The card prints list markers (spec §3.7), so its editors show them too.
@@ -81,6 +82,10 @@ export interface ApronCardTabProps {
   scanUrl: string;
   /** The machine-management capability (spec §3.6, §11.7). */
   canEdit: boolean;
+  /** Which saved cards are in the viewer's print queue (spec §13.2). */
+  queuedCardIds: readonly string[];
+  /** How many cards the viewer's print queue holds across all machines. */
+  queueCount: number;
 }
 
 /**
@@ -97,6 +102,8 @@ export function ApronCardTab({
   savedCards,
   scanUrl,
   canEdit,
+  queuedCardIds,
+  queueCount: initialQueueCount,
 }: ApronCardTabProps): React.JSX.Element {
   const id = useId();
   const [saved, setSaved] = useState(savedCards);
@@ -116,6 +123,11 @@ export function ApronCardTab({
   // card is deleted, while the dialog is still closing.
   const [deleteName, setDeleteName] = useState("");
   const [isSaving, startSaving] = useTransition();
+  // One queue state for both Export dialogs (phone and desktop layouts).
+  const [queued, setQueued] = useState<ReadonlySet<string>>(
+    () => new Set(queuedCardIds)
+  );
+  const [queueCount, setQueueCount] = useState(initialQueueCount);
 
   const dirty = deletedIds.length > 0 || draftsDirty(drafts, saved);
   const selected = drafts.find((card) => card.key === selectedKey) ?? null;
@@ -202,6 +214,7 @@ export function ApronCardTab({
           tipEnabled: card.tipEnabled,
           designEnabled: card.designEnabled,
           artEnabled: card.artEnabled,
+          codeEnabled: card.codeEnabled,
         })),
       });
       if (!result.ok) {
@@ -209,6 +222,15 @@ export function ApronCardTab({
         return;
       }
       const stored = result.value.cards;
+      // Deleting a saved card removes it from the print queue (§13.3).
+      const unqueued = deletedIds.filter((cardId) => queued.has(cardId));
+      if (unqueued.length > 0) {
+        setQueued(
+          (current) =>
+            new Set([...current].filter((cardId) => !unqueued.includes(cardId)))
+        );
+        setQueueCount((n) => n - unqueued.length);
+      }
       // A card added in this save is found again by its name (§11.2).
       const keepKey =
         selected?.id ??
@@ -232,11 +254,23 @@ export function ApronCardTab({
     [saved, identity, mainDescription]
   );
   const exportMenu = (className?: string): React.JSX.Element => (
-    <ApronCardExportMenu
+    <ApronCardExportDialog
+      machineName={identity.name}
       machineInitials={machineInitials}
       scanUrl={scanUrl}
       cards={exportable}
       initialCardId={selected?.id ?? null}
+      queued={queued}
+      queueCount={queueCount}
+      onQueuedChange={(cardId, isQueued, count) => {
+        setQueued((current) => {
+          const next = new Set(current);
+          if (isQueued) next.add(cardId);
+          else next.delete(cardId);
+          return next;
+        });
+        setQueueCount(count);
+      }}
       {...(className ? { className } : {})}
     />
   );
@@ -428,9 +462,7 @@ export function ApronCardTab({
                   <Select
                     value={selected.size ?? ""}
                     onValueChange={(value) => {
-                      if (value === "stern" || value === "wpc") {
-                        update({ size: value });
-                      }
+                      if (isApronCardSize(value)) update({ size: value });
                     }}
                   >
                     <SelectTrigger
@@ -566,6 +598,15 @@ export function ApronCardTab({
                   checked={selected.artEnabled}
                   onCheckedChange={(checked) => {
                     update({ artEnabled: checked });
+                  }}
+                />
+                <CreditCheckbox
+                  id={`${id}-code`}
+                  label="Code"
+                  names={identity.credits.code}
+                  checked={selected.codeEnabled}
+                  onCheckedChange={(checked) => {
+                    update({ codeEnabled: checked });
                   }}
                 />
               </fieldset>

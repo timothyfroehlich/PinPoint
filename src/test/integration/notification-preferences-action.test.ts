@@ -1,33 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
-import {
-  authUsers,
-  notificationPreferences,
-  userProfiles,
-} from "~/server/db/schema";
-import { createTestUser } from "~/test/helpers/factories";
+import { notificationPreferences } from "~/server/db/schema";
+import { signInAs, signOut } from "~/test/helpers/mock-auth";
+import { seedUser } from "~/test/helpers/seed";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
 
-const mockGetUser = vi.fn();
-vi.mock("~/lib/supabase/server", () => ({
-  createClient: () =>
-    Promise.resolve({
-      auth: { getUser: mockGetUser },
-    }),
-}));
+vi.mock("~/lib/supabase/server", () => import("~/test/helpers/mock-auth"));
 
-vi.mock("~/server/db", async () => {
-  const { getTestDb } = await import("~/test/setup/pglite");
-  const db = await getTestDb();
-  return { db };
-});
-
-// Import after the db mock so the action picks up the PGlite instance.
 const { updateNotificationPreferencesAction } =
   await import("~/app/(app)/settings/notifications/actions");
 
@@ -37,20 +21,9 @@ function buildFormData(entries: Record<string, "on" | "off">): FormData {
   return fd;
 }
 
-async function seedUser(): Promise<string> {
-  const id = randomUUID();
-  const email = `prefs-${id}@test.com`;
-  const db = await getTestDb();
-  await db.insert(authUsers).values({ id, email });
-  await db.insert(userProfiles).values(
-    createTestUser({
-      id,
-      email,
-      firstName: "Prefs",
-      lastName: "Tester",
-    })
-  );
-  return id;
+async function seedPrefsUser(): Promise<string> {
+  const user = await seedUser({ firstName: "Prefs", lastName: "Tester" });
+  return user.id;
 }
 
 describe("updateNotificationPreferencesAction (Integration)", () => {
@@ -61,8 +34,8 @@ describe("updateNotificationPreferencesAction (Integration)", () => {
   });
 
   it("preserves unsubmitted fields — biomonk regression case", async () => {
-    const userId = await seedUser();
-    mockGetUser.mockResolvedValue({ data: { user: { id: userId } } });
+    const userId = await seedPrefsUser();
+    signInAs(userId);
 
     const db = await getTestDb();
     await db.insert(notificationPreferences).values({
@@ -102,8 +75,8 @@ describe("updateNotificationPreferencesAction (Integration)", () => {
   });
 
   it("empty FormData is a no-op against an existing row", async () => {
-    const userId = await seedUser();
-    mockGetUser.mockResolvedValue({ data: { user: { id: userId } } });
+    const userId = await seedPrefsUser();
+    signInAs(userId);
 
     const db = await getTestDb();
     await db.insert(notificationPreferences).values({
@@ -129,8 +102,8 @@ describe("updateNotificationPreferencesAction (Integration)", () => {
   });
 
   it("creates a row with schema defaults when none exists", async () => {
-    const userId = await seedUser();
-    mockGetUser.mockResolvedValue({ data: { user: { id: userId } } });
+    const userId = await seedPrefsUser();
+    signInAs(userId);
 
     const db = await getTestDb();
 
@@ -156,7 +129,7 @@ describe("updateNotificationPreferencesAction (Integration)", () => {
   });
 
   it("rejects unauthenticated calls", async () => {
-    mockGetUser.mockResolvedValue({ data: { user: null } });
+    signOut();
 
     const result = await updateNotificationPreferencesAction(
       undefined,
@@ -170,7 +143,7 @@ describe("updateNotificationPreferencesAction (Integration)", () => {
 
   it("rejects calls when the user has insufficient permissions", async () => {
     const userId = randomUUID();
-    mockGetUser.mockResolvedValue({ data: { user: { id: userId } } });
+    signInAs(userId);
 
     const result = await updateNotificationPreferencesAction(
       undefined,
@@ -184,8 +157,8 @@ describe("updateNotificationPreferencesAction (Integration)", () => {
   });
 
   it("rejects invalid preference values", async () => {
-    const userId = await seedUser();
-    mockGetUser.mockResolvedValue({ data: { user: { id: userId } } });
+    const userId = await seedPrefsUser();
+    signInAs(userId);
 
     const result = await updateNotificationPreferencesAction(
       undefined,

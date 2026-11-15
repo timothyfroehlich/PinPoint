@@ -1,5 +1,44 @@
 import { describe, it, expect } from "vitest";
-import { resolveIssueReporter } from "./utils";
+import { parseIssueNumber, resolveIssueReporter } from "./utils";
+
+describe("parseIssueNumber", () => {
+  it("parses a plain positive integer", () => {
+    expect(parseIssueNumber("1")).toBe(1);
+    expect(parseIssueNumber("42")).toBe(42);
+  });
+
+  it("accepts leading zeros, matching the prior parseInt behavior", () => {
+    expect(parseIssueNumber("01")).toBe(1);
+  });
+
+  it("rejects trailing garbage instead of silently parsing a prefix", () => {
+    // parseInt("1abc", 10) === 1 — the bug PP-xlod fixes.
+    expect(parseIssueNumber("1abc")).toBeNull();
+  });
+
+  it("rejects decimals", () => {
+    // parseInt("1.5", 10) === 1.
+    expect(parseIssueNumber("1.5")).toBeNull();
+  });
+
+  it("rejects zero and negatives", () => {
+    expect(parseIssueNumber("0")).toBeNull();
+    expect(parseIssueNumber("-1")).toBeNull();
+  });
+
+  it("rejects empty, whitespace, and non-numeric segments", () => {
+    expect(parseIssueNumber("")).toBeNull();
+    expect(parseIssueNumber(" 1")).toBeNull();
+    expect(parseIssueNumber("1 ")).toBeNull();
+    expect(parseIssueNumber("abc")).toBeNull();
+  });
+
+  it("rejects numbers beyond the 32-bit issue_number column", () => {
+    expect(parseIssueNumber("2147483647")).toBe(2147483647);
+    expect(parseIssueNumber("2147483648")).toBeNull();
+    expect(parseIssueNumber("99999999999999999999")).toBeNull();
+  });
+});
 
 describe("resolveIssueReporter", () => {
   it("resolves reportedByUser", () => {

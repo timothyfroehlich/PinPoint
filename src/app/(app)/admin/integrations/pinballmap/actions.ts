@@ -13,14 +13,16 @@ import { reportError } from "~/lib/observability/report-error";
 import { db } from "~/server/db";
 import { authorizeIntegrationsAdmin } from "../authorize";
 import { pinballmapState } from "~/server/db/schema";
-import { log } from "~/lib/logger";
 import { getDiscordBotToken } from "~/lib/discord/config";
 import { postChannelMessage } from "~/lib/discord/client";
 import {
   checkDiscordChannel,
   fetchDiscordChannelName,
 } from "~/lib/discord/channel-check";
-import { getPinballMapState } from "~/lib/pinballmap/state";
+import {
+  PINBALLMAP_STATE_ID,
+  getPinballMapState,
+} from "~/lib/pinballmap/state";
 import { normalizeRegion } from "~/lib/pinballmap/config";
 import { bootstrapRegion } from "~/lib/pinballmap/region-alerts";
 import { eq } from "drizzle-orm";
@@ -268,7 +270,7 @@ export async function saveRegionAlertConfigAction(
     await db
       .insert(pinballmapState)
       .values({
-        id: "singleton",
+        id: PINBALLMAP_STATE_ID,
         regionAlertRegion: normalizedRegion,
         regionAlertChannelId: alertChannelId,
         regionAlertStatus: status,
@@ -301,14 +303,14 @@ export async function saveRegionAlertConfigAction(
       try {
         await bootstrapRegion(normalizedRegion);
       } catch (err) {
-        log.error(
-          {
-            err,
-            region: normalizedRegion,
-            action: "saveRegionAlertConfigAction.bootstrapRegion",
-          },
-          "Failed to bootstrap region"
-        );
+        // Tolerated: the config still saves. A region with no seen rows
+        // bootstraps on the next hourly run; one seen before resumes from its
+        // stored seen set.
+        reportError(err, {
+          region: normalizedRegion,
+          action: "saveRegionAlertConfigAction.bootstrapRegion",
+          bestEffort: true,
+        });
       }
     }
 
@@ -381,7 +383,7 @@ export async function sendRegionAlertTestAction(
             updatedAt: new Date(),
             updatedBy: authorization.userId,
           })
-          .where(eq(pinballmapState.id, "singleton"));
+          .where(eq(pinballmapState.id, PINBALLMAP_STATE_ID));
       }
       revalidatePath(INTEGRATIONS_PATH);
       return {
@@ -413,7 +415,7 @@ export async function sendRegionAlertTestAction(
             updatedAt: new Date(),
             updatedBy: authorization.userId,
           })
-          .where(eq(pinballmapState.id, "singleton"));
+          .where(eq(pinballmapState.id, PINBALLMAP_STATE_ID));
       }
 
       revalidatePath(INTEGRATIONS_PATH);
@@ -438,7 +440,7 @@ export async function sendRegionAlertTestAction(
           updatedAt: new Date(),
           updatedBy: authorization.userId,
         })
-        .where(eq(pinballmapState.id, "singleton"));
+        .where(eq(pinballmapState.id, PINBALLMAP_STATE_ID));
     }
     revalidatePath(INTEGRATIONS_PATH);
 

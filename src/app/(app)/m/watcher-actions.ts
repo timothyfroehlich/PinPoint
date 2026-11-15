@@ -1,11 +1,11 @@
 "use server";
 
 import { eq } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import {
   createProtectedAction,
+  revalidateMachine,
   type ProtectedActionResult,
 } from "~/lib/actions";
 import {
@@ -88,6 +88,6 @@ async function revalidateMachinePath(machineId: string): Promise<void> {
   });
 
   if (machine) {
-    revalidatePath(`/m/${machine.initials}`);
+    revalidateMachine(machine.initials);
   }
 }

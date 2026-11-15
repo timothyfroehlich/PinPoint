@@ -37,7 +37,7 @@
 
 ## 4. Placement
 
-- **4.1** On the machine's Info tab, the tip card sits in the reference rail between the Top scores card and the Tags card.
+- **4.1** On the machine's Info tab, the tip card sits in the reference rail directly after the Top scores card.
 - **4.2** On the scan hub, the tip card sits between the Top scores card and the Open issues card (scan hub spec §3.8).
 
 ## Known divergences
@@ -48,4 +48,5 @@ _None — the current implementation matches this spec._
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-04 | 4.1: the tip card follows Top scores; the Tags card moved to the top of the reference rail (collections-and-tags, PP-wqit.3). |
 | 2026-09-27 | Initial draft: data source and daily stored copy, tip card (random weighted pick, shuffle, category, Match Play link, hidden when no tips), placement on the Info tab and scan hub. |

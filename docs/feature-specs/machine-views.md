@@ -2,9 +2,9 @@
 
 **Status: approved.**
 
-**What this document is.** The requirements for PinPoint's shared machine-list experience on `/m`, standard Collections, and owner Collections. It describes the intended final state only; what the code does or used to do lives solely in the Known divergences table. Each requirement is numbered for citation. When code and spec disagree, either the code is wrong or this document gets amended — never silently neither.
+**What this document is.** The requirements for PinPoint's shared machine-list experience on `/m` and Collections. It describes the intended final state only; what the code does or used to do lives solely in the Known divergences table. Each requirement is numbered for citation. When code and spec disagree, either the code is wrong or this document gets amended — never silently neither.
 
-**Related records.** `docs/feature-specs/list-views.md` (the shared List View that Machine View is built on), `docs/feature-specs/collections-and-tags.md` (Collection, Owner Collection, and Tag membership and access), `docs/feature-specs/widgets.md` and `docs/feature-specs/machine-widgets.md` (the Summary Widgets on Machine View).
+**Related records.** `docs/feature-specs/list-views.md` (the shared List View that Machine View is built on), `docs/feature-specs/collections-and-tags.md` (Collection and Tag membership and access), `docs/feature-specs/widgets.md` and `docs/feature-specs/machine-widgets.md` (the Summary Widgets on Machine View).
 
 ---
 
@@ -31,7 +31,7 @@
 ## 3. Fields and Conditional Data
 
 - **3.1** The field catalog contains Machine, Playability, Open Issues, Last Serviced, Presence, Owner, Manufacturer, Year, Oldest Open Issue, Last Activity, and Date Added. Each field declares its sorting behavior, data dependencies, and table and compact presentations.
-- **3.2** Machine identity is always loaded. On desktop and tablet it is two lines: the machine title link plus its uppercase initials badge, then the machine's manufacturer, year, and owner. The phone Compact list shows it on one line (§5.3). Manufacturer, Year, and Owner remain fields of their own that a person can add as columns.
+- **3.2** Machine identity is always loaded. On desktop and tablet it is two lines: the machine title link plus its uppercase initials badge, then the machine's manufacturer, year, and owner. The phone Compact list puts the title and initials on its first line and manufacturer, year, and owner on its second (§5.3, §5.9). Manufacturer, Year, and Owner remain fields of their own that a person can add as columns.
 - **3.3** Missing owner, manufacturer, or year values display as “Unassigned” or “Unknown” as appropriate. Machine View never exposes owner email addresses.
 - **3.4** Health enrichment is loaded only when required by displayed fields, active filters, sorting, or Summary Widgets. It consists of grouped open-issue count, cosmetic/minor/major/unplayable counts, worst open severity, and oldest open issue. Closed issues never contribute.
 - **3.5** Playability is derived once on the server from compact issue aggregates; Machine View does not hydrate issue children.
@@ -41,22 +41,25 @@
 - **3.9** Filtering, deterministic sorting, and pagination occur in the server-only pipeline. The browser receives only the current page, filtered total count, Summary Widget counts, validated view state, permitted fields, and required filter options.
 - **3.10** Initial delivery adds no database index. Query plans are benchmarked with realistic 100- and 500-machine fixtures and `EXPLAIN` evidence before proposing a partial open-issue or latest-service index.
 - **3.11** The Open Issue Severity filter matches a machine that has at least one open issue of any selected severity.
-- **3.12** The Primary Filters, in order, are Presence, Playability, Issue severity, and Owner. Machine View has no Secondary Filters.
+- **3.12** The Primary Filters, in order, are Presence, Playability, Issue severity, Owner, Tag, and Collection. Machine View has no Secondary Filters. Tag and Collection follow collections-and-tags §12.
 - **3.13** Owner searches people by name and offers Me (signed-in people only) and Unassigned shortcuts.
 - **3.14** Every sortable field is offered in the List Header's sort control as well as by its column header.
+- **3.15** Export downloads a CSV of every machine matching the current View Configuration across all pages, within the Surface's scope, in the list's sort order.
+- **3.16** The CSV has these columns, in order, whatever fields are displayed: initials, name, full model, manufacturer, year, owner, Date Added, Presence, Playability, Open Issues, Last Serviced, and Last Activity. Name is the machine's title. Full model is the machine's catalog title, which names its edition. Dates are the site's calendar day. A missing value is left empty, and an unassigned owner is left empty.
+- **3.17** Export is offered to signed-in people only.
 
 ---
 
 ## 4. URL State and Presets
 
-- **4.1** Canonical Machine View URL state uses `q`, `presence`, `status`, `severity`, `owner`, `sort`, `dir`, `page`, `pageSize`, `columns`, and `view`.
+- **4.1** Canonical Machine View URL state uses `q`, `presence`, `status`, `severity`, `owner`, `tag`, `collection`, `sort`, `dir`, `page`, `pageSize`, `columns`, and `view`.
 - **4.2** Multi-values serialize as comma-separated canonical values. Owner filters use stable IDs plus the `me` and `unassigned` sentinels; `me` means whoever is viewing. Page sizes are limited to 25, 50, and 100. Severity filters use `cosmetic`, `minor`, `major`, and `unplayable`.
 - **4.3** _Moved 2026-10-02_ to list-views §9.3.
 - **4.4** _Moved 2026-10-02_ to list-views §4.7 and §4.8.
 - **4.5** _Moved 2026-10-02_ to list-views §9.8.
 - **4.6** Both initial Page Presets display Machine, Playability, Presence, Open Issues, Last Serviced, and Last Activity by default.
 - **4.7** `/m` defaults to Presence “On the Floor” and machine-title ascending. An omitted `presence` parameter means On the Floor; `presence=all` is the explicit unfiltered state.
-- **4.8** Collections include every member presence state by default and sort worst playability first.
+- **4.8** Collections open to On the Floor members by default, sorted worst playability first; All machines shows every presence state (§9.2).
 - **4.9** _Moved 2026-10-02_ to list-views §9.1.
 - **4.10** _Moved 2026-10-02_ to list-views §9.5.
 - **4.11** _Moved 2026-10-02_ to list-views §9.6.
@@ -67,12 +70,15 @@
 
 - **5.1** _Moved 2026-10-02._ list-views §3–§5 define the shared controls. Number kept so older citations don't dangle.
 - **5.2** Desktop and tablet use an accessible semantic table of two-line rows with a sticky header and pinned Machine identity column. The Machine column takes the remaining width on the left; the other columns are narrow and packed to the right. Selected columns remain available through horizontal scrolling rather than being silently hidden.
-- **5.3** Phones default to a Compact list of one-line rows: a Playability dot, the machine name, its initials badge, and its open-issue count. Other selected fields appear in Table mode.
+- **5.3** Phones default to a Compact list of two-line rows. The first line holds a Playability dot, the machine name, its initials badge, and, at the right, the open-issue count. The count is text (“N open”) in the color of the machine's worst open severity with no icon before it, and its accessible name includes that severity; a machine with no open issues shows a muted “None open”. Other selected fields appear only in Table mode.
 - **5.4** Phones offer an optional Table mode with a visible horizontal-overflow cue and pinned Machine identity. Compact/Table mode is stored as a browser preference and is not URL state.
 - **5.5** Sortable headers are keyboard-operable and expose `scope` and `aria-sort`; the table has an accessible name and preserves native table semantics.
 - **5.6** Open Issues values are right-aligned. A nonzero count is colored by the machine's worst open severity and links to that machine's issues (issues-list §7.4); zero remains neutral.
 - **5.7** Last Serviced displays a compact relative age and links populated values to `/m/{initials}/maintenance`. A machine without qualifying service history displays “Never”.
 - **5.8** Machine View exposes a stable machine-selection callback for a future inspection drawer without implementing drawer state or UI in this delivery.
+- **5.9** The second line of a Compact row spans the row's full width and never wraps: the Playability label in its Playability color, then manufacturer, year, owner, and the Last Serviced age. The Playability label and the Last Serviced age appear only when Playability and Last Serviced are among the displayed fields, so their data is loaded (§3.4); otherwise line 2 leaves them out. A machine with no qualifying service history shows “never serviced” in place of the age (§5.7).
+- **5.10** When the Compact row's second line does not fit, it drops year, then manufacturer, then Last Serviced, then owner. The Playability label never drops.
+- **5.11** The Compact row's Playability dot differs by shape as well as color for each Playability.
 
 ---
 
@@ -81,7 +87,7 @@
 - **6.1** `/m` remains publicly viewable. Add Machine remains governed by `machines.create`.
 - **6.2** `/m` preserves useful search coverage, existing empty-state intent, and machine navigation while replacing the machine-card grid.
 - **6.3** Standard Collections preserve their header, tabs, edit and add-machine flows, share-token authorization, and exact membership scoping.
-- **6.4** Owner Collections preserve their header, tabs, and exact owner scoping.
+- **6.4** _Retired 2026-10-07._ Owner Collections were replaced by the Owner filter (collections-and-tags §6.4). Number kept so older citations don't dangle.
 - **6.5** Issues and Timeline Collection tabs continue to use the resolved Collection machine identities and may not widen their scope through URL parameters.
 
 ---
@@ -107,7 +113,7 @@
 
 - **9.1** Machines offers five Built-in Views, in order: **On the floor** (On the Floor, by name — the Page Preset); **Needs attention** (On the Floor, Playability Needs service or Unplayable, worst first); **Service due** (On the Floor, oldest Last Serviced first); **All machines** (every presence state, by name); **Recently added** (every presence state except Removed, newest Date Added first, adding the Date Added field).
 - **9.2** Collections offer three Built-in Views, in order: **On the floor** (On the Floor, worst playability first — the Page Preset); **Needs attention** (On the Floor, Playability Needs service or Unplayable, worst first); **All machines** (every presence state, worst playability first).
-- **9.3** Unless 9.1 or 9.2 says otherwise, a Built-in View displays the Page Preset's fields at the Page Preset's page size.
+- **9.3** _Retired 2026-10-05._ Applying a Built-in View keeps the displayed fields and page size already showing (list-views §1). Number kept so older citations don't dangle.
 - **9.4** _Moved 2026-10-02_ to list-views §10.16.
 - **9.5** _Moved 2026-10-02_ to list-views §5.3 and §10.6.
 - **9.6** Built-in Views that share a name appear in the same order on every Surface.
@@ -118,11 +124,9 @@
 
 | Requirement | Divergence | Resolution |
 | :-- | :-- | :-- |
-| §9.2 | Collections' Page Preset is All machines. | PP-s363 |
-| §2.4 | Machine View has its own toolbar, chips, and Saved Views menu rather than the shared List View. | PP-jb9v |
-| §3.13 | Owner offers Unassigned but not Me. | PP-jb9v |
-| §3.14 | Sorting is only by column header; phones in Compact mode cannot sort. | PP-jb9v |
-| §4.2 | Owner "Me" writes the viewer's account ID into the URL. | PP-jb9v |
+| §3.2, §5.3, §5.9, §5.10 | Phone Compact rows are one line; the second line (Playability label, manufacturer, year, owner, Last Serviced) and its drop order are not built. | List View redesign, phone machine rows (PP-jb9v.13). |
+| §5.3 | The Compact row's open-issue count shows a severity icon before “N open”. | List View redesign, phone machine rows (PP-jb9v.13). |
+| §5.11 | The Compact row's Playability dot is the same round dot for every Playability, distinguished by color only. | List View redesign, phone machine rows (PP-jb9v.13). |
 
 ---
 
@@ -130,6 +134,11 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-13 | Export: a CSV of every machine the list matches, with initials, name, full model, manufacturer, year, owner, and the list's Date Added, Presence, Playability, Open Issues, Last Serviced, and Last Activity, for signed-in people (§3.15–§3.17). |
+| 2026-10-11 | Phone Compact rows become two lines: Playability dot, name, initials, and open-issue count first, then the Playability label, manufacturer, year, owner, and Last Serviced, dropping year, manufacturer, Last Serviced, then owner when crowded (§3.2, §5.3, §5.9, §5.10); the Playability label and Last Serviced age appear only when those fields are displayed, and no service history reads “never serviced” (§5.9); the count is colored “N open” text with no icon, or a muted “None open” (§5.3); the Playability dot differs by shape (§5.11). |
+| 2026-10-07 | Retired Owner Collections (preamble, 6.4); a person's machines are Machines filtered by Owner (collections-and-tags §6). |
+| 2026-10-05 | Built-in Views no longer set displayed fields or page size (§9.3). Tag and Collection Primary Filters (§3.12) and their `tag` and `collection` parameters (§4.1). |
+| 2026-10-04 | Collections open to On the Floor members by default (§4.8), matching §9.2. |
 | 2026-10-03 | Collections' Page Preset becomes On the floor (§9.2). |
 | 2026-10-03 | Presence and Last Activity join the default fields, Presence after Playability (§4.6); All machines and Recently added no longer add Presence (§9.1). Desktop and tablet rows are two lines, with manufacturer, year, and owner under the name (§3.2, §5.2); Owner, Manufacturer, and Year leave the default fields (§4.6). |
 | 2026-10-02 | Machine View became a List Host on the shared List View (§2.4): moved the generic concepts, URL rules, shared controls, and Saved Views to list-views (§1, §4.3–§4.5, §4.9–§4.11, §5.1, §7.6, §8, §9.4, §9.5); one-line machine identity and rows (§3.2, §5.2, §5.3); dropped Widget Population parameters (§4.1); Recently added leaves out Removed machines (§9.1); Primary Filters, Owner shortcuts, and the sort control (§3.12–§3.14); more default fields (§4.6); right-aligned Open Issues that link to the machine's issues in every presence state (§5.6); an Owner `me` sentinel (§4.2). |

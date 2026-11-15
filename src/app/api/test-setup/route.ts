@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 
 import { errorMessage } from "~/lib/errors";
+import { isProductionBuild } from "~/lib/runtime-env";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<Response> {
-  if (process.env.NODE_ENV === "production") {
+  if (isProductionBuild()) {
     return new Response(null, { status: 404 });
   }
 

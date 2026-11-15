@@ -241,6 +241,29 @@ def _read_manifest_locked(f: object) -> dict[str, int]:
         return {}
 
 
+def load_slots(path: Path | None = None) -> dict[str, int] | None:
+    """Read-only view of the slot manifest, taken under a shared lock.
+
+    `{}` when there is no manifest; None when it exists but can't be read or
+    parsed. None means *unknown*, not empty: callers that act on a missing entry
+    (cleanup, reap) must not read an unparseable manifest as "no entries".
+    `path` defaults to the live MANIFEST_PATH (looked up at call time so a test
+    can redirect it); a caller that keeps its own reference passes that.
+    """
+    manifest = MANIFEST_PATH if path is None else path
+    try:
+        with open(manifest) as f:
+            fcntl.flock(f.fileno(), fcntl.LOCK_SH)
+            slots = json.loads(f.read()).get("slots", {})
+    except FileNotFoundError:
+        return {}
+    except (OSError, ValueError, AttributeError):
+        return None
+    if not isinstance(slots, dict):
+        return None
+    return slots
+
+
 def _write_manifest_locked(f: object, slots: dict[str, int]) -> None:
     """Rewrite the manifest file from a locked file handle."""
     f.seek(0)  # type: ignore[union-attr]

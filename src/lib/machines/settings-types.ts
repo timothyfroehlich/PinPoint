@@ -79,29 +79,48 @@ export type AddSectionSpec =
   | { kind: "dip" }
   | { kind: "note"; title: string; customTitle: boolean };
 
+/**
+ * The two built-in settings tags (machine-settings spec §3.2), by slug. Each
+ * names one preferred-set slot per machine (§4.1).
+ */
+export const BUILTIN_SETTINGS_TAGS = ["house", "tournament"] as const;
+export type SettingsPreferredSlot = (typeof BUILTIN_SETTINGS_TAGS)[number];
+
+export const BUILTIN_SETTINGS_TAG_NAMES: Record<SettingsPreferredSlot, string> =
+  { house: "House", tournament: "Tournament" };
+
+/** A settings tag as a set carries it. */
+export interface SettingsTagRef {
+  id: string;
+  slug: string;
+  name: string;
+}
+
 export interface SettingsSetData {
   id: string;
   name: string;
-  /** The machine owner's canonical set — renders the "Owner's default" badge.
-   *  Exactly one per machine (partial unique index). */
-  isPreferred: boolean;
-  /** Kind: true = owner set (protected; only owner + admin edit), false =
-   *  community set (co-edited by technicians+ and the owner). Drives the
-   *  "Owner's" filter and per-set edit rules. */
-  isOwnerSet: boolean;
-  /** Visibility: false = private draft (creator only), true = public. */
-  isPublic: boolean;
-  /** The orthogonal, non-exclusive "Tournament" tag. */
-  isTournament: boolean;
-  /** Creator's user id — drives the "Mine" filter (=== viewer). Null when the
-   *  creating user was later deleted (created_by is ON DELETE SET NULL). */
+  /** The machine's preferred House set (spec §4). At most one per machine. */
+  isPreferredHouse: boolean;
+  /** The machine's preferred Tournament set (spec §4). At most one per machine. */
+  isPreferredTournament: boolean;
+  /** Kind (spec §2): false = personal (only its author edits), true = community. */
+  isCommunity: boolean;
+  /** The settings tags this set carries, House and Tournament included (§3). */
+  tags: SettingsTagRef[];
+  /** Creator's user id — drives the "Mine" filter (=== viewer) and personal-set
+   *  ownership. Null when the creating user was later deleted (created_by is
+   *  ON DELETE SET NULL). */
   createdById: string | null;
-  /** Whether the CURRENT viewer may edit this set (owner/community rules,
-   *  computed server-side in getMachineSettingsSets). */
+  /** Whether the CURRENT viewer may edit this set's contents (§2.2–§2.3). */
   canEdit: boolean;
-  /** Whether the current viewer may set this set as the Owner's default
-   *  (owner/admin on an owner set). False for community sets. */
-  canSetDefault: boolean;
+  /** Whether the current viewer may delete it (§2.2: admins too, for a
+   *  personal set). */
+  canDelete: boolean;
+  /** Whether the current viewer may make this personal set community (§2.4). */
+  canMakeCommunity: boolean;
+  /** Whether the current viewer may apply tags and choose preferred sets on
+   *  this machine (§3.4, §4.3). The same for every set on a machine. */
+  canCurate: boolean;
   updatedBy: string;
   /** Last editor's user id — lets the audit line flag an edit made by the
    *  machine owner (the OwnerBadge). Null when that user was later deleted

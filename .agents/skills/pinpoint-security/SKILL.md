@@ -25,6 +25,8 @@ Always import and use the custom client creator from `~/lib/supabase/server`. On
 
 After creating an SSR client, call `await supabase.auth.getUser()` immediately; do not run other logic between client creation and that call (CORE-SSR-002).
 
+Pages and layouts get the signed-in user from `getViewer()` (`~/lib/auth/viewer`, see `pinpoint-ui` Data access), which makes that call once per render.
+
 `src/lib/supabase/admin.ts` legitimately builds the server-only, service-role
 admin client from `@supabase/supabase-js`; importing types or specific utilities
 from that package is also fine.
@@ -80,8 +82,8 @@ the component. Deriving server-side also keeps the client payload minimal
 
 Authorization in PinPoint is partitioned between two complementary layers:
 
-- **Matrix-level permissions (`matrix.ts` / `helpers.ts`)**: Model role-based capabilities and standard ownership rules across the application (e.g. `issues.create`, `machines.edit`, `collections.view.private`). `checkPermission(permission, accessLevel, context)` evaluates role levels and resolves `own`, `owner`, and `own_or_owner` against an `OwnershipContext` (`reporterId`, `machineOwnerId`). When an ownership rule fits this model, prefer extending the matrix and `OwnershipContext` so capabilities stay visible on `/help/permissions` (CORE-ARCH-008).
-- **Resource-level permission predicates (`collections.ts`, upcoming `settings.ts`)**: Reserved for authorization rules depending on multi-dimensional entity state that `OwnershipContext` cannot represent—such as collaborator rosters, compound record relationships (e.g., machine owner vs settings set creator), public/private draft visibility, or capability tokens (e.g. `canViewCollection`, `canEditCollection`, `canManageCollection`, `canViewSet`, `canEditSet`).
+- **Matrix-level permissions (`matrix.ts` / `helpers.ts`)**: Model role-based capabilities and standard ownership rules across the application (e.g. `issues.create`, `machines.edit`, `collections.view.private`). `checkPermission(permission, accessLevel, context)` evaluates role levels and resolves `own`, `owner`, and `own_or_owner` against an `OwnershipContext` (`reporterId`, `machineOwnerId`). When an ownership rule fits this model, prefer extending the matrix and `OwnershipContext` so capabilities stay visible on `/help/permissions` (CORE-ARCH-008). The matrix is declared `as const satisfies`, and `PermissionId` (exported from `matrix.ts`) is the union of its ids: every permission helper takes `PermissionId`, so a misspelled id fails `tsc` instead of silently denying. Type a stored id as `PermissionId`, never `string`. An issue mutation loads the fields its ownership check reads (reporter, machine owner) with `getIssueAuthContext` (`src/lib/issues/auth-context.ts`), which fits `createProtectedAction`'s `load` step.
+- **Resource-level permission predicates (`collections.ts`, `settings.ts`)**: Reserved for authorization rules depending on multi-dimensional entity state that `OwnershipContext` cannot represent—such as collaborator rosters, compound record relationships (e.g., machine owner vs settings set author), or capability tokens (e.g. `canViewCollection`, `canEditCollection`, `canManageCollection`). Settings sets use `canManageMachineSettings` (tag, prefer, create), `canEditSet`, `canDeleteSet` and `canMakeCommunity`; the server actions, MCP tools and `src/services/machine-settings.ts` all call these rather than re-deriving the rules.
 
 **All permission helpers must live in `src/lib/permissions/` (CORE-ARCH-008).** Standalone permission predicates must never live scattered across feature domains (e.g., `src/lib/machines/settings-permissions.ts` being relocated to `src/lib/permissions/settings.ts` per PP-leli.5). Centralizing them in `src/lib/permissions/` ensures all authorization logic is discoverable in one place, cleanly separated from UI and data layers, and subject to audit scrutiny.
 
@@ -144,10 +146,11 @@ This has been learned twice the expensive way. `0028_natural_vengeance.sql` ship
 
 ## Input sanitization
 
-Don't roll a new `sanitize-html` allowlist. The codebase has a shared config — `~/lib/sanitize-html-config` exports `NON_TEXT_TAGS`, the canonical set of raw-text tags that must be stripped (covered by the test in `sanitize-html-config.test.ts`). The shared config is consumed by `src/lib/markdown.ts`, `src/lib/tiptap/render.ts`, and `src/lib/notifications/channels/email-channel.ts`.
+Don't roll a new `sanitize-html` allowlist. The codebase has a shared config — `~/lib/sanitize-html-config` exports `NON_TEXT_TAGS`, the canonical set of raw-text tags that must be stripped (covered by the test in `sanitize-html-config.test.ts`). The shared config is consumed by `src/lib/markdown.ts` and `src/lib/tiptap/render.ts`.
 
 For the common cases:
 
 - **Markdown-from-user-input → safe HTML**: call `renderMarkdownToHtml(...)` from `~/lib/markdown` (double-sanitizes after the markdown renderer runs).
 - **TipTap ProseMirror JSON → safe HTML for display**: use the renderer in `~/lib/tiptap/render` (this is what `RichTextDisplay` uses; the comment there reads "Output is double-sanitized — the renderer escapes all text").
+- **Plain text interpolated into HTML** (email bodies, titles, `docToPlainText` output): `escapeHtml` from `~/lib/markdown`, never `sanitize-html`. An allowlist that keeps `a[href]` turns a reporter's typed markup into a live link; notification emails had exactly this bug (PP-40qy).
 - **Raw HTML that genuinely needs sanitization in a new place**: import `sanitizeHtml` from `sanitize-html` AND `NON_TEXT_TAGS` from `~/lib/sanitize-html-config`, and pass `nonTextTags: NON_TEXT_TAGS` alongside whatever `allowedTags`/`allowedAttributes` you need. The shared `NON_TEXT_TAGS` constant is what keeps `<script>`, `<style>`, `<textarea>`, etc. from leaking through; replicating an inline allowlist that omits it is a footgun.

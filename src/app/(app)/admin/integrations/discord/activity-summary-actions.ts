@@ -46,6 +46,7 @@ async function readBotToken(
     return { ok: true, token: config?.botToken ?? null };
   } catch (error) {
     log.warn({ err: error, action }, "Failed to read the Discord bot token");
+    reportError(error, { action });
     return { ok: false };
   }
 }

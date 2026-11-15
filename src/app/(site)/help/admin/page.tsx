@@ -1,44 +1,24 @@
 import type React from "react";
 import { redirect } from "next/navigation";
-import { createClient } from "~/lib/supabase/server";
-import { db } from "~/server/db";
-import { userProfiles } from "~/server/db/schema";
-import { eq } from "drizzle-orm";
+import { getViewer } from "~/lib/auth/viewer";
 import { Forbidden } from "~/components/errors/Forbidden";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
-import { reportAuthError } from "~/lib/observability/report-error";
 
 export const metadata = {
   title: "Admin Help | PinPoint",
 };
 
 export default async function AdminHelpPage(): Promise<React.JSX.Element> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
+  const { userId, role } = await getViewer();
 
-  if (authError) {
-    reportAuthError(authError, {
-      action: "admin-help-page.auth.getUser",
-      bestEffort: true,
-    });
-  }
-
-  if (!user) {
+  if (!userId) {
     redirect("/login");
   }
 
-  const profile = await db.query.userProfiles.findFirst({
-    where: eq(userProfiles.id, user.id),
-    columns: { role: true },
-  });
-
-  if (!checkPermission("admin.access", getAccessLevel(profile?.role))) {
-    return <Forbidden role={profile?.role ?? null} />;
+  if (!checkPermission("admin.access", getAccessLevel(role))) {
+    return <Forbidden role={role} />;
   }
 
   return (

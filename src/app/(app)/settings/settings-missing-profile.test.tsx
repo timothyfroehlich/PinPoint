@@ -98,9 +98,6 @@ vi.mock("~/components/layout/PageContainer", () => ({
   PageContainer: ({ children }: { children: React.ReactNode }) => children,
 }));
 vi.mock("~/components/layout/PageHeader", () => ({ PageHeader: () => null }));
-vi.mock("~/lib/cookies/preferences", () => ({
-  getLastIssuesPath: vi.fn().mockResolvedValue("/issues"),
-}));
 
 import type React from "react";
 

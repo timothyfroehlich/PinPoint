@@ -133,6 +133,7 @@ export async function saveApronCardsAction(
           tipEnabled: card.tipEnabled,
           designEnabled: card.designEnabled,
           artEnabled: card.artEnabled,
+          codeEnabled: card.codeEnabled,
           updatedAt: savedAt,
         };
         if (card.id) {

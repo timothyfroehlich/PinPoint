@@ -2,6 +2,7 @@
 
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Plus, Info, Wrench, Check } from "lucide-react";
 import { toast } from "sonner";
 import { arrayMove } from "@dnd-kit/sortable";
@@ -19,22 +20,33 @@ import { useSaveStatus } from "~/components/machines/settings/use-save-status";
 import { pruneEmptyRows } from "~/components/machines/settings/prune-empty-rows";
 import {
   type AddSectionSpec,
+  BUILTIN_SETTINGS_TAG_NAMES,
+  BUILTIN_SETTINGS_TAGS,
   NAME_MAX,
+  type SettingsPreferredSlot,
   type SettingsSection,
   type SettingsSetData,
+  type SettingsTagRef,
 } from "~/lib/machines/settings-types";
+import {
+  builtinSlotOf,
+  compareSettingsTags,
+  SETTINGS_TAGS_HREF,
+} from "~/lib/machines/settings-tags";
 import { type ProseMirrorDoc } from "~/lib/tiptap/types";
+import { siteDayOf } from "~/lib/time-zone";
 import { cn } from "~/lib/utils";
 import {
   deleteSettingsSetAction,
   duplicateSettingsSetAction,
-  publishSettingsSetAction,
+  makeCommunitySettingsSetAction,
   saveSettingsSetAction,
   setPreferredSettingsSetAction,
-  setTournamentTagAction,
+  setSettingsSetTagAction,
   updateMachineSettingsInstructionsAction,
   updateMachineSettingsRequestsAction,
 } from "~/app/(app)/m/[initials]/(tabs)/settings/actions";
+import { createSettingsTagAction } from "~/app/(app)/c/settings-tags/actions";
 
 // Collision-free client keys (render keys + section ids + temp set ids).
 function makeKey(): string {
@@ -49,12 +61,10 @@ function isTempId(id: string): boolean {
   return id.startsWith("tmp-");
 }
 
+// The site-local day (America/Chicago), matching the `updatedAt` day the server
+// derives for a saved set.
 function today(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return siteDayOf(new Date());
 }
 
 /**
@@ -213,6 +223,14 @@ function useUnsavedChangesGuard({
   }, [enabled, hasFailed, hasUnsaved, hasUnsavedDraft, flushUnsaved]);
 }
 
+/**
+ * A built-in tag as the client shows it before the server's copy is reloaded.
+ * The UI keys tags by slug, so the placeholder id never reaches the server.
+ */
+function builtinTagRef(slot: SettingsPreferredSlot): SettingsTagRef {
+  return { id: slot, slug: slot, name: BUILTIN_SETTINGS_TAG_NAMES[slot] };
+}
+
 // Filter-chip styling. The category segment and the Tournament toggle are two
 // DIFFERENT kinds of control, so they must not look alike: a solid fill means
 // "this is the one selected category", while the independent toggle uses a
@@ -244,6 +262,10 @@ interface SettingsTabProps {
   /** Machine-level "How to change settings" (coin-door buttons, DIP locations,
    *  menu navigation). Shared by every set; edited via its own inline save. */
   settingsInstructions: ProseMirrorDoc | null;
+  /** Every settings tag, House and Tournament first (spec §3.7 order). */
+  allTags: SettingsTagRef[];
+  /** The viewer may create settings tags from a set's picker (spec §3.3). */
+  canManageTags: boolean;
 }
 
 export function SettingsTab({
@@ -254,8 +276,16 @@ export function SettingsTab({
   initialSets,
   settingsRequests,
   settingsInstructions,
+  allTags,
+  canManageTags,
 }: SettingsTabProps): React.JSX.Element {
   const [sets, setSets] = useState<SettingsSetData[]>(initialSets);
+  // Tags created from a picker this session join the server's list at once.
+  const [createdTags, setCreatedTags] = useState<SettingsTagRef[]>([]);
+  const knownTags = [
+    ...allTags,
+    ...createdTags.filter((c) => !allTags.some((t) => t.slug === c.slug)),
+  ].sort(compareSettingsTags);
   // Sets render COLLAPSED by default so every set can be scanned at once; the
   // user expands the ones they want to read.
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
@@ -264,18 +294,20 @@ export function SettingsTab({
   // Preferred/Duplicate target a persisted row, so they're gated on this.
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
 
-  // Category is single-select (All / Mine / Owner's / Community); the Tournament
-  // toggle is independent and ANDs with the category.
+  // Category is single-select (All / Mine / Community); the tag toggles
+  // (House, Tournament, then the machine's other tags) are independent and AND
+  // with the category.
   //  · Mine       — created by the viewer
-  //  · Owner's    — owner-kind sets (the machine owner's)
-  //  · Community  — community-kind sets (co-edited); mirror of Owner's
-  const [category, setCategory] = useState<
-    "all" | "mine" | "owners" | "community"
-  >("all");
-  const [tournamentFilter, setTournamentFilter] = useState(false);
-  // The viewer owns this machine → their sets ARE the owner's, so the "Owner's"
-  // chip is redundant with "Mine"; hide it.
-  const viewerIsOwner = viewerId !== null && viewerId === machineOwnerId;
+  //  · Community  — community sets (co-edited)
+  // Other people's personal sets are hidden unless preferred, until the viewer
+  // turns on "Others' personal" (machine-settings spec §2.5).
+  const [category, setCategory] = useState<"all" | "mine" | "community">("all");
+  // Slugs of the tags the list is narrowed to.
+  const [tagFilters, setTagFilters] = useState<ReadonlySet<string>>(
+    () => new Set()
+  );
+  const [showOthersPersonal, setShowOthersPersonal] = useState(false);
+  const anyTagFilter = tagFilters.size > 0;
 
   // -- Dirty explicit-save machine-level drafts (PP-8a5r) ----------------------
   // The two machine-level InlineEditableField sections ("Before you change
@@ -618,38 +650,60 @@ export function SettingsTab({
     flushUnsaved,
   });
 
-  // The preferred set is always pinned to the top. A stable sort preserves the
-  // insertion order of everything else.
+  // The preferred sets are always pinned to the top (House, then Tournament).
+  // A stable sort preserves the insertion order of everything else.
   const orderedSets = [...sets].sort(
-    (a, b) => Number(b.isPreferred) - Number(a.isPreferred)
+    (a, b) =>
+      Number(b.isPreferredHouse) - Number(a.isPreferredHouse) ||
+      Number(b.isPreferredTournament) - Number(a.isPreferredTournament)
   );
-  // Single-select category, then the independent Tournament toggle ANDs on top.
-  // "Community" is a KIND (the mirror of "Owner's"), independent of visibility —
-  // a community private draft the viewer can see still belongs to Community, so
-  // the counts partition cleanly (All = Owner's + Community). Visibility is
-  // already enforced upstream by the query (canViewSet).
-  const isCommunity = (s: SettingsSetData): boolean => !s.isOwnerSet;
   const isMine = (s: SettingsSetData): boolean =>
     viewerId !== null && s.createdById === viewerId;
+  const isOthersPersonal = (s: SettingsSetData): boolean =>
+    !s.isCommunity &&
+    !isMine(s) &&
+    !s.isPreferredHouse &&
+    !s.isPreferredTournament;
+  const hasTag = (s: SettingsSetData, slug: string): boolean =>
+    s.tags.some((t) => t.slug === slug);
+  // The pool every chip counts and filters over: all sets, less other people's
+  // personal sets unless the viewer asked for them.
+  const pool = orderedSets.filter(
+    (s) => showOthersPersonal || !isOthersPersonal(s)
+  );
   const matchesCategory = (s: SettingsSetData): boolean => {
     switch (category) {
       case "mine":
         return isMine(s);
-      case "owners":
-        return s.isOwnerSet;
       case "community":
-        return isCommunity(s);
+        return s.isCommunity;
       case "all":
         return true;
     }
   };
   const matchesFilter = (s: SettingsSetData): boolean =>
-    matchesCategory(s) && (!tournamentFilter || s.isTournament);
-  const visibleSets = orderedSets.filter(matchesFilter);
-  const mineCount = sets.filter(isMine).length;
-  const ownerCount = sets.filter((s) => s.isOwnerSet).length;
-  const communityCount = sets.filter(isCommunity).length;
-  const tournamentCount = sets.filter((s) => s.isTournament).length;
+    matchesCategory(s) && [...tagFilters].every((slug) => hasTag(s, slug));
+  const visibleSets = pool.filter(matchesFilter);
+  const mineCount = pool.filter(isMine).length;
+  const communityCount = pool.filter((s) => s.isCommunity).length;
+  // House and Tournament always, then any other tag a listed set carries (or
+  // one still lit after its last set left), by name.
+  const filterTags: SettingsTagRef[] = [
+    ...BUILTIN_SETTINGS_TAGS.map(builtinTagRef),
+    ...new Map(
+      [...pool, ...sets]
+        .flatMap((s) => s.tags)
+        .filter(
+          (t) =>
+            builtinSlotOf(t.slug) === null &&
+            (pool.some((s) => hasTag(s, t.slug)) || tagFilters.has(t.slug))
+        )
+        .map((t) => [t.slug, t] as const)
+    ).values(),
+  ].sort(compareSettingsTags);
+  const tagCount = (slug: string): number =>
+    pool.filter((s) => hasTag(s, slug)).length;
+  const othersPersonalCount = sets.filter(isOthersPersonal).length;
 
   function removeLocal(id: string): void {
     mutateSets((prev) => prev.filter((s) => s.id !== id));
@@ -681,82 +735,122 @@ export function SettingsTab({
     });
   }
 
-  async function togglePreferred(id: string): Promise<void> {
+  // Row-level flags (preferred, kind, tags) are not auto-save slices: write them
+  // to the working copy AND every baseline so they never read as pending edits.
+  function applyRowChange(
+    apply: (s: SettingsSetData) => SettingsSetData
+  ): void {
+    mutateSets((prev) => prev.map(apply));
+    for (const [bid, b] of baselineRef.current) {
+      baselineRef.current.set(bid, apply(b));
+    }
+  }
+
+  async function togglePreferred(
+    id: string,
+    slot: SettingsPreferredSlot
+  ): Promise<void> {
     if (newIds.has(id)) return;
     const set = sets.find((s) => s.id === id);
     if (!set) return;
-    const next = !set.isPreferred;
+    const key = slot === "house" ? "isPreferredHouse" : "isPreferredTournament";
+    const next = !set[key];
     const result = await setPreferredSettingsSetAction({
       id,
-      isPreferred: next,
+      slot,
+      preferred: next,
     });
     if (!result.success) {
       toast.error(result.error);
       return;
     }
-    // Preferred is a row flag, not an auto-save slice — update both working
-    // copy and baseline so it never reads as a pending edit.
-    const apply = (s: SettingsSetData): SettingsSetData => ({
-      ...s,
-      isPreferred: s.id === id ? next : next ? false : s.isPreferred,
-      // Promotion also publishes (the Owner's default is always public) —
-      // mirror the server so the card doesn't keep its "Private draft" badge.
-      ...(s.id === id && next
-        ? {
-            isPublic: true,
-            updatedBy: "You",
-            updatedById: viewerId,
-            updatedAt: today(),
-          }
-        : {}),
+    // Exclusive per slot; a set made preferred becomes a community set, so the
+    // viewer's rights on it follow the community rules from now on: curators
+    // edit and delete it (admins, who alone delete any set, always curate), and
+    // its author loses rights they held only as author.
+    applyRowChange((s) => {
+      if (s.id !== id) return next ? { ...s, [key]: false } : s;
+      if (!next || s.isCommunity) return { ...s, [key]: next };
+      return {
+        ...s,
+        [key]: true,
+        isCommunity: true,
+        canMakeCommunity: false,
+        canEdit: s.canCurate,
+        canDelete: s.canCurate,
+      };
     });
-    mutateSets((prev) => prev.map(apply));
-    for (const [bid, b] of baselineRef.current) {
-      baselineRef.current.set(bid, apply(b));
-    }
   }
 
-  // Write a boolean row-flag (Tournament / public) to both the working copy and
-  // every baseline so it never reads as a pending auto-save edit.
-  function writeFlag(
+  async function toggleTag(
     id: string,
-    key: "isTournament" | "isPublic",
-    value: boolean
-  ): void {
-    const apply = (s: SettingsSetData): SettingsSetData =>
-      s.id === id ? { ...s, [key]: value } : s;
-    mutateSets((prev) => prev.map(apply));
-    for (const [bid, b] of baselineRef.current) {
-      baselineRef.current.set(bid, apply(b));
+    tag: SettingsTagRef,
+    applied: boolean
+  ): Promise<void> {
+    if (newIds.has(id)) return;
+    const set = sets.find((s) => s.id === id);
+    if (!set || hasTag(set, tag.slug) === applied) return;
+    const write = (on: boolean): void => {
+      applyRowChange((s) =>
+        s.id !== id
+          ? s
+          : {
+              ...s,
+              tags: (on
+                ? [...s.tags.filter((t) => t.slug !== tag.slug), tag]
+                : s.tags.filter((t) => t.slug !== tag.slug)
+              ).sort(compareSettingsTags),
+            }
+      );
+    };
+    write(applied);
+    const slot = builtinSlotOf(tag.slug);
+    const result = await setSettingsSetTagAction({
+      id,
+      tag: slot ?? { tagId: tag.id },
+      applied,
+    });
+    if (!result.success) {
+      toast.error(result.error);
+      write(!applied);
     }
   }
 
-  // Toggle the non-exclusive Tournament tag (optimistic; revert on failure).
-  async function toggleTournament(id: string): Promise<void> {
-    if (newIds.has(id)) return;
-    const set = sets.find((s) => s.id === id);
-    if (!set) return;
-    const next = !set.isTournament;
-    writeFlag(id, "isTournament", next);
-    const result = await setTournamentTagAction({ id, isTournament: next });
-    if (!result.success) {
-      toast.error(result.error);
-      writeFlag(id, "isTournament", !next);
+  /** Create a settings tag from a set's picker and apply it to that set. */
+  async function createTag(id: string, name: string): Promise<string | null> {
+    if (newIds.has(id)) return "Save the set first";
+    let created: Awaited<ReturnType<typeof createSettingsTagAction>>;
+    try {
+      created = await createSettingsTagAction({ name });
+    } catch (error) {
+      console.error("Settings tag create failed", error);
+      return "Could not create the tag. Try again.";
     }
+    if (!created.ok) return created.message;
+    const tag: SettingsTagRef = created.value;
+    setCreatedTags((prev) => [...prev, tag]);
+    await toggleTag(id, tag, true);
+    return null;
   }
 
-  // Publish / unpublish a set (optimistic; revert on failure).
-  async function togglePublish(id: string): Promise<void> {
+  async function makeCommunity(id: string): Promise<void> {
     if (newIds.has(id)) return;
-    const set = sets.find((s) => s.id === id);
-    if (!set) return;
-    const next = !set.isPublic;
-    writeFlag(id, "isPublic", next);
-    const result = await publishSettingsSetAction({ id, isPublic: next });
+    const result = await makeCommunitySettingsSetAction({ id });
     if (!result.success) {
       toast.error(result.error);
-      writeFlag(id, "isPublic", !next);
+      return;
     }
+    applyRowChange((s) =>
+      s.id !== id
+        ? s
+        : {
+            ...s,
+            isCommunity: true,
+            canMakeCommunity: false,
+            canEdit: s.canCurate,
+            canDelete: s.canCurate,
+          }
+    );
   }
 
   function renameSet(id: string, name: string): void {
@@ -777,15 +871,17 @@ export function SettingsTab({
       ...original,
       id: result.id,
       name: `${original.name.slice(0, NAME_MAX - COPY_SUFFIX.length)}${COPY_SUFFIX}`,
-      isPreferred: false,
-      // Fresh private draft owned by the duplicator; ownership re-derived, but
-      // the Tournament tag carries over from the original.
-      isOwnerSet: viewerIsOwner,
-      isPublic: false,
-      isTournament: original.isTournament,
+      // A personal set of the duplicator, carrying the original's tags, never
+      // preferred (machine-settings spec §4.5).
+      isPreferredHouse: false,
+      isPreferredTournament: false,
+      isCommunity: false,
+      tags: original.tags,
       createdById: viewerId,
       canEdit: true,
-      canSetDefault: viewerIsOwner,
+      canDelete: true,
+      canMakeCommunity: true,
+      canCurate: original.canCurate,
       updatedBy: "You",
       updatedById: viewerId,
       updatedAt: today(),
@@ -815,21 +911,22 @@ export function SettingsTab({
 
   function addNewSet(): void {
     const id = makeTempSetId();
-    // Mirror the server's create rules optimistically: a set the owner makes is
-    // an owner set; the owner's first set (no existing default) auto-becomes the
-    // Owner's default and is published. Everyone else's is a private draft.
-    const isOwnerSet = viewerIsOwner;
-    const autoDefault = isOwnerSet && !sets.some((s) => s.isPreferred);
+    // Mirror the server's create rules optimistically (machine-settings spec
+    // §2.1, §4.4): a personal set tagged House — unless the machine has no
+    // preferred House set, when it becomes that, and so a community set.
+    const autoPreferred = !sets.some((s) => s.isPreferredHouse);
     const newSet: SettingsSetData = {
       id,
       name: "",
-      isPreferred: autoDefault,
-      isOwnerSet,
-      isPublic: autoDefault,
-      isTournament: false,
+      isPreferredHouse: autoPreferred,
+      isPreferredTournament: false,
+      isCommunity: autoPreferred,
+      tags: [builtinTagRef("house")],
       createdById: viewerId,
       canEdit: true,
-      canSetDefault: isOwnerSet,
+      canDelete: true,
+      canMakeCommunity: !autoPreferred,
+      canCurate: canCreate,
       updatedBy: "You",
       updatedById: viewerId,
       updatedAt: today(),
@@ -1243,6 +1340,15 @@ export function SettingsTab({
         />
       </div>
 
+      <div className="-mb-1 flex justify-end">
+        <Link
+          href={SETTINGS_TAGS_HREF}
+          className="inline-flex min-h-11 items-center text-xs font-medium text-primary underline-offset-4 hover:underline md:min-h-6"
+        >
+          All settings tags
+        </Link>
+      </div>
+
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div
           className="flex flex-wrap items-center gap-1.5"
@@ -1250,12 +1356,12 @@ export function SettingsTab({
           aria-label="Filter settings sets"
         >
           {/* Category — single-select (clicking the active one returns to All).
-              "All" is the row's reset: it clears the category AND the
-              Tournament toggle, because "All" reads as "no filters" and a user
-              who clicks it expects to see every set again (PP-tn6t review). */}
+              "All" is the row's reset: it clears the category AND the tag
+              toggles, because "All" reads as "no filters" and a user who
+              clicks it expects to see every set again (PP-tn6t review). */}
           {(
             [
-              { key: "all", label: "All", count: sets.length, show: true },
+              { key: "all", label: "All", count: pool.length, show: true },
               {
                 key: "mine",
                 label: "Mine",
@@ -1267,13 +1373,6 @@ export function SettingsTab({
                   viewerId !== null && (mineCount > 0 || category === "mine"),
               },
               {
-                key: "owners",
-                label: "Owner's",
-                count: ownerCount,
-                // Redundant with "Mine" when the viewer is the machine owner.
-                show: !viewerIsOwner,
-              },
-              {
                 key: "community",
                 label: "Community",
                 count: communityCount,
@@ -1283,12 +1382,10 @@ export function SettingsTab({
           )
             .filter((chip) => chip.show)
             .map((chip) => {
-              // "All" only reads as selected when NOTHING is filtered — a lit
-              // "All" next to a filtered list is exactly the contradiction that
-              // made the Tournament filter feel un-clearable.
+              // "All" only reads as selected when NOTHING is filtered.
               const active =
                 chip.key === "all"
-                  ? category === "all" && !tournamentFilter
+                  ? category === "all" && !anyTagFilter
                   : category === chip.key;
               return (
                 <button
@@ -1298,7 +1395,7 @@ export function SettingsTab({
                   onClick={() => {
                     if (chip.key === "all") {
                       setCategory("all");
-                      setTournamentFilter(false);
+                      setTagFilters(new Set());
                       return;
                     }
                     setCategory((c) => (c === chip.key ? "all" : chip.key));
@@ -1312,30 +1409,60 @@ export function SettingsTab({
                 </button>
               );
             })}
-          {/* Independent Tournament toggle (ANDs with the category). */}
+          {/* Independent tag toggles (AND with the category). */}
           <span
             className="mx-1 h-4 w-px shrink-0 bg-outline-variant"
             aria-hidden
           />
-          <button
-            type="button"
-            aria-pressed={tournamentFilter}
-            onClick={() => {
-              setTournamentFilter((v) => !v);
-            }}
-            className={cn(
-              chipClass,
-              tournamentFilter ? chipToggleActive : chipIdle
-            )}
-          >
-            {tournamentFilter && (
-              <Check className="size-3" aria-hidden="true" />
-            )}
-            Tournament{" "}
-            <span className={tournamentFilter ? "opacity-80" : "opacity-60"}>
-              {String(tournamentCount)}
-            </span>
-          </button>
+          {filterTags.map((tag) => {
+            const on = tagFilters.has(tag.slug);
+            return (
+              <button
+                key={tag.slug}
+                type="button"
+                aria-pressed={on}
+                onClick={() => {
+                  setTagFilters((f) => {
+                    const next = new Set(f);
+                    if (on) next.delete(tag.slug);
+                    else next.add(tag.slug);
+                    return next;
+                  });
+                }}
+                className={cn(chipClass, on ? chipToggleActive : chipIdle)}
+              >
+                {on && <Check className="size-3" aria-hidden="true" />}
+                {tag.name}{" "}
+                <span className={on ? "opacity-80" : "opacity-60"}>
+                  {String(tagCount(tag.slug))}
+                </span>
+              </button>
+            );
+          })}
+          {/* Other people's personal sets: hidden by default (spec §2.5). */}
+          {(othersPersonalCount > 0 || showOthersPersonal) && (
+            <button
+              type="button"
+              aria-pressed={showOthersPersonal}
+              onClick={() => {
+                setShowOthersPersonal((v) => !v);
+              }}
+              className={cn(
+                chipClass,
+                showOthersPersonal ? chipToggleActive : chipIdle
+              )}
+            >
+              {showOthersPersonal && (
+                <Check className="size-3" aria-hidden="true" />
+              )}
+              Others' personal{" "}
+              <span
+                className={showOthersPersonal ? "opacity-80" : "opacity-60"}
+              >
+                {String(othersPersonalCount)}
+              </span>
+            </button>
+          )}
         </div>
         {canCreate && (
           <Button size="sm" onClick={addNewSet}>
@@ -1368,7 +1495,6 @@ export function SettingsTab({
               set={set}
               isExpanded={expandedIds.has(set.id)}
               canEdit={set.canEdit}
-              canSetDefault={set.canSetDefault}
               updatedByIsOwner={
                 machineOwnerId !== null && set.updatedById === machineOwnerId
               }
@@ -1383,14 +1509,17 @@ export function SettingsTab({
               onToggleExpand={() => {
                 toggleExpand(set.id);
               }}
-              onTogglePreferred={() => {
-                void togglePreferred(set.id);
+              onTogglePreferred={(slot) => {
+                void togglePreferred(set.id, slot);
               }}
-              onToggleTournament={() => {
-                void toggleTournament(set.id);
+              allTags={knownTags}
+              canCreateTags={canManageTags}
+              onToggleTag={(tag, applied) => {
+                void toggleTag(set.id, tag, applied);
               }}
-              onTogglePublish={() => {
-                void togglePublish(set.id);
+              onCreateTag={(name) => createTag(set.id, name)}
+              onMakeCommunity={() => {
+                void makeCommunity(set.id);
               }}
               onRename={(name) => {
                 renameSet(set.id, name);

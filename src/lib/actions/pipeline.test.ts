@@ -31,7 +31,11 @@ vi.mock("~/lib/observability/report-error", () => ({
   serverActionError: mocks.serverActionError,
 }));
 
-import { createProtectedAction } from "./pipeline";
+import {
+  createProtectedAction,
+  createPublicAction,
+  type PublicActionContext,
+} from "./pipeline";
 
 const USER = { id: "user-1" };
 
@@ -61,21 +65,20 @@ describe("createProtectedAction", () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
-  it("returns VALIDATION_ERROR without checking permission or running the handler", async () => {
+  it("returns the first VALIDATION issue without checking permission or running the handler", async () => {
     const handler = vi.fn(() => Promise.resolve(ok("done")));
     const action = createProtectedAction({
-      schema: z.object({ count: z.number().int().positive() }),
+      schema: z.object({
+        count: z.number().int().positive("Count must be positive"),
+        name: z.string().min(1, "Name is required"),
+      }),
       permission: "issues.watch",
       handler,
     });
 
-    const result = await action({ count: -1 });
-
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.code).toBe("VALIDATION_ERROR");
-      expect(result.message).toContain("count");
-    }
+    await expect(action({ count: -1, name: "" })).resolves.toEqual(
+      err("VALIDATION", "Count must be positive")
+    );
     expect(mocks.getUserAccessLevel).not.toHaveBeenCalled();
     expect(mocks.checkPermission).not.toHaveBeenCalled();
     expect(handler).not.toHaveBeenCalled();
@@ -199,6 +202,93 @@ describe("createProtectedAction", () => {
     );
   });
 
+  it("maps raw FormData into the schema with mapInput", async () => {
+    const handler = vi.fn((input: { issueId: string }) =>
+      Promise.resolve(ok(input.issueId))
+    );
+    const action = createProtectedAction({
+      schema: z.object({ issueId: z.string().min(1, "Pick an issue") }),
+      mapInput: (formData: FormData) => ({ issueId: formData.get("issueId") }),
+      handler,
+    });
+    const filled = new FormData();
+    filled.set("issueId", "issue-1");
+
+    await expect(action(filled)).resolves.toEqual(ok("issue-1"));
+    await expect(action(new FormData())).resolves.toEqual(
+      err("VALIDATION", "Invalid input: expected string, received null")
+    );
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it("hands the loaded resource to the permission callback and the handler", async () => {
+    const machine = { initials: "AFM", ownerId: "owner-99" };
+    const load = vi.fn((input: { initials: string }) =>
+      Promise.resolve(ok({ ...machine, initials: input.initials }))
+    );
+    const action = createProtectedAction({
+      schema: z.object({ initials: z.string() }),
+      load,
+      permission: (_input, { user, resource }) => ({
+        permission: "machines.edit",
+        ownershipContext: { userId: user.id, machineOwnerId: resource.ownerId },
+      }),
+      handler: (_input, { resource }) => Promise.resolve(ok(resource.initials)),
+    });
+
+    await expect(action({ initials: "AFM" })).resolves.toEqual(ok("AFM"));
+    expect(load).toHaveBeenCalledWith(
+      { initials: "AFM" },
+      { user: USER, accessLevel: "member" }
+    );
+    expect(mocks.checkPermission).toHaveBeenCalledWith(
+      "machines.edit",
+      "member",
+      { userId: "user-1", machineOwnerId: "owner-99" }
+    );
+  });
+
+  it("returns the load error before checking permission or running the handler", async () => {
+    const handler = vi.fn(() => Promise.resolve(ok("done")));
+    const action = createProtectedAction({
+      schema: z.string(),
+      load: () => Promise.resolve(err("NOT_FOUND", "Issue not found")),
+      permission: "issues.update.reporting",
+      handler,
+    });
+
+    await expect(action("issue-1")).resolves.toEqual(
+      err("NOT_FOUND", "Issue not found")
+    );
+    expect(mocks.checkPermission).not.toHaveBeenCalled();
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("uses the action's own FORBIDDEN and SERVER messages", async () => {
+    mocks.checkPermission.mockReturnValueOnce(false);
+    const failure = new Error("database detail");
+    const action = createProtectedAction({
+      actionName: "updateIssueStatus",
+      permission: "issues.update.reporting",
+      forbiddenMessage: "You do not have permission to update this issue",
+      serverErrorMessage: "Failed to update status",
+      handler: () => Promise.reject(failure),
+    });
+
+    await expect(action(undefined)).resolves.toEqual(
+      err("FORBIDDEN", "You do not have permission to update this issue")
+    );
+    await expect(action(undefined)).resolves.toEqual(
+      err("SERVER", "Failed to update status")
+    );
+    expect(mocks.serverActionError).toHaveBeenCalledWith(
+      failure,
+      "SERVER",
+      "Failed to update status",
+      { action: "updateIssueStatus" }
+    );
+  });
+
   it("infers the input and complete result types", () => {
     const action = createProtectedAction({
       schema: z.object({ value: z.string() }),
@@ -222,11 +312,89 @@ describe("createProtectedAction", () => {
           { length: number },
           | "HANDLER_ERROR"
           | "UNAUTHORIZED"
-          | "VALIDATION_ERROR"
+          | "VALIDATION"
           | "FORBIDDEN"
           | "SERVER"
         >
       >
+    >();
+  });
+
+  it("types the raw argument from mapInput and adds load errors to the result", () => {
+    const action = createProtectedAction({
+      schema: z.object({ issueId: z.string() }),
+      mapInput: (formData: FormData) => ({ issueId: formData.get("issueId") }),
+      load: ({ issueId }) =>
+        Promise.resolve(
+          issueId ? ok({ issueNumber: 7 }) : err("NOT_FOUND", "Issue not found")
+        ),
+      handler: (_input, { resource }) => {
+        expectTypeOf(resource).toEqualTypeOf<{ issueNumber: number }>();
+        return Promise.resolve(ok(resource.issueNumber));
+      },
+    });
+
+    expectTypeOf(action).parameter(0).toEqualTypeOf<FormData>();
+    expectTypeOf(action).returns.toEqualTypeOf<
+      Promise<
+        Result<
+          number,
+          "NOT_FOUND" | "UNAUTHORIZED" | "VALIDATION" | "FORBIDDEN" | "SERVER"
+        >
+      >
+    >();
+  });
+});
+
+describe("createPublicAction", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.checkPermission.mockReturnValue(true);
+  });
+
+  it("runs for a signed-out caller as unauthenticated without a profile lookup", async () => {
+    mocks.getUser.mockResolvedValue({ data: { user: null } });
+    const handler = vi.fn((input: string, context: PublicActionContext) =>
+      Promise.resolve(ok({ input, userId: context.user?.id ?? null }))
+    );
+    const action = createPublicAction({
+      schema: z.string(),
+      permission: "issues.report",
+      handler,
+    });
+
+    await expect(action("AFM")).resolves.toEqual(
+      ok({ input: "AFM", userId: null })
+    );
+    expect(mocks.getUserAccessLevel).not.toHaveBeenCalled();
+    expect(mocks.checkPermission).toHaveBeenCalledWith(
+      "issues.report",
+      "unauthenticated",
+      undefined
+    );
+  });
+
+  it("resolves a signed-in caller's access level", async () => {
+    mocks.getUser.mockResolvedValue({ data: { user: USER } });
+    mocks.getUserAccessLevel.mockResolvedValue("member");
+    const action = createPublicAction({
+      handler: (_input: undefined, { user, accessLevel }) =>
+        Promise.resolve(ok({ userId: user?.id, accessLevel })),
+    });
+
+    await expect(action(undefined)).resolves.toEqual(
+      ok({ userId: "user-1", accessLevel: "member" })
+    );
+    expect(mocks.getUserAccessLevel).toHaveBeenCalledWith("user-1");
+  });
+
+  it("never returns UNAUTHORIZED in its result type", () => {
+    const action = createPublicAction({
+      handler: (_input: undefined) => Promise.resolve(ok(true)),
+    });
+
+    expectTypeOf(action).returns.toEqualTypeOf<
+      Promise<Result<boolean, "VALIDATION" | "FORBIDDEN" | "SERVER">>
     >();
   });
 });

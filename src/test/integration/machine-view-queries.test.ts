@@ -34,6 +34,8 @@ describe("machine view database pipeline", () => {
   const ownerOneId = randomUUID();
   const ownerTwoId = randomUUID();
   const collectionId = randomUUID();
+  /** Holds exactly Owner One's machines, AAA and BBB. */
+  const ownerOneCollectionId = randomUUID();
   const alphaId = randomUUID();
   const betaId = randomUUID();
   const gammaId = randomUUID();
@@ -72,14 +74,27 @@ describe("machine view database pipeline", () => {
         ownerId: ownerTwoId,
       }),
     ]);
-    await db.insert(collections).values({
-      id: collectionId,
-      name: "Mixed Collection",
-      ownerId: ownerOneId,
-    });
+    await db.insert(collections).values([
+      { id: collectionId, name: "Mixed Collection", ownerId: ownerOneId },
+      {
+        id: ownerOneCollectionId,
+        name: "Owner One's Machines",
+        ownerId: ownerOneId,
+      },
+    ]);
     await db.insert(collectionMachines).values([
       { collectionId, machineId: alphaId, addedBy: ownerOneId },
       { collectionId, machineId: gammaId, addedBy: ownerOneId },
+      {
+        collectionId: ownerOneCollectionId,
+        machineId: alphaId,
+        addedBy: ownerOneId,
+      },
+      {
+        collectionId: ownerOneCollectionId,
+        machineId: betaId,
+        addedBy: ownerOneId,
+      },
     ]);
   });
 
@@ -152,7 +167,7 @@ describe("machine view database pipeline", () => {
     expect(dates.get(alphaId)).toEqual(selected);
   });
 
-  it("keeps all, collection, and owner scopes exact", async () => {
+  it("keeps all and collection scopes exact", async () => {
     const db = await getTestDb();
     const searchParams = new URLSearchParams({
       presence: "all",
@@ -163,22 +178,18 @@ describe("machine view database pipeline", () => {
     const all = await loadMachineViewFromDatabase(tx, {
       scope: { kind: "all" },
       preset: "machines",
+      viewerId: null,
       searchParams,
     });
     const collection = await loadMachineViewFromDatabase(tx, {
       scope: { kind: "collection", collectionId },
       preset: "collection",
-      searchParams,
-    });
-    const owner = await loadMachineViewFromDatabase(tx, {
-      scope: { kind: "owner", ownerId: ownerOneId },
-      preset: "collection",
+      viewerId: null,
       searchParams,
     });
 
     expect(all.rows.map((row) => row.initials)).toEqual(["AAA", "BBB", "CCC"]);
     expect(collection.rows.map((row) => row.initials)).toEqual(["AAA", "CCC"]);
-    expect(owner.rows.map((row) => row.initials)).toEqual(["AAA", "BBB"]);
     expect(all.rows.every((row) => row.lastServicedAt === undefined)).toBe(
       true
     );
@@ -199,6 +210,7 @@ describe("machine view database pipeline", () => {
     const result = await loadMachineViewFromDatabase(asDbOrTx(db), {
       scope: { kind: "all" },
       preset: "machines",
+      viewerId: null,
       searchParams: new URLSearchParams({
         presence: "all",
         columns: "machine",
@@ -232,6 +244,7 @@ describe("machine view database pipeline", () => {
     const result = await loadMachineViewFromDatabase(asDbOrTx(db), {
       scope: { kind: "all" },
       preset: "machines",
+      viewerId: null,
       searchParams: new URLSearchParams({
         presence: "all",
         columns: "machine",
@@ -280,18 +293,19 @@ describe("machine view database pipeline", () => {
     const all = await loadMachineViewFromDatabase(tx, {
       scope: { kind: "all" },
       preset: "machines",
+      viewerId: null,
       searchParams,
     });
     const collection = await loadMachineViewFromDatabase(tx, {
       scope: { kind: "collection", collectionId },
       preset: "collection",
+      viewerId: null,
       searchParams,
     });
 
     expect(all.totalCount).toBe(0);
-    // Gamma is Removed: not counted, not in the headline total.
+    // Gamma is Removed: not counted.
     expect(all.summary.presence).toEqual({
-      total: 2,
       byPresence: {
         on_the_floor: 1,
         off_the_floor: 0,
@@ -304,8 +318,12 @@ describe("machine view database pipeline", () => {
       byStatus: { operational: 0, needs_service: 0, unplayable: 1 },
     });
     // The Collection tab holds Alpha and Gamma: only its own scope counts.
-    expect(collection.summary.presence.total).toBe(1);
-    expect(collection.summary.presence.byPresence.on_the_floor).toBe(1);
+    expect(collection.summary.presence.byPresence).toEqual({
+      on_the_floor: 1,
+      off_the_floor: 0,
+      on_loan: 0,
+      pending_arrival: 0,
+    });
     expect(collection.summary.playability.onTheFloor).toBe(1);
   });
 
@@ -320,18 +338,23 @@ describe("machine view database pipeline", () => {
       role: "member",
     });
 
-    // Owner Two's only machine is outside Owner One's Collection, and the
-    // invited person and Unassigned own nothing at all.
+    // Owner Two's only machine is outside this Collection, and the invited
+    // person and Unassigned own nothing at all.
     const result = await loadMachineViewFromDatabase(asDbOrTx(db), {
-      scope: { kind: "owner", ownerId: ownerOneId },
+      scope: { kind: "collection", collectionId: ownerOneCollectionId },
       preset: "collection",
+      viewerId: null,
       searchParams: new URLSearchParams({
         owner: `${ownerTwoId},${invitedId},unassigned`,
         columns: "machine",
       }),
     });
 
-    expect(result.state.owner).toEqual([ownerTwoId, invitedId, "unassigned"]);
+    // Canonical order: Unassigned, then people by id.
+    expect(result.state.owner).toEqual([
+      "unassigned",
+      ...[ownerTwoId, invitedId].sort(),
+    ]);
     expect(result.rows).toEqual([]);
     expect(result.totalCount).toBe(0);
     // The scope still bounds the tab; the filter never widens it.
@@ -352,22 +375,60 @@ describe("machine view database pipeline", () => {
     const result = await loadMachineViewFromDatabase(asDbOrTx(db), {
       scope: { kind: "collection", collectionId },
       preset: "collection",
+      viewerId: null,
       searchParams: new URLSearchParams({
         owner: `${ownerOneId},${ownerTwoId}`,
         columns: "machine",
       }),
     });
 
-    expect(result.state.owner).toEqual([ownerOneId, ownerTwoId]);
+    expect(result.state.owner).toEqual([ownerOneId, ownerTwoId].sort());
     // Beta belongs to Owner One but is outside the Collection.
     expect(result.rows.map((row) => row.initials)).toEqual(["AAA", "CCC"]);
+  });
+
+  it("resolves the Owner me value to whoever is viewing (machine-views §4.2)", async () => {
+    const db = await getTestDb();
+    const load = (
+      viewerId: string | null
+    ): ReturnType<typeof loadMachineViewFromDatabase> =>
+      loadMachineViewFromDatabase(asDbOrTx(db), {
+        scope: { kind: "all" },
+        preset: "machines",
+        viewerId,
+        searchParams: new URLSearchParams({
+          owner: "me",
+          presence: "all",
+          columns: "machine",
+        }),
+      });
+
+    const ownerOne = await load(ownerOneId);
+    // The URL keeps `me`; only the filter resolves it.
+    expect(ownerOne.state.owner).toEqual(["me"]);
+    expect(ownerOne.rows.map((row) => row.initials)).toEqual(["AAA", "BBB"]);
+    expect(ownerOne.offersMe).toBe(true);
+    // Me is a shortcut, never a person among the options.
+    expect(ownerOne.ownerOptions.map((option) => option.id)).not.toContain(
+      "me"
+    );
+
+    const ownerTwo = await load(ownerTwoId);
+    expect(ownerTwo.rows.map((row) => row.initials)).not.toContain("AAA");
+
+    // Anonymous visitors have no Me: the value is dropped (list-views §9.3).
+    const anonymous = await load(null);
+    expect(anonymous.state.owner).toEqual([]);
+    expect(anonymous.offersMe).toBe(false);
+    expect(anonymous.totalCount).toBe(anonymous.scopeCount);
   });
 
   it("drops owner values that name no one (list-views §10.14)", async () => {
     const db = await getTestDb();
     const result = await loadMachineViewFromDatabase(asDbOrTx(db), {
-      scope: { kind: "owner", ownerId: ownerOneId },
+      scope: { kind: "collection", collectionId: ownerOneCollectionId },
       preset: "collection",
+      viewerId: null,
       searchParams: new URLSearchParams({
         owner: `${ownerOneId},${randomUUID()},not-a-person`,
         columns: "machine",

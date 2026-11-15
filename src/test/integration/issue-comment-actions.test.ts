@@ -18,18 +18,17 @@
  *       2. admin soft-delete → eventData.deletedBy="admin"
  *       3. unauthenticated → UNAUTHORIZED + read-only invariant (no row mutated)
  *       4. non-existent comment → NOT_FOUND + read-only invariant
- *       5. system comment → UNAUTHORIZED + read-only invariant
- *       6. non-admin trying to delete another user's comment → UNAUTHORIZED + read-only
+ *       5. system comment → FORBIDDEN + read-only invariant
+ *       6. non-admin trying to delete another user's comment → FORBIDDEN + read-only
  *     addCommentAction:
  *       7. happy path → comment row persisted in real DB
  *     editCommentAction:
  *       8. author edits own comment → content updated in real DB
- *       9. non-author (including admin) → UNAUTHORIZED + read-only invariant
- *
- *   KEEP-unit (2 blocks, stayed in source):
+ *       9. non-author (including admin) → FORBIDDEN + read-only invariant
+ *   CONSOLIDATED (from retired delete-comment-audit.test.ts):
  *     deleteCommentAction:
- *       - "should return VALIDATION error for invalid commentId"   (pure Zod)
- *       - "should return VALIDATION error for missing commentId"   (pure Zod)
+ *       - "returns VALIDATION error for invalid commentId and leaves database untouched"
+ *       - "returns VALIDATION error for missing commentId and leaves database untouched"
  *
  * Permissions: deleteCommentAction uses checkPermission("comments.delete") and
  * checkPermission("comments.delete.any"). We drive those with REAL permission
@@ -37,7 +36,7 @@
  * authorId === userId check — no matrix call, but we still verify real row state.
  *
  * Read-only invariants on denied paths (lesson from Wave 3 Copilot review):
- * after every UNAUTHORIZED/NOT_FOUND error, we assert the issueComments table
+ * after every UNAUTHORIZED/FORBIDDEN/NOT_FOUND error, we assert the issueComments table
  * row is unchanged — confirming the action bailed out before any DB write.
  *
  * External boundaries mocked (never reach network):
@@ -62,6 +61,7 @@ import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 import {
   authUsers,
   issueComments,
+  issueImages,
   issues,
   machines,
   userProfiles,
@@ -337,8 +337,8 @@ describe("deleteCommentAction — integration (PP-x4li.1.4)", () => {
     expect(row.isSystem).toBe(false);
   });
 
-  // Block 5: system comment → UNAUTHORIZED + read-only invariant
-  it("returns UNAUTHORIZED for system comments and does not mutate them", async () => {
+  // Block 5: system comment → FORBIDDEN + read-only invariant
+  it("returns FORBIDDEN for system comments and does not mutate them", async () => {
     // Create a system comment (audit event row)
     const db = await getTestDb();
     const [systemComment] = await db
@@ -362,7 +362,7 @@ describe("deleteCommentAction — integration (PP-x4li.1.4)", () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.code).toBe("UNAUTHORIZED");
+      expect(result.code).toBe("FORBIDDEN");
       expect(result.message).toBe("System comments cannot be deleted");
     }
 
@@ -375,8 +375,8 @@ describe("deleteCommentAction — integration (PP-x4li.1.4)", () => {
     expect(row.eventData).toMatchObject({ type: "status_changed" });
   });
 
-  // Block 6: non-admin member tries to delete another user's comment → UNAUTHORIZED + read-only
-  it("returns UNAUTHORIZED when non-admin tries to delete another user's comment", async () => {
+  // Block 6: non-admin member tries to delete another user's comment → FORBIDDEN + read-only
+  it("returns FORBIDDEN when non-admin tries to delete another user's comment", async () => {
     // OTHER_MEMBER_ID is a member who did NOT author the comment (MEMBER_ID did)
     await mockAuth(OTHER_MEMBER_ID);
     const { deleteCommentAction } = await import("~/app/(app)/issues/actions");
@@ -388,7 +388,7 @@ describe("deleteCommentAction — integration (PP-x4li.1.4)", () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.code).toBe("UNAUTHORIZED");
+      expect(result.code).toBe("FORBIDDEN");
     }
 
     // Read-only invariant: comment row unchanged
@@ -399,6 +399,49 @@ describe("deleteCommentAction — integration (PP-x4li.1.4)", () => {
       .where(eq(issueComments.id, commentId));
     expect(row.isSystem).toBe(false);
     expect(row.authorId).toBe(MEMBER_ID);
+  });
+
+  it("returns VALIDATION error for invalid commentId and leaves database untouched", async () => {
+    await mockAuth(MEMBER_ID);
+    const { deleteCommentAction } = await import("~/app/(app)/issues/actions");
+
+    const formData = new FormData();
+    formData.append("commentId", "not-a-uuid");
+
+    const result = await deleteCommentAction(undefined, formData);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("VALIDATION");
+    }
+
+    const db = await getTestDb();
+    const [row] = await db
+      .select()
+      .from(issueComments)
+      .where(eq(issueComments.id, commentId));
+    expect(row.isSystem).toBe(false);
+  });
+
+  it("returns VALIDATION error for missing commentId and leaves database untouched", async () => {
+    await mockAuth(MEMBER_ID);
+    const { deleteCommentAction } = await import("~/app/(app)/issues/actions");
+
+    const formData = new FormData();
+
+    const result = await deleteCommentAction(undefined, formData);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("VALIDATION");
+    }
+
+    const db = await getTestDb();
+    const [row] = await db
+      .select()
+      .from(issueComments)
+      .where(eq(issueComments.id, commentId));
+    expect(row.isSystem).toBe(false);
   });
 });
 
@@ -481,6 +524,187 @@ describe("addCommentAction — integration (PP-x4li.1.4)", () => {
       ok: true,
       value: { issueId, commentId: rows[0].id },
     });
+  });
+
+  it("stores the pathname the blobUrl names, not the client's blobPathname (PP-9my0)", async () => {
+    await mockAuth(MEMBER_ID);
+    const { addCommentAction } = await import("~/app/(app)/issues/actions");
+
+    const blobUrl =
+      "https://test-blob.public.blob.vercel-storage.com/issue-images/pending/1-photo.jpg";
+    const formData = new FormData();
+    formData.append("issueId", issueId);
+    formData.append("comment", JSON.stringify(validCommentDoc));
+    formData.append(
+      "imagesMetadata",
+      JSON.stringify([
+        {
+          blobUrl,
+          blobPathname: "avatars/someone-else.png",
+          originalFilename: "photo.jpg",
+          fileSizeBytes: 1024,
+          mimeType: "image/jpeg",
+        },
+      ])
+    );
+
+    const result = await addCommentAction(undefined, formData);
+
+    expect(result.ok).toBe(true);
+    const db = await getTestDb();
+    const rows = await db
+      .select()
+      .from(issueImages)
+      .where(eq(issueImages.issueId, issueId));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.fullImageUrl).toBe(blobUrl);
+    expect(rows[0]?.fullBlobPathname).toBe("issue-images/pending/1-photo.jpg");
+  });
+
+  it("returns UNAUTHORIZED when caller is not authenticated and leaves DB untouched", async () => {
+    await mockAuth(null);
+    const { addCommentAction } = await import("~/app/(app)/issues/actions");
+
+    const formData = new FormData();
+    formData.append("issueId", issueId);
+    formData.append("comment", JSON.stringify(validCommentDoc));
+
+    const result = await addCommentAction(undefined, formData);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("UNAUTHORIZED");
+    }
+
+    const db = await getTestDb();
+    const rows = await db
+      .select()
+      .from(issueComments)
+      .where(eq(issueComments.issueId, issueId));
+    expect(rows).toHaveLength(0);
+  });
+
+  it("validates input and returns VALIDATION for empty comment", async () => {
+    await mockAuth(MEMBER_ID);
+    const { addCommentAction } = await import("~/app/(app)/issues/actions");
+
+    const formData = new FormData();
+    formData.append("issueId", issueId);
+    formData.append("comment", "");
+
+    const result = await addCommentAction(undefined, formData);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("VALIDATION");
+    }
+
+    const db = await getTestDb();
+    const rows = await db
+      .select()
+      .from(issueComments)
+      .where(eq(issueComments.issueId, issueId));
+    expect(rows).toHaveLength(0);
+  });
+
+  it.each([
+    ["malformed JSON", "{not json", "Invalid comment format"],
+    [
+      "a non-ProseMirror document",
+      JSON.stringify({ type: "paragraph" }),
+      "Invalid comment format",
+    ],
+    [
+      "a document with no text",
+      JSON.stringify({ type: "doc", content: [{ type: "paragraph" }] }),
+      "Comment cannot be empty",
+    ],
+  ])(
+    "returns VALIDATION for %s and leaves DB untouched",
+    async (_case, comment, message) => {
+      await mockAuth(MEMBER_ID);
+      const { addCommentAction } = await import("~/app/(app)/issues/actions");
+
+      const formData = new FormData();
+      formData.append("issueId", issueId);
+      formData.append("comment", comment);
+
+      const result = await addCommentAction(undefined, formData);
+
+      expect(result).toEqual({ ok: false, code: "VALIDATION", message });
+
+      const db = await getTestDb();
+      const rows = await db
+        .select()
+        .from(issueComments)
+        .where(eq(issueComments.issueId, issueId));
+      expect(rows).toHaveLength(0);
+    }
+  );
+
+  it("rejects comments exceeding COMMENT_MAX images with VALIDATION error", async () => {
+    await mockAuth(MEMBER_ID);
+    const { addCommentAction } = await import("~/app/(app)/issues/actions");
+
+    const excessiveImages = Array.from({ length: 5 }, (_, i) => ({
+      blobUrl: `https://test-blob.public.blob.vercel-storage.com/issue-images/test-${i}.jpg`,
+      blobPathname: `issue-images/test-${i}.jpg`,
+      originalFilename: `test-${i}.jpg`,
+      fileSizeBytes: 1024,
+      mimeType: "image/jpeg",
+    }));
+
+    const formData = new FormData();
+    formData.append("issueId", issueId);
+    formData.append("comment", JSON.stringify(validCommentDoc));
+    formData.append("imagesMetadata", JSON.stringify(excessiveImages));
+
+    const result = await addCommentAction(undefined, formData);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("VALIDATION");
+      expect(result.message).toContain("Maximum 4 images allowed per comment");
+    }
+
+    const db = await getTestDb();
+    const rows = await db
+      .select()
+      .from(issueComments)
+      .where(eq(issueComments.issueId, issueId));
+    expect(rows).toHaveLength(0);
+  });
+
+  it("returns SERVER error and does not mutate database when addIssueComment fails", async () => {
+    await mockAuth(MEMBER_ID);
+    const issuesService = await import("~/services/issues");
+    const spy = vi
+      .spyOn(issuesService, "addIssueComment")
+      .mockRejectedValueOnce(new Error("Database connection failure"));
+
+    try {
+      const { addCommentAction } = await import("~/app/(app)/issues/actions");
+
+      const formData = new FormData();
+      formData.append("issueId", issueId);
+      formData.append("comment", JSON.stringify(validCommentDoc));
+
+      const result = await addCommentAction(undefined, formData);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("SERVER");
+      }
+
+      const db = await getTestDb();
+      const rows = await db
+        .select()
+        .from(issueComments)
+        .where(eq(issueComments.issueId, issueId));
+      expect(rows).toHaveLength(0);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 
@@ -598,8 +822,8 @@ describe("editCommentAction — integration (PP-x4li.1.4)", () => {
     expect(row.authorId).toBe(AUTHOR_ID);
   });
 
-  // Block 9: non-author (including admin) → UNAUTHORIZED + read-only invariant
-  it("returns UNAUTHORIZED and does not mutate the comment when a non-author tries to edit", async () => {
+  // Block 9: non-author (including admin) → FORBIDDEN + read-only invariant
+  it("returns FORBIDDEN and does not mutate the comment when a non-author tries to edit", async () => {
     // NON_AUTHOR_ID is an admin, but editCommentAction enforces author-only at
     // the action boundary (admins can delete but cannot edit others' comments).
     await mockAuth(NON_AUTHOR_ID);
@@ -613,7 +837,7 @@ describe("editCommentAction — integration (PP-x4li.1.4)", () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.code).toBe("UNAUTHORIZED");
+      expect(result.code).toBe("FORBIDDEN");
     }
 
     // Read-only invariant: comment row content unchanged

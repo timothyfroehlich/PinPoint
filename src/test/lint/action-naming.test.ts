@@ -8,8 +8,8 @@ describe("isConformingActionFilename", () => {
     "watcher-actions.ts",
     "export-action.ts",
     "test-discord-dm-action.ts",
-    "src/server/actions/images.ts",
-    "src\\server\\actions\\images.ts",
+    "src/lib/blob/image-actions.ts",
+    "src\\lib\\blob\\image-actions.ts",
     "src/lib/pinballmap/actions.ts",
     "src/app/(app)/issues/actions.ts",
   ])("accepts conforming name: %s", (filename) => {

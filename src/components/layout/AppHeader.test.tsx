@@ -2,6 +2,7 @@ import React from "react";
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { usePathname } from "next/navigation";
+import { rememberListUrl } from "~/lib/list-view/return-to-list";
 import { AppHeader } from "./AppHeader";
 
 // Mock dependencies
@@ -103,14 +104,12 @@ const defaultAuthProps = {
   userName: "Alex Smith",
   role: "member" as const,
   notifications: [],
-  issuesPath: "/issues",
   newChangelogCount: 0,
 };
 
 const defaultUnauthProps = {
   isAuthenticated: false as const,
   notifications: [],
-  issuesPath: "/issues",
   newChangelogCount: 0,
 };
 
@@ -176,14 +175,14 @@ describe("AppHeader", () => {
       ]);
     });
 
-    it("uses issuesPath for the Issues link", () => {
-      render(
-        <AppHeader {...defaultAuthProps} issuesPath="/issues?status=open" />
-      );
+    it("reopens the last Issues list this tab session used (list-views §11.1)", () => {
+      rememberListUrl("/issues", "/issues?status=all");
+      render(<AppHeader {...defaultAuthProps} />);
       expect(screen.getByTestId("nav-issues")).toHaveAttribute(
         "href",
-        "/issues?status=open"
+        "/issues?status=all"
       );
+      window.sessionStorage.clear();
     });
 
     it("highlights the active nav item based on pathname", () => {

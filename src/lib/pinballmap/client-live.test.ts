@@ -911,3 +911,122 @@ describe("live client — refuses to reach PinballMap outside production", () =>
     expect(calls[0]?.init?.method).toBe("POST");
   });
 });
+
+describe("live client — request timeouts", () => {
+  /**
+   * A fetch that never answers: it settles only when its signal aborts, the
+   * way a real fetch rejects on abort. Without a deadline the call hangs and
+   * the test times out.
+   */
+  function installHangingFetch(): void {
+    globalThis.fetch = vi.fn(
+      (_input: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          const signal = init?.signal;
+          if (!signal) return;
+          signal.addEventListener(
+            "abort",
+            () => {
+              reject(
+                signal.reason instanceof Error
+                  ? signal.reason
+                  : new Error("aborted")
+              );
+            },
+            { once: true }
+          );
+        })
+    );
+  }
+
+  /**
+   * Fake timers do not drive `AbortSignal.timeout`, so the spy records the
+   * budget each request asks for and hands back a deadline that fires in
+   * milliseconds.
+   */
+  function shrinkDeadlines(): number[] {
+    const budgets: number[] = [];
+    const realTimeout = AbortSignal.timeout.bind(AbortSignal);
+    vi.spyOn(AbortSignal, "timeout").mockImplementation((ms) => {
+      budgets.push(ms);
+      return realTimeout(5);
+    });
+    return budgets;
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const READS = [
+    ["fetchLocation", (c) => c.fetchLocation(26454), 15_000],
+    ["fetchRegionLmxes", (c) => c.fetchRegionLmxes("austin"), 15_000],
+    ["fetchRegionLocations", (c) => c.fetchRegionLocations("austin"), 15_000],
+    ["fetchMachineGroups", (c) => c.fetchMachineGroups(), 15_000],
+    ["fetchRegions", (c) => c.fetchRegions(), 15_000],
+    ["fetchCatalog", (c) => c.fetchCatalog(), 60_000],
+  ] satisfies [string, (c: PinballMapClient) => Promise<unknown>, number][];
+
+  it.each(READS)(
+    "%s aborts a hung request and reports a transient read failure",
+    async (_method, call, budget) => {
+      installHangingFetch();
+      const budgets = shrinkDeadlines();
+
+      const err: unknown = await call(createLiveClient(null)).catch(
+        (e: unknown) => e
+      );
+
+      expect(err).toBeInstanceOf(PinballMapReadError);
+      expect(err instanceof PinballMapReadError ? err.reason : null).toBe(
+        "transient"
+      );
+      expect(budgets).toEqual([budget]);
+    }
+  );
+
+  const WRITES = [
+    ["authDetails", (c) => c.authDetails("operator", "hunter2")],
+    [
+      "addMachine",
+      (c) =>
+        c.addMachine({ credentials: CREDS, locationId: 26454, machineId: 10 }),
+    ],
+    ["removeMachine", (c) => c.removeMachine({ credentials: CREDS, lmxId: 1 })],
+    [
+      "postCondition",
+      (c) => c.postCondition({ credentials: CREDS, lmxId: 1, comment: "hi" }),
+    ],
+    [
+      "setInsiderConnected",
+      (c) =>
+        c.setInsiderConnected({ credentials: CREDS, lmxId: 1, enabled: true }),
+    ],
+    [
+      "confirmLineup",
+      (c) => c.confirmLineup({ credentials: CREDS, locationId: 26454 }),
+    ],
+  ] satisfies [string, (c: PinballMapClient) => Promise<unknown>][];
+
+  it.each(WRITES)(
+    "%s aborts a hung request after its 20s budget and reports transient",
+    async (_method, call) => {
+      installHangingFetch();
+      const budgets = shrinkDeadlines();
+      const warn = vi.spyOn(log, "warn").mockImplementation(() => undefined);
+
+      expect(await call(createLiveClient(null))).toEqual({
+        ok: false,
+        reason: "transient",
+      });
+      expect(budgets).toEqual([20_000]);
+      expect(warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "pinballmap.fetch",
+          timeoutMs: 20_000,
+        }),
+        "PinballMap fetch failed"
+      );
+    }
+  );
+});

@@ -21,14 +21,21 @@ import {
   invitedUsers,
   issueComments,
   issues,
+  machineSettingsSetTags,
+  machineSettingsSets,
   machines,
   pinballmapAbandonedListings,
   pinballmapCatalog,
   pinballmapState,
+  settingsTags,
   timelineEvents,
   userProfiles,
 } from "~/server/db/schema";
-import { docToPlainText } from "~/lib/tiptap/types";
+import {
+  docToPlainText,
+  plainTextToDoc,
+  type ProseMirrorDoc,
+} from "~/lib/tiptap/types";
 import {
   VALID_MACHINE_PRESENCE_STATUSES,
   type MachinePresenceStatus,
@@ -59,11 +66,19 @@ vi.mock("next/server", () => ({
 
 import { runAddIssueComment } from "~/lib/mcp/tools/add-issue-comment";
 import { runAddMachine } from "~/lib/mcp/tools/add-machine";
-import { runCreateIssue } from "~/lib/mcp/tools/create-issue";
+import {
+  createIssueSchema,
+  runCreateIssue,
+} from "~/lib/mcp/tools/create-issue";
+import {
+  createSettingsSetSchema,
+  runCreateSettingsSet,
+} from "~/lib/mcp/tools/create-settings-set";
 import { runGetIssue } from "~/lib/mcp/tools/get-issue";
 import { runGetMachine } from "~/lib/mcp/tools/get-machine";
 import { registerPinpointTools } from "~/lib/mcp/tools";
 import { runListIssues } from "~/lib/mcp/tools/list-issues";
+import { runListSettingsSets } from "~/lib/mcp/tools/list-settings-sets";
 import {
   listMachinesSchema,
   runListMachines,
@@ -77,7 +92,18 @@ import type { McpMachinePinballmap } from "~/lib/mcp/tools/pinballmap-block";
 import { updateMachineSchema as updateMachineFormSchema } from "~/app/(app)/m/schemas";
 import { updateMachinePbmLink } from "~/services/machines";
 import { REMOVED_MACHINE_REPORT_ERROR } from "~/services/issues";
-import { runUpdateIssue } from "~/lib/mcp/tools/update-issue";
+import {
+  ensureBuiltinSettingsTags,
+  updateSettingsSet,
+} from "~/services/machine-settings";
+import {
+  runUpdateIssue,
+  updateIssueSchema,
+} from "~/lib/mcp/tools/update-issue";
+import {
+  runUpdateSettingsSet,
+  updateSettingsSetSchema,
+} from "~/lib/mcp/tools/update-settings-set";
 import {
   runUpdateMachine,
   updateMachineSchema,
@@ -1514,6 +1540,29 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       expect(row?.title).toBe("left flipper dead");
     });
 
+    it("stores a multi-line title as one line (PP-61u5)", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine();
+
+      // Parsed through the tool's registered input schema, as the MCP server
+      // does before it calls the handler.
+      const outcome = await runCreateIssue(
+        createIssueSchema.parse({
+          machine: machine.initials,
+          title: "\nleft flipper\r\n\r\ndead\t",
+        }),
+        ctx("admin", admin)
+      );
+
+      expect(outcome.result).toMatchObject({ title: "left flipper dead" });
+      const db = await getTestDb();
+      const row = await db.query.issues.findFirst({
+        where: eq(issues.id, outcome.issueId ?? ""),
+        columns: { title: true },
+      });
+      expect(row?.title).toBe("left flipper dead");
+    });
+
     it("throws not_found when the machine is unknown", async () => {
       const admin = await makeUser("admin");
       await expect(
@@ -1852,13 +1901,16 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       "add_issue_comment",
       "add_machine",
       "create_issue",
+      "create_settings_set",
       "get_issue",
       "get_machine",
       "list_issues",
       "list_machines",
+      "list_settings_sets",
       "search_pinballmap_catalog",
       "update_issue",
       "update_machine",
+      "update_settings_set",
     ]);
   });
 
@@ -2428,6 +2480,33 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
         field: "status",
         changed: false,
       });
+    });
+
+    it("stores a multi-line title as one line (PP-61u5)", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ name: "Twilight Zone" });
+      await runCreateIssue(
+        { machine: machine.initials, title: "clock stuck" },
+        ctx("admin", admin)
+      );
+
+      // Parsed through the tool's registered input schema, as the MCP server
+      // does before it calls the handler.
+      const outcome = await runUpdateIssue(
+        updateIssueSchema.parse({
+          machine: machine.initials,
+          number: 1,
+          title: "clock stuck\r\nat 11:30\t",
+        }),
+        ctx("admin", admin)
+      );
+
+      const db = await getTestDb();
+      const row = await db.query.issues.findFirst({
+        where: eq(issues.id, outcome.issueId ?? ""),
+        columns: { title: true },
+      });
+      expect(row?.title).toBe("clock stuck at 11:30");
     });
 
     it("unassigns when the assignee is an empty string", async () => {
@@ -4061,6 +4140,884 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
 
         expect(result).toMatchObject({ ok: false, reason: "not_found" });
       });
+    });
+  });
+  describe("settings sets (PP-u4ab.25)", () => {
+    const BOLD_NOTE: ProseMirrorDoc = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            {
+              type: "text",
+              text: "Inlane rubbers off",
+              marks: [{ type: "bold" }],
+            },
+          ],
+        },
+      ],
+    };
+
+    /** Insert a set directly; `tags` are built-in slugs (none by default). */
+    async function seedSet(
+      machineId: string,
+      values: Partial<typeof machineSettingsSets.$inferInsert> = {},
+      tags: ("house" | "tournament")[] = []
+    ): Promise<string> {
+      const db = await getTestDb();
+      const [row] = await db
+        .insert(machineSettingsSets)
+        .values({ machineId, name: "Seed set", ...values })
+        .returning({ id: machineSettingsSets.id });
+      if (!row) throw new Error("failed to seed settings set");
+      if (tags.length > 0) {
+        const builtin = await ensureBuiltinSettingsTags();
+        await db
+          .insert(machineSettingsSetTags)
+          .values(
+            tags.map((slot) => ({ setId: row.id, tagId: builtin[slot] }))
+          );
+      }
+      return row.id;
+    }
+
+    async function storedSet(id: string) {
+      const db = await getTestDb();
+      const row = await db.query.machineSettingsSets.findFirst({
+        where: eq(machineSettingsSets.id, id),
+      });
+      if (!row) throw new Error(`settings set ${id} missing`);
+      return row;
+    }
+
+    async function storedTagSlugs(id: string): Promise<string[]> {
+      const db = await getTestDb();
+      const rows = await db
+        .select({ slug: settingsTags.slug })
+        .from(machineSettingsSetTags)
+        .innerJoin(
+          settingsTags,
+          eq(settingsTags.id, machineSettingsSetTags.tagId)
+        )
+        .where(eq(machineSettingsSetTags.setId, id));
+      return rows.map((r) => r.slug).sort();
+    }
+
+    /** Every settings event on the machine as `kind:tag`, sorted. */
+    async function settingsEvents(machineId: string): Promise<string[]> {
+      const db = await getTestDb();
+      const rows = await db
+        .select({
+          eventData: timelineEvents.eventData,
+          tag: timelineEvents.tag,
+        })
+        .from(timelineEvents)
+        .where(eq(timelineEvents.machineId, machineId));
+      return rows
+        .map(
+          (r) =>
+            `${(r.eventData as { kind: string } | null)?.kind ?? ""}:${r.tag}`
+        )
+        .sort();
+    }
+
+    const tournamentArgs = (machine: string) => ({
+      machine,
+      name: "Tournament",
+      description: "From the May '26 sheet. Tilt warnings unconfirmed.",
+      sections: [
+        {
+          kind: "software" as const,
+          baseline: "Competition install",
+          rows: [
+            { id: "A1.26", name: "Tournament Play", value: "YES" },
+            { id: "", name: "Thor MB", value: "HARD" },
+          ],
+        },
+        {
+          kind: "dip" as const,
+          name: "MPU board",
+          switches: [
+            { switch: "28", position: "ON" as const, note: "Novelty" },
+          ],
+        },
+        { kind: "note" as const, title: "Rubbers", text: "Inlane rubbers off" },
+      ],
+    });
+
+    it("creates a House set with converted sections; on a machine with no preferred House set it becomes the preferred House set and a community set", async () => {
+      const owner = await makeUser("member", "Olive", "Owner");
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ ownerId: owner });
+
+      const outcome = await runCreateSettingsSet(
+        createSettingsSetSchema.parse(tournamentArgs(machine.initials)),
+        ctx("admin", admin)
+      );
+
+      expect(outcome.result).toMatchObject({
+        created: true,
+        kind: "community",
+        isPreferredHouse: true,
+        tags: ["House"],
+      });
+      const { id } = outcome.result as { id: string };
+      const row = await storedSet(id);
+      expect(row).toMatchObject({
+        isCommunity: true,
+        isPreferredHouse: true,
+        createdBy: admin,
+      });
+      expect(await storedTagSlugs(id)).toEqual(["house"]);
+      expect(docToPlainText(row.description)).toBe(
+        "From the May '26 sheet. Tilt warnings unconfirmed."
+      );
+      expect(row.sections.map((s) => s.kind)).toEqual([
+        "software",
+        "dip",
+        "note",
+      ]);
+      const [software, , note] = row.sections;
+      expect(software).toMatchObject({
+        baseline: "Competition install",
+        rows: [
+          { id: "A1.26", name: "Tournament Play", value: "YES" },
+          { id: "", name: "Thor MB", value: "HARD" },
+        ],
+      });
+      expect(note).toMatchObject({ title: "Rubbers", customTitle: false });
+      expect(note?.kind === "note" ? docToPlainText(note.body) : null).toBe(
+        "Inlane rubbers off"
+      );
+      expect(await settingsEvents(machine.id)).toEqual([
+        "settings_preferred_changed:settings",
+        "settings_set_created:settings",
+      ]);
+    });
+
+    it("creates a personal set tagged House and Tournament when asked for Tournament and a preferred House set exists", async () => {
+      const tech = await makeUser("technician");
+      const machine = await seedMachine();
+      await seedSet(machine.id, { isCommunity: true, isPreferredHouse: true }, [
+        "house",
+      ]);
+
+      const outcome = await runCreateSettingsSet(
+        createSettingsSetSchema.parse({
+          ...tournamentArgs(machine.initials),
+          tournament: true,
+        }),
+        ctx("technician", tech)
+      );
+
+      expect(outcome.result).toMatchObject({
+        created: true,
+        kind: "personal",
+        isPreferredHouse: false,
+        tags: ["House", "Tournament"],
+      });
+      const { id } = outcome.result as { id: string };
+      expect(await storedSet(id)).toMatchObject({
+        isCommunity: false,
+        isPreferredHouse: false,
+        createdBy: tech,
+      });
+      expect(await storedTagSlugs(id)).toEqual(["house", "tournament"]);
+    });
+
+    it("returns the existing set when an identical create is retried", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine();
+      const args = createSettingsSetSchema.parse(
+        tournamentArgs(machine.initials)
+      );
+
+      const first = await runCreateSettingsSet(args, ctx("admin", admin));
+      const retry = await runCreateSettingsSet(args, ctx("admin", admin));
+
+      expect(retry.result).toMatchObject({
+        created: false,
+        id: (first.result as { id: string }).id,
+        kind: "community",
+        machine: machine.initials,
+      });
+      const db = await getTestDb();
+      const rows = await db.query.machineSettingsSets.findMany({
+        where: eq(machineSettingsSets.machineId, machine.id),
+      });
+      expect(rows).toHaveLength(1);
+    });
+
+    it("refuses a member who does not own the machine", async () => {
+      const member = await makeUser("member");
+      const machine = await seedMachine({ ownerId: await makeUser("member") });
+
+      await expect(
+        runCreateSettingsSet(
+          createSettingsSetSchema.parse(tournamentArgs(machine.initials)),
+          ctx("member", member)
+        )
+      ).rejects.toMatchObject({ reason: "denied" });
+    });
+
+    it("refuses a second note under the same standard heading", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine();
+
+      await expect(
+        runCreateSettingsSet(
+          createSettingsSetSchema.parse({
+            machine: machine.initials,
+            name: "Two rubbers notes",
+            sections: [
+              { kind: "note", title: "Rubbers", text: "a" },
+              { kind: "note", title: "Rubbers", text: "b" },
+            ],
+          }),
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({ reason: "invalid" });
+    });
+
+    it("lists every set, another user's personal set included, with its kind, tags, preferred slots, and plain-text notes", async () => {
+      const owner = await makeUser("member");
+      const other = await makeUser("technician");
+      const machine = await seedMachine({ ownerId: owner });
+      await seedSet(
+        machine.id,
+        {
+          name: "House rules",
+          isCommunity: true,
+          isPreferredHouse: true,
+          createdBy: owner,
+          sections: [
+            {
+              kind: "note",
+              id: "n1",
+              title: "Other",
+              body: BOLD_NOTE,
+              customTitle: true,
+            },
+          ],
+        },
+        ["house"]
+      );
+      await seedSet(machine.id, { name: "Tech personal", createdBy: other }, [
+        "tournament",
+      ]);
+
+      const outcome = await runListSettingsSets(
+        { machine: machine.initials },
+        ctx("member", owner)
+      );
+
+      const { sets } = outcome.result as { sets: { name: string }[] };
+      expect(sets).toHaveLength(2);
+      expect(sets[0]).toMatchObject({
+        name: "House rules",
+        kind: "community",
+        isPreferredHouse: true,
+        isPreferredTournament: false,
+        tags: ["House"],
+        canEdit: true,
+        sections: [
+          {
+            kind: "note",
+            id: "n1",
+            title: "Other",
+            text: "Inlane rubbers off",
+          },
+        ],
+      });
+      expect(sets[1]).toMatchObject({
+        name: "Tech personal",
+        kind: "personal",
+        isPreferredHouse: false,
+        isPreferredTournament: false,
+        tags: ["Tournament"],
+        canEdit: false,
+      });
+    });
+
+    it("replaces the author's sections, keeping an unchanged note's formatting", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine();
+      const setId = await seedSet(machine.id, {
+        createdBy: admin,
+        sections: [
+          {
+            kind: "note",
+            id: "n1",
+            title: "Rubbers",
+            body: BOLD_NOTE,
+            customTitle: false,
+          },
+        ],
+      });
+
+      const outcome = await runUpdateSettingsSet(
+        updateSettingsSetSchema.parse({
+          machine: machine.initials,
+          set: setId,
+          version: (await storedSet(setId)).updatedAt.toISOString(),
+          sections: [
+            {
+              kind: "note",
+              id: "n1",
+              title: "Rubbers",
+              text: "Inlane rubbers off",
+            },
+            {
+              kind: "software",
+              baseline: "",
+              rows: [{ id: "A1.3", name: "Max Extra Balls", value: "0" }],
+            },
+          ],
+        }),
+        ctx("admin", admin)
+      );
+
+      expect(outcome.result).toMatchObject({
+        changed: true,
+        contentChanged: true,
+        kind: "personal",
+      });
+      const row = await storedSet(setId);
+      expect(row.sections[0]).toEqual({
+        kind: "note",
+        id: "n1",
+        title: "Rubbers",
+        body: BOLD_NOTE,
+        customTitle: false,
+      });
+      expect(row.sections[1]).toMatchObject({
+        kind: "software",
+        rows: [{ id: "A1.3", name: "Max Extra Balls", value: "0" }],
+      });
+      expect(await settingsEvents(machine.id)).toEqual([
+        "settings_set_updated:settings_edit",
+      ]);
+    });
+
+    it("makes a personal set community for its author only", async () => {
+      const tech = await makeUser("technician");
+      const admin = await makeUser("admin");
+      const machine = await seedMachine();
+      const mine = await seedSet(machine.id, { createdBy: tech });
+      const notMine = await seedSet(machine.id, { createdBy: tech });
+
+      await expect(
+        runUpdateSettingsSet(
+          updateSettingsSetSchema.parse({
+            machine: machine.initials,
+            set: notMine,
+            makeCommunity: true,
+          }),
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({ reason: "denied" });
+      expect((await storedSet(notMine)).isCommunity).toBe(false);
+
+      const outcome = await runUpdateSettingsSet(
+        updateSettingsSetSchema.parse({
+          machine: machine.initials,
+          set: mine,
+          makeCommunity: true,
+        }),
+        ctx("technician", tech)
+      );
+      expect(outcome.result).toMatchObject({
+        changed: true,
+        contentChanged: false,
+        kind: "community",
+      });
+      expect((await storedSet(mine)).isCommunity).toBe(true);
+    });
+
+    it("lets a technician tag another user's personal set without changing its version", async () => {
+      const owner = await makeUser("member");
+      const tech = await makeUser("technician");
+      const machine = await seedMachine({ ownerId: owner });
+      const setId = await seedSet(machine.id, { createdBy: owner }, ["house"]);
+      const before = await storedSet(setId);
+
+      const outcome = await runUpdateSettingsSet(
+        updateSettingsSetSchema.parse({
+          machine: machine.initials,
+          set: setId,
+          house: false,
+          tournament: true,
+        }),
+        ctx("technician", tech)
+      );
+
+      expect(outcome.result).toMatchObject({
+        changed: true,
+        contentChanged: false,
+        kind: "personal",
+      });
+      expect(await storedTagSlugs(setId)).toEqual(["tournament"]);
+      expect((await storedSet(setId)).updatedAt).toEqual(before.updatedAt);
+    });
+
+    it("refuses a rename plus removing the preferred set's tag before writing anything", async () => {
+      const tech = await makeUser("technician");
+      const machine = await seedMachine();
+      const setId = await seedSet(
+        machine.id,
+        { createdBy: tech, isCommunity: true, isPreferredTournament: true },
+        ["tournament"]
+      );
+
+      await expect(
+        runUpdateSettingsSet(
+          updateSettingsSetSchema.parse({
+            machine: machine.initials,
+            set: setId,
+            name: "Renamed",
+            tournament: false,
+          }),
+          ctx("technician", tech)
+        )
+      ).rejects.toMatchObject({ reason: "invalid" });
+      expect((await storedSet(setId)).name).not.toBe("Renamed");
+      expect(await storedTagSlugs(setId)).toEqual(["tournament"]);
+    });
+
+    it("makes a tagged set preferred, clearing the previous preferred set and writing settings_preferred_changed", async () => {
+      const owner = await makeUser("member");
+      const tech = await makeUser("technician");
+      const machine = await seedMachine({ ownerId: owner });
+      const firstSet = await seedSet(
+        machine.id,
+        {
+          name: "Original House",
+          createdBy: tech,
+          isCommunity: true,
+          isPreferredHouse: true,
+        },
+        ["house"]
+      );
+      const personalSet = await seedSet(
+        machine.id,
+        {
+          name: "New House",
+          createdBy: owner,
+          isCommunity: false,
+          isPreferredHouse: false,
+        },
+        ["house"]
+      );
+
+      const outcome = await runUpdateSettingsSet(
+        updateSettingsSetSchema.parse({
+          machine: machine.initials,
+          set: personalSet,
+          preferredHouse: true,
+        }),
+        ctx("technician", tech)
+      );
+
+      expect(outcome.result).toMatchObject({
+        changed: true,
+        contentChanged: false,
+        kind: "community",
+      });
+      expect((await storedSet(personalSet)).isPreferredHouse).toBe(true);
+      expect((await storedSet(personalSet)).isCommunity).toBe(true);
+      expect((await storedSet(firstSet)).isPreferredHouse).toBe(false);
+
+      expect(await settingsEvents(machine.id)).toEqual([
+        "settings_preferred_changed:settings",
+        "settings_set_made_community:settings_edit",
+      ]);
+    });
+
+    it("allows the machine owner or admin to set preferred, but refuses a regular member with denied writing nothing", async () => {
+      const owner = await makeUser("member");
+      const nonOwner = await makeUser("member");
+      const admin = await makeUser("admin");
+      const machine = await seedMachine({ ownerId: owner });
+      const setId = await seedSet(
+        machine.id,
+        {
+          name: "Tourney Set",
+          createdBy: nonOwner,
+          isCommunity: false,
+          isPreferredTournament: false,
+        },
+        ["tournament"]
+      );
+
+      // A plain member editing their own personal set with name + preferred is denied up front;
+      // name is not changed and no timeline event is written.
+      await expect(
+        runUpdateSettingsSet(
+          updateSettingsSetSchema.parse({
+            machine: machine.initials,
+            set: setId,
+            name: "Member Attempted Rename",
+            preferredTournament: true,
+          }),
+          ctx("member", nonOwner)
+        )
+      ).rejects.toMatchObject({ reason: "denied" });
+      const storedAfterDenied = await storedSet(setId);
+      expect(storedAfterDenied.name).toBe("Tourney Set");
+      expect(storedAfterDenied.isPreferredTournament).toBe(false);
+      expect(await settingsEvents(machine.id)).toEqual([]);
+
+      // Machine owner can make it preferred
+      await runUpdateSettingsSet(
+        updateSettingsSetSchema.parse({
+          machine: machine.initials,
+          set: setId,
+          preferredTournament: true,
+        }),
+        ctx("member", owner)
+      );
+      expect((await storedSet(setId)).isPreferredTournament).toBe(true);
+
+      // Admin can clear it
+      await runUpdateSettingsSet(
+        updateSettingsSetSchema.parse({
+          machine: machine.initials,
+          set: setId,
+          preferredTournament: false,
+        }),
+        ctx("admin", admin)
+      );
+      expect((await storedSet(setId)).isPreferredTournament).toBe(false);
+    });
+
+    it("allows clearing preferred and removing the slot tag in the same call without failing", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine();
+      const setId = await seedSet(
+        machine.id,
+        {
+          name: "House Rules",
+          createdBy: admin,
+          isCommunity: true,
+          isPreferredHouse: true,
+        },
+        ["house"]
+      );
+
+      const outcome = await runUpdateSettingsSet(
+        updateSettingsSetSchema.parse({
+          machine: machine.initials,
+          set: setId,
+          name: "Renamed",
+          house: false,
+          preferredHouse: false,
+        }),
+        ctx("admin", admin)
+      );
+
+      expect(outcome.result).toMatchObject({
+        changed: true,
+        contentChanged: true,
+      });
+      const stored = await storedSet(setId);
+      expect(stored.name).toBe("Renamed");
+      expect(stored.isPreferredHouse).toBe(false);
+      expect(await storedTagSlugs(setId)).toEqual([]);
+      expect(await settingsEvents(machine.id)).toEqual([
+        "settings_preferred_changed:settings",
+        "settings_set_tagged:settings_edit",
+        "settings_set_updated:settings_edit",
+      ]);
+    });
+
+    it("refuses making a set preferred if it lacks the slot tag and writes nothing even with content edits", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine();
+      const setId = await seedSet(
+        machine.id,
+        {
+          name: "Untagged Set",
+          createdBy: admin,
+          isCommunity: true,
+          isPreferredTournament: false,
+        },
+        ["house"] // only tagged house, not tournament
+      );
+
+      await expect(
+        runUpdateSettingsSet(
+          updateSettingsSetSchema.parse({
+            machine: machine.initials,
+            set: setId,
+            name: "Attempted Rename",
+            preferredTournament: true,
+          }),
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({
+        reason: "invalid",
+        message: expect.stringMatching(
+          /Only a set tagged Tournament can be the default Tournament set/i
+        ),
+      });
+
+      const stored = await storedSet(setId);
+      expect(stored.name).toBe("Untagged Set");
+      expect(stored.isPreferredTournament).toBe(false);
+      expect(await settingsEvents(machine.id)).toEqual([]);
+    });
+
+    it("allows applying the slot tag and making it preferred in the same call", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine();
+      const setId = await seedSet(
+        machine.id,
+        {
+          name: "Fresh Set",
+          createdBy: admin,
+          isCommunity: true,
+        },
+        []
+      );
+
+      const outcome = await runUpdateSettingsSet(
+        updateSettingsSetSchema.parse({
+          machine: machine.initials,
+          set: setId,
+          tournament: true,
+          preferredTournament: true,
+        }),
+        ctx("admin", admin)
+      );
+
+      expect(outcome.result).toMatchObject({
+        changed: true,
+      });
+      const stored = await storedSet(setId);
+      expect(stored.isPreferredTournament).toBe(true);
+      expect(await storedTagSlugs(setId)).toEqual(["tournament"]);
+    });
+
+    it("refuses a technician editing another user's personal set", async () => {
+      const owner = await makeUser("member");
+      const tech = await makeUser("technician");
+      const machine = await seedMachine({ ownerId: owner });
+      const setId = await seedSet(machine.id, { createdBy: owner });
+
+      await expect(
+        runUpdateSettingsSet(
+          updateSettingsSetSchema.parse({
+            machine: machine.initials,
+            set: setId,
+            name: "Renamed",
+          }),
+          ctx("technician", tech)
+        )
+      ).rejects.toMatchObject({ reason: "denied" });
+      expect((await storedSet(setId)).name).toBe("Seed set");
+    });
+
+    it("reports changed: false and writes nothing when every value already matches", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine();
+      const setId = await seedSet(
+        machine.id,
+        { name: "Tournament", createdBy: admin },
+        ["tournament"]
+      );
+      const before = await storedSet(setId);
+
+      const outcome = await runUpdateSettingsSet(
+        updateSettingsSetSchema.parse({
+          machine: machine.initials,
+          set: setId,
+          name: "Tournament",
+          tournament: true,
+        }),
+        ctx("admin", admin)
+      );
+
+      expect(outcome.result).toMatchObject({ changed: false });
+      expect((await storedSet(setId)).updatedAt).toEqual(before.updatedAt);
+      expect(await settingsEvents(machine.id)).toEqual([]);
+    });
+    it("lists paragraphs separated by blank lines and writes them back as paragraphs", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine();
+      const setId = await seedSet(machine.id, {
+        createdBy: admin,
+        sections: [
+          {
+            kind: "note",
+            id: "n1",
+            title: "Other",
+            body: plainTextToDoc("Gate left on\n\nEar plug installed"),
+            customTitle: true,
+          },
+        ],
+      });
+
+      const listed = await runListSettingsSets(
+        { machine: machine.initials },
+        ctx("admin", admin)
+      );
+      const { sets } = listed.result as {
+        sets: { sections: { text: string }[] }[];
+      };
+      const text = sets[0]?.sections[0]?.text;
+      expect(text).toBe("Gate left on\n\nEar plug installed");
+
+      await runUpdateSettingsSet(
+        updateSettingsSetSchema.parse({
+          machine: machine.initials,
+          set: setId,
+          version: (await storedSet(setId)).updatedAt.toISOString(),
+          sections: [
+            {
+              kind: "note",
+              id: "n1",
+              title: "Other",
+              text: `${text ?? ""}\n\nOutlane posts removed`,
+            },
+          ],
+        }),
+        ctx("admin", admin)
+      );
+
+      const [note] = (await storedSet(setId)).sections;
+      expect(note?.kind === "note" ? note.body?.content : null).toHaveLength(3);
+    });
+
+    it("keeps a custom note titled like a preset custom on round trip", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine();
+      const sections = [
+        {
+          kind: "note" as const,
+          id: "preset",
+          title: "Rubbers",
+          body: plainTextToDoc("Inlane off"),
+          customTitle: false,
+        },
+        {
+          kind: "note" as const,
+          id: "custom",
+          title: "Rubbers",
+          body: plainTextToDoc("Bring spares"),
+          customTitle: true,
+        },
+      ];
+      const setId = await seedSet(machine.id, { createdBy: admin, sections });
+      const listed = await runListSettingsSets(
+        { machine: machine.initials },
+        ctx("admin", admin)
+      );
+      const { sets } = listed.result as {
+        sets: { version: string; sections: unknown[] }[];
+      };
+
+      const outcome = await runUpdateSettingsSet(
+        updateSettingsSetSchema.parse({
+          machine: machine.initials,
+          set: setId,
+          version: sets[0]?.version,
+          sections: sets[0]?.sections,
+          tournament: true,
+        }),
+        ctx("admin", admin)
+      );
+
+      expect(outcome.result).toMatchObject({
+        changed: true,
+        contentChanged: false,
+      });
+      expect((await storedSet(setId)).sections).toEqual(sections);
+    });
+
+    it("refuses an update built from a read the set has since moved past", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine();
+      const setId = await seedSet(machine.id, { createdBy: admin });
+      const readAt = (await storedSet(setId)).updatedAt;
+      const db = await getTestDb();
+      await db
+        .update(machineSettingsSets)
+        .set({
+          name: "Edited in the web app",
+          updatedAt: new Date(readAt.getTime() + 1000),
+        })
+        .where(eq(machineSettingsSets.id, setId));
+
+      const result = await updateSettingsSet({
+        setId,
+        actor: { userId: admin, access: "admin" },
+        expectedUpdatedAt: readAt,
+        payload: { name: "Renamed", description: null, sections: [] },
+      });
+
+      expect(result).toMatchObject({ ok: false, code: "conflict" });
+      expect((await storedSet(setId)).name).toBe("Edited in the web app");
+    });
+
+    it("refuses replacing sections when the set was edited after the list read", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine();
+      const setId = await seedSet(machine.id, { createdBy: admin });
+      const listed = await runListSettingsSets(
+        { machine: machine.initials },
+        ctx("admin", admin)
+      );
+      const { sets } = listed.result as { sets: { version: string }[] };
+      const db = await getTestDb();
+      await db
+        .update(machineSettingsSets)
+        .set({
+          name: "Edited in the web app",
+          updatedAt: new Date(Date.parse(sets[0]?.version ?? "") + 1000),
+        })
+        .where(eq(machineSettingsSets.id, setId));
+
+      await expect(
+        runUpdateSettingsSet(
+          updateSettingsSetSchema.parse({
+            machine: machine.initials,
+            set: setId,
+            version: sets[0]?.version,
+            sections: [],
+          }),
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({ reason: "conflict" });
+      expect((await storedSet(setId)).name).toBe("Edited in the web app");
+    });
+
+    it("requires a version when replacing sections", () => {
+      expect(
+        updateSettingsSetSchema.safeParse({
+          machine: "MM",
+          set: randomUUID(),
+          sections: [],
+        }).success
+      ).toBe(false);
+    });
+
+    it("treats a set on a different machine as not found", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine();
+      const elsewhere = await seedMachine();
+      const setId = await seedSet(elsewhere.id, { createdBy: admin });
+
+      await expect(
+        runUpdateSettingsSet(
+          updateSettingsSetSchema.parse({
+            machine: machine.initials,
+            set: setId,
+            name: "Moved",
+          }),
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({ reason: "not_found" });
     });
   });
 });

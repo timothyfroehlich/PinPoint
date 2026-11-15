@@ -28,10 +28,18 @@ import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import type { PbmRegionLmx, PbmRegionLocation } from "~/lib/pinballmap/types";
 import type { DiscordSendResult } from "~/lib/discord/client";
 import type * as CatalogModule from "~/lib/pinballmap/catalog";
+import type * as ReportErrorModule from "~/lib/observability/report-error";
+import { reportError } from "~/lib/observability/report-error";
 
 vi.mock("~/lib/logger", () => ({
   log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
+
+// Spy on reportError without dropping the module's other exports.
+vi.mock("~/lib/observability/report-error", async (importOriginal) => {
+  const actual = await importOriginal<typeof ReportErrorModule>();
+  return { ...actual, reportError: vi.fn() };
+});
 
 // Route the production db import to the PGlite worker instance.
 vi.mock("~/server/db", async () => {
@@ -148,7 +156,6 @@ async function seenRows(): Promise<
     isPresent: boolean;
     missedRuns: number;
     generation: number;
-    announcedAt: Date | null;
   }[]
 > {
   const db = await getTestDb();
@@ -158,7 +165,6 @@ async function seenRows(): Promise<
       isPresent: pinballmapRegionSeenMachines.isPresent,
       missedRuns: pinballmapRegionSeenMachines.missedRuns,
       generation: pinballmapRegionSeenMachines.generation,
-      announcedAt: pinballmapRegionSeenMachines.announcedAt,
     })
     .from(pinballmapRegionSeenMachines);
 }
@@ -219,12 +225,23 @@ async function seedCatalog(
 }
 
 /**
- * Un-announce every seen row, so a bootstrap back-fill can be reused as a large
- * pending backlog without fetching 600+ entries a second time.
+ * Queue an unannounced `added` event for every seen row, so a bootstrap
+ * back-fill can be reused as a large pending backlog without fetching 600+
+ * entries a second time.
  */
 async function markAllPending(): Promise<void> {
   const db = await getTestDb();
-  await db.update(pinballmapRegionSeenMachines).set({ announcedAt: null });
+  const seen = await db.select().from(pinballmapRegionSeenMachines);
+  await db.insert(pinballmapRegionAlertEvents).values(
+    seen.map((row) => ({
+      region: row.region,
+      lmxId: row.lmxId,
+      generation: row.generation,
+      eventType: "added" as const,
+      locationId: row.locationId,
+      pinballmapMachineId: row.pinballmapMachineId,
+    }))
+  );
 }
 
 /** A mirror last written long enough ago that the cooldown has expired. */
@@ -271,6 +288,7 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
     discord.hasToken = true;
     discord.result = { ok: true };
     discord.posts = [];
+    vi.mocked(reportError).mockClear();
   });
 
   it("bootstraps the seen-set on the first run without announcing anything", async () => {
@@ -287,11 +305,11 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
       announced: 0,
       pending: 0,
     });
-    // No flood: everything was born already-announced.
+    // No flood: bootstrap back-fills membership without queuing any event.
     expect(discord.posts).toEqual([]);
+    expect(await eventRows()).toEqual([]);
     const rows = await seenRows();
     expect(rows).toHaveLength(2);
-    expect(rows.every((r) => r.announcedAt !== null)).toBe(true);
     // The one-time location snapshot preserves venue names for a later removal,
     // after that venue no longer appears in Pinball Map's current region list.
     expect(pbm.locationCalls).toBe(1);
@@ -328,14 +346,12 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
         lmxId: 1,
         locationId: 26454,
         pinballmapMachineId: 6412,
-        announcedAt: new Date(),
       },
       {
         region: "austin",
         lmxId: 2,
         locationId: 999,
         pinballmapMachineId: 7,
-        announcedAt: new Date(),
       },
     ]);
     pbm.entries = [lmx({ lmxId: 1 })];
@@ -368,14 +384,12 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
         lmxId: 1,
         locationId: 26454,
         pinballmapMachineId: 6412,
-        announcedAt: new Date(),
       },
       {
         region: "austin",
         lmxId: 2,
         locationId: 999,
         pinballmapMachineId: 7,
-        announcedAt: new Date(),
       },
     ]);
     pbm.entries = [lmx({ lmxId: 1 })];
@@ -482,9 +496,16 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
     const run = await runRegionMachineAlerts();
 
     expect(run).toMatchObject({ discovered: 1, announced: 0, pending: 1 });
+    expect(reportError).toHaveBeenCalledWith(
+      pbm.locationsError,
+      expect.objectContaining({
+        step: "fetchRegionLocations",
+        bestEffort: true,
+      })
+    );
     expect(discord.posts).toEqual([]);
     expect(await seenRows()).toContainEqual(
-      expect.objectContaining({ lmxId: 2, announcedAt: null })
+      expect.objectContaining({ lmxId: 2, isPresent: true })
     );
 
     pbm.locationsError = null;
@@ -557,7 +578,7 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
     expect(run).toMatchObject({ announced: 0, pending: 1 });
     expect(discord.posts).toEqual([]);
     expect(await seenRows()).toContainEqual(
-      expect.objectContaining({ lmxId: 2, announcedAt: null })
+      expect.objectContaining({ lmxId: 2, isPresent: true })
     );
 
     // The empty refresh still spent the cooldown (PP-o355.44); a later refresh
@@ -612,6 +633,10 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
 
     expect(catalog.refreshCalls).toBe(1);
     expect(run).toMatchObject({ announced: 0, pending: 1 });
+    expect(reportError).toHaveBeenCalledWith(
+      catalog.error,
+      expect.objectContaining({ step: "refreshCatalog", bestEffort: true })
+    );
     expect(discord.posts).toEqual([]);
   });
 
@@ -815,14 +840,14 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
     const failed = await runRegionMachineAlerts();
 
     expect(failed).toMatchObject({ discovered: 1, announced: 0, pending: 1 });
-    const pendingRow = (await seenRows()).find((r) => r.lmxId === 2);
-    expect(pendingRow?.announcedAt).toBeNull();
+    const pendingEvent = (await eventRows()).find((r) => r.lmxId === 2);
+    expect(pendingEvent?.announcedAt).toBeNull();
 
     // Next run: nothing new upstream, but the pending row is retried.
     discord.result = { ok: true };
     const retried = await runRegionMachineAlerts();
     expect(retried).toMatchObject({ discovered: 0, announced: 1, pending: 0 });
-    const settled = (await seenRows()).find((r) => r.lmxId === 2);
+    const settled = (await eventRows()).find((r) => r.lmxId === 2);
     expect(settled?.announcedAt).not.toBeNull();
   });
 
@@ -891,31 +916,6 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
     ]);
   });
 
-  it("adopts an old-runtime pending addition into the event queue", async () => {
-    await seedCatalog([{ machineId: 6412, name: "Godzilla" }]);
-    const db = await getTestDb();
-    await db.insert(pinballmapRegionSeenMachines).values({
-      region: "austin",
-      lmxId: 1,
-      locationId: 26454,
-      pinballmapMachineId: 6412,
-      announcedAt: null,
-    });
-    pbm.entries = [lmx({ lmxId: 1 })];
-
-    const run = await runRegionMachineAlerts();
-
-    expect(run).toMatchObject({ discovered: 0, announced: 1, pending: 0 });
-    expect(await eventRows()).toEqual([
-      expect.objectContaining({
-        lmxId: 1,
-        generation: 0,
-        eventType: "added",
-        announcedAt: expect.any(Date),
-      }),
-    ]);
-  });
-
   it("keeps a migrated addition pending until its departed venue can be named", async () => {
     await seedCatalog([{ machineId: 7, name: "Medieval Madness" }]);
     const db = await getTestDb();
@@ -928,7 +928,6 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
         lmxId: 1,
         locationId: 26454,
         pinballmapMachineId: 6412,
-        announcedAt: new Date(),
       },
       {
         region: "austin",
@@ -937,7 +936,6 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
         pinballmapMachineId: 7,
         isPresent: false,
         missedRuns: 2,
-        announcedAt: null,
       },
     ]);
     await db.insert(pinballmapRegionAlertState).values({
@@ -1055,80 +1053,35 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
     expect(nextRun.pending).toBe(600);
   });
 
-  it("re-bootstraps instead of announcing when one run discovers a huge share of the region", async () => {
-    // The flood this guards: PBM returns a TRUNCATED first payload, the region
-    // bootstraps on a handful of entries, and the next run reads the rest of the
-    // region as brand-new arrivals. Neither existing guard catches it — the
-    // payload is neither empty nor implausibly large.
+  it("announces a run that adds a large share of the region", async () => {
+    await seedCatalog([{ machineId: 6412, name: "Godzilla (Premium)" }]);
     pbm.entries = [lmx({ lmxId: 1 })];
-    await runRegionMachineAlerts(); // truncated bootstrap: 1 of 300
+    await runRegionMachineAlerts();
 
     pbm.entries = Array.from({ length: 300 }, (_, i) => lmx({ lmxId: i + 1 }));
     const run = await runRegionMachineAlerts();
 
-    expect(run.discovered).toBe(299);
-    expect(run.announced).toBe(0);
-    expect(run.pending).toBe(0);
-    // Nothing posted, and the seen-set self-heals: every row is now announced,
-    // so the next genuine arrival is the only thing that can be announced.
-    expect(discord.posts).toEqual([]);
-    const rows = await seenRows();
-    expect(rows).toHaveLength(300);
-    expect(rows.every((r) => r.announcedAt !== null)).toBe(true);
+    expect(run).toMatchObject({ skipped: null, discovered: 299, removed: 0 });
+    expect(await eventRows()).toHaveLength(299);
+    expect(discord.posts).toHaveLength(1);
   });
 
-  it("silently reconciles removals from the same snapshot that triggers re-bootstrap", async () => {
-    pbm.entries = [lmx({ lmxId: 1 }), lmx({ lmxId: 2 })];
-    await runRegionMachineAlerts();
-
-    pbm.entries = [
-      lmx({ lmxId: 1 }),
-      ...Array.from({ length: 51 }, (_, i) => lmx({ lmxId: i + 100 })),
-    ];
-    const rebootstrapped = await runRegionMachineAlerts();
-
-    expect(rebootstrapped).toMatchObject({
-      discovered: 51,
-      removed: 0,
-      announced: 0,
-      pending: 0,
-    });
-    expect(await seenRows()).toContainEqual(
-      expect.objectContaining({ lmxId: 2, isPresent: false, missedRuns: 1 })
-    );
-    expect(await eventRows()).toEqual([]);
-    expect(discord.posts).toEqual([]);
-  });
-
-  it("discards a read missing more than 50 active entries without advancing misses", async () => {
+  it("announces a run that removes a large share of the region", async () => {
+    await seedCatalog([{ machineId: 6412, name: "Godzilla (Premium)" }]);
+    // PP-3fq4: a venue closing removes dozens of machines at once. That is a
+    // real change, so it is announced rather than discarded as an incomplete read.
     pbm.entries = Array.from({ length: 100 }, (_, i) => lmx({ lmxId: i + 1 }));
     await runRegionMachineAlerts();
 
     pbm.entries = pbm.entries.slice(0, 40);
     const run = await runRegionMachineAlerts();
 
-    expect(run).toMatchObject({
-      skipped: "incomplete_payload",
-      observed: 40,
-      discovered: 0,
-      removed: 0,
-      announced: 0,
-    });
-    expect((await seenRows()).every((row) => row.missedRuns === 0)).toBe(true);
-    expect(await eventRows()).toEqual([]);
-  });
-
-  it("still announces a normal day's arrivals, well under the re-bootstrap ceiling", async () => {
-    // The guard must not swallow real discoveries — this is the case it would
-    // break if the threshold were set anywhere near a plausible hour.
-    await seedCatalog([{ machineId: 6412, name: "Godzilla (Premium)" }]);
-    pbm.entries = Array.from({ length: 300 }, (_, i) => lmx({ lmxId: i + 1 }));
-    await runRegionMachineAlerts();
-
-    pbm.entries = [...pbm.entries, lmx({ lmxId: 901 }), lmx({ lmxId: 902 })];
-    const run = await runRegionMachineAlerts();
-
-    expect(run).toMatchObject({ discovered: 2, announced: 2, pending: 0 });
+    expect(run).toMatchObject({ skipped: null, observed: 40, removed: 60 });
+    const rows = await seenRows();
+    expect(rows.filter((row) => !row.isPresent)).toHaveLength(60);
+    expect(
+      (await eventRows()).filter((event) => event.eventType === "removed")
+    ).toHaveLength(60);
     expect(discord.posts).toHaveLength(1);
   });
 
@@ -1203,6 +1156,19 @@ describe("PinballMap region machine-change alerts (PGlite)", () => {
       discovered: 0,
       announced: 0,
     });
+    expect(reportError).toHaveBeenCalledWith(
+      expect.any(RegionPayloadTooLargeError),
+      expect.objectContaining({
+        observedAtLeast: MAX_REGION_ENTRIES + 1,
+        action: "pinballmap.regionAlerts",
+        step: "fetchRegionLmxes",
+      })
+    );
+    // The run aborted, so this is a primary failure, not a tolerated one.
+    expect(reportError).not.toHaveBeenCalledWith(
+      expect.any(RegionPayloadTooLargeError),
+      expect.objectContaining({ bestEffort: true })
+    );
     expect(await seenRows()).toEqual([]);
     expect(discord.posts).toEqual([]);
   });
@@ -1315,7 +1281,6 @@ describe("GET /api/cron/pinballmap-region-alerts", () => {
         pinballmapMachineId: 100,
         isPresent: true,
         missedRuns: 0,
-        announcedAt: new Date(),
       },
       {
         region: "austin",
@@ -1324,7 +1289,6 @@ describe("GET /api/cron/pinballmap-region-alerts", () => {
         pinballmapMachineId: 101,
         isPresent: true,
         missedRuns: 0,
-        announcedAt: new Date(),
       },
     ]);
 
@@ -1375,7 +1339,6 @@ describe("GET /api/cron/pinballmap-region-alerts", () => {
         lmxId: 1,
         locationId: 26454,
         pinballmapMachineId: 6412,
-        announcedAt: new Date(),
         isPresent: true,
       },
     ]);

@@ -10,15 +10,25 @@ import { CookieConsentBanner } from "~/components/CookieConsentBanner";
 import { SentryInitializer } from "~/components/SentryInitializer";
 import { ClientProviders } from "~/components/layout/ClientProviders";
 import { DEV_SHOW_COOKIE_BANNER_KEY } from "~/lib/cookies/constants";
+import { isProductionRuntime } from "~/lib/runtime-env";
+import { getSiteUrl } from "~/lib/url";
 
 export const metadata: Metadata = {
+  // Resolves the link-preview image (app/opengraph-image.png) to an absolute URL.
+  metadataBase: new URL(getSiteUrl()),
   title: "PinPoint - Pinball Machine Issue Tracking",
   description:
     "Issue tracking for pinball machines at Austin Pinball Collective",
   icons: {
-    icon: "/favicon.png",
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+    ],
     apple: "/apple-touch-icon.png",
   },
+  // No og:title here, so link previews use each page's own <title>.
+  openGraph: { siteName: "PinPoint", type: "website" },
+  twitter: { card: "summary_large_image" },
 };
 
 /**
@@ -42,6 +52,8 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   interactiveWidget: "resizes-content",
+  // Android Chrome tints its address bar to match the header.
+  themeColor: "#0f0f11",
 };
 
 /**
@@ -69,9 +81,7 @@ export default async function RootLayout({
   await connection();
   const isDevelopment = process.env.NODE_ENV === "development";
 
-  const isProduction =
-    process.env["VERCEL_ENV"] === "production" ||
-    (!process.env["VERCEL_ENV"] && process.env.NODE_ENV === "production");
+  const isProduction = isProductionRuntime();
 
   let forceShow = false;
   if (!isProduction) {

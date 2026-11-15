@@ -57,15 +57,20 @@ export function getTestEmail(base: string): string {
 /**
  * Generate unique machine initials for test-created machines
  *
- * Combines the worker index with a random character for uniqueness.
- * Example output: "T0X" (Test Worker 0 with random suffix)
+ * Combines the worker index with random base-36 characters, filling the app's
+ * six-character initials limit. Example output: "T0X4QZ" (Test Worker 0).
+ * One random letter gave 26 values per worker, and specs that draw twice or
+ * hold a machine across a describe hit the unique constraint (PP-n4ri).
  */
 export function getTestMachineInitials(): string {
-  // Use worker index + random char for uniqueness across workers
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  const randomChar = chars[Math.floor(Math.random() * chars.length)];
+  const prefix = `T${workerIndex}`;
+  const random = Math.random()
+    .toString(36)
+    .slice(2)
+    .toUpperCase()
+    .padEnd(6, "0");
 
-  return `T${workerIndex}${randomChar}`;
+  return `${prefix}${random}`.slice(0, 6);
 }
 
 /**

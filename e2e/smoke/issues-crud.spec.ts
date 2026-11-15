@@ -37,11 +37,11 @@ test.describe("Issues System", () => {
     );
   });
 
-  test.afterEach(async ({ request }) => {
+  test.afterEach(async () => {
     if (!createdIssueIds.size) {
       return;
     }
-    await cleanupTestEntities(request, {
+    await cleanupTestEntities({
       issueIds: Array.from(createdIssueIds),
     });
     createdIssueIds.clear();

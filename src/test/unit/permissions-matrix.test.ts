@@ -114,6 +114,9 @@ describe("getPermission", () => {
   });
 
   it("should return false for unknown permissions", () => {
+    // Typed ids reject this at compile time; the runtime still fails closed
+    // for any untyped caller.
+    // @ts-expect-error -- deliberately not a PermissionId
     expect(getPermission("nonexistent.permission", "admin")).toBe(false);
   });
 
@@ -500,6 +503,14 @@ describe("Specific permission rules from design", () => {
       expect(getPermission("machines.pinballmap.sync", "admin")).toBe(true);
     });
 
+    it("should let every signed-in account save views (list-views §10.1)", () => {
+      expect(getPermission("views.save", "unauthenticated")).toBe(false);
+      expect(getPermission("views.save", "guest")).toBe(true);
+      expect(getPermission("views.save", "member")).toBe(true);
+      expect(getPermission("views.save", "technician")).toBe(true);
+      expect(getPermission("views.save", "admin")).toBe(true);
+    });
+
     it("should require authentication to watch machines", () => {
       expect(getPermission("machines.watch", "unauthenticated")).toBe(false);
       expect(getPermission("machines.watch", "guest")).toBe(true);
@@ -515,40 +526,6 @@ describe("Specific permission rules from design", () => {
         true
       );
       expect(getPermission("machines.settings.manage", "admin")).toBe(true);
-    });
-
-    it("should restrict setting owner default to machine owners and admins (PP-leli.8)", () => {
-      expect(
-        getPermission("machines.settings.setDefault", "unauthenticated")
-      ).toBe(false);
-      expect(getPermission("machines.settings.setDefault", "guest")).toBe(
-        false
-      );
-      expect(getPermission("machines.settings.setDefault", "member")).toBe(
-        "owner"
-      );
-      expect(getPermission("machines.settings.setDefault", "technician")).toBe(
-        "owner"
-      );
-      expect(getPermission("machines.settings.setDefault", "admin")).toBe(true);
-    });
-
-    it("should restrict viewing private settings drafts to admins (PP-leli.8)", () => {
-      expect(
-        getPermission("machines.settings.view.private", "unauthenticated")
-      ).toBe(false);
-      expect(getPermission("machines.settings.view.private", "guest")).toBe(
-        false
-      );
-      expect(getPermission("machines.settings.view.private", "member")).toBe(
-        false
-      );
-      expect(
-        getPermission("machines.settings.view.private", "technician")
-      ).toBe(false);
-      expect(getPermission("machines.settings.view.private", "admin")).toBe(
-        true
-      );
     });
 
     it("should define machines.timeline.comment.add: members+ can post (PP-0x98)", () => {

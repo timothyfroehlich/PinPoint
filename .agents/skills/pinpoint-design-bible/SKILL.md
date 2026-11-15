@@ -126,6 +126,8 @@ These values are fixed. Do not deviate.
 
 **If you add a new page:** it MUST include the content bottom padding or content will be hidden behind the tab bar on mobile.
 
+**Nothing full-width is pinned above the bottom tab bar on phones.** Page actions and pagers live in the page flow and scroll with it; the tab bar is the only fixed chrome at the bottom of the screen.
+
 ## 4. Responsive Strategy
 
 PinPoint uses a **two-layer responsive framework**. Each layer has a distinct job. Never use both layers to solve the same layout problem.

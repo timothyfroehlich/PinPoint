@@ -18,7 +18,7 @@
 
 ## 2. Hosts and Scope
 
-- **2.1** Issue View appears on `/issues` and on the Issues tab of every standard Collection, owner Collection, and Tag.
+- **2.1** Issue View appears on `/issues` and on the Issues tab of every Collection and Tag.
 - **2.2** On an Issues tab the scope is the issues on that Collection's or Tag's machines; a Machine filter can narrow it but never widen it.
 - **2.3** The page title is "Issues". Issue View adds no page action; reporting an issue stays in the app header and tab bar.
 
@@ -26,27 +26,34 @@
 
 ## 3. Rows
 
-- **3.1** Every issue row has two lines at every screen size, and the full title is always shown, wrapping rather than truncating. On a narrow phone the second line also wraps rather than truncating, so the row may run longer.
-- **3.2** Line 1 shows the status icon, the title (linking to the issue), the severity badge, and the priority badge.
-- **3.3** Line 2 shows the issue ID, the machine name (linking to the machine), the status name, and how long ago the issue was updated.
-- **3.4** On desktop the row's right side shows the comment count (when nonzero) and the assignee's avatar; on phones the assignee's initials end line 2.
-- **3.5** A person allowed to change an issue can change its status, severity, priority, and assignee from the row. Other people see the same values as plain text.
-- **3.6** After a change from a row, the row keeps its place in the list until the list next reloads, even if the change means it no longer matches the sort or filters.
+- **3.1** Every issue row uses one two-line layout at every screen size. The full title is always shown, wrapping rather than truncating; line 2 always stays on one line.
+- **3.2** Line 1 shows the title, then the status pill and the severity pill, which flow inline after the title text and wrap with it as one run.
+- **3.3** Line 2 shows, in order, the issue ID, the machine name, the priority pill, the assignee's initials, and how long ago the issue was updated (abbreviated on phones). The issue ID shows only on desktop, where it never drops; phones do not show it.
+- **3.4** Rows show no comment count, and the assignee appears only on line 2.
+- **3.5** _Retired 2026-10-11._ Rows offered inline editing of status, severity, priority, and assignee; 3.11 now forbids it. Number kept so older citations don't dangle.
+- **3.6** _Retired 2026-10-11._ Rows kept their place after an inline change; with no inline editing (3.11) there is nothing to keep in place. Number kept so older citations don't dangle.
 - **3.7** An unassigned issue shows an empty avatar announced as "Unassigned". Assignee names never show email addresses.
+- **3.8** Rows show no status icon; status appears only as the status pill.
+- **3.9** When line 2 does not fit, it drops the age first, then the priority pill, then the assignee's initials; the machine name truncates only after all three are gone.
+- **3.10** Row fields rank, most to least important: title, machine, status, severity, assignee, priority, age, issue ID. A field that gives way for room gives way in reverse of this order, except the issue ID, which never gives way: it shows on desktop and is not shown on phones (3.3).
+- **3.11** Rows never change an issue; status, severity, priority, and assignee are read-only values on the row for everyone.
+- **3.12** The whole row is a link to the issue, and the machine name is its own link to the machine.
+- **3.13** On List View pages, the status, severity, and priority pills have no border: a scoped exception to the design bible's chip style (§1, state colors), which keeps its border everywhere else.
 
 ---
 
 ## 4. Search and Filters
 
-- **4.1** Search matches issue titles, issue IDs (such as AFM-12), machine names and initials, people's names, and comment text.
+- **4.1** Search matches issue titles, issue IDs (such as AFM-12), machine names and initials, people's names, description text, and comment text.
 - **4.2** The Primary Filters, in order, are Status, Severity, Priority, Machine, Assignee, and Machine Presence.
-- **4.3** The Secondary Filters, in order, are Created, Updated, Frequency, Machine owner, Reporter, and Watching.
+- **4.3** The Secondary Filters, in order, are Created, Updated, Frequency, Machine owner, Machine tag, Machine collection, Reporter, and Watching. Machine tag and Machine collection follow collections-and-tags §12.
 - **4.4** Status offers every status grouped by status group; selecting a group selects all its statuses. The control reads "Open" when exactly the Open statuses are selected.
 - **4.5** Machine searches machines by name and initials, leaving out Removed machines unless Machine Presence includes Removed, and offers a My machines shortcut (machines the person owns, other than Removed ones). A machine already selected stays listed.
 - **4.6** Assignee searches people by name and offers Me and Unassigned shortcuts.
 - **4.7** Machine Presence offers every presence state.
-- **4.8** Created and Updated are date ranges.
-- **4.9** Me, My machines, and Watching appear only to signed-in people.
+- **4.8** Created and Updated are date ranges. A Created or Updated day is a calendar day on the collective's local clock, America/Chicago, daylight saving included: a range runs from local midnight starting its first day up to, but not including, local midnight after its last day.
+- **4.9** Me, My machines, Watching, and Machine collection appear only to signed-in people.
+- **4.10** Machine owner searches people by name and offers Me and Unassigned shortcuts; Unassigned matches machines with no owner. Reporter searches people by name and offers a Me shortcut.
 
 ---
 
@@ -71,7 +78,7 @@
 
 ## 7. URL State
 
-- **7.1** Canonical parameters are `q`, `status`, `severity`, `priority`, `machine`, `assignee`, `presence`, `created`, `updated`, `frequency`, `owner`, `reporter`, `watching`, `sort`, `dir`, `page`, `pageSize`, and `view`.
+- **7.1** Canonical parameters are `q`, `status`, `severity`, `priority`, `machine`, `assignee`, `presence`, `created`, `updated`, `frequency`, `owner`, `tag`, `collection`, `reporter`, `watching`, `sort`, `dir`, `page`, `pageSize`, and `view`.
 - **7.2** The older parameters `page_size`, a composite `sort` such as `updated_desc`, `include_inactive_machines`, and the separate created and updated date bounds open correctly and are rewritten to the canonical form (list-views §9.4).
 - **7.3** Machine values are machine initials; people are stable IDs plus the `me` and `unassigned` sentinels; `me` means whoever is viewing.
 - **7.4** A link to Issues for one machine, from a machine page or a Machine View cell, also sets Machine Presence to every presence state, so the machine's issues show whatever its presence.
@@ -88,11 +95,13 @@
 
 | Requirement | Divergence | Resolution |
 | :-- | :-- | :-- |
-| 4.5 | Machine and My machines include Removed machines. | PP-s363 |
-| §2.3 | The page title is "All Issues". | PP-jb9v |
-| §4.2, §4.7 | Machine presence has no filter control; a hidden parameter includes other presence states. | PP-jb9v |
-| §6 | No Built-in Views. | PP-jb9v |
-| §7 | Snake_case parameters, composite sort, and unvalidated page size and ID values. | PP-jb9v |
+| 3.1, 3.9, 3.10 | Line 2 wraps between its parts instead of staying on one line and dropping age, priority, then assignee. | Issue rows implementation PR (PP-jb9v.12). |
+| 3.2, 3.8 | Line 1 leads with a status icon and carries the severity and priority pills; there is no status pill. | Issue rows implementation PR (PP-jb9v.12). |
+| 3.3 | Line 2 shows the status name and no priority pill, shows the issue ID on phones, and shows assignee initials only on phones. | Issue rows implementation PR (PP-jb9v.12). |
+| 3.4 | On desktop the row's right side shows the comment count and the assignee avatar. | Issue rows implementation PR (PP-jb9v.12). |
+| 3.11 | People allowed to change an issue can change status, severity, priority, and assignee from the row, and rows keep their place after a change. | Issue rows implementation PR (PP-jb9v.12). |
+| 3.12 | Only the title links to the issue; the rest of the row is not a link. | Issue rows implementation PR (PP-jb9v.12). |
+| 3.13 | Pills keep the design bible's chip border. | Issue rows implementation PR (PP-jb9v.12). |
 
 ---
 
@@ -100,6 +109,11 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-11 | Issue rows redesigned: one layout at every width with a one-line line 2 and a drop order (3.1, 3.9), status and severity pills on line 1 and no status icon (3.2, 3.8), line 2 order with the issue ID desktop only (3.3), no comment count (3.4), field importance (3.10), no inline editing (3.11; 3.5 and 3.6 retired), whole-row link (3.12), borderless pills on List View pages (3.13). |
+| 2026-10-07 | Owner Collections retired; the Issues tab appears on every Collection and Tag (2.1). |
+| 2026-10-07 | Created and Updated days are the collective's local days, America/Chicago (4.8). |
+| 2026-10-05 | Machine tag and Machine collection Secondary Filters (4.3, 4.9) and their `tag` and `collection` parameters (7.1). |
+| 2026-10-04 | Search also matches description text (4.1). Machine owner offers Me and Unassigned shortcuts and Reporter offers Me (4.10). |
 | 2026-10-03 | Machine and My machines leave out Removed machines unless Machine Presence includes Removed (4.5). |
 | 2026-10-03 | §3.1: on a narrow phone the second line wraps rather than truncating. |
 | 2026-10-02 | Created from the approved list-framework design: two-line rows with inline editing, Primary and Secondary Filters including Machine Presence, sorting and export rules, the Open issues Page Preset and four Built-in Views, and canonical URL state with aliases for older parameters. |

@@ -12,12 +12,8 @@ import {
   ensureLoggedIn,
   assertNoA11yViolations,
 } from "../support/actions.js";
-import {
-  seededMachines,
-  seededIssue,
-  seededMember,
-} from "../support/constants.js";
-import { getProfileIdByEmail } from "../support/supabase-admin.js";
+import { seededMachines, seededIssue } from "../support/constants.js";
+import { STORAGE_STATE } from "../support/auth-state.js";
 
 // Build routes from seeded data so they don't break if seed data changes
 const machineInitials = seededMachines.addamsFamily.initials;
@@ -32,17 +28,15 @@ const issueNum = seededIssue("TAF").num;
 // claims to overflow-check.
 const ownedMachineInitials = seededMachines.eightBallDeluxe.initials;
 
-// Filter-heavy query for surfaces that render <IssueFilters>. Overflow bugs
-// live in the loaded, many-chips state — not the empty default — so exercise a
-// route variant where a wide set of active-filter chips is rendered. This is
-// what surfaces content bleeding off the viewport (see PP collections chip
-// overflow: chips previously overlaid the search input and spilled off-screen
-// on narrow viewports once several filters were active).
-// Deliberately heavy: partial selections from each status group (so they render
-// as individual chips rather than collapsing to a single group chip) plus every
-// severity, priority, and frequency value. This produces ~19 chips — enough that
-// a non-wrapping chip row would overrun a 375px viewport, which is exactly the
-// regression this guards against.
+// Filter-heavy query for the Issues List View. Overflow bugs live in the
+// loaded, many-filters state — not the empty default — so exercise a route
+// variant where every filter button shows a selection: each reads its value
+// or a count, which widens the row beside search until filters move into More
+// (list-views §4.3, §8.1), and the phone Filters button shows its active count
+// (§7.3). Deliberately heavy: partial selections from each status group plus
+// every severity, priority, and frequency value (Frequency is a Secondary
+// Filter, so More carries a selection too), and the URL carries no view, so
+// the List Header adds Save view (§5.2).
 const filterHeavyQuery =
   `?status=new,in_progress,need_parts,need_help,fixed,wont_fix,wai,no_repro` +
   `&severity=cosmetic,minor,major,unplayable` +
@@ -58,6 +52,10 @@ const authenticatedRoutes = [
   // Desktop-only page that scrolls inside its own container; the document
   // itself must not overflow (CORE-RESP-004, lineup spec 2.6).
   "/m/pinball-map",
+  // Print apron cards (apron-cards spec §12).
+  "/m/apron-cards",
+  // Print settings sheets (settings-sheets spec §2).
+  "/m/settings-sheets",
   `/m/${machineInitials}`,
   `/m/${machineInitials}/settings`,
   `/m/${machineInitials}/maintenance`,
@@ -75,6 +73,10 @@ const authenticatedRoutes = [
   "/c/tags",
   "/c/tags/location",
   "/c/tags/location/front-room",
+  // Settings tags (machine-settings §3.6–§3.7), from seed-machine-settings.mjs:
+  // the list, and a custom tag that finds sets on several machines.
+  "/c/settings-tags",
+  "/c/settings-tags/bat-city-2025",
 ];
 
 const publicRoutes = [
@@ -173,6 +175,18 @@ test.describe("Responsive: no horizontal overflow", () => {
       });
     }
 
+    // 320px is the layout floor (design bible §4). Medieval Madness's seeded
+    // issues put severity badges in its Recent activity rows, the row shape
+    // that overran this width (PP-xw8s).
+    test("machine Info tab fits a 320px viewport", async ({ page }) => {
+      await page.setViewportSize({ width: 320, height: 640 });
+      await page.goto(`/m/${seededMachines.medievalMadness.initials}`);
+      await expect(
+        page.getByTestId("issue-severity-badge").first()
+      ).toBeVisible();
+      await assertNoHorizontalOverflow(page);
+    });
+
     test("machine tabs remain reachable at 320px with 200% root text", async ({
       page,
     }) => {
@@ -204,17 +218,15 @@ test.describe("Responsive: no horizontal overflow", () => {
       });
     });
 
-    // Collection routes (PP-slrd.1) are keyed by a seed-time-generated user
-    // uuid, so the owner id is resolved at runtime instead of hardcoded.
+    // Machine group pages (Collections and Tags) share one header and tab
+    // strip (collections-and-tags 4.1). A seeded tag is the stable vehicle:
+    // its slug is fixed, and front-room holds TAF, the filter-heavy machine.
+    // Its Overview is already in authenticatedRoutes above.
     test.describe("collection pages", () => {
-      let collectionBase = "";
-      test.beforeAll(async () => {
-        const memberId = await getProfileIdByEmail(seededMember.email);
-        collectionBase = `/c/owner/${memberId}`;
-      });
+      const collectionBase = "/c/tags/location/front-room";
 
-      for (const suffix of ["", "/issues", "/timeline"]) {
-        test(`/c/owner/[member]${suffix}`, async ({ page }) => {
+      for (const suffix of ["/issues", "/timeline"]) {
+        test(`${collectionBase}${suffix}`, async ({ page }) => {
           await page.goto(`${collectionBase}${suffix}`);
           await page.waitForLoadState("load");
           await assertNoHorizontalOverflow(page);
@@ -222,10 +234,10 @@ test.describe("Responsive: no horizontal overflow", () => {
         });
       }
 
-      // Loaded state: the collection Issues tab with a wide set of active
+      // Loaded state: the group's Issues tab with a wide set of active
       // filters renders the full chip row — the surface where the chip overflow
       // was originally reported.
-      test(`/c/owner/[member]/issues (filters active)`, async ({ page }) => {
+      test(`${collectionBase}/issues (filters active)`, async ({ page }) => {
         await page.goto(`${collectionBase}/issues${filterHeavyQuery}`);
         await page.waitForLoadState("load");
         await assertNoHorizontalOverflow(page);
@@ -311,6 +323,32 @@ test.describe("Responsive: no horizontal overflow", () => {
         });
       });
     });
+  });
+
+  // The member-role `/m` entry above renders no header actions. An admin sees
+  // Pinball Map, the Print menu, and Add Machine on the title row, which
+  // must stay inside the viewport down to the 320px floor (list-views §7.2).
+  test.describe("machines list header as admin", () => {
+    test.use({ storageState: STORAGE_STATE.admin });
+
+    for (const width of [320, 430]) {
+      test(`/m header actions fit at ${String(width)}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 800 });
+        await page.goto("/m");
+
+        const main = page.getByRole("main");
+        for (const action of [
+          main.getByRole("link", { name: "Pinball Map", exact: true }),
+          // The Print menu trigger; its name gains the queue count when the
+          // admin has apron cards queued.
+          main.getByRole("button", { name: /^Print(,|$)/ }),
+          main.getByRole("link", { name: "Add Machine", exact: true }),
+        ]) {
+          await expect(action).toBeInViewport({ ratio: 1 });
+        }
+        await assertNoHorizontalOverflow(page);
+      });
+    }
   });
 
   test.describe("public pages", () => {

@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, ExternalLink, Plus, Trophy } from "lucide-react";
 import { Button } from "~/components/ui/button";
-import { formatDate } from "~/lib/dates";
+import { formatCalendarDay } from "~/lib/dates";
 import { getGameroomUrl, getGameUrl, getScoreEntryUrl } from "~/lib/iscored";
 import type { IscoredScore } from "~/lib/iscored/types";
 
@@ -26,15 +26,10 @@ const UNLINKED_CARD =
 const LABEL =
   "text-[10px] font-bold uppercase tracking-wider text-muted-foreground";
 
+// iScored dates are the venue's wall-clock time with no zone, so print their
+// day as written rather than converting it.
 function formatScoreDate(dateStr: string): string {
-  if (!dateStr) return "";
-  try {
-    const d = new Date(dateStr);
-    if (Number.isNaN(d.getTime())) return dateStr;
-    return formatDate(d);
-  } catch {
-    return dateStr;
-  }
+  return formatCalendarDay(dateStr) ?? dateStr;
 }
 
 /**

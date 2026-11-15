@@ -2,240 +2,363 @@
 
 import * as React from "react";
 import { SearchX } from "lucide-react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { EmptyState } from "~/components/ui/empty-state";
-import { Button } from "~/components/ui/button";
-import { getMachineViewPreset } from "~/lib/machines/view/config";
 import {
+  createSavedMachineViewAction,
+  deleteSavedMachineViewAction,
+  renameSavedMachineViewAction,
+  setMachineViewDefaultAction,
+  updateSavedMachineViewAction,
+} from "~/app/(app)/m/saved-view-actions";
+import {
+  ListSearchField,
+  ListTitleRow,
+  ListView,
+  type ListDisplayModel,
+  type ListPaginationModel,
+  type ListSortModel,
+} from "~/components/list-view";
+import { useListViewHost } from "~/components/list-view/use-list-view-host";
+import {
+  SummaryRowToggle,
+  useSummaryWidgetsController,
+} from "~/components/summary-widgets";
+import { Button } from "~/components/ui/button";
+import { EmptyState } from "~/components/ui/empty-state";
+import { isListPageSize } from "~/lib/list-view/url-state";
+import {
+  getMachineViewPreset,
+  MACHINE_VIEW_FIELDS,
+  MACHINE_VIEW_PAGE_PRESET_VIEW_ID,
+} from "~/lib/machines/view/config";
+import {
+  applyMachineBuiltInView,
+  hasMachineViewConfiguration,
+  isMachineViewField,
   nextMachineViewSort,
   serializeMachineViewState,
+  toMachineViewSavedState,
 } from "~/lib/machines/view/state";
-import type {
-  MachineViewPresetId,
-  MachineViewResult,
-  MachineViewSavedViews,
-  MachineViewState,
-} from "~/lib/types";
-import { cn } from "~/lib/utils";
-import { MachineSummaryWidgets } from "./MachineSummaryWidgets";
-import { MachineViewCompactList } from "./MachineViewCompactList";
-import { MachineViewPageControls } from "./MachineViewPageControls";
-import { MachineViewTable } from "./MachineViewTable";
 import {
-  MachineViewSavedViewsMenu,
-  type MachineViewSelectableView,
-} from "./MachineViewSavedViewsMenu";
-import { MachineViewToolbar } from "./MachineViewToolbar";
-import type { MachineSelectionHandler } from "./field-catalog";
+  LIST_PAGE_SIZES,
+  type MachineViewFieldId,
+  type MachineViewPresetId,
+  type MachineViewResult,
+  type MachineViewSavedState,
+  type MachineViewSavedViews,
+  type MachineViewState,
+} from "~/lib/types";
+import {
+  MACHINE_SUMMARY_STORAGE_KEY,
+  MACHINE_SUMMARY_WIDGET_COUNT,
+  MachineSummaryRow,
+  MachineSummaryWidgets,
+} from "./MachineSummaryWidgets";
+import { MachineViewCompactList } from "./MachineViewCompactList";
+import { MachineViewTable } from "./MachineViewTable";
+import type {
+  MachineRowAction,
+  MachineSelectionHandler,
+} from "./field-catalog";
+import { buildMachineFilters } from "./machine-filters";
 
 const MOBILE_MODE_STORAGE_KEY = "pinpoint:machine-view:mobile-mode";
+const NOUN = { one: "machine", other: "machines" } as const;
+
+type MobileMode = "compact" | "table";
 
 interface MachineViewProps {
   result: MachineViewResult;
   preset: MachineViewPresetId;
-  onMachineSelect?: MachineSelectionHandler | undefined;
   /** The views this Surface offers the viewer (list-views §10). */
-  savedViews?: MachineViewSavedViews | null | undefined;
+  savedViews: MachineViewSavedViews;
+  /**
+   * The page title row, when Machine View owns its page (the Machines page).
+   * A Collection or Tag tab's title row belongs to its own page, so the
+   * Summary Row toggle then sits on its own row (list-views §7.2).
+   */
+  title?: string | undefined;
+  /** The page actions beside the title (list-views §3.2). */
+  actions?: React.ReactNode;
+  onMachineSelect?: MachineSelectionHandler | undefined;
+  /**
+   * An action at the end of each row, such as Add on Print settings sheets
+   * (settings-sheets §2.2).
+   */
+  rowAction?: MachineRowAction | undefined;
+  /** An action in the List Header that applies to the whole result. */
+  listAction?: React.ReactNode;
+  /** Whether the Summary Widgets show. A picker Surface leaves them out. */
+  showSummary?: boolean;
+  /** Told when a new result starts and finishes loading. */
+  onBusyChange?: ((busy: boolean) => void) | undefined;
 }
 
+/** How the sort control names a field, such as "Name" (machine-views §3.14). */
+function sortFieldLabel(field: MachineViewFieldId): string {
+  const definition = MACHINE_VIEW_FIELDS[field];
+  return definition.sortLabel ?? definition.label;
+}
+
+const MACHINE_VIEW_ACTIONS = {
+  create: createSavedMachineViewAction,
+  update: updateSavedMachineViewAction,
+  rename: renameSavedMachineViewAction,
+  remove: deleteSavedMachineViewAction,
+  setDefault: setMachineViewDefaultAction,
+};
+
+function withPage(
+  saved: MachineViewSavedState,
+  page: number
+): MachineViewState {
+  return { ...saved, page };
+}
+
+/**
+ * Machine View on the shared List View (machine-views §2.4): it builds the
+ * List View models from its own state and fields, and keeps the URL, the
+ * Applied View, and the return-to-list memory in step with them.
+ */
 export function MachineView({
   result,
   preset,
-  onMachineSelect,
   savedViews,
+  title,
+  actions,
+  onMachineSelect,
+  rowAction,
+  listAction,
+  showSummary = true,
+  onBusyChange,
 }: MachineViewProps): React.JSX.Element {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const [isPending, startTransition] = React.useTransition();
   const rootRef = React.useRef<HTMLDivElement>(null);
-  const [state, setState] = React.useState(result.state);
-  const [searchValue, setSearchValue] = React.useState(result.state.q);
-  const requestedQuery = React.useRef(result.state.q);
-  const [mobileMode, setMobileMode] = React.useState<"compact" | "table">(
-    "compact"
+  const [mobileMode, setMobileMode] = React.useState<MobileMode>("compact");
+  const summaryController = useSummaryWidgetsController(
+    MACHINE_SUMMARY_STORAGE_KEY,
+    MACHINE_SUMMARY_WIDGET_COUNT
   );
-  // The `view` URL reference (list-views §9.6) carried by every navigation until
-  // another Saved View or the Page Preset is chosen.
-  const serverViewReference = savedViews?.activeViewId ?? null;
-  const viewReference = React.useRef(serverViewReference);
-  const [activeViewId, setActiveViewId] = React.useState(serverViewReference);
-  React.useEffect(() => {
-    viewReference.current = serverViewReference;
-    setActiveViewId(serverViewReference);
-  }, [serverViewReference]);
+  const defaults = getMachineViewPreset(preset).defaultState;
+  const serialize = React.useCallback(
+    (next: MachineViewState, view: string | null): URLSearchParams =>
+      serializeMachineViewState(next, preset, view),
+    [preset]
+  );
+  const applyBuiltIn = React.useCallback(
+    (
+      view: { id: string; state: MachineViewSavedState },
+      current: MachineViewSavedState
+    ): MachineViewSavedState => applyMachineBuiltInView(preset, view, current),
+    [preset]
+  );
+  const { state, applied, edited, pagePresetName, isPending, update, views } =
+    useListViewHost({
+      resultState: result.state,
+      savedViews,
+      pagePresetViewId: MACHINE_VIEW_PAGE_PRESET_VIEW_ID[preset],
+      pagePresetState: toMachineViewSavedState(defaults),
+      serialize,
+      hasConfiguration: hasMachineViewConfiguration,
+      toSaved: toMachineViewSavedState,
+      withPage,
+      applyBuiltIn,
+      defaultPageName: "Machines",
+      actions: MACHINE_VIEW_ACTIONS,
+    });
+  React.useEffect(() => onBusyChange?.(isPending), [isPending, onBusyChange]);
 
   React.useEffect(() => {
-    const isRequestedResult = result.state.q === requestedQuery.current;
-    setState(result.state);
-    if (!isRequestedResult) setSearchValue(result.state.q);
-    requestedQuery.current = result.state.q;
-  }, [result.state]);
-
-  React.useEffect(() => {
-    const stored = window.localStorage.getItem(MOBILE_MODE_STORAGE_KEY);
-    if (stored === "compact" || stored === "table") setMobileMode(stored);
+    try {
+      const stored = window.localStorage.getItem(MOBILE_MODE_STORAGE_KEY);
+      if (stored === "compact" || stored === "table") setMobileMode(stored);
+    } catch {
+      // Storage can be unavailable; Compact list is the default.
+    }
   }, []);
 
-  const navigate = React.useCallback(
-    (
-      next: MachineViewState,
-      view: string | null = viewReference.current
-    ): void => {
-      requestedQuery.current = next.q;
-      viewReference.current = view;
-      setActiveViewId(view);
-      setState(next);
-      const query = serializeMachineViewState(next, preset, view).toString();
-      startTransition(() => {
-        router.replace(query ? `${pathname}?${query}` : pathname, {
-          scroll: false,
-        });
-      });
-    },
-    [pathname, preset, router]
-  );
-
-  React.useEffect(() => {
-    if (searchValue.trim() === state.q) return;
-    const timeout = window.setTimeout(() => {
-      navigate({ ...state, q: searchValue.trim(), page: 1 });
-    }, 250);
-    return () => window.clearTimeout(timeout);
-  }, [navigate, searchValue, state]);
-
-  React.useEffect(() => {
-    const canonical = serializeMachineViewState(
-      result.state,
-      preset,
-      serverViewReference
-    ).toString();
-    if (canonical === searchParams.toString()) return;
-    router.replace(canonical ? `${pathname}?${canonical}` : pathname, {
-      scroll: false,
-    });
-  }, [
-    pathname,
-    preset,
-    result.state,
-    router,
-    searchParams,
-    serverViewReference,
-  ]);
-
-  function applyView(view: MachineViewSelectableView): void {
-    setSearchValue(view.state.q);
-    navigate({ ...view.state, page: 1 }, view.id);
-  }
-
-  function changeMobileMode(mode: "compact" | "table"): void {
+  function changeMobileMode(mode: MobileMode): void {
     setMobileMode(mode);
-    window.localStorage.setItem(MOBILE_MODE_STORAGE_KEY, mode);
+    try {
+      window.localStorage.setItem(MOBILE_MODE_STORAGE_KEY, mode);
+    } catch {
+      // Without storage the choice lasts for this page view.
+    }
   }
+
+  const filters = buildMachineFilters({
+    state,
+    defaults,
+    ownerOptions: result.ownerOptions,
+    offersMe: result.offersMe,
+    onChange: (partial) => update(partial),
+  });
 
   function resetFilters(): void {
-    const defaults = getMachineViewPreset(preset).defaultState;
-    setSearchValue("");
-    navigate({
-      ...state,
-      q: "",
+    // Like each filter's Reset (list-views §4.9), nothing happens at the
+    // Page Preset: no page change and no navigation.
+    if (filters.every((filter) => filter.atPreset)) return;
+    update({
       presence: defaults.presence,
-      status: [],
-      severity: [],
-      owner: [],
-      page: 1,
+      status: defaults.status,
+      severity: defaults.severity,
+      owner: defaults.owner,
     });
   }
 
-  // Paging from the bottom controls returns the reader to the top of the list;
-  // navigation itself keeps scroll position (`scroll: false`).
-  function navigateFromBottom(page: number): void {
-    navigate({ ...state, page });
-    rootRef.current?.scrollIntoView({ block: "start" });
-  }
+  const sort: ListSortModel = {
+    fields: result.permittedFields.map((field) => ({
+      value: field,
+      label: sortFieldLabel(field),
+    })),
+    field: state.sort,
+    dir: state.dir,
+    label: `${sortFieldLabel(state.sort)}, ${MACHINE_VIEW_FIELDS[state.sort].directionLabels[state.dir]}`,
+    directionLabels: (field) =>
+      isMachineViewField(field)
+        ? MACHINE_VIEW_FIELDS[field].directionLabels
+        : { asc: "Ascending", desc: "Descending" },
+    preferredDirection: (field) =>
+      isMachineViewField(field)
+        ? MACHINE_VIEW_FIELDS[field].preferredDirection
+        : "asc",
+    onChange: (field, dir) => {
+      if (isMachineViewField(field)) update({ sort: field, dir });
+    },
+  };
+
+  const display: ListDisplayModel = {
+    pageSize: state.pageSize,
+    pageSizes: LIST_PAGE_SIZES,
+    onPageSizeChange: (pageSize) => {
+      if (isListPageSize(pageSize)) update({ pageSize });
+    },
+    fields: {
+      options: result.permittedFields
+        .filter((field) => field !== "machine")
+        .map((field) => ({
+          value: field,
+          label: MACHINE_VIEW_FIELDS[field].label,
+        })),
+      selected: state.columns.filter((field) => field !== "machine"),
+      // Displayed fields keep the page (§4.8).
+      onToggle: (value, checked) => {
+        if (!isMachineViewField(value)) return;
+        const columns = checked
+          ? [...new Set([...state.columns, value])]
+          : state.columns.filter((column) => column !== value);
+        update({ columns }, false);
+      },
+    },
+    layout: {
+      label: "Layout",
+      options: [
+        { value: "compact", label: "Compact list" },
+        { value: "table", label: "Table" },
+      ],
+      value: mobileMode,
+      onChange: (value) => {
+        if (value === "compact" || value === "table") changeMobileMode(value);
+      },
+    },
+  };
+
+  const pagination: ListPaginationModel = {
+    page: state.page,
+    pageSize: state.pageSize,
+    totalCount: result.totalCount,
+    onPage: (page, fromBottom) => {
+      update({ page }, false);
+      // The pagers below the list return the reader to the list's top.
+      if (fromBottom) rootRef.current?.scrollIntoView({ block: "start" });
+    },
+  };
+
+  const summary = (
+    <MachineSummaryWidgets
+      summary={result.summary}
+      state={state}
+      onStateChange={(next) => update(next, false)}
+      controller={title ? summaryController : undefined}
+    />
+  );
 
   return (
-    <div ref={rootRef} className="space-y-4" aria-busy={isPending}>
-      <MachineSummaryWidgets
-        summary={result.summary}
-        state={state}
-        onStateChange={navigate}
-      />
-      <MachineViewToolbar
-        state={state}
-        preset={preset}
-        ownerOptions={result.ownerOptions}
-        permittedFields={result.permittedFields}
-        totalCount={result.totalCount}
-        searchValue={searchValue}
-        mobileMode={mobileMode}
-        onSearchChange={setSearchValue}
-        onStateChange={navigate}
-        onMobileModeChange={changeMobileMode}
-        renderSavedViewsMenu={
-          savedViews
-            ? (layout) => (
-                <MachineViewSavedViewsMenu
-                  layout={layout}
-                  savedViews={savedViews}
-                  activeViewId={activeViewId}
-                  state={state}
-                  preset={preset}
-                  onApply={applyView}
-                  onViewSaved={(viewId) => navigate(state, viewId)}
-                />
-              )
-            : undefined
-        }
-      />
-      <div className={cn("transition-opacity", isPending && "opacity-60")}>
-        {result.rows.length === 0 ? (
-          <EmptyState
-            icon={SearchX}
-            title="No machines match"
-            description="Try removing a filter or using a broader search."
-            action={
-              <Button type="button" variant="outline" onClick={resetFilters}>
-                Clear filters
-              </Button>
-            }
-          />
-        ) : (
-          <>
-            {mobileMode === "compact" ? (
-              <MachineViewCompactList
-                rows={result.rows}
-                onMachineSelect={onMachineSelect}
-              />
-            ) : null}
-            <MachineViewTable
-              rows={result.rows}
-              state={state}
-              mobileMode={mobileMode}
-              onSort={(field) => {
-                const nextSort = nextMachineViewSort(state, field, preset);
-                navigate({ ...state, ...nextSort, page: 1 });
-              }}
-              onMachineSelect={onMachineSelect}
+    <div ref={rootRef} className="scroll-mt-14">
+      <ListView
+        label="Machines list"
+        noun={NOUN}
+        titleRow={
+          title ? (
+            <ListTitleRow
+              title={title}
+              actions={actions}
+              summaryToggle={
+                <SummaryRowToggle controller={summaryController}>
+                  <MachineSummaryRow summary={result.summary} compact />
+                </SummaryRowToggle>
+              }
             />
-            {/* Phone: a floating bar held just above the tab bar while the
-                list scrolls. Desktop: a plain row after the last machine. */}
-            <div className="sticky bottom-[calc(64px+env(safe-area-inset-bottom))] z-10 mt-3 flex justify-end rounded-xl border border-outline-variant bg-card/95 px-3 py-1.5 shadow-lg backdrop-blur-sm md:static md:rounded-none md:border-0 md:bg-transparent md:px-0 md:py-0 md:shadow-none md:backdrop-blur-none">
-              <MachineViewPageControls
-                state={state}
-                permittedFields={result.permittedFields}
-                totalCount={result.totalCount}
-                mobileMode={mobileMode}
-                onStateChange={navigate}
-                onMobileModeChange={changeMobileMode}
-                onNavigate={navigateFromBottom}
-                testIdPrefix="machine-view-bottom"
-                touchSized
-              />
-            </div>
-          </>
-        )}
-      </div>
+          ) : undefined
+        }
+        summary={showSummary ? summary : undefined}
+        search={
+          <ListSearchField
+            id="machine-view-search"
+            value={state.q}
+            onSearch={(q) => update({ q })}
+            label="Search machines"
+          />
+        }
+        primaryFilters={filters}
+        views={views}
+        sort={sort}
+        display={display}
+        pagination={pagination}
+        exportControl={listAction}
+        busy={isPending}
+        onResetAll={resetFilters}
+        emptyState={({ discard, openPagePreset }) =>
+          applied && !edited ? (
+            <EmptyState
+              icon={SearchX}
+              title={`No machines in ${applied.name}`}
+            />
+          ) : (
+            <EmptyState
+              icon={SearchX}
+              title="No machines match"
+              description="Try removing a filter or using a broader search."
+              action={
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={applied ? discard : openPagePreset}
+                >
+                  Back to {applied?.name ?? pagePresetName}
+                </Button>
+              }
+            />
+          )
+        }
+      >
+        {mobileMode === "compact" ? (
+          <MachineViewCompactList
+            rows={result.rows}
+            onMachineSelect={onMachineSelect}
+            rowAction={rowAction}
+          />
+        ) : null}
+        <MachineViewTable
+          rows={result.rows}
+          state={state}
+          mobileMode={mobileMode}
+          onSort={(field) => {
+            const nextSort = nextMachineViewSort(state, field, preset);
+            update(nextSort);
+          }}
+          onMachineSelect={onMachineSelect}
+          rowAction={rowAction}
+        />
+      </ListView>
     </div>
   );
 }

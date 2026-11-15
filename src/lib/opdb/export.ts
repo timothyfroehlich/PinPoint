@@ -1,3 +1,4 @@
+import { NETWORK_ERROR_STATUS, safeFetch } from "~/lib/http/external";
 import { parseOpdbExport } from "./parse";
 import type { OpdbMachine } from "./types";
 
@@ -27,11 +28,23 @@ export const MIN_EXPORT_MACHINES = 1_000;
  * not the export, or one implausibly small, so the caller keeps its last copy.
  */
 export async function fetchOpdbExport(): Promise<OpdbMachine[]> {
-  const response = await fetch(OPDB_EXPORT_URL, {
-    headers: { Accept: "application/json", "User-Agent": OPDB_USER_AGENT },
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    cache: "no-store",
-  });
+  const response = await safeFetch(
+    OPDB_EXPORT_URL,
+    {
+      headers: { Accept: "application/json", "User-Agent": OPDB_USER_AGENT },
+      cache: "no-store",
+    },
+    {
+      timeoutMs: FETCH_TIMEOUT_MS,
+      networkErrorLog: {
+        fields: { action: "opdb.export" },
+        message: "OPDB export fetch failed",
+      },
+    }
+  );
+  if (response.status === NETWORK_ERROR_STATUS) {
+    throw new Error("OPDB export request failed: network error or timeout");
+  }
   if (!response.ok) {
     throw new Error(
       `OPDB export request failed: HTTP ${String(response.status)}`

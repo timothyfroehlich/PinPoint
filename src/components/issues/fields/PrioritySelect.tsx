@@ -9,7 +9,7 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { PRIORITY_CONFIG } from "~/lib/issues/status";
-import { type IssuePriority } from "~/lib/types";
+import { ISSUE_PRIORITY_VALUES, type IssuePriority } from "~/lib/types";
 
 interface PrioritySelectProps {
   value: IssuePriority | "";
@@ -21,7 +21,7 @@ interface PrioritySelectProps {
   testId?: string;
 }
 
-const priorityOptions: IssuePriority[] = ["low", "medium", "high"];
+const priorityOptions: readonly IssuePriority[] = ISSUE_PRIORITY_VALUES;
 
 export function PrioritySelect({
   value,

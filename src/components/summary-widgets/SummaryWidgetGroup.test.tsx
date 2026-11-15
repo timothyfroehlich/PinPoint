@@ -4,7 +4,11 @@ import { hydrateRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SummaryWidget, type SummaryWidgetSegment } from "./SummaryWidget";
-import { SummaryWidgetGroup } from "./SummaryWidgetGroup";
+import {
+  SummaryRowToggle,
+  SummaryWidgetGroup,
+  useSummaryWidgetsController,
+} from "./SummaryWidgetGroup";
 
 const KEY = "pinpoint:summary-widgets:test";
 
@@ -31,11 +35,6 @@ function widget(index: number): React.JSX.Element {
       key={index}
       id={`widget-${index}`}
       label={`Widget ${index}`}
-      headline={{
-        figure: 2,
-        text: `up in widget ${index}`,
-        accentClassName: "text-success",
-      }}
       segments={SEGMENTS}
       selectedValue={null}
       onSegmentSelect={vi.fn()}
@@ -159,7 +158,7 @@ describe("SummaryWidgetGroup", () => {
 });
 
 /**
- * Stacked versus side by side (widgets §2.3, §2.4, §5.1, §5.7). jsdom has no
+ * Stacked versus side by side (widgets §2.3, §2.4, §5.7). jsdom has no
  * layout, so the CSS classes that switch at the side-by-side container query
  * are the observable contract; the base classes are the stacked layout, at
  * every width.
@@ -197,31 +196,76 @@ describe.each(SIDE_BY_SIDE)(
       expect(content()).toHaveClass("hidden", `${sideBySide}:grid`);
     });
 
-    it("shows each headline only side by side, and moves the breakdown under the bar there", () => {
+    it("keeps the breakdown on the label line and the bar beneath it, stacked or side by side", () => {
       renderGroup(widgetCount);
 
       for (let i = 1; i <= widgetCount; i += 1) {
         const region = screen.getByRole("region", { name: `Widget ${i}` });
-        const headline = within(region).getByText(`up in widget ${i}`);
         const breakdown = within(region).getByRole("button", {
           name: "1 Down",
         }).parentElement;
-        const [label, ...rest] = Array.from(region.children);
-        const bar = rest.find((child) => child.hasAttribute("aria-hidden"));
+        const [label, bar] = Array.from(region.children);
 
-        // DOM order stays label, headline, bar, breakdown for screen readers.
-        expect(Array.from(region.children)).toEqual([
-          label,
-          headline,
-          bar,
-          breakdown,
-        ]);
-        // display:none while stacked, so it is not announced either.
-        expect(headline).toHaveClass("hidden", `${sideBySide}:block`);
-        // Stacked: breakdown on the label line, bar beneath it.
-        expect(breakdown).toHaveClass("order-2", `${sideBySide}:order-4`);
-        expect(bar).toHaveClass("order-4", `${sideBySide}:order-3`);
+        // DOM order stays label, bar, breakdown for screen readers.
+        expect(Array.from(region.children)).toEqual([label, bar, breakdown]);
+        expect(bar).toHaveAttribute("aria-hidden", "true");
+        // Flex order puts the breakdown on the label line, the bar beneath.
+        expect(breakdown).toHaveClass("order-2");
+        expect(bar).toHaveClass("order-4");
       }
+    });
+
+    it("drops the swatches and the card whenever the widgets stack (§5.7)", () => {
+      renderGroup(widgetCount);
+      const region = screen.getByRole("region", { name: "Widget 1" });
+      const swatch = within(region)
+        .getByRole("button", { name: "1 Down" })
+        .querySelector("[data-swatch]");
+
+      // Hidden by default, shown only at the side-by-side query.
+      expect(swatch).toHaveClass("hidden", `${sideBySide}:inline-block`);
+      expect(swatch).not.toHaveClass("md:inline-block");
+      // The card's padding, border, and rules apply only side by side.
+      expect(region).toHaveClass("py-1.5", `${sideBySide}:px-4`);
+      expect(region).not.toHaveClass("md:px-4");
+      expect(content().parentElement).toHaveClass(`${sideBySide}:border`);
+      expect(content().parentElement).not.toHaveClass("md:border");
+      expect(content()).not.toHaveClass("divide-y", "md:divide-y");
+    });
+
+    it("hands the collapse control to a title-row toggle at every stacked width (list-views §8.4)", async () => {
+      const user = userEvent.setup();
+      function Host(): React.JSX.Element {
+        const controller = useSummaryWidgetsController(KEY, widgetCount);
+        return (
+          <>
+            <SummaryRowToggle controller={controller}>3 open</SummaryRowToggle>
+            <SummaryWidgetGroup
+              storageKey={KEY}
+              summaryRow="3 open"
+              widgetCount={widgetCount}
+              controller={controller}
+            >
+              {Array.from({ length: widgetCount }, (_, i) => widget(i + 1))}
+            </SummaryWidgetGroup>
+          </>
+        );
+      }
+      render(<Host />);
+
+      // Exactly one toggle: shown whenever the widgets stack, hidden side
+      // by side, never limited to phones.
+      const toggle = toggleButton();
+      expect(
+        screen.getAllByRole("button", { name: "Summary: 3 open" })
+      ).toHaveLength(1);
+      expect(toggle).toHaveClass(`${sideBySide}:hidden`);
+      expect(toggle).not.toHaveClass("md:hidden");
+      // Without its own toggle, the stacked section has no rule beneath it.
+      expect(content().parentElement).not.toHaveClass("border-b");
+      await user.click(toggle);
+      expect(toggle).toHaveAttribute("aria-expanded", "false");
+      expect(content()).toHaveClass("hidden", `${sideBySide}:grid`);
     });
   }
 );

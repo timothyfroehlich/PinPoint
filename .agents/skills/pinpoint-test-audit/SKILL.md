@@ -16,7 +16,7 @@ Two modes:
 
 Discovery is read-only; report evidence before editing. For broad scope, split into parallel lanes by area:
 
-- Server actions (`actions.ts` beside their routes under `src/app/`, plus `src/server/actions/`) and services (`src/services/`, `src/lib/<domain>/`);
+- Server actions (`actions.ts` / `*-action(s).ts` beside their routes under `src/app/`, plus cross-cutting ones like `src/lib/blob/image-actions.ts`) and services (`src/services/`, `src/lib/<domain>/`);
 - Route handlers and the request proxy (`src/app/api/`, `src/proxy.ts`, `src/lib/supabase/middleware.ts`);
 - Components and hooks (`src/components/`, `src/hooks/`);
 - E2E and smoke specs (`e2e/full/`, `e2e/smoke/`);
@@ -65,7 +65,7 @@ Take one coherent batch per PR, grouped by production owner. Move retained regre
 
 ## Landing
 
-Follow [`pinpoint-pr-workflow`](../pinpoint-pr-workflow/SKILL.md): dedicated worktree, draft PR, CI, local `/code-review` with a recorded review, then `bash scripts/workflow/merge-handoff.sh <PR>`. The PR body carries the handoff report:
+Follow [`pinpoint-pr-workflow`](../pinpoint-pr-workflow/SKILL.md): dedicated worktree, draft PR, CI, mark ready, every Claude Review finding adjudicated, then report the PR ready. The PR body carries the landing report:
 
 - Categories of low-value tests removed, with the candidate evidence;
 - Production simplifications and deleted test-only seams;

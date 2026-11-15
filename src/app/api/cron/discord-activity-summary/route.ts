@@ -1,8 +1,7 @@
-import { NextResponse } from "next/server";
-import { assertCronAuthorized } from "~/lib/cron/auth";
+import type { NextResponse } from "next/server";
+import { runCron } from "~/lib/cron/run-cron";
 import { runScheduledActivitySummary } from "~/lib/discord/activity-summary/runner";
 import { log } from "~/lib/logger";
-import { reportError } from "~/lib/observability/report-error";
 
 /**
  * Discord activity summary (PP-ogup, discord-activity-summary spec §3).
@@ -21,23 +20,12 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function GET(request: Request): Promise<NextResponse> {
-  const denied = assertCronAuthorized(request);
-  if (denied) return denied;
-
-  try {
+  return runCron(request, "discord.activitySummary", async () => {
     const run = await runScheduledActivitySummary();
     log.info(
       { ...run, action: "discord.activitySummary" },
       "Discord activity summary run"
     );
-    return NextResponse.json({ ok: true, ...run });
-  } catch (err) {
-    // `reportError`, not a bare `log.error`: this route catches to return a
-    // 502, and Sentry's auto-capture only sees uncaught exceptions (PP-a5y).
-    reportError(err, { action: "discord.activitySummary" });
-    return NextResponse.json(
-      { error: "Activity summary failed" },
-      { status: 502 }
-    );
-  }
+    return { ok: true, ...run };
+  });
 }

@@ -1,9 +1,6 @@
 import type React from "react";
 import { notFound } from "next/navigation";
-import { eq } from "drizzle-orm";
-import { createClient } from "~/lib/supabase/server";
-import { db } from "~/server/db";
-import { userProfiles } from "~/server/db/schema";
+import { getViewer } from "~/lib/auth/viewer";
 import { WatchMachineButton } from "~/components/machines/WatchMachineButton";
 import { MachineRecentActivity } from "~/components/machines/timeline/MachineRecentActivity";
 import {
@@ -40,24 +37,14 @@ export default async function MachineMaintenanceTab({
   const { view: viewParam } = await searchParams;
   const view = viewParam === "all" ? "all" : "open";
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { userId, role } = await getViewer();
 
-  const currentUserProfile = user
-    ? await db.query.userProfiles.findFirst({
-        where: eq(userProfiles.id, user.id),
-        columns: { role: true },
-      })
-    : null;
-
-  const accessLevel = getAccessLevel(currentUserProfile?.role);
+  const accessLevel = getAccessLevel(role);
   const canWatch = checkPermission("machines.watch", accessLevel);
   // Who may post timeline notes; their unposted note is kept as a draft.
   const composerUserId =
-    user && checkPermission("machines.timeline.comment.add", accessLevel)
-      ? user.id
+    userId && checkPermission("machines.timeline.comment.add", accessLevel)
+      ? userId
       : null;
 
   const { machine } = await getMachineForLayout(initials);
@@ -66,7 +53,7 @@ export default async function MachineMaintenanceTab({
   }
 
   const ownershipContext: OwnershipContext = {
-    userId: user?.id,
+    userId,
     machineOwnerId: machine.ownerId ?? undefined,
   };
   const canEditGeneral = checkPermission(
@@ -79,8 +66,8 @@ export default async function MachineMaintenanceTab({
     accessLevel
   );
 
-  const currentUserWatch = user
-    ? machine.watchers.find((w) => w.userId === user.id)
+  const currentUserWatch = userId
+    ? machine.watchers.find((w) => w.userId === userId)
     : undefined;
   const isWatching = !!currentUserWatch;
   const watchMode = currentUserWatch?.watchMode ?? "notify";

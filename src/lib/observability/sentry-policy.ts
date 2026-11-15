@@ -2,6 +2,7 @@ import type * as Sentry from "@sentry/nextjs";
 import type { Breadcrumb, ErrorEvent, Log, Metric } from "@sentry/nextjs";
 
 import { maskEmailsInText } from "~/lib/logging/mask";
+import { isVercelPreview } from "~/lib/runtime-env";
 
 const SUPABASE_AUTH_COLD_START_MESSAGE = "Tenant or user not found";
 const MAX_SANITIZE_DEPTH = 64;
@@ -194,7 +195,7 @@ function sanitizeChannelPayload(value: object): boolean {
  * not rewritten here.
  */
 export function sentryBeforeSend(event: ErrorEvent): ErrorEvent | null {
-  if (process.env["VERCEL_ENV"] === "preview") {
+  if (isVercelPreview()) {
     const inMessage =
       event.message?.includes(SUPABASE_AUTH_COLD_START_MESSAGE) ?? false;
     const inException =

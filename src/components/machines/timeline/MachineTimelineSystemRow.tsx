@@ -4,7 +4,7 @@ import {
   MachineAttributionLine,
   type MachineLabel,
 } from "./MachineAttributionLine";
-import { RelativeTime } from "~/components/issues/RelativeTime";
+import { TimelineRowTime } from "./TimelineRowTime";
 import { MACHINE_EVENT_ICONS } from "~/lib/timeline/machine-event-icons";
 import { formatMachineEvent } from "~/lib/timeline/format-machine-event";
 import type { MachineLifecycleEventData } from "~/lib/timeline/machine-event-types";
@@ -74,7 +74,7 @@ export function MachineTimelineSystemRow({
   // `<RelativeTime>` ticks every 60s so the label stays accurate while the
   // page is open; a raw formatRelative() would freeze at first render.
   const rightMeta: React.ReactNode = showRelativeTime ? (
-    <RelativeTime value={row.createdAt} />
+    <TimelineRowTime value={row.createdAt} />
   ) : (
     rowDateLabel
   );
@@ -94,7 +94,7 @@ export function MachineTimelineSystemRow({
         <Icon aria-hidden="true" className={cn("size-5", colorClass)} />
       </div>
       {machineLabel ? (
-        <div className="min-w-0 flex-1">
+        <div className="@container min-w-0 flex-1">
           <MachineAttributionLine machine={machineLabel} />
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
             <span>{text}</span>
@@ -104,7 +104,7 @@ export function MachineTimelineSystemRow({
           </div>
         </div>
       ) : (
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+        <div className="@container flex min-w-0 flex-1 flex-wrap items-center gap-2">
           <span>{text}</span>
           {rightMeta ? (
             <span className="ml-auto text-xs tabular-nums">{rightMeta}</span>

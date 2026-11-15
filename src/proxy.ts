@@ -1,6 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "~/lib/supabase/middleware";
 import { canonicalMachinePath } from "~/lib/machines/canonical-path";
+import {
+  isLocalDevelopment,
+  isProductionBuild,
+  isVercelPreview,
+  isVercelProduction,
+} from "~/lib/runtime-env";
 
 /**
  * Next.js Proxy for Supabase SSR authentication and security headers
@@ -45,20 +51,17 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 
   // Allow Vercel preview toolbar in non-production environments.
   // Per https://vercel.com/docs/vercel-toolbar/managing-toolbar#using-a-content-security-policy
-  const vercelEnv = process.env["VERCEL_ENV"];
+  // Every production build except a preview gets the strict policy, so the
+  // E2E production build (VERCEL_ENV=development) gets it too.
   const isProduction =
-    vercelEnv === "production" ||
-    (process.env.NODE_ENV === "production" && vercelEnv !== "preview");
-  const isLocalDevelopment =
-    process.env.NODE_ENV === "development" &&
-    vercelEnv !== "production" &&
-    vercelEnv !== "preview";
+    isVercelProduction() || (isProductionBuild() && !isVercelPreview());
+  const allowUnsafeEval = isLocalDevelopment();
 
   // Production: strict-dynamic (nonce-only, blocks host allowlists)
   // Preview: explicit allowlist (allows vercel.live scripts)
   const scriptSrc = isProduction
     ? `'self' 'nonce-${nonce}' 'strict-dynamic'`
-    : `'self' 'nonce-${nonce}' https://vercel.live${isLocalDevelopment ? " 'unsafe-eval'" : ""}`;
+    : `'self' 'nonce-${nonce}' https://vercel.live${allowUnsafeEval ? " 'unsafe-eval'" : ""}`;
 
   const styleSrc = isProduction
     ? "'self' 'unsafe-inline'"
@@ -85,8 +88,8 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   //    no request-derived signal can drop them from production or preview.
   //    Either request signal only ever adds them.
   const isHttps =
-    vercelEnv === "production" ||
-    vercelEnv === "preview" ||
+    isVercelProduction() ||
+    isVercelPreview() ||
     request.nextUrl.protocol === "https:" ||
     request.headers.get("x-forwarded-proto") === "https";
   const mixedContentDirectives = isHttps
@@ -132,12 +135,20 @@ export const config = {
   matcher: [
     /*
      * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
+     * - _next/static/ (static files)
+     * - _next/image (image optimization endpoint)
      * - favicon.ico (favicon file)
+     * - manifest.webmanifest (browsers fetch it without cookies, so the
+     *   login redirect would hide it from "Add to Home screen")
      * - Assets with extensions (.svg, .png, .jpg, .jpeg, .gif, .webp)
      * - /api/health (health check endpoint)
+     *
+     * Every alternative MUST be anchored — `$` for an exact path, a trailing
+     * `/` for a directory. The lookahead runs right after the leading `/`, so
+     * a bare `api/health` would also skip /api/healthz and /api/health/db,
+     * and any path the proxy skips loses the nonce CSP and the session
+     * refresh (PP-5aev). Next reads this statically: keep it a literal.
      */
-    "/((?!_next/static|_next/image|favicon.ico|api/health|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static/|_next/image$|favicon\\.ico$|manifest\\.webmanifest$|api/health$|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
