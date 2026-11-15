@@ -22,9 +22,10 @@ export function SummaryWidgetGroup({
     // Two query containers: the outer one hides the whole group when not
     // even one widget fits, and the row inside the card is what the slots
     // measure, so the card's padding stays out of their thresholds. (Phones
-    // have no card, so there both widths are the same.)
+    // have no card, so there both widths are the same. At md+ the outer
+    // threshold adds the card's 32px padding and 2px border, 240 + 34.)
     <div className="@container">
-      <div className="hidden @min-[240px]:block md:rounded-lg md:border md:border-outline-variant md:bg-card md:px-4 md:py-3">
+      <div className="hidden max-md:@min-[240px]:block md:@min-[274px]:block md:rounded-lg md:border md:border-outline-variant md:bg-card md:px-4 md:py-3">
         <div className="@container">
           <div className="flex gap-4 md:gap-6">
             {widgets.map((widget, index) => (

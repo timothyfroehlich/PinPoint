@@ -102,7 +102,12 @@ describe.each([2, 3] as const)(
       renderGroup(widgetCount);
       const card = slotOf(1).closest(".md\\:border");
 
-      expect(card).toHaveClass("hidden", "@min-[240px]:block");
+      // At md+ the threshold adds the card's padding and border (240 + 34).
+      expect(card).toHaveClass(
+        "hidden",
+        "max-md:@min-[240px]:block",
+        "md:@min-[274px]:block"
+      );
       expect(card?.parentElement).toHaveClass("@container");
     });
 
