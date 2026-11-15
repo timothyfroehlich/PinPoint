@@ -150,106 +150,92 @@ export function planListHeader(input: ListHeaderFitInput): ListHeaderPlan {
   };
 }
 
-export interface LineDropInput<K extends string> {
-  /** The line's width. */
-  available: number;
-  /** Width of the part that never drops, or 0 when there is none. */
-  keptWidth: number;
-  /**
-   * Each droppable segment's width with its separator. A segment the row
-   * does not show at all is left out.
-   */
-  segmentWidths: Partial<Record<K, number>>;
-  /** The segments in the order they drop, first to drop first. */
-  dropOrder: readonly K[];
-}
-
-/**
- * Which segments a one-line row drops so the rest fit (machine-views §5.10):
- * segments drop one at a time in `dropOrder` until the line fits. The kept
- * part never drops; if it alone does not fit, the line truncates.
- */
-export function planLineDrops<K extends string>({
-  available,
-  keptWidth,
-  segmentWidths,
-  dropOrder,
-}: LineDropInput<K>): ReadonlySet<K> {
-  const present = dropOrder.filter((key) => segmentWidths[key] !== undefined);
-  let total = keptWidth + sum(present.map((key) => segmentWidths[key] ?? 0));
-  const dropped = new Set<K>();
-  for (const key of present) {
-    if (total <= available) break;
-    dropped.add(key);
-    total -= segmentWidths[key] ?? 0;
-  }
-  return dropped;
-}
-
 /**
  * Room a line fit leaves spare, so a part drops a little before the line is
  * exactly full and real glyphs never crowd the line's end.
  */
 export const LINE_FIT_TOLERANCE = 16;
 
-export interface LineFitInput<Part extends string> {
-  /** The line's inner width. */
-  available: number;
-  /** Widths of the parts that never drop, at their full width. */
-  keptWidths: readonly number[];
-  /** Each droppable part's width, any leading separator included. */
-  partWidths: Readonly<Record<Part, number>>;
-  /** The droppable parts, the first to drop first. */
-  dropOrder: readonly Part[];
-  /** The gap between the parts that lead the line. */
-  gap: number;
+/** One part of a one-line row, at its full width. */
+export interface LineFitPart<Part extends string> {
+  key: Part;
+  width: number;
   /**
-   * Droppable parts in a right-anchored group at the line's end instead of
-   * after the kept parts. The group takes no room once all its parts drop.
+   * Plain text. A "·" separates two plain-text parts that show next to each
+   * other in the same group, and nothing else.
    */
-  trailing?: LineFitTrailingGroup<Part> | undefined;
+  text: boolean;
 }
 
-/** A right-anchored group of droppable parts at a line's end. */
-export interface LineFitTrailingGroup<Part extends string> {
-  /** The group's parts, in display order. */
-  parts: readonly Part[];
-  /** The gap between the group's parts. */
+/** The spacing of a one-line row (list-views §8, issues-list §3.9). */
+export interface LineFitSpacing {
+  /** The gap between the leading group's parts, separators included. */
   gap: number;
-  /** The least room between the leading parts and the group. */
+  /** The gap between the trailing group's parts. */
+  trailingGap: number;
+  /** The least room between the leading and the trailing group. */
   groupGap: number;
+  /** The width of a "·" separator. */
+  separatorWidth: number;
+}
+
+export interface LineFitInput<Part extends string> extends LineFitSpacing {
+  /** The line's inner width. */
+  available: number;
+  /** The parts that lead the line, in display order. */
+  leading: readonly LineFitPart<Part>[];
+  /**
+   * The right-anchored group at the line's end, in display order. The group
+   * takes no room once none of its parts shows.
+   */
+  trailing: readonly LineFitPart<Part>[];
+  /** The parts that give way for room, the first to drop first. */
+  dropOrder: readonly Part[];
+}
+
+/** One group's width with the parts in `shown`, separators included. */
+function groupWidth<Part extends string>(
+  parts: readonly LineFitPart<Part>[],
+  shown: ReadonlySet<Part>,
+  gap: number,
+  separatorWidth: number
+): number {
+  const widths: number[] = [];
+  let previousText = false;
+  for (const part of parts) {
+    if (!shown.has(part.key)) continue;
+    if (part.text && previousText) widths.push(separatorWidth);
+    widths.push(part.width);
+    previousText = part.text;
+  }
+  return rowWidth(widths, gap);
 }
 
 /**
- * Which droppable parts of a one-line row stay shown (issues-list §3.9):
- * parts drop one at a time in `dropOrder` until the line fits with
- * `LINE_FIT_TOLERANCE` to spare. When the kept parts alone still do not fit,
- * every droppable part is gone and the component truncates what remains.
+ * Which parts of a one-line row show (machine-views §5.10, issues-list
+ * §3.9): the parts in `dropOrder` drop one at a time, in that order, until
+ * the line fits with `LINE_FIT_TOLERANCE` to spare. A part outside
+ * `dropOrder` never drops; when those alone still do not fit, every
+ * droppable part is gone and the component truncates what remains.
  */
 export function fitLineParts<Part extends string>({
   available,
-  keptWidths,
-  partWidths,
+  leading,
+  trailing,
   dropOrder,
   gap,
-  trailing,
+  trailingGap,
+  groupGap,
+  separatorWidth,
 }: LineFitInput<Part>): ReadonlySet<Part> {
-  const shown = new Set(dropOrder);
+  const shown = new Set<Part>(
+    [...leading, ...trailing].map((part) => part.key)
+  );
   const room = available - LINE_FIT_TOLERANCE;
-  const trailingParts = trailing?.parts ?? [];
-  const widthsOf = (parts: readonly Part[]): number[] =>
-    parts.filter((part) => shown.has(part)).map((part) => partWidths[part]);
   const lineWidth = (): number => {
-    const leading = rowWidth(
-      [
-        ...keptWidths,
-        ...widthsOf(dropOrder.filter((part) => !trailingParts.includes(part))),
-      ],
-      gap
-    );
-    const trailingWidths = widthsOf(trailingParts);
-    if (!trailing || trailingWidths.length === 0) return leading;
-    return leading + trailing.groupGap + rowWidth(trailingWidths, trailing.gap);
+    const lead = groupWidth(leading, shown, gap, separatorWidth);
+    const end = groupWidth(trailing, shown, trailingGap, separatorWidth);
+    return end === 0 ? lead : lead + groupGap + end;
   };
   for (const part of dropOrder) {
     if (lineWidth() <= room) break;

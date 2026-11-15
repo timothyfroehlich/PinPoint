@@ -235,14 +235,15 @@ describe("Issue rows", () => {
 describe("Issue row line 2 fit (issues-list §3.9)", () => {
   /**
    * jsdom lays nothing out, so line 2 and each measured part get widths:
-   * ID 60, machine 120 (its "·" included), priority 50, assignee 30,
-   * comments 40, age 90. The left group (ID, machine, priority) has 6px gaps,
+   * ID 60, the "·" 4, machine 110, priority 50, assignee 30, comments 40,
+   * age 90. The left group (ID, "·", machine, priority) has 6px gaps,
    * the right group (assignee, comments, age) 8px gaps, and at least 12px
    * separates the groups while the right one shows anything.
    */
   const PART_WIDTHS: Record<string, number> = {
     id: 60,
-    machine: 120,
+    "·": 4,
+    machine: 110,
     priority: 50,
     assignee: 30,
     comments: 40,
@@ -252,10 +253,7 @@ describe("Issue row line 2 fit (issues-list §3.9)", () => {
   function stubLayout(lineWidth: number): void {
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
       function (this: HTMLElement) {
-        const isLine =
-          this.querySelector(
-            ':scope > span > [data-testid="issue-machine"]'
-          ) !== null;
+        const isLine = this.hasAttribute("data-row-line");
         const width = isLine
           ? lineWidth
           : (PART_WIDTHS[this.getAttribute("data-measure") ?? ""] ?? 0);
@@ -269,7 +267,7 @@ describe("Issue row line 2 fit (issues-list §3.9)", () => {
   });
 
   // Each width is the parts' total plus the 16px fit tolerance. The left
-  // group is 60+6+120+6+50 = 242 with the priority, 186 without.
+  // group is 60+6+4+6+110+6+50 = 242 with the priority, 186 without.
   it.each<[number, string[]]>([
     // 242 + 12 + (30+8+40+8+90) = 430.
     [
