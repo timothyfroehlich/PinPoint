@@ -1,10 +1,8 @@
 import type React from "react";
 
-import { CallbackLoadingClient } from "./CallbackLoadingClient";
+import { getSafeRedirect } from "~/lib/url";
 
-function isInternalPath(path: string): boolean {
-  return path.startsWith("/") && !path.startsWith("//");
-}
+import { CallbackLoadingClient } from "./CallbackLoadingClient";
 
 export default async function AuthLoadingPage({
   searchParams,
@@ -13,7 +11,7 @@ export default async function AuthLoadingPage({
 }): Promise<React.JSX.Element> {
   const params = await searchParams;
   const rawNext = Array.isArray(params.next) ? params.next[0] : params.next;
-  const nextPath = rawNext && isInternalPath(rawNext) ? rawNext : "/";
+  const nextPath = getSafeRedirect(rawNext, "/");
 
   return <CallbackLoadingClient nextPath={nextPath} />;
 }

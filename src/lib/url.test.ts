@@ -110,6 +110,50 @@ describe("isInternalUrl", () => {
     expect(isInternalUrl(undefined)).toBe(false);
     expect(isInternalUrl("")).toBe(false);
   });
+
+  // Each of these resolves to another host when a browser follows it as a
+  // Location header: "\" reads as "/", and tabs/newlines are stripped.
+  it.each([
+    "/\\evil.example",
+    "/\\/evil.example",
+    "/\t/evil.example",
+    "/\n/evil.example",
+    "/\r/evil.example",
+  ])("returns false for off-site path %j", async (url) => {
+    const { isInternalUrl } = await import("./url");
+    expect(isInternalUrl(url)).toBe(false);
+  });
+
+  it.each(["/\u0000/dashboard", "/\u007F/dashboard", "/\u0085/dashboard"])(
+    "returns false for a path with control characters %j",
+    async (url) => {
+      const { isInternalUrl } = await import("./url");
+      expect(isInternalUrl(url)).toBe(false);
+    }
+  );
+
+  it.each(["/issues?q=left flipper", "/\u3000/dashboard"])(
+    "accepts a same-origin path with a space %j",
+    async (url) => {
+      const { isInternalUrl } = await import("./url");
+      expect(isInternalUrl(url)).toBe(true);
+    }
+  );
+
+  it.each([
+    "next=/%5Cevil.example",
+    "next=/%5C%5Cevil.example",
+    "next=/%09/evil.example",
+    "next=/%0A/evil.example",
+  ])("returns false for the decoded query string %s", async (query) => {
+    const { isInternalUrl } = await import("./url");
+    expect(isInternalUrl(new URLSearchParams(query).get("next"))).toBe(false);
+  });
+
+  it("accepts a percent-encoded backslash, which stays in the path", async () => {
+    const { isInternalUrl } = await import("./url");
+    expect(isInternalUrl("/%5Cevil.example")).toBe(true);
+  });
 });
 
 describe("getLoginUrl", () => {
@@ -151,5 +195,10 @@ describe("getSafeRedirect", () => {
     const { getSafeRedirect } = await import("./url");
     expect(getSafeRedirect(null)).toBe("/dashboard");
     expect(getSafeRedirect(undefined)).toBe("/dashboard");
+  });
+
+  it("returns the fallback for a backslash path that resolves off-site", async () => {
+    const { getSafeRedirect } = await import("./url");
+    expect(getSafeRedirect("/\\evil.example")).toBe("/dashboard");
   });
 });

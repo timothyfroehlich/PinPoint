@@ -21,7 +21,7 @@
 ## 2. Placement and Configuration
 
 - **2.1** Each host's widgets spec defines which Summary Widgets appear and in what order. A person cannot add, remove, hide, or reorder them.
-- **2.2** Summary Widgets appear between the page heading and the host's search and filter toolbar, to everyone who can view the host.
+- **2.2** Summary Widgets appear between the page heading and the list, to everyone who can view the host.
 - **2.3** A host's Summary Widgets sit side by side in one row at every width, each at least 240px wide, always expanded, with no collapse control.
 - **2.4** _Retired 2026-10-11._ Summary Widgets no longer stack into a collapsible section; whole widgets drop instead (§2.7). Number kept so older citations don't dangle.
 - **2.5** _Retired 2026-10-11_ with the Summary Row (§1). Number kept so older citations don't dangle.
@@ -83,6 +83,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-10-11 | Summary Widgets sit between the page heading and the list, since phones have no search row (§2.2). |
 | 2026-10-11 | Summary Widgets sit side by side at every width, each at least 240px wide, and whole widgets drop from the right when they do not fit, leaving no summary when not even one fits (§2.3, §2.7). Retired the collapsible stacked section, the Summary Row, and the remembered expanded or collapsed choice (§1, §2.4–§2.6). Breakdowns show no color swatches at any width, and each count is shown in its Segment's category color (§5.7). |
 | 2026-10-05 | Stacked breakdowns drop the color swatches at every width (§5.7). |
 | 2026-10-04 | Summary Widgets no longer show a headline (§1, §5.1); the breakdown sits on the label line at every width (§5.7). |

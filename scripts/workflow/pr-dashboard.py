@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """Render the PR dashboard from one repository-level GraphQL snapshot.
 
-CI and merge state come from the GraphQL snapshot. The Review column is the merge
-gate's own label — `_review_summary` in `_pr-gates.sh` runs two checkers
-(Claude review record, Codex evidence) and names the result with
-one of four words: approved, changes requested, stale review, not reviewed. The
-dashboard shells out to it per PR rather than keeping a Python copy of that logic.
+Every column comes from that snapshot. CI counts every check on the head commit.
+Review and UI are the head's `Claude Review` and `UI Approval` required checks
+(ruleset 6326455), counted only when the GitHub Actions app ran them, so a check
+another app posts under the same name cannot read as a pass: pass, fail, pending,
+skipped (the job did not run, as Claude Review on a draft), or — when absent. UI
+reads `waiting` while the `Tim's UI sign-off` job waits on his approval, before
+the `UI Approval` job that decides exists. Any
+response the dashboard cannot read renders as `?`, never as green.
 """
 
 from __future__ import annotations
@@ -24,9 +27,22 @@ from gh_cli import run_gh  # noqa: E402
 
 CONNECTION_PAGE_SIZE = 100
 CI_GATE_NAME = "CI Gate"
-GATES_SCRIPT = Path(__file__).resolve().parent / "_pr-gates.sh"
-REVIEW_LABELS = frozenset(
-    {"approved", "changes requested", "stale review", "not reviewed"}
+CLAUDE_REVIEW_NAME = "Claude Review"
+UI_APPROVAL_NAME = "UI Approval"
+UI_SIGN_OFF_NAME = "Tim's UI sign-off"
+ACTIONS_APP_SLUG = "github-actions"
+PENDING_CHECK_STATUSES = frozenset(
+    {"IN_PROGRESS", "QUEUED", "PENDING", "WAITING", "REQUESTED"}
+)
+FAILED_CHECK_CONCLUSIONS = frozenset(
+    {
+        "ACTION_REQUIRED",
+        "CANCELLED",
+        "FAILURE",
+        "STALE",
+        "STARTUP_FAILURE",
+        "TIMED_OUT",
+    }
 )
 
 
@@ -74,7 +90,10 @@ PR_FIELDS = f"""
             pageInfo {{ hasNextPage endCursor }}
             nodes {{
               __typename
-              ... on CheckRun {{ name status conclusion startedAt completedAt }}
+              ... on CheckRun {{
+                name status conclusion startedAt completedAt
+                checkSuite {{ app {{ slug }} }}
+              }}
               ... on StatusContext {{ context state }}
             }}
           }}
@@ -149,7 +168,10 @@ def _checks_query(owner: str, repo: str, pr: int, cursor: str) -> str:
             pageInfo {{ hasNextPage endCursor }}
             nodes {{
               __typename
-              ... on CheckRun {{ name status conclusion startedAt completedAt }}
+              ... on CheckRun {{
+                name status conclusion startedAt completedAt
+                checkSuite {{ app {{ slug }} }}
+              }}
               ... on StatusContext {{ context state }}
             }}
           }}
@@ -198,29 +220,89 @@ def _complete_checks(
     return nodes
 
 
-def review_label(pr: int) -> str:
-    """The merge gate's review label for a PR, or "?" when the gate cannot say."""
-    result = subprocess.run(
-        [
-            "bash",
-            "-c",
-            'set -euo pipefail; source "$1"; _review_summary "$2"',
-            "_",
-            str(GATES_SCRIPT),
-            str(pr),
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if result.returncode != 0:
-        return "?"
+def _latest_run(runs: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """The newest of several same-named check runs on one commit.
+
+    A re-run, or a run a concurrency group cancelled, leaves its superseded check
+    next to the live one; the most recent start wins. Raises DashboardError when
+    two or more runs cannot be ordered, rather than guessing which one counts.
+    """
+    if len(runs) > 1:
+        for run in runs:
+            completed_at = run.get("completedAt")
+            started_at = run.get("startedAt")
+            if (
+                completed_at is not None
+                and not isinstance(completed_at, str)
+                or started_at is not None
+                and not isinstance(started_at, str)
+                or not (completed_at or started_at)
+            ):
+                raise DashboardError("check runs could not be ordered")
+
+    def run_rank(check: dict[str, Any]) -> str:
+        when = check.get("startedAt") or check.get("completedAt") or ""
+        return str(when)
+
+    return max(runs, key=run_rank) if runs else None
+
+
+def _app_slug(check: dict[str, Any]) -> str | None:
+    suite = check.get("checkSuite")
+    app = suite.get("app") if isinstance(suite, dict) else None
+    slug = app.get("slug") if isinstance(app, dict) else None
+    return slug if isinstance(slug, str) else None
+
+
+def _required_check_label(checks: list[dict[str, Any]], name: str) -> str:
+    """The state of one required check that GitHub Actions runs on the head."""
+    runs = [
+        check
+        for check in checks
+        if check.get("__typename") == "CheckRun"
+        and check.get("name") == name
+        and _app_slug(check) == ACTIONS_APP_SLUG
+    ]
     try:
-        summary = json.loads(result.stdout)
-    except json.JSONDecodeError:
+        run = _latest_run(runs)
+    except DashboardError:
         return "?"
-    label = summary.get("label") if isinstance(summary, dict) else None
-    return label if label in REVIEW_LABELS else "?"
+    if run is None:
+        return "—"
+    status = run.get("status")
+    conclusion = run.get("conclusion")
+    if status in PENDING_CHECK_STATUSES:
+        return "pending"
+    if status != "COMPLETED" or not isinstance(conclusion, str):
+        return "?"
+    if conclusion in {"SUCCESS", "NEUTRAL"}:
+        return "pass"
+    if conclusion == "SKIPPED":
+        return "skipped"
+    if conclusion in FAILED_CHECK_CONCLUSIONS:
+        return "fail"
+    return "?"
+
+
+def _ui_label(checks: list[dict[str, Any]]) -> str:
+    """UI Approval's state, or `waiting` while the sign-off job waits on Tim."""
+    label = _required_check_label(checks, UI_APPROVAL_NAME)
+    if label not in {"—", "pending"}:
+        return label
+    sign_offs = [
+        check
+        for check in checks
+        if check.get("__typename") == "CheckRun"
+        and check.get("name") == UI_SIGN_OFF_NAME
+        and _app_slug(check) == ACTIONS_APP_SLUG
+    ]
+    try:
+        sign_off = _latest_run(sign_offs)
+    except DashboardError:
+        return label
+    if sign_off is not None and sign_off.get("status") == "WAITING":
+        return "waiting"
+    return label
 
 
 def _ci_label(checks: list[dict[str, Any]]) -> str:
@@ -229,24 +311,10 @@ def _ci_label(checks: list[dict[str, Any]]) -> str:
         for check in checks
         if check.get("__typename") == "CheckRun" and check.get("name") == CI_GATE_NAME
     ]
-    if len(gates) > 1:
-        for gate in gates:
-            completed_at = gate.get("completedAt")
-            started_at = gate.get("startedAt")
-            if (
-                completed_at is not None
-                and not isinstance(completed_at, str)
-                or started_at is not None
-                and not isinstance(started_at, str)
-                or not (completed_at or started_at)
-            ):
-                return "?"
-
-    def gate_rank(check: dict[str, Any]) -> str:
-        when = check.get("startedAt") or check.get("completedAt") or ""
-        return str(when)
-
-    authoritative_gate = max(gates, key=gate_rank) if gates else None
+    try:
+        authoritative_gate = _latest_run(gates)
+    except DashboardError:
+        return "?"
     effective_checks = [
         check
         for check in checks
@@ -344,6 +412,7 @@ def _unknown_row(number: int) -> dict[str, str]:
         "title": "?",
         "ci": "?",
         "review": "?",
+        "ui": "?",
         "merge": "?",
         "draft": "?",
         "branch": "?",
@@ -353,18 +422,19 @@ def _unknown_row(number: int) -> dict[str, str]:
 def _render_row(row: dict[str, str]) -> None:
     print(
         f"#{row['number']:<5} {row['title'][:40]:<40} {row['ci']:<12} "
-        f"{row['review']:<18} {row['merge']:<10} {row['draft']:<8} {row['branch']}"
+        f"{row['review']:<8} {row['ui']:<8} {row['merge']:<10} {row['draft']:<8} "
+        f"{row['branch']}"
     )
 
 
 def _render_header() -> None:
     print(
-        f"{'PR':<6} {'Title':<40} {'CI':<12} {'Review':<18} "
+        f"{'PR':<6} {'Title':<40} {'CI':<12} {'Review':<8} {'UI':<8} "
         f"{'Merge':<10} {'Draft':<8} Branch"
     )
     print(
         f"{'------':<6} {'----------------------------------------':<40} "
-        f"{'------------':<12} {'------------------':<18} {'----------':<10} "
+        f"{'------------':<12} {'--------':<8} {'--------':<8} {'----------':<10} "
         f"{'--------':<8} -------------------"
     )
 
@@ -410,9 +480,12 @@ def _row_for_pr(owner: str, repo: str, pr_data: dict[str, Any]) -> dict[str, str
 
     try:
         checks = _complete_checks(owner, repo, number, _checks_from_pr(pr_data))
-        ci = _ci_label(checks)
     except DashboardError:
-        ci = "?"
+        ci = review = ui = "?"
+    else:
+        ci = _ci_label(checks)
+        review = _required_check_label(checks, CLAUDE_REVIEW_NAME)
+        ui = _ui_label(checks)
 
     title = pr_data.get("title")
     branch = pr_data.get("headRefName")
@@ -421,7 +494,8 @@ def _row_for_pr(owner: str, repo: str, pr_data: dict[str, Any]) -> dict[str, str
         "number": str(number),
         "title": title if isinstance(title, str) else "?",
         "ci": ci,
-        "review": review_label(number),
+        "review": review,
+        "ui": ui,
         "merge": _merge_label(pr_data.get("mergeStateStatus")),
         "draft": "draft" if is_draft is True else "" if is_draft is False else "?",
         "branch": branch if isinstance(branch, str) else "?",

@@ -6,7 +6,7 @@
 # claude.ai environment variables. Its whole job is to put three binaries on PATH:
 #   - dolt (the storage engine, PINNED — see below)
 #   - bd   (beads, PINNED — see below)
-#   - gh   (GitHub CLI, PINNED — the workflow scripts, e.g. merge-pr.sh, need it; the
+#   - gh   (GitHub CLI, PINNED — the PR workflow and its scripts need it; the
 #           cloud image does not ship it)
 # The agent then runs scripts/beads-cloud-init.sh, which materializes the DoltHub
 # credential and clones the shared DB.

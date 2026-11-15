@@ -556,6 +556,7 @@
 - **Why:** Web platform features evolve faster than LLM training data refreshes. Memorizing patterns produces stale code. The Google Chrome `modern-web-guidance` plugin ships ~90 prescriptive guides — searchable by use case, each with Baseline status — and is the canonical reference for "what's the right way to do X today."
 - **Do:** At the start of any non-trivial UI work, search the catalog: `npx -y modern-web-guidance@latest search "<query>"`. Retrieve specific guides by id with `retrieve "<id>,<id2>"`. Check the guide's Browser Support section against CORE-UI-005 before adopting any recommendation.
 - **Don't:** Implement ad-hoc patterns when a Widely-available primitive exists for the same job. Don't pre-emptively pull every guide into context; search per task.
+- **Caveat — a guide's Baseline tier can lag the real Newly → Widely promotion:** Newly → Widely is pure elapsed time (Widely = 30 months after the Baseline low date, no new browser release required), so the catalog can still read "Newly available" after a feature has already crossed into Widely. That lag only ever under-reports — an unnecessary opt-in, never a gate bypass — so MWG's tier is not authoritative on its own. When a guide reads "Newly" for a feature whose Baseline low date is already more than 30 months past and that tier would gate a decision (adopt directly vs. opt-in per CORE-UI-005), confirm against a second source — `web-features`, caniuse, the Baseline dashboard (webstatus.dev), or MDN — before treating it as below the floor. (Casework: `:has()`, PP-l7fj.)
 - **Reference:** Plugin is installed at `~/.claude/plugins/marketplaces/googlechrome/skills/modern-web-guidance/`.
 
 ---
@@ -632,7 +633,7 @@
 - **Severity:** Required
 - **Why:** `:user-invalid` (Baseline Widely available) flips a CSS pseudo-class on form controls only **after** the user has interacted with them — no premature red rings on page load, no JS state mirroring, no event listeners. The shared `<Input>` already has `aria-invalid:` styling; pair it with `:user-invalid:` and the browser does the rest.
 - **Do:** `src/components/ui/input.tsx` and `textarea.tsx` carry the equivalent of `[&:user-invalid]:border-destructive [&:user-invalid]:ring-destructive/40` so every input automatically picks up post-interaction invalid styling. Add to the primitive once — don't copy this per form. (`select.tsx` is a Radix trigger, not a native form control, so the `:user-invalid` pseudo-class does not apply to it — it uses `aria-invalid:` styling only.)
-- **Don't:** Hand-roll `useState` + `onBlur` to mirror invalid state. Don't paint inputs red on initial render.
+- **Don't:** Hand-roll `useState` + `onBlur` to mirror invalid state. Don't paint inputs red on initial render. Don't reach for Tailwind's `peer-invalid` variant — it matches from first render, painting the premature red rings `:user-invalid` exists to avoid; it is the obvious Tailwind-native choice and the wrong one.
 - **Reference:** modern-web-guidance `validate-input-after-interaction`.
 - **Status:** Implemented in `input.tsx` and `textarea.tsx` (PP-kqbk.2). `select.tsx` is out of scope — see the Do note.
 
