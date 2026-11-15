@@ -14,9 +14,9 @@
  * - Pinball Map account link: 5 sign-in attempts per user per 15 min
  * - Quick Search: 60 requests/minute for anonymous requests (keyed by IP), 120 requests/minute for signed-in users (keyed by user ID)
  *
- * @see https://github.com/timothyfroehlich/PinPoint/issues/536
- * @see https://github.com/timothyfroehlich/PinPoint/issues/537
- * @see https://github.com/timothyfroehlich/PinPoint/issues/538
+ * @see https://github.com/minamaya/PinPoint/issues/536
+ * @see https://github.com/minamaya/PinPoint/issues/537
+ * @see https://github.com/minamaya/PinPoint/issues/538
  * @see PP-rw29
  */
 
