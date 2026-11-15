@@ -36,6 +36,7 @@ const DROP_ORDER: readonly DetailSegment[] = [
   "owner",
 ];
 
+/** Between two plain-text parts only; the owner avatar takes a gap instead. */
 const SEPARATOR = " · ";
 
 interface MachineViewCompactListProps {
@@ -126,10 +127,13 @@ function ServiceAge({ text }: { text: ServiceAgeText }): React.JSX.Element {
 
 function DetailLine({
   row,
+  indented,
   showPlayability,
   showServiced,
 }: {
   row: MachineViewRow;
+  /** Line 2 lines up under the name, past the Playability dot's column. */
+  indented: boolean;
   showPlayability: boolean;
   showServiced: boolean;
 }): React.JSX.Element {
@@ -178,18 +182,17 @@ function DetailLine({
           dropOrder: DROP_ORDER,
         })
       : new Set<DetailSegment>();
-  // Each left-group part with its separator. A part dropped for width is
-  // hidden visually but stays readable to screen readers, separator and
-  // all, so they hear the whole line; the first part shown has no separator.
+  // Each left-group part with what leads it: a separator between two text
+  // parts, a 6px gap before the owner avatar. A part dropped for width is
+  // hidden visually but stays readable to screen readers, so they hear the
+  // whole line; the first part shown has no lead.
   let shownBefore = playabilityLabel !== null;
-  const leftParts = (["manufacturer", "year", "owner"] as const).map((key) => {
-    const content =
-      key === "owner" ? <OwnerAvatar name={ownerName} /> : text[key];
+  const textParts = TEXT_ORDER.map((key) => {
     if (dropped.has(key)) {
       return (
         <span key={key} className="sr-only">
           {SEPARATOR}
-          {content}
+          {text[key]}
         </span>
       );
     }
@@ -198,15 +201,26 @@ function DetailLine({
     return (
       <span key={key}>
         {separator}
-        {content}
+        {text[key]}
       </span>
     );
   });
+  const ownerPart = dropped.has("owner") ? (
+    <span className="sr-only">
+      <OwnerAvatar name={ownerName} />
+    </span>
+  ) : (
+    <span className={shownBefore ? "pl-1.5" : undefined}>
+      <OwnerAvatar name={ownerName} />
+    </span>
+  );
 
   return (
     // Not positioned: a positioned line would sit above the row link's
     // overlay and swallow taps on it. The lane anchors to the row instead.
-    <div className="mt-0.5 min-w-0">
+    // Indented 20px (the 10px dot and its 10px gap) when the row has a dot:
+    // the same column issue rows indent line 2 to.
+    <div className={cn("mt-0.5 min-w-0", indented && "pl-5")}>
       <div
         ref={lineRef}
         data-testid="machine-row-detail"
@@ -218,7 +232,8 @@ function DetailLine({
               {playabilityLabel}
             </span>
           ) : null}
-          {leftParts}
+          {textParts}
+          {ownerPart}
         </p>
         {/* Right-anchored under the open-issue count, at least 12px from the
             left group; once it drops, the left group has the whole line and
@@ -236,8 +251,8 @@ function DetailLine({
           </span>
         ) : null}
       </div>
-      {/* Each part at its natural width, with its separator or its 12px gap
-          (list-views §8). */}
+      {/* Each part at its natural width, with its separator or its gap: 6px
+          before the avatar, 12px before the service age (list-views §8). */}
       <div
         ref={laneRef}
         aria-hidden="true"
@@ -258,8 +273,7 @@ function DetailLine({
             {text[key]}
           </span>
         ))}
-        <span data-measure="owner" className="absolute whitespace-pre">
-          {SEPARATOR}
+        <span data-measure="owner" className="absolute pl-1.5 whitespace-pre">
           <OwnerAvatar name={ownerName} />
         </span>
         {serviced !== null ? (
@@ -279,9 +293,10 @@ function DetailLine({
  * The phone Compact list (machine-views §5.3, §5.9): two lines per machine.
  * Line 1 holds the Playability dot, identity, and open-issue count; the name
  * truncates first, so the initials badge and the count always stay on
- * screen. Line 2 spans the row and never wraps: the Playability label,
- * manufacturer, year, and the owner's initials avatar on the left, and the
- * service age (a wrench and "2h ago") right-anchored under the count. When
+ * screen. Line 2 lines up under the name, past the dot, and never wraps:
+ * the Playability label, manufacturer, and year ("·" only between those),
+ * then the owner's initials avatar 6px on, at the left, and the service age
+ * (a wrench and "2h ago") right-anchored at the row's right edge. When
  * they do not fit it drops year, manufacturer, the service age, then the
  * owner (§5.10); a dropped part stays readable to screen readers. Other
  * selected fields show only in Table mode. The whole
@@ -324,6 +339,7 @@ export function MachineViewCompactList({
             </div>
             <DetailLine
               row={row}
+              indented={row.health !== undefined}
               showPlayability={showPlayability}
               showServiced={showServiced}
             />

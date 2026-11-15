@@ -61,11 +61,17 @@ function leftGroup(row: HTMLElement): HTMLElement {
   return group;
 }
 
-/** An element's text without the parts hidden visually (`sr-only`). */
+/**
+ * An element's text without the parts hidden visually (`sr-only`), with
+ * each avatar's initials in brackets: "Stern · 2019[A]".
+ */
 function shownText(element: HTMLElement): string {
   const copy = element.cloneNode(true);
   if (!(copy instanceof HTMLElement)) return "";
   for (const hidden of copy.querySelectorAll(".sr-only")) hidden.remove();
+  for (const avatar of copy.querySelectorAll('[role="img"]')) {
+    avatar.textContent = `[${avatar.textContent ?? ""}]`;
+  }
   return copy.textContent ?? "";
 }
 
@@ -147,7 +153,8 @@ describe("MachineViewCompactList", () => {
     const row = screen.getByRole("listitem");
     const line = detailLine(row);
     const left = leftGroup(row);
-    expect(left).toHaveTextContent(/^Unplayable · Stern · 2019 · A$/);
+    // "·" only between text parts; the avatar follows 6px on.
+    expect(lineSummary(row)).toBe("Unplayable · Stern · 2019[A] | 3d ago");
     expect(left).toHaveClass("truncate");
     expect(within(left).getByText("Unplayable")).toHaveClass(
       MACHINE_STATUS_COLORS.unplayable.text
@@ -158,6 +165,7 @@ describe("MachineViewCompactList", () => {
     const owner = within(left).getByRole("img", { name: "Owner: Alex" });
     expect(owner).toHaveTextContent(/^A$/);
     expect(owner).toHaveClass("size-5", "text-[9px]", "bg-outline");
+    expect(owner.parentElement).toHaveClass("pl-1.5");
 
     // The service age sits after the left group, a wrench and a short age.
     const age = within(line).getByText("3d ago");
@@ -223,8 +231,29 @@ describe("MachineViewCompactList", () => {
     renderList([machine({ year: null })], ["machine", "presence"]);
 
     expect(lineSummary(screen.getByRole("listitem"))).toBe(
-      "Stern · Unknown · A | -"
+      "Stern · Unknown[A] | -"
     );
+  });
+
+  it("indents line 2 under the name, past the Playability dot's column", () => {
+    renderList([machine({ id: "a" }), machine({ id: "b", health: undefined })]);
+
+    const [withDot, withoutDot] = screen.getAllByRole("listitem");
+    if (!withDot || !withoutDot) throw new Error("Expected two rows");
+    // The 10px dot and its 10px gap, as on issue rows.
+    expect(detailLine(withDot).parentElement).toHaveClass("pl-5");
+    expect(detailLine(withoutDot).parentElement).not.toHaveClass("pl-5");
+  });
+
+  it("gives the owner avatar no gap when it leads line 2", () => {
+    stubLayout(40, { manufacturer: 48, year: 42, owner: 26 });
+    renderList([machine({ lastServicedAt: null })], ["machine", "presence"]);
+
+    const row = screen.getByRole("listitem");
+    expect(lineSummary(row)).toBe("[A] | -");
+    expect(
+      within(row).getByRole("img", { name: "Owner: Alex" }).parentElement
+    ).not.toHaveClass("pl-1.5");
   });
 
   it("says “never” for a machine without service history", () => {
@@ -239,23 +268,23 @@ describe("MachineViewCompactList", () => {
   });
 
   it("drops year, then manufacturer, then service age, then owner, keeping the Playability label", () => {
-    // Unplayable 60, · Stern 48, · 2019 42, · avatar 32, gap and service
-    // age 60: 242 in all.
+    // Unplayable 60, · Stern 48, · 2019 42, 6px gap and avatar 26, gap and
+    // service age 60: 236 in all.
     const widths = {
       playability: 60,
       manufacturer: 48,
       year: 42,
-      owner: 32,
+      owner: 26,
       lastServiced: 60,
     };
     const row = machine({ lastServicedAt: null });
     const cases: [number, string][] = [
-      [242, "Unplayable · Stern · 2019 · A | never"],
-      [241, "Unplayable · Stern · A | never"],
-      [199, "Unplayable · A | never"],
+      [236, "Unplayable · Stern · 2019[A] | never"],
+      [235, "Unplayable · Stern[A] | never"],
+      [193, "Unplayable[A] | never"],
       // Without the service age the left group has the whole line.
-      [151, "Unplayable · A | -"],
-      [91, "Unplayable | -"],
+      [145, "Unplayable[A] | -"],
+      [85, "Unplayable | -"],
       [40, "Unplayable | -"],
     ];
     for (const [width, expected] of cases) {
@@ -276,7 +305,7 @@ describe("MachineViewCompactList", () => {
       playability: 60,
       manufacturer: 48,
       year: 42,
-      owner: 32,
+      owner: 26,
       lastServiced: 60,
     });
     renderList([machine({ lastServicedAt: null })]);
