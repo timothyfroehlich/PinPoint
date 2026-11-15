@@ -13,11 +13,11 @@
 - **List View** — the one shared list framework: page layout, search, filters, list header, rows, pagination, URL state, and Saved Views. It knows nothing about machines or issues.
 - **List Host** — a list built on List View. Machine View (machine-views) and Issue View (issues-list) are the List Hosts. A host defines its fields, filters, sorts, row presentation, Page Presets, and Built-in Views.
 - **View Scope** — the authoritative set of records a route may show, supplied by that route. Filtering can narrow a scope but never widen it.
-- **Page Preset** — a route-owned configuration defining a host's default filters, displayed fields, sorting, and page size.
+- **Page Preset** — a route-owned configuration defining a host's default filters, sorting, and page size.
 - **Surface** — a place where a List View appears: Machines, Issues, or one tab of one individual Collection or Tag. Every Collection or Tag tab is its own Surface.
-- **View Configuration** — the displayed fields, search, filters, sorting, and page size a List View shows. Page number is not part of it.
+- **View Configuration** — the search, filters, sorting, and page size a List View shows. Page number is not part of it.
 - **Saved View** — a named, personal View Configuration owned by one account and belonging to one List Host. It can be applied on every Surface of that host.
-- **Built-in View** — a named set of filters and sorting PinPoint defines for a Surface, the same for every viewer, with an empty search. Applying one keeps the displayed fields and page size already showing, adding any field its host names for it. One Built-in View on each Surface has its Page Preset's filters and sorting.
+- **Built-in View** — a named set of filters and sorting PinPoint defines for a Surface, the same for every viewer, with an empty search. Applying one keeps the page size already showing. One Built-in View on each Surface has its Page Preset's filters and sorting.
 - **Default View** — the one Saved View or Built-in View an account marks to open on its host's main page (Machines or Issues) when the URL carries no view configuration.
 - **Applied View** — the account's Saved View the current View Configuration came from, or else the Built-in View whose search, filters, and sorting it has. A List View that has left every Built-in View this way has no Applied View.
 - **Edited** — the state of a List View whose Applied View is one of the account's Saved Views and whose current View Configuration differs from it.
@@ -33,7 +33,7 @@
 - **2.1** Machines, Issues, and every Collection and Tag tab that lists machines or issues use List View rather than separate toolbars, pagers, or URL handling.
 - **2.2** A List View shows exactly the records in the scope its route supplies; the feature that owns each group defines its membership. No URL parameter can widen a scope.
 - **2.3** Each host keeps its own query pipeline; List View defines behavior, not where filtering runs. Filtering, sorting, and pagination are server-side, and the browser receives only the current page, the filtered total, Summary Widget counts, validated view state, and the filter options it needs.
-- **2.4** Row density is a host decision: a host may use one-line or two-line rows, the same at every screen size.
+- **2.4** Every List Host's rows are two lines, the same at every screen size, on the shared row structure of §6.4.
 
 ---
 
@@ -61,7 +61,7 @@
 - **4.5** More filters holds every Secondary Filter, and any Primary Filter that does not fit (§8.15).
 - **4.6** Filter values the Page Preset sets by default are shown on their control like any other value.
 - **4.7** Changing search, a filter, sorting, or page size returns to page 1.
-- **4.8** Changing displayed fields keeps the current page when that page remains valid.
+- **4.8** _Retired 2026-11-15._ No List Host offers a choice of displayed fields (§5.6), so there is no field change to keep the page through. Number kept so older citations don't dangle.
 - **4.9** Every filter's options offer Reset, which returns that filter to its Page Preset value, at every width.
 - **4.10** More filters shows a badge counting only the filters it holds whose value differs from the Page Preset; with none, it shows no badge.
 
@@ -74,7 +74,7 @@
 - **5.3** Save offers Save changes and Save as new. Save view saves the current View Configuration as a new Saved View.
 - **5.4** Discard changes returns to the Applied View's configuration at page 1.
 - **5.5** The List Header shows the sort control, a compact pager (range, previous, next), and View options. Export, when a host offers it, is a page action in ⋯ (§3.7), never in the List Header.
-- **5.6** View options holds page size and, for hosts with columns, the displayed fields.
+- **5.6** View options holds page size only. No List Host offers columns or a choice of displayed fields.
 - **5.7** Page sizes are 25, 50, and 100; 25 is the default everywhere.
 - **5.8** View tabs are quiet pills with the Applied View's pill filled, so they never read as a page's own tabs.
 
@@ -85,6 +85,7 @@
 - **6.1** On desktop the pager sits below the list box, with Previous, page numbers, and Next.
 - **6.2** The compact pager in the List Header and the pager below the list always show the same page.
 - **6.3** Pages are numbered from 1; a page past the end shows the last page.
+- **6.4** Machine rows and issue rows share one row structure: a leading dot column, then line 1, then line 2 starting past the dot, with a left group and a group anchored to the right end of the line. Each host names what each part holds (machine-views §5.14, issues-list §3.3).
 
 ---
 
@@ -124,8 +125,8 @@
 - **8.17** When only the Applied View's tab is left and the List Header is still crowded, the compact pager drops its range text, then disappears. The pager below the list remains, and shows the result range even when there is only one page.
 - **8.18** Next, Discard changes shortens to Discard.
 - **8.19** Last, the Applied View's tab name truncates.
-- **8.20** A host table whose columns do not fit scrolls sideways inside the list box, with its identity column pinned (machine-views §5.2).
-- **8.21** A row line that does not fit drops fields in the order its host defines: issue rows per issues-list §3.9, phone machine rows per machine-views §5.10.
+- **8.20** _Retired 2026-11-15._ No List Host has a table (machine-views §5.2), so nothing scrolls sideways. Number kept so older citations don't dangle.
+- **8.21** A row line that does not fit drops fields in the order its host defines: issue rows per issues-list §3.9, machine rows per machine-views §5.10.
 - **8.22** Below the md breakpoint the phone layout of §7 applies: search moves into the List Header (§7.3), sort, filters, and page size move into the Filters sheet (§7.5), the pager follows the list (§7.8), and the List Header sticks to the top while the page header scrolls away (§7.10).
 - **8.23** Below 390px wide, a Collection or Tag page's header tightens the space above its title and below its tabs from 12px to 4px.
 - **8.24** No List View width between 320px and 1440px scrolls the page horizontally.
@@ -141,7 +142,7 @@
 - **9.5** Canonical URLs are always expressed relative to the Page Preset, never relative to a viewer's Saved Views, so the same URL shows every viewer the same list.
 - **9.6** `view` names the Applied View. It never changes the configuration a URL shows, and a viewer who does not own the named Saved View ignores it.
 - **9.7** List View updates the URL in place without adding a history entry for each keystroke or filter change, and without scrolling the page.
-- **9.8** Sort headers, where a host has them, cycle the field's preferred direction, its opposite, and then the Page Preset's default sort.
+- **9.8** _Retired 2026-11-15._ No List Host has sort headers; sorting is the List Header's sort control (§5.5). Number kept so older citations don't dangle.
 
 ---
 
@@ -160,7 +161,7 @@
 - **10.11** When the Default View opens, the address bar shows its canonical URL.
 - **10.12** Every Built-in View is always reachable, as a List Header tab or in More views, so an account with a default can still reach the Page Preset.
 - **10.13** Deleting the Default View leaves its host without a default; the main page then opens to the Page Preset.
-- **10.14** A stored field, filter value, or person that no longer exists or is not permitted on the Surface is dropped when the view is applied, exactly as an invalid URL value is (§9.3).
+- **10.14** A stored field, filter value, or person that no longer exists or is not permitted on the Surface is dropped when the view is applied, exactly as an invalid URL value is (§9.3). A Saved View stored with displayed fields applies the rest of its configuration and ignores them.
 - **10.15** _Retired 2026-10-02._ Saved Views belong to a List Host, not a Surface, so deleting a Collection or Tag deletes none. Number kept so older citations don't dangle.
 - **10.16** Built-in Views are the same for every viewer and cannot be renamed, changed, or deleted.
 - **10.17** Sharing Saved View records with other accounts is deferred; copied URLs are the sharing mechanism.
@@ -204,6 +205,8 @@
 | §8.13, §8.23 | A Collection or Tag page's tabs never move into a menu, and its header spacing does not tighten below 390px. | PP-jb9v.18 |
 | §3.7–§3.10, §7.2 | Page actions are separate buttons with no ⋯ Actions menu, cap, or fold order; they become icon buttons at the md breakpoint rather than when they stop fitting, and Machines' Add Machine label shortens in steps. | PP-jb9v.17 |
 | §1, §5.5 | Issue View's Export sits in the desktop List Header, and phones offer no Export. | PP-jb9v.17 |
+| §1, §5.6, §10.14 | Machine View's View options offers a choice of columns, which its View Configurations, Built-in Views, and Saved Views carry. | Machine rows at every width (PP-jb9v.13). |
+| §2.4, §6.4 | Machine rows are table rows on desktop and tablet, and no machine row shares the issue rows' structure. | Machine rows at every width (PP-jb9v.13). |
 
 ---
 
@@ -211,6 +214,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-11-15 | No List Host has columns, a table, or displayed fields: View options holds page size only (§5.6), View Configurations, Page Presets, and Built-in Views carry no fields (§1), and Saved Views stored with fields ignore them (§10.14); retired keeping the page on a field change (§4.8), the sideways-scrolling table step (§8.20), and sort headers (§9.8). Every host uses two-line rows (§2.4) on one row structure shared by machine and issue rows (§6.4); the machine row drop step applies at every width (§8.21). |
 | 2026-11-15 | On phones the search field becomes an icon when it would be narrower than 175px, opening across the List Header when tapped (§7.12). |
 | 2026-10-11 | §8 becomes the Collapse Order (§1): one set of ordered steps for every Surface, measured on each part's container with a small tolerance (§8.6–§8.8); page-header steps for the breadcrumb, description, page actions, and page tabs (§8.9–§8.13); Summary Widget, filter, List Header, table, and row steps (§8.14–§8.21); the phone layout and the narrow Collection or Tag header (§8.22, §8.23); 8.1–8.3 and 8.5 retired into §8.15–§8.19 and §8.24. The filter overflow is named More filters, and its badge counts only filters changed from the Page Preset (§1, §4.5, §4.10, §12.1). View tabs are quiet pills (§5.8). The List Header concept names its phone contents (§1). Page actions: at most three, ending with a ⋯ menu that reads Actions when labeled; they go from labeled outlined buttons to icon buttons, then fold into ⋯ in the page's order, at every width (§1, §3.2, §3.7–§3.10, §7.2). Export leaves the List Header for ⋯ (§1, §5.5). |
 | 2026-10-11 | Phone list chrome: search moves into the phone List Header with no search row (§7.1, §7.3); the pager follows the list instead of being pinned (§7.8); the phone List Header stays under the app header while the page above it scrolls away (§7.10); nothing full-width is pinned above the tab bar, per the site-wide design-bible §3 rule (§7.11). |
