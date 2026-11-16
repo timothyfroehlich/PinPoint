@@ -107,16 +107,12 @@ test.describe("Issue List Features - Extended", () => {
 
   test("a Severity Segment filters the list to its issues", async ({
     page,
-  }) => {
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name.includes("Mobile"),
+      "Phones show only the Status widget (widgets §2.7); the phone Status Segment test covers Segment selection there"
+    );
     await page.goto("/issues");
-    // Below 390px the stacked widgets start collapsed (widgets §2.4), so the
-    // Mobile Safari project (375px) opens the section first.
-    if ((page.viewportSize()?.width ?? 0) < 390) {
-      const summary = page.getByRole("button", { name: /^Summary: / });
-      // aria-expanded is set only once hydrated, so the click is not lost.
-      await expect(summary).toHaveAttribute("aria-expanded", "false");
-      await summary.click();
-    }
     const severity = page.getByRole("region", { name: "Severity" });
     await expect(severity).toBeVisible();
 
@@ -159,6 +155,83 @@ test.describe("Issue List Features - Extended", () => {
         { message: "the selected Segment's count equals the filtered total" }
       )
       .toBe(true);
+  });
+
+  // Summary Widgets sit side by side at every width, each at least 240px
+  // wide, and whole widgets drop from the right when the row cannot hold
+  // them (widgets §2.3, §2.7). There is no Summary Row and no toggle.
+  test.describe("Summary Widgets", () => {
+    test.describe("at a desktop width", () => {
+      test.use({ viewport: { width: 1024, height: 768 } });
+
+      test("Status, Severity, and Priority sit side by side", async ({
+        page,
+      }) => {
+        await page.goto("/issues");
+        const widgets = ["Status", "Severity", "Priority"].map((name) =>
+          page.getByRole("region", { name })
+        );
+        const tops: number[] = [];
+        for (const widget of widgets) {
+          await expect(widget).toBeVisible();
+          const box = await widget.boundingBox();
+          expect(box).not.toBeNull();
+          if (box) tops.push(box.y);
+        }
+        expect(new Set(tops).size).toBe(1);
+        await expect(
+          page.getByRole("button", { name: /^Summary: / })
+        ).toHaveCount(0);
+      });
+    });
+
+    test.describe("on a wide phone with room for two widgets", () => {
+      test.use({ viewport: { width: 600, height: 900 } });
+
+      test("Priority drops from the right", async ({ page }) => {
+        await page.goto("/issues");
+        await expect(
+          page.getByRole("region", { name: "Status" })
+        ).toBeVisible();
+        await expect(
+          page.getByRole("region", { name: "Severity" })
+        ).toBeVisible();
+        await expect(
+          page.getByRole("region", { name: "Priority" })
+        ).toBeHidden();
+      });
+    });
+
+    test.describe("on a phone with room for one widget", () => {
+      test.use({ viewport: { width: 375, height: 812 } });
+
+      test("only Status shows, and a Status Segment filters the list", async ({
+        page,
+      }) => {
+        await page.goto("/issues");
+        const status = page.getByRole("region", { name: "Status" });
+        await expect(status).toBeVisible();
+        await expect(
+          page.getByRole("region", { name: "Severity" })
+        ).toBeHidden();
+        await expect(
+          page.getByRole("region", { name: "Priority" })
+        ).toBeHidden();
+        await expect(
+          page.getByRole("button", { name: /^Summary: / })
+        ).toHaveCount(0);
+
+        // A Status Segment is a status group; selecting it sets the Status
+        // filter to every status in the group (issue-widgets §3.3).
+        const segment = status
+          .getByRole("button", { name: /^\d+ (New|In Progress)$/ })
+          .first();
+        await expect(segment).toBeVisible();
+        await segment.click();
+        await expect(page).toHaveURL(/[?&]status=/);
+        await expect(segment).toHaveAttribute("aria-pressed", "true");
+      });
+    });
   });
 
   test("should persist filters when navigating to issue detail and back", async ({
