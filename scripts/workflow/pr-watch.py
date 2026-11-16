@@ -1,31 +1,39 @@
 #!/usr/bin/env python3
-"""Wait on one PR head's CI Gate and Claude Review.
+"""Wait on one PR head: its CI Gate and Claude Review, or its merge-queue entry.
 
 Run it as a background command; it blocks until a verdict:
 
   pr-watch.py <PR> --phase ci --expected-head <SHA>
+  pr-watch.py <PR> --phase queue --expected-head <SHA>
 
 Progress goes to stderr, one line per state change. stdout carries exactly one
 terminal JSON verdict. The watch is pinned to the expected head: if the PR head
 moves it ends `stale` instead of following the new head, and a DIRTY/CONFLICTING
-merge state ends it `conflicting`.
+merge state on an open PR ends it `conflicting`.
 
-Outcomes: passed | failed | stale | conflicting | timed_out | undetermined. `passed`
-means CI Gate passed and, on a PR that is not a draft, the `Claude Review` check
-passed too (a draft skips Claude Review, so only CI Gate is awaited). Claude
-Review's findings are review threads the owning agent still adjudicates. A
-failed check saves the failed-step log to tmp/gh-monitor/failure-<run>.md and
-returns it as `failure_artifact`. `UI Approval` is not awaited: it can wait on
-Tim indefinitely. `ci` is the only phase; the flag stays so callers name what
-they wait on.
+`ci` outcomes: passed | failed | stale | conflicting | timed_out | undetermined.
+`passed` means CI Gate passed and, on a PR that is not a draft, the `Claude
+Review` check passed too (a draft skips Claude Review, so only CI Gate is
+awaited). Claude Review's findings are review threads the owning agent still
+adjudicates. A failed check saves the failed-step log to
+tmp/gh-monitor/failure-<run>.md and returns it as `failure_artifact`. `UI
+Approval` is not awaited: it can wait on Tim indefinitely.
+
+`queue` outcomes: merged | removed | not_queued | stale | conflicting |
+timed_out | undetermined. Run it after `gh pr merge` put the PR in the merge
+queue, or armed auto-merge, which enqueues the PR once its checks pass.
+`merged` carries the merge commit. `removed` means the PR left the queue
+without merging; the failing `merge_group` run for the PR's queue branch, when
+there is one, supplies `detail_url`, `failing_jobs`, and the same failure
+artifact the ci phase writes.
 
 A cancelled CI Gate is superseded, not failed: pushing a second commit cancels
 the in-flight run via concurrency groups. (PP-r63o) A gh API error (rate-limit
 403, network drop, auth failure) is not a failure either — it means we could
 not find out. (PP-qkl8)
 
-Exit 0: passed.
-Exit 1: failed, stale, or conflicting.
+Exit 0: passed or merged.
+Exit 1: failed, removed, not_queued, stale, or conflicting.
 Exit 2: timed_out or undetermined — neither a pass nor a failure. Usage errors
         also exit 2, with nothing on stdout.
 """
@@ -39,7 +47,7 @@ import re
 import subprocess
 import sys
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -68,7 +76,10 @@ CONFLICT_STATES = ("DIRTY", "CONFLICTING")
 EXIT_UNDETERMINED = 2
 EXIT_CODES = {
     "passed": 0,
+    "merged": 0,
     "failed": 1,
+    "removed": 1,
+    "not_queued": 1,
     "stale": 1,
     "conflicting": 1,
     "timed_out": EXIT_UNDETERMINED,
@@ -239,9 +250,10 @@ class Verdict:
     failure_artifact: str | None = None
 
 
-def _verdict(outcome: str, detail: str, **fields) -> Verdict:
+def _verdict(outcome: str, detail: str, *, cls: type = Verdict, **fields):
+    """Log why the watch ended and build its verdict as the phase's dataclass."""
     emit(detail)
-    return Verdict(outcome, **fields)
+    return cls(outcome, **fields)
 
 
 def _current_phase_ci_snapshot(
@@ -279,17 +291,25 @@ def _current_phase_ci_snapshot(
 
 
 def _head_problem(
-    head_sha: str, merge_state: str, expected_head: str, watch: str
-) -> Verdict | None:
+    head_sha: str,
+    merge_state: str,
+    expected_head: str,
+    watch: str,
+    *,
+    cls: type = Verdict,
+):
     """End a watch whose pinned head is unknown, moved, or conflicted."""
     if not head_sha:
         return _verdict(
-            "undetermined", f"⚠  Could not determine {watch} state — PR head was empty."
+            "undetermined",
+            f"⚠  Could not determine {watch} state — PR head was empty.",
+            cls=cls,
         )
     if head_sha != expected_head:
         return _verdict(
             "stale",
             f"PR head moved {expected_head[:7]} → {head_sha[:7]} — {watch} watch is stale",
+            cls=cls,
             observed_head=head_sha,
             merge_state=merge_state,
         )
@@ -297,33 +317,47 @@ def _head_problem(
         return _verdict(
             "conflicting",
             f"PR merge state is {merge_state} — conflict must be resolved",
+            cls=cls,
             observed_head=head_sha,
             merge_state=merge_state,
         )
     return None
 
 
-def _unresolved_threads(pr: int) -> int | None:
-    """Count the PR's unresolved review threads; None when GitHub cannot say."""
+def _graphql_pull_request(fields: str, pr: int) -> dict:
+    """Fetch `fields` of one pull request in a single GraphQL query.
+
+    Raises RuntimeError (gh failed, or no such PR), json.JSONDecodeError,
+    KeyError, or TypeError when GitHub's answer is unusable.
+    """
     query = (
         "query($owner:String!,$name:String!,$pr:Int!){repository(owner:$owner,name:$name)"
-        "{pullRequest(number:$pr){reviewThreads(first:100)"
-        "{pageInfo{hasNextPage} nodes{isResolved}}}}}"
+        f"{{pullRequest(number:$pr){{{fields}}}}}}}"
     )
+    raw = gh(
+        "api",
+        "graphql",
+        "-f",
+        f"query={query}",
+        "-F",
+        f"owner={REPO_OWNER}",
+        "-F",
+        f"name={REPO_NAME}",
+        "-F",
+        f"pr={pr}",
+    )
+    pull = json.loads(raw)["data"]["repository"]["pullRequest"]
+    if not isinstance(pull, dict):
+        raise RuntimeError(f"GitHub returned no pull request #{pr}")
+    return pull
+
+
+def _unresolved_threads(pr: int) -> int | None:
+    """Count the PR's unresolved review threads; None when GitHub cannot say."""
     try:
-        raw = gh(
-            "api",
-            "graphql",
-            "-f",
-            f"query={query}",
-            "-F",
-            f"owner={REPO_OWNER}",
-            "-F",
-            f"name={REPO_NAME}",
-            "-F",
-            f"pr={pr}",
-        )
-        threads = json.loads(raw)["data"]["repository"]["pullRequest"]["reviewThreads"]
+        threads = _graphql_pull_request(
+            "reviewThreads(first:100){pageInfo{hasNextPage} nodes{isResolved}}", pr
+        )["reviewThreads"]
         if threads["pageInfo"]["hasNextPage"]:
             return None
         return sum(1 for t in threads["nodes"] if not t["isResolved"])
@@ -470,6 +504,231 @@ def _watch_phase_ci(
 
 
 # ---------------------------------------------------------------------------
+# Merge-queue watch
+# ---------------------------------------------------------------------------
+#
+# The queue builds a `gh-readonly-queue/<base>/pr-<n>-<sha>` commit and runs the
+# required checks on it as a `merge_group` event; it then merges the PR or
+# drops it from the queue, leaving it open. While queued, a PR has a
+# mergeQueueEntry and no autoMergeRequest; armed auto-merge waiting for the PR's
+# own checks is the reverse; a merged or dropped PR has neither.
+
+QUEUE_BRANCH_PREFIX = "gh-readonly-queue/"
+
+# One query per interval carries everything a queue verdict needs.
+_QUEUE_FIELDS = (
+    "state headRefOid mergeStateStatus mergeCommit{oid} "
+    "autoMergeRequest{enabledAt} mergeQueueEntry{state position enqueuedAt}"
+)
+
+
+@dataclass
+class QueueVerdict:
+    """How a queue watch ended; main() wraps it in the terminal JSON envelope."""
+
+    outcome: str
+    observed_head: str = ""
+    # OPEN, MERGED, or CLOSED.
+    pr_state: str = "UNKNOWN"
+    # The last observed queue entry state (QUEUED, AWAITING_CHECKS, MERGEABLE,
+    # UNMERGEABLE, LOCKED), AUTO_MERGE_ARMED while waiting to be enqueued, or
+    # NOT_QUEUED.
+    queue_state: str = "UNKNOWN"
+    queue_position: int | None = None
+    merge_state: str = "UNKNOWN"
+    merge_commit: str | None = None
+    failing_jobs: list[str] = field(default_factory=list)
+    detail_url: str | None = None
+    failure_artifact: str | None = None
+
+
+def _failed_queue_run(pr: int, since: str) -> dict | None:
+    """Return the failing merge_group run built for ``pr`` since ``since``.
+
+    Called once, after the PR has left the queue. A queue that rebuilds a group
+    (a PR ahead of it dropped out) leaves cancelled runs on the older commits,
+    so take the newest failing commit and, among its red runs, prefer CI, the
+    workflow that carries CI Gate. Runs created before this enqueue belong to
+    an earlier attempt and are ignored.
+    """
+    raw = gh(
+        "run",
+        "list",
+        "--event",
+        "merge_group",
+        "--limit",
+        "50",
+        "--json",
+        "databaseId,status,conclusion,headBranch,headSha,workflowName,createdAt,url",
+    )
+    marker = f"/pr-{pr}-"
+    failed = [
+        run
+        for run in json.loads(raw)
+        if str(run.get("headBranch") or "").startswith(QUEUE_BRANCH_PREFIX)
+        and marker in str(run.get("headBranch"))
+        and str(run.get("createdAt") or "") >= since
+        and run.get("status") == "completed"
+        and _is_failing(run.get("conclusion"))
+    ]
+    if not failed:
+        return None
+    newest_sha = max(failed, key=lambda run: int(run.get("databaseId") or 0))["headSha"]
+    return max(
+        (run for run in failed if run["headSha"] == newest_sha),
+        key=lambda run: (
+            run.get("workflowName") == "CI",
+            int(run.get("databaseId") or 0),
+        ),
+    )
+
+
+def _queue_failure(pr: int, since: str) -> dict:
+    """The removed PR's failing run: detail_url, failing_jobs, failure_artifact.
+
+    Whatever was found before an error is kept; nothing found is an empty dict,
+    which is the case for a conflict, a manual dequeue, or a closed PR.
+    """
+    found: dict = {}
+    try:
+        run = _failed_queue_run(pr, since)
+        if run is None:
+            emit("No failing merge_group run found for this PR's queue branch")
+            return found
+        run_id = int(run["databaseId"])
+        found["detail_url"] = (
+            run.get("url") or f"https://github.com/{REPOSITORY}/actions/runs/{run_id}"
+        )
+        jobs = json.loads(gh("run", "view", str(run_id), "--json", "jobs"))["jobs"]
+        found["failing_jobs"] = [
+            str(job.get("name"))
+            for job in jobs
+            if job.get("status") == "completed" and _is_failing(job.get("conclusion"))
+        ]
+        emit(
+            f"merge_group run failed: {found['detail_url']} "
+            f"({', '.join(found['failing_jobs']) or 'no failed job listed'})"
+        )
+        found["failure_artifact"] = write_failure_artifact(run_id)
+        emit(f"Failure details: {found['failure_artifact']}")
+    except (
+        RuntimeError,
+        json.JSONDecodeError,
+        OSError,
+        ValueError,
+        KeyError,
+        TypeError,
+    ) as exc:
+        emit(f"Queue failure details unavailable: {exc}")
+    return found
+
+
+def _watch_phase_queue(
+    pr: int,
+    expected_head: str,
+    *,
+    timeout_sec: float = WATCH_TIMEOUT_SECONDS,
+    poll_sec: float = WATCH_POLL_SECONDS,
+) -> QueueVerdict:
+    """Watch one pinned head through the merge queue, one query per interval."""
+    deadline = time.monotonic() + timeout_sec
+    # When the PR was first seen headed into the queue: its enqueue time, or the
+    # time auto-merge was armed. None until then.
+    since: str | None = None
+    last_signature: tuple | None = None
+    seen: dict = {}
+
+    while time.monotonic() < deadline:
+        try:
+            pull = _graphql_pull_request(_QUEUE_FIELDS, pr)
+            entry = pull.get("mergeQueueEntry") or {}
+            auto_merge = pull.get("autoMergeRequest") or {}
+            merge_commit = (pull.get("mergeCommit") or {}).get("oid")
+        except (
+            RuntimeError,
+            json.JSONDecodeError,
+            KeyError,
+            TypeError,
+            AttributeError,
+        ) as exc:
+            return _verdict(
+                "undetermined",
+                "⚠  Could not determine merge-queue state — "
+                f"the GitHub API was unreachable ({exc}).",
+                cls=QueueVerdict,
+                **seen,
+            )
+        state = str(pull.get("state") or "UNKNOWN")
+        head_sha = str(pull.get("headRefOid") or "")
+        merge_state = str(pull.get("mergeStateStatus") or "UNKNOWN")
+        seen = {
+            "observed_head": head_sha,
+            "pr_state": state,
+            "queue_state": entry.get("state")
+            or ("AUTO_MERGE_ARMED" if auto_merge else "NOT_QUEUED"),
+            "queue_position": entry.get("position"),
+            "merge_state": merge_state,
+        }
+        # A conflict only matters while the PR can still merge.
+        problem = _head_problem(
+            head_sha,
+            merge_state if state == "OPEN" else "UNKNOWN",
+            expected_head,
+            "queue",
+            cls=QueueVerdict,
+        )
+        if problem is not None:
+            return problem
+
+        if state == "MERGED":
+            return _verdict(
+                "merged",
+                f"PR #{pr} merged as {(merge_commit or 'unknown')[:7]} ✓",
+                cls=QueueVerdict,
+                merge_commit=merge_commit,
+                **seen,
+            )
+        if entry or auto_merge:
+            since = (
+                since or entry.get("enqueuedAt") or auto_merge.get("enabledAt") or ""
+            )
+            signature = (seen["queue_state"], seen["queue_position"])
+            if signature != last_signature:
+                emit(
+                    f"Queued at position {entry.get('position')} ({str(entry.get('state')).lower()})"
+                    if entry
+                    else "Auto-merge armed — waiting for GitHub to enqueue the PR"
+                )
+                last_signature = signature
+        elif since is None:
+            # Not queued when the watch began, with no auto-merge armed either.
+            # That is `not_queued` (exit 1, act on it), not undetermined (exit
+            # 2): GitHub answered, and nothing will merge this PR on its own.
+            # Exit 2 means "could not find out; re-run the watch", and re-running
+            # here can never change the answer. The caller acts: enqueue it with
+            # `gh pr merge`, or, if it was dropped before the watch started,
+            # read why on the PR page.
+            return _verdict(
+                "not_queued",
+                f"PR #{pr} is {state.lower()} and not in the merge queue",
+                cls=QueueVerdict,
+                **seen,
+            )
+        else:
+            emit(f"PR #{pr} left the merge queue without merging ({state.lower()})")
+            return QueueVerdict("removed", **seen, **_queue_failure(pr, since))
+
+        time.sleep(poll_sec)
+
+    return _verdict(
+        "timed_out",
+        f"⚠  Could not determine merge-queue state — no terminal verdict within {timeout_sec}s.",
+        cls=QueueVerdict,
+        **seen,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -488,7 +747,7 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     )
     parser.add_argument("pr", type=int, help="pull request number")
     parser.add_argument(
-        "--phase", choices=("ci",), required=True, help="phase to wait on"
+        "--phase", choices=("ci", "queue"), required=True, help="phase to wait on"
     )
     parser.add_argument(
         "--expected-head",
@@ -502,7 +761,8 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
-    verdict = _watch_phase_ci(args.pr, args.expected_head)
+    watch = _watch_phase_queue if args.phase == "queue" else _watch_phase_ci
+    verdict = watch(args.pr, args.expected_head)
     artifact = verdict.failure_artifact
     payload = {
         "schema_version": 2,

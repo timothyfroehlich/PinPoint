@@ -565,6 +565,255 @@ def test_failure_run_lookup_is_terminal_only_and_head_scoped(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
+# Queue phase — one GraphQL snapshot per interval; run lookups only on removal
+# ---------------------------------------------------------------------------
+
+MERGE_SHA = "46b0d567ab1ad159a843b5f480d59ee907b173d2"
+QUEUE_SHA = "95b2e4a0acbef8e771997da4a09de2b78abaeab8"
+ENQUEUED_AT = "2026-11-16T00:42:44Z"
+
+
+def queue_snapshot(
+    state="OPEN",
+    head=HEAD_SHA,
+    entry_state="AWAITING_CHECKS",
+    position=1,
+    auto_merge=False,
+    merge_commit=None,
+    merge_state="UNKNOWN",
+):
+    """One pullRequest node as the queue query returns it; entry_state=None: not queued."""
+    return {
+        "state": state,
+        "headRefOid": head,
+        "mergeStateStatus": merge_state,
+        "mergeCommit": {"oid": merge_commit} if merge_commit else None,
+        "autoMergeRequest": {"enabledAt": ENQUEUED_AT} if auto_merge else None,
+        "mergeQueueEntry": None
+        if entry_state is None
+        else {"state": entry_state, "position": position, "enqueuedAt": ENQUEUED_AT},
+    }
+
+
+NOT_QUEUED = queue_snapshot(entry_state=None)
+
+
+def _queue_run(run_id, conclusion, pr=PR, sha=QUEUE_SHA, workflow="CI", created=None):
+    return {
+        "databaseId": run_id,
+        "status": "completed",
+        "conclusion": conclusion,
+        "headBranch": f"gh-readonly-queue/main/pr-{pr}-1698e1b603b364bd79105d30aea5f440d4f3da50",
+        "headSha": sha,
+        "workflowName": workflow,
+        "createdAt": created or "2026-11-16T00:43:51Z",
+        "url": f"https://github.com/minamaya/PinPoint/actions/runs/{run_id}",
+    }
+
+
+def queue_gh(snapshots, runs=(), jobs=()):
+    """Answer the queue query with `snapshots` in sequence (the last repeats).
+
+    `gh run list` answers with `runs` and `gh run view --json jobs` with `jobs`;
+    every call is recorded so a test can assert none of them happen early.
+    """
+    remaining = list(snapshots)
+
+    def fake_gh(*args: str) -> str:
+        fake_gh.calls.append(args)
+        if args[:2] == ("api", "graphql"):
+            assert "mergeQueueEntry" in args[3], args
+            snapshot = remaining.pop(0) if len(remaining) > 1 else remaining[0]
+            return json.dumps({"data": {"repository": {"pullRequest": snapshot}}})
+        if args[:2] == ("run", "list"):
+            assert args[2:4] == ("--event", "merge_group"), args
+            return json.dumps(list(runs))
+        if args[:2] == ("run", "view"):
+            return json.dumps({"jobs": list(jobs)})
+        raise AssertionError(args)
+
+    fake_gh.calls = []
+    return fake_gh
+
+
+def _queries(fake) -> int:
+    return sum(1 for call in fake.calls if call[:2] == ("api", "graphql"))
+
+
+@pytest.mark.unit
+def test_watch_phase_queue_reports_merged_with_merge_commit(monkeypatch, capsys):
+    fake = queue_gh(
+        [
+            queue_snapshot(position=2),
+            queue_snapshot(entry_state="MERGEABLE", position=1),
+            queue_snapshot(state="MERGED", entry_state=None, merge_commit=MERGE_SHA),
+        ]
+    )
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    no_sleep(monkeypatch)
+
+    verdict = pr_watch._watch_phase_queue(PR, HEAD_SHA, timeout_sec=60, poll_sec=0)
+    assert verdict.outcome == "merged"
+    assert verdict.merge_commit == MERGE_SHA
+    assert verdict.pr_state == "MERGED"
+    assert _queries(fake) == 3
+    assert all(call[:2] == ("api", "graphql") for call in fake.calls)
+    err = capsys.readouterr().err
+    assert "Queued at position 2" in err
+    assert "merged as 46b0d56" in err
+
+
+@pytest.mark.unit
+def test_watch_phase_queue_waits_for_armed_auto_merge_to_enqueue(monkeypatch):
+    fake = queue_gh(
+        [
+            queue_snapshot(entry_state=None, auto_merge=True),
+            queue_snapshot(),
+            queue_snapshot(state="MERGED", entry_state=None, merge_commit=MERGE_SHA),
+        ]
+    )
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    no_sleep(monkeypatch)
+
+    verdict = pr_watch._watch_phase_queue(PR, HEAD_SHA, timeout_sec=60, poll_sec=0)
+    assert verdict.outcome == "merged"
+    assert _queries(fake) == 3
+
+
+@pytest.mark.unit
+def test_watch_phase_queue_removed_reports_the_failing_merge_group_run(
+    monkeypatch, capsys
+):
+    runs = [
+        # This PR's newest group: CI failed, and a second workflow failed too.
+        _queue_run(90, "failure", workflow="UI Approval"),
+        _queue_run(91, "failure"),
+        _queue_run(92, "skipped", workflow="Claude Review"),
+        # An older group the queue rebuilt, and an earlier attempt's red run
+        # (newer id, but created before this enqueue).
+        _queue_run(80, "cancelled", sha=OLD_SHA),
+        _queue_run(99, "failure", sha=OLD_SHA, created="2026-11-15T20:00:00Z"),
+        # Another PR's red run in the same queue.
+        _queue_run(98, "failure", pr=PR + 1, sha=OLD_SHA),
+    ]
+    jobs = [
+        {"name": "Static checks", "status": "completed", "conclusion": "success"},
+        {"name": "E2E Full", "status": "completed", "conclusion": "failure"},
+        {"name": "CI Gate", "status": "completed", "conclusion": "failure"},
+        {"name": "Smoke", "status": "completed", "conclusion": "skipped"},
+    ]
+    fake = queue_gh([queue_snapshot(), NOT_QUEUED], runs=runs, jobs=jobs)
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    monkeypatch.setattr(
+        pr_watch,
+        "write_failure_artifact",
+        lambda run_id: f"tmp/gh-monitor/failure-{run_id}.md",
+    )
+    no_sleep(monkeypatch)
+
+    verdict = pr_watch._watch_phase_queue(PR, HEAD_SHA, timeout_sec=60, poll_sec=0)
+    assert verdict.outcome == "removed"
+    assert verdict.pr_state == "OPEN"
+    assert verdict.queue_state == "NOT_QUEUED"
+    assert verdict.detail_url == "https://github.com/minamaya/PinPoint/actions/runs/91"
+    assert verdict.failing_jobs == ["E2E Full", "CI Gate"]
+    assert verdict.failure_artifact == "tmp/gh-monitor/failure-91.md"
+    assert ("run", "view", "91", "--json", "jobs") in fake.calls
+    assert "left the merge queue" in capsys.readouterr().err
+
+
+@pytest.mark.unit
+def test_watch_phase_queue_removed_without_a_failing_run(monkeypatch, capsys):
+    """A manual dequeue or a conflict leaves no red run; the verdict says so."""
+    fake = queue_gh([queue_snapshot(), NOT_QUEUED], runs=[_queue_run(91, "cancelled")])
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    monkeypatch.setattr(
+        pr_watch,
+        "write_failure_artifact",
+        lambda _run_id: pytest.fail("no failing run, so no failure artifact"),
+    )
+    no_sleep(monkeypatch)
+
+    verdict = pr_watch._watch_phase_queue(PR, HEAD_SHA, timeout_sec=60, poll_sec=0)
+    assert verdict.outcome == "removed"
+    assert (verdict.detail_url, verdict.failing_jobs, verdict.failure_artifact) == (
+        None,
+        [],
+        None,
+    )
+    assert "No failing merge_group run" in capsys.readouterr().err
+
+
+@pytest.mark.unit
+def test_watch_phase_queue_not_queued_at_start_needs_action(monkeypatch):
+    fake = queue_gh([NOT_QUEUED])
+    monkeypatch.setattr(pr_watch, "gh", fake)
+
+    verdict = pr_watch._watch_phase_queue(PR, HEAD_SHA, timeout_sec=60, poll_sec=0)
+    assert verdict.outcome == "not_queued"
+    assert pr_watch.EXIT_CODES[verdict.outcome] == 1
+    assert verdict.queue_state == "NOT_QUEUED"
+    # GitHub answered definitively, so there is no run lookup and no retry.
+    assert len(fake.calls) == 1
+
+
+class FakeClock:
+    """Stands in for pr_watch.time: sleep advances monotonic instead of waiting."""
+
+    def __init__(self):
+        self.now = 0.0
+
+    def monotonic(self):
+        return self.now
+
+    def sleep(self, seconds):
+        self.now += seconds
+
+
+@pytest.mark.unit
+def test_watch_phase_queue_timeout_is_undetermined(monkeypatch, capsys):
+    fake = queue_gh([queue_snapshot(position=4)])
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    monkeypatch.setattr(pr_watch, "time", FakeClock())
+
+    verdict = pr_watch._watch_phase_queue(PR, HEAD_SHA, timeout_sec=90, poll_sec=30)
+    assert verdict.outcome == "timed_out"
+    assert pr_watch.EXIT_CODES[verdict.outcome] == 2
+    assert verdict.queue_position == 4
+    assert _queries(fake) == 3
+    err = capsys.readouterr().err
+    assert err.count("Queued at position 4") == 1
+    assert "no terminal verdict" in err
+
+
+@pytest.mark.unit
+def test_watch_phase_queue_exits_stale_when_head_moves(monkeypatch):
+    fake = queue_gh([queue_snapshot(head=OLD_SHA, entry_state=None)])
+    monkeypatch.setattr(pr_watch, "gh", fake)
+
+    verdict = pr_watch._watch_phase_queue(PR, HEAD_SHA, timeout_sec=60, poll_sec=0)
+    assert verdict.outcome == "stale"
+    assert verdict.observed_head == OLD_SHA
+    assert isinstance(verdict, pr_watch.QueueVerdict)
+
+
+@pytest.mark.unit
+def test_watch_phase_queue_reports_api_outage_as_undetermined(monkeypatch, capsys):
+    calls = []
+
+    def unavailable(*args):
+        calls.append(args)
+        raise RuntimeError(RATE_LIMIT_403)
+
+    monkeypatch.setattr(pr_watch, "gh", unavailable)
+
+    verdict = pr_watch._watch_phase_queue(PR, HEAD_SHA, timeout_sec=60, poll_sec=0)
+    assert verdict.outcome == "undetermined"
+    assert len(calls) == 1
+    assert RATE_LIMIT_403 in capsys.readouterr().err
+
+
+# ---------------------------------------------------------------------------
 # main — argument contract, one JSON verdict on stdout, exit codes
 # ---------------------------------------------------------------------------
 
@@ -576,6 +825,11 @@ def test_parse_args_watch():
 
     args = pr_watch._parse_args(["1734", "--phase=ci", f"--expected-head={HEAD_SHA}"])
     assert (args.phase, args.expected_head) == ("ci", HEAD_SHA)
+
+    args = pr_watch._parse_args(
+        ["1734", "--phase", "queue", "--expected-head", HEAD_SHA]
+    )
+    assert args.phase == "queue"
 
 
 @pytest.mark.unit
@@ -589,6 +843,7 @@ def test_parse_args_watch():
         ["1734", "--phase", "ci", "--expected-head", HEAD_SHA[:10]],
         ["1734", "--phase", "ci", "--expected-head", HEAD_SHA.upper()],
         ["1734", "--phase", "review", "--expected-head", HEAD_SHA],
+        ["1734", "--phase", "queue"],
         ["--check-ready", "1734"],
         ["1734", "--check-ready", "--phase", "ci", "--expected-head", HEAD_SHA],
         ["1734", "--phase", "ci", "--expected-head", HEAD_SHA, "--force"],
@@ -677,3 +932,65 @@ def test_main_exit_code_follows_the_outcome(monkeypatch, capsys, outcome, code):
 
     assert exit_code == code
     assert json.loads(capsys.readouterr().out)["outcome"] == outcome
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "outcome,code",
+    [
+        ("merged", 0),
+        ("removed", 1),
+        ("not_queued", 1),
+        ("stale", 1),
+        ("conflicting", 1),
+        ("timed_out", 2),
+        ("undetermined", 2),
+    ],
+)
+def test_main_queue_exit_code_follows_the_outcome(monkeypatch, capsys, outcome, code):
+    monkeypatch.setattr(
+        pr_watch,
+        "_watch_phase_queue",
+        lambda _pr, _head: pr_watch.QueueVerdict(outcome),
+    )
+
+    exit_code = pr_watch.main(["1734", "--phase", "queue", "--expected-head", HEAD_SHA])
+
+    assert exit_code == code
+    assert json.loads(capsys.readouterr().out)["outcome"] == outcome
+
+
+@pytest.mark.unit
+def test_main_queue_prints_exactly_one_json_verdict(monkeypatch, capsys):
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        queue_gh(
+            [queue_snapshot(state="MERGED", entry_state=None, merge_commit=MERGE_SHA)]
+        ),
+    )
+
+    exit_code = pr_watch.main(["1734", "--phase", "queue", "--expected-head", HEAD_SHA])
+
+    assert exit_code == 0
+    stdout_lines = capsys.readouterr().out.splitlines()
+    assert len(stdout_lines) == 1, stdout_lines
+    payload = json.loads(stdout_lines[0])
+    assert payload == {
+        "schema_version": 2,
+        "repository": "minamaya/PinPoint",
+        "pr": PR,
+        "phase": "queue",
+        "expected_head": HEAD_SHA,
+        "observed_head": HEAD_SHA,
+        "outcome": "merged",
+        "pr_state": "MERGED",
+        "queue_state": "NOT_QUEUED",
+        "queue_position": None,
+        "merge_state": "UNKNOWN",
+        "merge_commit": MERGE_SHA,
+        "failing_jobs": [],
+        "detail_url": None,
+        "failure_artifact": None,
+        "timestamp": payload["timestamp"],
+    }

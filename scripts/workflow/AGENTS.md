@@ -38,25 +38,27 @@ approval policy.
 
 ### PR Monitoring
 
-| Script                                | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pr-dashboard.sh [PR...]`             | Status table: CI checks, review, UI approval, merge state, draft state. All open PRs if no args. One repository GraphQL snapshot supplies every column. Review and UI are the head's `Claude Review` and `UI Approval` required checks, counted only when the GitHub Actions app ran them: pass, fail, pending, skipped (the job did not run, as Claude Review on a draft), or — when absent. Anything the dashboard cannot read renders as `?`, never as green. |
-| `pr-watch.py <PR>`                    | Wait on one PR head's CI Gate and, once the PR is ready, its Claude Review: `--phase ci --expected-head <SHA>` polls every 30s until a terminal verdict (1h ceiling). Progress goes to stderr; stdout is exactly one terminal JSON verdict. A failed check writes `tmp/gh-monitor/failure-<run>.md` when the run log can be fetched.                                                                                                                             |
-| `claude-review-level.sh [<base-ref>]` | Trusted helper for `.github/workflows/claude-review.yaml`, not an agent step: prints the review level for HEAD against `origin/main`. Line 1 `low`, `medium`, `high`, or `ask`; line 2 the weighted size. Leaves out the lockfile, `drizzle/meta`, fixtures, binaries and feature specs; counts test code at half weight.                                                                                                                                        |
-| `claude-review-range.sh <PR> <SHA>`   | Trusted helper for `.github/workflows/claude-review.yaml` (run from main's copy): picks full, incremental (commits since the newest earlier passing check, main's changes left out), or skip. `CLAUDE_REVIEW_CHECK_NAME` keys it on another check; `CLAUDE_REVIEW_SKIP_LEVEL=1` skips the level.                                                                                                                                                                 |
+| Script                                | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pr-dashboard.sh [PR...]`             | Status table: CI checks, review, UI approval, merge state, draft state. All open PRs if no args. One repository GraphQL snapshot supplies every column. Review and UI are the head's `Claude Review` and `UI Approval` required checks, counted only when the GitHub Actions app ran them: pass, fail, pending, skipped (the job did not run, as Claude Review on a draft), or — when absent. Anything the dashboard cannot read renders as `?`, never as green.    |
+| `pr-watch.py <PR>`                    | Wait on one PR head: `--phase ci` for its CI Gate and, once the PR is ready, its Claude Review; `--phase queue` for its merge-queue entry until it merges or the queue drops it. Both poll every 30s with `--expected-head <SHA>` until a terminal verdict (1h ceiling). Progress goes to stderr; stdout is exactly one terminal JSON verdict. A failed check or failed `merge_group` run writes `tmp/gh-monitor/failure-<run>.md` when the run log can be fetched. |
+| `claude-review-level.sh [<base-ref>]` | Trusted helper for `.github/workflows/claude-review.yaml`, not an agent step: prints the review level for HEAD against `origin/main`. Line 1 `low`, `medium`, `high`, or `ask`; line 2 the weighted size. Leaves out the lockfile, `drizzle/meta`, fixtures, binaries and feature specs; counts test code at half weight.                                                                                                                                           |
+| `claude-review-range.sh <PR> <SHA>`   | Trusted helper for `.github/workflows/claude-review.yaml` (run from main's copy): picks full, incremental (commits since the newest earlier passing check, main's changes left out), or skip. `CLAUDE_REVIEW_CHECK_NAME` keys it on another check; `CLAUDE_REVIEW_SKIP_LEVEL=1` skips the level.                                                                                                                                                                    |
 
 #### `pr-watch.py` flags and terminal verdict
 
 ```bash
 python3 scripts/workflow/pr-watch.py <PR> --phase ci --expected-head <FULL_SHA>
+python3 scripts/workflow/pr-watch.py <PR> --phase queue --expected-head <FULL_SHA>
 ```
 
 Run it as a background command. `--phase` and `--expected-head` (full lowercase 40-character SHA) are required together. Usage errors exit 2 with nothing on stdout.
 
 - `--phase ci`: polls CI Gate for the expected head and, on a PR that is not a draft, `Claude Review` too (a draft skips Claude Review). `passed` needs both; a red Claude Review ends the watch `failed` without waiting for CI. A passed verdict carries `unresolved_threads`, Claude Review's findings and any other open threads still to adjudicate. Terminal outcomes: `passed` (exit 0), `failed` / `stale` / `conflicting` (exit 1), `timed_out` / `undetermined` (exit 2). It does not watch `UI Approval`, which can wait on Tim indefinitely.
+- `--phase queue`: run after `gh pr merge`. One GraphQL query per interval reads the PR's state and `mergeQueueEntry`; it keeps waiting while the PR is queued or auto-merge is armed. Terminal outcomes: `merged` (exit 0); `removed` (the PR left the queue still open, or was closed), `not_queued` (neither queued nor armed when the watch began), `stale`, `conflicting` (exit 1); `timed_out` / `undetermined` (exit 2). Only on `removed` does it list `merge_group` runs, once, to find the failing run for the PR's `gh-readonly-queue/<base>/pr-<n>-<sha>` branch since it was enqueued.
 - `--expected-head <SHA>`: if the PR head moves, the watch ends `stale` rather than following the new head. GitHub's transient `UNKNOWN` merge state is not treated as a conflict.
 
-Terminal JSON schema (`stdout`):
+Terminal JSON schema for `--phase ci` (`stdout`):
 
 ```json
 {
@@ -79,10 +81,29 @@ Terminal JSON schema (`stdout`):
 
 `claude_review` is the head's Claude Review conclusion or status, `SKIPPED_DRAFT` on a draft, or `UNKNOWN` before the check posts. `unresolved_threads` is counted only on a `passed` verdict, and is `null` otherwise or when GitHub cannot say.
 
+`--phase queue` shares the envelope (`schema_version` through `observed_head`, then `detail_url`, `failure_artifact`, `timestamp`) and replaces the CI fields with its own:
+
+```json
+{
+  "phase": "queue",
+  "outcome": "removed",
+  "pr_state": "OPEN",
+  "queue_state": "NOT_QUEUED",
+  "queue_position": null,
+  "merge_state": "UNKNOWN",
+  "merge_commit": null,
+  "failing_jobs": ["E2E Full", "CI Gate"],
+  "detail_url": "https://github.com/minamaya/PinPoint/actions/runs/123",
+  "failure_artifact": "/abs/path/tmp/gh-monitor/failure-123.md"
+}
+```
+
+`queue_state` is the last observed entry state (`QUEUED`, `AWAITING_CHECKS`, `MERGEABLE`, `UNMERGEABLE`, `LOCKED`), `AUTO_MERGE_ARMED`, or `NOT_QUEUED`; `queue_position` is the entry's position while queued. `merge_commit` is set on `merged`. `failing_jobs`, `detail_url`, and `failure_artifact` are set on `removed` when a `merge_group` run failed; they stay empty for a conflict, a manual dequeue, or a closed PR.
+
 `pr-watch.py` exit codes:
 
-- **0**: `passed` (CI Gate passed on the expected head, and Claude Review too unless the PR is a draft).
-- **1**: Failure or action required (`failed`, `stale`, `conflicting`).
+- **0**: `passed` (CI Gate passed on the expected head, and Claude Review too unless the PR is a draft) or `merged`.
+- **1**: Failure or action required (`failed`, `removed`, `not_queued`, `stale`, `conflicting`).
 - **2**: Undetermined / unavailable evidence (`undetermined`, `timed_out`). Exit 2 is not a red CI: re-run the watch once evidence is available rather than hunting for a broken test. (PP-qkl8)
 
 ### Compact Validation Progress
@@ -138,6 +159,7 @@ The pinpoint-pr-workflow skill defaults to MCP tools for per-operation reads and
 | Apply/remove PR label                          | `issue_write(method: "update", labels: [...])` | —                                                                                                                   |
 | Get failed CI logs                             | `get_job_logs(failed_only, tail_lines)`        | —                                                                                                                   |
 | Wait on CI for one PR head                     | —                                              | `pr-watch.py --phase ci`                                                                                            |
+| Wait on a queued PR to merge                   | —                                              | `pr-watch.py --phase queue`                                                                                         |
 | Required-check state for one PR                | —                                              | `gh pr checks <PR> --required`                                                                                      |
 | Merge a PR                                     | —                                              | `gh pr merge <PR> --squash` (or `--auto --squash`) after Tim explicitly requests that PR; GitHub enforces the gates |
 | Capture UI screenshots                         | —                                              | `pr-screenshots.mjs` (agent-runnable, local)                                                                        |
