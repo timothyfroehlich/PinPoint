@@ -29,7 +29,7 @@ import { join } from "node:path";
 
 const PBM_API_BASE = "https://pinballmap.com/api/v1";
 const PBM_USER_AGENT =
-  "PinPoint/1.0 (Austin Pinball Collective issue tracker; +https://github.com/timothyfroehlich/PinPoint)";
+  "PinPoint/1.0 (Austin Pinball Collective issue tracker; +https://github.com/minamaya/PinPoint)";
 // Mandatory blanket access gate; mirrors api-token.ts (empty/whitespace -> absent).
 const PBM_API_TOKEN = process.env["PINBALLMAP_API_TOKEN"]?.trim() ?? "";
 const APC_LOCATION_ID = 26454;

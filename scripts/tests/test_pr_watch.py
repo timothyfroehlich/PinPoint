@@ -617,7 +617,7 @@ def test_main_prints_exactly_one_json_verdict_on_stdout(monkeypatch, capsys):
     payload = json.loads(stdout_lines[0])
     assert payload == {
         "schema_version": 2,
-        "repository": "timothyfroehlich/PinPoint",
+        "repository": "minamaya/PinPoint",
         "pr": PR,
         "phase": "ci",
         "expected_head": HEAD_SHA,
