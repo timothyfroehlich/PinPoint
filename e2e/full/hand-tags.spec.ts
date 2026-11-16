@@ -663,9 +663,15 @@ test.describe("Tag type changes", () => {
       await expect(
         page.getByRole("heading", { level: 1, name: target })
       ).toBeVisible();
-      await expect(page.getByTestId("collection-summary")).toContainText(
-        "2 machines"
-      );
+      // Its Overview lists both machines.
+      for (const machine of [both, onlySource]) {
+        await expect(
+          page.getByRole("link", {
+            name: `Test Machine ${machine.initials}`,
+            exact: true,
+          })
+        ).toBeVisible();
+      }
 
       // --- The merged tag's addresses open the target (11.19) --------------
       await page.goto(oldPath);
