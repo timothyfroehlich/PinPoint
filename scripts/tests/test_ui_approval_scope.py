@@ -1,9 +1,11 @@
 """Tests for ui-approval-scope.sh, which decides whether a PR head needs Tim's UI
-approval (PP-zxlq.4): only when the PR's own UI diff (merge base with main to head,
-UI paths only) is a different patch from the one at the newest earlier commit whose
-UI Approval passed. Also approve-ui.sh, which records an approval on a head that
-moved past the commit Tim saw when that move left the PR's own UI diff alone, and
-the workflow's merge-queue path, which never waits on sign-off.
+sign-off (PP-zxlq.4): only when the PR's own diff (merge base with main to head)
+touches a UI path and no earlier head of the PR has a successful "Tim's UI
+sign-off" job. After one sign-off the check never waits again; the owning agent
+decides when a later UI change goes back to Tim. Also its --compare mode and
+approve-ui.sh, which records an approval on a head that moved past the commit Tim
+saw when the PR's own UI diff is unchanged, and the workflow's merge-queue path,
+which never waits on sign-off.
 """
 
 import json
@@ -57,7 +59,7 @@ def scope(
         "if '/pulls/7/commits' in path:\n"
         "    print(os.environ['STUB_COMMITS'])\n"
         "elif '/check-runs' in path:\n"
-        "    assert 'check_name=UI%20Approval' in path, path\n"
+        "    assert 'check_name=Tim%27s%20UI%20sign-off&' in path, path\n"
         "    sha = path.split('/commits/')[1].split('/')[0]\n"
         "    runs = [{'conclusion': 'success', 'app': {'slug': 'github-actions'}}\n"
         "            for s in os.environ['STUB_APPROVED'].split(',') if s == sha]\n"
@@ -126,13 +128,27 @@ def test_approval_carries_across_non_ui_commits(tmp_path: Path, repo: Path) -> N
     assert outputs["last_approved"] == approved
 
 
-def test_ui_change_after_approval_needs_approval_again(
-    tmp_path: Path, repo: Path
-) -> None:
+def test_ui_change_after_a_sign_off_does_not_wait(tmp_path: Path, repo: Path) -> None:
+    """One sign-off covers the PR; the owning agent decides when to re-ask."""
     approved = commit_file(repo, "src/components/a.tsx", "a\n")
     commit_file(repo, "src/components/a.tsx", "a2\n")
+    commit_file(repo, "src/components/b.tsx", "b\n")
     outputs, files = scope(tmp_path, repo, approved=[approved])
+    assert outputs["ui_changed"] == "false"
+    assert outputs["last_approved"] == approved
+    assert files == []
+
+
+def test_head_that_passed_without_ui_is_not_a_sign_off(
+    tmp_path: Path, repo: Path
+) -> None:
+    """A head with no UI change passes UI Approval without Tim. It must not count:
+    only the sign-off job does, and the stub answers only for that check name."""
+    commit_file(repo, "src/lib/math.ts", "x\n")
+    commit_file(repo, "src/components/a.tsx", "a\n")
+    outputs, files = scope(tmp_path, repo, approved=[])
     assert outputs["ui_changed"] == "true"
+    assert outputs["last_approved"] == ""
     assert files == ["src/components/a.tsx"]
 
 
@@ -228,7 +244,7 @@ def test_conflicted_main_merge_that_keeps_the_prs_ui_diff_needs_no_new_approval(
     assert compare(repo, approved, head) == []
 
 
-def test_conflict_resolution_that_changes_the_prs_ui_diff_needs_approval(
+def test_conflict_resolution_that_changes_the_prs_ui_diff_does_not_wait(
     tmp_path: Path, repo: Path
 ) -> None:
     advance_main(repo, "src/components/a.tsx", LINES)
@@ -241,12 +257,13 @@ def test_conflict_resolution_that_changes_the_prs_ui_diff_needs_approval(
     reworked = edit_line(edit_line(LINES, 2, "line 2 reworked"), 3, "line 3 main")
     head = finish_merge(repo, {"src/components/a.tsx": reworked})
     outputs, files = scope(tmp_path, repo, approved=[approved])
-    assert outputs["ui_changed"] == "true"
-    assert files == ["src/components/a.tsx"]
+    assert outputs["ui_changed"] == "false"
+    assert files == []
+    # --compare still sees it, which is what approve-ui.sh refuses on.
     assert compare(repo, approved, head) == ["src/components/a.tsx"]
 
 
-def test_new_ui_commit_after_a_main_merge_needs_approval(
+def test_new_ui_commit_after_a_main_merge_does_not_wait(
     tmp_path: Path, repo: Path
 ) -> None:
     approved = commit_file(repo, "src/components/a.tsx", "a\n")
@@ -254,26 +271,16 @@ def test_new_ui_commit_after_a_main_merge_needs_approval(
     merge_main(repo)
     head = commit_file(repo, "src/app/(app)/m/[id]/page.tsx", "page\n")
     outputs, files = scope(tmp_path, repo, approved=[approved])
-    assert outputs["ui_changed"] == "true"
-    assert files == ["src/app/(app)/m/[id]/page.tsx"]
-    assert compare(repo, approved, head) == ["src/app/(app)/m/[id]/page.tsx"]
-
-
-def test_reverting_a_ui_change_back_to_the_approved_one_needs_no_approval(
-    tmp_path: Path, repo: Path
-) -> None:
-    approved = commit_file(repo, "src/components/a.tsx", "a\n")
-    commit_file(repo, "src/components/a.tsx", "a2\n")
-    commit_file(repo, "src/components/a.tsx", "a\n")
-    outputs, _ = scope(tmp_path, repo, approved=[approved])
     assert outputs["ui_changed"] == "false"
+    assert files == []
+    assert compare(repo, approved, head) == ["src/app/(app)/m/[id]/page.tsx"]
 
 
 # --- approve-ui.sh -----------------------------------------------------------
 
 
 def approve(
-    tmp_path: Path, repo: Path, seen: str
+    tmp_path: Path, repo: Path, seen: str, waiting: bool = True
 ) -> tuple[subprocess.CompletedProcess[str], list[dict[str, str]]]:
     """Run approve-ui.sh against a bare origin holding the PR head, with gh stubbed."""
     origin = tmp_path / "origin.git"
@@ -298,7 +305,15 @@ def approve(
         "    print(os.environ['STUB_HEAD'])\n"
         "elif args[:2] == ['run', 'list']:\n"
         "    assert os.environ['STUB_HEAD'] in args, args\n"
-        "    print('99')\n"
+        "    status = args[args.index('--status') + 1]\n"
+        "    if status == 'waiting' and os.environ['STUB_WAITING'] == '1':\n"
+        "        print('99')\n"
+        "    elif status == 'success' and os.environ['STUB_WAITING'] == '0':\n"
+        "        print('98')\n"
+        "elif args[:2] == ['pr', 'comment']:\n"
+        "    body = args[args.index('--body') + 1]\n"
+        "    with open(os.environ['STUB_POSTS'], 'a') as f:\n"
+        "        f.write(json.dumps({'pr_comment': body}) + '\\n')\n"
         "elif args[0] == 'api' and '-X' not in args:\n"
         "    print('5')\n"
         "elif args[0] == 'api':\n"
@@ -321,6 +336,7 @@ def approve(
             "PATH": f"{gh.parent}{os.pathsep}{os.environ['PATH']}",
             "STUB_HEAD": head,
             "STUB_POSTS": str(posts),
+            "STUB_WAITING": "1" if waiting else "0",
         },
     )
     recorded = (
@@ -373,6 +389,18 @@ def test_approve_ui_refuses_a_head_with_new_ui_changes(
     assert "src/components/b.tsx" in result.stderr
 
 
+def test_approve_ui_records_a_fresh_approval_after_an_earlier_sign_off(
+    tmp_path: Path, repo: Path
+) -> None:
+    """After a significant UI change the agent re-asks; the head's check already
+    passed on the earlier sign-off, so the fresh approval goes on the PR."""
+    commit_file(repo, "src/components/a.tsx", "a\n")
+    seen = commit_file(repo, "src/components/a.tsx", "a redesigned\n")
+    result, posts = approve(tmp_path, repo, seen, waiting=False)
+    assert result.returncode == 0, result.stderr
+    assert posts == [{"pr_comment": f"UI approved by Tim (chat) on {seen[:7]}."}]
+
+
 # --- the merge queue ---------------------------------------------------------
 
 
@@ -382,6 +410,8 @@ def test_merge_queue_never_waits_on_sign_off() -> None:
     jobs = yaml.safe_load(UI_APPROVAL_YAML.read_text("utf-8"))["jobs"]
     assert jobs["scope"]["if"] == "github.event_name == 'pull_request'"
     sign_off = jobs["sign-off"]
+    # ui-approval-scope.sh finds earlier sign-offs by this check name.
+    assert sign_off["name"] == "Tim's UI sign-off"
     assert sign_off["environment"] == "ui-approval"
     assert sign_off["if"].startswith("github.event_name == 'pull_request' && ")
     decide = jobs["ui-approval"]["steps"][-1]["run"]

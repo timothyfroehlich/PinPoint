@@ -1,13 +1,15 @@
-# UI Approval: Tim's visual sign-off on every UI change (PP-zxlq.4).
+# UI Approval: Tim's visual sign-off, at least once, on every PR with UI changes (PP-zxlq.4).
 #
-# A required check (ruleset 6326455). It compares the PR's own UI diff (the UI
-# paths in scripts/workflow/ui-paths.txt, diffed from the head's merge base with
-# main) with the one at the newest earlier commit whose UI Approval passed. When
-# they are the same patch it passes on its own; otherwise the `sign-off` job waits
-# on the `ui-approval` environment, whose only required reviewer is Tim. So the
-# approval carries across E2E updates and other non-UI commits, and across every
-# merge of main, clean or conflicted, that leaves the PR's UI changes as they were;
-# a later UI change, or a resolution that changes one, waits again.
+# A required check (ruleset 6326455). Every PR with UI changes gets Tim's sign-off
+# at least once. The `sign-off` job waits on the `ui-approval` environment, whose
+# only required reviewer is Tim, when the PR's own diff (from its merge base with
+# main) touches a UI path in scripts/workflow/ui-paths.txt and no earlier head of
+# the PR has a successful `Tim's UI sign-off` job. After the first sign-off the
+# check passes on its own: across E2E updates, merges of main (clean or
+# conflicted), and later UI commits. The owning agent decides when a later UI
+# change is significant enough to show Tim again and records his fresh approval
+# with approve-ui.sh (pinpoint-pr-workflow 3.5). ui-approval-scope.sh finds the
+# sign-off by this job's name, so renaming the job resets every PR's approval.
 #
 # Runs on drafts too: UI is approved while the PR is a draft, before E2E tests are
 # updated and before the PR is marked ready for Claude Review. Marking a draft
@@ -17,8 +19,8 @@
 # How Tim approves: on GitHub (the run's "Review deployments"), or by telling the
 # owning session in Claude Code Desktop, or by clicking Approve in the orchestrator
 # artifact; in the last two the session runs scripts/workflow/approve-ui.sh, which
-# records the approval on the current head when it moved past the commit Tim saw
-# without changing the PR's own UI diff.
+# also records an approval on a head that moved past the commit Tim saw without
+# changing the PR's own UI diff.
 #
 # The required check is the `UI Approval` job, never `sign-off` itself: a skipped
 # job counts as passing, so the final job decides from both results.
@@ -84,7 +86,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Compare the PR's own UI changes with the last approval
+      - name: Find UI changes and earlier sign-offs
         id: scope
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
