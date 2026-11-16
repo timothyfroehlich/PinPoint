@@ -884,7 +884,9 @@ def test_watch_phase_queue_re_enqueue_starts_a_new_attempt(monkeypatch):
     assert verdict.outcome == "removed"
     assert verdict.detail_url is None
     assert verdict.failing_jobs == []
-    assert len(lookups) == 2
+    # First attempt's absence; the second's first absent read and its
+    # pre-verdict lookup, both bounded by the second enqueue time.
+    assert len(lookups) == 3
 
 
 @pytest.mark.unit
@@ -940,9 +942,58 @@ def test_watch_phase_queue_removed_without_a_failing_run(monkeypatch, capsys):
         None,
     )
     assert clock.now == 30 + pr_watch.QUEUE_ABSENT_SETTLE_SECONDS
-    # One lookup for the whole settle window.
-    assert sum(1 for call in fake.calls if call[:2] == ("run", "list")) == 1
+    # Two lookups for the whole settle window: the first absent read, and once
+    # more before the verdict; none on the re-reads between.
+    assert sum(1 for call in fake.calls if call[:2] == ("run", "list")) == 2
     assert "No failing merge_group run" in capsys.readouterr().err
+
+
+@pytest.mark.unit
+def test_watch_phase_queue_run_red_after_the_first_lookup_is_reported(monkeypatch):
+    """The failing run shows up only after the first absent read's lookup."""
+
+    def runs():
+        # Empty for the first absent read's lookup (the second query), red after.
+        return [] if _queries(fake) <= 2 else [_queue_run(91, "failure")]
+
+    jobs = [{"name": "CI Gate", "status": "completed", "conclusion": "failure"}]
+    fake = queue_gh([queue_snapshot(), NOT_QUEUED], runs=runs, jobs=jobs)
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    monkeypatch.setattr(
+        pr_watch,
+        "write_failure_artifact",
+        lambda run_id: f"tmp/gh-monitor/failure-{run_id}.md",
+    )
+    clock = FakeClock()
+    monkeypatch.setattr(pr_watch, "time", clock)
+
+    verdict = pr_watch._watch_phase_queue(PR, HEAD_SHA, timeout_sec=600, poll_sec=30)
+    assert verdict.outcome == "removed"
+    assert verdict.detail_url == "https://github.com/minamaya/PinPoint/actions/runs/91"
+    assert verdict.failing_jobs == ["CI Gate"]
+    assert verdict.failure_artifact == "tmp/gh-monitor/failure-91.md"
+    # Decided at the end of the settle window, not on the empty first lookup.
+    assert clock.now == 30 + pr_watch.QUEUE_ABSENT_SETTLE_SECONDS
+
+
+@pytest.mark.unit
+def test_watch_phase_queue_final_read_at_the_deadline_repeats_the_lookup(monkeypatch):
+    def runs():
+        return [] if _queries(fake) <= 2 else [_queue_run(91, "failure")]
+
+    fake = queue_gh([queue_snapshot(), NOT_QUEUED], runs=runs)
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    monkeypatch.setattr(
+        pr_watch,
+        "write_failure_artifact",
+        lambda run_id: f"tmp/gh-monitor/failure-{run_id}.md",
+    )
+    monkeypatch.setattr(pr_watch, "time", FakeClock())
+
+    verdict = pr_watch._watch_phase_queue(PR, HEAD_SHA, timeout_sec=35, poll_sec=30)
+    assert verdict.outcome == "removed"
+    assert verdict.failure_artifact == "tmp/gh-monitor/failure-91.md"
+    assert _queries(fake) == 3
 
 
 @pytest.mark.unit

@@ -711,7 +711,9 @@ def _watch_phase_queue(
     group_sha: str | None = None
     # The settle window (see QUEUE_ABSENT_SETTLE_SECONDS): when the current run
     # of reads with no entry and no auto-merge began, and the attempt's
-    # failing-run lookup, made once per run. None while the PR is queued.
+    # failing-run lookup: made on the first absent read so a red run ends the
+    # watch at once, and once more just before an empty-handed `removed`.
+    # None while the PR is queued.
     absent_since: float | None = None
     failure: dict | None = None
     # Set when the budget runs out mid-settle: one last read past the deadline
@@ -791,6 +793,7 @@ def _watch_phase_queue(
                 last_signature = signature
         else:
             now = time.monotonic()
+            looked_up_now = False
             if absent_since is None:
                 absent_since = now
                 last_signature = None
@@ -798,7 +801,7 @@ def _watch_phase_queue(
             if since is not None and failure is None:
                 # A red merge_group run for this attempt is a real failure:
                 # nothing left to settle.
-                failure = _queue_failure(pr, since, group_sha)
+                failure, looked_up_now = _queue_failure(pr, since, group_sha), True
                 if failure.get("detail_url"):
                     emit(f"PR #{pr} left the merge queue without merging")
                     return QueueVerdict("removed", **seen, **failure)
@@ -818,12 +821,12 @@ def _watch_phase_queue(
                         cls=QueueVerdict,
                         **seen,
                     )
-                return _verdict(
-                    "removed",
-                    f"PR #{pr} left the merge queue without merging ({state.lower()})",
-                    cls=QueueVerdict,
-                    **seen,
-                )
+                if not looked_up_now:
+                    # The run can go red after the first lookup came back
+                    # empty: look once more before deciding.
+                    failure = _queue_failure(pr, since, group_sha)
+                emit(f"PR #{pr} left the merge queue without merging ({state.lower()})")
+                return QueueVerdict("removed", **seen, **(failure or {}))
             # Clamped to the settle window and to the budget, so the watch never
             # sleeps past the timeout; once the budget is spent, the next read
             # is the final one.
