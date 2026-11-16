@@ -9,6 +9,7 @@ import { test, expect, type Page } from "../support/fixtures.js";
 import {
   assertNoHorizontalOverflow,
   assertNoA11yViolations,
+  openListSearch,
   showIssueSection,
 } from "../support/actions.js";
 import { cleanupTestEntities, extractIdFromUrl } from "../support/cleanup.js";
@@ -104,9 +105,7 @@ test.describe("Issues System", () => {
         .waitForLoadState("networkidle", { timeout: 5000 })
         .catch(() => undefined);
 
-      const machineSearchInput = page.getByRole("searchbox", {
-        name: "Search machines",
-      });
+      const machineSearchInput = await openListSearch(page, "Search machines");
       await machineSearchInput.fill(seededMachines.addamsFamily.initials);
       await expect(machineSearchInput).toHaveValue(
         seededMachines.addamsFamily.initials

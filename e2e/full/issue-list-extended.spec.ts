@@ -1,11 +1,16 @@
 import { test, expect, type Locator, type Page } from "../support/fixtures.js";
-import { setListFilterOptions } from "../support/actions.js";
+import { openListSearch, setListFilterOptions } from "../support/actions.js";
 import { cleanupTestEntities } from "../support/cleanup.js";
 import { seededIssue, seededMachines } from "../support/constants.js";
 import { fillReportForm } from "../support/page-helpers.js";
 import { getTestIssueTitle } from "../support/test-isolation.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
 
+/**
+ * The visible search field, without opening it. On a narrow phone a field
+ * holding a search shows open by itself (list-views §7.3), so this finds it
+ * there too; use openListSearch to type into it.
+ */
 function searchField(page: Page): Locator {
   return page.getByRole("searchbox", { name: "Search issues" });
 }
@@ -55,8 +60,9 @@ test.describe("Issue List Features - Extended", () => {
 
     // Navigate to issues list and search for our unique issue
     await page.goto("/issues");
-    await searchField(page).fill(issueTitle);
-    await searchField(page).press("Enter");
+    const search = await openListSearch(page, "Search issues");
+    await search.fill(issueTitle);
+    await search.press("Enter");
     await expect
       .poll(() => new URL(page.url()).searchParams.get("q"), { timeout: 15000 })
       .toBe(issueTitle);
@@ -256,8 +262,9 @@ test.describe("Issue List Features - Extended", () => {
   }) => {
     // 1. Go to issues and apply a search filter
     await page.goto("/issues");
-    await searchField(page).fill("Thing");
-    await searchField(page).press("Enter");
+    const search = await openListSearch(page, "Search issues");
+    await search.fill("Thing");
+    await search.press("Enter");
     await page.waitForURL(/[?&]q=Thing(?:&|$)/);
 
     // 2. Navigate to a different page in the same tab (dashboard)

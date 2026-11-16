@@ -3,8 +3,47 @@ import {
   fitLineParts,
   fitPrimaryFilters,
   LINE_FIT_TOLERANCE,
+  phoneSearchAsIcon,
   planListHeader,
 } from "./overflow";
+
+describe("phoneSearchAsIcon (list-views §7.12, §8.7)", () => {
+  // The views button: icon 16 + gap 8 + name + gap 8 + chevron 16.
+  const openIssues = 48 + 94;
+  // Filters 44 plus two 8px gaps.
+  const besideField = 60;
+  const fit = (available: number, viewsWidth: number): boolean =>
+    phoneSearchAsIcon({ available, viewsWidth, filtersWidth: 44, gap: 8 });
+
+  it("keeps the field on a 400px screen with Open issues", () => {
+    // 400 - 16 left - 6 right padding = 378; 378 - 142 - 44 - 16 = 176.
+    expect(fit(378, openIssues)).toBe(false);
+  });
+
+  it("switches a tolerance pixel early, so a field of exactly 175px is an icon", () => {
+    expect(fit(176 + openIssues + besideField, openIssues)).toBe(false);
+    expect(fit(175 + openIssues + besideField, openIssues)).toBe(true);
+    expect(fit(174 + openIssues + besideField, openIssues)).toBe(true);
+  });
+
+  it("shows the icon on a 320px screen", () => {
+    // 320 - 22 padding = 298; 298 - 142 - 60 = 96.
+    expect(fit(298, openIssues)).toBe(true);
+  });
+
+  it("switches sooner for the Edited marker", () => {
+    // The Edited marker adds its 8px dot and an 8px gap: 176 - 16 = 160.
+    expect(fit(378, openIssues + 16)).toBe(true);
+    // Wide enough for the marker too: 394 - 158 - 60 = 176.
+    expect(fit(394, openIssues + 16)).toBe(false);
+  });
+
+  it("switches sooner for a longer view name", () => {
+    expect(fit(378, 48 + 140)).toBe(true);
+    // 430 - 22 = 408; 408 - 188 - 60 = 160, still an icon on a large phone.
+    expect(fit(408, 48 + 140)).toBe(true);
+  });
+});
 
 describe("fitLineParts (issues-list §3.9)", () => {
   // ID 60 · machine 120 · priority 50 · assignee 30 · comments 40 · age 90,
