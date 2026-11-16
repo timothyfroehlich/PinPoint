@@ -11,7 +11,7 @@ describe("UserMenu admin navigation", () => {
     const user = userEvent.setup();
     render(<UserMenu userName="Ada Admin" role="admin" />);
 
-    await user.click(screen.getByRole("button", { name: "User menu" }));
+    await user.click(screen.getByRole("button", { name: /user menu/i }));
 
     expect(screen.getByTestId("user-menu-admin-integrations")).toHaveAttribute(
       "href",
@@ -23,7 +23,7 @@ describe("UserMenu admin navigation", () => {
     const user = userEvent.setup();
     render(<UserMenu userName="Ada Admin" role="admin" />);
 
-    await user.click(screen.getByRole("button", { name: "User menu" }));
+    await user.click(screen.getByRole("button", { name: /user menu/i }));
 
     const lineup = screen.getByTestId("user-menu-admin-pinball-map");
     expect(lineup).toHaveAttribute("href", "/m/pinball-map");
@@ -39,7 +39,7 @@ describe("UserMenu admin navigation", () => {
     const user = userEvent.setup();
     render(<UserMenu userName="Mo Member" role="member" />);
 
-    await user.click(screen.getByRole("button", { name: "User menu" }));
+    await user.click(screen.getByRole("button", { name: /user menu/i }));
 
     expect(
       screen.queryByTestId("user-menu-admin-pinball-map")

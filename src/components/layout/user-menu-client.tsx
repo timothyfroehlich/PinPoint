@@ -63,7 +63,6 @@ export function UserMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        aria-label="User menu"
         className="flex items-center gap-1.5 rounded-lg px-1.5 py-1 hover:bg-primary hover:text-on-primary transition-colors duration-150 motion-reduce:transition-none focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
         data-testid={testId}
       >
@@ -77,11 +76,21 @@ export function UserMenu({
             </p>
           </div>
           <Avatar className="size-7 bg-primary text-on-primary">
-            <AvatarFallback className="bg-primary text-on-primary font-semibold text-[10px]">
+            <AvatarFallback
+              aria-hidden="true"
+              className="bg-primary text-on-primary font-semibold text-[10px]"
+            >
               {initials}
             </AvatarFallback>
           </Avatar>
-          <ChevronDown className="size-3.5 text-on-primary-container" />
+          <ChevronDown
+            aria-hidden="true"
+            className="size-3.5 text-on-primary-container"
+          />
+          {/* Accessible name is built from content ("Tim User menu") so it
+              contains the visible first name (WCAG 2.5.3 Label in Name);
+              an aria-label would replace the visible text instead. */}
+          <span className="sr-only">User menu</span>
         </div>
       </DropdownMenuTrigger>
 

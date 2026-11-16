@@ -86,6 +86,7 @@ The three required PR E2E jobs each run a single project against their own datab
 **What it does:**
 
 - Runs `new AxeBuilder({ page }).analyze()` against the page's **current rendered state**, so call it _after_ you have navigated and the surface you want to check has settled (await your usual load/visibility assertions first).
+- **Waits for a settled page first**: no element with `aria-busy="true"`, then every finite running CSS animation or transition finished (infinite spinners and pulses are skipped). Axe computes contrast through opacity, so a list dimmed by `ListView`'s pending-transition `opacity-60`, or a fade in flight, fails `color-contrast` for every muted label at once (PP-4bhb). The wait cannot see work that has not started yet: after typing into a debounced field such as `ListSearchField` (250 ms), wait for the result to land (the URL's `q=`, or the list's `aria-busy` clearing) before scanning.
 - **Fails the test only on `serious` and `critical` impact violations** — it throws with a per-violation report (rule id, help URL, offending selectors + HTML).
 - **`minor`/`moderate` (and un-ranked) violations do not fail** — they are logged to the console (up to 5, with up to 3 elements each). Watch for `[A11y Warning]` lines; they are real findings the gate deliberately does not block on.
 - Attaches the full scan to the Playwright report as `a11y-scan-results.json` when run inside a test.

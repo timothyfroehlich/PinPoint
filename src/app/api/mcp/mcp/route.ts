@@ -48,6 +48,10 @@ const handler = createMcpHandler(
   },
   {
     serverInfo: { name: "pinpoint", version: "1.1.0" },
+    // The tool set is fixed at deploy time. The SDK defaults listChanged to
+    // true, which keeps every subscriptions/listen stream open until Vercel's
+    // maxDuration kills it; false makes the server acknowledge and close it.
+    capabilities: { tools: { listChanged: false } },
     instructions:
       "PinPoint is the Austin Pinball Collective issue tracker. Read tools may be used to answer questions. Mutation tools change production records: inspect the target with a read tool first, describe the intended change, and obtain explicit user confirmation before calling one. Use machine initials and issue numbers returned by the read tools; never guess Pinball Map ids.",
   }

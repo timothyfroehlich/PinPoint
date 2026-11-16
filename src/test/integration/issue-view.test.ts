@@ -33,9 +33,10 @@ function ids(result: IssueViewResult): string[] {
   );
 }
 
-/** The open issues the widgets count (issue-widgets §2.2, §2.4). */
+/** The open issues the Status Widget counts (issue-widgets §2.2, §3.2). */
 function counted(result: IssueViewResult): number {
-  return result.summary.open;
+  const { new: fresh, in_progress: inProgress } = result.summary.byStatusGroup;
+  return fresh + inProgress;
 }
 
 function load(query: string, scope?: string[]): Promise<IssueViewResult> {
