@@ -55,7 +55,7 @@ python3 scripts/workflow/pr-watch.py <PR> --phase queue --expected-head <FULL_SH
 Run it as a background command. `--phase` and `--expected-head` (full lowercase 40-character SHA) are required together. Usage errors exit 2 with nothing on stdout.
 
 - `--phase ci`: polls CI Gate for the expected head and, on a PR that is not a draft, `Claude Review` too (a draft skips Claude Review). `passed` needs both; a red Claude Review ends the watch `failed` without waiting for CI. A passed verdict carries `unresolved_threads`, Claude Review's findings and any other open threads still to adjudicate. Terminal outcomes: `passed` (exit 0), `failed` / `stale` / `conflicting` (exit 1), `timed_out` / `undetermined` (exit 2). It does not watch `UI Approval`, which can wait on Tim indefinitely.
-- `--phase queue`: run after `gh pr merge`. One GraphQL query per interval reads the PR's state and `mergeQueueEntry`; it keeps waiting while the PR is queued or auto-merge is armed. A read with neither is re-read after 10s before it counts, because a merge drops the entry before the state turns `MERGED`. Terminal outcomes: `merged` (exit 0); `removed` (the PR left the queue still open, or was closed), `not_queued` (neither queued nor armed when the watch began), `stale`, `conflicting` (exit 1); `timed_out` / `undetermined` (exit 2). Only on `removed` does it list `merge_group` runs, once: by the entry's merge-group commit (`headCommit`) last seen in this enqueue attempt, falling back, when no poll caught one or that commit has no red run (the group was rebuilt after the last poll), to scanning recent runs for the PR's `gh-readonly-queue/<base>/pr-<n>-<sha>` branch created since this attempt was enqueued.
+- `--phase queue`: run after `gh pr merge`. One GraphQL query per interval reads the PR's state and `mergeQueueEntry`; it keeps waiting while the PR is queued or auto-merge is armed. A merge drops the entry before the state turns `MERGED`, so a read with neither is settled first: a failing `merge_group` run for this attempt ends it `removed` at once; otherwise it re-reads every 10s for up to 60s until the PR shows `MERGED`, re-enters the queue, or the window ends. Every sleep is clamped to the remaining budget, and a budget spent mid-settle gets one final read that decides. Terminal outcomes: `merged` (exit 0); `removed` (the PR left the queue still open, or was closed), `not_queued` (neither queued nor armed when the watch began), `stale`, `conflicting` (exit 1); `timed_out` / `undetermined` (exit 2). Only on `removed` does it list `merge_group` runs, once: by the entry's merge-group commit (`headCommit`) last seen in this enqueue attempt, falling back, when no poll caught one or that commit has no red run (the group was rebuilt after the last poll), to scanning recent runs for the PR's `gh-readonly-queue/<base>/pr-<n>-<sha>` branch created since this attempt was enqueued.
 - `--expected-head <SHA>`: if the PR head moves, the watch ends `stale` rather than following the new head. GitHub's transient `UNKNOWN` merge state is not treated as a conflict.
 
 Terminal JSON schema for `--phase ci` (`stdout`):
@@ -93,12 +93,13 @@ Terminal JSON schema for `--phase ci` (`stdout`):
   "merge_state": "UNKNOWN",
   "merge_commit": null,
   "failing_jobs": ["E2E Full", "CI Gate"],
+  "failing_group_commit": "40-char-sha",
   "detail_url": "https://github.com/minamaya/PinPoint/actions/runs/123",
   "failure_artifact": "/abs/path/tmp/gh-monitor/failure-123.md"
 }
 ```
 
-`queue_state` is the last observed entry state (`QUEUED`, `AWAITING_CHECKS`, `MERGEABLE`, `UNMERGEABLE`, `LOCKED`), `AUTO_MERGE_ARMED`, or `NOT_QUEUED`; `queue_position` is the entry's position while queued. `merge_commit` is set on `merged`. `failing_jobs`, `detail_url`, and `failure_artifact` are set on `removed` when a `merge_group` run failed; they stay empty for a conflict, a manual dequeue, or a closed PR.
+`queue_state` is the last observed entry state (`QUEUED`, `AWAITING_CHECKS`, `MERGEABLE`, `UNMERGEABLE`, `LOCKED`), `AUTO_MERGE_ARMED`, or `NOT_QUEUED`; `queue_position` is the entry's position while queued. `merge_commit` is set on `merged`. `failing_jobs`, `failing_group_commit`, `detail_url`, and `failure_artifact` are set on `removed` when a `merge_group` run failed; they stay empty for a conflict, a manual dequeue, or a closed PR. `failing_group_commit` is the merge-group commit the failing run was built on; when the branch scan found it instead of the last-seen group commit, stderr says so, and it is the newest red group on the PR's queue branch, not proven to be the one that dropped the PR.
 
 `pr-watch.py` exit codes:
 

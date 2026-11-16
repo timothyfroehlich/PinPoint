@@ -625,9 +625,10 @@ def _queue_run(run_id, conclusion, pr=PR, sha=QUEUE_SHA, workflow="CI", created=
 def queue_gh(snapshots, runs=(), jobs=()):
     """Answer the queue query with `snapshots` in sequence (the last repeats).
 
-    `gh run list` answers with `runs` (only that commit's, for `--commit`) and
-    `gh run view --json jobs` with `jobs`; every call is recorded so a test can
-    assert none of them happen early.
+    `gh run list` answers with `runs` (only that commit's, for `--commit`), or
+    with what `runs()` returns when it is callable, for runs that appear
+    mid-watch; `gh run view --json jobs` answers with `jobs`. Every call is
+    recorded so a test can assert none of them happen early.
     """
     remaining = list(snapshots)
 
@@ -639,10 +640,11 @@ def queue_gh(snapshots, runs=(), jobs=()):
             return json.dumps({"data": {"repository": {"pullRequest": snapshot}}})
         if args[:2] == ("run", "list"):
             assert args[args.index("--event") + 1] == "merge_group", args
+            current = list(runs() if callable(runs) else runs)
             if "--commit" in args:
                 sha = args[args.index("--commit") + 1]
-                return json.dumps([run for run in runs if run["headSha"] == sha])
-            return json.dumps(list(runs))
+                return json.dumps([run for run in current if run["headSha"] == sha])
+            return json.dumps(current)
         if args[:2] == ("run", "view"):
             return json.dumps({"jobs": list(jobs)})
         raise AssertionError(args)
@@ -742,8 +744,12 @@ def test_watch_phase_queue_removed_without_a_group_commit_scans_the_queue_branch
 
 
 @pytest.mark.unit
-def test_watch_phase_queue_removed_looks_up_runs_by_group_commit(monkeypatch):
-    """The merge-group commit seen while queued finds the run on a busy queue."""
+def test_watch_phase_queue_red_group_is_removed_without_waiting(monkeypatch):
+    """The merge-group commit's red run settles the absence on the first read.
+
+    The commit lookup also finds the run on a busy queue, where the branch scan
+    could miss it.
+    """
     runs = [
         _queue_run(91, "failure"),
         # Not this PR's group commit: never fetched by the commit lookup.
@@ -759,19 +765,24 @@ def test_watch_phase_queue_removed_looks_up_runs_by_group_commit(monkeypatch):
         "write_failure_artifact",
         lambda run_id: f"tmp/gh-monitor/failure-{run_id}.md",
     )
-    no_sleep(monkeypatch)
+    clock = FakeClock()
+    monkeypatch.setattr(pr_watch, "time", clock)
 
-    verdict = pr_watch._watch_phase_queue(PR, HEAD_SHA, timeout_sec=60, poll_sec=0)
+    verdict = pr_watch._watch_phase_queue(PR, HEAD_SHA, timeout_sec=600, poll_sec=30)
     assert verdict.outcome == "removed"
     assert verdict.detail_url == "https://github.com/minamaya/PinPoint/actions/runs/91"
     assert verdict.failing_jobs == ["CI Gate"]
+    assert verdict.failing_group_commit == QUEUE_SHA
+    # One poll interval, then the absent read: no settle window.
+    assert clock.now == 30
+    assert _queries(fake) == 2
     (lookup,) = [call for call in fake.calls if call[:2] == ("run", "list")]
     assert lookup[lookup.index("--commit") + 1] == QUEUE_SHA
 
 
 @pytest.mark.unit
 def test_watch_phase_queue_green_group_commit_falls_back_to_the_branch_scan(
-    monkeypatch,
+    monkeypatch, capsys
 ):
     """The queue rebuilt the group after the last poll and the new commit failed."""
     runs = [
@@ -799,6 +810,9 @@ def test_watch_phase_queue_green_group_commit_falls_back_to_the_branch_scan(
     assert verdict.outcome == "removed"
     assert verdict.detail_url == "https://github.com/minamaya/PinPoint/actions/runs/91"
     assert verdict.failure_artifact == "tmp/gh-monitor/failure-91.md"
+    # The scan's group, flagged as such: not proven to be the one that dropped it.
+    assert verdict.failing_group_commit == QUEUE_SHA
+    assert "came from the queue-branch scan" in capsys.readouterr().err
     lookup, scan = [call for call in fake.calls if call[:2] == ("run", "list")]
     assert lookup[lookup.index("--commit") + 1] == OLD_SHA
     assert "--commit" not in scan
@@ -806,39 +820,57 @@ def test_watch_phase_queue_green_group_commit_falls_back_to_the_branch_scan(
 
 
 @pytest.mark.unit
-def test_watch_phase_queue_one_absent_read_mid_merge_is_not_a_removal(monkeypatch):
-    """GitHub drops the entry before it flips the state to MERGED."""
+def test_watch_phase_queue_green_group_then_merged_25s_later_is_merged(monkeypatch):
+    """GitHub drops the entry well before it flips the state to MERGED."""
     fake = queue_gh(
         [
             queue_snapshot(group_sha=QUEUE_SHA),
+            # Absent at 0s, 10s, and 20s into the settle window; MERGED by 30s.
+            NOT_QUEUED,
+            NOT_QUEUED,
             NOT_QUEUED,
             queue_snapshot(state="MERGED", entry_state=None, merge_commit=MERGE_SHA),
-        ]
+        ],
+        runs=[_queue_run(91, "success")],
     )
     monkeypatch.setattr(pr_watch, "gh", fake)
-    slept = []
-    monkeypatch.setattr(pr_watch.time, "sleep", slept.append)
+    monkeypatch.setattr(
+        pr_watch,
+        "write_failure_artifact",
+        lambda _run_id: pytest.fail("a green group has no failure artifact"),
+    )
+    clock = FakeClock()
+    monkeypatch.setattr(pr_watch, "time", clock)
 
-    verdict = pr_watch._watch_phase_queue(PR, HEAD_SHA, timeout_sec=60, poll_sec=30)
+    verdict = pr_watch._watch_phase_queue(PR, HEAD_SHA, timeout_sec=600, poll_sec=30)
     assert verdict.outcome == "merged"
     assert verdict.merge_commit == MERGE_SHA
-    assert slept == [30, pr_watch.QUEUE_ABSENT_CONFIRM_SECONDS]
-    assert all(call[:2] == ("api", "graphql") for call in fake.calls)
+    assert clock.now == 30 + 3 * pr_watch.QUEUE_ABSENT_REREAD_SECONDS
+    # The failing-run lookup (commit, then branch scan) runs once per absence.
+    lookup, scan = [call for call in fake.calls if call[:2] == ("run", "list")]
+    assert "--commit" in lookup and "--commit" not in scan
 
 
 @pytest.mark.unit
 def test_watch_phase_queue_re_enqueue_starts_a_new_attempt(monkeypatch):
     """A failure from before a drop and re-enqueue is not this attempt's."""
-    re_enqueued_at = "2026-11-16T01:30:00Z"
+    lookups = []
+    stale_run = _queue_run(91, "failure", created="2026-11-16T00:50:00Z")
+
+    def runs():
+        # The first attempt's red run, after the first enqueue and before the
+        # second, only shows up after the first absence was looked up.
+        lookups.append(1)
+        return [] if len(lookups) == 1 else [stale_run]
+
     fake = queue_gh(
         [
             queue_snapshot(),
             NOT_QUEUED,
-            queue_snapshot(enqueued_at=re_enqueued_at),
+            queue_snapshot(enqueued_at="2026-11-16T01:30:00Z"),
             NOT_QUEUED,
         ],
-        # The first attempt's red run: after the first enqueue, before the second.
-        runs=[_queue_run(91, "failure", created="2026-11-16T00:50:00Z")],
+        runs=runs,
     )
     monkeypatch.setattr(pr_watch, "gh", fake)
     monkeypatch.setattr(
@@ -846,17 +878,23 @@ def test_watch_phase_queue_re_enqueue_starts_a_new_attempt(monkeypatch):
         "write_failure_artifact",
         lambda _run_id: pytest.fail("the earlier attempt's run must not be reported"),
     )
-    no_sleep(monkeypatch)
+    monkeypatch.setattr(pr_watch, "time", FakeClock())
 
-    verdict = pr_watch._watch_phase_queue(PR, HEAD_SHA, timeout_sec=60, poll_sec=0)
+    verdict = pr_watch._watch_phase_queue(PR, HEAD_SHA, timeout_sec=600, poll_sec=30)
     assert verdict.outcome == "removed"
     assert verdict.detail_url is None
     assert verdict.failing_jobs == []
-    assert _queries(fake) == 5
+    assert len(lookups) == 2
 
 
 @pytest.mark.unit
 def test_watch_phase_queue_re_enqueue_drops_the_old_group_commit(monkeypatch):
+    def runs():
+        # Nothing red until the re-enqueue (the third read); both groups red after.
+        if _queries(fake) < 3:
+            return []
+        return [_queue_run(91, "failure"), _queue_run(99, "failure", sha=OLD_SHA)]
+
     fake = queue_gh(
         [
             queue_snapshot(group_sha=OLD_SHA),
@@ -864,7 +902,7 @@ def test_watch_phase_queue_re_enqueue_drops_the_old_group_commit(monkeypatch):
             queue_snapshot(enqueued_at="2026-11-16T01:30:00Z", group_sha=QUEUE_SHA),
             NOT_QUEUED,
         ],
-        runs=[_queue_run(91, "failure"), _queue_run(99, "failure", sha=OLD_SHA)],
+        runs=runs,
     )
     monkeypatch.setattr(pr_watch, "gh", fake)
     monkeypatch.setattr(
@@ -877,13 +915,13 @@ def test_watch_phase_queue_re_enqueue_drops_the_old_group_commit(monkeypatch):
     verdict = pr_watch._watch_phase_queue(PR, HEAD_SHA, timeout_sec=60, poll_sec=0)
     assert verdict.outcome == "removed"
     assert verdict.failure_artifact == "tmp/gh-monitor/failure-91.md"
-    (lookup,) = [call for call in fake.calls if call[:2] == ("run", "list")]
-    assert lookup[lookup.index("--commit") + 1] == QUEUE_SHA
+    last_lookup = [call for call in fake.calls if call[:2] == ("run", "list")][-1]
+    assert last_lookup[last_lookup.index("--commit") + 1] == QUEUE_SHA
 
 
 @pytest.mark.unit
 def test_watch_phase_queue_removed_without_a_failing_run(monkeypatch, capsys):
-    """A manual dequeue or a conflict leaves no red run; the verdict says so."""
+    """A manual dequeue or a conflict leaves no red run: removed after the window."""
     fake = queue_gh([queue_snapshot(), NOT_QUEUED], runs=[_queue_run(91, "cancelled")])
     monkeypatch.setattr(pr_watch, "gh", fake)
     monkeypatch.setattr(
@@ -891,15 +929,19 @@ def test_watch_phase_queue_removed_without_a_failing_run(monkeypatch, capsys):
         "write_failure_artifact",
         lambda _run_id: pytest.fail("no failing run, so no failure artifact"),
     )
-    no_sleep(monkeypatch)
+    clock = FakeClock()
+    monkeypatch.setattr(pr_watch, "time", clock)
 
-    verdict = pr_watch._watch_phase_queue(PR, HEAD_SHA, timeout_sec=60, poll_sec=0)
+    verdict = pr_watch._watch_phase_queue(PR, HEAD_SHA, timeout_sec=600, poll_sec=30)
     assert verdict.outcome == "removed"
     assert (verdict.detail_url, verdict.failing_jobs, verdict.failure_artifact) == (
         None,
         [],
         None,
     )
+    assert clock.now == 30 + pr_watch.QUEUE_ABSENT_SETTLE_SECONDS
+    # One lookup for the whole settle window.
+    assert sum(1 for call in fake.calls if call[:2] == ("run", "list")) == 1
     assert "No failing merge_group run" in capsys.readouterr().err
 
 
@@ -907,14 +949,16 @@ def test_watch_phase_queue_removed_without_a_failing_run(monkeypatch, capsys):
 def test_watch_phase_queue_not_queued_at_start_needs_action(monkeypatch):
     fake = queue_gh([NOT_QUEUED])
     monkeypatch.setattr(pr_watch, "gh", fake)
-    no_sleep(monkeypatch)
+    clock = FakeClock()
+    monkeypatch.setattr(pr_watch, "time", clock)
 
-    verdict = pr_watch._watch_phase_queue(PR, HEAD_SHA, timeout_sec=60, poll_sec=0)
+    verdict = pr_watch._watch_phase_queue(PR, HEAD_SHA, timeout_sec=600, poll_sec=30)
     assert verdict.outcome == "not_queued"
     assert pr_watch.EXIT_CODES[verdict.outcome] == 1
     assert verdict.queue_state == "NOT_QUEUED"
-    # One confirming re-read; GitHub answered, so no run lookup and no retry.
-    assert len(fake.calls) == 2
+    # Re-read through the settle window; never queued, so no run lookup.
+    assert clock.now == pr_watch.QUEUE_ABSENT_SETTLE_SECONDS
+    assert all(call[:2] == ("api", "graphql") for call in fake.calls)
 
 
 class FakeClock:
@@ -947,20 +991,65 @@ def test_watch_phase_queue_timeout_is_undetermined(monkeypatch, capsys):
 
 
 @pytest.mark.unit
-def test_watch_phase_queue_confirming_read_never_overruns_the_timeout(monkeypatch):
-    """An absent read 5s before the deadline sleeps 5s, not 10, then times out."""
+def test_watch_phase_queue_settle_window_never_overruns_the_timeout(monkeypatch):
+    """An absent read 5s before the deadline sleeps 5s, not 10, then reads once more.
+
+    That final read at the deadline decides: still absent is a removal.
+    """
     fake = queue_gh([queue_snapshot(), NOT_QUEUED])
     monkeypatch.setattr(pr_watch, "gh", fake)
     clock = FakeClock()
     monkeypatch.setattr(pr_watch, "time", clock)
 
     verdict = pr_watch._watch_phase_queue(PR, HEAD_SHA, timeout_sec=35, poll_sec=30)
-    assert verdict.outcome == "timed_out"
+    assert verdict.outcome == "removed"
     assert clock.now == 35
-    # The queued read and the absent read; no confirming read past the deadline,
-    # and an unconfirmed absence is never reported as a removal.
+    assert _queries(fake) == 3
+    assert verdict.detail_url is None
+
+
+@pytest.mark.unit
+def test_watch_phase_queue_final_read_at_the_deadline_reports_merged(monkeypatch):
+    fake = queue_gh(
+        [
+            queue_snapshot(),
+            NOT_QUEUED,
+            queue_snapshot(state="MERGED", entry_state=None, merge_commit=MERGE_SHA),
+        ]
+    )
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    clock = FakeClock()
+    monkeypatch.setattr(pr_watch, "time", clock)
+
+    verdict = pr_watch._watch_phase_queue(PR, HEAD_SHA, timeout_sec=35, poll_sec=30)
+    assert verdict.outcome == "merged"
+    assert verdict.merge_commit == MERGE_SHA
+    assert clock.now == 35
+
+
+@pytest.mark.unit
+def test_watch_phase_queue_final_read_back_in_the_queue_times_out(monkeypatch):
+    fake = queue_gh([queue_snapshot(), NOT_QUEUED, queue_snapshot(position=2)])
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    monkeypatch.setattr(pr_watch, "time", FakeClock())
+
+    verdict = pr_watch._watch_phase_queue(PR, HEAD_SHA, timeout_sec=35, poll_sec=30)
+    assert verdict.outcome == "timed_out"
+    assert verdict.queue_position == 2
+    assert _queries(fake) == 3
+
+
+@pytest.mark.unit
+def test_watch_phase_queue_poll_sleep_is_clamped_to_the_budget(monkeypatch):
+    fake = queue_gh([queue_snapshot()])
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    clock = FakeClock()
+    monkeypatch.setattr(pr_watch, "time", clock)
+
+    verdict = pr_watch._watch_phase_queue(PR, HEAD_SHA, timeout_sec=45, poll_sec=30)
+    assert verdict.outcome == "timed_out"
+    assert clock.now == 45
     assert _queries(fake) == 2
-    assert not any(call[:2] == ("run", "list") for call in fake.calls)
 
 
 @pytest.mark.unit
@@ -1167,6 +1256,7 @@ def test_main_queue_prints_exactly_one_json_verdict(monkeypatch, capsys):
         "merge_state": "UNKNOWN",
         "merge_commit": MERGE_SHA,
         "failing_jobs": [],
+        "failing_group_commit": None,
         "detail_url": None,
         "failure_artifact": None,
         "timestamp": payload["timestamp"],

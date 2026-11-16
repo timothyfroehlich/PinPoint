@@ -516,10 +516,14 @@ def _watch_phase_ci(
 QUEUE_BRANCH_PREFIX = "gh-readonly-queue/"
 
 # Merging is two writes on GitHub's side: the entry disappears, then the state
-# flips to MERGED. A read between them shows an open PR with no entry, so one
-# such read is only a candidate; the watch re-reads after this grace and decides
-# on the second consecutive one.
-QUEUE_ABSENT_CONFIRM_SECONDS = 10
+# flips to MERGED, with a gap of unknown length between them. A read in that
+# gap shows an open PR with no entry, which is also what a dropped PR looks
+# like. A failing merge_group run settles it as a removal at once; otherwise the
+# watch re-reads every QUEUE_ABSENT_REREAD_SECONDS for up to
+# QUEUE_ABSENT_SETTLE_SECONDS (clamped to the timeout), until the PR shows
+# MERGED or re-enters the queue.
+QUEUE_ABSENT_REREAD_SECONDS = 10
+QUEUE_ABSENT_SETTLE_SECONDS = 60
 
 # The branch-prefix fallback scans this many recent merge_group runs; a busy
 # queue spends three runs (one per required workflow) on every group.
@@ -550,6 +554,9 @@ class QueueVerdict:
     merge_state: str = "UNKNOWN"
     merge_commit: str | None = None
     failing_jobs: list[str] = field(default_factory=list)
+    # The merge-group commit the failing run was built on. It differs from the
+    # last group commit a poll saw when the branch scan found the run.
+    failing_group_commit: str | None = None
     detail_url: str | None = None
     failure_artifact: str | None = None
 
@@ -638,10 +645,11 @@ def _failed_queue_run(pr: int, since: str, group_sha: str | None) -> dict | None
 
 
 def _queue_failure(pr: int, since: str, group_sha: str | None) -> dict:
-    """The removed PR's failing run: detail_url, failing_jobs, failure_artifact.
+    """The removed PR's failing run as verdict fields.
 
-    Whatever was found before an error is kept; nothing found is an empty dict,
-    which is the case for a conflict, a manual dequeue, or a closed PR.
+    detail_url, failing_group_commit, failing_jobs, failure_artifact. Whatever
+    was found before an error is kept; nothing found is an empty dict, which is
+    the case for a conflict, a manual dequeue, or a closed PR.
     """
     found: dict = {}
     try:
@@ -653,6 +661,15 @@ def _queue_failure(pr: int, since: str, group_sha: str | None) -> dict:
         found["detail_url"] = (
             run.get("url") or f"https://github.com/{REPOSITORY}/actions/runs/{run_id}"
         )
+        found["failing_group_commit"] = run.get("headSha")
+        if found["failing_group_commit"] != group_sha:
+            # Not proven to be the group that dropped the PR: the newest red
+            # group on its queue branch since this attempt was enqueued.
+            emit(
+                f"Failing run on {str(run.get('headSha'))[:7]} came from the "
+                "queue-branch scan, not the last-seen group commit "
+                f"({(group_sha or 'none seen')[:10]})"
+            )
         jobs = json.loads(gh("run", "view", str(run_id), "--json", "jobs"))["jobs"]
         found["failing_jobs"] = [
             str(job.get("name"))
@@ -692,13 +709,18 @@ def _watch_phase_queue(
     # the PR is first seen headed into the queue.
     since: str | None = None
     group_sha: str | None = None
-    # True after one read showed no entry and no auto-merge (see
-    # QUEUE_ABSENT_CONFIRM_SECONDS); the next such read is the verdict.
-    absent_once = False
+    # The settle window (see QUEUE_ABSENT_SETTLE_SECONDS): when the current run
+    # of reads with no entry and no auto-merge began, and the attempt's
+    # failing-run lookup, made once per run. None while the PR is queued.
+    absent_since: float | None = None
+    failure: dict | None = None
+    # Set when the budget runs out mid-settle: one last read past the deadline
+    # decides, instead of discarding an absence the watch already saw.
+    final_read = False
     last_signature: tuple | None = None
     seen: dict = {}
 
-    while time.monotonic() < deadline:
+    while time.monotonic() < deadline or final_read:
         try:
             pull = _graphql_pull_request(_QUEUE_FIELDS, pr)
             entry = pull.get("mergeQueueEntry") or {}
@@ -749,7 +771,10 @@ def _watch_phase_queue(
                 **seen,
             )
         if entry or auto_merge:
-            absent_once = False
+            if final_read:
+                # Back in the queue at the deadline: no verdict yet.
+                break
+            absent_since, failure = None, None
             attempt = str(entry.get("enqueuedAt") or auto_merge.get("enabledAt") or "")
             if attempt != since:
                 # A new attempt (first sighting, armed → enqueued, or a
@@ -764,40 +789,55 @@ def _watch_phase_queue(
                     else "Auto-merge armed — waiting for GitHub to enqueue the PR"
                 )
                 last_signature = signature
-        elif not absent_once:
-            absent_once = True
-            last_signature = None
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                break
-            emit("No queue entry — re-reading to confirm")
-            # Clamped to the budget: the confirming read never overruns the
-            # timeout, and the loop condition turns an exhausted budget into
-            # timed_out rather than a read past it.
-            time.sleep(min(QUEUE_ABSENT_CONFIRM_SECONDS, remaining))
-            continue
-        elif since is None:
-            # Not queued when the watch began (confirmed by a second read), with
-            # no auto-merge armed either.
-            # That is `not_queued` (exit 1, act on it), not undetermined (exit
-            # 2): GitHub answered, and nothing will merge this PR on its own.
-            # Exit 2 means "could not find out; re-run the watch", and re-running
-            # here can never change the answer. The caller acts: enqueue it with
-            # `gh pr merge`, or, if it was dropped before the watch started,
-            # read why on the PR page.
-            return _verdict(
-                "not_queued",
-                f"PR #{pr} is {state.lower()} and not in the merge queue",
-                cls=QueueVerdict,
-                **seen,
-            )
         else:
-            emit(f"PR #{pr} left the merge queue without merging ({state.lower()})")
-            return QueueVerdict(
-                "removed", **seen, **_queue_failure(pr, since, group_sha)
+            now = time.monotonic()
+            if absent_since is None:
+                absent_since = now
+                last_signature = None
+                emit(f"PR #{pr} is {state.lower()} with no queue entry")
+            if since is not None and failure is None:
+                # A red merge_group run for this attempt is a real failure:
+                # nothing left to settle.
+                failure = _queue_failure(pr, since, group_sha)
+                if failure.get("detail_url"):
+                    emit(f"PR #{pr} left the merge queue without merging")
+                    return QueueVerdict("removed", **seen, **failure)
+            if final_read or now - absent_since >= QUEUE_ABSENT_SETTLE_SECONDS:
+                if since is None:
+                    # Not queued when the watch began, with no auto-merge armed
+                    # either, through the whole settle window. That is
+                    # `not_queued` (exit 1, act on it), not undetermined (exit
+                    # 2): GitHub answered, and nothing will merge this PR on its
+                    # own. Exit 2 means "could not find out; re-run the watch",
+                    # and re-running here can never change the answer. The
+                    # caller acts: enqueue it with `gh pr merge`, or, if it was
+                    # dropped before the watch started, read why on the PR page.
+                    return _verdict(
+                        "not_queued",
+                        f"PR #{pr} is {state.lower()} and not in the merge queue",
+                        cls=QueueVerdict,
+                        **seen,
+                    )
+                return _verdict(
+                    "removed",
+                    f"PR #{pr} left the merge queue without merging ({state.lower()})",
+                    cls=QueueVerdict,
+                    **seen,
+                )
+            # Clamped to the settle window and to the budget, so the watch never
+            # sleeps past the timeout; once the budget is spent, the next read
+            # is the final one.
+            time.sleep(
+                min(
+                    QUEUE_ABSENT_REREAD_SECONDS,
+                    absent_since + QUEUE_ABSENT_SETTLE_SECONDS - now,
+                    max(deadline - now, 0),
+                )
             )
+            final_read = time.monotonic() >= deadline
+            continue
 
-        time.sleep(poll_sec)
+        time.sleep(min(poll_sec, max(deadline - time.monotonic(), 0)))
 
     return _verdict(
         "timed_out",
