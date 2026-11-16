@@ -182,9 +182,23 @@ gh pr merge <PR> --squash          # gates already pass
 gh pr merge <PR> --auto --squash   # GitHub merges once the required checks pass
 ```
 
-Both put the PR in the merge queue: the first once the gates pass, `--auto` as soon as they do. Use `--auto` when checks are still running, and always when Tim asks for several merges at once. Say “merged” only after `gh pr view <PR> --json state` reads `MERGED`; a PR armed or waiting in the queue is “queued to merge”.
+Both put the PR in the merge queue: the first once the gates pass, `--auto` as soon as they do. Use `--auto` when checks are still running, and always when Tim asks for several merges at once. Say “merged” only on the queue watch's `merged` verdict; a PR armed or waiting in the queue is “queued to merge”.
 
 **The merge queue.** The queue builds a commit of `main` plus every PR ahead plus this one and runs CI Gate on it; Claude Review and UI Approval pass there without a new review or sign-off, since each PR passed them on its own head. A branch behind `main` merges as it is. The queue removes a PR whose combined commit conflicts or fails CI Gate; its owning session merges `main` in (`gh pr update-branch <PR>` or locally, never `--rebase`; AGENTS.md §5 Branches), fixes the failure, and runs `gh pr merge` again.
+
+**Watch the queue.** Right after `gh pr merge`, run the watcher in the background (as in 3.1), pinned to the head you enqueued:
+
+```bash
+python3 scripts/workflow/pr-watch.py <PR> --phase queue --expected-head <HEAD_SHA>
+```
+
+It also waits while auto-merge is armed and GitHub has not yet enqueued the PR. A PR whose own checks go red is never enqueued and the watch runs to its 1h ceiling, so after `--auto` on a head still in CI, run the 3.1 watch first.
+
+- `outcome: "merged"` (exit 0): the PR merged as `merge_commit`. Go to Phase 5.
+- `outcome: "removed"` (exit 1): the queue dropped the PR and it is still open. `detail_url`, `failing_jobs`, and `failure_artifact` describe the failed `merge_group` run; all three are empty when no run failed, as for a conflict or a manual dequeue. Fix it as the merge-queue paragraph above says.
+- `outcome: "not_queued"` (exit 1): when the watch began the PR was neither in the queue nor armed for auto-merge, so nothing will merge it. If `gh pr merge` printed an error, fix what it names; otherwise the queue dropped the PR before the watch began, so read why on the PR page and handle it as `removed`.
+- `outcome: "stale"` or `"conflicting"` (exit 1): as in 3.1. A push to a queued PR drops it from the queue.
+- `outcome: "timed_out"` or `"undetermined"` (exit 2): re-run the watch.
 
 **A refused merge means a gate is unmet.** Read `gh pr checks <PR> --required` and the unresolved conversations, fix what is missing, and merge again. `gh pr merge` is the one merge path: `--admin` is denied to agents (they act through Tim's account, and the ruleset's admin bypass is his), as are the raw API and MCP merge channels.
 
