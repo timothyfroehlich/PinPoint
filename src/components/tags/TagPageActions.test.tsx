@@ -110,4 +110,29 @@ describe("TagPageActions", () => {
       "Delete tag…",
     ]);
   });
+
+  it("returns focus to ⋯ when a dialog opened from ⋯ closes", async () => {
+    const user = userEvent.setup();
+    render(
+      <TagPageActions
+        tagHref="/c/tags/location/storage"
+        settingsSheetsHref="/m/settings-sheets?m=AFM"
+        editing={editing}
+      />
+    );
+    const more = screen.getByRole("button", { name: "Actions" });
+    more.focus();
+    await user.keyboard("{Enter}");
+    await screen.findByRole("menu");
+    await user.keyboard("{ArrowDown}{Enter}");
+    expect(
+      await screen.findByRole("dialog", { name: "Rename tag" })
+    ).toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+    );
+    expect(more).toHaveFocus();
+  });
 });

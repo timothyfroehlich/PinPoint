@@ -30,6 +30,8 @@ interface MergeTagDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   merge: TagMerge;
+  /** Where focus goes when the dialog closes (useReturnFocus). */
+  onCloseAutoFocus?: ((event: Event) => void) | undefined;
 }
 
 function groupLabel(group: TagMergeGroup): string {
@@ -68,10 +70,14 @@ export function MergeTagDialog({
   open,
   onOpenChange,
   merge,
+  onCloseAutoFocus,
 }: MergeTagDialogProps): React.JSX.Element {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg">
+      <DialogContent
+        className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg"
+        onCloseAutoFocus={onCloseAutoFocus}
+      >
         {/* Mounts with the content, so each open starts with nothing chosen. */}
         <MergeTagForm merge={merge} onClose={() => onOpenChange(false)} />
       </DialogContent>

@@ -15,6 +15,11 @@
 import { test, expect, attachHydrationWait } from "../support/fixtures.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
 import { getTestPrefix } from "../support/test-isolation.js";
+import {
+  clickPageAction,
+  expectNoPageAction,
+  expectPageAction,
+} from "../support/page-actions.js";
 
 test.describe("Personal collections (PP-wqit.1)", () => {
   test.use({ storageState: STORAGE_STATE.member });
@@ -101,8 +106,10 @@ test.describe("Personal collections (PP-wqit.1)", () => {
       page.getByRole("link", { name: "Attack from Mars", exact: true })
     ).toBeVisible();
 
-    // Enable view sharing and grab the generated link.
-    await page.getByTestId("collection-share-trigger").click();
+    // Enable view sharing and grab the generated link. Share is a page
+    // action, or an entry in ⋯ once the row folds it (collections-and-tags
+    // 4.15, 4.18).
+    await clickPageAction(page, "Share");
     await page.getByTestId("collection-share-toggle").click();
     const shareUrl = await page
       .getByTestId("collection-share-url")
@@ -123,12 +130,8 @@ test.describe("Personal collections (PP-wqit.1)", () => {
         anonPage.getByRole("link", { name: "Attack from Mars", exact: true })
       ).toBeVisible();
       await expect(anonPage).toHaveURL(/\/c\/[^/]+$/);
-      await expect(
-        anonPage.getByTestId("collection-share-trigger")
-      ).toHaveCount(0);
-      await expect(anonPage.getByTestId("collection-edit-trigger")).toHaveCount(
-        0
-      );
+      await expectNoPageAction(anonPage, "Share");
+      await expectNoPageAction(anonPage, "Edit collection");
     } finally {
       await anon.close();
     }
@@ -136,7 +139,7 @@ test.describe("Personal collections (PP-wqit.1)", () => {
     // The OWNER opening their own share link still sees full controls — access
     // is permission-based, not URL-based (the token only widens who can read).
     await page.goto(shareUrl);
-    await expect(page.getByTestId("collection-share-trigger")).toBeVisible();
-    await expect(page.getByTestId("collection-edit-trigger")).toBeVisible();
+    await expectPageAction(page, "Share");
+    await expectPageAction(page, "Edit collection");
   });
 });

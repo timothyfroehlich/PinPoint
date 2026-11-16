@@ -45,7 +45,12 @@ export interface TagMachinesEditor {
 type EditTagMachinesDialogProps = TagMachinesEditor &
   (
     | { variant: "add" }
-    | { open: boolean; onOpenChange: (open: boolean) => void }
+    | {
+        open: boolean;
+        onOpenChange: (open: boolean) => void;
+        /** Where focus goes when the dialog closes (useReturnFocus). */
+        onCloseAutoFocus?: ((event: Event) => void) | undefined;
+      }
   );
 
 function plural(count: number, word: string): string {
@@ -64,6 +69,7 @@ export function EditTagMachinesDialog(
   const controlled = "open" in props;
   const open = controlled ? props.open : ownOpen;
   const setOpen = controlled ? props.onOpenChange : setOwnOpen;
+  const onCloseAutoFocus = controlled ? props.onCloseAutoFocus : undefined;
   const editor: TagMachinesEditor = {
     tagId: props.tagId,
     tagName: props.tagName,
@@ -84,6 +90,7 @@ export function EditTagMachinesDialog(
       )}
       <DialogContent
         className="flex max-h-[calc(100dvh-2rem)] flex-col gap-0 p-0 sm:max-w-lg"
+        onCloseAutoFocus={onCloseAutoFocus}
         // A stray backdrop click shouldn't discard the selection.
         onInteractOutside={(event) => event.preventDefault()}
       >

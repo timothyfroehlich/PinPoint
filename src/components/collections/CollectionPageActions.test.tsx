@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { CollectionPageActions } from "./CollectionPageActions";
@@ -79,5 +79,58 @@ describe("CollectionPageActions", () => {
       />
     );
     expect(actionNames()).toEqual(["Print"]);
+  });
+});
+
+/** Dialogs opened from state have no trigger, so focus returns by hand. */
+describe("CollectionPageActions focus return", () => {
+  it("returns focus to Share when the Share dialog closes", async () => {
+    const user = userEvent.setup();
+    render(
+      <CollectionPageActions
+        collectionId="c1"
+        settingsSheetsHref="/m/settings-sheets?m=AFM"
+        share={share}
+        edit={edit}
+      />
+    );
+    const shareButton = screen.getByRole("button", { name: "Share" });
+    shareButton.focus();
+    await user.keyboard("{Enter}");
+    expect(
+      await screen.findByRole("dialog", { name: "Share collection" })
+    ).toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+    );
+    expect(shareButton).toHaveFocus();
+  });
+
+  it("returns focus to ⋯ when a dialog opened from ⋯ closes", async () => {
+    const user = userEvent.setup();
+    render(
+      <CollectionPageActions
+        collectionId="c1"
+        settingsSheetsHref="/m/settings-sheets?m=AFM"
+        share={share}
+        edit={edit}
+      />
+    );
+    const more = screen.getByRole("button", { name: "Actions" });
+    more.focus();
+    await user.keyboard("{Enter}");
+    await screen.findByRole("menu");
+    await user.keyboard("{Enter}");
+    expect(
+      await screen.findByRole("dialog", { name: "Edit collection" })
+    ).toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+    );
+    expect(more).toHaveFocus();
   });
 });

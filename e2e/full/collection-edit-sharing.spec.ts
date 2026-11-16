@@ -12,6 +12,11 @@
 import { test, expect, attachHydrationWait } from "../support/fixtures.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
 import { getTestPrefix } from "../support/test-isolation.js";
+import {
+  clickPageAction,
+  expectNoPageAction,
+  expectPageAction,
+} from "../support/page-actions.js";
 
 const EDITOR_NAME = "Technician User";
 
@@ -42,7 +47,7 @@ test.describe("Collection edit sharing (PP-wqit.7)", () => {
     ).toBeVisible();
 
     // --- Owner grants Technician User editor access -----------------------
-    await page.getByTestId("collection-share-trigger").click();
+    await clickPageAction(page, "Share");
     await page.getByTestId("collab-add-trigger").click();
     await page.getByPlaceholder("Search members…").fill("Technician");
     await page.getByRole("option", { name: new RegExp(EDITOR_NAME) }).click();
@@ -70,12 +75,12 @@ test.describe("Collection edit sharing (PP-wqit.7)", () => {
 
       await sharedLink.click();
       await expect(ed).toHaveURL(/\/c\/[0-9a-f-]{36}/);
-      // Editor gets the Edit control but NOT Share (owner-only).
-      await expect(ed.getByTestId("collection-edit-trigger")).toBeVisible();
-      await expect(ed.getByTestId("collection-share-trigger")).toHaveCount(0);
+      // Editor gets Edit collection in ⋯ but NOT Share (owner-only, 4.15).
+      await expectPageAction(ed, "Edit collection");
+      await expectNoPageAction(ed, "Share");
 
       // Editor adds a machine and saves; no Delete control is present.
-      await ed.getByTestId("collection-edit-trigger").click();
+      await clickPageAction(ed, "Edit collection");
       await expect(ed.getByTestId("collection-delete-trigger")).toHaveCount(0);
       await ed.getByTestId("collection-machines-multiselect").click();
       // The populated Overview also has the Machine View search. The picker
@@ -93,7 +98,7 @@ test.describe("Collection edit sharing (PP-wqit.7)", () => {
 
     // --- Owner revokes access ---------------------------------------------
     await page.goto(collectionUrl);
-    await page.getByTestId("collection-share-trigger").click();
+    await clickPageAction(page, "Share");
     await page.getByLabel(`Remove ${EDITOR_NAME}`).click();
     await expect(page.getByLabel(`Remove ${EDITOR_NAME}`)).toHaveCount(0);
     await page.keyboard.press("Escape");

@@ -3,25 +3,23 @@
  *
  * Column mapping, scope resolution, and the server action's auth gate are
  * covered in src/test/integration/machine-export-action.test.ts; this spec
- * proves the List Header button downloads the file in a real browser.
+ * proves Export to CSV in the page's ⋯ downloads the file in a real browser,
+ * at every width (list-views §5.5, machine-views §6.6).
  */
 
 import { readFile } from "node:fs/promises";
 import { test, expect } from "../support/fixtures.js";
 import { seededMachines } from "../support/constants.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
+import {
+  clickPageAction,
+  expectNoPageAction,
+} from "../support/page-actions.js";
 
 const HEADER =
   "ID,Name,Model,Manufacturer,Year,Owner,Date Added,Presence,Playability,Open Issues,Last Serviced,Last Activity";
 
 test.describe("Machine export", () => {
-  test.beforeEach(({}, testInfo) => {
-    test.skip(
-      testInfo.project.name.includes("Mobile"),
-      "Export sits in the desktop List Header (list-views §5.5); the phone header has none (§7.3)"
-    );
-  });
-
   test.describe("signed in", () => {
     test.use({ storageState: STORAGE_STATE.member });
 
@@ -35,7 +33,7 @@ test.describe("Machine export", () => {
       ).toBeVisible();
 
       const downloadPromise = page.waitForEvent("download");
-      await page.getByRole("button", { name: "Export to CSV" }).click();
+      await clickPageAction(page, "Export to CSV");
       const download = await downloadPromise;
 
       expect(download.suggestedFilename()).toMatch(
@@ -58,8 +56,7 @@ test.describe("Machine export", () => {
   test("is not offered to anonymous visitors", async ({ page }) => {
     await page.goto("/m");
     await expect(page.getByRole("heading", { name: "Machines" })).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Export to CSV" })
-    ).toHaveCount(0);
+    // Their ⋯ still holds Print settings sheets (settings-sheets §2.1).
+    await expectNoPageAction(page, "Export to CSV");
   });
 });

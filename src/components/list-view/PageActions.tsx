@@ -31,6 +31,13 @@ import {
 import { cn } from "~/lib/utils";
 import { useMeasuredWidths } from "./use-measured-widths";
 
+/**
+ * Runs a page action. `opener` is the control it was chosen from, the
+ * action's own button or its menu's trigger (⋯ once it folds), so a dialog
+ * it opens can return focus there (useReturnFocus).
+ */
+export type PageActionSelect = (opener: HTMLElement | null) => void;
+
 /** One entry in ⋯ or in an action's own menu. */
 export type PageMenuEntry = {
   key: string;
@@ -43,7 +50,7 @@ export type PageMenuEntry = {
   /** The entry's action is running; it shows a spinner and is disabled. */
   busy?: boolean | undefined;
   testId?: string | undefined;
-} & ({ href: string } | { onSelect: () => void });
+} & ({ href: string } | { onSelect: PageActionSelect });
 
 interface PageActionBase {
   key: string;
@@ -62,7 +69,7 @@ interface PageActionBase {
 export type PageAction = PageActionBase &
   (
     | { href: string }
-    | { onSelect: () => void }
+    | { onSelect: PageActionSelect }
     | {
         entries: readonly PageMenuEntry[];
         foldedEntries?: readonly PageMenuEntry[] | undefined;
@@ -186,8 +193,11 @@ function EntryContent({ entry }: { entry: PageMenuEntry }): React.JSX.Element {
 /** Entries in a dropdown menu, a divider between sections. */
 function MenuEntries({
   sections,
+  opener,
 }: {
   sections: readonly (readonly PageMenuEntry[])[];
+  /** The menu's trigger, which an entry's dialog returns focus to. */
+  opener: React.RefObject<HTMLButtonElement | null>;
 }): React.JSX.Element {
   return (
     <>
@@ -212,7 +222,7 @@ function MenuEntries({
                 disabled={entry.busy}
                 aria-label={entry.accessibleLabel}
                 data-testid={entry.testId}
-                onSelect={entry.onSelect}
+                onSelect={() => entry.onSelect(opener.current)}
               >
                 <EntryContent entry={entry} />
               </DropdownMenuItem>
@@ -231,9 +241,11 @@ const sheetRowClass =
 function ActionsSheet({
   trigger,
   sections,
+  opener,
 }: {
   trigger: React.ReactNode;
   sections: readonly (readonly PageMenuEntry[])[];
+  opener: React.RefObject<HTMLButtonElement | null>;
 }): React.JSX.Element {
   const [open, setOpen] = React.useState(false);
   return (
@@ -282,7 +294,7 @@ function ActionsSheet({
                       data-testid={entry.testId}
                       onClick={() => {
                         setOpen(false);
-                        entry.onSelect();
+                        entry.onSelect(opener.current);
                       }}
                       className={cn(
                         sheetRowClass,
@@ -310,6 +322,7 @@ function ActionButton({
   action: PageAction;
   face: Face;
 }): React.JSX.Element {
+  const menuTriggerRef = React.useRef<HTMLButtonElement>(null);
   const className = buttonClass(action.primary, face);
   const title = face === "labeled" ? undefined : action.label;
   if ("href" in action) {
@@ -337,7 +350,7 @@ function ActionButton({
         aria-label={action.label}
         title={title}
         data-testid={action.testId}
-        onClick={action.onSelect}
+        onClick={(event) => action.onSelect(event.currentTarget)}
         className={className}
       >
         <ActionFace
@@ -353,6 +366,7 @@ function ActionButton({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
+          ref={menuTriggerRef}
           type="button"
           aria-label={action.label}
           title={title}
@@ -368,7 +382,7 @@ function ActionButton({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <MenuEntries sections={[action.entries]} />
+        <MenuEntries sections={[action.entries]} opener={menuTriggerRef} />
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -385,8 +399,10 @@ function ActionsMenu({
   // Menu or sheet is a behavior swap CSS cannot express (CORE-RESP-002's
   // sanctioned use-is-mobile exception); the button's look stays in CSS.
   const isMobile = useIsMobile();
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
   const trigger = (
     <button
+      ref={triggerRef}
       type="button"
       aria-label={PAGE_ACTIONS_MENU_LABEL}
       title={face === "labeled" ? undefined : PAGE_ACTIONS_MENU_LABEL}
@@ -401,12 +417,16 @@ function ActionsMenu({
       />
     </button>
   );
-  if (isMobile) return <ActionsSheet trigger={trigger} sections={sections} />;
+  if (isMobile) {
+    return (
+      <ActionsSheet trigger={trigger} sections={sections} opener={triggerRef} />
+    );
+  }
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-52">
-        <MenuEntries sections={sections} />
+        <MenuEntries sections={sections} opener={triggerRef} />
       </DropdownMenuContent>
     </DropdownMenu>
   );

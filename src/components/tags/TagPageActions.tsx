@@ -11,6 +11,8 @@ import {
 import {
   PageActions,
   usePageExportEntry,
+  useReturnFocus,
+  type PageActionSelect,
   type PageMenuEntry,
 } from "~/components/list-view";
 import {
@@ -62,11 +64,19 @@ export function TagPageActions({
 }: TagPageActionsProps): React.JSX.Element {
   const [dialog, setDialog] = useState<TagDialog | null>(null);
   const exportEntry = usePageExportEntry();
+  const returnFocus = useReturnFocus();
+  const openDialog = (name: TagDialog): PageActionSelect =>
+    returnFocus.opens(() => setDialog(name));
   const dialogProps = (
     name: TagDialog
-  ): { open: boolean; onOpenChange: (open: boolean) => void } => ({
+  ): {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    onCloseAutoFocus: (event: Event) => void;
+  } => ({
     open: dialog === name,
     onOpenChange: (open) => setDialog(open ? name : null),
+    onCloseAutoFocus: returnFocus.onCloseAutoFocus,
   });
 
   async function copyAddress(): Promise<void> {
@@ -85,22 +95,22 @@ export function TagPageActions({
         {
           key: "edit-machines",
           label: "Edit machines",
-          onSelect: () => setDialog("machines"),
+          onSelect: openDialog("machines"),
         },
         {
           key: "rename",
           label: "Rename…",
-          onSelect: () => setDialog("rename"),
+          onSelect: openDialog("rename"),
         },
         {
           key: "move",
           label: "Move to another tag type…",
-          onSelect: () => setDialog("move"),
+          onSelect: openDialog("move"),
         },
         {
           key: "merge",
           label: "Merge into another tag…",
-          onSelect: () => setDialog("merge"),
+          onSelect: openDialog("merge"),
         },
       ]
     : [];
@@ -110,7 +120,7 @@ export function TagPageActions({
           key: "delete",
           label: "Delete tag…",
           destructive: true,
-          onSelect: () => setDialog("delete"),
+          onSelect: openDialog("delete"),
         },
       ]
     : [];

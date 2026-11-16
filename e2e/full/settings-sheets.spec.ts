@@ -2,7 +2,7 @@
  * Print settings sheets (PP-k3km, docs/feature-specs/settings-sheets.md).
  *
  * What only a browser proves: an anonymous visitor reaches the page from the
- * Machines list's Print menu (§2.1), adds machines from the list (§2.2–§2.3),
+ * Machines list's ⋯ (§2.1), adds machines from the list (§2.2–§2.3),
  * the print run shows what each block will print and asks for a set when a
  * tag finds several (§2.5, §6.3), Print opens the sheet on its own page and
  * links back to the same run (§2.8), and a tag page opens the page with its
@@ -18,6 +18,10 @@
 import type { Page } from "@playwright/test";
 import { test, expect } from "../support/fixtures.js";
 import { assertNoA11yViolations, openListSearch } from "../support/actions.js";
+import {
+  choosePageMenuEntry,
+  clickPageAction,
+} from "../support/page-actions.js";
 
 // The print page opens the print dialog on load; a test has no use for it.
 test.beforeEach(async ({ page }) => {
@@ -58,8 +62,8 @@ test.describe("Print settings sheets", () => {
     page,
   }) => {
     await page.goto("/m");
-    await page.getByRole("button", { name: "Print" }).click();
-    await page.getByRole("menuitem", { name: "Settings sheets" }).click();
+    // An entry in /m's ⋯ for everyone (machine-views §6.6).
+    await clickPageAction(page, "Print settings sheets");
     await expect(page).toHaveURL(/\/m\/settings-sheets/);
     await expect(
       page.getByRole("heading", { name: "Print settings sheets" })
@@ -148,7 +152,13 @@ test.describe("Print settings sheets", () => {
     page,
   }) => {
     await page.goto("/c/tags/location/front-room");
-    await page.getByRole("link", { name: "Settings sheets" }).click();
+    // Print → Settings sheets, or Print settings sheets in ⋯ once Print
+    // folds (collections-and-tags 4.16, 4.18).
+    await choosePageMenuEntry(page, {
+      action: "Print",
+      entry: "Settings sheets",
+      foldedEntry: "Print settings sheets",
+    });
     await expect(page).toHaveURL(/\/m\/settings-sheets/);
     const run = page.getByRole("region", { name: "In this print run" });
     // Front room's seeded machines: Attack from Mars and others On the Floor,
