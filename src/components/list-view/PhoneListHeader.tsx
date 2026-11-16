@@ -783,14 +783,15 @@ export function PhoneListHeader({
           if (searchAsIcon) setOpened(true);
         }}
         onBlur={(event) => {
-          // An emptied field closes once focus leaves the header. Backgrounding
-          // the tab or app also blurs it; that isn't the person leaving, so
-          // the field stays open for when they come back.
+          // Leaving the header ends "opened"; a field holding text stays open
+          // through `hasText` alone, so clearing it from elsewhere (Reset all)
+          // closes it. Backgrounding the tab or app also blurs it; that isn't
+          // the person leaving, so the field stays open for when they return.
           if (document.visibilityState === "hidden") return;
           const next = event.relatedTarget;
           const staysInHeader =
             next instanceof Node && headerRef.current?.contains(next) === true;
-          if (!hasText && !staysInHeader) setOpened(false);
+          if (!staysInHeader) setOpened(false);
         }}
       >
         <ListSearchField

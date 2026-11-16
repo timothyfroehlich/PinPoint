@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PhoneListHeader } from "./PhoneListHeader";
@@ -102,6 +102,8 @@ function renderHeader(
   onSaveAsNew: ReturnType<typeof vi.fn>;
   onManage: ReturnType<typeof vi.fn>;
   onSearch: ReturnType<typeof vi.fn>;
+  /** Re-renders with a new search value, as a URL change would. */
+  setSearchValue: (value: string) => void;
 } {
   const handlers = {
     onSaveChanges: vi.fn(),
@@ -109,7 +111,7 @@ function renderHeader(
     onManage: vi.fn(),
   };
   const onSearch = vi.fn();
-  render(
+  const header = (searchValue: string): React.JSX.Element => (
     <PhoneListHeader
       views={options.views ?? views()}
       primaryFilters={options.primary ?? [filter()]}
@@ -121,7 +123,7 @@ function renderHeader(
       search={{
         id: "issue-view-search",
         label: "Search issues",
-        value: options.searchValue ?? "",
+        value: searchValue,
         onSearch,
       }}
       searchEpoch={0}
@@ -129,7 +131,12 @@ function renderHeader(
       {...handlers}
     />
   );
-  return { ...handlers, onSearch };
+  const { rerender } = render(header(options.searchValue ?? ""));
+  return {
+    ...handlers,
+    onSearch,
+    setSearchValue: (value) => rerender(header(value)),
+  };
 }
 
 /**
@@ -415,6 +422,22 @@ describe("PhoneListHeader", () => {
     ).toBeInTheDocument();
 
     await user.click(document.body);
+    expect(screen.getByTestId("list-phone-search-trigger")).toBeInTheDocument();
+  });
+
+  it("closes the field when its search is cleared from elsewhere after blur (§7.3)", async () => {
+    const user = userEvent.setup();
+    layOut(353, 142);
+    const { setSearchValue } = renderHeader({ searchValue: "gate" });
+
+    await user.click(screen.getByRole("searchbox", { name: "Search issues" }));
+    await user.click(document.body);
+    expect(
+      screen.getByRole("button", { name: "Close search" })
+    ).toBeInTheDocument();
+
+    // Reset all in the Filters sheet clears the search through the URL.
+    act(() => setSearchValue(""));
     expect(screen.getByTestId("list-phone-search-trigger")).toBeInTheDocument();
   });
 
