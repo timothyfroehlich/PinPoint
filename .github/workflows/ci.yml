@@ -8,11 +8,19 @@ on:
     branches:
       - main
       - claude/**
+  # The merge queue's run: main plus every PR ahead in the queue plus this one,
+  # tested together before any of them lands. CI Gate is required here too, so
+  # the jobs a PR runs (path filter included) run again on the combined commit;
+  # the filter diffs the whole group against main (merge_group.base_sha).
+  merge_group:
+    types: [checks_requested]
 
 permissions: read-all  # zizmor: ignore[excessive-permissions]
 
 # PR runs: a new push cancels the run in progress. Main runs: one at a time,
-# never cancelled mid-run.
+# never cancelled mid-run. Merge-queue runs each get their own ref
+# (gh-readonly-queue/main/pr-<n>-<sha>), so they never share a group and are
+# never cancelled here; the queue itself discards a group it no longer needs.
 #
 # A PR push supersedes the one before it — same branch, same question, and the
 # older answer is worthless — so cancelling saves runners with nothing lost.
@@ -81,9 +89,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
         with:
           persist-credentials: false
-          # Push runs diff back past `before` (next step); PR runs use the API.
-          # Strings, because a bare 0 is falsy in an expression.
-          fetch-depth: ${{ github.event_name == 'push' && '0' || '1' }}
+          # Push runs diff back past `before` (next step) and merge-queue runs
+          # diff the group against merge_group.base_sha, both with git; PR runs
+          # use the API. Strings, because a bare 0 is falsy in an expression.
+          fetch-depth: ${{ github.event_name != 'pull_request' && '0' || '1' }}
 
       # Main runs one at a time and a newer merge cancels the waiting run (see
       # the concurrency block), so this push's `before` can skip merges whose
@@ -242,37 +251,21 @@ jobs:
           set +a
           pnpm run build
 
-  # Setup job caches dependencies for reuse by other jobs
-  setup:
-    name: Setup Dependencies
-    runs-on: ubuntu-latest
-    needs: changes
-    if: needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true'
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2  # ratchet:step-security/harden-runner@v2.22.2
-        with:
-          egress-policy: audit
+  # Job count, not job length, is what makes PR CI slow: every job waits for one
+  # of the account's 20 concurrent runner slots, and in a busy hour a job waits
+  # ~10 minutes for one and then runs 3-5. So checks that need the same setup
+  # share a job, and nothing runs as its own job to save a minute of wall clock.
+  # A code PR run is 7 jobs: Detect Changes, Static, Fast Linters, Integration,
+  # E2E Smoke, E2E Full, CI Gate. Under the old 15 (2026-11-15 measurements,
+  # PP-bg1u), two PRs pushed together filled the cap.
+  #
+  # There is no dependency-cache job. `static` saves the node_modules cache
+  # (actions/cache), and every other job restores it and installs on a miss,
+  # so a lockfile change costs each job one install instead of a queue hop.
 
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Setup locked mise toolchain
-        id: toolchain
-        uses: $/.github/actions/setup-mise
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Cache node_modules
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
-        with:
-          path: node_modules
-          key: ${{ steps.toolchain.outputs.node-modules-key }}
-
-  # Fast linters that always run — cheap enough to never skip.
+  # Fast linters that always run — cheap enough to never skip. Gitleaks runs
+  # here, not in a job of its own (~20s of work against a slot's ~2 min of
+  # wait and setup).
   linters:
     name: Fast Linters
     runs-on: ubuntu-latest
@@ -286,6 +279,43 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0  # Gitleaks scans the commits, not the tree
+
+      # The gitleaks CLI, not gitleaks-action: the action refuses to run in a
+      # repository owned by an organization without a GITLEAKS_LICENSE key,
+      # and PinPoint moved to the minamaya org. The CLI needs no key. Same scan
+      # as the action: the commits this event introduces, merges skipped.
+      - name: Gitleaks secret scan
+        env:
+          GITLEAKS_VERSION: "8.30.1"
+          GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_AFTER: ${{ github.event.after }}
+          MQ_BASE: ${{ github.event.merge_group.base_sha }}
+          MQ_HEAD: ${{ github.event.merge_group.head_sha }}
+        run: |
+          set -euo pipefail
+          tarball="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSL -o "$RUNNER_TEMP/$tarball" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${tarball}"
+          echo "${GITLEAKS_SHA256}  $RUNNER_TEMP/$tarball" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$tarball" -C "$RUNNER_TEMP" gitleaks
+          case "$EVENT_NAME" in
+            pull_request) range="${PR_BASE}..${PR_HEAD}" ;;
+            merge_group) range="${MQ_BASE}..${MQ_HEAD}" ;;
+            push)
+              if [[ -z "$PUSH_BEFORE" || "$PUSH_BEFORE" =~ ^0+$ ]]; then
+                range="-1 ${PUSH_AFTER}"
+              else
+                range="${PUSH_BEFORE}..${PUSH_AFTER}"
+              fi ;;
+            *) range="-1 HEAD" ;;
+          esac
+          "$RUNNER_TEMP/gitleaks" git --redact --verbose --exit-code=2 \
+            --log-opts="--no-merges --first-parent ${range}" .
 
       - name: Install system linters
         run: |
@@ -345,10 +375,12 @@ jobs:
             .github/workflows/preview-control.yaml
             .github/workflows/preview-reaper.yaml
 
+  # PGlite integration tests, plus `pnpm audit` when the lockfile changed.
   test-integration:
     name: Integration Tests
     runs-on: ubuntu-latest
-    needs: setup
+    needs: changes
+    if: needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true'
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2  # ratchet:step-security/harden-runner@v2.22.2
@@ -359,6 +391,9 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
         with:
           persist-credentials: false
+          # The audit reads the base commit's lockfile. Strings, because a
+          # bare 0 is falsy in an expression.
+          fetch-depth: ${{ needs.changes.outputs.deps == 'true' && '0' || '1' }}
 
       - name: Setup locked mise toolchain
         id: toolchain
@@ -382,135 +417,93 @@ jobs:
           set +a
           pnpm run test:integration
 
-  # ==============================================================================
-  # Migration Verification
-  #
-  # Validates that Drizzle migrations can apply cleanly to a fresh database.
-  # Uses Supabase CLI since migrations reference auth.users (Supabase-specific).
-  # This catches broken migrations before they reach production.
-  # ==============================================================================
-  test-migrations:
-    name: Verify Migrations
-    runs-on: ubuntu-latest
-    needs: setup
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2  # ratchet:step-security/harden-runner@v2.22.2
-        with:
-          egress-policy: audit
-
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Setup locked mise toolchain
-        id: toolchain
-        uses: $/.github/actions/setup-mise
-        with:
-          install-args: "--locked node pnpm supabase"
-
-      - name: Restore node_modules
-        id: cache-restore
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache/restore@v6.1.0
-        with:
-          path: node_modules
-          key: ${{ steps.toolchain.outputs.node-modules-key }}
-
-      - name: Install dependencies (if cache miss)
-        if: steps.cache-restore.outputs.cache-hit != 'true'
-        run: pnpm install --frozen-lockfile
-
-      - name: Setup Supabase
-        uses: $/.github/actions/setup-supabase
-        with:
-          seed: "false"
-
-      - name: Apply migrations to fresh database
-        run: pnpm run db:migrate
-
-      - name: Verify migration metadata integrity
-        run: pnpm run check:migrations
-
-      - name: Ensure test schema is current
+      # Only when the lockfile changed. Fails only on high/critical advisories
+      # the change adds over its base: one published against a version already
+      # locked on main is Dependabot's job (dependabot.yml security updates) and
+      # must not block unrelated dependency PRs. After the tests, and on their
+      # failure too, so one verdict never hides the other. pnpm audit reads the
+      # lockfile only. `--dir` keeps pnpm's mise shim resolving from the
+      # checkout.
+      - name: Run pnpm audit
+        if: ${{ !cancelled() && needs.changes.outputs.deps == 'true' }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
         run: |
-          set -a
-          source .env.ci
-          set +a
-          pnpm run test:ensure-schema
+          # Writes "<id> <package>: <title>" per high/critical advisory in the
+          # lockfile at $1 to $RUNNER_TEMP/$2.ids; fails when there is no report.
+          audit() {
+            local out="$RUNNER_TEMP/$2"
+            pnpm --dir "$1" --pm-on-fail=ignore audit --json >"$out.json" 2>"$out.err" || true
+            jq -e '.advisories | type == "object"' "$out.json" >/dev/null 2>&1 || return 1
+            jq -r '.advisories | to_entries[]
+              | select(.value.severity == "high" or .value.severity == "critical")
+              | "\(.key) \(.value.module_name): \(.value.title)"' "$out.json" >"$out.ids"
+          }
 
-  # The Supabase integration and E2E jobs need only `changes`, so they start
-  # within a minute of the run instead of after static, integration and
-  # migrations finish (~5 minutes in). They install dependencies themselves on
-  # a node_modules cache miss, so they never depended on `setup`'s output.
-  # Nothing passes unchecked: CI Gate still needs every job. The cost is runner
-  # time spent on E2E in a run that static goes on to fail. (PP-yva7.1.)
-  test-integration-supabase:
-    name: Supabase Integration Tests
-    runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'pull_request' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
-    needs: changes
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2  # ratchet:step-security/harden-runner@v2.22.2
-        with:
-          egress-policy: audit
+          if ! audit . head; then
+            cat "$RUNNER_TEMP/head.json" "$RUNNER_TEMP/head.err"
+            registry_errors="ERR_PNPM_AUDIT_BAD_RESPONSE|ERR_PNPM_AUDIT_REGISTRY"
+            registry_errors+="|ECONNREFUSED|EAI_AGAIN|ETIMEDOUT"
+            if grep -qE "$registry_errors" "$RUNNER_TEMP/head.json" "$RUNNER_TEMP/head.err"; then
+              echo "::warning::pnpm audit skipped: registry error"
+              exit 0
+            fi
+            echo "::error::pnpm audit produced no report."
+            exit 1
+          fi
 
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
-        with:
-          persist-credentials: false
+          base="$RUNNER_TEMP/base"
+          mkdir -p "$base"
+          for f in package.json pnpm-lock.yaml pnpm-workspace.yaml; do
+            git show "$BASE_SHA:$f" >"$base/$f" 2>/dev/null || rm -f "$base/$f"
+          done
+          if ! audit "$base" base; then
+            echo "::warning::Could not audit the base lockfile; every advisory counts as new."
+            : >"$RUNNER_TEMP/base.ids"
+          fi
 
-      - name: Setup locked mise toolchain
-        id: toolchain
-        uses: $/.github/actions/setup-mise
-        with:
-          install-args: "--locked node pnpm supabase"
+          new=$(awk 'FILENAME == ARGV[1] { seen[$1]; next } !($1 in seen)' \
+            "$RUNNER_TEMP/base.ids" "$RUNNER_TEMP/head.ids")
+          if [[ -s "$RUNNER_TEMP/base.ids" ]]; then
+            echo "Already on the base (Dependabot's job):"
+            cat "$RUNNER_TEMP/base.ids"
+          fi
+          if [[ -n "$new" ]]; then
+            echo "::error::This change adds high/critical advisories:"
+            echo "$new"
+            exit 1
+          fi
+          echo "No high/critical advisories added over the base."
 
-      - name: Restore node_modules
-        id: cache-restore
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache/restore@v6.1.0
-        with:
-          path: node_modules
-          key: ${{ steps.toolchain.outputs.node-modules-key }}
-
-      - name: Install dependencies (if cache miss)
-        if: steps.cache-restore.outputs.cache-hit != 'true'
-        run: pnpm install --frozen-lockfile
-
-      - name: Setup Supabase
-        uses: $/.github/actions/setup-supabase
-
-      - name: Run Supabase integration tests
-        run: pnpm run test:integration:supabase
-
+  # ==============================================================================
+  # PR E2E: two jobs, unsharded
+  #
+  # Each E2E job pays ~130s before its first test: ~95s of checkout, toolchain,
+  # cache restore and Supabase start, then ~35s of `next build` inside the
+  # Playwright step. The tests themselves are short (2026-11-15: ~45s per smoke
+  # project, ~3 min for Full on chromium at 3 workers). Sharding repeated that
+  # 130s on every shard and took a runner slot each, which under the account's
+  # 20-job cap costs far more in queueing than it saves in test time. One job
+  # per suite instead (PP-bg1u; the shards came from PP-yva7.2):
+  #   - Smoke runs chromium and Mobile Chrome in one Playwright process against
+  #     one database, as the comprehensive legs already do with three browsers.
+  #   - Full also runs the Supabase integration tests and checks the migration
+  #     metadata, since it already has a migrated Supabase stack. Setup
+  #     Supabase applies every migration to a fresh database, so a migration
+  #     that cannot apply fails there. E2E global setup fast-resets the
+  #     database, so the integration tests leave nothing behind for E2E.
+  # Both need only `changes`, so they start within a minute of the run, not
+  # after static and integration finish. CI Gate still needs every job; the cost
+  # is runner time spent on E2E in a run that static goes on to fail. (PP-yva7.1.)
+  # ==============================================================================
   test-e2e-smoke:
-    # ==============================================================================
-    # E2E Smoke Tests (Chromium Only)
-    #
-    # Runs smoke tests with chromium browser only for fast feedback.
-    #
-    # This and its two PR siblings each split into 2 Playwright shards
-    # (`--shard`); GitHub appends the shard number to the job name. The name
-    # itself stays a plain string, because a skipped matrix job never expands its
-    # matrix and would show the raw expression. The smoke jobs use
-    # playwright.config.ts, which sets fullyParallel, so smoke splits by test and
-    # comes out even (51/51 tests; ~200s per shard against ~420s unsplit).
-    # playwright.config.full.ts does not, so Full splits by file and runs uneven
-    # (62/57 tests, 396s/267s on the first run). Each shard runs auth-setup itself
-    # and gets its own database. Every extra shard pays ~2 minutes of job setup
-    # and the dev server's first-compile cost again, and takes another slot under
-    # the account's concurrent-job cap. (PP-yva7.2.)
-    # ==============================================================================
-    name: E2E Smoke Tests (Chromium)
+    name: E2E Smoke Tests (Chromium, Mobile Chrome)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'pull_request' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
+    if: >-
+      ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group')
+      && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
     needs: changes
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2]
+    timeout-minutes: 20
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2  # ratchet:step-security/harden-runner@v2.22.2
@@ -547,9 +540,8 @@ jobs:
       - name: Setup Supabase
         uses: $/.github/actions/setup-supabase
 
-      - name: Run Smoke Tests (Chromium)
+      - name: Run Smoke Tests (Chromium, Mobile Chrome)
         env:
-          SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
           MOCK_BLOB_STORAGE: "true"
           # Production server: the webServer runs `next build && next start`
           # inside this step, after Setup Supabase exported the NEXT_PUBLIC_*
@@ -558,103 +550,24 @@ jobs:
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
           UNSUBSCRIBE_SIGNING_SECRET: "ci-test-only-not-a-real-secret-0000000000000000000000000000000000"
-        run: pnpm exec playwright test e2e/smoke --project=chromium --shard="$SHARD"
+        run: pnpm exec playwright test e2e/smoke --project=chromium --project="Mobile Chrome"
 
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # ratchet:actions/upload-artifact@v7.0.2
         with:
-          name: playwright-report-smoke-chromium-shard-${{ matrix.shard }}
-          path: playwright-report/
-          retention-days: 7
-
-  test-e2e-smoke-mobile-chrome:
-    # ==============================================================================
-    # E2E Smoke Tests (Mobile Chrome)
-    #
-    # Runs smoke tests with Mobile Chrome browser to catch mobile-specific issues.
-    # ==============================================================================
-    name: E2E Smoke Tests (Mobile Chrome)
-    runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'pull_request' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
-    needs: changes
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2]
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2  # ratchet:step-security/harden-runner@v2.22.2
-        with:
-          egress-policy: audit
-
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Setup locked mise toolchain
-        id: toolchain
-        uses: $/.github/actions/setup-mise
-        with:
-          install-args: "--locked node pnpm supabase"
-
-      - name: Restore node_modules
-        id: cache-restore
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache/restore@v6.1.0
-        with:
-          path: node_modules
-          key: ${{ steps.toolchain.outputs.node-modules-key }}
-
-      - name: Install dependencies (if cache miss)
-        if: steps.cache-restore.outputs.cache-hit != 'true'
-        run: pnpm install --frozen-lockfile
-
-      - name: Setup Playwright browsers
-        uses: $/.github/actions/setup-playwright
-        with:
-          browsers: chromium
-
-      - name: Setup Supabase
-        uses: $/.github/actions/setup-supabase
-
-      - name: Run Smoke Tests (Mobile Chrome)
-        env:
-          SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
-          MOCK_BLOB_STORAGE: "true"
-          # Production server: the webServer runs `next build && next start`
-          # inside this step, after Setup Supabase exported the NEXT_PUBLIC_*
-          # values the build inlines. See playwright.config.ts (PP-izj5).
-          PLAYWRIGHT_WEB_SERVER: "start"
-          PLAYWRIGHT_STDOUT: "pipe"
-          PLAYWRIGHT_STDERR: "pipe"
-          UNSUBSCRIBE_SIGNING_SECRET: "ci-test-only-not-a-real-secret-0000000000000000000000000000000000"
-        run: pnpm exec playwright test e2e/smoke --project="Mobile Chrome" --shard="$SHARD"
-
-      - name: Upload Playwright report
-        if: failure()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # ratchet:actions/upload-artifact@v7.0.2
-        with:
-          name: playwright-report-smoke-mobile-chrome-shard-${{ matrix.shard }}
+          name: playwright-report-smoke
           path: playwright-report/
           retention-days: 7
 
   test-e2e-full-chromium:
-    # ==============================================================================
-    # E2E Full Tests (Chromium)
-    #
-    # Runs full test suite with chromium browser.
-    # ==============================================================================
-    name: E2E Full Tests (Chromium)
+    name: E2E Full Tests (Chromium), Supabase integration
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'pull_request' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
+    if: >-
+      ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group')
+      && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
     needs: changes
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2]
+    timeout-minutes: 20
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2  # ratchet:step-security/harden-runner@v2.22.2
@@ -689,11 +602,22 @@ jobs:
           browsers: chromium
 
       - name: Setup Supabase
+        id: supabase
         uses: $/.github/actions/setup-supabase
 
+      - name: Verify migration metadata integrity
+        run: pnpm run check:migrations
+
+      # This step and the next run whenever Supabase is up, even after an
+      # earlier check failed, so one red step never hides another verdict.
+      # Runs test:ensure-schema first, so a stale test schema fails here.
+      - name: Run Supabase integration tests
+        if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
+        run: pnpm run test:integration:supabase
+
       - name: Run Full Tests (Chromium)
+        if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
         env:
-          SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
           MOCK_BLOB_STORAGE: "true"
           # Production server: the webServer runs `next build && next start`
           # inside this step, after Setup Supabase exported the NEXT_PUBLIC_*
@@ -702,13 +626,13 @@ jobs:
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
           UNSUBSCRIBE_SIGNING_SECRET: "ci-test-only-not-a-real-secret-0000000000000000000000000000000000"
-        run: pnpm exec playwright test --config=playwright.config.full.ts --project=chromium --shard="$SHARD"
+        run: pnpm exec playwright test --config=playwright.config.full.ts --project=chromium
 
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # ratchet:actions/upload-artifact@v7.0.2
         with:
-          name: playwright-report-full-chromium-shard-${{ matrix.shard }}
+          name: playwright-report-full-chromium
           path: playwright-report/
           retention-days: 7
 
@@ -736,7 +660,7 @@ jobs:
     # show unexpanded.
     name: E2E Comprehensive Tests (Post-Merge)
     runs-on: ubuntu-latest
-    # Explicit code/deps guard mirrors the three PR E2E siblings. It is the
+    # Explicit code/deps guard mirrors the two PR E2E siblings. It is the
     # only thing keeping this job off docs-only main pushes: like them it
     # needs only `changes`, so no skipped upstream job cascades a skip. (PP-x0ke.)
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
@@ -829,6 +753,13 @@ jobs:
       - name: Setup Supabase
         uses: $/.github/actions/setup-supabase
 
+      # Main's migration check. Setup Supabase has just applied every
+      # migration to a fresh database; this checks the drizzle/meta chain.
+      # (On a PR, the E2E Full job runs it.)
+      - name: Verify migration metadata integrity
+        if: matrix.suite == 'full' && matrix.shard == 1
+        run: pnpm run check:migrations
+
       # Lists the suite with the same config and projects the run uses, so the
       # assignment covers exactly the files the run would load. Every leg
       # computes the same assignment, so the legs partition the suite. Not
@@ -904,112 +835,19 @@ jobs:
           path: playwright-report/
           retention-days: 7
 
-  gitleaks:
-    name: Gitleaks Secret Scan
-    runs-on: ubuntu-latest
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2  # ratchet:step-security/harden-runner@v2.22.2
-        with:
-          egress-policy: audit
-
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-
-      - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e  # ratchet:gitleaks/gitleaks-action@v3.0.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  pnpm-audit:
-    name: pnpm audit
-    runs-on: ubuntu-latest
-    needs: changes
-    # Fails only on high/critical advisories the change adds over its base.
-    # One published against a version already locked on main is Dependabot's
-    # job (dependabot.yml security updates) and must not block unrelated
-    # dependency PRs.
-    if: needs.changes.outputs.deps == 'true'
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2  # ratchet:step-security/harden-runner@v2.22.2
-        with:
-          egress-policy: audit
-
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # ratchet:actions/checkout@v7.0.1
-        with:
-          persist-credentials: false
-          fetch-depth: 0  # the base commit's lockfile
-
-      - name: Setup locked mise toolchain
-        uses: $/.github/actions/setup-mise
-
-      # pnpm audit reads the lockfile only; no node_modules needed. `--dir`
-      # keeps pnpm's mise shim resolving from the checkout.
-      - name: Run pnpm audit
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-        run: |
-          # Writes "<id> <package>: <title>" per high/critical advisory in the
-          # lockfile at $1 to $RUNNER_TEMP/$2.ids; fails when there is no report.
-          audit() {
-            local out="$RUNNER_TEMP/$2"
-            pnpm --dir "$1" --pm-on-fail=ignore audit --json >"$out.json" 2>"$out.err" || true
-            jq -e '.advisories | type == "object"' "$out.json" >/dev/null 2>&1 || return 1
-            jq -r '.advisories | to_entries[]
-              | select(.value.severity == "high" or .value.severity == "critical")
-              | "\(.key) \(.value.module_name): \(.value.title)"' "$out.json" >"$out.ids"
-          }
-
-          if ! audit . head; then
-            cat "$RUNNER_TEMP/head.json" "$RUNNER_TEMP/head.err"
-            registry_errors="ERR_PNPM_AUDIT_BAD_RESPONSE|ERR_PNPM_AUDIT_REGISTRY"
-            registry_errors+="|ECONNREFUSED|EAI_AGAIN|ETIMEDOUT"
-            if grep -qE "$registry_errors" "$RUNNER_TEMP/head.json" "$RUNNER_TEMP/head.err"; then
-              echo "::warning::pnpm audit skipped: registry error"
-              exit 0
-            fi
-            echo "::error::pnpm audit produced no report."
-            exit 1
-          fi
-
-          base="$RUNNER_TEMP/base"
-          mkdir -p "$base"
-          for f in package.json pnpm-lock.yaml pnpm-workspace.yaml; do
-            git show "$BASE_SHA:$f" >"$base/$f" 2>/dev/null || rm -f "$base/$f"
-          done
-          if ! audit "$base" base; then
-            echo "::warning::Could not audit the base lockfile; every advisory counts as new."
-            : >"$RUNNER_TEMP/base.ids"
-          fi
-
-          new=$(awk 'FILENAME == ARGV[1] { seen[$1]; next } !($1 in seen)' \
-            "$RUNNER_TEMP/base.ids" "$RUNNER_TEMP/head.ids")
-          if [[ -s "$RUNNER_TEMP/base.ids" ]]; then
-            echo "Already on the base (Dependabot's job):"
-            cat "$RUNNER_TEMP/base.ids"
-          fi
-          if [[ -n "$new" ]]; then
-            echo "::error::This change adds high/critical advisories:"
-            echo "$new"
-            exit 1
-          fi
-          echo "No high/critical advisories added over the base."
-
   # ==============================================================================
   # CI Gate (Aggregator) — the only required check.
   #
   # Fails if any job it needs failed or was cancelled; `skipped` passes.
   #   - Path-filtered jobs skip on docs-only PRs, and test-e2e-comprehensive
-  #     skips on pull_request events, so `skipped` must pass.
+  #     skips on pull_request and merge_group events, so `skipped` must pass.
+  #     Because a skip passes, every job a PR runs must also be allowed to run
+  #     on merge_group; an event check that leaves merge_group out would make
+  #     the queue's verdict a silent pass.
   #   - `cancelled` fails because a job that hits its timeout-minutes reports
   #     `cancelled` — a hung E2E run must not leave the gate green (PP-jxhy).
-  #   - `changes` and `setup` are listed so a failure there, which skips the
-  #     jobs that need it, cannot pass as a skip.
+  #   - `changes` is listed so a failure there, which skips the jobs that
+  #     need it, cannot pass as a skip.
   #
   # On push to main this also carries the post-merge full-matrix verdict
   # (test-e2e-comprehensive, PP-x0ke): a red or hung run turns CI Gate red on
@@ -1020,18 +858,12 @@ jobs:
     if: always()
     needs:
       - changes
-      - setup
       - static
       - linters
-      - gitleaks
       - test-integration
-      - test-migrations
-      - test-integration-supabase
       - test-e2e-smoke
-      - test-e2e-smoke-mobile-chrome
       - test-e2e-full-chromium
       - test-e2e-comprehensive
-      - pnpm-audit
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner

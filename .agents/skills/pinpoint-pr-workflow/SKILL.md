@@ -169,7 +169,7 @@ The approval carries across later commits that touch no UI path, so E2E updates 
 
 ## Phase 4: Merge — Tim's decision
 
-**Tim decides whether to merge.** GitHub's ruleset `6326455` enforces the gates natively: required checks `CI Gate`, `Claude Review`, and `UI Approval`, every conversation resolved, and the branch up to date with `main`. Green checks alone never authorize a merge; Tim's explicit request does.
+**Tim decides whether to merge.** GitHub's ruleset `6326455` enforces the gates natively: required checks `CI Gate`, `Claude Review`, and `UI Approval`, every conversation resolved, and merging through the merge queue. Green checks alone never authorize a merge; Tim's explicit request does.
 
 ### 4.1 Report ready by default; merge on explicit request
 
@@ -182,9 +182,9 @@ gh pr merge <PR> --squash          # gates already pass
 gh pr merge <PR> --auto --squash   # GitHub merges once the required checks pass
 ```
 
-Use `--auto` when checks are still running or the branch is behind, and always when Tim asks for several merges at once. Say “merged” only after `gh pr view <PR> --json state` reads `MERGED`; an auto-merge that is armed but not yet merged is “queued to merge”.
+Both put the PR in the merge queue: the first once the gates pass, `--auto` as soon as they do. Use `--auto` when checks are still running, and always when Tim asks for several merges at once. Say “merged” only after `gh pr view <PR> --json state` reads `MERGED`; a PR armed or waiting in the queue is “queued to merge”.
 
-**Behind main.** The ruleset requires the branch up to date. Bring it current with `gh pr update-branch <PR>`, which merges `main` into the branch (never `--rebase`; AGENTS.md §5 Branches). The new head gets fresh CI; Claude Review and UI Approval pass a clean merge of `main` without a new review or sign-off. Once auto-merge is armed, the `Auto-update branches` workflow does this after every push to `main`, so a queue of armed PRs lands one after another without you. A PR whose update conflicts stays behind with a warning in that workflow's run; merge `main` in locally and resolve it. The workflow skips bot PRs (§4.3).
+**The merge queue.** The queue builds a commit of `main` plus every PR ahead plus this one and runs CI Gate on it; Claude Review and UI Approval pass there without a new review or sign-off, since each PR passed them on its own head. A branch behind `main` merges as it is. The queue removes a PR whose combined commit conflicts or fails CI Gate; its owning session merges `main` in (`gh pr update-branch <PR>` or locally, never `--rebase`; AGENTS.md §5 Branches), fixes the failure, and runs `gh pr merge` again.
 
 **A refused merge means a gate is unmet.** Read `gh pr checks <PR> --required` and the unresolved conversations, fix what is missing, and merge again. `gh pr merge` is the one merge path: `--admin` is denied to agents (they act through Tim's account, and the ruleset's admin bypass is his), as are the raw API and MCP merge channels.
 
@@ -200,7 +200,7 @@ When two or more Dependabot PRs that both touch `pnpm-lock.yaml` (or any lockfil
 
 **Why `rebase-strategy: auto` in `.github/dependabot.yml` doesn't save you:** "auto" means Dependabot rebases when _the dependency version_ is out of date, not when _the lockfile region_ has shifted under it. Two independent Dependabot PRs against the same main can both stay "current" by Dependabot's definition while their lockfile diffs collide.
 
-**What the up-to-date rule changes:** the ruleset requires the branch current with `main`, so the second PR must be updated before it can merge, and the duplicate key then fails `Setup Dependencies` in that PR's CI instead of breaking `main`. A red `Setup Dependencies` with `ERR_PNPM_BROKEN_LOCKFILE` on an updated Dependabot PR is this trap, not a flake.
+**What the up-to-date rule changes:** the ruleset requires the branch current with `main`, so the second PR must be updated before it can merge, and the duplicate key then fails the `pnpm install --frozen-lockfile` step of that PR's CI (first in `Static checks, unit tests, build`) instead of breaking `main`. A red install step with `ERR_PNPM_BROKEN_LOCKFILE` on an updated Dependabot PR is this trap, not a flake.
 
 **Rule:** after the first of two lockfile-touching Dependabot PRs merges, comment `@dependabot rebase` on each remaining one (Dependabot's own command: it regenerates the lockfile against current `main`, which dedupes the entry). `gh pr update-branch <PR>` also brings it current, but a textual merge keeps the duplicate, so prefer the Dependabot rebase for lockfile PRs. Wait for the regenerated PR's CI before reporting it ready.
 

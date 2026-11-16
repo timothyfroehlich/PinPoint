@@ -73,7 +73,7 @@ Sign every review comment or reply with your agent name (`—Claude`, `—Gemini
 
 ## The PinPoint merge boundary
 
-Reviewers never merge a PinPoint PR merely by reviewing it. Tim decides whether to merge. GitHub's ruleset `6326455` enforces the gates natively: required checks `CI Gate`, `Claude Review`, and `UI Approval`, every conversation resolved, and the branch up to date with `main`.
+Reviewers never merge a PinPoint PR merely by reviewing it. Tim decides whether to merge. GitHub's ruleset `6326455` enforces the gates natively: required checks `CI Gate`, `Claude Review`, and `UI Approval`, every conversation resolved, and merging through the merge queue.
 
 When Tim explicitly asks to merge an unambiguous PR, the owning agent runs `gh pr merge <PR> --squash` (or `--auto --squash`) and verifies the result; if the target is ambiguous, clarify it first. A refused merge means a gate is unmet: fix the gate. `--admin` is Tim's own emergency bypass and is denied to agents, as are the raw API and MCP merge channels.
 
