@@ -777,6 +777,11 @@ export function PhoneListHeader({
               ? "hidden"
               : "min-w-24 flex-[1_1_96px]"
         )}
+        onFocus={() => {
+          // A field the person is in counts as opened, so one that arrived
+          // with a search from the URL stays open when they delete it all.
+          if (searchAsIcon) setOpened(true);
+        }}
         onBlur={(event) => {
           // An emptied field closes once focus leaves the header. Backgrounding
           // the tab or app also blurs it; that isn't the person leaving, so

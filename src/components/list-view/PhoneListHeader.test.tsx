@@ -401,6 +401,23 @@ describe("PhoneListHeader", () => {
     ).toHaveValue("");
   });
 
+  it("keeps a search from the URL open while it is deleted to empty (§7.3)", async () => {
+    const user = userEvent.setup();
+    layOut(353, 142);
+    renderHeader({ searchValue: "gate" });
+
+    const field = screen.getByRole("searchbox", { name: "Search issues" });
+    await user.clear(field);
+    expect(field).toHaveFocus();
+    expect(field).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Close search" })
+    ).toBeInTheDocument();
+
+    await user.click(document.body);
+    expect(screen.getByTestId("list-phone-search-trigger")).toBeInTheDocument();
+  });
+
   it("announces the Edited marker and the count of filters off their preset (§7.3, §7.4)", () => {
     renderHeader({
       views: views({ edited: true }),
