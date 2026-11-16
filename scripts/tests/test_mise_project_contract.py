@@ -6,7 +6,7 @@ Verifies that:
 3. mise.toml does not duplicate the pnpm version (idiomatic_version_file_enable_tools is used).
 4. mise.lock exists and captures resolved artifacts across platforms.
 5. mise rejects mismatched packageManager checksum suffixes (negative test).
-6. mise meets the minimum version requirement (>= 2026.8.11).
+6. mise meets the minimum version requirement (>= 2026.11.7).
 7. CI's required mise-only canary validates the locked toolchain and cache identity (PP-h2ui.8).
 8. CI and preview workflows use the shared mise setup without legacy setup actions (PP-h2ui.9).
 9. pnpm-lock.yaml stays one YAML document, because pnpm self-switching is off (PP-o961).
@@ -45,12 +45,14 @@ MISE_ACTION_PATH = REPO_ROOT / ".github" / "actions" / "setup-mise" / "action.ym
 PREVIEW_CONTROL_PATH = REPO_ROOT / ".github" / "workflows" / "preview-control.yaml"
 PREVIEW_REAPER_PATH = REPO_ROOT / ".github" / "workflows" / "preview-reaper.yaml"
 
-MINIMUM_MISE_VERSION = (2026, 8, 11)
+MINIMUM_MISE_VERSION = (2026, 11, 7)
 MISE_MANAGED_TOOLS = ("node", "python", "ruff", "supabase", "zizmor", "actionlint")
 EXPECTED_TOOL_BACKENDS = {
     "actionlint": "aqua:rhysd/actionlint",
     "node": "core:node",
-    "pnpm": "aqua:pnpm/pnpm",
+    # A packageManager checksum selects the npm backend whatever [tool_alias] says
+    # (PP-66o0); the lock entry carries the checksum, not per-platform artifacts.
+    "pnpm": "npm:pnpm",
     "python": "core:python",
     "ruff": "aqua:astral-sh/ruff",
     "supabase": "aqua:supabase/cli",
@@ -278,6 +280,34 @@ def _assert_platform_locks_coherent(
         )
 
 
+def _assert_pnpm_lock_checksum_matches_package_json(
+    entry: dict[str, object], package_data: dict[str, object]
+) -> None:
+    """Require the locked npm:pnpm checksum to be packageManager's sha512."""
+    package_manager = package_data.get("packageManager")
+    assert isinstance(package_manager, str)
+    match = re.fullmatch(
+        r"pnpm@\d+\.\d+\.\d+\+sha512\.([0-9a-f]{128})", package_manager
+    )
+    assert match, (
+        f"package.json#packageManager is not an integrity pin: {package_manager!r}"
+    )
+    options = entry.get("options")
+    assert isinstance(options, dict), (
+        f"mise.lock pnpm entry must carry an options table, got {options!r}"
+    )
+    assert options.get("checksum") == f"sha512:{match.group(1)}", (
+        "mise.lock pnpm checksum option must equal package.json#packageManager's "
+        f"sha512, got {options.get('checksum')!r}"
+    )
+    # The install script that swaps the registry stub for the native binary runs
+    # only when builds are allowed; a lock regenerated without it installs the stub.
+    assert options.get("allow_builds") == "true", (
+        'mise.lock pnpm entry must keep allow_builds = "true" so pnpm\'s install '
+        f"script runs, got {options.get('allow_builds')!r}"
+    )
+
+
 def _assert_mise_lock_coherent(
     mise_data: dict[str, object],
     lock_data: dict[str, object],
@@ -318,6 +348,8 @@ def _assert_mise_lock_coherent(
             f"got {entry.get('backend')!r}"
         )
         _assert_platform_locks_coherent(tool, expected_version, entry)
+        if tool == "pnpm":
+            _assert_pnpm_lock_checksum_matches_package_json(entry, package_data)
 
 
 def test_mise_toml_exists_and_is_valid() -> None:
@@ -325,8 +357,15 @@ def test_mise_toml_exists_and_is_valid() -> None:
     data = tomllib.loads(MISE_TOML_PATH.read_text(encoding="utf-8"))
 
     # Top-level min_version must be enforced
-    assert data.get("min_version") == "2026.8.11", (
-        f"mise.toml must enforce min_version = '2026.8.11', got {data.get('min_version')!r}"
+    assert data.get("min_version") == "2026.11.7", (
+        f"mise.toml must enforce min_version = '2026.11.7', got {data.get('min_version')!r}"
+    )
+
+    # A pnpm alias is ignored once packageManager carries a checksum and would
+    # need an aqua lock entry that `mise lock` removes (PP-66o0).
+    assert "pnpm" not in data.get("tool_alias", {}), (
+        "mise.toml must not alias pnpm to another backend; the packageManager "
+        "checksum selects npm:pnpm and mise.lock records that backend"
     )
 
     # Managed development runtimes must remain exact pins. Their current values
@@ -546,6 +585,21 @@ def test_mise_cli_version_meets_minimum() -> None:
     )
 
 
+def test_ci_mise_version_meets_minimum() -> None:
+    """CI installs a mise at least as new as mise.toml's min_version (PP-66o0)."""
+    action = yaml.safe_load(MISE_ACTION_PATH.read_text(encoding="utf-8"))
+    install_step = next(
+        step
+        for step in action["runs"]["steps"]
+        if str(step.get("uses", "")).startswith("jdx/mise-action@")
+    )
+    ci_version = _parse_mise_version(install_step["with"]["version"])
+    assert ci_version >= MINIMUM_MISE_VERSION, (
+        f"setup-mise installs mise {install_step['with']['version']}, older than "
+        f"the minimum required {MINIMUM_MISE_VERSION}"
+    )
+
+
 def _selected_tool_entry(info: object) -> dict[str, object]:
     """Select the active entry, or the sole requested entry if uninstalled."""
     candidates = info if isinstance(info, list) else [info]
@@ -715,7 +769,7 @@ def test_negative_checksum_mismatch_rejected(tmp_path: Path) -> None:
     # Create an isolated sandbox with mise.toml and a package.json with a bad sha512
     test_mise_toml = tmp_path / "mise.toml"
     test_mise_toml.write_text(
-        'min_version = "2026.8.11"\n\n'
+        'min_version = "2026.11.7"\n\n'
         f'[tools]\nnode = "{node_version}"\n\n'
         '[settings]\nidiomatic_version_file_enable_tools = ["pnpm"]\n',
         encoding="utf-8",
@@ -999,21 +1053,14 @@ def test_ci_jobs_share_runtime_aware_dependency_cache() -> None:
     """Producer and consumers must agree on the composite action's cache key."""
     workflow = CI_WORKFLOW_PATH.read_text(encoding="utf-8")
     dependency_jobs = (
-        "setup",
         "static",
         "test-integration",
-        "test-migrations",
-        "test-integration-supabase",
         "test-e2e-smoke",
-        "test-e2e-smoke-mobile-chrome",
         "test-e2e-full-chromium",
         "test-e2e-comprehensive",
     )
     supabase_jobs = {
-        "test-migrations",
-        "test-integration-supabase",
         "test-e2e-smoke",
-        "test-e2e-smoke-mobile-chrome",
         "test-e2e-full-chromium",
         "test-e2e-comprehensive",
     }
@@ -1116,27 +1163,61 @@ def test_offline_python_and_ruff_resolution() -> None:
     )
 
 
-def test_pr_e2e_shards_and_browser_cache_wiring() -> None:
-    """PR E2E jobs shard by the matrix and never save the shared browser cache.
+def test_pr_e2e_jobs_unsharded_and_browser_cache_wiring() -> None:
+    """PR E2E is two unsharded jobs that never save the shared browser cache.
 
-    A `--shard` denominator out of step with the matrix silently drops tests,
-    a shared artifact name makes the shards' uploads collide, and a PR-scoped
-    browser save would spread one cache entry per PR. Only main's comprehensive
-    job saves. (PP-yva7.2, PP-yva7.4.)
+    Each E2E job pays ~130s of setup and build before its first test, so a
+    shard costs a runner slot and that 130s again for under two minutes of
+    tests; under the account's 20-job cap the queueing costs more than the
+    split saves (PP-bg1u). Smoke runs both projects in one process; Full also
+    carries the Supabase integration tests and the migration metadata check,
+    which used to be jobs of their own. A PR-scoped browser save would spread
+    one cache entry per PR; only main's comprehensive job saves (PP-yva7.4).
     """
     workflow = CI_WORKFLOW_PATH.read_text(encoding="utf-8")
-    for job_name in (
-        "test-e2e-smoke",
-        "test-e2e-smoke-mobile-chrome",
-        "test-e2e-full-chromium",
-    ):
-        job = _workflow_job_block(workflow, job_name)
-        assert "fail-fast: false" in job, job_name
-        assert "SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}" in job, job_name
-        assert '--shard="$SHARD"' in job, job_name
-        assert "-shard-${{ matrix.shard }}" in job, f"{job_name} artifact name"
+    smoke = _workflow_job_block(workflow, "test-e2e-smoke")
+    full = _workflow_job_block(workflow, "test-e2e-full-chromium")
+    for job_name, job in (("test-e2e-smoke", smoke), ("test-e2e-full-chromium", full)):
+        assert "matrix" not in job, f"{job_name} must not shard"
+        assert "--shard" not in job, f"{job_name} must not shard"
         assert "uses: $/.github/actions/setup-playwright" in job, job_name
         assert "save-cache" not in job, f"{job_name} must not save the browser cache"
+
+    assert '--project=chromium --project="Mobile Chrome"' in smoke
+    assert "name: playwright-report-smoke\n" in smoke
+    assert "name: playwright-report-full-chromium\n" in full
+
+    # Full runs every check the removed Supabase jobs ran, after Supabase is
+    # up, and runs E2E even when an earlier check is red.
+    order = [
+        full.index("uses: $/.github/actions/setup-supabase"),
+        full.index("run: pnpm run check:migrations"),
+        full.index("run: pnpm run test:integration:supabase"),
+        full.index("--config=playwright.config.full.ts --project=chromium"),
+    ]
+    assert order == sorted(order)
+    assert (
+        full.count("if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}")
+        == 2
+    )
+
+    # The merged-away jobs stay merged, and main still checks migrations.
+    for removed in (
+        "setup",
+        "gitleaks",
+        "pnpm-audit",
+        "test-migrations",
+        "test-integration-supabase",
+        "test-e2e-smoke-mobile-chrome",
+    ):
+        assert f"\n  {removed}:\n" not in workflow, (
+            f"{removed} is folded into another job"
+        )
+    linters = _workflow_job_block(workflow, "linters")
+    # The CLI, not gitleaks-action, which needs a license key in an org repo.
+    assert '"$RUNNER_TEMP/gitleaks" git --redact' in linters
+    assert "gitleaks/gitleaks-action@" not in linters
+    assert "- name: Run pnpm audit" in _workflow_job_block(workflow, "test-integration")
 
     comprehensive = _workflow_job_block(workflow, "test-e2e-comprehensive")
     # One leg saves; six would race to upload the same key.
@@ -1152,3 +1233,5 @@ def test_pr_e2e_shards_and_browser_cache_wiring() -> None:
         in comprehensive
     )
     assert workflow.count("save-cache:") == 1
+    # Main has no PR E2E jobs, so one comprehensive leg checks the migrations.
+    assert "run: pnpm run check:migrations" in comprehensive

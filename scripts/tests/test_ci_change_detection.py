@@ -374,11 +374,12 @@ def test_dependency_updates_trigger_deps_filter(
     assert has_deps, f"Dependency file {file_path} was not flagged as deps=True"
 
 
-def test_setup_job_gates_on_code_or_deps(ci_workflow: dict) -> None:
-    """The setup job must gate on both code and deps."""
-    setup_if = ci_workflow["jobs"]["setup"]["if"]
-    assert "needs.changes.outputs.code == 'true'" in setup_if
-    assert "needs.changes.outputs.deps == 'true'" in setup_if
+def test_integration_job_gates_on_code_or_deps(ci_workflow: dict) -> None:
+    """Integration (which also runs pnpm audit) gates on code or deps, on every event."""
+    integration_if = ci_workflow["jobs"]["test-integration"]["if"]
+    assert "needs.changes.outputs.code == 'true'" in integration_if
+    assert "needs.changes.outputs.deps == 'true'" in integration_if
+    assert "event_name" not in integration_if
 
 
 def test_push_change_detection_reaches_back_to_the_last_passing_main_run(
@@ -401,8 +402,8 @@ def test_push_change_detection_reaches_back_to_the_last_passing_main_run(
         s for s in changes["steps"] if "actions/checkout@" in s.get("uses", "")
     )
     assert checkout["with"]["fetch-depth"] == (
-        "${{ github.event_name == 'push' && '0' || '1' }}"
-    ), "push runs need full history to diff past `before`"
+        "${{ github.event_name != 'pull_request' && '0' || '1' }}"
+    ), "push and merge-queue runs diff with git and need full history"
 
     base = steps["base"]
     assert base["if"] == "github.event_name == 'push'"
@@ -435,3 +436,50 @@ def test_mixed_changes_trigger_tests(paths_filter: PathsFilterSimulator) -> None
 
     has_code, _ = paths_filter.evaluate(mixed_files)
     assert has_code, "Mixed PR containing website code was not flagged as has_code=True"
+
+
+WORKFLOWS_DIR = REPO_ROOT / ".github" / "workflows"
+
+
+def _triggers(workflow: dict) -> dict:
+    # PyYAML (YAML 1.1) reads the bare key `on` as the boolean True.
+    return workflow.get("on", workflow.get(True)) or {}
+
+
+@pytest.mark.parametrize(
+    "workflow_file", ["ci.yml", "claude-review.yaml", "ui-approval.yaml"]
+)
+def test_required_check_workflows_run_on_the_merge_queue(workflow_file: str) -> None:
+    """Every workflow behind a required check reports on merge_group events.
+
+    The ruleset requires CI Gate, Claude Review and UI Approval on the merge
+    queue's commit as well as on the PR head. A workflow without the trigger
+    never reports there, and the queue waits until its timeout drops the PR.
+    """
+    workflow = yaml.safe_load((WORKFLOWS_DIR / workflow_file).read_text("utf-8"))
+    merge_group = _triggers(workflow).get("merge_group")
+    assert merge_group == {"types": ["checks_requested"]}, (
+        f"{workflow_file} must trigger on merge_group checks_requested"
+    )
+
+
+def test_every_pr_job_also_runs_in_the_merge_queue(ci_workflow: dict) -> None:
+    """A job gated to pull_request events must be allowed on merge_group too.
+
+    CI Gate passes a skipped job. A job whose `if` admits pull_request but not
+    merge_group would skip on the queue's commit and the queue would merge
+    untested combinations as green.
+    """
+    for name, job in ci_workflow["jobs"].items():
+        condition = str(job.get("if", ""))
+        if "'pull_request'" in condition:
+            assert "'merge_group'" in condition, (
+                f"job {name} runs on pull_request but skips merge_group"
+            )
+
+
+def test_e2e_jobs_run_in_the_merge_queue(ci_workflow: dict) -> None:
+    """Smoke and Full E2E are named explicitly, so a rename cannot hide a skip."""
+    for name in ("test-e2e-smoke", "test-e2e-full-chromium"):
+        condition = str(ci_workflow["jobs"][name]["if"])
+        assert "github.event_name == 'merge_group'" in condition, name
