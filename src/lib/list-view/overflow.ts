@@ -386,3 +386,63 @@ export function planPageActions({
   }
   return plan;
 }
+
+/** The room between an inline breadcrumb and the title it precedes. */
+export const GROUP_HEADER_BREADCRUMB_GAP = 8;
+/** The room between the title block and a description beside it. */
+export const GROUP_HEADER_DESCRIPTION_GAP = 24;
+/** The narrowest a Collection's description column beside the title may be. */
+export const GROUP_HEADER_DESCRIPTION_MIN = 280;
+
+export interface GroupHeaderFitInput {
+  /** The page header's inner width. */
+  available: number;
+  /**
+   * The breadcrumb's width on one line in its inline form, trailing "›"
+   * included; 0 when the page shows no breadcrumb.
+   */
+  breadcrumb: number;
+  /** The title's width on one line. */
+  title: number;
+  /**
+   * Whether a description competes for the row beside the title: a
+   * Collection with a description, at and above the md breakpoint. Below it
+   * the description always sits under the title (collections-and-tags 4.11).
+   */
+  description: boolean;
+}
+
+export interface GroupHeaderPlan {
+  /** The breadcrumb sits before the title rather than above it. */
+  breadcrumbInline: boolean;
+  /** The description sits beside the title rather than under it. */
+  descriptionBeside: boolean;
+}
+
+/**
+ * Lays out a Collection or Tag page's header (list-views §8.9, §8.10;
+ * collections-and-tags 4.9, 4.11). The breadcrumb stays inline before the
+ * title while the breadcrumb, the title, and a description's 280px column
+ * fit on one line; it is the first to move, above the title, before the
+ * description leaves its column. The description sits beside the title
+ * while the column there can be at least 280px, and moves under it
+ * otherwise. Both checks keep the §8.7 tolerance.
+ */
+export function planGroupHeader({
+  available,
+  breadcrumb,
+  title,
+  description,
+}: GroupHeaderFitInput): GroupHeaderPlan {
+  const room = available - FIT_TOLERANCE;
+  const column = description
+    ? GROUP_HEADER_DESCRIPTION_GAP + GROUP_HEADER_DESCRIPTION_MIN
+    : 0;
+  const inlineWidth = breadcrumb + GROUP_HEADER_BREADCRUMB_GAP + title;
+  const breadcrumbInline = breadcrumb > 0 && inlineWidth + column <= room;
+  if (!description) return { breadcrumbInline, descriptionBeside: false };
+  const titleBlock = breadcrumbInline
+    ? inlineWidth
+    : Math.max(breadcrumb, title);
+  return { breadcrumbInline, descriptionBeside: titleBlock + column <= room };
+}

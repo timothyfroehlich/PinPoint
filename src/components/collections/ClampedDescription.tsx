@@ -9,10 +9,16 @@ interface Props {
   children: React.ReactNode;
 }
 
+const toggleClass =
+  "rounded-sm text-[13px] leading-[21px] text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none";
+
 /**
- * A Collection's description under its header (spec collections-and-tags
- * 4.7): clamped to three lines, with a Show more / Show less toggle that
- * appears only when the text runs past three lines.
+ * A Collection's description in its header (spec collections-and-tags 4.7,
+ * 4.12): clamped to three lines, or two below the md breakpoint. Longer
+ * text ends its last shown line with an inline "… Show more"; expanded, a
+ * Show less under the text returns it to its clamped length. A link inside
+ * the clamped text that takes keyboard focus shows the whole text, so focus
+ * never lands on a hidden link.
  *
  * Overflow is measured on the element itself (scrollHeight vs clientHeight
  * while clamped), re-measured when its box resizes. That is a property of the
@@ -38,23 +44,46 @@ export function ClampedDescription({ children }: Props): React.JSX.Element {
   }, [expanded, children]);
 
   return (
-    <div className="max-w-3xl" data-testid="collection-description">
+    <div
+      className="group/description relative text-sm/[21px]"
+      data-testid="collection-description"
+    >
       <div
         id={id}
         ref={ref}
-        className={cn("text-sm text-foreground", !expanded && "line-clamp-3")}
+        className={cn(
+          "text-foreground-secondary",
+          !expanded &&
+            "line-clamp-2 has-[a:focus]:line-clamp-none md:line-clamp-3"
+        )}
       >
         {children}
       </div>
-      {overflows ? (
+      {overflows && !expanded ? (
+        // Over the end of the last shown line, fading the text beneath it
+        // into the page background.
         <button
           type="button"
-          aria-expanded={expanded}
+          aria-expanded={false}
           aria-controls={id}
-          onClick={() => setExpanded((value) => !value)}
-          className="mt-1 rounded-sm text-sm font-medium text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          onClick={() => setExpanded(true)}
+          className={cn(
+            toggleClass,
+            "absolute right-0 bottom-0 bg-[linear-gradient(to_right,transparent,var(--color-background)_24px)] pl-6 group-has-[a:focus]/description:hidden"
+          )}
         >
-          {expanded ? "Show less" : "Show more"}
+          <span aria-hidden="true">… </span>Show more
+        </button>
+      ) : null}
+      {overflows && expanded ? (
+        <button
+          type="button"
+          aria-expanded={true}
+          aria-controls={id}
+          onClick={() => setExpanded(false)}
+          className={toggleClass}
+        >
+          Show less
         </button>
       ) : null}
     </div>

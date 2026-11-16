@@ -1,12 +1,15 @@
 import type React from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import {
+  GroupBreadcrumb,
+  tagCrumbs,
+} from "~/components/collections/GroupBreadcrumb";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { AddTagDialog } from "~/components/tags/AddTagDialog";
 import { AutomaticBadge } from "~/components/tags/AutomaticBadge";
 import { ExclusiveBadge } from "~/components/tags/ExclusiveBadge";
 import { TagList } from "~/components/tags/TagList";
-import { TagTrail } from "~/components/tags/TagTrail";
 import { TagTypeActionsMenu } from "~/components/tags/TagTypeActionsMenu";
 import { getViewer } from "~/lib/auth/viewer";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
@@ -75,7 +78,7 @@ export default async function TagTypePage({
     <PageContainer size="standard">
       <div className="space-y-6">
         <div className="space-y-1">
-          <TagTrail />
+          <GroupBreadcrumb crumbs={tagCrumbs()} />
           {/* Wraps rather than squeezing at 320px: title, badge, actions. */}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-outline-variant pb-2">
             <h1 className="text-balance text-3xl font-bold tracking-tight">

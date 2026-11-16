@@ -1,6 +1,7 @@
 import type React from "react";
 import { PageContainer } from "~/components/layout/PageContainer";
-import { CollectionHeader } from "~/components/collections/CollectionHeader";
+import type { Crumb } from "~/components/collections/GroupBreadcrumb";
+import { GroupPageHeader } from "~/components/collections/GroupPageHeader";
 import { CollectionTabStrip } from "~/components/collections/CollectionTabStrip";
 import type { CollectionMachine } from "~/lib/collections/types";
 import { summarizeCollection } from "~/lib/collections/summary";
@@ -9,31 +10,34 @@ import { db } from "~/server/db";
 
 interface MachineGroupShellProps {
   title: string;
-  /** Line above the title, e.g. a tag's breadcrumb. */
-  eyebrow?: React.ReactNode;
+  /** Where the group lives (spec collections-and-tags 4.8); empty for none. */
+  breadcrumb: readonly Crumb[];
   machines: CollectionMachine[];
   /** Route prefix the tabs hang off, e.g. `/c/<id>`. */
   basePath: string;
-  action?: React.ReactNode;
+  /** The page actions, at the right end of the tab row (4.10). */
+  actions?: React.ReactNode;
   /**
-   * Shown between the header and the tab strip on every tab. Only a
-   * Collection passes one (spec collections-and-tags 4.7).
+   * A Collection's description, shown in the header on every tab. Only a
+   * Collection passes one (4.7).
    */
   description?: React.ReactNode;
   children: React.ReactNode;
 }
 
 /**
- * The header and Overview / Issues / Timeline tab strip shared by every
- * machine group page: Collections and tags
- * (spec collections-and-tags 4.1–4.2).
+ * The header and Overview / Issues / Timeline tab row shared by every
+ * machine group page: Collections and tags (spec collections-and-tags
+ * 4.1–4.13). Below 390px the space above the title and below the tabs
+ * tightens from 12px to 4px (4.13, list-views §8.23), and the header sits
+ * directly on the tabs.
  */
 export async function MachineGroupShell({
   title,
-  eyebrow,
+  breadcrumb,
   machines,
   basePath,
-  action,
+  actions,
   description,
   children,
 }: MachineGroupShellProps): Promise<React.JSX.Element> {
@@ -41,6 +45,8 @@ export async function MachineGroupShell({
     db,
     machines.map((machine) => machine.initials)
   );
+  // The header shows no counts (4.2); the Issues tab carries the open-issue
+  // count, colored by the group's worst status.
   const summary = summarizeCollection(machines, health);
   const worstStatus =
     summary.unplayable > 0
@@ -50,21 +56,25 @@ export async function MachineGroupShell({
         : "operational";
 
   return (
-    <PageContainer size="standard">
-      <div className="space-y-2">
-        <CollectionHeader
+    // The two phone ranges don't overlap, so neither depends on CSS order.
+    <PageContainer
+      size="standard"
+      className="max-[390px]:pt-1 min-[390px]:max-md:pt-3"
+    >
+      <div>
+        <GroupPageHeader
           title={title}
-          eyebrow={eyebrow}
-          summary={summary}
-          action={action}
+          breadcrumb={breadcrumb}
+          description={description}
         />
-        {description}
         <CollectionTabStrip
           basePath={basePath}
           openIssueCount={summary.openIssues}
           status={worstStatus}
+          actions={actions}
+          className="mt-2 max-[390px]:mt-0 md:mt-3"
         />
-        <div className="pt-2">{children}</div>
+        <div className="mt-3 max-[390px]:mt-1">{children}</div>
       </div>
     </PageContainer>
   );
