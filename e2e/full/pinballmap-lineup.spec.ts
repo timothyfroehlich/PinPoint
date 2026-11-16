@@ -21,6 +21,7 @@ import { STORAGE_STATE } from "../support/auth-state.js";
 import { TEST_USERS } from "../support/constants.js";
 import { getTestMachineInitials } from "../support/test-isolation.js";
 import { cleanupTestEntities } from "../support/cleanup.js";
+import { clickPageAction } from "../support/page-actions.js";
 import {
   addLmxToStoredLineup,
   createTestMachine,
@@ -83,9 +84,10 @@ test.describe("Pinball Map lineup page (PP-o355.65)", () => {
           pinballmapLmxId: entryLmxId,
         });
 
-        // Entry point 1: the machines list header button.
+        // Entry point 1: the machines list's Pinball Map page action, or its
+        // entry in ⋯ once it folds (machine-views §6.8).
         await page.goto("/m");
-        await page.getByTestId("pinball-map-lineup-button").click();
+        await clickPageAction(page, "Pinball Map");
         await expect(page).toHaveURL(/\/m\/pinball-map$/);
         await expect(
           page.getByRole("heading", { name: "Pinball Map lineup" })

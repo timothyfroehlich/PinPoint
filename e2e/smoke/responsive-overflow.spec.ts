@@ -13,6 +13,13 @@ import {
   assertNoA11yViolations,
 } from "../support/actions.js";
 import { seededMachines, seededIssue } from "../support/constants.js";
+import {
+  closePageActions,
+  openPageActions,
+  pageActionButton,
+  pageActionsEntry,
+  pageActionsTrigger,
+} from "../support/page-actions.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
 
 // Build routes from seeded data so they don't break if seed data changes
@@ -325,9 +332,11 @@ test.describe("Responsive: no horizontal overflow", () => {
     });
   });
 
-  // The member-role `/m` entry above renders no header actions. An admin sees
-  // Pinball Map, the Print menu, and Add Machine on the title row, which
-  // must stay inside the viewport down to the 320px floor (list-views §7.2).
+  // An admin has every `/m` page action: Pinball Map, Add Machine, and ⋯
+  // holding Export and the Print entries (machine-views §6.6). Down to the
+  // 320px floor, whatever the title row shows stays inside the viewport, and
+  // what it cannot show is in ⋯: Pinball Map folds first, Add Machine last
+  // (list-views §3.9, §7.2; machine-views §6.8).
   test.describe("machines list header as admin", () => {
     test.use({ storageState: STORAGE_STATE.admin });
 
@@ -336,17 +345,40 @@ test.describe("Responsive: no horizontal overflow", () => {
         await page.setViewportSize({ width, height: 800 });
         await page.goto("/m");
 
-        const main = page.getByRole("main");
-        for (const action of [
-          main.getByRole("link", { name: "Pinball Map", exact: true }),
-          // The Print menu trigger; its name gains the queue count when the
-          // admin has apron cards queued.
-          main.getByRole("button", { name: /^Print(,|$)/ }),
-          main.getByRole("link", { name: "Add Machine", exact: true }),
-        ]) {
-          await expect(action).toBeInViewport({ ratio: 1 });
+        // ⋯ never folds, and every action still on the row fits.
+        await expect(pageActionsTrigger(page)).toBeInViewport({ ratio: 1 });
+        const folded: string[] = [];
+        for (const name of ["Pinball Map", "Add Machine"]) {
+          const button = pageActionButton(page, name);
+          if (await button.isVisible()) {
+            await expect(button).toBeInViewport({ ratio: 1 });
+          } else {
+            folded.push(name);
+          }
+        }
+        if (folded.includes("Add Machine")) {
+          expect(folded, "Pinball Map folds before Add Machine").toContain(
+            "Pinball Map"
+          );
         }
         await assertNoHorizontalOverflow(page);
+
+        // ⋯ holds the folded actions, Export, and the Print entries.
+        const actions = await openPageActions(page);
+        for (const name of [
+          ...folded,
+          "Export to CSV",
+          "Print settings sheets",
+          // Its name gains the queue count when the admin has cards queued.
+          /^Print apron cards(,|$)/,
+        ]) {
+          await expect(pageActionsEntry(actions, name)).toBeVisible();
+        }
+        for (const name of ["Pinball Map", "Add Machine"]) {
+          if (folded.includes(name)) continue;
+          await expect(pageActionsEntry(actions, name)).toHaveCount(0);
+        }
+        await closePageActions(page, actions);
       });
     }
   });

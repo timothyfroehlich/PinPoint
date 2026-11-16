@@ -11,6 +11,7 @@
 import { test, expect, attachHydrationWait } from "../support/fixtures.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
 import { getTestPrefix } from "../support/test-isolation.js";
+import { clickPageAction } from "../support/page-actions.js";
 
 // Long enough to run past three lines at the description's 768px max width.
 const DESCRIPTION =
@@ -53,8 +54,8 @@ test.describe("Collection descriptions (PP-wqit.11)", () => {
     // No description yet: nothing under the header (4.7).
     await expect(page.getByTestId("collection-description")).toHaveCount(0);
 
-    // Write one in the Edit dialog.
-    await page.getByTestId("collection-edit-trigger").click();
+    // Write one in the Edit dialog, from Edit collection in ⋯ (4.17).
+    await clickPageAction(page, "Edit collection");
     const dialog = page.getByRole("dialog", { name: "Edit collection" });
     const editor = dialog.getByRole("textbox", { name: "Description" });
     await editor.click();
@@ -81,7 +82,7 @@ test.describe("Collection descriptions (PP-wqit.11)", () => {
 
     // A View Link visitor sees it too.
     await page.goto(collectionUrl);
-    await page.getByTestId("collection-share-trigger").click();
+    await clickPageAction(page, "Share");
     await page.getByTestId("collection-share-toggle").click();
     const shareUrl = await page
       .getByTestId("collection-share-url")
@@ -101,7 +102,7 @@ test.describe("Collection descriptions (PP-wqit.11)", () => {
     }
 
     // Clearing the description removes it.
-    await page.getByTestId("collection-edit-trigger").click();
+    await clickPageAction(page, "Edit collection");
     await dialog.getByRole("textbox", { name: "Description" }).click();
     await page.keyboard.press("ControlOrMeta+a");
     await page.keyboard.press("Backspace");
