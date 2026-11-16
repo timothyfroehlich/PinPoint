@@ -296,6 +296,24 @@ type SentryPrivacyOptionKeys =
   | "beforeSendLog"
   | "beforeSendMetric";
 
+/**
+ * Sentry `environment` for Vercel deployments, kept at the v10 names
+ * (`vercel-production`, `vercel-preview`) because Sentry alert rules filter on
+ * them; v11 would default to the bare `production`/`preview`. Off Vercel
+ * (`vercelEnv` unset) it returns nothing, so the SDK falls back to
+ * `SENTRY_ENVIRONMENT` or `NODE_ENV`, exactly as v10 did.
+ *
+ * Callers pass the variable their runtime exposes, read with a literal key so
+ * Next can inline it: `VERCEL_ENV` on server and edge,
+ * `NEXT_PUBLIC_VERCEL_ENV` in the browser.
+ */
+export function sentryEnvironmentOption(vercelEnv: string | undefined): {
+  environment?: string;
+} {
+  if (!vercelEnv || process.env["SENTRY_ENVIRONMENT"]) return {};
+  return { environment: `vercel-${vercelEnv}` };
+}
+
 /** PinPoint-owned privacy boundary shared verbatim by all Sentry runtimes. */
 export const SENTRY_PRIVACY_OPTIONS = {
   dataCollection: SENTRY_DATA_COLLECTION,

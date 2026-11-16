@@ -9,6 +9,7 @@ import {
   sentryBeforeSend,
   sentryBeforeSendLog,
   sentryBeforeSendMetric,
+  sentryEnvironmentOption,
   sentryBeforeSendSpan,
 } from "~/lib/observability/sentry-policy";
 
@@ -397,5 +398,26 @@ describe("sentryBeforeSendMetric", () => {
     };
 
     expect(sentryBeforeSendMetric(metric)).toBeNull();
+  });
+});
+
+describe("sentryEnvironmentOption", () => {
+  it("keeps the v10 vercel-prefixed names on Vercel", () => {
+    expect(sentryEnvironmentOption("production")).toEqual({
+      environment: "vercel-production",
+    });
+    expect(sentryEnvironmentOption("preview")).toEqual({
+      environment: "vercel-preview",
+    });
+  });
+
+  it("leaves the SDK default (NODE_ENV) off Vercel", () => {
+    expect(sentryEnvironmentOption(undefined)).toEqual({});
+    expect(sentryEnvironmentOption("")).toEqual({});
+  });
+
+  it("defers to SENTRY_ENVIRONMENT when it is set", () => {
+    vi.stubEnv("SENTRY_ENVIRONMENT", "staging");
+    expect(sentryEnvironmentOption("production")).toEqual({});
   });
 });

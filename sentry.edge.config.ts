@@ -1,6 +1,9 @@
 import * as Sentry from "@sentry/nextjs";
 
-import { SENTRY_PRIVACY_OPTIONS } from "~/lib/observability/sentry-policy";
+import {
+  SENTRY_PRIVACY_OPTIONS,
+  sentryEnvironmentOption,
+} from "~/lib/observability/sentry-policy";
 
 Sentry.init({
   ...(process.env["NEXT_PUBLIC_SENTRY_DSN"] && {
@@ -9,6 +12,8 @@ Sentry.init({
 
   // Define how likely traces are sampled. Adjust this value in production, or use tracesSampler for greater control.
   tracesSampleRate: 0.1,
+
+  ...sentryEnvironmentOption(process.env["VERCEL_ENV"]),
 
   ...SENTRY_PRIVACY_OPTIONS,
 });
