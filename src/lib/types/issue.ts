@@ -17,7 +17,8 @@ export type IssueCommentWithAuthor = Pick<
   images: IssueImage[];
 };
 
-export type IssueListItem = Pick<
+/** One row of an issue list page (issues-list §3), with its comment count. */
+export type IssueListRow = Pick<
   Issue,
   | "id"
   | "issueNumber"
@@ -33,15 +34,7 @@ export type IssueListItem = Pick<
   | "assignedTo"
 > & {
   machine: Pick<Machine, "id" | "name">;
-  reportedByUser?: Pick<UserProfile, "id" | "name"> | null;
-  invitedReporter?: Pick<UserProfile, "id" | "name"> | null;
-  assignedToUser?: Pick<UserProfile, "id" | "name"> | null;
-};
-
-/** One row of an issue list page (issues-list §3), with its comment count. */
-export type IssueListRow = Omit<IssueListItem, "machine"> & {
-  /** The owner id lets a row mirror the server's ownership checks (§3.5). */
-  machine: Pick<Machine, "id" | "name" | "ownerId">;
+  assignedToUser: Pick<UserProfile, "id" | "name"> | null;
   /** Comments people wrote; system timeline entries are not counted. */
   commentCount: number;
 };

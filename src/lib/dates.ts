@@ -123,9 +123,31 @@ export function formatCompactAge(
   date: Date | string | number,
   now: Date | number = new Date()
 ): string {
+  const parts = ageParts(date, now);
+  if (parts.length === 0) return "now";
+  return parts.map(([n, unit]) => `${n}${AGE_UNITS[unit].short}`).join(" ");
+}
+
+const AGE_UNITS = {
+  years: { short: "y", long: "year" },
+  months: { short: "mo", long: "month" },
+  days: { short: "d", long: "day" },
+  hours: { short: "h", long: "hour" },
+  minutes: { short: "m", long: "minute" },
+} as const;
+type AgeUnit = keyof typeof AGE_UNITS;
+
+/**
+ * The one or two units of an age, largest first, that the compact and
+ * spoken labels share; empty under a minute and for future timestamps.
+ */
+function ageParts(
+  date: Date | string | number,
+  now: Date | number
+): [number, AgeUnit][] {
   const start = toDate(date);
   const end = toDate(now);
-  if (start.getTime() > end.getTime()) return "now"; // future/clock skew
+  if (start.getTime() > end.getTime()) return []; // future/clock skew
   const {
     years = 0,
     months = 0,
@@ -136,12 +158,32 @@ export function formatCompactAge(
     start,
     end,
   });
-  if (years > 0) return months > 0 ? `${years}y ${months}mo` : `${years}y`;
-  if (months > 0) return days > 0 ? `${months}mo ${days}d` : `${months}mo`;
-  if (days > 0) return `${days}d`;
-  if (hours > 0) return `${hours}h`;
-  if (minutes > 0) return `${minutes}m`;
-  return "now";
+  const pair = (
+    major: [number, AgeUnit],
+    minor: [number, AgeUnit]
+  ): [number, AgeUnit][] => (minor[0] > 0 ? [major, minor] : [major]);
+  if (years > 0) return pair([years, "years"], [months, "months"]);
+  if (months > 0) return pair([months, "months"], [days, "days"]);
+  if (days > 0) return [[days, "days"]];
+  if (hours > 0) return [[hours, "hours"]];
+  if (minutes > 0) return [[minutes, "minutes"]];
+  return [];
+}
+
+/**
+ * {@link formatCompactAgeAgo} spelled out for screen readers, unit for unit:
+ * "just now", "12 minutes ago", "1 day ago", "2 months 5 days ago".
+ */
+export function formatSpokenAgeAgo(
+  date: Date | string | number,
+  now: Date | number = new Date()
+): string {
+  const parts = ageParts(date, now);
+  if (parts.length === 0) return "just now";
+  const words = parts.map(
+    ([n, unit]) => `${n} ${AGE_UNITS[unit].long}${n === 1 ? "" : "s"}`
+  );
+  return `${words.join(" ")} ago`;
 }
 
 /**
