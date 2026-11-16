@@ -137,7 +137,7 @@ function OpenIssueCount({ row }: { row: MachineViewRow }): React.JSX.Element {
   return (
     <Link
       href={machineIssuesHref(row.initials)}
-      aria-label={`View ${issues} for ${row.title}${worstLabel}`}
+      aria-label={`${issues} for ${row.title}${worstLabel}`}
       {...(severity === null
         ? {}
         : { title: `Worst severity: ${severity.label}` })}

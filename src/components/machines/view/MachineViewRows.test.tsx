@@ -49,9 +49,11 @@ function detailLine(row: HTMLElement): HTMLElement {
 }
 
 /** Line 2's two groups: Playability, manufacturer, year, owner; the age. */
-function groups(row: HTMLElement): [Element, Element] {
+function groups(row: HTMLElement): [HTMLElement, HTMLElement] {
   const [leading, trailing] = Array.from(detailLine(row).children);
-  if (!leading || !trailing) throw new Error("Expected two groups");
+  if (!(leading instanceof HTMLElement) || !(trailing instanceof HTMLElement)) {
+    throw new Error("Expected two groups");
+  }
   return [leading, trailing];
 }
 
@@ -132,7 +134,7 @@ describe("Machine rows", () => {
     expect(within(row).getByText("EHOH")).toBeInTheDocument();
 
     const count = within(row).getByRole("link", {
-      name: "View 2 open issues for Elvira's House of Horrors (Blood Red Kiss Edition), worst Unplayable",
+      name: "2 open issues for Elvira's House of Horrors (Blood Red Kiss Edition), worst Unplayable",
     });
     // Colored text alone, with no severity icon before it (§5.3).
     expect(count).toHaveTextContent(/^2 open$/);
@@ -160,7 +162,7 @@ describe("Machine rows", () => {
     expect(line).toHaveClass("text-muted-foreground", "text-[13px]");
 
     // The owner is the same initials avatar as the issue row's assignee.
-    const owner = within(leading as HTMLElement).getByRole("img", {
+    const owner = within(leading).getByRole("img", {
       name: "Owner: Alex",
     });
     expect(owner).toHaveTextContent(/^A$/);
@@ -228,7 +230,7 @@ describe("Machine rows", () => {
     expect(title).toHaveClass("after:absolute", "after:inset-0");
     // The count is raised above the overlay.
     expect(
-      within(row).getByRole("link", { name: /^View 2 open issues/ })
+      within(row).getByRole("link", { name: /^2 open issues/ })
     ).toHaveClass("relative", "z-[2]");
   });
 
@@ -426,7 +428,7 @@ describe("Machine rows", () => {
     ]);
 
     const count = screen.getByRole("link", {
-      name: "View 1 open issue for Medieval Madness, worst Major",
+      name: "1 open issue for Medieval Madness, worst Major",
     });
     expect(count).toHaveAttribute("title", "Worst severity: Major");
     expect(count).toHaveTextContent(/^1 open$/);
@@ -435,7 +437,7 @@ describe("Machine rows", () => {
   it("gives the count a 44px-wide hit area that stays clear of the title and line 2", () => {
     renderRows([machine()]);
 
-    const count = screen.getByRole("link", { name: /^View 2 open issues/ });
+    const count = screen.getByRole("link", { name: /^2 open issues/ });
     // At least 44px wide (list-views §7.9), growing leftward from the
     // link's right edge into the gap before it.
     expect(count).toHaveClass(

@@ -8,7 +8,7 @@ describe("MachineEmptyState", () => {
     render(<MachineEmptyState machineInitials={machineInitials} />);
 
     // Check if the link exists and has the correct href
-    const link = screen.getByRole("link", { name: /report a new issue/i });
+    const link = screen.getByRole("link", { name: /report an issue/i });
     expect(link).toHaveAttribute("href", `/report?machine=${machineInitials}`);
 
     // Check if the content is visible

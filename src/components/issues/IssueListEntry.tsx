@@ -248,7 +248,14 @@ function IssueRowDetails({
       leading={leading}
       trailing={trailing}
       dropOrder={DROP_ORDER}
-      contentKey={`${issue.id}:${hasComments}:${ageText}`}
+      contentKey={[
+        issue.id,
+        issue.commentCount,
+        priority.label,
+        assigneeName ?? "",
+        issue.machine.name,
+        ageText,
+      ].join(":")}
     />
   );
 }

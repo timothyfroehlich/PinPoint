@@ -91,7 +91,7 @@ export function QuickRecentIssues({
                   >
                     <span className="line-clamp-2 min-w-0 flex-1 text-sm font-medium group-hover:text-primary">
                       {issue.title}
-                    </span>
+                    </span>{" "}
                     <span
                       className={`flex shrink-0 items-center gap-1.5 text-xs font-medium ${status.iconColor}`}
                     >

@@ -26,8 +26,9 @@ describe("ListPager", () => {
 
     expect(container).toHaveTextContent("26–50 of 60");
     const pager = screen.getByRole("navigation", { name: "Pagination" });
-    expect(
-      within(pager).getByRole("button", { name: "Page 2" })
-    ).toHaveAttribute("aria-current", "page");
+    expect(within(pager).getByRole("button", { name: /^2$/ })).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
   });
 });

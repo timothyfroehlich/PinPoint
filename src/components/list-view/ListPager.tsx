@@ -160,7 +160,6 @@ function PageControls({
           <button
             key={item.page}
             type="button"
-            aria-label={`Page ${item.page}`}
             aria-current={item.page === range.page ? "page" : undefined}
             onClick={() => pagination.onPage(item.page, true)}
             className={cn(

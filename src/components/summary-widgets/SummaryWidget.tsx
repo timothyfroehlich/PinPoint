@@ -68,7 +68,7 @@ function SegmentEntryContent<T extends string>({
     <>
       <span className={cn("font-bold tabular-nums", segment.textClassName)}>
         {segment.count}
-      </span>
+      </span>{" "}
       <span className="text-foreground-secondary">{segment.label}</span>
     </>
   );
@@ -79,7 +79,7 @@ function OtherEntryContent({ count }: { count: number }): React.JSX.Element {
     <>
       <span className="font-bold text-muted-foreground tabular-nums">
         {count}
-      </span>
+      </span>{" "}
       <span className="text-foreground-secondary">other</span>
     </>
   );
@@ -100,7 +100,6 @@ function SegmentButton<T extends string>({
     <button
       type="button"
       aria-pressed={selected}
-      aria-label={`${segment.count} ${segment.label}`}
       onClick={() => onSelect(segment.value)}
       className={cn(
         ENTRY_CLASS,

@@ -66,7 +66,7 @@ export function PinTipCard({
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1 text-xs font-semibold whitespace-nowrap text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-          aria-label="View all tips on Match Play (opens in a new tab)"
+          aria-label="Match Play: all tips (opens in a new tab)"
         >
           Match Play
           <ExternalLink className="size-3" aria-hidden="true" />

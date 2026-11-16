@@ -100,7 +100,7 @@ describe("SummaryWidget", () => {
     expect(
       within(region)
         .getAllByRole("button")
-        .map((button) => button.getAttribute("aria-label"))
+        .map((button) => (button.textContent ?? "").trim())
     ).toEqual(["2 Worn", "4 Up"]);
     expect(
       screen.queryByRole("button", { name: "0 Down" })
@@ -128,7 +128,7 @@ describe("SummaryWidget", () => {
     expect(
       within(others)
         .getAllByRole("button")
-        .map((button) => button.getAttribute("aria-label"))
+        .map((button) => (button.textContent ?? "").trim())
     ).toEqual(["2 Worn", "4 Up"]);
 
     await user.click(within(others).getByRole("button", { name: "4 Up" }));
@@ -161,7 +161,7 @@ describe("SummaryWidget", () => {
     expect(
       within(others)
         .getAllByRole("button")
-        .map((button) => button.getAttribute("aria-label"))
+        .map((button) => (button.textContent ?? "").trim())
     ).toEqual(["4 Up"]);
   });
 
@@ -198,7 +198,7 @@ describe("SummaryWidget", () => {
     const pairs = within(container).getAllByRole("button");
 
     // No measurement yet: every pair, no "N other".
-    expect(pairs.map((button) => button.getAttribute("aria-label"))).toEqual([
+    expect(pairs.map((button) => (button.textContent ?? "").trim())).toEqual([
       "2 Worn",
       "4 Up",
     ]);

@@ -28,7 +28,7 @@ function renderWidgets(
 function segmentNames(widget: string): (string | null)[] {
   return within(screen.getByRole("region", { name: widget }))
     .getAllByRole("button")
-    .map((button) => button.getAttribute("aria-label"));
+    .map((button) => (button.textContent ?? "").trim());
 }
 
 describe("IssueSummaryWidgets", () => {
