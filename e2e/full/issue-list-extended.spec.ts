@@ -1,11 +1,7 @@
 import { test, expect, type Locator, type Page } from "../support/fixtures.js";
 import { openListSearch, setListFilterOptions } from "../support/actions.js";
 import { cleanupTestEntities } from "../support/cleanup.js";
-import {
-  TEST_USERS,
-  seededIssue,
-  seededMachines,
-} from "../support/constants.js";
+import { seededIssue, seededMachines } from "../support/constants.js";
 import { fillReportForm } from "../support/page-helpers.js";
 import { getTestIssueTitle } from "../support/test-isolation.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
@@ -25,7 +21,7 @@ function resultCount(page: Page): Locator {
 }
 
 test.describe("Issue List Features - Extended", () => {
-  // Use Admin to ensure permissions for all inline edits
+  // Admin holds every permission, so read-only rows prove no role can edit
   test.use({ storageState: STORAGE_STATE.admin });
 
   // Track issue title prefix for cleanup across tests that create issues
@@ -44,19 +40,23 @@ test.describe("Issue List Features - Extended", () => {
     }
   });
 
-  test("should inline-edit issues", async ({ page }) => {
-    // Priority and assignee are menus on every row at every width: a pill on
-    // line 1 and an avatar beside line 2 (phones) or in the right column.
+  test("rows are read-only links to the issue and its machine", async ({
+    page,
+  }) => {
+    // Rows never change an issue (issues-list §3.11), even for an admin. The
+    // whole row links to the issue, and the machine name to the machine
+    // (§3.12).
 
     // Create a unique test issue to avoid parallel worker conflicts
-    const issueTitle = getTestIssueTitle("Inline Edit Test");
+    const issueTitle = getTestIssueTitle("Read-only Row Test");
     createdIssueTitlePrefix = issueTitle;
-    const machineInitials = seededMachines.addamsFamily.initials;
+    const machine = seededMachines.addamsFamily;
 
-    await page.goto(`/report/detailed?machine=${machineInitials}`);
+    await page.goto(`/report/detailed?machine=${machine.initials}`);
     await fillReportForm(page, { title: issueTitle, priority: "low" });
     await page.getByRole("button", { name: "Submit Issue Report" }).click();
     await expect(page).toHaveURL(/\/m\/[A-Z0-9]{2,6}\/i\/[0-9]+/);
+    const issuePath = new URL(page.url()).pathname;
 
     // Navigate to issues list and search for our unique issue
     await page.goto("/issues");
@@ -68,47 +68,30 @@ test.describe("Issue List Features - Extended", () => {
       .toBe(issueTitle);
     await expect(resultCount(page)).toHaveText("Showing 1 to 1 of 1 issue");
 
-    const issueRow = (): Locator =>
-      page
-        .getByRole("list", { name: "Issues" })
-        .getByRole("listitem")
-        .filter({ has: page.getByRole("link", { name: issueTitle }) });
-    const row = issueRow();
+    const row = page
+      .getByRole("list", { name: "Issues" })
+      .getByRole("listitem")
+      .filter({ has: page.getByRole("link", { name: issueTitle }) });
     await expect(row).toBeVisible();
 
-    // 1. Test Priority Inline Edit (Low -> High)
-    await row.getByRole("button", { name: "Priority: Low, change" }).click();
-    await page.getByRole("menuitemradio", { name: "High" }).click();
+    // No edit controls: the values are read-only text, and the only
+    // interactive elements are the issue link and the machine link.
+    await expect(row.getByRole("button")).toHaveCount(0);
+    await expect(row.getByRole("combobox")).toHaveCount(0);
+    await expect(row.getByRole("link")).toHaveCount(2);
+    await expect(row.getByTestId("issue-priority")).toHaveText("Priority: Low");
+    await expect(row.getByRole("img", { name: "Unassigned" })).toBeAttached();
 
-    // Verify optimistic update
-    await expect(
-      row.getByRole("button", { name: "Priority: High, change" })
-    ).toBeVisible();
+    // The machine name opens the machine, not the issue.
+    await row.getByRole("link", { name: machine.name }).click();
+    await expect(page).toHaveURL(new RegExp(`/m/${machine.initials}$`));
+    await page.goBack();
+    await expect(row).toBeVisible();
 
-    // Verify persistence after reload; the search stays in the URL.
-    await page.reload();
-    await expect(searchField(page)).toHaveValue(issueTitle);
-
-    const rowAfterReload = issueRow();
-    await expect(
-      rowAfterReload.getByRole("button", { name: "Priority: High, change" })
-    ).toBeVisible();
-
-    // 2. Test Assignee Inline Edit (Unassigned -> Admin)
-    await rowAfterReload
-      .getByRole("button", { name: "Unassigned, change assignee" })
-      .click();
-    await page
-      .getByRole("menuitemradio", { name: TEST_USERS.admin.name })
-      .click();
-
-    // Verify assignee update
-    await expect(page.getByText("Assignee updated")).toBeVisible();
-    await expect(
-      rowAfterReload.getByRole("button", {
-        name: `Assigned to ${TEST_USERS.admin.name}, change assignee`,
-      })
-    ).toBeVisible();
+    // A click anywhere on the row, away from the title, opens the issue: the
+    // row's top-left corner is padding the title link's overlay covers.
+    await row.click({ position: { x: 4, y: 4 } });
+    await expect(page).toHaveURL(new RegExp(`${issuePath}$`));
   });
 
   test("a Severity Segment filters the list to its issues", async ({
@@ -271,7 +254,7 @@ test.describe("Issue List Features - Extended", () => {
       issues.getByRole("link", { name: seededIssue("TAF").title })
     ).toBeVisible();
     await expect(
-      issues.getByRole("button", { name: /^Severity: (?!Major,)/ })
+      issues.getByTestId("issue-severity").filter({ hasNotText: "Major" })
     ).toHaveCount(0);
   });
 

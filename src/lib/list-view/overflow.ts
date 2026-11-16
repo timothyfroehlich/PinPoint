@@ -187,3 +187,75 @@ export function phoneSearchAsIcon({
   const fieldWidth = available - viewsWidth - filtersWidth - 2 * gap;
   return fieldWidth < PHONE_SEARCH_MIN_WIDTH + FIT_TOLERANCE_PX;
 }
+
+/**
+ * Room a line fit leaves spare, so a part drops a little before the line is
+ * exactly full and real glyphs never crowd the line's end.
+ */
+export const LINE_FIT_TOLERANCE = 16;
+
+export interface LineFitInput<Part extends string> {
+  /** The line's inner width. */
+  available: number;
+  /** Widths of the parts that never drop, at their full width. */
+  keptWidths: readonly number[];
+  /** Each droppable part's width, any leading separator included. */
+  partWidths: Readonly<Record<Part, number>>;
+  /** The droppable parts, the first to drop first. */
+  dropOrder: readonly Part[];
+  /** The gap between the parts that lead the line. */
+  gap: number;
+  /**
+   * Droppable parts in a right-anchored group at the line's end instead of
+   * after the kept parts. The group takes no room once all its parts drop.
+   */
+  trailing?: LineFitTrailingGroup<Part> | undefined;
+}
+
+/** A right-anchored group of droppable parts at a line's end. */
+export interface LineFitTrailingGroup<Part extends string> {
+  /** The group's parts, in display order. */
+  parts: readonly Part[];
+  /** The gap between the group's parts. */
+  gap: number;
+  /** The least room between the leading parts and the group. */
+  groupGap: number;
+}
+
+/**
+ * Which droppable parts of a one-line row stay shown (issues-list §3.9):
+ * parts drop one at a time in `dropOrder` until the line fits with
+ * `LINE_FIT_TOLERANCE` to spare. When the kept parts alone still do not fit,
+ * every droppable part is gone and the component truncates what remains.
+ */
+export function fitLineParts<Part extends string>({
+  available,
+  keptWidths,
+  partWidths,
+  dropOrder,
+  gap,
+  trailing,
+}: LineFitInput<Part>): ReadonlySet<Part> {
+  const shown = new Set(dropOrder);
+  const room = available - LINE_FIT_TOLERANCE;
+  const trailingParts = trailing?.parts ?? [];
+  const widthsOf = (parts: readonly Part[]): number[] =>
+    parts.filter((part) => shown.has(part)).map((part) => partWidths[part]);
+  const lineWidth = (): number => {
+    const leading = rowWidth(
+      [
+        ...keptWidths,
+        ...widthsOf(dropOrder.filter((part) => !trailingParts.includes(part))),
+      ],
+      gap
+    );
+    const trailingWidths = widthsOf(trailingParts);
+    if (!trailing || trailingWidths.length === 0) return leading;
+    return leading + trailing.groupGap + rowWidth(trailingWidths, trailing.gap);
+  };
+  for (const part of dropOrder) {
+    if (lineWidth() <= room) break;
+    shown.delete(part);
+  }
+  return shown;
+}

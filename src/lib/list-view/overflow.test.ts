@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  fitLineParts,
   fitPrimaryFilters,
+  LINE_FIT_TOLERANCE,
   phoneSearchAsIcon,
   planListHeader,
 } from "./overflow";
@@ -40,6 +42,79 @@ describe("phoneSearchAsIcon (list-views §7.12, §8.7)", () => {
     expect(fit(378, 48 + 140)).toBe(true);
     // 430 - 22 = 408; 408 - 188 - 60 = 160, still an icon on a large phone.
     expect(fit(408, 48 + 140)).toBe(true);
+  });
+});
+
+describe("fitLineParts (issues-list §3.9)", () => {
+  // ID 60 · machine 120 · priority 50 · assignee 30 · comments 40 · age 90,
+  // gap 6.
+  const base = {
+    keptWidths: [60, 120],
+    partWidths: { priority: 50, assignee: 30, comments: 40, age: 90 },
+    dropOrder: ["age", "comments", "priority", "assignee"] as const,
+    gap: 6,
+  };
+  const shown = (available: number): string[] =>
+    [...fitLineParts({ ...base, available })].sort();
+
+  it("keeps every part when the line fits with the tolerance to spare", () => {
+    // 60+120+50+30+40+90 + 5 gaps = 420.
+    expect(shown(420 + LINE_FIT_TOLERANCE)).toEqual([
+      "age",
+      "assignee",
+      "comments",
+      "priority",
+    ]);
+    expect(shown(420)).toEqual(["assignee", "comments", "priority"]);
+  });
+
+  it("drops age, then comments, then priority, then assignee", () => {
+    expect(shown(419 + LINE_FIT_TOLERANCE)).toEqual([
+      "assignee",
+      "comments",
+      "priority",
+    ]);
+    // 60+120+50+30+40 + 4 gaps = 324.
+    expect(shown(323 + LINE_FIT_TOLERANCE)).toEqual(["assignee", "priority"]);
+    // 60+120+50+30 + 3 gaps = 278.
+    expect(shown(277 + LINE_FIT_TOLERANCE)).toEqual(["assignee"]);
+    // 60+120+30 + 2 gaps = 222.
+    expect(shown(221 + LINE_FIT_TOLERANCE)).toEqual([]);
+  });
+
+  it("leaves nothing droppable when the kept parts alone overflow", () => {
+    expect(shown(100)).toEqual([]);
+  });
+
+  describe("with a right-anchored trailing group", () => {
+    // Leading: ID 60, machine 120, priority 50 with 6px gaps. Trailing:
+    // assignee 30, comments 40, age 90 with 8px gaps, 12px from the lead.
+    const trailing = {
+      parts: ["assignee", "comments", "age"] as const,
+      gap: 8,
+      groupGap: 12,
+    };
+    const shownWithGroup = (available: number): string[] =>
+      [...fitLineParts({ ...base, trailing, available })].sort();
+
+    it("counts each group's own gap and the gap between the groups", () => {
+      // (60+6+120+6+50) + 12 + (30+8+40+8+90) = 430.
+      expect(shownWithGroup(430 + LINE_FIT_TOLERANCE)).toEqual([
+        "age",
+        "assignee",
+        "comments",
+        "priority",
+      ]);
+      // 242 + 12 + (30+8+40) = 332.
+      expect(shownWithGroup(332 + LINE_FIT_TOLERANCE)).toEqual([
+        "assignee",
+        "comments",
+        "priority",
+      ]);
+      // 186 + 12 + 30 = 228.
+      expect(shownWithGroup(228 + LINE_FIT_TOLERANCE)).toEqual(["assignee"]);
+      expect(shownWithGroup(227 + LINE_FIT_TOLERANCE)).toEqual([]);
+    });
   });
 });
 

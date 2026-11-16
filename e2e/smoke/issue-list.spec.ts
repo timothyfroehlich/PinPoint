@@ -68,7 +68,7 @@ test.describe("Issue List Features", () => {
     await expect(issues.getByRole("link", { name: title2 })).toBeVisible();
     // Every row left is Major.
     await expect(
-      issues.getByRole("button", { name: /^Severity: (?!Major,)/ })
+      issues.getByTestId("issue-severity").filter({ hasNotText: "Major" })
     ).toHaveCount(0);
 
     // Clear the Severity filter
