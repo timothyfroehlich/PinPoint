@@ -7,7 +7,7 @@ The server admits an OAuth token only when its `client_id` is an enabled row in 
 ## Connect claude.ai (also covers mobile)
 
 1. In Supabase Authentication > OAuth Server, confirm the OAuth server is on and Dynamic Client Registration (DCR) is enabled. If DCR is off, turn it on for this procedure and note that you did. Leave `MCP_OAUTH_DCR_CANARY` unset in Vercel: without it, the unregistered client fails closed.
-2. In claude.ai, open Customize > Plugins > Add > Add marketplace and enter `timothyfroehlich/PinPoint`. Install the **PinPoint** plugin.
+2. In claude.ai, open Customize > Plugins > Add > Add marketplace and enter `minamaya/PinPoint`. Install the **PinPoint** plugin.
 3. On the plugin's Connectors tab, connect **pinpoint**. Sign in as Tim and approve the PinPoint consent page.
 4. The connection fails with an authorization error, either right after the consent page or on the first tool call. That is expected: the new client is not allowlisted yet. Find its id in either place:
    - Supabase Authentication > OAuth Server > clients: the newest client, with redirect URI `https://claude.ai/api/mcp/auth_callback`.
