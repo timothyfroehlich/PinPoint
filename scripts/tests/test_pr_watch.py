@@ -770,6 +770,42 @@ def test_watch_phase_queue_removed_looks_up_runs_by_group_commit(monkeypatch):
 
 
 @pytest.mark.unit
+def test_watch_phase_queue_green_group_commit_falls_back_to_the_branch_scan(
+    monkeypatch,
+):
+    """The queue rebuilt the group after the last poll and the new commit failed."""
+    runs = [
+        # The last-seen group commit: cancelled by the rebuild, nothing red.
+        _queue_run(80, "cancelled", sha=OLD_SHA),
+        # The rebuilt group's red run, never seen by a poll.
+        _queue_run(91, "failure"),
+        # An earlier attempt's red run on its own group commit, created before
+        # this enqueue: the scan's `since` bound keeps it out.
+        _queue_run(99, "failure", sha="ab" * 20, created="2026-11-15T20:00:00Z"),
+    ]
+    jobs = [{"name": "CI Gate", "status": "completed", "conclusion": "failure"}]
+    fake = queue_gh(
+        [queue_snapshot(group_sha=OLD_SHA), NOT_QUEUED], runs=runs, jobs=jobs
+    )
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    monkeypatch.setattr(
+        pr_watch,
+        "write_failure_artifact",
+        lambda run_id: f"tmp/gh-monitor/failure-{run_id}.md",
+    )
+    no_sleep(monkeypatch)
+
+    verdict = pr_watch._watch_phase_queue(PR, HEAD_SHA, timeout_sec=60, poll_sec=0)
+    assert verdict.outcome == "removed"
+    assert verdict.detail_url == "https://github.com/minamaya/PinPoint/actions/runs/91"
+    assert verdict.failure_artifact == "tmp/gh-monitor/failure-91.md"
+    lookup, scan = [call for call in fake.calls if call[:2] == ("run", "list")]
+    assert lookup[lookup.index("--commit") + 1] == OLD_SHA
+    assert "--commit" not in scan
+    assert scan[scan.index("--limit") + 1] == str(pr_watch.QUEUE_RUN_SCAN_LIMIT)
+
+
+@pytest.mark.unit
 def test_watch_phase_queue_one_absent_read_mid_merge_is_not_a_removal(monkeypatch):
     """GitHub drops the entry before it flips the state to MERGED."""
     fake = queue_gh(
@@ -908,6 +944,23 @@ def test_watch_phase_queue_timeout_is_undetermined(monkeypatch, capsys):
     err = capsys.readouterr().err
     assert err.count("Queued at position 4") == 1
     assert "no terminal verdict" in err
+
+
+@pytest.mark.unit
+def test_watch_phase_queue_confirming_read_never_overruns_the_timeout(monkeypatch):
+    """An absent read 5s before the deadline sleeps 5s, not 10, then times out."""
+    fake = queue_gh([queue_snapshot(), NOT_QUEUED])
+    monkeypatch.setattr(pr_watch, "gh", fake)
+    clock = FakeClock()
+    monkeypatch.setattr(pr_watch, "time", clock)
+
+    verdict = pr_watch._watch_phase_queue(PR, HEAD_SHA, timeout_sec=35, poll_sec=30)
+    assert verdict.outcome == "timed_out"
+    assert clock.now == 35
+    # The queued read and the absent read; no confirming read past the deadline,
+    # and an unconfirmed absence is never reported as a removal.
+    assert _queries(fake) == 2
+    assert not any(call[:2] == ("run", "list") for call in fake.calls)
 
 
 @pytest.mark.unit

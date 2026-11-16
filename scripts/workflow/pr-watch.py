@@ -589,8 +589,10 @@ def _failed_queue_run(pr: int, since: str, group_sha: str | None) -> dict | None
     Called once, after the removal is confirmed. With the merge-group commit
     seen while the PR was queued, look up that commit's runs directly: exact,
     and independent of how busy the queue is. Without one (the PR left the
-    queue before a poll caught its group), scan recent merge_group runs for the
-    PR's queue branch created since this attempt was enqueued.
+    queue before a poll caught its group), or when that commit has no red run
+    (the queue rebuilt the group after the last poll and the new commit
+    failed), scan recent merge_group runs for the PR's queue branch created
+    since this attempt was enqueued.
     """
     if group_sha:
         raw = gh(
@@ -605,8 +607,13 @@ def _failed_queue_run(pr: int, since: str, group_sha: str | None) -> dict | None
             "--json",
             _QUEUE_RUN_FIELDS,
         )
-        return _newest_failing_group_run(
+        run = _newest_failing_group_run(
             [run for run in json.loads(raw) if run.get("headSha") == group_sha]
+        )
+        if run is not None:
+            return run
+        emit(
+            f"No failing merge_group run on {group_sha[:7]}; scanning the queue branch"
         )
     raw = gh(
         "run",
@@ -640,11 +647,7 @@ def _queue_failure(pr: int, since: str, group_sha: str | None) -> dict:
     try:
         run = _failed_queue_run(pr, since, group_sha)
         if run is None:
-            emit(
-                f"No failing merge_group run found on {group_sha[:7]}"
-                if group_sha
-                else "No failing merge_group run found for this PR's queue branch"
-            )
+            emit("No failing merge_group run found for this PR's queue branch")
             return found
         run_id = int(run["databaseId"])
         found["detail_url"] = (
@@ -764,8 +767,14 @@ def _watch_phase_queue(
         elif not absent_once:
             absent_once = True
             last_signature = None
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
             emit("No queue entry — re-reading to confirm")
-            time.sleep(QUEUE_ABSENT_CONFIRM_SECONDS)
+            # Clamped to the budget: the confirming read never overruns the
+            # timeout, and the loop condition turns an exhausted budget into
+            # timed_out rather than a read past it.
+            time.sleep(min(QUEUE_ABSENT_CONFIRM_SECONDS, remaining))
             continue
         elif since is None:
             # Not queued when the watch began (confirmed by a second read), with
