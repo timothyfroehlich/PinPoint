@@ -58,7 +58,11 @@ test.describe("Machines Public Access", () => {
 
   test("a Playability Segment filters the list to its On the Floor machines", async ({
     page,
-  }) => {
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name.includes("Mobile"),
+      "Phones show only the Presence widget; the Issues Status Segment test covers Segment selection on phones"
+    );
     await page.goto("/m?presence=all");
     const playability = page.getByRole("region", { name: "Playability" });
     await expect(playability).toBeVisible();
@@ -114,51 +118,51 @@ test.describe("Machines Public Access", () => {
       .toBe(true);
   });
 
-  test.describe("on a phone narrower than 390px", () => {
-    test.use({ viewport: { width: 375, height: 812 } });
+  // Summary Widgets sit side by side at every width, each at least 240px
+  // wide, and whole widgets drop from the right when the row cannot hold
+  // them (widgets §2.3, §2.7). There is no Summary Row and no toggle.
+  test.describe("at a desktop width", () => {
+    test.use({ viewport: { width: 1024, height: 768 } });
 
-    test("the Summary Row starts collapsed and an expanded choice survives a reload", async ({
-      page,
-    }) => {
+    test("Presence and Playability sit side by side", async ({ page }) => {
       await page.goto("/m");
-      const summaryRow = page.getByRole("button", {
-        name: /^Summary: \d+ of \d+ playable$/,
-      });
       const presence = page.getByRole("region", { name: "Presence" });
-      await expect(summaryRow).toHaveAttribute("aria-expanded", "false");
-      await expect(presence).not.toBeVisible();
-
-      await summaryRow.click();
-      await expect(summaryRow).toHaveAttribute("aria-expanded", "true");
+      const playability = page.getByRole("region", { name: "Playability" });
       await expect(presence).toBeVisible();
+      await expect(playability).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: /^Summary: / })
+      ).toHaveCount(0);
 
-      await page.reload();
-      await expect(summaryRow).toHaveAttribute("aria-expanded", "true");
-      await expect(presence).toBeVisible();
+      const presenceBox = await presence.boundingBox();
+      const playabilityBox = await playability.boundingBox();
+      expect(presenceBox).not.toBeNull();
+      expect(playabilityBox).not.toBeNull();
+      if (presenceBox && playabilityBox) {
+        expect(playabilityBox.y).toBe(presenceBox.y);
+        expect(playabilityBox.x).toBeGreaterThan(
+          presenceBox.x + presenceBox.width
+        );
+      }
     });
   });
 
-  test.describe("on a phone at least 390px wide", () => {
-    test.use({ viewport: { width: 390, height: 844 } });
+  test.describe("on a phone too narrow for two widgets", () => {
+    test.use({ viewport: { width: 375, height: 812 } });
 
-    test("the Summary Row starts open and a collapsed choice survives a reload", async ({
+    test("only Presence shows; Playability drops from the right", async ({
       page,
     }) => {
       await page.goto("/m");
-      const summaryRow = page.getByRole("button", {
-        name: /^Summary: \d+ of \d+ playable$/,
-      });
-      const presence = page.getByRole("region", { name: "Presence" });
-      await expect(summaryRow).toHaveAttribute("aria-expanded", "true");
-      await expect(presence).toBeVisible();
-
-      await summaryRow.click();
-      await expect(summaryRow).toHaveAttribute("aria-expanded", "false");
-      await expect(presence).not.toBeVisible();
-
-      await page.reload();
-      await expect(summaryRow).toHaveAttribute("aria-expanded", "false");
-      await expect(presence).not.toBeVisible();
+      await expect(
+        page.getByRole("region", { name: "Presence" })
+      ).toBeVisible();
+      await expect(
+        page.getByRole("region", { name: "Playability" })
+      ).toBeHidden();
+      await expect(
+        page.getByRole("button", { name: /^Summary: / })
+      ).toHaveCount(0);
     });
   });
 });

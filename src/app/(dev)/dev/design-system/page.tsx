@@ -149,6 +149,11 @@ function ColorPaletteSection(): React.JSX.Element {
             cssVar="--color-muted-foreground"
             hex="#a1a1aa"
           />
+          <ColorSwatch
+            name="Foreground Secondary"
+            cssVar="--color-foreground-secondary"
+            hex="#d4d4d8"
+          />
           <ColorSwatch name="Border" cssVar="--color-border" hex="#27272a" />
         </div>
       </div>

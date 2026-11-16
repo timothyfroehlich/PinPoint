@@ -252,9 +252,14 @@ async function seedUsersAndData() {
     const machines = Object.values(machinesData);
 
     // Machine ownership distribution:
-    // Admin: Humpty Dumpty, Black Knight, Medieval Madness, Godzilla, Godzilla (GDZ3)
-    // Member: Slick Chick, Eight Ball Deluxe, Attack from Mars, Hyperball, Spider-Man, Godzilla (GDZ2)
+    // Admin: Humpty Dumpty, Black Knight, Medieval Madness, Godzilla, Godzilla (GDZ3),
+    //        The Addams Family Special Collectors Edition
+    // Member: Slick Chick, Eight Ball Deluxe, Attack from Mars, Hyperball, Spider-Man, Godzilla (GDZ2),
+    //         Indiana Jones: The Pinball Adventure
     // Invited: The Addams Family
+    //
+    // TAFSCE and IJ carry the two longest names in the seed, so list layouts
+    // get exercised by realistic long titles.
     //
     // Note: Hyperball (HB) and Spider-Man (SM) were previously owned by the guest user.
     // They are now assigned to the member user because machine owners must be member+
@@ -272,6 +277,8 @@ async function seedUsersAndData() {
       GDZ: userIds.admin,
       GDZ2: userIds.member,
       GDZ3: userIds.admin,
+      TAFSCE: userIds.admin,
+      IJ: userIds.member,
     };
 
     for (const machine of machines) {
@@ -322,6 +329,9 @@ async function seedUsersAndData() {
       GDZ: "Keith Elwin's 2021 Stern design pits Godzilla against Mechagodzilla around a motorized, collapsing skyscraper bash toy and the debut of Magna Grab, a magnetic ball lock that releases the ball back into play on the player's cue. Stern's Insider Connected system layers online leaderboards and remote tournaments onto the ruleset. On free play; the building's collapse mechanism gets a monthly check to keep the motor timing crisp.",
       GDZ2: "Keith Elwin's 2021 Stern design pits Godzilla against Mechagodzilla around a motorized, collapsing skyscraper bash toy and the debut of Magna Grab, a magnetic ball lock that releases the ball on the player's cue. This is the club's second cabinet, acquired newer than the original. On free play; its playfield glass rides looser in the channel than cabinet one's, so reseat it after opening the coin door.",
       GDZ3: "Keith Elwin's 2021 Stern design pits Godzilla against Mechagodzilla around a motorized, collapsing skyscraper bash toy and the debut of Magna Grab, a magnetic ball lock that releases the ball on the player's cue. This is the club's third cabinet, added most recently to cover demand at busy tournament nights. On free play; the right ramp's diverter solenoid runs warm after long sessions, so give it a cooldown between back-to-back games.",
+      TAFSCE:
+        "Bally's 1994 Special Collectors Edition is a limited re-run of Pat Lawlor's 1992 design, built because demand for The Addams Family outlasted its original production. The playfield, ruleset, and Raul Julia and Anjelica Huston dialogue carry over; the gold-trimmed cabinet and commemorative backglass mark the cabinet as the collector's run. On free play; the gold trim scratches easily, so slide the glass out with care.",
+      IJ: "Mark Ritchie's 1993 Williams design draws on the first three Indiana Jones films: a ladder of film-scene modes, a rotating idol that locks balls for multiball, and the Path of Adventure, a mini-playfield the player tilts with the flipper buttons to steer the ball past pits. On free play; the Path of Adventure's tilt motor is the first thing to check when the mini-playfield stops responding.",
       HB: "Williams' 1981 Steve Ritchie curiosity has no flippers at all — a hyper-cannon rapid-fires steel balls up the playfield at targets as fast as you can trigger it, pure volume-and-speed scoring rather than shot-making. Roughly 5,000 were built before the mechanical strain proved too much for most operators. On free play; the ball-return auger backs up under heavy play, so give it a moment to clear between games.",
     };
     for (const [initials, text] of Object.entries(machineDescriptions)) {
@@ -332,7 +342,7 @@ async function seedUsersAndData() {
     }
     console.log("✅ Machines seeded with distributed ownership.");
 
-    // 3. Seed Issues (18 issues with comprehensive permutations)
+    // 3. Seed Issues (22 issues with comprehensive permutations)
     console.log("\n🔧 Seeding issues...");
 
     // About two thirds of the issues are assigned, spread across member+
@@ -604,6 +614,32 @@ async function seedUsersAndData() {
         frequency: "intermittent",
         assignedTo: userIds.member,
       },
+      // TAFSCE (The Addams Family Special Collectors Edition) - 1994
+      {
+        id: "10000000-0000-4000-8000-000000000021",
+        initials: "TAFSCE",
+        num: 1,
+        title: "Left flipper weak",
+        desc: "The left flipper loses strength after a few games and can no longer make the upper ramp shot.",
+        status: "new",
+        severity: "minor",
+        priority: "medium",
+        frequency: "intermittent",
+        reportedBy: userIds.member,
+      },
+      // IJ (Indiana Jones: The Pinball Adventure) - 1993
+      {
+        id: "10000000-0000-4000-8000-000000000022",
+        initials: "IJ",
+        num: 1,
+        title: "Path of Adventure not tilting",
+        desc: "The Path of Adventure mini-playfield stays level when the flipper buttons are pressed, so the ball drains straight into the first pit.",
+        status: "new",
+        severity: "major",
+        priority: "high",
+        frequency: "constant",
+        reportedBy: userIds.admin,
+      },
     ];
 
     for (const issue of issueSeed) {
@@ -640,6 +676,8 @@ async function seedUsersAndData() {
     await sql`UPDATE machines SET next_issue_number = 3 WHERE initials = 'MM'`;
     await sql`UPDATE machines SET next_issue_number = 2 WHERE initials = 'SM'`;
     await sql`UPDATE machines SET next_issue_number = 4 WHERE initials = 'GDZ'`;
+    await sql`UPDATE machines SET next_issue_number = 2 WHERE initials = 'TAFSCE'`;
+    await sql`UPDATE machines SET next_issue_number = 2 WHERE initials = 'IJ'`;
 
     console.log("✅ Issues seeded.");
 
