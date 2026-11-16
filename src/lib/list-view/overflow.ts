@@ -150,6 +150,44 @@ export function planListHeader(input: ListHeaderFitInput): ListHeaderPlan {
   };
 }
 
+/** The narrowest the phone search field may be before it becomes an icon. */
+export const PHONE_SEARCH_MIN_WIDTH = 175;
+
+/**
+ * Fit tolerance (list-views §8.7): the icon takes over slightly before the
+ * field would drop below its minimum, so a field at exactly 175px is
+ * already an icon.
+ */
+const FIT_TOLERANCE_PX = 1;
+
+export interface PhoneSearchFitInput {
+  /** The phone List Header's inner width. */
+  available: number;
+  /** The views button's untruncated width, Edited marker included. */
+  viewsWidth: number;
+  /** Width of the Filters icon button. */
+  filtersWidth: number;
+  gap: number;
+}
+
+/**
+ * Whether the phone List Header shows search as an icon button instead of
+ * the field (list-views §7.12). The field takes what the views button and
+ * Filters leave, and becomes an icon when that would be narrower than
+ * 175px, the field's width on a 400px screen with "Open issues" as the view
+ * name, with the §8.7 tolerance on top. A longer view name, or the Edited
+ * marker, makes it an icon on a wider screen.
+ */
+export function phoneSearchAsIcon({
+  available,
+  viewsWidth,
+  filtersWidth,
+  gap,
+}: PhoneSearchFitInput): boolean {
+  const fieldWidth = available - viewsWidth - filtersWidth - 2 * gap;
+  return fieldWidth < PHONE_SEARCH_MIN_WIDTH + FIT_TOLERANCE_PX;
+}
+
 /**
  * Room a line fit leaves spare, so a part drops a little before the line is
  * exactly full and real glyphs never crowd the line's end.

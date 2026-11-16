@@ -18,6 +18,16 @@ interface ListSearchFieldProps {
   onSearch: (query: string) => void;
   /** Accessible name, such as "Search machines" (§4.2). */
   label: string;
+  /** Focus and clear, for the phone List Header's search icon (§7.3). */
+  handleRef?: React.Ref<ListSearchFieldHandle> | undefined;
+  /** Called with the field's text whenever it changes, typing included. */
+  onTextChange?: ((text: string) => void) | undefined;
+}
+
+export interface ListSearchFieldHandle {
+  focus: () => void;
+  /** Empties the field and clears the list's search at once. */
+  clear: () => void;
 }
 
 /**
@@ -26,15 +36,27 @@ interface ListSearchFieldProps {
  * typing while an earlier search's results arrive, and takes a new value
  * only when the list's search changes from elsewhere. List View mounts it
  * afresh when a view is applied or changes are discarded, which drops a
- * search still waiting to run.
+ * search still waiting to run. Below md it only shows in the phone List
+ * Header, so its base styles are the phone field's (§7.3) and its md styles
+ * the toolbar's.
  */
 export function ListSearchField({
   id,
   value,
   onSearch,
   label,
+  handleRef,
+  onTextChange,
 }: ListSearchFieldProps): React.JSX.Element {
   const [text, setText] = React.useState(value);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  const onTextChangeRef = React.useRef(onTextChange);
+  React.useLayoutEffect(() => {
+    onTextChangeRef.current = onTextChange;
+  }, [onTextChange]);
+  React.useLayoutEffect(() => {
+    onTextChangeRef.current?.(text);
+  }, [text]);
   const submitted = React.useRef(value);
   const timeout = React.useRef<number | null>(null);
   const onSearchRef = React.useRef(onSearch);
@@ -67,6 +89,18 @@ export function ListSearchField({
 
   React.useEffect(() => clearPending, [clearPending]);
 
+  React.useImperativeHandle(
+    handleRef,
+    () => ({
+      focus: () => inputRef.current?.focus(),
+      clear: () => {
+        setText("");
+        submit("");
+      },
+    }),
+    [submit]
+  );
+
   function change(next: string): void {
     setText(next);
     clearPending();
@@ -80,9 +114,10 @@ export function ListSearchField({
       </label>
       <Search
         aria-hidden="true"
-        className="pointer-events-none absolute left-3 size-4 text-muted-foreground"
+        className="pointer-events-none absolute left-2.5 size-4 text-muted-foreground md:left-3"
       />
       <Input
+        ref={inputRef}
         id={id}
         type="search"
         value={text}
@@ -95,7 +130,7 @@ export function ListSearchField({
         }}
         autoComplete="off"
         enterKeyHint="search"
-        className="h-11 bg-background pl-9 text-base md:h-9 md:text-sm"
+        className="h-9 rounded-[10px] border-outline bg-background pr-2.5 pl-8 text-base md:rounded-md md:border-input md:pr-3 md:pl-9 md:text-sm"
       />
     </search>
   );

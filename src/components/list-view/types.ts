@@ -138,6 +138,18 @@ export interface ListViewsModel {
   actions: SavedViewActions;
 }
 
+/** The List View search (list-views §4.1, §4.2, §7.3). */
+export interface ListSearchModel {
+  /** The toolbar field's id; the phone List Header's field adds "-phone". */
+  id: string;
+  /** Accessible name, such as "Search machines" (§4.2). */
+  label: string;
+  /** The search the list currently shows. */
+  value: string;
+  /** Runs a search (§4.1). */
+  onSearch: (query: string) => void;
+}
+
 /** The sort control (list-views §5.5; machine-views §3.14). */
 export interface ListSortModel {
   fields: readonly ListOption[];

@@ -1,9 +1,9 @@
-export { ListSearchField } from "./ListSearchField";
 export { ListTitleRow, ListView } from "./ListView";
 export type {
   ListDisplayModel,
   ListFilterModel,
   ListPaginationModel,
+  ListSearchModel,
   ListSortModel,
   ListViewsModel,
 } from "./types";
