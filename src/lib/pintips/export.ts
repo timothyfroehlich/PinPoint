@@ -11,7 +11,7 @@ export const PINTIPS_EXPORT_URL =
   "https://mp-data.sfo3.cdn.digitaloceanspaces.com/latest-pintips.json";
 
 const USER_AGENT =
-  "PinPoint/1.0 (Austin Pinball Collective issue tracker; +https://github.com/timothyfroehlich/PinPoint)";
+  "PinPoint/1.0 (Austin Pinball Collective issue tracker; +https://github.com/minamaya/PinPoint)";
 
 /** A bulk file download, not an API call; allow it time on a slow CDN edge. */
 const FETCH_TIMEOUT_MS = 60_000;

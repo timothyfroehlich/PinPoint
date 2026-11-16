@@ -1,23 +1,21 @@
 # PinPoint project toolchain contract.
 #
 # package.json#packageManager remains the single authority for the exact pnpm
-# version and its integrity hash. Mise 2026.8.11+ reads that declaration directly
-# via idiomatic_version_file_enable_tools without duplicating the pnpm version here.
+# version and its integrity hash. Mise reads that declaration directly via
+# idiomatic_version_file_enable_tools without duplicating the pnpm version here.
 #
-# Minimum mise version: 2026.8.11 (verifies packageManager sha512 checksums).
-min_version = "2026.8.11"
-
-# pnpm 12 ships as a native binary; the npm registry package for it is just a
-# postinstall stub that fetches the real binary, and mise's npm: backend does
-# not run npm lifecycle scripts. aqua:pnpm/pnpm downloads the prebuilt binary
-# directly. CI's mise-action invokes `mise install --locked node pnpm`, naming
-# pnpm as an explicit CLI argument — that resolves through mise's registry
-# default backend for the bare name and skips whatever backend mise.lock has
-# recorded for the idiomatically-detected tool (PP-fmnm). This alias pins the
-# backend so both the explicit-argument and project-aware resolution paths
-# agree; the version still comes from packageManager, never duplicated here.
-[tool_alias]
-pnpm = "aqua:pnpm/pnpm"
+# Minimum mise version: 2026.11.7. A packageManager entry with a +sha512
+# checksum makes mise install pnpm from the npm registry (the `npm:pnpm`
+# backend), whatever `[tool_alias]` or a command-line `pnpm` argument says, and
+# mise.lock records that backend with the checksum as an option. pnpm 12's npm
+# package is only a postinstall stub for its native binary. mise 2026.11.7 is the
+# first release that runs that install script on this path, so the installed
+# pnpm is the real native binary (mise 2026.8.11 left the stub, PP-rhzk).
+# Do not add a `[tool_alias] pnpm = "aqua:pnpm/pnpm"`: it is ignored here, and
+# the aqua lock entry it needs is rewritten away by every `mise lock` (PP-66o0).
+# The "locked to npm:pnpm, but the registry now installs it from aqua" warning
+# is expected; do not run `mise backends switch pnpm`.
+min_version = "2026.11.7"
 
 [tools]
 node = "24.22.2"
