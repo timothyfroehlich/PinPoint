@@ -191,10 +191,6 @@
 
 | Requirement | Divergence | Resolution |
 | :-- | :-- | :-- |
-| §7.1, §7.3 | On phones search still has its own row above the list box; the phone List Header has no search field. | PP-jb9v.15 |
-| §7.8, §7.11 | The phone pager is a 44px full-width bar pinned above the tab bar, and the scroller reserves its height. | PP-jb9v.15 |
-| §7.12 | The phone search field never collapses to an icon. | PP-jb9v.15 |
-| §7.10, §12.5 | The phone List Header scrolls away with the page, and the page's top scroll padding covers only the app header, not a pinned List Header. | PP-jb9v.15 |
 | §4.5, §12.1 | The filter overflow button is labeled "More". | PP-jb9v.16 |
 | §4.10 | The filter overflow badge counts every filter the button holds, changed or not. | PP-jb9v.16 |
 | §5.8 | View tabs are underlined like page tabs, the current one marked by its underline. | PP-jb9v.16 |
@@ -204,8 +200,6 @@
 | §8.13, §8.23 | A Collection or Tag page's tabs never move into a menu, and its header spacing does not tighten below 390px. | PP-jb9v.18 |
 | §3.7–§3.10, §7.2 | Page actions are separate buttons with no ⋯ Actions menu, cap, or fold order; they become icon buttons at the md breakpoint rather than when they stop fitting, and Machines' Add Machine label shortens in steps. | PP-jb9v.17 |
 | §1, §5.5 | Issue View's Export sits in the desktop List Header, and phones offer no Export. | PP-jb9v.17 |
-| §1, §5.6, §10.14 | Machine View's View options offers a choice of columns, which its View Configurations, Built-in Views, and Saved Views carry. | Machine rows at every width (PP-jb9v.13). |
-| §2.4, §6.4 | Machine rows are table rows on desktop and tablet, and no machine row shares the issue rows' structure. | Machine rows at every width (PP-jb9v.13). |
 
 ---
 

@@ -47,7 +47,6 @@ export interface MachineViewState {
   dir: MachineViewSortDirection;
   page: number;
   pageSize: MachineViewPageSize;
-  columns: MachineViewFieldId[];
 }
 
 export interface MachineViewOwnerOption {
@@ -75,8 +74,9 @@ export interface MachineViewRow {
   hasOwner: boolean;
   presence: MachinePresenceStatus;
   createdAt: string;
-  health?: MachineViewHealth;
-  lastServicedAt?: string | null;
+  health: MachineViewHealth;
+  /** The latest service date, which every load reads; null when never serviced. */
+  lastServicedAt: string | null;
   lastActivityAt?: string | null;
 }
 
@@ -110,6 +110,8 @@ export interface MachineViewResult {
   permittedFields: MachineViewFieldId[];
   /** Whether the Owner filter offers Me: the viewer is signed in (machine-views §3.13). */
   offersMe: boolean;
+  /** Whether the viewer is signed in, which Export requires (machine-views §3.15). */
+  signedIn: boolean;
   /**
    * Every matching machine's id across all pages, when the Surface asked for
    * it (settings-sheets §2.3: adding every machine the filters show).

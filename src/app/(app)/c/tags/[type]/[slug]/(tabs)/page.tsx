@@ -61,6 +61,11 @@ export default async function TagOverviewPage({
     }),
   ]);
   return (
-    <MachineView result={result} preset="collection" savedViews={savedViews} />
+    <MachineView
+      result={result}
+      preset="collection"
+      savedViews={savedViews}
+      exportScope={{ kind: "tag", type, slug }}
+    />
   );
 }

@@ -72,7 +72,7 @@ a blank Full-E2E cell is often correct by design) is in the
 
 | Feature surface                          | Unit | Integration | Smoke | Full E2E | Representative tests                                                                                                                                   |
 | ---------------------------------------- | :--: | :---------: | :---: | :------: | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Roster / machine view & saved views      |  ✓   |      ✓      |       |    ✓     | `components/machines/view/MachineViewTable.test.tsx`, `machine-view-saved-views.test.ts`, `e2e/full/machine-view-saved-views.spec.ts`                  |
+| Roster / machine view & saved views      |  ✓   |      ✓      |       |    ✓     | `components/machines/view/MachineViewRows.test.tsx`, `machine-view-saved-views.test.ts`, `e2e/full/machine-view-saved-views.spec.ts`                   |
 | Machine info / hero / scan hub           |  ✓   |      ✓      |   ✓   |    ✓     | `m/[initials]/(tabs)/info-hero.test.tsx`, `machine-services.test.ts`, `e2e/smoke/machine-scan-hub.spec.ts`, `e2e/full/machine-info.spec.ts`            |
 | Machine create / edit form               |  ✓   |      ✓      |       |          | `m/new/create-machine-form.test.tsx`, `machine-form-actions.test.ts`                                                                                   |
 | Machine settings tab (inline / autosave) |  ✓   |      ✓      |       |    ✓     | `test/unit/components/machines/use-auto-save.test.ts`, `machine-settings-actions.test.ts`, `e2e/full/machine-settings.spec.ts`                         |

@@ -12,7 +12,6 @@ import {
 import type { IssueExportScope } from "~/app/(app)/issues/export-schema";
 import { ExportButton } from "~/components/issues/ExportButton";
 import {
-  ListSearchField,
   ListTitleRow,
   ListView,
   type ListDisplayModel,
@@ -181,14 +180,12 @@ export function IssueView({
         noun={NOUN}
         titleRow={title ? <ListTitleRow title={title} /> : undefined}
         summary={summary}
-        search={
-          <ListSearchField
-            id="issue-view-search"
-            value={state.q}
-            onSearch={(q) => update({ q })}
-            label="Search issues"
-          />
-        }
+        search={{
+          id: "issue-view-search",
+          label: "Search issues",
+          value: state.q,
+          onSearch: (q) => update({ q }),
+        }}
         primaryFilters={filters.primary}
         secondaryFilters={filters.secondary}
         views={views}

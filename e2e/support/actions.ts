@@ -445,6 +445,28 @@ function escapeRegExp(text: string): string {
 }
 
 /**
+ * The List View's search field, visible and ready to type into, at any width
+ * (list-views §4.1, §7.3). From md up it sits in the toolbar. Below md it sits
+ * in the phone List Header, which shows a search icon instead whenever the
+ * field would be narrower than 175px; the icon carries the field's name and
+ * opens it. A field that holds text stays open, so later calls find it
+ * without the icon. The click is retried because a press before React
+ * attaches the handler is dropped.
+ */
+export async function openListSearch(
+  page: Page,
+  label: string
+): Promise<Locator> {
+  const field = page.getByRole("searchbox", { name: label, exact: true });
+  const icon = page.getByRole("button", { name: label, exact: true });
+  await expect(async () => {
+    if (await icon.isVisible()) await icon.click({ timeout: 2_000 });
+    await expect(field).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 20_000 });
+  return field;
+}
+
+/**
  * Checks (or, with `checked: false`, unchecks) options of one List View
  * filter, at any width (list-views §4, §7.5). From md up the filter is a
  * dropdown beside search, or under More when it does not fit; below md it is

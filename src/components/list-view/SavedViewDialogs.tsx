@@ -80,7 +80,7 @@ export function SaveViewDialog({
           <DialogHeader>
             <DialogTitle>Save view</DialogTitle>
             <DialogDescription className="sr-only">
-              Name the current fields, search, filters, sorting, and page size.
+              Name the current search, filters, sorting, and page size.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-1.5">

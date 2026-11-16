@@ -583,7 +583,7 @@
 
 - **Severity:** Required
 - **Why:** WCAG 1.3.1 Level A. Without `scope="col"` on header cells, screen readers can't announce the column header for each data cell. Without `aria-sort`, sort state is invisible to AT. Without `<caption>` or `aria-label`, the table has no accessible name in the page outline.
-- **Do:** Every `<th>` carries `scope="col"`. Sortable columns expose `aria-sort="ascending" | "descending" | "none"` synced to the active sort. The `<table>` has either a visible `<caption>` or an `aria-label` describing its contents. The table at `src/components/machines/view/MachineViewTable.tsx` is the reference implementation — match its semantics for new tables.
+- **Do:** Every `<th>` carries `scope="col"`. Sortable columns expose `aria-sort="ascending" | "descending" | "none"` synced to the active sort. The `<table>` has either a visible `<caption>` or an `aria-label` describing its contents.
 - **Don't:** Render a `<th>` without `scope`. Don't ship a sortable table with no `aria-sort`. Don't rely on column header text alone — that's not what AT uses.
 
 **CORE-A11Y-004:** No `<div role="button">` — use real `<button>`
