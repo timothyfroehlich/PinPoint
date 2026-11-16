@@ -515,10 +515,22 @@ def _watch_phase_ci(
 
 QUEUE_BRANCH_PREFIX = "gh-readonly-queue/"
 
-# One query per interval carries everything a queue verdict needs.
+# Merging is two writes on GitHub's side: the entry disappears, then the state
+# flips to MERGED. A read between them shows an open PR with no entry, so one
+# such read is only a candidate; the watch re-reads after this grace and decides
+# on the second consecutive one.
+QUEUE_ABSENT_CONFIRM_SECONDS = 10
+
+# The branch-prefix fallback scans this many recent merge_group runs; a busy
+# queue spends three runs (one per required workflow) on every group.
+QUEUE_RUN_SCAN_LIMIT = 200
+
+# One query per interval carries everything a queue verdict needs. The entry's
+# headCommit is the merge-group commit its merge_group runs are built on.
 _QUEUE_FIELDS = (
     "state headRefOid mergeStateStatus mergeCommit{oid} "
-    "autoMergeRequest{enabledAt} mergeQueueEntry{state position enqueuedAt}"
+    "autoMergeRequest{enabledAt} "
+    "mergeQueueEntry{state position enqueuedAt headCommit{oid}}"
 )
 
 
@@ -542,34 +554,22 @@ class QueueVerdict:
     failure_artifact: str | None = None
 
 
-def _failed_queue_run(pr: int, since: str) -> dict | None:
-    """Return the failing merge_group run built for ``pr`` since ``since``.
+_QUEUE_RUN_FIELDS = (
+    "databaseId,status,conclusion,headBranch,headSha,workflowName,createdAt,url"
+)
 
-    Called once, after the PR has left the queue. A queue that rebuilds a group
-    (a PR ahead of it dropped out) leaves cancelled runs on the older commits,
-    so take the newest failing commit and, among its red runs, prefer CI, the
-    workflow that carries CI Gate. Runs created before this enqueue belong to
-    an earlier attempt and are ignored.
+
+def _newest_failing_group_run(runs: list[dict]) -> dict | None:
+    """Among red runs, the newest failing commit's run, preferring CI.
+
+    A queue that rebuilds a group (a PR ahead of it dropped out) leaves
+    cancelled runs on the older commits, so the newest failing commit is the
+    one that removed the PR; CI carries CI Gate, the queue's real gate.
     """
-    raw = gh(
-        "run",
-        "list",
-        "--event",
-        "merge_group",
-        "--limit",
-        "50",
-        "--json",
-        "databaseId,status,conclusion,headBranch,headSha,workflowName,createdAt,url",
-    )
-    marker = f"/pr-{pr}-"
     failed = [
         run
-        for run in json.loads(raw)
-        if str(run.get("headBranch") or "").startswith(QUEUE_BRANCH_PREFIX)
-        and marker in str(run.get("headBranch"))
-        and str(run.get("createdAt") or "") >= since
-        and run.get("status") == "completed"
-        and _is_failing(run.get("conclusion"))
+        for run in runs
+        if run.get("status") == "completed" and _is_failing(run.get("conclusion"))
     ]
     if not failed:
         return None
@@ -583,7 +583,54 @@ def _failed_queue_run(pr: int, since: str) -> dict | None:
     )
 
 
-def _queue_failure(pr: int, since: str) -> dict:
+def _failed_queue_run(pr: int, since: str, group_sha: str | None) -> dict | None:
+    """Return the failing merge_group run that removed ``pr`` from the queue.
+
+    Called once, after the removal is confirmed. With the merge-group commit
+    seen while the PR was queued, look up that commit's runs directly: exact,
+    and independent of how busy the queue is. Without one (the PR left the
+    queue before a poll caught its group), scan recent merge_group runs for the
+    PR's queue branch created since this attempt was enqueued.
+    """
+    if group_sha:
+        raw = gh(
+            "run",
+            "list",
+            "--commit",
+            group_sha,
+            "--event",
+            "merge_group",
+            "--limit",
+            "20",
+            "--json",
+            _QUEUE_RUN_FIELDS,
+        )
+        return _newest_failing_group_run(
+            [run for run in json.loads(raw) if run.get("headSha") == group_sha]
+        )
+    raw = gh(
+        "run",
+        "list",
+        "--event",
+        "merge_group",
+        "--limit",
+        str(QUEUE_RUN_SCAN_LIMIT),
+        "--json",
+        _QUEUE_RUN_FIELDS,
+    )
+    marker = f"/pr-{pr}-"
+    return _newest_failing_group_run(
+        [
+            run
+            for run in json.loads(raw)
+            if str(run.get("headBranch") or "").startswith(QUEUE_BRANCH_PREFIX)
+            and marker in str(run.get("headBranch"))
+            and str(run.get("createdAt") or "") >= since
+        ]
+    )
+
+
+def _queue_failure(pr: int, since: str, group_sha: str | None) -> dict:
     """The removed PR's failing run: detail_url, failing_jobs, failure_artifact.
 
     Whatever was found before an error is kept; nothing found is an empty dict,
@@ -591,9 +638,13 @@ def _queue_failure(pr: int, since: str) -> dict:
     """
     found: dict = {}
     try:
-        run = _failed_queue_run(pr, since)
+        run = _failed_queue_run(pr, since, group_sha)
         if run is None:
-            emit("No failing merge_group run found for this PR's queue branch")
+            emit(
+                f"No failing merge_group run found on {group_sha[:7]}"
+                if group_sha
+                else "No failing merge_group run found for this PR's queue branch"
+            )
             return found
         run_id = int(run["databaseId"])
         found["detail_url"] = (
@@ -632,9 +683,15 @@ def _watch_phase_queue(
 ) -> QueueVerdict:
     """Watch one pinned head through the merge queue, one query per interval."""
     deadline = time.monotonic() + timeout_sec
-    # When the PR was first seen headed into the queue: its enqueue time, or the
-    # time auto-merge was armed. None until then.
+    # Per-attempt state, taken from the latest entry (or armed auto-merge) so a
+    # drop and re-enqueue starts a new attempt: when it was enqueued (or armed),
+    # and the merge-group commit its runs are built on. `since` stays None until
+    # the PR is first seen headed into the queue.
     since: str | None = None
+    group_sha: str | None = None
+    # True after one read showed no entry and no auto-merge (see
+    # QUEUE_ABSENT_CONFIRM_SECONDS); the next such read is the verdict.
+    absent_once = False
     last_signature: tuple | None = None
     seen: dict = {}
 
@@ -689,9 +746,13 @@ def _watch_phase_queue(
                 **seen,
             )
         if entry or auto_merge:
-            since = (
-                since or entry.get("enqueuedAt") or auto_merge.get("enabledAt") or ""
-            )
+            absent_once = False
+            attempt = str(entry.get("enqueuedAt") or auto_merge.get("enabledAt") or "")
+            if attempt != since:
+                # A new attempt (first sighting, armed → enqueued, or a
+                # re-enqueue): an earlier attempt's group commit is not this one's.
+                since, group_sha = attempt, None
+            group_sha = (entry.get("headCommit") or {}).get("oid") or group_sha
             signature = (seen["queue_state"], seen["queue_position"])
             if signature != last_signature:
                 emit(
@@ -700,8 +761,15 @@ def _watch_phase_queue(
                     else "Auto-merge armed — waiting for GitHub to enqueue the PR"
                 )
                 last_signature = signature
+        elif not absent_once:
+            absent_once = True
+            last_signature = None
+            emit("No queue entry — re-reading to confirm")
+            time.sleep(QUEUE_ABSENT_CONFIRM_SECONDS)
+            continue
         elif since is None:
-            # Not queued when the watch began, with no auto-merge armed either.
+            # Not queued when the watch began (confirmed by a second read), with
+            # no auto-merge armed either.
             # That is `not_queued` (exit 1, act on it), not undetermined (exit
             # 2): GitHub answered, and nothing will merge this PR on its own.
             # Exit 2 means "could not find out; re-run the watch", and re-running
@@ -716,7 +784,9 @@ def _watch_phase_queue(
             )
         else:
             emit(f"PR #{pr} left the merge queue without merging ({state.lower()})")
-            return QueueVerdict("removed", **seen, **_queue_failure(pr, since))
+            return QueueVerdict(
+                "removed", **seen, **_queue_failure(pr, since, group_sha)
+            )
 
         time.sleep(poll_sec)
 
