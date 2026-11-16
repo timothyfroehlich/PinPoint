@@ -104,7 +104,6 @@ function result(overrides: Partial<IssueViewResult> = {}): IssueViewResult {
     rows: [row()],
     totalCount: 1,
     summary: {
-      open: 1,
       byStatusGroup: { new: 1, in_progress: 0 },
       bySeverity: { cosmetic: 0, minor: 0, major: 1, unplayable: 0 },
       byPriority: { low: 0, medium: 0, high: 1 },

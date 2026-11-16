@@ -102,7 +102,6 @@ async function loadIssueListSummary(
     .groupBy(issues.status, issues.severity, issues.priority);
 
   const counts: IssueListSummary = {
-    open: 0,
     byStatusGroup: { new: 0, in_progress: 0 },
     bySeverity: { cosmetic: 0, minor: 0, major: 0, unplayable: 0 },
     byPriority: { low: 0, medium: 0, high: 0 },
@@ -110,7 +109,6 @@ async function loadIssueListSummary(
   for (const group of groups) {
     const statusGroup = OPEN_STATUS_GROUP.get(group.status);
     if (statusGroup === undefined) continue;
-    counts.open += group.value;
     counts.byStatusGroup[statusGroup] += group.value;
     counts.bySeverity[group.severity] += group.value;
     counts.byPriority[group.priority] += group.value;

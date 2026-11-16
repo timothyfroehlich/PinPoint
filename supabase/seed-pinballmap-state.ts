@@ -35,8 +35,8 @@
  * state is a function of BOTH the snapshot and the machine's own columns. Every
  * cabinet is matched to its OWN real title (so the machine header reads
  * correctly); the spread across the listing states comes from intent and
- * availability, not from mismatched titles. Of the twelve: seven are matched to
- * a title the captured lineup carries, three to a title it does not, and two
+ * availability, not from mismatched titles. Of the fourteen: seven are matched
+ * to a title the captured lineup carries, five to a title it does not, and two
  * are marked not on Pinball Map (uncataloged) — one with nothing hand-entered,
  * one with a hand-entered model. Each id below was verified against both fixtures; see
  * the table in `MACHINE_PLAN`.
@@ -87,6 +87,8 @@ const TITLE = {
   addamsFamily: 90002, // added to the mirror, NOT on the lineup → sync_off
   eightBallDeluxe: 90003, // added to the mirror, NOT on the lineup → blocked
   attackFromMars: 90001, // added to the mirror AND the lineup → on
+  addamsFamilySce: 90004, // added to the mirror, NOT on the lineup → off
+  indianaJones: 90005, // added to the mirror, NOT on the lineup → off
 } as const;
 
 /**
@@ -117,6 +119,8 @@ assertLineup(TITLE.spiderManVault, true);
 assertLineup(TITLE.medievalMadness, false);
 assertLineup(TITLE.addamsFamily, false);
 assertLineup(TITLE.eightBallDeluxe, false);
+assertLineup(TITLE.addamsFamilySce, false);
+assertLineup(TITLE.indianaJones, false);
 // Attack from Mars is not in APC's real capture; the seed adds it to
 // location-26454.json so the AFM cabinet renders its correct match as `on`.
 // refresh-fixture.ts rewrites that file verbatim from the live API, so a future
@@ -198,6 +202,8 @@ interface MachinePlan {
  * | EBD  Eight Ball Deluxe | 90003   | no        | off     | removed      | blocked     |
  * | HD   Humpty Dumpty     | none    | —         | off     | on the floor | uncataloged |
  * | HB   Hyperball         | none    | —         | off     | on the floor | uncataloged |
+ * | TAFSCE Addams Fam. SCE | 90004   | no        | off     | on the floor | off         |
+ * | IJ   Indiana Jones     | 90005   | no        | off     | on the floor | off         |
  *
  * **Shared and Covered need three cabinets of one title**, so GDZ / GDZ2 / GDZ3
  * are three genuine Godzillas the club owns (all matched to 3416): two intent-On
@@ -226,10 +232,15 @@ interface MachinePlan {
  * row written straight to the end state is exactly what a real machine reaches
  * by being marked Removed after intent was set On.
  *
- * **Two states are still not seeded.** `off` (intent Off, entry absent,
- * availability fine) and `waiting` (needs no stored lineup at all, which would
- * take out every other row — clear `snapshot_json` by hand to see it). Both are
- * trivial to reach by hand; neither had a spare cabinet.
+ * **TAFSCE and IJ render `off`** (intent Off, entry absent, availability
+ * fine): the quiet state, so the two long-named machines that exist for layout
+ * testing add no Pinball Map prompts. Neither title is in APC's real capture,
+ * so both are added to the catalog mirror like AFM / TAF / EBD, without OPDB
+ * or IPDB ids.
+ *
+ * **One state is still not seeded.** `waiting` needs no stored lineup at all,
+ * which would take out every other row — clear `snapshot_json` by hand to see
+ * it.
  *
  * **No machine here survives being edited into a different state and back.**
  * Re-run the seed rather than reasoning about what the fixture became.
@@ -378,6 +389,24 @@ const MACHINE_PLAN: MachinePlan[] = [
     manufacturer: "Williams",
     year: 1981,
     state: "uncataloged",
+  },
+  {
+    initials: "TAFSCE",
+    pinballmapMachineId: TITLE.addamsFamilySce,
+    pinballmapIntent: "off",
+    pinballmapExcluded: false,
+    presenceStatus: "on_the_floor",
+    modelName: null,
+    state: "off",
+  },
+  {
+    initials: "IJ",
+    pinballmapMachineId: TITLE.indianaJones,
+    pinballmapIntent: "off",
+    pinballmapExcluded: false,
+    presenceStatus: "on_the_floor",
+    modelName: null,
+    state: "off",
   },
 ];
 

@@ -20,36 +20,24 @@ import {
 
 interface ListTitleRowProps {
   title: string;
-  /**
-   * The Summary Row toggle (list-views §7.2), shown whenever the Summary
-   * Widgets stack (§8.4); it hides itself when they sit side by side.
-   */
-  summaryToggle?: React.ReactNode;
   /** The host's page actions (§3.2). */
   actions?: React.ReactNode;
 }
 
 /**
- * The page title row (list-views §3.2, §7.2): the title, the Summary Row
- * toggle while the Summary Widgets stack (§8.4), and the host's page
+ * The page title row (list-views §3.2, §7.2): the title and the host's page
  * actions. The result count is never repeated here.
  */
 export function ListTitleRow({
   title,
-  summaryToggle,
   actions,
 }: ListTitleRowProps): React.JSX.Element {
   return (
-    // The toggle's container: as wide as the Summary Widgets group beside it
-    // in the List View, so the toggle shows exactly while the group stacks.
     // Actions that still do not fit as icon buttons wrap below the title.
-    <div className="@container flex min-h-11 flex-wrap items-center gap-x-1.5 gap-y-2 md:gap-x-3">
+    <div className="flex min-h-11 flex-wrap items-center gap-x-1.5 gap-y-2 md:gap-x-3">
       <h1 className="shrink-0 text-2xl font-bold tracking-tight md:text-3xl">
         {title}
       </h1>
-      {summaryToggle ? (
-        <div className="flex min-w-0">{summaryToggle}</div>
-      ) : null}
       {actions ? (
         <div className="ml-auto flex shrink-0 items-center gap-2">
           {actions}
@@ -66,7 +54,7 @@ interface ListViewProps {
   noun: ListNoun;
   /** The page title row, when the List View owns its page (§3.1). */
   titleRow?: React.ReactNode;
-  /** The host's Summary Widgets (§3.1, §8.4). */
+  /** The host's Summary Widgets (§3.1). */
   summary?: React.ReactNode;
   /**
    * The search field (§4.1, §4.2). It is mounted afresh whenever a view is
@@ -184,8 +172,6 @@ export function ListView({
 
   return (
     <div className="space-y-3 max-md:pb-11">
-      {/* Full-width siblings: the title row's Summary Row toggle and the
-          Summary Widgets switch on equal container widths (§8.4). */}
       {titleRow}
       {summary}
       <ListToolbar

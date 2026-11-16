@@ -29,6 +29,13 @@ test.beforeEach(async ({ page }) => {
 async function addByInitials(page: Page, initials: string): Promise<void> {
   const search = page.getByRole("searchbox", { name: "Search machines" });
   await search.fill(initials);
+  // The search applies after a debounce, through a router transition that
+  // dims the list. Wait for it to land so neither the click below nor a later
+  // accessibility scan meets the list mid-update (PP-4bhb).
+  await expect(page).toHaveURL(new RegExp(`[?&]q=${initials}(&|$)`));
+  await expect(
+    page.getByRole("region", { name: "Machines list" })
+  ).not.toHaveAttribute("aria-busy", "true");
   // The machine list renders as a table (role=row) on desktop and as a compact
   // card list (role=listitem, MachineViewCompactList) on phones; the off-
   // breakpoint layout is display:none, so only one is in the accessibility tree
