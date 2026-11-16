@@ -1096,7 +1096,9 @@ describe("MachineView", () => {
     await user.click(screen.getByRole("menuitem", { name: "Manage views…" }));
     const dialog = await screen.findByRole("dialog", { name: "Manage views" });
     expect(
-      within(dialog).queryByRole("button", { name: /by default$/ })
+      within(dialog).queryByRole("button", {
+        name: /^(?:Default|Make default): /,
+      })
     ).not.toBeInTheDocument();
     // Deleting the Default View here names the page it opens on.
     await user.click(

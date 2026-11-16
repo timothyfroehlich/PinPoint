@@ -180,11 +180,7 @@ function DefaultToggle({
         size="sm"
         disabled={isPending}
         aria-pressed={isDefault}
-        aria-label={
-          isDefault
-            ? `Default: ${view.name}, stop opening by default`
-            : `Make default: ${view.name}`
-        }
+        aria-label={`${isDefault ? "Default" : "Make default"}: ${view.name}`}
         onClick={() => run(() => views.actions.setDefault(target))}
         className={cn(
           "h-9 shrink-0",
