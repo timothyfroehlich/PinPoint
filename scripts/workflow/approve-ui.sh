@@ -6,11 +6,14 @@
 # Run it only when Tim himself approved this PR's UI: in the owning session's chat,
 # or by clicking Approve in the orchestrator artifact. --source says which, and goes
 # into the approval comment with --note. --head is the commit Tim saw (the one the
-# screenshots were taken from); the script refuses when the PR head has moved past
-# it, so an approval never lands on UI he did not see. It approves the pending
-# `ui-approval` environment deployment of that head's UI Approval run. Tim can also
-# approve that deployment himself on GitHub; agents use this script, never the raw
-# API.
+# screenshots were taken from). When the PR head has moved past it, the script
+# records the approval on the current head only if the PR's own UI diff there is
+# the same patch as at the commit Tim saw (ui-approval-scope.sh --compare): a merge
+# of main, clean or conflicted, that left the PR's UI changes alone. Otherwise it
+# refuses and names the UI files that changed, so an approval never lands on UI he
+# did not see. It approves the pending `ui-approval` environment deployment of the
+# current head's UI Approval run. Tim can also approve that deployment himself on
+# GitHub; agents use this script, never the raw API.
 #
 # Exits 1 when the head has no UI Approval run waiting for sign-off.
 set -euo pipefail
@@ -35,12 +38,27 @@ done
 [[ "$source" == "chat" || "$source" == "artifact" ]] || usage
 [[ "$seen" =~ ^[0-9a-f]{7,40}$ ]] || usage
 
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
 head=$(gh pr view "$pr" --json headRefOid --jq .headRefOid)
+saw=""
 if [[ "$head" != "$seen"* ]]; then
-  echo "approve-ui: PR #${pr} head is ${head:0:7}, not ${seen:0:7}, the commit Tim saw." >&2
-  echo "  Show Tim the UI at ${head:0:7} and get his approval for that commit." >&2
-  exit 1
+  # The head moved past the commit Tim saw. Fetch both and compare the PR's own UI
+  # diff at each: a merge of main leaves it unchanged, a new UI change does not.
+  git fetch -q origin main "refs/pull/${pr}/head"
+  if ! seen_full=$(git rev-parse --verify -q "${seen}^{commit}"); then
+    echo "approve-ui: ${seen:0:7}, the commit Tim saw, is not in this clone." >&2
+    exit 1
+  fi
+  differ=$(CLAUDE_REVIEW_MAIN_REF=origin/main \
+    bash "${script_dir}/ui-approval-scope.sh" --compare "$seen_full" "$head")
+  if [[ -n "$differ" ]]; then
+    echo "approve-ui: PR #${pr} head ${head:0:7} changes UI beyond ${seen:0:7}, the commit Tim saw:" >&2
+    while IFS= read -r path; do echo "  ${path}" >&2; done <<< "$differ"
+    echo "  Show Tim the UI at ${head:0:7} and get his approval for that commit." >&2
+    exit 1
+  fi
+  saw=$seen_full
 fi
 
 run_id=$(gh run list --workflow ui-approval.yaml --commit "$head" --status waiting \
@@ -59,8 +77,14 @@ if [[ -z "$env_id" ]]; then
 fi
 
 comment="UI approved by Tim (${source}) on ${head:0:7}."
+if [[ -n "$saw" ]]; then
+  comment="${comment} He saw ${saw:0:7}; the PR's own UI changes are the same at ${head:0:7}."
+fi
 [[ -n "$note" ]] && comment="${comment} ${note}"
 
 gh api -X POST "repos/${repo}/actions/runs/${run_id}/pending_deployments" \
   -F "environment_ids[]=${env_id}" -f state=approved -f comment="$comment" >/dev/null
 echo "approve-ui: approved UI on PR #${pr} head ${head:0:7} (run ${run_id}, source ${source})."
+if [[ -n "$saw" ]]; then
+  echo "  Tim saw ${saw:0:7}; the PR's own UI changes are the same at ${head:0:7}."
+fi

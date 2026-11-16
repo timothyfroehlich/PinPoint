@@ -149,7 +149,7 @@ A local `/code-review` by the owning agent is optional, useful before marking a 
 
 ### 3.5 Get Tim's UI approval (UI-touching PRs, while still a draft)
 
-When the diff touches a path in `scripts/workflow/ui-paths.txt` (`src/app/**/*.tsx`, `src/components/**`, any `.css`, Tailwind config, design tokens), the required `UI Approval` check waits for Tim's sign-off on the head. Tim reviews rendered UI by eye, not by reading a diff. Get it while the PR is a draft, before updating E2E tests and before marking the PR ready for Claude Review, so no E2E work rides on a layout he has not seen. The commit-time `ui-screenshot-reminder.cjs` hook nudges on the first UI commit.
+When the PR's own diff (from its merge base with `main`) touches a path in `scripts/workflow/ui-paths.txt` (`src/app/**/*.tsx`, `src/components/**`, any `.css`, Tailwind config, design tokens), the required `UI Approval` check waits for Tim's sign-off on the head. Tim reviews rendered UI by eye, not by reading a diff. Get it while the PR is a draft, before updating E2E tests and before marking the PR ready for Claude Review, so no E2E work rides on a layout he has not seen. The commit-time `ui-screenshot-reminder.cjs` hook nudges on the first UI commit.
 
 1. **Capture.** With the dev server (`pnpm run dev`) and Supabase (`pnpm supabase:start`) running:
    ```
@@ -161,9 +161,9 @@ When the diff touches a path in `scripts/workflow/ui-paths.txt` (`src/app/**/*.t
    ```
    bash scripts/workflow/approve-ui.sh <PR> --head <sha> --source chat|artifact
    ```
-   `--head` is the commit the screenshots came from; the script refuses if the PR head has moved past it, so capture from a committed, pushed tree. It approves the `ui-approval` environment deployment that head's UI Approval run is waiting on, and only that one. Run it only on Tim's own approval; never call the `pending_deployments` API directly. Tim can also approve on GitHub from the run's "Review deployments".
+   `--head` is the commit the screenshots came from, so capture from a committed, pushed tree. If the PR head has since moved past it, the script records the approval on the current head only when the PR's own UI diff there is the same patch as at the commit Tim saw (a merge of `main` that left the PR's UI changes alone, clean or conflicted), and says which head he saw; otherwise it refuses and names the UI files that changed. It approves the `ui-approval` environment deployment that head's UI Approval run is waiting on, and only that one. Run it only on Tim's own approval; never call the `pending_deployments` API directly. Tim can also approve on GitHub from the run's "Review deployments".
 
-The approval carries across later commits that touch no UI path, so E2E updates after sign-off pass on their own. A later UI change makes the new head wait again; show Tim what changed and repeat step 3. A UI-path edit with no rendered effect (a refactor, a type-only change) still waits: tell Tim it renders nothing new and let him approve it from the description.
+The check compares the PR's own UI diff at the new head with the one at the last approved head, per file by `git patch-id` over a zero-context diff. The approval therefore carries across later commits that touch no UI path, so E2E updates after sign-off pass on their own, and across every merge of `main`, clean or conflicted, whose resolution leaves the PR's own UI lines as they were. A later UI change, or a conflict resolution that changes the PR's own lines in a UI file, makes the new head wait again; show Tim what changed and repeat step 3. A UI-path edit with no rendered effect (a refactor, a type-only change) still waits: tell Tim it renders nothing new and let him approve it from the description.
 
 ---
 
