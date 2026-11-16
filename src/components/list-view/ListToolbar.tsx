@@ -145,13 +145,24 @@ function FilterDropdown({
 /**
  * The face of More filters: "More", then a badge counting the filters it
  * holds that differ from the Page Preset, or no badge when none do (§4.10).
- * Its accessible name, "More filters", is set on the button.
+ * It reads "More filters", then "2 changed": the name comes from the face,
+ * so the visible "More" starts it (WCAG Label in Name) and the badge's
+ * digit is spoken in words rather than run onto the label.
  */
 function MoreFiltersFace({ changed }: { changed: number }): React.JSX.Element {
   return (
     <>
-      <span>More</span>
-      {changed > 0 ? <CountPill count={changed} active={false} /> : null}
+      <span>
+        More <span className="sr-only">filters</span>
+      </span>
+      {changed > 0 ? (
+        <>
+          <span className="sr-only">{`, ${changed} changed`}</span>
+          <span aria-hidden="true">
+            <CountPill count={changed} active={false} />
+          </span>
+        </>
+      ) : null}
       <ChevronDown aria-hidden="true" className="size-3.5 shrink-0" />
     </>
   );
@@ -190,9 +201,6 @@ function MoreFilters({
     >
       <PopoverTrigger
         type="button"
-        aria-label={
-          changed > 0 ? `More filters, ${changed} changed` : "More filters"
-        }
         className={filterButtonClass}
         data-testid="list-filter-more"
         data-filter-trigger={MORE_ID}
