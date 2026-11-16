@@ -92,7 +92,6 @@ describe("issue list Summary Widget counts", () => {
     // New group (issue-widgets §3.2); the Fixed issue counts nowhere.
     expect(totalCount).toBe(0);
     expect(summary).toEqual({
-      open: 2,
       byStatusGroup: { new: 1, in_progress: 1 },
       bySeverity: { cosmetic: 0, minor: 0, major: 1, unplayable: 1 },
       byPriority: { low: 0, medium: 1, high: 1 },
@@ -108,7 +107,9 @@ describe("issue list Summary Widget counts", () => {
 
     // The group holds AA, CC, and DD; only AA is on the floor. The tab's
     // machine filter (BB) never narrows or widens the widgets.
-    expect(summary.open).toBe(1);
+    expect(summary.byStatusGroup.new + summary.byStatusGroup.in_progress).toBe(
+      1
+    );
     expect(summary.bySeverity).toEqual({
       cosmetic: 0,
       minor: 0,
