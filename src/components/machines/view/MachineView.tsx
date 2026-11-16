@@ -20,6 +20,7 @@ import {
 import { useListViewHost } from "~/components/list-view/use-list-view-host";
 import { Button } from "~/components/ui/button";
 import { EmptyState } from "~/components/ui/empty-state";
+import type { MachineExportScope } from "~/app/(app)/m/export-schema";
 import { isListPageSize } from "~/lib/list-view/url-state";
 import {
   getMachineViewPreset,
@@ -44,6 +45,7 @@ import {
   type MachineViewState,
 } from "~/lib/types";
 import { MachineSummaryWidgets } from "./MachineSummaryWidgets";
+import { MachineExportButton } from "./MachineExportButton";
 import { MachineViewCompactList } from "./MachineViewCompactList";
 import { MachineViewTable } from "./MachineViewTable";
 import type {
@@ -77,6 +79,11 @@ interface MachineViewProps {
   rowAction?: MachineRowAction | undefined;
   /** An action in the List Header that applies to the whole result. */
   listAction?: React.ReactNode;
+  /**
+   * The Surface to export from (machine-views §3.15). Export shows for
+   * signed-in viewers only; a Surface with its own `listAction` leaves this out.
+   */
+  exportScope?: MachineExportScope | undefined;
   /** Whether the Summary Widgets show. A picker Surface leaves them out. */
   showSummary?: boolean;
   /** Told when a new result starts and finishes loading. */
@@ -118,6 +125,7 @@ export function MachineView({
   onMachineSelect,
   rowAction,
   listAction,
+  exportScope,
   showSummary = true,
   onBusyChange,
 }: MachineViewProps): React.JSX.Element {
@@ -288,7 +296,20 @@ export function MachineView({
         sort={sort}
         display={display}
         pagination={pagination}
-        exportControl={listAction}
+        // The export action requires sign-in, so anonymous visitors are not
+        // offered Export.
+        exportControl={
+          listAction ??
+          (result.signedIn && exportScope !== undefined ? (
+            <MachineExportButton
+              query={serializeMachineViewState(
+                { ...state, page: 1 },
+                preset
+              ).toString()}
+              scope={exportScope}
+            />
+          ) : undefined)
+        }
         busy={isPending}
         onResetAll={resetFilters}
         emptyState={({ discard, openPagePreset }) =>

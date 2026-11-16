@@ -12,6 +12,7 @@ import type {
   MachineViewSavedViews,
   MachineViewSavedViewSummary,
 } from "~/lib/types";
+import type { MachineExportScope } from "~/app/(app)/m/export-schema";
 import { MachineView } from "./MachineView";
 
 window.matchMedia = vi.fn().mockImplementation(() => ({
@@ -46,6 +47,9 @@ const actions = vi.hoisted(() => ({
 }));
 
 vi.mock("~/app/(app)/m/saved-view-actions", () => actions);
+vi.mock("~/app/(app)/m/export-action", () => ({
+  exportMachinesAction: vi.fn(),
+}));
 vi.mock("next/navigation", () => ({
   useRouter: () => navigation.router,
   usePathname: () => "/m",
@@ -139,6 +143,7 @@ function result(overrides: Partial<MachineViewResult> = {}): MachineViewResult {
     ],
     permittedFields: getMachineViewPreset("machines").permittedFields,
     offersMe: true,
+    signedIn: true,
     ...overrides,
   };
 }
@@ -164,6 +169,8 @@ function renderView(
     views?: MachineViewSavedViews;
     preset?: MachineViewPresetId;
     title?: string;
+    exportScope?: MachineExportScope;
+    listAction?: React.ReactNode;
     actions?: React.ReactNode;
   } = {}
 ): ReturnType<typeof render> {
@@ -174,6 +181,8 @@ function renderView(
       preset={preset}
       savedViews={options.views ?? savedViews({}, preset)}
       title={options.title}
+      exportScope={options.exportScope}
+      listAction={options.listAction}
       actions={options.actions}
     />
   );
@@ -1144,6 +1153,37 @@ describe("MachineView", () => {
 
     expect(navigation.replace).toHaveBeenLastCalledWith("/m?owner=me", {
       scroll: false,
+    });
+  });
+
+  describe("Export (machine-views §3.15)", () => {
+    it("offers signed-in viewers Export on a Surface that names its scope", () => {
+      renderView({ exportScope: { kind: "all" } });
+      expect(screen.getByTestId("export-csv-button")).toBeInTheDocument();
+    });
+
+    it("hides Export from anonymous visitors", () => {
+      renderView({
+        result: result({ offersMe: false, signedIn: false }),
+        exportScope: { kind: "all" },
+      });
+      expect(screen.queryByTestId("export-csv-button")).not.toBeInTheDocument();
+    });
+
+    it("offers no Export on a Surface without an export scope", () => {
+      renderView();
+      expect(screen.queryByTestId("export-csv-button")).not.toBeInTheDocument();
+    });
+
+    it("keeps a Surface's own list action in place of Export", () => {
+      renderView({
+        exportScope: { kind: "all" },
+        listAction: <button type="button">Add 3 shown</button>,
+      });
+      expect(
+        screen.getByRole("button", { name: "Add 3 shown" })
+      ).toBeInTheDocument();
+      expect(screen.queryByTestId("export-csv-button")).not.toBeInTheDocument();
     });
   });
 
