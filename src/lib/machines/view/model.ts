@@ -268,13 +268,11 @@ function summarizePlayability(
     needs_service: 0,
     unplayable: 0,
   };
-  let onTheFloor = 0;
   for (const row of rows) {
     if (row.presence !== "on_the_floor") continue;
-    onTheFloor += 1;
     byStatus[row.health?.playability ?? "operational"] += 1;
   }
-  return { onTheFloor, byStatus };
+  return { byStatus };
 }
 
 /**

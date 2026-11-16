@@ -96,7 +96,6 @@ export interface MachineViewSummary {
     byPresence: Record<MachinePresenceWidgetStatus, number>;
   };
   playability: {
-    onTheFloor: number;
     byStatus: Record<MachineStatus, number>;
   };
 }

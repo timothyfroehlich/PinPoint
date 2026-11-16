@@ -28,7 +28,7 @@ set -euo pipefail
 
 : "${SUPABASE_PROJECT_ID:?SUPABASE_PROJECT_ID is required}"
 
-REPO="${GITHUB_REPOSITORY:-timothyfroehlich/PinPoint}"
+REPO="${GITHUB_REPOSITORY:-minamaya/PinPoint}"
 HERE="$(dirname "$0")"
 
 # Resolve the PR head branch (git ref) for Vercel env cleanup. Empty if the PR

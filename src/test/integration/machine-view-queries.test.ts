@@ -314,7 +314,6 @@ describe("machine view database pipeline", () => {
       },
     });
     expect(all.summary.playability).toEqual({
-      onTheFloor: 1,
       byStatus: { operational: 0, needs_service: 0, unplayable: 1 },
     });
     // The Collection tab holds Alpha and Gamma: only its own scope counts.
@@ -324,7 +323,11 @@ describe("machine view database pipeline", () => {
       on_loan: 0,
       pending_arrival: 0,
     });
-    expect(collection.summary.playability.onTheFloor).toBe(1);
+    expect(collection.summary.playability.byStatus).toEqual({
+      operational: 0,
+      needs_service: 0,
+      unplayable: 1,
+    });
   });
 
   it("keeps an owner with no machines in the scope, matching nothing (list-views §10.18)", async () => {
