@@ -12,7 +12,6 @@ import {
   SlidersHorizontal,
   X,
 } from "lucide-react";
-import { Checkbox } from "~/components/ui/checkbox";
 import {
   Drawer,
   DrawerContent,
@@ -196,9 +195,7 @@ type FiltersPanel =
   | { kind: "top" }
   | { kind: "filter"; id: string }
   | { kind: "sort" }
-  | { kind: "pageSize" }
-  | { kind: "layout" }
-  | { kind: "fields" };
+  | { kind: "pageSize" };
 
 function SheetRow({
   label,
@@ -409,28 +406,6 @@ function FiltersSheet({
           onOpen={() => openPanel({ kind: "pageSize" }, "pageSize")}
           rowRef={registerRow("pageSize")}
         />
-        {display.layout ? (
-          <SheetRow
-            label={display.layout.label}
-            value={
-              display.layout.options.find(
-                (option) => option.value === display.layout?.value
-              )?.label ?? ""
-            }
-            emphasized={false}
-            onOpen={() => openPanel({ kind: "layout" }, "layout")}
-            rowRef={registerRow("layout")}
-          />
-        ) : null}
-        {display.fields ? (
-          <SheetRow
-            label="Fields"
-            value={`${display.fields.selected.length} selected`}
-            emphasized={false}
-            onOpen={() => openPanel({ kind: "fields" }, "fields")}
-            rowRef={registerRow("fields")}
-          />
-        ) : null}
       </>
     );
   } else if (activeFilter) {
@@ -477,37 +452,6 @@ function FiltersSheet({
         value={String(display.pageSize)}
         onChange={(value) => display.onPageSizeChange(Number(value))}
       />
-    );
-  } else if (panel.kind === "layout" && display.layout) {
-    title = display.layout.label;
-    body = (
-      <RadioList
-        label={display.layout.label}
-        options={display.layout.options}
-        value={display.layout.value}
-        onChange={display.layout.onChange}
-      />
-    );
-  } else if (panel.kind === "fields" && display.fields) {
-    const fields = display.fields;
-    title = "Fields";
-    body = (
-      <div role="group" aria-label="Fields">
-        {fields.options.map((field) => (
-          <label
-            key={field.value}
-            className="flex min-h-11 cursor-pointer items-center gap-3 border-b border-border text-base"
-          >
-            <Checkbox
-              checked={fields.selected.includes(field.value)}
-              onCheckedChange={(checked) =>
-                fields.onToggle(field.value, checked === true)
-              }
-            />
-            <span className="flex-1">{field.label}</span>
-          </label>
-        ))}
-      </div>
     );
   }
 

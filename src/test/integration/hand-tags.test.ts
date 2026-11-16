@@ -185,7 +185,6 @@ describe("hand-applied tag reads", () => {
       preset: "collection",
       viewerId: null,
       searchParams: new URLSearchParams({
-        columns: "machine",
         presence: "all",
       }),
     });
@@ -197,7 +196,6 @@ describe("hand-applied tag reads", () => {
       viewerId: null,
       searchParams: new URLSearchParams({
         q: "Attack",
-        columns: "machine",
         presence: "all",
       }),
     });

@@ -14,7 +14,6 @@ import {
 } from "~/lib/machines/presence";
 import type { MachineStatus } from "~/lib/machines/status";
 import {
-  getMachineViewBuiltInViews,
   getMachineViewPreset,
   MACHINE_VIEW_FIELDS,
 } from "~/lib/machines/view/config";
@@ -23,7 +22,6 @@ import {
   canonicalFilterValues,
   canonicalPeopleValues,
   parsePageSize,
-  parseUrlList,
   positiveInteger,
   storedStateParams,
   type ListSearchParams,
@@ -89,18 +87,8 @@ export function parseMachineViewState(
     searchParams.get("pageSize"),
     defaults.pageSize
   );
-  // Displayed fields keep the URL's order: it is the order they show in.
-  const requestedColumns = parseUrlList(
-    searchParams.get("columns"),
-    MACHINE_VIEW_FIELD_IDS
-  ).filter((field) => preset.permittedFields.includes(field));
-  const columns =
-    requestedColumns.length === 0
-      ? defaults.columns
-      : [
-          "machine" as const,
-          ...requestedColumns.filter((field) => field !== "machine"),
-        ];
+  // A `columns` parameter from before the rows replaced the table is
+  // ignored: every row shows the same fields (machine-views §5.9).
 
   return {
     q: searchParams.get("q")?.trim() ?? defaults.q,
@@ -118,7 +106,6 @@ export function parseMachineViewState(
     dir,
     page: positiveInteger(searchParams.get("page"), defaults.page),
     pageSize,
-    columns,
   };
 }
 
@@ -156,9 +143,6 @@ export function serializeMachineViewState(
   if (state.pageSize !== defaults.pageSize) {
     params.set("pageSize", String(state.pageSize));
   }
-  if (!arraysEqual(state.columns, defaults.columns)) {
-    params.set("columns", state.columns.join(","));
-  }
   if (view) params.set("view", view);
 
   return params;
@@ -173,7 +157,6 @@ const MACHINE_VIEW_CONFIGURATION_PARAMS = [
   "sort",
   "dir",
   "pageSize",
-  "columns",
   "view",
 ] as const;
 
@@ -199,24 +182,13 @@ export function toMachineViewSavedState(
 
 /**
  * A Built-in View applied to the current configuration (list-views §1): its
- * search, filters, and sorting with the displayed fields and page size
- * already showing, plus the fields the view adds, such as Recently added's
- * Date Added (machine-views §9.1).
+ * search, filters, and sorting with the page size already showing.
  */
 export function applyMachineBuiltInView(
-  presetId: MachineViewPresetId,
-  view: { id: string; state: MachineViewSavedState },
+  view: { state: MachineViewSavedState },
   current: MachineViewSavedState
 ): MachineViewSavedState {
-  const addsFields =
-    getMachineViewBuiltInViews(presetId).find(
-      (definition) => definition.id === view.id
-    )?.addsFields ?? [];
-  return {
-    ...view.state,
-    pageSize: current.pageSize,
-    columns: [...new Set([...current.columns, ...addsFields])],
-  };
+  return { ...view.state, pageSize: current.pageSize };
 }
 
 /** The keys of a stored configuration, which are also its URL parameters. */
@@ -229,7 +201,6 @@ const SAVED_STATE_KEYS = [
   "sort",
   "dir",
   "pageSize",
-  "columns",
 ] as const satisfies readonly (keyof MachineViewSavedState)[];
 
 /**
@@ -260,18 +231,4 @@ export function normalizeMachineViewSavedState(
       SAVED_STATE_PRESET
     )
   );
-}
-
-export function nextMachineViewSort(
-  current: Pick<MachineViewState, "sort" | "dir">,
-  field: MachineViewFieldId,
-  presetId: MachineViewPresetId
-): Pick<MachineViewState, "sort" | "dir"> {
-  const preferred = MACHINE_VIEW_FIELDS[field].preferredDirection;
-  if (current.sort !== field) return { sort: field, dir: preferred };
-  if (current.dir === preferred) {
-    return { sort: field, dir: preferred === "asc" ? "desc" : "asc" };
-  }
-  const defaults = getMachineViewPreset(presetId).defaultState;
-  return { sort: defaults.sort, dir: defaults.dir };
 }

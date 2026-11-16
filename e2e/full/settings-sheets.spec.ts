@@ -36,18 +36,12 @@ async function addByInitials(page: Page, initials: string): Promise<void> {
   await expect(
     page.getByRole("region", { name: "Machines list" })
   ).not.toHaveAttribute("aria-busy", "true");
-  // The machine list renders as a table (role=row) on desktop and as a compact
-  // card list (role=listitem, MachineViewCompactList) on phones; the off-
-  // breakpoint layout is display:none, so only one is in the accessibility tree
-  // at a time. Match either so this helper works at every viewport. Scoped to
-  // the "Add machines" section so the mobile listitem branch can't collide with
-  // the print-run list's items.
-  const section = page.getByRole("region", { name: "Add machines" });
-  const hasInitials = { has: page.getByText(initials, { exact: true }) };
-  const entry = section
-    .getByRole("row")
-    .filter(hasInitials)
-    .or(section.getByRole("listitem").filter(hasInitials));
+  // The machine rows are list items at every width. Scoped to the "Add
+  // machines" section so they can't collide with the print-run list's items.
+  const entry = page
+    .getByRole("region", { name: "Add machines" })
+    .getByRole("listitem")
+    .filter({ has: page.getByText(initials, { exact: true }) });
   await entry.getByRole("button", { name: /^Add / }).click();
   await expect(entry.getByText("Added")).toBeVisible();
 }

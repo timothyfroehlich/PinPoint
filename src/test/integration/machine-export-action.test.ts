@@ -223,6 +223,25 @@ describe("exportMachinesAction — PGlite integration (CORE-TEST-004, CORE-TEST-
     expect(exportedIds(result).slice(0, 2)).toEqual(["BRV", "ALP"]);
   });
 
+  it("carries Last Serviced for machines off the shown page while sorted by Name", async () => {
+    // The list loads service dates for its shown page only unless it is
+    // sorted by Last Serviced; the export loads them for the whole scope.
+    const db = await getTestDb();
+    await db.insert(timelineEvents).values({
+      machineId: ids.bravo,
+      sourceType: "comment",
+      tag: "maintenance",
+      createdAt: new Date("2026-03-01T15:00:00.000Z"),
+    });
+    signInAs(STRANGER);
+    const result = await exportMachinesAction({
+      query: "sort=machine&dir=asc&presence=all&pageSize=1&page=1",
+      scope: { kind: "all" },
+    });
+    const bravo = exportedLines(result).find((line) => line.startsWith("BRV,"));
+    expect(bravo?.split(",").at(-2)).toBe("2026-03-01");
+  });
+
   it("exports only a Collection's machines when its owner opens it by id", async () => {
     signInAs(OWNER);
     const result = await exportMachinesAction({

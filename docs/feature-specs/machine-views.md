@@ -131,14 +131,6 @@
 
 | Requirement | Divergence | Resolution |
 | :-- | :-- | :-- |
-| §3.14, §5.3, §5.12–§5.14 | Desktop and tablet show a table with sortable column headers and a choice of columns, and phones offer a Table mode beside the Compact list; table rows are not whole-row links. | Machine rows at every width (PP-jb9v.13). |
-| §3.2, §5.3, §5.9, §5.10 | Compact rows are one line; the second line (Playability label, manufacturer, year, owner, Last Serviced) and its drop order are not built. | Machine rows at every width (PP-jb9v.13). |
-| §5.3 | The Compact row's open-issue count shows a severity icon before “N open”. | Machine rows at every width (PP-jb9v.13). |
-| §5.11 | The Compact row's Playability dot is the same round dot for every Playability, distinguished by color only. | Machine rows at every width (PP-jb9v.13). |
-| §5.7 | In the table, a Last Serviced age links to the machine's maintenance page. | Machine rows at every width (PP-jb9v.13). |
-| §2.3, §3.6, §3.7 | Page Presets set default columns, and service and activity data load only when a displayed column or the sort needs them. | Machine rows at every width (PP-jb9v.13). |
-| §4.1 | `columns` is canonical URL state and Saved Views store it. | Machine rows at every width (PP-jb9v.13). |
-| §5.15, §9.1 | Recently added adds the Date Added column instead of showing the added age on the row. | Machine rows at every width (PP-jb9v.13). |
 | §6.6–§6.8 | `/m` shows Pinball Map, a Print menu, and a filled Add Machine as separate buttons with no ⋯; nothing folds. | PP-jb9v.17 |
 
 ---

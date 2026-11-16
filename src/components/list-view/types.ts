@@ -131,8 +131,8 @@ export interface ListViewsModel {
   /** Returns to the Applied View's configuration at page 1 (§5.4). */
   onDiscard: () => void;
   /**
-   * Applies the Page Preset's Built-in View, keeping the displayed fields
-   * and page size (§1, §3.6).
+   * Applies the Page Preset's Built-in View, keeping the page size
+   * (§1, §3.6).
    */
   onOpenPagePreset: () => void;
   actions: SavedViewActions;
@@ -168,23 +168,6 @@ export interface ListDisplayModel {
   pageSize: number;
   pageSizes: readonly number[];
   onPageSizeChange: (pageSize: number) => void;
-  /** Displayed fields, for hosts with columns (§5.6). */
-  fields?:
-    | {
-        options: readonly ListOption[];
-        selected: readonly string[];
-        onToggle: (value: string, checked: boolean) => void;
-      }
-    | undefined;
-  /** A phone-only presentation choice, such as Compact list or Table. */
-  layout?:
-    | {
-        label: string;
-        options: readonly ListOption[];
-        value: string;
-        onChange: (value: string) => void;
-      }
-    | undefined;
 }
 
 export interface ListPaginationModel {

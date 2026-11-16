@@ -200,8 +200,6 @@
 | §8.13, §8.23 | A Collection or Tag page's tabs never move into a menu, and its header spacing does not tighten below 390px. | PP-jb9v.18 |
 | §3.7–§3.10, §7.2 | Page actions are separate buttons with no ⋯ Actions menu, cap, or fold order; they become icon buttons at the md breakpoint rather than when they stop fitting, and Machines' Add Machine label shortens in steps. | PP-jb9v.17 |
 | §1, §5.5 | Issue View's Export sits in the desktop List Header, and phones offer no Export. | PP-jb9v.17 |
-| §1, §5.6, §10.14 | Machine View's View options offers a choice of columns, which its View Configurations, Built-in Views, and Saved Views carry. | Machine rows at every width (PP-jb9v.13). |
-| §2.4, §6.4 | Machine rows are table rows on desktop and tablet, and no machine row shares the issue rows' structure. | Machine rows at every width (PP-jb9v.13). |
 
 ---
 

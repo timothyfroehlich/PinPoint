@@ -261,7 +261,10 @@ export function getLatestMachineActivityDates(
   return latestTimelineDates(tx, machineIds, false);
 }
 
-function publicRow(candidate: MachineViewCandidate): MachineViewRow {
+function publicRow(
+  candidate: MachineViewCandidate,
+  serviceDates: ReadonlyMap<string, Date>
+): MachineViewRow {
   const row: MachineViewRow = {
     id: candidate.id,
     initials: candidate.initials,
@@ -272,15 +275,11 @@ function publicRow(candidate: MachineViewCandidate): MachineViewRow {
     hasOwner: candidate.hasOwner,
     presence: candidate.presence,
     createdAt: candidate.createdAt,
+    // Every row shows Playability, the open-issue count, and the service age
+    // (machine-views §5.3, §5.9).
+    health: candidate.health,
+    lastServicedAt: serviceDates.get(candidate.id)?.toISOString() ?? null,
   };
-  // Every row carries health: the phone Compact row always shows Playability
-  // and the open-issue count, whatever fields are selected (§5.3).
-  if (candidate.health !== undefined) {
-    row.health = candidate.health;
-  }
-  if (candidate.lastServicedAt !== undefined) {
-    row.lastServicedAt = candidate.lastServicedAt;
-  }
   if (candidate.lastActivityAt !== undefined) {
     row.lastActivityAt = candidate.lastActivityAt;
   }
@@ -301,6 +300,8 @@ async function buildMachineViewCandidates(
   selectedOwners: Map<string, string>;
   validatedState: MachineViewState;
   candidates: MachineViewCandidate[];
+  /** The scope's service dates, or null when only the page's are needed. */
+  scopeServiceDates: Map<string, Date> | null;
 }> {
   const parsedState = parseMachineViewState(searchParams, preset);
   // Owner values are checked against people who exist, not against the
@@ -323,13 +324,14 @@ async function buildMachineViewCandidates(
   const machineInitials = baseRows.map((row) => row.initials);
   // Health loads for the whole scope on every request: the Summary Widgets
   // count it across the scope (machine-widgets §2.3) and every row carries it
-  // to the browser (machine-views §5.3). Service and activity dates load only
-  // when a displayed field or the sort needs them.
-  const [health, serviceDates, activityDates] = await Promise.all([
+  // to the browser (machine-views §5.3). Service and activity dates load for
+  // the whole scope only when the sort needs them; otherwise the shown page's
+  // service dates load after paging, below.
+  const [health, scopeServiceDates, activityDates] = await Promise.all([
     getMachineViewHealth(tx, machineInitials),
     dependencyPlan.service
       ? getLatestMachineServiceDates(tx, machineIds)
-      : Promise.resolve(new Map<string, Date>()),
+      : Promise.resolve(null),
     dependencyPlan.activity
       ? getLatestMachineActivityDates(tx, machineIds)
       : Promise.resolve(new Map<string, Date>()),
@@ -348,25 +350,32 @@ async function buildMachineViewCandidates(
       createdAt: machine.createdAt.toISOString(),
       canonicalModelName: machine.canonicalModelName,
       legacyModelName: machine.legacyModelName,
+      health:
+        health.get(machine.initials) ??
+        healthFromSeverityCounts({
+          cosmetic: 0,
+          minor: 0,
+          major: 0,
+          unplayable: 0,
+          oldestOpenIssueAt: null,
+        }),
     };
-    row.health =
-      health.get(machine.initials) ??
-      healthFromSeverityCounts({
-        cosmetic: 0,
-        minor: 0,
-        major: 0,
-        unplayable: 0,
-        oldestOpenIssueAt: null,
-      });
-    if (dependencyPlan.service) {
-      row.lastServicedAt = serviceDates.get(machine.id)?.toISOString() ?? null;
+    if (scopeServiceDates !== null) {
+      row.lastServicedAt =
+        scopeServiceDates.get(machine.id)?.toISOString() ?? null;
     }
     if (dependencyPlan.activity) {
       row.lastActivityAt = activityDates.get(machine.id)?.toISOString() ?? null;
     }
     return row;
   });
-  return { baseRows, selectedOwners, validatedState, candidates };
+  return {
+    baseRows,
+    selectedOwners,
+    validatedState,
+    candidates,
+    scopeServiceDates,
+  };
 }
 
 /** The state the filter reads: the URL's `me` becomes the viewer's own id. */
@@ -387,8 +396,13 @@ export async function loadMachineViewFromDatabase(
   args: LoadMachineViewFromDatabaseArgs
 ): Promise<MachineViewResult> {
   const { preset, viewerId } = args;
-  const { baseRows, selectedOwners, validatedState, candidates } =
-    await buildMachineViewCandidates(tx, args);
+  const {
+    baseRows,
+    selectedOwners,
+    validatedState,
+    candidates,
+    scopeServiceDates,
+  } = await buildMachineViewCandidates(tx, args);
   // The scope's owners, plus any selected owner with nothing here, so the
   // filter control can still show the selection. Me is a shortcut the
   // control offers on its own (machine-views §3.13), never a person.
@@ -404,9 +418,16 @@ export async function loadMachineViewFromDatabase(
     withMeResolved(validatedState, viewerId)
   );
   const state = { ...validatedState, page: applied.page };
+  // Every shown row carries its service date (machine-views §5.9).
+  const serviceDates =
+    scopeServiceDates ??
+    (await getLatestMachineServiceDates(
+      tx,
+      applied.rows.map((row) => row.id)
+    ));
 
   return {
-    rows: applied.rows.map(publicRow),
+    rows: applied.rows.map((row) => publicRow(row, serviceDates)),
     scopeCount: baseRows.length,
     totalCount: applied.totalCount,
     summary: summarizeMachineView(candidates),
@@ -456,8 +477,8 @@ export async function loadMachineExportRows(
         ownerName: base.ownerId === null ? null : base.ownerName,
         createdAt: candidate.createdAt,
         presence: candidate.presence,
-        playability: candidate.health?.playability ?? "operational",
-        openIssues: candidate.health?.openIssues ?? 0,
+        playability: candidate.health.playability,
+        openIssues: candidate.health.openIssues,
         lastServicedAt: candidate.lastServicedAt ?? null,
         lastActivityAt: candidate.lastActivityAt ?? null,
       },

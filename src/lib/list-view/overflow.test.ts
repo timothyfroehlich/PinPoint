@@ -5,6 +5,7 @@ import {
   LINE_FIT_TOLERANCE,
   phoneSearchAsIcon,
   planListHeader,
+  type LineFitPart,
 } from "./overflow";
 
 describe("phoneSearchAsIcon (list-views §7.12, §8.7)", () => {
@@ -45,75 +46,128 @@ describe("phoneSearchAsIcon (list-views §7.12, §8.7)", () => {
   });
 });
 
-describe("fitLineParts (issues-list §3.9)", () => {
-  // ID 60 · machine 120 · priority 50 · assignee 30 · comments 40 · age 90,
-  // gap 6.
-  const base = {
-    keptWidths: [60, 120],
-    partWidths: { priority: 50, assignee: 30, comments: 40, age: 90 },
-    dropOrder: ["age", "comments", "priority", "assignee"] as const,
-    gap: 6,
-  };
-  const shown = (available: number): string[] =>
-    [...fitLineParts({ ...base, available })].sort();
+describe("fitLineParts (machine-views §5.10, issues-list §3.9)", () => {
+  // Gaps 6px in the leading group, 8px in the trailing group, 12px between
+  // the groups; a "·" is 4px wide.
+  const spacing = { gap: 6, trailingGap: 8, groupGap: 12, separatorWidth: 4 };
 
-  it("keeps every part when the line fits with the tolerance to spare", () => {
-    // 60+120+50+30+40+90 + 5 gaps = 420.
-    expect(shown(420 + LINE_FIT_TOLERANCE)).toEqual([
-      "age",
-      "assignee",
-      "comments",
-      "priority",
-    ]);
-    expect(shown(420)).toEqual(["assignee", "comments", "priority"]);
-  });
+  describe("an issue row's line 2", () => {
+    // Leading: ID 60 (text) · machine 120 (text), priority 50. Trailing:
+    // assignee 30, comments 40, age 90.
+    type Part = "id" | "machine" | "priority" | "assignee" | "comments" | "age";
+    const leading: LineFitPart<Part>[] = [
+      { key: "id", width: 60, text: true },
+      { key: "machine", width: 120, text: true },
+      { key: "priority", width: 50, text: false },
+    ];
+    const trailing: LineFitPart<Part>[] = [
+      { key: "assignee", width: 30, text: false },
+      { key: "comments", width: 40, text: false },
+      { key: "age", width: 90, text: false },
+    ];
+    const dropOrder: Part[] = ["age", "comments", "priority", "assignee"];
+    const shown = (available: number): string[] =>
+      [
+        ...fitLineParts({
+          ...spacing,
+          available,
+          leading,
+          trailing,
+          dropOrder,
+        }),
+      ].sort();
 
-  it("drops age, then comments, then priority, then assignee", () => {
-    expect(shown(419 + LINE_FIT_TOLERANCE)).toEqual([
-      "assignee",
-      "comments",
-      "priority",
-    ]);
-    // 60+120+50+30+40 + 4 gaps = 324.
-    expect(shown(323 + LINE_FIT_TOLERANCE)).toEqual(["assignee", "priority"]);
-    // 60+120+50+30 + 3 gaps = 278.
-    expect(shown(277 + LINE_FIT_TOLERANCE)).toEqual(["assignee"]);
-    // 60+120+30 + 2 gaps = 222.
-    expect(shown(221 + LINE_FIT_TOLERANCE)).toEqual([]);
-  });
-
-  it("leaves nothing droppable when the kept parts alone overflow", () => {
-    expect(shown(100)).toEqual([]);
-  });
-
-  describe("with a right-anchored trailing group", () => {
-    // Leading: ID 60, machine 120, priority 50 with 6px gaps. Trailing:
-    // assignee 30, comments 40, age 90 with 8px gaps, 12px from the lead.
-    const trailing = {
-      parts: ["assignee", "comments", "age"] as const,
-      gap: 8,
-      groupGap: 12,
-    };
-    const shownWithGroup = (available: number): string[] =>
-      [...fitLineParts({ ...base, trailing, available })].sort();
-
-    it("counts each group's own gap and the gap between the groups", () => {
-      // (60+6+120+6+50) + 12 + (30+8+40+8+90) = 430.
-      expect(shownWithGroup(430 + LINE_FIT_TOLERANCE)).toEqual([
+    it("keeps every part when the line fits with the tolerance to spare", () => {
+      // (60+6+4+6+120+6+50) + 12 + (30+8+40+8+90) = 440.
+      expect(shown(440 + LINE_FIT_TOLERANCE)).toEqual([
         "age",
         "assignee",
         "comments",
+        "id",
+        "machine",
         "priority",
       ]);
-      // 242 + 12 + (30+8+40) = 332.
-      expect(shownWithGroup(332 + LINE_FIT_TOLERANCE)).toEqual([
+    });
+
+    it("drops age, then comments, then priority, then assignee", () => {
+      expect(shown(439 + LINE_FIT_TOLERANCE)).not.toContain("age");
+      // 252 + 12 + (30+8+40) = 342.
+      expect(shown(342 + LINE_FIT_TOLERANCE)).toEqual([
         "assignee",
         "comments",
+        "id",
+        "machine",
         "priority",
       ]);
-      // 186 + 12 + 30 = 228.
-      expect(shownWithGroup(228 + LINE_FIT_TOLERANCE)).toEqual(["assignee"]);
-      expect(shownWithGroup(227 + LINE_FIT_TOLERANCE)).toEqual([]);
+      expect(shown(341 + LINE_FIT_TOLERANCE)).toEqual([
+        "assignee",
+        "id",
+        "machine",
+        "priority",
+      ]);
+      // 196 + 12 + 30 = 238.
+      expect(shown(238 + LINE_FIT_TOLERANCE)).toEqual([
+        "assignee",
+        "id",
+        "machine",
+      ]);
+      expect(shown(237 + LINE_FIT_TOLERANCE)).toEqual(["id", "machine"]);
+    });
+
+    it("never drops a part outside the drop order", () => {
+      expect(shown(10)).toEqual(["id", "machine"]);
+    });
+  });
+
+  describe("a machine row's line 2", () => {
+    // Leading: Playability 80 · manufacturer 70 · year 40 (text), owner 20.
+    // Trailing: the service age 60.
+    type Part = "playability" | "manufacturer" | "year" | "owner" | "serviced";
+    const leading: LineFitPart<Part>[] = [
+      { key: "playability", width: 80, text: true },
+      { key: "manufacturer", width: 70, text: true },
+      { key: "year", width: 40, text: true },
+      { key: "owner", width: 20, text: false },
+    ];
+    const trailing: LineFitPart<Part>[] = [
+      { key: "serviced", width: 60, text: false },
+    ];
+    const dropOrder: Part[] = ["year", "manufacturer", "serviced", "owner"];
+    const shown = (available: number): string[] =>
+      [
+        ...fitLineParts({
+          ...spacing,
+          available,
+          leading,
+          trailing,
+          dropOrder,
+        }),
+      ].sort();
+
+    it("puts a separator only between two plain-text parts", () => {
+      // (80+6+4+6+70+6+4+6+40+6+20) + 12 + 60 = 320: two separators, none
+      // before the owner.
+      expect(shown(320 + LINE_FIT_TOLERANCE)).toHaveLength(5);
+      // Without the year: (80+6+4+6+70+6+20) + 12 + 60 = 264.
+      expect(shown(319 + LINE_FIT_TOLERANCE)).toEqual([
+        "manufacturer",
+        "owner",
+        "playability",
+        "serviced",
+      ]);
+      expect(shown(264 + LINE_FIT_TOLERANCE)).toHaveLength(4);
+    });
+
+    it("drops year, manufacturer, the service age, then the owner", () => {
+      // (80+6+20) + 12 + 60 = 178.
+      expect(shown(178 + LINE_FIT_TOLERANCE)).toEqual([
+        "owner",
+        "playability",
+        "serviced",
+      ]);
+      // The trailing group takes no room once it is gone: 80+6+20 = 106.
+      expect(shown(106 + LINE_FIT_TOLERANCE)).toEqual(["owner", "playability"]);
+      expect(shown(105 + LINE_FIT_TOLERANCE)).toEqual(["playability"]);
     });
   });
 });

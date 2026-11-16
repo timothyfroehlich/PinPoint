@@ -22,8 +22,7 @@ test.describe("Machines Public Access", () => {
     await expect(page).toHaveURL(/\/m(?:\?.*)?$/);
     await expect(page.getByRole("heading", { name: "Machines" })).toBeVisible();
 
-    // The public directory presents a table on desktop and a compact list on
-    // phones. The machine link is visible in both layouts.
+    // The public directory shows the same machine rows at every width.
     await expect(
       page.getByRole("link", {
         name: seededMachines.attackFromMars.name,
@@ -62,7 +61,7 @@ test.describe("Machines Public Access", () => {
   }, testInfo) => {
     test.skip(
       testInfo.project.name.includes("Mobile"),
-      "Phones show the compact list, not the table this test counts, and only the Presence widget; the Issues Status Segment test covers Segment selection on phones"
+      "Phones show only the Presence widget; the Issues Status Segment test covers Segment selection on phones"
     );
     await page.goto("/m?presence=all");
     const playability = page.getByRole("region", { name: "Playability" });
@@ -102,9 +101,8 @@ test.describe("Machines Public Access", () => {
     // Poll the count and the rows together after the filter applies: a count
     // read before the click goes stale when another worker adds a machine.
     const rows = page
-      .getByRole("table")
-      .getByRole("row")
-      .filter({ has: page.getByRole("cell") });
+      .getByRole("list", { name: "Machines list" })
+      .getByRole("listitem");
     await expect
       .poll(
         async () => {
