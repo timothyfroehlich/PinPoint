@@ -110,13 +110,12 @@ describe("InlineMarkdownField — clickToEdit at rest (PP-tn6t)", () => {
         />
       );
 
-      const button = screen.getByRole("button", { name: "Edit description" });
+      const name = "Add a short description…, edit description";
+      const button = screen.getByRole("button", { name });
       expect(button).toHaveTextContent("Add a short description…");
 
       fireEvent.click(button);
-      expect(
-        screen.queryByRole("button", { name: "Edit description" })
-      ).toBeNull();
+      expect(screen.queryByRole("button", { name })).toBeNull();
     });
   });
 

@@ -66,7 +66,7 @@ function FilterButtonFace({
   const count = selectionCount(filter);
   return (
     <>
-      <span>{filter.label}</span>
+      <span>{filter.label}</span>{" "}
       {filter.valueLabel ? (
         <span className="max-w-40 truncate text-foreground">
           {filter.valueLabel}
@@ -177,7 +177,7 @@ function MoreFilters({
         data-testid="list-filter-more"
         data-filter-trigger={MORE_ID}
       >
-        <span>More</span>
+        <span>More</span>{" "}
         <span className="sr-only">
           {`, ${filters.length} ${filters.length === 1 ? "filter" : "filters"}`}
         </span>

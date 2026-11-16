@@ -23,7 +23,7 @@ export function PrintSettingsSheetsLink({
     <Button asChild variant="outline" className="max-md:size-11 max-md:px-0">
       <Link
         href={`/m/settings-sheets?${params.toString()}`}
-        aria-label="Print settings sheets"
+        aria-label="Settings sheets"
       >
         <ClipboardList className="size-4 md:mr-2" aria-hidden="true" />
         <span className="max-md:hidden">Settings sheets</span>

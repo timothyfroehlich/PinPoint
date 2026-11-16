@@ -6,7 +6,7 @@ import { cn } from "~/lib/utils";
 
 /**
  * A "Help" link to a help article, placed beside the controls it explains.
- * `topic` completes the accessible name ("Pinball Map help") so several Help
+ * `topic` completes the accessible name ("Help: Pinball Map") so several Help
  * links on one page stay distinguishable to a screen reader.
  */
 export function HelpLink({
@@ -21,7 +21,7 @@ export function HelpLink({
   return (
     <Link
       href={href}
-      aria-label={`${topic} help`}
+      aria-label={`Help: ${topic}`}
       className={cn("inline-flex items-center gap-1.5 text-link", className)}
     >
       <CircleHelp className="size-4" aria-hidden="true" />
