@@ -637,7 +637,11 @@ export function PhoneListHeader({
     <button
       type="button"
       aria-haspopup="dialog"
-      aria-label={active > 0 ? `Filters, ${active} active` : "Filters"}
+      aria-label={
+        active > 0
+          ? `${active} active ${active === 1 ? "filter" : "filters"}`
+          : "Filters"
+      }
       data-testid="list-phone-filters-trigger"
       className="relative ml-auto inline-flex size-11 shrink-0 items-center justify-center rounded-md text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
     >

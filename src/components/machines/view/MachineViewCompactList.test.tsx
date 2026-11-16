@@ -46,7 +46,7 @@ describe("MachineViewCompactList", () => {
     expect(within(row).getByText("EHOH")).toBeInTheDocument();
 
     const count = within(row).getByRole("link", {
-      name: "View 2 open issues for Elvira's House of Horrors (Blood Red Kiss Edition), worst Unplayable",
+      name: "2 open issues for Elvira's House of Horrors (Blood Red Kiss Edition), worst Unplayable",
     });
     expect(count).toHaveTextContent(/^2 open$/);
     expect(count).toHaveClass(SEVERITY_CONFIG.unplayable.iconColor);
@@ -127,7 +127,7 @@ describe("MachineViewCompactList", () => {
     );
 
     const count = screen.getByRole("link", {
-      name: "View 1 open issue for Medieval Madness, worst Major",
+      name: "1 open issue for Medieval Madness, worst Major",
     });
     // Sighted users get the severity as a tooltip; the text stays compact.
     expect(count).toHaveAttribute("title", "Worst severity: Major");
@@ -137,7 +137,7 @@ describe("MachineViewCompactList", () => {
   it("gives the count a 44px-tall hit area that stays clear of the title", () => {
     render(<MachineViewCompactList rows={[machine()]} />);
 
-    const count = screen.getByRole("link", { name: /^View 2 open issues/ });
+    const count = screen.getByRole("link", { name: /^2 open issues/ });
     // A 16px link plus 14px above and below is 44px (list-views §7.9).
     expect(count).toHaveClass(
       "relative",

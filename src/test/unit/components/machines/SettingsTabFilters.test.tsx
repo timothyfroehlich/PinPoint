@@ -166,20 +166,33 @@ function renderTab(
 
 /**
  * The names of the set cards currently rendered, in DOM order. Every card
- * carries a disclosure button whose accessible name embeds the set name, so
- * this reads exactly what a user can see. The two card variants label it
- * differently — an editable card has a standalone chevron ("Expand <name>
- * settings set"), a read-only card makes the whole title row the trigger
- * ("<name> settings set") — so match both shapes.
+ * carries a disclosure button (`aria-expanded`). An editable card has a
+ * standalone chevron named "Expand <name> settings set"; a read-only card
+ * makes the whole title row the trigger, named by its visible text (badges,
+ * then the set name), so its name is the longest known set name it ends with.
  */
 function visibleSetNames(): string[] {
+  const known = Object.values(SET);
   return screen
-    .queryAllByRole("button", { name: /.+ settings set$/ })
-    .map((el) =>
-      (el.getAttribute("aria-label") ?? "")
-        .replace(/^(?:Expand|Collapse) /, "")
-        .replace(/ settings set$/, "")
-    );
+    .queryAllByRole("button")
+    .filter((el) => el.hasAttribute("aria-expanded"))
+    .flatMap((el) => {
+      const label = el.getAttribute("aria-label");
+      if (label !== null) {
+        return label.endsWith(" settings set")
+          ? [
+              label
+                .replace(/^(?:Expand|Collapse) /, "")
+                .replace(/ settings set$/, ""),
+            ]
+          : [];
+      }
+      const text = (el.textContent ?? "").trim();
+      const name = known
+        .filter((candidate) => text.endsWith(candidate))
+        .sort((a, b) => b.length - a.length)[0];
+      return name === undefined ? [] : [name];
+    });
 }
 
 function chip(label: string): HTMLElement {

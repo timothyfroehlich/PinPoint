@@ -111,7 +111,7 @@ export function InlineMarkdownField({
               onClick={() => {
                 setIsEditing(true);
               }}
-              aria-label={editLabel}
+              aria-label={`${placeholder}, edit ${label ?? "description"}`}
               className={cn(
                 "block w-full rounded text-left",
                 EDITABLE_TEXT_CLASS

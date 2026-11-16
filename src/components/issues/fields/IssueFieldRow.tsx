@@ -60,7 +60,7 @@ function RowValue({
             aria-hidden="true"
           />
         ) : null))
-      )}
+      )}{" "}
       <span
         className={cn(
           "truncate font-medium",
@@ -110,7 +110,7 @@ export const FieldRowButton = React.forwardRef<
       aria-busy={isPending || undefined}
       {...props}
     >
-      <span className={labelClassName}>{label}</span>
+      <span className={labelClassName}>{label}</span>{" "}
       <RowValue value={value} isPending={isPending} />
       <ChevronRight
         className="size-4 shrink-0 text-muted-foreground"

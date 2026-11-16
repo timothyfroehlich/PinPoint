@@ -47,15 +47,6 @@ updates:
         update-types:
           - "minor"
           - "patch"
-    # axe 4.14 raises label-content-name-mismatch (serious) on many aria-labels
-    # that do not contain their visible text. Held at 4.13 until the follow-up
-    # PR for PP-pbyu fixes those components; that PR removes this entry and
-    # bumps @axe-core/playwright back to ^4.14.0 in package.json.
-    ignore:
-      - dependency-name: "@axe-core/playwright"
-        versions: [">=4.14.0"]
-      - dependency-name: "axe-core"
-        versions: [">=4.14.0"]
     # "ownerless": opened by an unattended bot, so nobody owns the PR lifecycle
     # (CI, review, merge readiness) until a human or orchestrator picks it up.
     labels:

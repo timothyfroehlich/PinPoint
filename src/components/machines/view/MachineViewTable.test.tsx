@@ -71,7 +71,7 @@ describe("MachineViewTable", () => {
     expect(valueFor("Year")).toBe("1995");
     expect(
       screen.getByRole("link", {
-        name: "View service history for Attack from Mars",
+        name: /service history for Attack from Mars/,
       })
     ).toHaveAttribute("href", "/m/AFM/maintenance");
   });
@@ -112,7 +112,7 @@ describe("MachineViewTable", () => {
     );
 
     const issueLink = screen.getByRole("link", {
-      name: "View 2 open issues for Attack from Mars, worst Major",
+      name: "2 open issues for Attack from Mars, worst Major",
     });
     expect(issueLink).toHaveTextContent(/^2$/);
     expect(issueLink).toHaveAttribute("title", "Worst severity: Major");
