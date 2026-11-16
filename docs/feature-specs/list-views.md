@@ -191,7 +191,6 @@
 
 | Requirement | Divergence | Resolution |
 | :-- | :-- | :-- |
-| §7.2 | While the Summary Widgets stack, the title row holds a Summary Row toggle; on a Collection or Tag tab it sits on its own row between the page's tabs and search. | PP-jb9v.14 |
 | §4.5, §12.1 | The filter overflow button is labeled "More". | PP-jb9v.16 |
 | §4.10 | The filter overflow badge counts every filter the button holds, changed or not. | PP-jb9v.16 |
 | §5.8 | View tabs are underlined like page tabs, the current one marked by its underline. | PP-jb9v.16 |
