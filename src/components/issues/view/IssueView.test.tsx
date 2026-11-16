@@ -13,6 +13,7 @@ import type {
   IssueViewSavedViewSummary,
   IssueViewState,
 } from "~/lib/types";
+import { PageExportProvider, usePageExportEntry } from "~/components/list-view";
 import { IssueView } from "./IssueView";
 
 /**
@@ -157,6 +158,12 @@ function renderView(
   );
 }
 
+/** Opens ⋯ in the page actions and returns its menu (list-views §3.10). */
+async function openActions(): Promise<HTMLElement> {
+  await userEvent.click(screen.getByRole("button", { name: "Actions" }));
+  return screen.findByRole("menu");
+}
+
 function withState(state: Partial<IssueViewState>): IssueViewResult {
   return result({ state: { ...preset, ...state } });
 }
@@ -177,7 +184,7 @@ describe("IssueView", () => {
     vi.restoreAllMocks();
   });
 
-  it("titles the page Issues with no page action (issues-list §2.3)", () => {
+  it("titles the page Issues with ⋯ as its only page action (issues-list §2.3)", async () => {
     renderView();
     expect(
       screen.getByRole("heading", { level: 1, name: "Issues" })
@@ -185,6 +192,12 @@ describe("IssueView", () => {
     expect(
       screen.queryByRole("link", { name: /report/i })
     ).not.toBeInTheDocument();
+    const menu = await openActions();
+    expect(
+      within(menu)
+        .getAllByRole("menuitem")
+        .map((item) => item.textContent)
+    ).toEqual(["Export to CSV"]);
   });
 
   it("shows the four Built-in Views as tabs, Open issues current (issues-list §6.2)", () => {
@@ -395,18 +408,12 @@ describe("IssueView", () => {
   });
 
   it("offers Export only to signed-in viewers, since exporting requires sign-in", () => {
-    const { unmount } = renderView({
-      result: result({ signedIn: false, myMachines: [] }),
-    });
+    // With nothing for ⋯ to hold, an anonymous visitor sees no page action.
+    renderView({ result: result({ signedIn: false, myMachines: [] }) });
     expect(
-      screen.queryByRole("button", { name: "Export to CSV" })
+      screen.queryByRole("button", { name: "Actions" })
     ).not.toBeInTheDocument();
-    unmount();
-
-    renderView();
-    expect(
-      screen.getByRole("button", { name: "Export to CSV" })
-    ).toBeInTheDocument();
+    expect(screen.queryByTestId("export-csv-button")).not.toBeInTheDocument();
   });
 
   it("searches without a placeholder, named for the list it searches (list-views §4.2)", () => {
@@ -516,8 +523,43 @@ describe("IssueView", () => {
     });
     renderView({ result: withState({ severity: ["major"], page: 2 }) });
 
-    await user.click(screen.getByRole("button", { name: "Export to CSV" }));
+    const menu = await openActions();
+    await user.click(
+      within(menu).getByRole("menuitem", { name: "Export to CSV" })
+    );
     expect(exportAction).toHaveBeenCalledWith({ query: "severity=major" });
+  });
+
+  it("offers an Issues tab's Export, with its scope, to the page header's ⋯ (issues-list 2.4)", async () => {
+    exportAction.mockReturnValue(new Promise(() => undefined));
+    function HeaderProbe(): React.JSX.Element | null {
+      const entry = usePageExportEntry();
+      if (!entry || !("onSelect" in entry)) return null;
+      return (
+        <button type="button" onClick={entry.onSelect}>
+          {entry.label}
+        </button>
+      );
+    }
+    navigation.pathname = "/c/c1/issues";
+    render(
+      <PageExportProvider>
+        <HeaderProbe />
+        <IssueView
+          result={result()}
+          savedViews={savedViews({ offersDefault: false })}
+          exportScope={{ kind: "collection", handle: "c1" }}
+        />
+      </PageExportProvider>
+    );
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Export to CSV" })
+    );
+    expect(exportAction).toHaveBeenCalledWith({
+      query: "",
+      scope: { kind: "collection", handle: "c1" },
+    });
   });
 
   it("saves the configuration as a new issue Saved View (list-views §10.1)", async () => {

@@ -12,7 +12,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "~/components/ui/dialog";
 import {
   AlertDialog,
@@ -31,6 +30,9 @@ import {
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 
 interface Props {
+  /** The dialog opens from Edit collection in ⋯ (collections-and-tags 4.17). */
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   collectionId: string;
   currentName: string;
   currentDescription: ProseMirrorDoc | null;
@@ -51,6 +53,8 @@ interface Props {
  * (gated by `canDelete`).
  */
 export function EditCollectionDialog({
+  open,
+  onOpenChange: setOpen,
   collectionId,
   currentName,
   currentDescription,
@@ -59,7 +63,6 @@ export function EditCollectionDialog({
   canDelete,
 }: Props): React.JSX.Element {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
   const [name, setName] = useState(currentName);
   const [description, setDescription] = useState<ProseMirrorDoc | null>(
     currentDescription
@@ -115,11 +118,6 @@ export function EditCollectionDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" data-testid="collection-edit-trigger">
-          Edit collection
-        </Button>
-      </DialogTrigger>
       <DialogContent
         className="sm:max-w-lg"
         // A stray backdrop click shouldn't discard an in-progress edit — only

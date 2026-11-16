@@ -98,7 +98,6 @@
 | Requirement | Divergence | Resolution |
 | :-- | :-- | :-- |
 | 4.2 | The Primary Filters run Status, Severity, Priority, Machine, Assignee, Machine Presence. | Desktop List Header PR (PP-jb9v.16). |
-| 2.3, 2.4 | Issues has no page actions; Export sits in the desktop List Header on `/issues` and on every Issues tab, and phones offer no Export. | PP-jb9v.17 |
 
 ---
 

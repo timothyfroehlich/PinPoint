@@ -2,7 +2,30 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { useState, type ComponentProps } from "react";
 import { EditCollectionDialog } from "./EditCollectionDialog";
+
+/** Edit collection in ⋯ opens the dialog (collections-and-tags 4.17). */
+function EditHarness(
+  props: Omit<
+    ComponentProps<typeof EditCollectionDialog>,
+    "open" | "onOpenChange"
+  >
+): React.JSX.Element {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        data-testid="collection-edit-trigger"
+        onClick={() => setOpen(true)}
+      >
+        Edit collection
+      </button>
+      <EditCollectionDialog {...props} open={open} onOpenChange={setOpen} />
+    </>
+  );
+}
 
 const updateAction = vi.fn();
 const deleteAction = vi.fn();
@@ -66,7 +89,7 @@ const savedDescription = paragraphDoc("Saved description");
 
 function renderDialog(canDelete = true): void {
   render(
-    <EditCollectionDialog
+    <EditHarness
       collectionId="c1"
       currentName="My Faves"
       currentDescription={savedDescription}

@@ -6,7 +6,7 @@ interface Props {
   /** Line above the title, e.g. a tag's breadcrumb. */
   eyebrow?: React.ReactNode;
   summary: CollectionSummary;
-  /** Action slot rendered to the right of the title/count block. */
+  /** The page actions (4.14), which fill the rest of the row. */
   action?: React.ReactNode;
 }
 
@@ -32,11 +32,10 @@ export function CollectionHeader({
     parts.push(plural(summary.openIssues, "open issue"));
   }
   return (
-    // The title block keeps at least 16rem; when the actions can't fit beside
-    // it (phones), they wrap onto their own row instead of squeezing the
-    // title and summary to a word per line.
-    <header className="flex flex-wrap items-center justify-between gap-3">
-      <div className="min-w-0 flex-[1_1_16rem]">
+    // The title block takes the room its text needs and the page actions
+    // fit themselves into what is left, down to a lone ⋯ (list-views §8.11).
+    <header className="flex items-center gap-3">
+      <div className="min-w-0 flex-[0_1_auto]">
         {eyebrow ? <div className="mb-1">{eyebrow}</div> : null}
         <h1 className="min-w-0 break-words text-2xl font-bold text-foreground sm:text-3xl">
           {title}
@@ -48,7 +47,7 @@ export function CollectionHeader({
           {parts.join(" · ")}
         </p>
       </div>
-      {action ? <div className="shrink-0">{action}</div> : null}
+      {action}
     </header>
   );
 }

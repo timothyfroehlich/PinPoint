@@ -13,6 +13,8 @@ import type {
   MachineViewSavedViewSummary,
 } from "~/lib/types";
 import type { MachineExportScope } from "~/app/(app)/m/export-schema";
+import { PageExportProvider, usePageExportEntry } from "~/components/list-view";
+import { MachinesPageActions } from "~/components/machines/MachinesPageActions";
 import { MachineView } from "./MachineView";
 
 /**
@@ -58,9 +60,8 @@ const actions = vi.hoisted(() => ({
 }));
 
 vi.mock("~/app/(app)/m/saved-view-actions", () => actions);
-vi.mock("~/app/(app)/m/export-action", () => ({
-  exportMachinesAction: vi.fn(),
-}));
+const exportMachinesAction = vi.hoisted(() => vi.fn());
+vi.mock("~/app/(app)/m/export-action", () => ({ exportMachinesAction }));
 vi.mock("next/navigation", () => ({
   useRouter: () => navigation.router,
   usePathname: () => "/m",
@@ -1184,26 +1185,98 @@ describe("MachineView", () => {
     });
   });
 
-  describe("Export (machine-views §3.15)", () => {
-    it("offers signed-in viewers Export on a Surface that names its scope", () => {
-      renderView({ exportScope: { kind: "all" } });
-      expect(screen.getByTestId("export-csv-button")).toBeInTheDocument();
-    });
+  describe("Export (machine-views §3.15, list-views §5.5)", () => {
+    const machinesActions = (
+      <MachinesPageActions
+        canViewLineup={false}
+        canCreateMachine={false}
+        canPrintApronCards={false}
+        apronQueueCount={0}
+      />
+    );
 
-    it("hides Export from anonymous visitors", () => {
+    async function openActions(): Promise<HTMLElement> {
+      await userEvent.click(screen.getByRole("button", { name: "Actions" }));
+      return screen.findByRole("menu");
+    }
+
+    it("offers signed-in viewers Export in ⋯, never in the List Header", async () => {
       renderView({
-        result: result({ offersMe: false, signedIn: false }),
+        title: "Machines",
+        actions: machinesActions,
         exportScope: { kind: "all" },
       });
       expect(screen.queryByTestId("export-csv-button")).not.toBeInTheDocument();
+
+      const menu = await openActions();
+      expect(
+        within(menu).getByRole("menuitem", { name: "Export to CSV" })
+      ).toBeInTheDocument();
     });
 
-    it("offers no Export on a Surface without an export scope", () => {
-      renderView();
-      expect(screen.queryByTestId("export-csv-button")).not.toBeInTheDocument();
+    it("sends the list's query and the Surface scope", async () => {
+      exportMachinesAction.mockReturnValue(new Promise(() => undefined));
+      renderView({
+        title: "Machines",
+        actions: machinesActions,
+        exportScope: { kind: "tag", type: "manufacturer", slug: "stern" },
+      });
+
+      const menu = await openActions();
+      await userEvent.click(
+        within(menu).getByRole("menuitem", { name: "Export to CSV" })
+      );
+
+      expect(exportMachinesAction).toHaveBeenCalledWith({
+        query: "",
+        scope: { kind: "tag", type: "manufacturer", slug: "stern" },
+      });
     });
 
-    it("keeps a Surface's own list action in place of Export", () => {
+    it("hides Export from anonymous visitors", async () => {
+      renderView({
+        result: result({ offersMe: false, signedIn: false }),
+        title: "Machines",
+        actions: machinesActions,
+        exportScope: { kind: "all" },
+      });
+      const menu = await openActions();
+      expect(
+        within(menu).getByRole("menuitem", { name: "Print settings sheets" })
+      ).toBeInTheDocument();
+      expect(
+        within(menu).queryByRole("menuitem", { name: "Export to CSV" })
+      ).not.toBeInTheDocument();
+    });
+
+    it("offers no Export on a Surface without an export scope", async () => {
+      renderView({ title: "Machines", actions: machinesActions });
+      const menu = await openActions();
+      expect(
+        within(menu).queryByRole("menuitem", { name: "Export to CSV" })
+      ).not.toBeInTheDocument();
+    });
+
+    it("offers a Collection or Tag tab's Export to its page header's ⋯", () => {
+      function HeaderProbe(): React.JSX.Element {
+        const entry = usePageExportEntry();
+        return <p>{entry ? entry.label : "No export"}</p>;
+      }
+      render(
+        <PageExportProvider>
+          <HeaderProbe />
+          <MachineView
+            result={result()}
+            preset="collection"
+            savedViews={savedViews({}, "collection")}
+            exportScope={{ kind: "collection", handle: "c1" }}
+          />
+        </PageExportProvider>
+      );
+      expect(screen.getByText("Export to CSV")).toBeInTheDocument();
+    });
+
+    it("keeps a Surface's own list action in the List Header", () => {
       renderView({
         exportScope: { kind: "all" },
         listAction: <button type="button">Add 3 shown</button>,
@@ -1211,7 +1284,6 @@ describe("MachineView", () => {
       expect(
         screen.getByRole("button", { name: "Add 3 shown" })
       ).toBeInTheDocument();
-      expect(screen.queryByTestId("export-csv-button")).not.toBeInTheDocument();
     });
   });
 

@@ -2,7 +2,30 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { useState, type ComponentProps } from "react";
 import { CollectionShareDialog } from "./CollectionShareDialog";
+
+/** Share in the page actions opens the dialog (collections-and-tags 4.15). */
+function ShareHarness(
+  props: Omit<
+    ComponentProps<typeof CollectionShareDialog>,
+    "open" | "onOpenChange"
+  >
+): React.JSX.Element {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        data-testid="collection-share-trigger"
+        onClick={() => setOpen(true)}
+      >
+        Share
+      </button>
+      <CollectionShareDialog {...props} open={open} onOpenChange={setOpen} />
+    </>
+  );
+}
 
 /** The current value of the read-only share-link input. */
 function shareUrlValue(): string {
@@ -40,7 +63,7 @@ describe("CollectionShareDialog", () => {
       data: { viewToken: "fresh-token" },
     });
     render(
-      <CollectionShareDialog
+      <ShareHarness
         collectionId="c1"
         viewToken={null}
         ownerName="You"
@@ -73,7 +96,7 @@ describe("CollectionShareDialog", () => {
   it("shows the link when already shared and disabling hides it", async () => {
     setSharing.mockResolvedValue({ success: true, data: { viewToken: null } });
     render(
-      <CollectionShareDialog
+      <ShareHarness
         collectionId="c1"
         viewToken="existing"
         ownerName="You"
@@ -103,7 +126,7 @@ describe("CollectionShareDialog", () => {
   it("surfaces an error and leaves state unchanged when the action fails", async () => {
     setSharing.mockResolvedValue({ success: false, error: "Forbidden" });
     render(
-      <CollectionShareDialog
+      <ShareHarness
         collectionId="c1"
         viewToken={null}
         ownerName="You"

@@ -3,8 +3,6 @@
 import type React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import { Share2 } from "lucide-react";
-import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Switch } from "~/components/ui/switch";
 import { CopyButton } from "~/components/ui/copy-button";
@@ -14,13 +12,15 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "~/components/ui/dialog";
 import { setCollectionSharingAction } from "~/app/(app)/c/collections/actions";
 import { CollectionCollaborators } from "./CollectionCollaborators";
 import type { CollaboratorUser } from "~/lib/collections/collaborators";
 
 interface Props {
+  /** The dialog opens from Share in the page actions (collections-and-tags 4.15). */
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   collectionId: string;
   /** Current view-share token (null = sharing off). */
   viewToken: string | null;
@@ -38,6 +38,8 @@ interface Props {
  * query param — so it stays out of access logs and CSP reports.
  */
 export function CollectionShareDialog({
+  open,
+  onOpenChange,
   collectionId,
   viewToken,
   ownerName,
@@ -92,17 +94,7 @@ export function CollectionShareDialog({
   }
 
   return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <Button
-          variant="outline"
-          className="gap-2"
-          data-testid="collection-share-trigger"
-        >
-          <Share2 className="size-4 shrink-0" aria-hidden="true" />
-          Share
-        </Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Share collection</DialogTitle>

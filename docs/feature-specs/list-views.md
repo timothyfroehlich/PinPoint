@@ -196,10 +196,7 @@
 | §5.8 | View tabs are underlined like page tabs, the current one marked by its underline. | PP-jb9v.16 |
 | §8.7 | Fit checks compare bare measured widths with no tolerance. | PP-jb9v.16 |
 | §8.9, §8.10 | A Tag page's breadcrumb always sits above the title, a Collection page has no breadcrumb, and a Collection's description always sits under the header. | PP-jb9v.18 |
-| §8.11, §8.12 | Page actions that do not fit wrap below the title or onto their own row; there is no Actions menu to fold into. | PP-jb9v.17 |
 | §8.13, §8.23 | A Collection or Tag page's tabs never move into a menu, and its header spacing does not tighten below 390px. | PP-jb9v.18 |
-| §3.7–§3.10, §7.2 | Page actions are separate buttons with no ⋯ Actions menu, cap, or fold order; they become icon buttons at the md breakpoint rather than when they stop fitting, and Machines' Add Machine label shortens in steps. | PP-jb9v.17 |
-| §1, §5.5 | Issue View's Export sits in the desktop List Header, and phones offer no Export. | PP-jb9v.17 |
 
 ---
 
