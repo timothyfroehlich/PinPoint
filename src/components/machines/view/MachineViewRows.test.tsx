@@ -122,7 +122,13 @@ describe("Machine rows", () => {
       "title",
       "Elvira's House of Horrors (Blood Red Kiss Edition)"
     );
-    expect(title).toHaveClass("truncate");
+    // The name truncates on the span inside the link, so the raised text
+    // never runs past the link's box (responsive-overflow at 320px).
+    expect(
+      within(title).getByText(
+        "Elvira's House of Horrors (Blood Red Kiss Edition)"
+      )
+    ).toHaveClass("truncate");
     expect(within(row).getByText("EHOH")).toBeInTheDocument();
 
     const count = within(row).getByRole("link", {

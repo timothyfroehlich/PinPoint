@@ -141,12 +141,16 @@ export function ListRowTitleLink({
       {...(onClick === undefined ? {} : { onClick })}
       className={cn(
         "font-semibold text-foreground transition-colors duration-150 group-hover/row:text-primary after:absolute after:inset-0 focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-ring focus-visible:after:ring-inset motion-reduce:transition-none",
-        truncate ? "block min-w-0 truncate" : "break-words",
+        truncate ? "block min-w-0" : "break-words",
         className
       )}
       data-testid={testId}
     >
-      <span className={LIST_ROW_RAISED}>{children}</span>
+      {/* A truncated title clips and adds its ellipsis on this span, so the
+          raised text never runs past the link's box. */}
+      <span className={cn(LIST_ROW_RAISED, truncate && "block truncate")}>
+        {children}
+      </span>
     </Link>
   );
 }
