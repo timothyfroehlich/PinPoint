@@ -536,7 +536,10 @@ describe("IssueView", () => {
       const entry = usePageExportEntry();
       if (!entry || !("onSelect" in entry)) return null;
       return (
-        <button type="button" onClick={entry.onSelect}>
+        <button
+          type="button"
+          onClick={(event) => entry.onSelect(event.currentTarget)}
+        >
           {entry.label}
         </button>
       );

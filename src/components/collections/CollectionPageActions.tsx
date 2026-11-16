@@ -12,6 +12,7 @@ import {
 import {
   PageActions,
   usePageExportEntry,
+  useReturnFocus,
   type PageAction,
   type PageMenuEntry,
 } from "~/components/list-view";
@@ -54,6 +55,7 @@ export function CollectionPageActions({
   const [shareOpen, setShareOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const exportEntry = usePageExportEntry();
+  const returnFocus = useReturnFocus();
 
   const actions: PageAction[] = [];
   if (share) {
@@ -61,7 +63,7 @@ export function CollectionPageActions({
       key: "share",
       label: "Share",
       icon: Share2,
-      onSelect: () => setShareOpen(true),
+      onSelect: returnFocus.opens(() => setShareOpen(true)),
       testId: "collection-share-trigger",
     });
   }
@@ -72,7 +74,7 @@ export function CollectionPageActions({
         {
           key: "edit-collection",
           label: "Edit collection",
-          onSelect: () => setEditOpen(true),
+          onSelect: returnFocus.opens(() => setEditOpen(true)),
           testId: "collection-edit-trigger",
         },
       ]
@@ -89,6 +91,7 @@ export function CollectionPageActions({
         <CollectionShareDialog
           open={shareOpen}
           onOpenChange={setShareOpen}
+          onCloseAutoFocus={returnFocus.onCloseAutoFocus}
           collectionId={collectionId}
           viewToken={share.viewToken}
           ownerName={share.ownerName}
@@ -100,6 +103,7 @@ export function CollectionPageActions({
         <EditCollectionDialog
           open={editOpen}
           onOpenChange={setEditOpen}
+          onCloseAutoFocus={returnFocus.onCloseAutoFocus}
           collectionId={collectionId}
           currentName={edit.currentName}
           currentDescription={edit.currentDescription}

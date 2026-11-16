@@ -30,17 +30,23 @@ interface RenameDialogProps {
   title: string;
   currentName: string;
   onRename: (name: string) => Promise<TagActionResult>;
+  /** Where focus goes when the dialog closes (useReturnFocus). */
+  onCloseAutoFocus?: ((event: Event) => void) | undefined;
 }
 
 /** Rename a tag or tag type; its page keeps its address (spec 11.8). */
 export function TagRenameDialog({
   open,
   onOpenChange,
+  onCloseAutoFocus,
   ...form
 }: RenameDialogProps): React.JSX.Element {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent
+        className="sm:max-w-sm"
+        onCloseAutoFocus={onCloseAutoFocus}
+      >
         <RenameForm {...form} onClose={() => onOpenChange(false)} />
       </DialogContent>
     </Dialog>
@@ -119,6 +125,8 @@ interface DeleteDialogProps {
   onDelete: () => Promise<TagActionResult>;
   /** Where to go once the page being viewed no longer exists. */
   redirectTo: string;
+  /** Where focus goes when the dialog closes (useReturnFocus). */
+  onCloseAutoFocus?: ((event: Event) => void) | undefined;
 }
 
 /** Confirm deleting a tag or tag type; it cannot be undone (spec 11.9). */
@@ -130,6 +138,7 @@ export function TagDeleteDialog({
   confirmLabel,
   onDelete,
   redirectTo,
+  onCloseAutoFocus,
 }: DeleteDialogProps): React.JSX.Element {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -156,7 +165,7 @@ export function TagDeleteDialog({
         onOpenChange(next);
       }}
     >
-      <AlertDialogContent>
+      <AlertDialogContent onCloseAutoFocus={onCloseAutoFocus}>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>

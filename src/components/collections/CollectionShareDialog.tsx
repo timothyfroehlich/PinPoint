@@ -30,6 +30,8 @@ interface Props {
   editors: CollaboratorUser[];
   /** All grantable members (owner excluded) for the add-people picker. */
   grantableMembers: CollaboratorUser[];
+  /** Where focus goes when the dialog closes (useReturnFocus). */
+  onCloseAutoFocus?: ((event: Event) => void) | undefined;
 }
 
 /**
@@ -45,6 +47,7 @@ export function CollectionShareDialog({
   ownerName,
   editors,
   grantableMembers,
+  onCloseAutoFocus,
 }: Props): React.JSX.Element {
   const router = useRouter();
   const pathname = usePathname();
@@ -95,7 +98,10 @@ export function CollectionShareDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent
+        className="sm:max-w-lg"
+        onCloseAutoFocus={onCloseAutoFocus}
+      >
         <DialogHeader>
           <DialogTitle>Share collection</DialogTitle>
           <DialogDescription>

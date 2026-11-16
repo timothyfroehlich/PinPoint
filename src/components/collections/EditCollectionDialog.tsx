@@ -44,6 +44,8 @@ interface Props {
    * `false` for them (PP-wqit.7).
    */
   canDelete: boolean;
+  /** Where focus goes when the dialog closes (useReturnFocus). */
+  onCloseAutoFocus?: ((event: Event) => void) | undefined;
 }
 
 /**
@@ -61,6 +63,7 @@ export function EditCollectionDialog({
   allMachines,
   currentIds,
   canDelete,
+  onCloseAutoFocus,
 }: Props): React.JSX.Element {
   const router = useRouter();
   const [name, setName] = useState(currentName);
@@ -120,6 +123,7 @@ export function EditCollectionDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent
         className="sm:max-w-lg"
+        onCloseAutoFocus={onCloseAutoFocus}
         // A stray backdrop click shouldn't discard an in-progress edit — only
         // Cancel / the X / Esc close it (unsaved-form dismissal guidance).
         onInteractOutside={(e) => e.preventDefault()}

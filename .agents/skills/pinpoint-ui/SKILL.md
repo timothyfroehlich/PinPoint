@@ -81,6 +81,16 @@ The consequence that bites most often is that `"use client"` is viral downward �
 
 Canonical page composition and the layout wrappers are in `references/key-files.md` § Layout.
 
+### List View page actions
+
+Reuse these (`src/components/list-view/`, `src/lib/list-view/overflow.ts`; spec `docs/feature-specs/list-views.md` §3.7–§3.10):
+
+- `PageActions` renders a page's actions; `planPageActions` decides their faces in order: labeled, then icons, then folding into ⋯ along the page's `foldSteps`.
+- `PageExportProvider`, `RegisterPageExport`, and `usePageExportEntry` let a list hand its Export up to the page header's ⋯.
+- `useReturnFocus` returns focus to the page action or ⋯ that opened a dialog from state: wrap its `onSelect` in `opens`, and pass `onCloseAutoFocus` to the dialog's content.
+- `FIT_TOLERANCE` is the 16px every fit check keeps spare; a new fit check uses it rather than its own margin.
+- `groupSettingsSheetsHref` (`src/lib/collections/settings-sheets-href.ts`) builds a Machine Group's Print settings sheets link with its machines On the Floor.
+
 ## Server Action Forms
 
 ### The Radix Select carve-out: dispatch directly, never `action={...}`
