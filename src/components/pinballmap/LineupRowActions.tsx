@@ -140,6 +140,13 @@ const PUSH_LABEL: Record<LineupOutOfSyncTag, string> = {
   to_update: "Update Pinball Map",
 };
 
+/** The action a read-only Pinball Map link points the viewer to. */
+const PUSH_VERB: Record<LineupOutOfSyncTag, string> = {
+  to_add: "add",
+  to_remove: "remove",
+  to_update: "update",
+};
+
 /** What Add also does to Insider Connected, for its confirm (pinballmap 4.5). */
 function icAddClause(target: PbmIcIntent | null): string {
   if (target === "on") return " and marks it Insider Connected";
@@ -175,7 +182,7 @@ export function LineupPushAction({
       <Slots error={null}>
         <PinballMapLink
           locationUrl={locationUrl}
-          label={`Open Pinball Map, ${PUSH_LABEL[tag].toLowerCase()}: ${game}`}
+          label={`Open Pinball Map: ${PUSH_VERB[tag]} ${game}`}
         />
       </Slots>
     );
@@ -320,7 +327,7 @@ export function LineupEntryActions({
         ) : (
           <PinballMapLink
             locationUrl={locationUrl}
-            label={`Open Pinball Map, ${PUSH_LABEL.to_remove.toLowerCase()}: ${game}`}
+            label={`Open Pinball Map: ${PUSH_VERB.to_remove} ${game}`}
           />
         )
       ) : null}
