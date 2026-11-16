@@ -10,8 +10,13 @@ The repository contract is `.github/renovate.json`:
 - `enabledManagers` contains only `mise`, and `includePaths` limits extraction to
   the root `mise.toml`.
 - Renovate may prepare pull requests, but `automerge` is explicitly disabled.
-- Independent tools are not grouped. A proposal changes one compatibility surface
-  at a time plus the generated `mise.lock` entries needed for that tool.
+- Minor and patch updates of every tool except the Supabase CLI go in one weekly
+  `toolchain` PR, with the generated `mise.lock` entries for each. Tim reversed
+  the earlier one-PR-per-tool policy on 2026-11-15 to cut merge-line load: armed
+  PRs land one at a time, and one PR per tool made each merge force the others to
+  rebase. Major updates and the Supabase CLI keep their own PRs. Cooldowns apply
+  per tool, not per group: a tool still inside its cooldown is left out of that
+  week's group PR and joins a later one.
 - Branch creation is limited to Saturday mornings in `America/Chicago`. Ordinary
   releases must be at least 14 days old, Supabase CLI releases at least 7 days old,
   and major releases at least 30 days old. Missing release timestamps fail closed.
@@ -30,9 +35,10 @@ Review release and migration notes, the `mise.toml` change, and all regenerated
 Supabase CLI proposals additionally require the existing Bazzite
 rootless-Podman/SELinux compatibility check and a successful local-stack start on
 an SELinux host. Major Node, Python, Ruff, or Supabase releases require the same
-explicit migration assessment as a manual proposal. Do not add a group unless the
-tools have a concrete shared compatibility test that requires them to move
-together.
+explicit migration assessment as a manual proposal. The Supabase CLI stays out of
+the `toolchain` group because that compatibility check is its own gate: in a shared
+PR a failing Supabase bump would hold back every other tool. Review the `toolchain`
+PR as one diff, checking each tool's release notes.
 
 The `packageManager` pnpm pin in `package.json` remains outside Renovate because
 enabling the npm manager would overlap Dependabot. The weekly chores procedure

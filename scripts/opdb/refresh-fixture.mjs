@@ -37,7 +37,7 @@ const wanted = new Set(
 const response = await fetch(EXPORT_URL, {
   headers: {
     "User-Agent":
-      "PinPoint/1.0 (Austin Pinball Collective issue tracker; +https://github.com/timothyfroehlich/PinPoint)",
+      "PinPoint/1.0 (Austin Pinball Collective issue tracker; +https://github.com/minamaya/PinPoint)",
   },
 });
 if (!response.ok) {
