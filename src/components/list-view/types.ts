@@ -131,8 +131,8 @@ export interface ListViewsModel {
   /** Returns to the Applied View's configuration at page 1 (§5.4). */
   onDiscard: () => void;
   /**
-   * Applies the Page Preset's Built-in View, keeping the displayed fields
-   * and page size (§1, §3.6).
+   * Applies the Page Preset's Built-in View, keeping the page size
+   * (§1, §3.6).
    */
   onOpenPagePreset: () => void;
   actions: SavedViewActions;

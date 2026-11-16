@@ -201,8 +201,10 @@ function MachineRowDetails({
       key: "playability",
       text: true,
       truncate: true,
+      // The dot announces Playability; this label shows it silently.
       node: (
         <span
+          aria-hidden="true"
           className={cn("truncate", MACHINE_STATUS_COLORS[playability].text)}
         >
           {playabilityLabel}
