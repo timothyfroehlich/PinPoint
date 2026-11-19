@@ -227,9 +227,23 @@ export async function runUpdateMachine(
     field: string,
     reason: string,
     errorReason?:
-      "denied" | "not_found" | "invalid" | "conflict" | "rate_limited"
+      "denied" | "not_found" | "invalid" | "conflict" | "rate_limited",
+    cause?: unknown
   ): UpdateMachineOutcome {
     if (applied.length > 0) {
+      // A partial success still returns a payload, so `runTool` never sees this
+      // failure as a throw and never reports it. An unexpected exception (a
+      // caught throw that is not an already-curated McpToolError) has to be
+      // reported here, or a recurring partial write produces no Sentry events
+      // at all. Structured rejections carry an `errorReason` and are expected,
+      // so they are not reported. Mirrors update_issue's apply-loop handling.
+      if (errorReason === undefined && !(cause instanceof McpToolError)) {
+        reportError(cause, {
+          action: "mcp.tool.update_machine",
+          userId: ctx.userId,
+          field,
+        });
+      }
       return {
         applied,
         result: {
@@ -298,7 +312,9 @@ export async function runUpdateMachine(
     } catch (error) {
       return handleFailure(
         "presenceStatus",
-        error instanceof Error ? error.message : "Updating presence failed."
+        error instanceof Error ? error.message : "Updating presence failed.",
+        undefined,
+        error
       );
     }
   }
@@ -324,7 +340,9 @@ export async function runUpdateMachine(
     } catch (error) {
       return handleFailure(
         "owner",
-        error instanceof Error ? error.message : "Updating owner failed."
+        error instanceof Error ? error.message : "Updating owner failed.",
+        undefined,
+        error
       );
     }
 
@@ -378,7 +396,9 @@ export async function runUpdateMachine(
         "pinballmap",
         error instanceof Error
           ? error.message
-          : "Updating Pinball Map link failed."
+          : "Updating Pinball Map link failed.",
+        undefined,
+        error
       );
     }
 
@@ -440,7 +460,9 @@ export async function runUpdateMachine(
         "insiderConnected",
         error instanceof Error
           ? error.message
-          : "Updating Insider Connected failed."
+          : "Updating Insider Connected failed.",
+        undefined,
+        error
       );
     }
     if (!set.ok) {
@@ -471,7 +493,11 @@ export async function runUpdateMachine(
     } catch (error) {
       return handleFailure(
         "iscoredGameId",
-        error instanceof Error ? error.message : "Updating iScored link failed."
+        error instanceof Error
+          ? error.message
+          : "Updating iScored link failed.",
+        undefined,
+        error
       );
     }
   }
