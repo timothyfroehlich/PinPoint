@@ -133,6 +133,17 @@ function buttonClass(primary: boolean | undefined, face: Face): string {
   );
 }
 
+/**
+ * A page action's button face, for the one header that keeps its own
+ * buttons: issue detail's Edit title, Move, and ⋯ (design-bible §26.1).
+ */
+export function pageActionClassName(
+  face: "labeled" | "icon",
+  primary = false
+): string {
+  return buttonClass(primary, face);
+}
+
 function ActionFace({
   icon: Icon,
   label,

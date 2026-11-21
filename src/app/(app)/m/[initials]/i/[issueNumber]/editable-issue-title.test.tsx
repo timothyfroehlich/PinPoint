@@ -271,6 +271,51 @@ describe("EditableIssueTitle", () => {
     });
   });
 
+  it("shows Edit title as a borderless icon button with a tooltip and Move as an outlined labeled button (design-bible §26.1, §26.2)", async () => {
+    const user = userEvent.setup();
+    render(
+      <EditableIssueTitle
+        issueId="issue-1"
+        title="Original Title"
+        canEdit
+        move={{ currentInitials: "AFM", machines: [] }}
+      />
+    );
+    const edit = screen.getByTestId("issue-edit-title");
+    expect(edit).toHaveClass("border-transparent", "bg-transparent");
+    expect(edit).not.toHaveAttribute("title");
+    await user.hover(edit);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Edit title");
+
+    const move = screen.getByTestId("issue-move-button");
+    expect(move).toHaveTextContent("Move");
+    expect(move).toHaveClass("border-outline");
+  });
+
+  it("names the phone ⋯ More, a borderless button whose entries are text only", async () => {
+    const user = userEvent.setup();
+    render(
+      <EditableIssueTitle
+        issueId="issue-1"
+        title="Original Title"
+        canEdit
+        move={{ currentInitials: "AFM", machines: [] }}
+      />
+    );
+    const more = screen.getByTestId("issue-actions-menu-trigger");
+    expect(more).toHaveAccessibleName("More");
+    expect(more).toHaveClass("border-transparent", "bg-transparent");
+    await user.click(more);
+    const items = await screen.findAllByRole("menuitem");
+    expect(items.map((item) => item.textContent)).toEqual([
+      "Edit title",
+      "Move to another machine",
+    ]);
+    for (const item of items) {
+      expect(item.querySelector("svg")).toBeNull();
+    }
+  });
+
   describe("on a phone", () => {
     let restoreViewport: () => void;
     beforeEach(() => {
@@ -283,7 +328,7 @@ describe("EditableIssueTitle", () => {
     async function openFromMenu(
       user: ReturnType<typeof userEvent.setup>
     ): Promise<HTMLElement> {
-      await user.click(screen.getByRole("button", { name: "Issue actions" }));
+      await user.click(screen.getByRole("button", { name: "More" }));
       await user.click(
         await screen.findByRole("menuitem", { name: "Edit title" })
       );
@@ -311,9 +356,7 @@ describe("EditableIssueTitle", () => {
 
       await user.click(screen.getByRole("button", { name: "Cancel" }));
       expect(screen.getByRole("heading")).toHaveTextContent("Original Title");
-      expect(
-        screen.getByRole("button", { name: "Issue actions" })
-      ).toHaveFocus();
+      expect(screen.getByRole("button", { name: "More" })).toHaveFocus();
     });
 
     it("asks before leaving the page with an unsaved edit", async () => {
@@ -360,9 +403,7 @@ describe("EditableIssueTitle", () => {
         expect(formData.get("title")).toBe("Original Title edited");
       }
       await waitFor(() => {
-        expect(
-          screen.getByRole("button", { name: "Issue actions" })
-        ).toHaveFocus();
+        expect(screen.getByRole("button", { name: "More" })).toHaveFocus();
       });
     });
 

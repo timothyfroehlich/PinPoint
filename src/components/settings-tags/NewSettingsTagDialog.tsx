@@ -3,7 +3,6 @@
 import type React from "react";
 import { useId, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus } from "lucide-react";
 
 import { Button } from "~/components/ui/button";
 import {
@@ -13,7 +12,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
@@ -25,20 +23,28 @@ import {
 import { cn } from "~/lib/utils";
 import { createSettingsTagAction } from "~/app/(app)/c/settings-tags/actions";
 
+interface NewSettingsTagDialogProps {
+  /** Opens from the page's New settings tag action (design-bible §26.1). */
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  /** Where focus goes when the dialog closes (useReturnFocus). */
+  onCloseAutoFocus?: ((event: Event) => void) | undefined;
+}
+
 /** "New settings tag" on the Settings tags page (machine-settings §3.3). */
-export function NewSettingsTagDialog(): React.JSX.Element {
-  const [open, setOpen] = useState(false);
+export function NewSettingsTagDialog({
+  open,
+  onOpenChange,
+  onCloseAutoFocus,
+}: NewSettingsTagDialogProps): React.JSX.Element {
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" className="gap-2 max-md:h-11">
-          <Plus className="size-4 shrink-0" aria-hidden="true" />
-          New settings tag
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-sm">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="sm:max-w-sm"
+        onCloseAutoFocus={onCloseAutoFocus}
+      >
         {/* Mounts with the content, so each open starts clean. */}
-        <NewSettingsTagForm onClose={() => setOpen(false)} />
+        <NewSettingsTagForm onClose={() => onOpenChange(false)} />
       </DialogContent>
     </Dialog>
   );
