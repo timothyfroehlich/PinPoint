@@ -79,6 +79,7 @@ If you’re changing code, **start here**:
 
 - [mise](https://mise.jdx.dev/) **2026.11.7+**
 - A Docker-compatible container runtime for the local Supabase stack
+- GNU parallel (`sem`) for the host-wide heavy-command and dev-server slots
 - A Supabase account only for preview or production administration
 
 `mise install --locked` supplies the project Node, Python, Ruff, Supabase CLI,

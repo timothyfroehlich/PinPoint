@@ -120,16 +120,16 @@ before each and stopping at the first failure: readiness, `check:human`, `test:h
 chromium-only smoke. `pnpm run preflight` wraps it in `quiet-run.py`;
 `pnpm run preflight:human` streams it.
 
-### Host memory budget
+### Host slots
 
-`heavy-run.sh <kind> <command…>` runs an expensive command inside one host-wide agent
-memory budget kept by `agent-budget.py` (PP-p2ts.5). `pr-screenshots.mjs` reserves
-through `agent-budget.py acquire` instead, and `pnpm run agent-load` lists the ledger.
-Each kind's reserved size, where it was measured, and the crabbox or CI route its
-timeout message names live in the `KINDS` table at the top of `agent-budget.py`; a
-new expensive command gets a row there and a `heavy-run.sh` call site. Re-measure a
-size with `footprint` (phys_footprint), never RSS, summed over the command's process
-tree.
+`heavy-run.sh <heavy|dev> <command…>` runs an expensive command in a host-wide GNU `sem`
+slot (PP-p2ts.5): one `pinpoint-heavy` slot for `check`, the full unit suite, coverage,
+integration, build, smoke and `pr-screenshots.mjs` (which re-runs itself under it), and
+two `pinpoint-dev` slots held for each dev server's lifetime. The header of
+`heavy-run.sh` carries the measured footprints behind those counts, the env overrides,
+and the passthrough rules. `agent-load.sh` (`pnpm run agent-load`) lists holders and
+waiters from the semaphore files. A new expensive command gets a `heavy-run.sh heavy`
+call site.
 
 ### UI Screenshots
 
