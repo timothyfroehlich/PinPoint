@@ -3475,6 +3475,106 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       expect(outcome.auditReason).toBe("partial:pinballmap");
     });
 
+    /**
+     * The thrown-error partial path (PP-x4ma). The partial test above drives the
+     * non-throwing `{ ok: false }` branch (a bad catalog id makes
+     * updateMachinePbmLink RETURN a failure); this covers the branch where a
+     * service THROWS after an earlier field committed. That response is a success
+     * payload, so it never reaches runTool's harness — update_machine must curate
+     * `failed.reason` itself, exactly as update_issue does (see its partial test
+     * above). Without the fix, the raw `error.message` (driver/Postgres text)
+     * reached the MCP caller verbatim.
+     */
+    it("scrubs raw thrown-error text from the partial failure reason", async () => {
+      const admin = await makeUser("admin", "Admin", "User");
+      const machine = await seedMachine();
+
+      // name commits first; presence then throws a driver-style error.
+      const services = await import("~/services/machines");
+      const spy = vi
+        .spyOn(services, "updateMachinePresence")
+        .mockRejectedValueOnce(
+          new Error(
+            'connection reset by peer; relation "machines" does not exist'
+          )
+        );
+
+      try {
+        const outcome = await runUpdateMachine(
+          {
+            machine: machine.initials,
+            name: "Renamed Before Presence Error",
+            presenceStatus: "off_the_floor",
+          },
+          ctx("admin", admin)
+        );
+
+        expect(outcome.result.partial).toBe(true);
+        expect(outcome.result.failed?.field).toBe("presenceStatus");
+        // The whole point of the fix: no fragment of the raw thrown text leaks.
+        const reason = outcome.result.failed?.reason ?? "";
+        expect(reason).not.toContain("connection reset");
+        expect(reason).not.toContain("relation");
+        expect(reason).toBe(
+          "Changing presenceStatus failed. The failure has been logged."
+        );
+        // The earlier field committed and must be reported as landed.
+        expect(outcome.applied.map((a) => a.field)).toEqual(["name"]);
+        // Success payload, but the audit line records the partial failure.
+        expect(outcome.auditOutcome).toBe("error");
+        expect(outcome.auditReason).toBe("partial:presenceStatus");
+
+        // The rename persisted; the presence change did not.
+        const db = await getTestDb();
+        const row = await db.query.machines.findFirst({
+          where: eq(machines.id, outcome.machineId ?? ""),
+          columns: { name: true, presenceStatus: true },
+        });
+        expect(row).toMatchObject({
+          name: "Renamed Before Presence Error",
+          presenceStatus: "on_the_floor",
+        });
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    /**
+     * The pre-commit path (PP-pb5b). With nothing applied yet, a service's
+     * thrown error is re-thrown to runTool's harness. Rebuilding it as a plain
+     * `Error` turned an McpToolError into the generic internal-error response,
+     * losing its reason code and curated message.
+     */
+    it("keeps an McpToolError's reason and message when a service throws it before any field commits", async () => {
+      const admin = await makeUser("admin", "Admin", "User");
+      const machine = await seedMachine();
+
+      const services = await import("~/services/machines");
+      const spy = vi
+        .spyOn(services, "updateMachinePresence")
+        .mockRejectedValueOnce(
+          new McpToolError("conflict", "Presence changed in another session.")
+        );
+
+      try {
+        const error: unknown = await runUpdateMachine(
+          { machine: machine.initials, presenceStatus: "off_the_floor" },
+          ctx("admin", admin)
+        ).then(
+          () => null,
+          (e: unknown) => e
+        );
+
+        expect(error).toBeInstanceOf(McpToolError);
+        expect(error).toMatchObject({
+          reason: "conflict",
+          message: "Presence changed in another session.",
+        });
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
     it("enforces permission gates: member cannot update another member's machine but can update their own", async () => {
       const member1 = await makeUser("member", "User", "One");
       const member2 = await makeUser("member", "User", "Two");

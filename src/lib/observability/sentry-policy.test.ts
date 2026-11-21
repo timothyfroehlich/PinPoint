@@ -9,12 +9,11 @@ import {
   sentryBeforeSend,
   sentryBeforeSendLog,
   sentryBeforeSendMetric,
+  sentryEnvironmentOption,
   sentryBeforeSendSpan,
-  sentryBeforeSendTransaction,
 } from "~/lib/observability/sentry-policy";
 
 type SentrySpan = Parameters<typeof sentryBeforeSendSpan>[0];
-type SentryTransaction = Parameters<typeof sentryBeforeSendTransaction>[0];
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -36,13 +35,12 @@ describe("strict Sentry collection", () => {
     });
   });
 
-  it("owns all six outbound sanitization hooks", () => {
+  it("owns all outbound sanitization hooks", () => {
     expect(SENTRY_PRIVACY_OPTIONS).toEqual({
       dataCollection: SENTRY_DATA_COLLECTION,
       beforeSend: sentryBeforeSend,
       beforeBreadcrumb: sentryBeforeBreadcrumb,
       beforeSendSpan: sentryBeforeSendSpan,
-      beforeSendTransaction: sentryBeforeSendTransaction,
       beforeSendLog: sentryBeforeSendLog,
       beforeSendMetric: sentryBeforeSendMetric,
     });
@@ -204,26 +202,6 @@ describe("sentryBeforeSend", () => {
   });
 });
 
-describe("sentryBeforeSendTransaction", () => {
-  it("sanitizes transaction request URLs and nested event data", () => {
-    const transaction: SentryTransaction = {
-      type: "transaction",
-      transaction: "signup victim@example.com",
-      request: {
-        url: "https://pinpoint.example/signup?email=victim%40example.com#form",
-      },
-      contexts: { mail: { recipient: "victim%40example.com" } },
-    };
-
-    expect(sentryBeforeSendTransaction(transaction)).toEqual({
-      type: "transaction",
-      transaction: "signup vic***",
-      request: { url: "https://pinpoint.example/signup" },
-      contexts: { mail: { recipient: "vic***" } },
-    });
-  });
-});
-
 describe("sentryBeforeBreadcrumb", () => {
   it("sanitizes breadcrumb messages, nested data, and captured URLs", () => {
     const breadcrumb: Breadcrumb = {
@@ -242,9 +220,19 @@ describe("sentryBeforeBreadcrumb", () => {
 });
 
 describe("sentryBeforeSendSpan", () => {
-  it("sanitizes span descriptions, attributes, and captured URLs", () => {
+  const correlation = {
+    is_segment: false,
+    span_id: "1234567890abcdef",
+    start_timestamp: 1,
+    status: "ok",
+    trace_id: "1234567890abcdef1234567890abcdef",
+  } satisfies Partial<SentrySpan>;
+
+  it("sanitizes span names, attributes, and captured URLs", () => {
     const span: SentrySpan = {
-      data: {
+      ...correlation,
+      name: "invite victim%40example.com",
+      attributes: {
         recipient: "victim@example.com",
         "http.url":
           "https://pinpoint.example/signup?email=victim%40example.com#form",
@@ -254,44 +242,65 @@ describe("sentryBeforeSendSpan", () => {
         "url.fragment": "form",
         query_string: "token=secret",
       },
-      description: "invite victim%40example.com",
-      span_id: "1234567890abcdef",
-      start_timestamp: 1,
-      trace_id: "1234567890abcdef1234567890abcdef",
     };
 
     const result = sentryBeforeSendSpan(span);
 
-    expect(result.data).toEqual({
+    expect(result.attributes).toEqual({
       recipient: "vic***",
       "http.url": "https://pinpoint.example/signup",
     });
-    expect(result.description).toBe("invite vic***");
+    expect(result.name).toBe("invite vic***");
+  });
+
+  it("sanitizes typed attribute values on a segment span", () => {
+    const span: SentrySpan = {
+      ...correlation,
+      is_segment: true,
+      name: "GET /signup",
+      attributes: {
+        "url.full": {
+          value: "https://pinpoint.example/signup?email=a%40b.example#x",
+          unit: "none",
+        },
+      },
+    };
+
+    const result = sentryBeforeSendSpan(span);
+
+    expect(result.is_segment).toBe(true);
+    expect(result.attributes).toEqual({
+      "url.full": { value: "https://pinpoint.example/signup", unit: "none" },
+    });
   });
 
   it("returns a minimal safe span with original trace correlation when a sensitive field is unwritable", () => {
     const span: SentrySpan = {
-      data: Object.freeze({ recipient: "victim@example.com" }),
-      description: "invite victim@example.com",
-      span_id: "1234567890abcdef",
-      start_timestamp: 1,
-      trace_id: "1234567890abcdef1234567890abcdef",
+      ...correlation,
+      is_segment: true,
+      parent_span_id: "fedcba0987654321",
+      status: "error",
+      name: "invite victim@example.com",
+      attributes: Object.freeze({ recipient: "victim@example.com" }),
     };
 
     expect(sentryBeforeSendSpan(span)).toEqual({
-      data: {},
+      attributes: {},
+      name: "[redacted]",
+      is_segment: true,
+      parent_span_id: "fedcba0987654321",
       span_id: "1234567890abcdef",
       start_timestamp: 1,
+      status: "error",
       trace_id: "1234567890abcdef1234567890abcdef",
     });
   });
 
   it("returns a contract-valid safe span when trace correlation cannot be read", () => {
     const span: SentrySpan = {
-      data: { recipient: "victim@example.com" },
-      span_id: "1234567890abcdef",
-      start_timestamp: 1,
-      trace_id: "1234567890abcdef1234567890abcdef",
+      ...correlation,
+      name: "invite victim@example.com",
+      attributes: { recipient: "victim@example.com" },
     };
     Object.defineProperty(span, "span_id", {
       enumerable: true,
@@ -301,9 +310,12 @@ describe("sentryBeforeSendSpan", () => {
     });
 
     expect(sentryBeforeSendSpan(span)).toEqual({
-      data: {},
+      attributes: {},
+      name: "[redacted]",
+      is_segment: false,
       span_id: "0000000000000001",
       start_timestamp: 0,
+      status: "ok",
       trace_id: "00000000000000000000000000000001",
     });
   });
@@ -386,5 +398,33 @@ describe("sentryBeforeSendMetric", () => {
     };
 
     expect(sentryBeforeSendMetric(metric)).toBeNull();
+  });
+});
+
+describe("sentryEnvironmentOption", () => {
+  it("keeps the v10 vercel-prefixed names on Vercel", () => {
+    expect(sentryEnvironmentOption("production")).toEqual({
+      environment: "vercel-production",
+    });
+    expect(sentryEnvironmentOption("preview")).toEqual({
+      environment: "vercel-preview",
+    });
+  });
+
+  it("leaves the SDK default (NODE_ENV) off Vercel", () => {
+    expect(sentryEnvironmentOption(undefined)).toEqual({});
+    expect(sentryEnvironmentOption("")).toEqual({});
+  });
+
+  it("defers to SENTRY_ENVIRONMENT when it is set", () => {
+    vi.stubEnv("SENTRY_ENVIRONMENT", "staging");
+    expect(sentryEnvironmentOption("production")).toEqual({});
+  });
+
+  it("treats an empty SENTRY_ENVIRONMENT as unset", () => {
+    vi.stubEnv("SENTRY_ENVIRONMENT", "");
+    expect(sentryEnvironmentOption("production")).toEqual({
+      environment: "vercel-production",
+    });
   });
 });

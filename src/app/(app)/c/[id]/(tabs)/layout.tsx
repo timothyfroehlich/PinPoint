@@ -12,7 +12,6 @@ import {
   getEditorCollaborators,
   getGrantableMembers,
 } from "~/lib/collections/collaborators";
-import { db } from "~/server/db";
 import { getCollectionForLayout, getPickerMachines } from "../_data";
 
 interface LayoutProps {
@@ -56,8 +55,8 @@ export default async function CollectionLayout({
     const allMachines = await getPickerMachines(data.collection.id);
     if (data.viewerCanManage) {
       const [editors, grantableMembers] = await Promise.all([
-        getEditorCollaborators(db, data.collection.id),
-        getGrantableMembers(db, data.collection.owner.id),
+        getEditorCollaborators(undefined, data.collection.id),
+        getGrantableMembers(undefined, data.collection.owner.id),
       ]);
       share = {
         viewToken: data.collection.viewToken,

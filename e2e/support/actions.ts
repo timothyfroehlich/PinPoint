@@ -279,17 +279,6 @@ async function openUserMenu(
   await openDropdownMenu(userMenu);
 }
 
-/**
- * No-op: Navigation uses AppHeader (desktop nav links) + BottomTabBar (mobile).
- * There is no sidebar to open.
- */
-export async function openSidebarIfMobile(
-  _page: Page,
-  _testInfo: TestInfo
-): Promise<void> {
-  // No-op — mobile navigation is handled by the bottom tab bar
-}
-
 interface RetryNavClickOptions {
   /** Outer `toPass` timeout. Default 15 000 ms. */
   timeout?: number;
@@ -794,32 +783,6 @@ export async function assertNoHorizontalOverflow(
       `<body>. Offenders (boundary element of each overrun):\n` +
       result.offenders.map((o) => `  • ${o}`).join("\n")
   ).toEqual([]);
-}
-
-/**
- * Asserts that a shadcn Select dropdown trigger is displaying its placeholder text.
- */
-export async function assertSelectAtPlaceholder(
-  trigger: Locator,
-  placeholderText: string | RegExp
-): Promise<void> {
-  await expect(trigger).toHaveAttribute("data-placeholder");
-  await expect(trigger.locator('[data-slot="select-value"]')).toHaveText(
-    placeholderText
-  );
-}
-
-/**
- * Asserts that a shadcn Select dropdown trigger is displaying the expected option label.
- */
-export async function assertSelectValue(
-  trigger: Locator,
-  expectedLabel: string | RegExp
-): Promise<void> {
-  await expect(trigger).not.toHaveAttribute("data-placeholder");
-  await expect(trigger.locator('[data-slot="select-value"]')).toHaveText(
-    expectedLabel
-  );
 }
 
 /**

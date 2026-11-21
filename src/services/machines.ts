@@ -175,16 +175,9 @@ export async function updateMachineWatchMode({
       .returning();
 
     if (!updated) {
-      // If we try to update a non-existent watcher, should we create it or fail?
-      // Logic implies "update mode", so failing if not watching makes sense,
-      // but simplistic approach might just be treating it as a no-op/error.
-      // Let's assume the UI only shows this when watching.
-      return ok({ watchMode }); // Return verified mode even if no-op? Or error?
-      // Better to imply success if state matches intent, or fail if context missing.
-      // Let's stick to simple return for now, or check 'updated'.
-      // If NOT updated, it means they weren't watching.
-      // We could return err("NOT_FOUND") but "SERVER" is generically defined above.
-      // Let's keep it simple for now matching strict return types.
+      // Not watching: nothing to update. The UI only offers this while
+      // watching, so report the requested mode as a no-op.
+      return ok({ watchMode });
     }
 
     return ok({ watchMode });

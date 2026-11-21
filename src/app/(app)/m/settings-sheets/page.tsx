@@ -3,12 +3,11 @@ import type { Metadata } from "next";
 
 import { PageContainer } from "~/components/layout/PageContainer";
 import { SettingsSheetsBuilder } from "~/components/machines/settings/SettingsSheetsBuilder";
-import { db } from "~/server/db";
 import {
-  getOnTheFloorMachineIds,
-  getPrintRunMachines,
-  getSettingsTagOptions,
-} from "~/lib/machines/settings-sheet-queries";
+  getOnTheFloorIds,
+  getPrintRunMachinesByInitials,
+  getSettingsTags,
+} from "./_data";
 import {
   parsePrintRunQuery,
   printRunRowsFromQuery,
@@ -44,9 +43,9 @@ export default async function PrintSettingsSheetsPage({
         searchParams: viewSearchParams,
         withMatchingIds: true,
       }),
-      getOnTheFloorMachineIds(db),
-      getSettingsTagOptions(db),
-      getPrintRunMachines(db, { kind: "initials", initials: query.initials }),
+      getOnTheFloorIds(),
+      getSettingsTags(),
+      getPrintRunMachinesByInitials(query.initials),
     ]);
   // The account's Default View belongs to the Machines page (list-views
   // §10.10); this page opens at its Page Preset and never sets a default.

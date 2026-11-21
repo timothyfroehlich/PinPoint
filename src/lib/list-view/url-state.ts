@@ -24,18 +24,6 @@ export function toListSearchParams(
   return params;
 }
 
-/** The values of a URL list that `allowed` names, in the URL's order. */
-export function parseUrlList<T extends string>(
-  value: string | null,
-  allowed: readonly T[]
-): T[] {
-  if (!value) return [];
-  const allowedSet = new Set<string>(allowed);
-  return [...new Set(value.split(","))].filter((item): item is T =>
-    allowedSet.has(item)
-  );
-}
-
 /**
  * The values of `values` that `allowed` names, in `allowed`'s order. A filter
  * selection is a set, so one order keeps the same selection the same

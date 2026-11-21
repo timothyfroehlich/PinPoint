@@ -5,10 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { createClient } from "~/lib/supabase/server";
 import { OAuthButtonList } from "../oauth-button-list";
 import { SignupForm } from "./signup-form";
-
-import { db } from "~/server/db";
-import { invitedUsers } from "~/server/db/schema";
-import { eq } from "drizzle-orm";
+import { getInvitationByEmail } from "./_data";
 
 /**
  * Signup Page
@@ -39,9 +36,7 @@ export default async function SignupPage({
   let initialData = undefined;
 
   if (email) {
-    const invited = await db.query.invitedUsers.findFirst({
-      where: eq(invitedUsers.email, email.toLowerCase()),
-    });
+    const invited = await getInvitationByEmail(email.toLowerCase());
 
     if (invited) {
       initialData = {

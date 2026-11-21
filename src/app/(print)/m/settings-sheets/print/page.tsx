@@ -1,12 +1,11 @@
 import type React from "react";
 import type { Metadata } from "next";
 
-import { db } from "~/server/db";
 import { buildSettingsSheet } from "~/lib/machines/settings-sheet";
 import {
-  getPrintRunMachines,
-  getSettingsTagOptions,
-} from "~/lib/machines/settings-sheet-queries";
+  getPrintRunMachinesByInitials,
+  getSettingsTags,
+} from "~/app/(app)/m/settings-sheets/_data";
 import {
   parsePrintRunQuery,
   printRunInputs,
@@ -30,8 +29,8 @@ export default async function SettingsSheetPrintPage({
 }): Promise<React.JSX.Element> {
   const query = parsePrintRunQuery(await searchParams);
   const [machines, tags] = await Promise.all([
-    getPrintRunMachines(db, { kind: "initials", initials: query.initials }),
-    getSettingsTagOptions(db),
+    getPrintRunMachinesByInitials(query.initials),
+    getSettingsTags(),
   ]);
   const rows = printRunRowsFromQuery(query, machines);
   const sheet = buildSettingsSheet(

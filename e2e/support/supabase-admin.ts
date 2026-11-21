@@ -176,34 +176,6 @@ export async function deleteTestUser(userId: string) {
 }
 
 /**
- * Delete a test issue by machine initials and issue number
- */
-export async function deleteTestIssueByNumber(
-  machineInitials: string,
-  issueNumber: number
-) {
-  // First, get the machine ID
-  const { data: machine } = await supabaseAdmin
-    .from("machines")
-    .select("id")
-    .eq("initials", machineInitials)
-    .single();
-
-  if (!machine) {
-    // Machine might not exist (already deleted?), so ignore
-    return;
-  }
-
-  const { error } = await supabaseAdmin
-    .from("issues")
-    .delete()
-    .eq("machine_initials", machineInitials)
-    .eq("issue_number", issueNumber);
-
-  if (error) throw error;
-}
-
-/**
  * Set the user_profiles.discord_user_id mirror for a test user.
  * Mirrors what the auth callback would write after a Discord OAuth link.
  */

@@ -1,9 +1,6 @@
 import type React from "react";
 import { notFound, redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
 import { getViewer } from "~/lib/auth/viewer";
-import { db } from "~/server/db";
-import { machines } from "~/server/db/schema";
 import {
   getAccessLevel,
   checkPermission,
@@ -15,10 +12,7 @@ import {
   getPinballMapState,
   getRefreshAllowance,
 } from "~/lib/pinballmap/state";
-import {
-  derivePbmListingView,
-  type PbmSiblingInput,
-} from "~/lib/pinballmap/listing-state";
+import { derivePbmListingView } from "~/lib/pinballmap/listing-state";
 import { listSurfacingAbandonedForMachine } from "~/lib/pinballmap/abandoned-listings";
 import { getCatalogEntry } from "~/lib/pinballmap/catalog";
 import { getPinballMapLinkStatus } from "~/lib/pinballmap/user-credentials";
@@ -26,11 +20,14 @@ import { PinballmapListingControl } from "~/components/machines/PinballmapListin
 import {
   deriveInsiderConnectedView,
   withInsiderConnected,
-  type PbmIcIntent,
 } from "~/lib/pinballmap/insider-connected";
 import { PinballmapAbandonedEntries } from "~/components/machines/PinballmapAbandonedEntries";
 import { getUnifiedUsers } from "~/lib/users/queries";
 import { getMachineForLayout } from "~/app/(app)/m/[initials]/_data";
+import {
+  getSameTitleMachines,
+  type SameTitleMachine,
+} from "~/lib/pinballmap/same-title";
 import { MachineDetailsForm } from "./machine-details-form";
 import { DetailsDirtyProvider } from "./details-dirty";
 import { PinballmapDirtyGate } from "./pinballmap-dirty-gate";
@@ -144,20 +141,9 @@ export default async function MachineEditPage({
   // Small by construction: the group is keyed on one catalog title, so it is one
   // cabinet in almost every case and a handful in the worst. Skipped for an
   // unmatched machine, which has no title to share.
-  const sameTitlePromise: Promise<
-    (PbmSiblingInput & { icIntent: PbmIcIntent | null })[]
-  > =
+  const sameTitlePromise: Promise<SameTitleMachine[]> =
     machine.pinballmapMachineId !== null
-      ? db
-          .select({
-            id: machines.id,
-            initials: machines.initials,
-            name: machines.name,
-            intent: machines.pinballmapIntent,
-            icIntent: machines.pinballmapIcIntent,
-          })
-          .from(machines)
-          .where(eq(machines.pinballmapMachineId, machine.pinballmapMachineId))
+      ? getSameTitleMachines(machine.pinballmapMachineId)
       : Promise.resolve([]);
 
   const allUsersPromise = canEdit

@@ -223,13 +223,33 @@ export async function runUpdateMachine(
   let currentOwnerId = machine.ownerId;
   let currentInvitedOwnerId = machine.invitedOwnerId;
 
+  /**
+   * Record a field failure whose `reason` is already a user-facing string — a
+   * service's structured `{ ok: false }` result. For an error THROWN by a
+   * service, use {@link handleThrownFailure}, which curates the raw message
+   * first.
+   */
   function handleFailure(
     field: string,
     reason: string,
     errorReason?:
-      "denied" | "not_found" | "invalid" | "conflict" | "rate_limited"
+      "denied" | "not_found" | "invalid" | "conflict" | "rate_limited",
+    cause?: unknown
   ): UpdateMachineOutcome {
     if (applied.length > 0) {
+      // A partial success still returns a payload, so `runTool` never sees this
+      // failure as a throw and never reports it. An unexpected exception (a
+      // caught throw that is not an already-curated McpToolError) has to be
+      // reported here, or a recurring partial write produces no Sentry events
+      // at all. Structured rejections carry an `errorReason` and are expected,
+      // so they are not reported. Mirrors update_issue's apply-loop handling.
+      if (errorReason === undefined && !(cause instanceof McpToolError)) {
+        reportError(cause, {
+          action: "mcp.tool.update_machine",
+          userId: ctx.userId,
+          field,
+        });
+      }
       return {
         applied,
         result: {
@@ -250,6 +270,44 @@ export async function runUpdateMachine(
       throw new McpToolError(errorReason, reason);
     }
     throw new Error(reason);
+  }
+
+  /**
+   * Handle an error THROWN by a field's service call, curating the reason the
+   * way `update-issue.ts` does so no raw driver/internal text reaches the caller.
+   *
+   * On the partial-success path (an earlier field already committed) the call
+   * returns a success payload that bypasses {@link runTool}'s harness — the
+   * harness is what normally reduces an unexpected error to a generic line — so
+   * we curate here: an {@link McpToolError} message is already user-facing and
+   * passes through; anything else is reduced to a generic line (and reported to
+   * Sentry by {@link handleFailure}). Before any field has committed we re-throw so the harness handles it
+   * (reporting the real error to Sentry and returning a generic line to the
+   * caller). That pre-commit re-throw is a deliberate difference from
+   * `update-issue.ts`, which instead returns an empty partial payload.
+   */
+  function handleThrownFailure(
+    field: string,
+    error: unknown,
+    fallback: string
+  ): UpdateMachineOutcome {
+    if (applied.length === 0) {
+      // Re-throw the original so an McpToolError keeps its class, reason code
+      // and curated message for the harness; only a non-Error throw (a bare
+      // string, say) has nothing to preserve and gets the per-field fallback.
+      throw error instanceof Error ? error : new Error(fallback);
+    }
+    // handleFailure reports a non-McpToolError cause to Sentry on the partial
+    // path, so the raw error is passed as the cause rather than reported here.
+    if (error instanceof McpToolError) {
+      return handleFailure(field, error.message, undefined, error);
+    }
+    return handleFailure(
+      field,
+      `Changing ${field} failed. The failure has been logged.`,
+      undefined,
+      error
+    );
   }
 
   // 1. updateMachineName (if name supplied)
@@ -296,9 +354,10 @@ export async function runUpdateMachine(
       });
       currentPresenceStatus = cleanArgs.presenceStatus;
     } catch (error) {
-      return handleFailure(
+      return handleThrownFailure(
         "presenceStatus",
-        error instanceof Error ? error.message : "Updating presence failed."
+        error,
+        "Updating presence failed."
       );
     }
   }
@@ -322,10 +381,7 @@ export async function runUpdateMachine(
       });
       deliveryPlan = outcome.deliveryPlan;
     } catch (error) {
-      return handleFailure(
-        "owner",
-        error instanceof Error ? error.message : "Updating owner failed."
-      );
+      return handleThrownFailure("owner", error, "Updating owner failed.");
     }
 
     // Owner row is committed past this point: never report it as failed.
@@ -374,11 +430,10 @@ export async function runUpdateMachine(
         },
       });
     } catch (error) {
-      return handleFailure(
+      return handleThrownFailure(
         "pinballmap",
-        error instanceof Error
-          ? error.message
-          : "Updating Pinball Map link failed."
+        error,
+        "Updating Pinball Map link failed."
       );
     }
 
@@ -436,11 +491,10 @@ export async function runUpdateMachine(
     try {
       set = await setMachineIcIntent({ machineId: machine.id, icIntent });
     } catch (error) {
-      return handleFailure(
+      return handleThrownFailure(
         "insiderConnected",
-        error instanceof Error
-          ? error.message
-          : "Updating Insider Connected failed."
+        error,
+        "Updating Insider Connected failed."
       );
     }
     if (!set.ok) {
@@ -469,9 +523,10 @@ export async function runUpdateMachine(
         changed,
       });
     } catch (error) {
-      return handleFailure(
+      return handleThrownFailure(
         "iscoredGameId",
-        error instanceof Error ? error.message : "Updating iScored link failed."
+        error,
+        "Updating iScored link failed."
       );
     }
   }
