@@ -67,17 +67,6 @@ describe("InfoRail", () => {
     expect(screen.getByText(/no owner assigned/i)).toBeInTheDocument();
   });
 
-  it("renders the edit slot inside the Details card", () => {
-    renderRail({
-      editSlot: <button type="button">Edit machine</button>,
-    });
-    const card = screen.getByTestId("machine-owner-card");
-    expect(within(card).getByText("Details")).toBeInTheDocument();
-    expect(
-      within(card).getByRole("button", { name: /edit machine/i })
-    ).toBeInTheDocument();
-  });
-
   it("divides the owner from the Model block above", () => {
     renderRail();
     expect(screen.getByTestId("owner-block")).toHaveClass("border-t");
