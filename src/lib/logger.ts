@@ -222,10 +222,6 @@ function getOrCreateLogger(): pino.Logger {
   return loggerInstance;
 }
 
-export function getLogger(): pino.Logger {
-  return getOrCreateLogger();
-}
-
 export const log = {
   info: (obj: object | string, msg?: string): void => {
     getOrCreateLogger().info(obj, msg);

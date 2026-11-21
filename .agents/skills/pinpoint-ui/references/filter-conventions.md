@@ -17,7 +17,7 @@ registry.
   `STATUS_GROUP_LABELS` maps each to a display name — note the deliberate
   mismatch: the `new` group **displays as "Open"** (Phase-2 label-consistency
   decision; don't relitigate it). The convenience sets `OPEN_STATUSES`
-  (new + in_progress = all 6 non-closed), `NEW_STATUSES`, `IN_PROGRESS_STATUSES`,
+  (new + in_progress = all 6 non-closed) and
   `CLOSED_STATUSES` are derived from the same source.
 - **Default issue view = `OPEN_STATUSES`.** The Issue View Page Preset (Open
   issues) selects them, and the Status filter reads "Open" when exactly they

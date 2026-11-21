@@ -13,6 +13,8 @@ import { reportError } from "~/lib/observability/report-error";
 import { checkPermission } from "~/lib/permissions/helpers";
 import { getUserAccessLevel } from "~/lib/permissions/access";
 import { getDiscordTokenForAdmin } from "~/lib/discord/config";
+import { DISCORD_API, DISCORD_TIMEOUT_MS } from "~/lib/discord/api";
+import { NETWORK_ERROR_STATUS, safeFetch } from "~/lib/http/external";
 
 async function verifyIntegrationsAdmin(): Promise<{ userId: string }> {
   const supabase = await createClient();
@@ -42,9 +44,22 @@ export type ValidateBotTokenResult =
 
 async function probeBotToken(token: string): Promise<ValidateBotTokenResult> {
   try {
-    const res = await fetch("https://discord.com/api/v10/users/@me", {
-      headers: { Authorization: `Bot ${token}` },
-    });
+    const res = await safeFetch(
+      `${DISCORD_API}/users/@me`,
+      { headers: { Authorization: `Bot ${token}` } },
+      {
+        timeoutMs: DISCORD_TIMEOUT_MS,
+        networkErrorLog: {
+          fields: { action: "probeBotToken" },
+          message: "Discord token validation failed",
+        },
+      }
+    );
+    // A network failure or timeout is a synthetic 599 with no HTTP status of
+    // Discord's to show the admin.
+    if (res.status === NETWORK_ERROR_STATUS) {
+      return { ok: false, reason: "transient" };
+    }
     if (res.ok) {
       const body = (await res.json()) as { username: string };
       return { ok: true, botUsername: body.username };
@@ -85,9 +100,20 @@ async function probeServerMembership(
   serverId: string
 ): Promise<ValidateServerIdResult> {
   try {
-    const res = await fetch(`https://discord.com/api/v10/guilds/${serverId}`, {
-      headers: { Authorization: `Bot ${token}` },
-    });
+    const res = await safeFetch(
+      `${DISCORD_API}/guilds/${serverId}`,
+      { headers: { Authorization: `Bot ${token}` } },
+      {
+        timeoutMs: DISCORD_TIMEOUT_MS,
+        networkErrorLog: {
+          fields: { action: "probeServerMembership" },
+          message: "Discord server validation failed",
+        },
+      }
+    );
+    if (res.status === NETWORK_ERROR_STATUS) {
+      return { ok: false, reason: "transient" };
+    }
     if (res.ok) {
       const body = (await res.json()) as { name?: string };
       return body.name ? { ok: true, guildName: body.name } : { ok: true };

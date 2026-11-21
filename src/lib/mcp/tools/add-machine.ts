@@ -99,7 +99,7 @@ export async function runAddMachine(
   const owner = await resolveOwner(args.owner);
 
   // Always resolved, like the New Machine form: the linked-or-uncataloged
-  // requirement (PBM_LINKING_REQUIRED) applies to a call that names neither.
+  // requirement (validatePbmLinkSelection) applies to a call that names neither.
   // The resolver's message names form controls, so a tool caller gets its own.
   if (
     validatePbmLinkSelection({

@@ -700,6 +700,63 @@ describe("validateBotToken", () => {
       expect(result.reason).toBe("invalid_token");
     }
   });
+
+  it("returns transient with the HTTP status when Discord returns a 5xx", async () => {
+    vi.mocked(getDiscordTokenForAdmin).mockResolvedValue(VALID_TOKEN);
+    mockFetch(() => new Response("{}", { status: 503 }));
+
+    const fd = new FormData();
+    fd.set("newToken", "");
+    expect(await validateBotToken(fd)).toEqual({
+      ok: false,
+      reason: "transient",
+      status: 503,
+    });
+  });
+
+  it("returns transient without a status when the network fails", async () => {
+    vi.mocked(getDiscordTokenForAdmin).mockResolvedValue(VALID_TOKEN);
+    globalThis.fetch = vi.fn().mockRejectedValue(new TypeError("fetch failed"));
+
+    const fd = new FormData();
+    fd.set("newToken", "");
+    // No `status`: the form would otherwise show the helper's synthetic 599
+    // as "HTTP 599".
+    expect(await validateBotToken(fd)).toEqual({
+      ok: false,
+      reason: "transient",
+    });
+  });
+
+  it("returns transient and passes a deadline signal when the request times out", async () => {
+    vi.mocked(getDiscordTokenForAdmin).mockResolvedValue(VALID_TOKEN);
+    globalThis.fetch = vi
+      .fn()
+      .mockRejectedValue(
+        new DOMException("The operation timed out.", "TimeoutError")
+      );
+
+    const fd = new FormData();
+    fd.set("newToken", "");
+    expect(await validateBotToken(fd)).toEqual({
+      ok: false,
+      reason: "transient",
+    });
+    const [, init] = vi.mocked(globalThis.fetch).mock.calls[0] ?? [];
+    expect(init?.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("returns transient when a 200 response body is not JSON", async () => {
+    vi.mocked(getDiscordTokenForAdmin).mockResolvedValue(VALID_TOKEN);
+    mockFetch(() => new Response("<html>", { status: 200 }));
+
+    const fd = new FormData();
+    fd.set("newToken", "");
+    expect(await validateBotToken(fd)).toEqual({
+      ok: false,
+      reason: "transient",
+    });
+  });
 });
 
 // ── validateServerId ──────────────────────────────────────────────────────────
@@ -758,5 +815,81 @@ describe("validateServerId", () => {
     if (!result.ok) {
       expect(result.reason).toBe("not_member");
     }
+  });
+
+  it("returns not_member when Discord returns 403", async () => {
+    mockFetch(() => new Response("{}", { status: 403 }));
+
+    const fd = new FormData();
+    fd.set("guildId", "123456789012345678");
+    fd.set("newToken", VALID_TOKEN);
+    expect(await validateServerId(fd)).toEqual({
+      ok: false,
+      reason: "not_member",
+    });
+  });
+
+  it("returns invalid_token when Discord returns 401", async () => {
+    mockFetch(() => new Response("{}", { status: 401 }));
+
+    const fd = new FormData();
+    fd.set("guildId", "123456789012345678");
+    fd.set("newToken", VALID_TOKEN);
+    expect(await validateServerId(fd)).toEqual({
+      ok: false,
+      reason: "invalid_token",
+    });
+  });
+
+  it("returns ok:true without a guild name when Discord omits it", async () => {
+    mockFetch(() => new Response("{}", { status: 200 }));
+
+    const fd = new FormData();
+    fd.set("guildId", "123456789012345678");
+    fd.set("newToken", VALID_TOKEN);
+    expect(await validateServerId(fd)).toEqual({ ok: true });
+  });
+
+  it("returns transient with the HTTP status when Discord returns a 5xx", async () => {
+    mockFetch(() => new Response("{}", { status: 502 }));
+
+    const fd = new FormData();
+    fd.set("guildId", "123456789012345678");
+    fd.set("newToken", VALID_TOKEN);
+    expect(await validateServerId(fd)).toEqual({
+      ok: false,
+      reason: "transient",
+      status: 502,
+    });
+  });
+
+  it("returns transient without a status when the network fails", async () => {
+    globalThis.fetch = vi.fn().mockRejectedValue(new TypeError("fetch failed"));
+
+    const fd = new FormData();
+    fd.set("guildId", "123456789012345678");
+    fd.set("newToken", VALID_TOKEN);
+    expect(await validateServerId(fd)).toEqual({
+      ok: false,
+      reason: "transient",
+    });
+  });
+
+  it("returns transient and passes a deadline signal when the request times out", async () => {
+    globalThis.fetch = vi
+      .fn()
+      .mockRejectedValue(
+        new DOMException("The operation timed out.", "TimeoutError")
+      );
+
+    const fd = new FormData();
+    fd.set("guildId", "123456789012345678");
+    fd.set("newToken", VALID_TOKEN);
+    expect(await validateServerId(fd)).toEqual({
+      ok: false,
+      reason: "transient",
+    });
+    const [, init] = vi.mocked(globalThis.fetch).mock.calls[0] ?? [];
+    expect(init?.signal).toBeInstanceOf(AbortSignal);
   });
 });

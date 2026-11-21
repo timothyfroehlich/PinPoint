@@ -52,9 +52,6 @@ export interface DeliveryPlan {
   deliveries: (() => Promise<DeliveryResult>)[];
 }
 
-/** @deprecated Prefer the explicit NotificationEvent name. */
-export type CreateNotificationProps = NotificationEvent;
-
 interface DiscordCandidate {
   userId: string;
   type: NotificationType;
@@ -535,7 +532,7 @@ export async function dispatchNotification(plan: DeliveryPlan): Promise<void> {
  * then `dispatchNotification(plan)` after the transaction resolves.
  */
 export async function createNotification(
-  props: CreateNotificationProps
+  props: NotificationEvent
 ): Promise<void> {
   const plan = await planNotification(props);
   await dispatchNotification(plan);

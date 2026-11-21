@@ -165,6 +165,59 @@ describe("updateMachinePresenceAction (PP-5sgt.3)", () => {
     ).toHaveLength(0);
   });
 
+  it("rethrows a Next.js redirect thrown by the service instead of returning an error", async () => {
+    const adminId = await makeUser("admin");
+    const machine = await makeMachine();
+    mockAuth(adminId);
+    const redirectError = Object.assign(new Error("NEXT_REDIRECT"), {
+      digest: "NEXT_REDIRECT;replace;/login;307;",
+    });
+
+    const machinesService = await import("~/services/machines");
+    const spy = vi
+      .spyOn(machinesService, "updateMachinePresence")
+      .mockRejectedValueOnce(redirectError);
+
+    try {
+      const { updateMachinePresenceAction } =
+        await import("~/app/(app)/m/actions");
+      await expect(
+        updateMachinePresenceAction(machine.id, "off_the_floor")
+      ).rejects.toBe(redirectError);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("rethrows a Next.js redirect thrown by a text-field update instead of returning an error", async () => {
+    const adminId = await makeUser("admin");
+    const machine = await makeMachine();
+    mockAuth(adminId);
+    const redirectError = Object.assign(new Error("NEXT_REDIRECT"), {
+      digest: "NEXT_REDIRECT;replace;/login;307;",
+    });
+
+    const db = await getTestDb();
+    const spy = vi
+      .spyOn(db, "transaction")
+      .mockRejectedValueOnce(redirectError);
+
+    try {
+      const { updateMachineDescription } =
+        await import("~/app/(app)/m/actions");
+      await expect(
+        updateMachineDescription(machine.id, {
+          type: "doc",
+          content: [
+            { type: "paragraph", content: [{ type: "text", text: "New" }] },
+          ],
+        })
+      ).rejects.toBe(redirectError);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it("rejects unauthenticated callers", async () => {
     const machine = await makeMachine();
     mockAuth(null);

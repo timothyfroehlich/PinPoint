@@ -42,7 +42,6 @@ export const BLOB_CONFIG = {
   // The daily /api/cron/cleanup-blobs job (~/lib/blob/cleanup) deletes any
   // blob no database row references once it is older than this window,
   // including uploads that never got linked to an issue.
-  // TODO: Implement cron/cleanup job to enforce SOFT_DELETE_RETENTION_HOURS
   SOFT_DELETE_RETENTION_HOURS: 24,
 } as const;
 
