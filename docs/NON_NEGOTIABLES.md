@@ -1,7 +1,7 @@
 # PinPoint Non‑Negotiables
 
 **Last Updated**: 2026-11-15
-**Version**: 2.13 (CORE-ARCH-018 added: pages, layouts and components never import the database — PP-az4d.10). Prior: 2.12 (CORE-ARCH-017 added: additive migrations merge first in their own PR, destructive ones last — PP-ncxx.6). Prior: 2.11 (CORE-TS-002 amended: a `*_VALUES` array is the single source for zod, Drizzle and TS unions — PP-az4d.13). Prior: 2.10 (CORE-ARCH-016 added: third-party HTTP goes through `~/lib/http/external` with a per-request timeout — PP-az4d.11). Prior: 2.9 (CORE-ARCH-013 added: Server Actions go through `createProtectedAction` — PP-az4d.4). Prior: 2.8 (CORE-ARCH-015 added: a caught error not returned to the user goes to `reportError`; cron routes use `runCron` — PP-az4d.3). Prior: 2.7 (CORE-ARCH-014 added: one write path per mutation; CORE-ARCH-010 amended: share load-bearing code at two copies, reuse existing helpers — PP-az4d.1)
+**Version**: 2.14 (CORE-UI-007 added: overlay libraries only inside `src/components/ui`, every floating primitive animates — PP-p2ts.7). Prior: 2.13 (CORE-ARCH-018 added: pages, layouts and components never import the database — PP-az4d.10). Prior: 2.12 (CORE-ARCH-017 added: additive migrations merge first in their own PR, destructive ones last — PP-ncxx.6). Prior: 2.11 (CORE-TS-002 amended: a `*_VALUES` array is the single source for zod, Drizzle and TS unions — PP-az4d.13). Prior: 2.10 (CORE-ARCH-016 added: third-party HTTP goes through `~/lib/http/external` with a per-request timeout — PP-az4d.11). Prior: 2.9 (CORE-ARCH-013 added: Server Actions go through `createProtectedAction` — PP-az4d.4). Prior: 2.8 (CORE-ARCH-015 added: a caught error not returned to the user goes to `reportError`; cron routes use `runCron` — PP-az4d.3). Prior: 2.7 (CORE-ARCH-014 added: one write path per mutation; CORE-ARCH-010 amended: share load-bearing code at two copies, reuse existing helpers — PP-az4d.1)
 
 > **Canonical catalog**: this document defines the canonical `CORE-*` rules for PinPoint. Portable skills (`.agents/skills/`) and agent context (`AGENTS.md`) cite rules by ID and provide domain/task-specific procedures.
 
@@ -43,8 +43,9 @@
 26. A caught error that is not returned to the user goes to `reportError`, never to a bare `log.error`; cron routes use `runCron` (CORE-ARCH-015)
 27. Server Actions are built with `createProtectedAction` / `createPublicAction` from `~/lib/actions` (CORE-ARCH-013)
 28. Third-party HTTP calls go through `~/lib/http/external` with a per-request timeout (CORE-ARCH-016)
-29. Additive migrations merge first in their own PR; destructive ones last (CORE-ARCH-017)
-30. Pages, layouts and components never import `~/server/db`; reads live in a `cache()`'d `_data.ts` loader or a `src/lib` read (CORE-ARCH-018)
+29. Overlay libraries (`radix-ui`, `vaul`, `cmdk`, `@floating-ui`) are imported only in `src/components/ui`, and every floating primitive there carries `animate-in`/`animate-out` (CORE-UI-007)
+30. Additive migrations merge first in their own PR; destructive ones last (CORE-ARCH-017)
+31. Pages, layouts and components never import `~/server/db`; reads live in a `cache()`'d `_data.ts` loader or a `src/lib` read (CORE-ARCH-018)
 
 ---
 
@@ -567,6 +568,19 @@
 - **Don't:** Implement ad-hoc patterns when a Widely-available primitive exists for the same job. Don't pre-emptively pull every guide into context; search per task.
 - **Caveat — a guide's Baseline tier can lag the real Newly → Widely promotion:** Newly → Widely is pure elapsed time (Widely = 30 months after the Baseline low date, no new browser release required), so the catalog can still read "Newly available" after a feature has already crossed into Widely. That lag only ever under-reports — an unnecessary opt-in, never a gate bypass — so MWG's tier is not authoritative on its own. When a guide reads "Newly" for a feature whose Baseline low date is already more than 30 months past and that tier would gate a decision (adopt directly vs. opt-in per CORE-UI-005), confirm against a second source — `web-features`, caniuse, the Baseline dashboard (webstatus.dev), or MDN — before treating it as below the floor. (Casework: `:has()`, PP-l7fj.)
 - **Reference:** Plugin is installed at `~/.claude/plugins/marketplaces/googlechrome/skills/modern-web-guidance/`.
+
+---
+
+## Motion
+
+**CORE-UI-007:** Overlays animate through the shared `src/components/ui/` primitives
+
+- **Severity:** Required
+- **Why:** Dialogs, popovers, menus, tooltips, hover cards and sheets must open and close with the same fade and zoom everywhere. From 2025-11-09 (the Tailwind 4 move) until `tw-animate-css` was added (PP-p2ts.7) every one of them appeared and vanished instantly, because the utilities their classes name were no longer generated, and nothing noticed. A hand-built overlay (the @-mention popup) never had motion at all. Keeping the floating-content libraries behind one folder makes consistent motion a property of the folder, not of each author's memory.
+- **Do:** Import `@radix-ui/*`, `radix-ui`, `vaul`, `cmdk` and `@floating-ui/*` only inside `src/components/ui/**`. Everywhere else, use or extend the shared component there. A floating panel carries `data-[state=open]:animate-in data-[state=closed]:animate-out` plus the fade and zoom classes `popover.tsx` uses (`FloatingPanel` for a panel Radix does not render).
+- **Don't:** Import those libraries in a page, feature component or editor; hand-build a floating panel; add a primitive under `src/components/ui/` that renders floating content without `animate-in` and `animate-out`, unless it is listed in the allowlist in `src/components/ui/motion.test.ts` with a reason.
+- **Enforced by:** the `no-restricted-imports` patterns in `.oxlintrc.json` (the import half) and `src/components/ui/motion.test.ts` (the motion half, a static scan of `src/components/ui/`). Both run in CI. Reduced-motion is separate: one global block in `globals.css` (CORE-A11Y-002).
+- **Reference:** `pinpoint-design-bible` §11 Motion.
 
 ---
 

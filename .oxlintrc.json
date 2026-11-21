@@ -137,6 +137,17 @@
               {
                 "group": ["../../*", "../../../*", "../../../../*"],
                 "message": "Use '~/' path alias instead of deep relative imports (../../). This improves maintainability and prevents broken imports when files are moved."
+              },
+              {
+                "group": [
+                  "@radix-ui/*",
+                  "radix-ui",
+                  "radix-ui/*",
+                  "vaul",
+                  "cmdk",
+                  "@floating-ui/*"
+                ],
+                "message": "Overlay and primitive libraries (radix-ui, vaul, cmdk, floating-ui) are only imported inside src/components/ui. Use or extend the shared component in src/components/ui so open/close motion stays consistent (CORE-UI-007)."
               }
             ]
           }
@@ -245,6 +256,24 @@
           }
         ],
         "typescript/no-unnecessary-condition": "error"
+      }
+    },
+    {
+      // The shared primitives are the one place the overlay libraries may be
+      // imported (CORE-UI-007); the deep-relative pattern still applies here.
+      "files": ["src/components/ui/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["../../*", "../../../*", "../../../../*"],
+                "message": "Use '~/' path alias instead of deep relative imports (../../). This improves maintainability and prevents broken imports when files are moved."
+              }
+            ]
+          }
+        ]
       }
     },
     {
