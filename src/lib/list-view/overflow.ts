@@ -345,10 +345,19 @@ export interface PageActionsFitInput {
   available: number;
   /** The page's actions before ⋯, in display order. */
   actions: readonly PageActionWidths[];
-  /** ⋯ with its "Actions" label and as an icon button. */
+  /** ⋯ with its "More" label and as an icon button. */
   more: { labeled: number; icon: number };
-  /** Whether ⋯ holds anything of its own before any action folds into it. */
+  /**
+   * Whether ⋯ holds anything of its own before any action folds into it,
+   * not counting `loneEntry`.
+   */
   moreHasItems: boolean;
+  /**
+   * ⋯'s only entry, when it can show as a button: planned as a trailing
+   * action that folds after every fold step, so while there is room it
+   * shows as its own button instead (list-views §3.7).
+   */
+  loneEntry?: PageActionWidths | undefined;
   /**
    * The page's fold order (list-views §3.9): each step names the actions
    * that fold into ⋯ together, the first step first. An action named in no
@@ -375,18 +384,25 @@ export interface PageActionsPlan {
  * spare (§8.7); otherwise every one is an icon button, with no size
  * between. When even the icons do not fit, the next fold step moves its
  * actions into ⋯ and the rest try labels, then icons, again. ⋯ never folds
- * and shows only while it holds something. When nothing fits even after the
- * last step, that step's icons remain.
+ * and shows only while it holds something. A lone entry (§3.7) shows as the
+ * last button and folds after every step, so ⋯ holds it alone only when
+ * space forces it. When nothing fits even after the last step, that step's
+ * icons remain.
  */
 export function planPageActions({
   available,
-  actions,
+  actions: pageActions,
   more,
   moreHasItems,
-  foldSteps,
+  loneEntry,
+  foldSteps: pageFoldSteps,
   gap,
 }: PageActionsFitInput): PageActionsPlan {
   const room = available - FIT_TOLERANCE;
+  const actions = loneEntry ? [...pageActions, loneEntry] : pageActions;
+  const foldSteps = loneEntry
+    ? [...pageFoldSteps, [loneEntry.key]]
+    : pageFoldSteps;
   const keys = actions.map((action) => action.key);
   // Each level folds one more step; a step naming no present action adds
   // no level.

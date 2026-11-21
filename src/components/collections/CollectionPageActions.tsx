@@ -3,11 +3,12 @@
 import type React from "react";
 import { useState } from "react";
 import { Share2 } from "lucide-react";
+import { CollectionDeleteDialog } from "~/components/collections/CollectionDeleteDialog";
 import { CollectionShareDialog } from "~/components/collections/CollectionShareDialog";
 import { EditCollectionDialog } from "~/components/collections/EditCollectionDialog";
 import {
   GROUP_FOLD_STEPS,
-  groupPrintAction,
+  groupPrintEntry,
 } from "~/components/collections/group-page-actions";
 import {
   PageActions,
@@ -41,10 +42,13 @@ interface CollectionPageActionsProps {
   } | null;
 }
 
+type CollectionDialog = "share" | "edit" | "delete";
+
 /**
  * A Collection page's actions (collections-and-tags 4.14–4.18): Share for
- * the owner, Print, then ⋯ holding Edit collection for the owner and
- * Editors and the current tab's Export. Share and Print fold together.
+ * the owner, then ⋯ holding Edit collection for the owner and Editors, the
+ * current tab's Export, Print settings sheets for everyone, and Delete
+ * collection for the owner. Share folds into ⋯.
  */
 export function CollectionPageActions({
   collectionId,
@@ -52,10 +56,20 @@ export function CollectionPageActions({
   share,
   edit,
 }: CollectionPageActionsProps): React.JSX.Element {
-  const [shareOpen, setShareOpen] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
+  const [dialog, setDialog] = useState<CollectionDialog | null>(null);
   const exportEntry = usePageExportEntry();
   const returnFocus = useReturnFocus();
+  const dialogProps = (
+    name: CollectionDialog
+  ): {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    onCloseAutoFocus: (event: Event) => void;
+  } => ({
+    open: dialog === name,
+    onOpenChange: (open) => setDialog(open ? name : null),
+    onCloseAutoFocus: returnFocus.onCloseAutoFocus,
+  });
 
   const actions: PageAction[] = [];
   if (share) {
@@ -63,19 +77,33 @@ export function CollectionPageActions({
       key: "share",
       label: "Share",
       icon: Share2,
-      onSelect: returnFocus.opens(() => setShareOpen(true)),
+      onSelect: returnFocus.opens(() => setDialog("share")),
       testId: "collection-share-trigger",
     });
   }
-  actions.push(groupPrintAction(settingsSheetsHref));
 
   const editing: PageMenuEntry[] = edit
     ? [
         {
           key: "edit-collection",
-          label: "Edit collection",
-          onSelect: returnFocus.opens(() => setEditOpen(true)),
+          label: "Edit collection…",
+          onSelect: returnFocus.opens(() => setDialog("edit")),
           testId: "collection-edit-trigger",
+        },
+      ]
+    : [];
+  const output: PageMenuEntry[] = [
+    ...(exportEntry ? [exportEntry] : []),
+    groupPrintEntry(settingsSheetsHref),
+  ];
+  const deleting: PageMenuEntry[] = edit?.canDelete
+    ? [
+        {
+          key: "delete-collection",
+          label: "Delete collection",
+          destructive: true,
+          onSelect: returnFocus.opens(() => setDialog("delete")),
+          testId: "collection-delete-trigger",
         },
       ]
     : [];
@@ -84,14 +112,12 @@ export function CollectionPageActions({
     <>
       <PageActions
         actions={actions}
-        menu={[editing, exportEntry ? [exportEntry] : []]}
+        menu={[editing, output, deleting]}
         foldSteps={GROUP_FOLD_STEPS}
       />
       {share ? (
         <CollectionShareDialog
-          open={shareOpen}
-          onOpenChange={setShareOpen}
-          onCloseAutoFocus={returnFocus.onCloseAutoFocus}
+          {...dialogProps("share")}
           collectionId={collectionId}
           viewToken={share.viewToken}
           ownerName={share.ownerName}
@@ -101,15 +127,18 @@ export function CollectionPageActions({
       ) : null}
       {edit ? (
         <EditCollectionDialog
-          open={editOpen}
-          onOpenChange={setEditOpen}
-          onCloseAutoFocus={returnFocus.onCloseAutoFocus}
+          {...dialogProps("edit")}
           collectionId={collectionId}
           currentName={edit.currentName}
           currentDescription={edit.currentDescription}
           allMachines={edit.allMachines}
           currentIds={edit.currentIds}
-          canDelete={edit.canDelete}
+        />
+      ) : null}
+      {edit?.canDelete ? (
+        <CollectionDeleteDialog
+          {...dialogProps("delete")}
+          collectionId={collectionId}
         />
       ) : null}
     </>

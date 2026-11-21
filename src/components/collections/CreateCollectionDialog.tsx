@@ -3,7 +3,6 @@
 import type React from "react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import { Plus } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { CollectionFields } from "~/components/collections/CollectionFields";
 import {
@@ -13,12 +12,16 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "~/components/ui/dialog";
 import { createCollectionAction } from "~/app/(app)/c/collections/actions";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 
 interface Props {
+  /** Opens from the page's New collection action (design-bible §26.1). */
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  /** Where focus goes when the dialog closes (useReturnFocus). */
+  onCloseAutoFocus?: ((event: Event) => void) | undefined;
   allMachines: { id: string; initials: string; name: string }[];
 }
 
@@ -29,10 +32,12 @@ interface Props {
  * success.
  */
 export function CreateCollectionDialog({
+  open,
+  onOpenChange: setOpen,
+  onCloseAutoFocus,
   allMachines,
 }: Props): React.JSX.Element {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState<ProseMirrorDoc | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
@@ -67,14 +72,9 @@ export function CreateCollectionDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button className="gap-2" data-testid="create-collection-trigger">
-          <Plus className="size-4 shrink-0" aria-hidden="true" />
-          New collection
-        </Button>
-      </DialogTrigger>
       <DialogContent
         className="sm:max-w-lg"
+        onCloseAutoFocus={onCloseAutoFocus}
         // A stray backdrop click shouldn't discard an in-progress collection —
         // only Cancel / the X / Esc close it (unsaved-form dismissal guidance).
         onInteractOutside={(e) => e.preventDefault()}

@@ -1,34 +1,20 @@
 import { Printer } from "lucide-react";
-import type { PageAction } from "~/components/list-view";
+import type { PageMenuEntry } from "~/components/list-view";
 
 /**
- * Print, the menu every Machine Group page shows: Settings sheets only, no
- * apron cards entry (collections-and-tags 4.16).
+ * Print settings sheets, the ⋯ entry every Machine Group page holds for
+ * everyone; there is no apron cards entry (collections-and-tags 4.16). Its
+ * icon lets it show as its own button when it is ⋯'s only entry
+ * (list-views §3.7).
  */
-export function groupPrintAction(settingsSheetsHref: string): PageAction {
+export function groupPrintEntry(settingsSheetsHref: string): PageMenuEntry {
   return {
-    key: "print",
-    label: "Print",
+    key: "settings-sheets",
+    label: "Print settings sheets",
     icon: Printer,
-    entries: [
-      {
-        key: "settings-sheets",
-        label: "Settings sheets",
-        href: settingsSheetsHref,
-      },
-    ],
-    // Folded into ⋯, the entry says what it prints.
-    foldedEntries: [
-      {
-        key: "settings-sheets",
-        label: "Print settings sheets",
-        href: settingsSheetsHref,
-      },
-    ],
+    href: settingsSheetsHref,
   };
 }
 
-/** Share and Print fold into ⋯ together (collections-and-tags 4.18). */
-export const GROUP_FOLD_STEPS: readonly (readonly string[])[] = [
-  ["share", "print"],
-];
+/** Share is the only action that folds (collections-and-tags 4.18). */
+export const GROUP_FOLD_STEPS: readonly (readonly string[])[] = [["share"]];

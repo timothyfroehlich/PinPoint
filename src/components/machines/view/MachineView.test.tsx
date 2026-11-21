@@ -1196,7 +1196,7 @@ describe("MachineView", () => {
     );
 
     async function openActions(): Promise<HTMLElement> {
-      await userEvent.click(screen.getByRole("button", { name: "Actions" }));
+      await userEvent.click(screen.getByRole("button", { name: "More" }));
       return screen.findByRole("menu");
     }
 

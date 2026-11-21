@@ -95,6 +95,13 @@ describe("MachineTimelineCommentRow", () => {
     expect(
       screen.getByRole("menuitem", { name: /delete/i })
     ).toBeInTheDocument();
+    // design-bible §26.3: text-only entries, Delete last after a divider.
+    const menu = screen.getByRole("menu");
+    expect(
+      screen.getAllByRole("menuitem").map((item) => item.textContent)
+    ).toEqual(["Edit", "Delete"]);
+    expect(screen.getAllByRole("separator")).toHaveLength(1);
+    expect(menu.querySelector("svg")).toBeNull();
   });
 
   it("offers Delete only when canEdit is false", async () => {

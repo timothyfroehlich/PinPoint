@@ -14,7 +14,7 @@ import { getPickerMachines } from "~/app/(app)/c/[id]/_data";
 import { ownerMachinesHref } from "~/lib/machines/links";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
-import { CreateCollectionDialog } from "~/components/collections/CreateCollectionDialog";
+import { CollectionsPageActions } from "~/components/collections/CollectionsPageActions";
 
 export const metadata: Metadata = {
   title: "My Collections | PinPoint",
@@ -38,7 +38,7 @@ export default async function MyCollectionsPage(): Promise<React.JSX.Element> {
       <div className="space-y-6">
         <PageHeader
           title="My Collections"
-          actions={<CreateCollectionDialog allMachines={allMachines} />}
+          pageActions={<CollectionsPageActions allMachines={allMachines} />}
         />
 
         {owned.length === 0 &&

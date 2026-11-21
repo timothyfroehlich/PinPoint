@@ -27,6 +27,8 @@ interface TagTypeExclusiveDialogProps {
   exclusive: boolean;
   /** Machines holding more than one of its tags, as the page last read them. */
   conflicts: readonly TagConflictMachine[];
+  /** Where focus goes when the dialog closes (useReturnFocus). */
+  onCloseAutoFocus?: ((event: Event) => void) | undefined;
 }
 
 /**
@@ -41,6 +43,7 @@ export function TagTypeExclusiveDialog({
   name,
   exclusive,
   conflicts,
+  onCloseAutoFocus,
 }: TagTypeExclusiveDialogProps): React.JSX.Element {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -84,7 +87,10 @@ export function TagTypeExclusiveDialog({
       }}
     >
       {/* Scrolls rather than running off a short phone screen. */}
-      <AlertDialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
+      <AlertDialogContent
+        className="max-h-[calc(100dvh-2rem)] overflow-y-auto"
+        onCloseAutoFocus={onCloseAutoFocus}
+      >
         <AlertDialogHeader className="place-items-start text-left">
           <AlertDialogTitle>
             {making

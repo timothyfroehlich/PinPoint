@@ -69,8 +69,9 @@ function serialize(
 }
 
 /**
- * The Issues page's actions (issues-list 2.3): only ⋯, holding Export, at
- * every width. Anonymous visitors, who cannot export, see none.
+ * The Issues page's actions (issues-list 2.3): Export as its own button,
+ * since it would be ⋯'s only entry (list-views §3.7). Anonymous visitors,
+ * who cannot export, see none.
  */
 function IssuesPageActions(): React.JSX.Element {
   const exportEntry = usePageExportEntry();

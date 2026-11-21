@@ -2,6 +2,7 @@ export { ListTitleRow, ListView } from "./ListView";
 export {
   PAGE_ACTIONS_MENU_LABEL,
   PageActions,
+  pageActionClassName,
   type PageAction,
   type PageActionSelect,
   type PageMenuEntry,

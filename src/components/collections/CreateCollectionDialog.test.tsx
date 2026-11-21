@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { CreateCollectionDialog } from "./CreateCollectionDialog";
+import { CollectionsPageActions } from "./CollectionsPageActions";
 
 const createAction = vi.fn();
 vi.mock("~/app/(app)/c/collections/actions", () => ({
@@ -59,7 +59,8 @@ const allMachines = [
   { id: "m2", initials: "BB", name: "Beta" },
 ];
 
-describe("CreateCollectionDialog", () => {
+/** New collection, My Collections' create action (design-bible §26). */
+describe("CreateCollectionDialog from CollectionsPageActions", () => {
   beforeEach(() => {
     createAction.mockReset();
     push.mockReset();
@@ -67,7 +68,7 @@ describe("CreateCollectionDialog", () => {
 
   it("creates with the typed name and description and navigates to the new collection", async () => {
     createAction.mockResolvedValue({ success: true, data: { id: "new-id" } });
-    render(<CreateCollectionDialog allMachines={allMachines} />);
+    render(<CollectionsPageActions allMachines={allMachines} />);
 
     await userEvent.click(screen.getByTestId("create-collection-trigger"));
     await userEvent.type(screen.getByLabelText(/name/i), "Tournament Bank");
@@ -88,7 +89,7 @@ describe("CreateCollectionDialog", () => {
   });
 
   it("keeps submit disabled until a name is entered", async () => {
-    render(<CreateCollectionDialog allMachines={allMachines} />);
+    render(<CollectionsPageActions allMachines={allMachines} />);
 
     await userEvent.click(screen.getByTestId("create-collection-trigger"));
     expect(screen.getByTestId("create-collection-submit")).toBeDisabled();
@@ -99,7 +100,7 @@ describe("CreateCollectionDialog", () => {
 
   it("shows the error message when create fails and does not navigate", async () => {
     createAction.mockResolvedValue({ success: false, error: "Forbidden" });
-    render(<CreateCollectionDialog allMachines={allMachines} />);
+    render(<CollectionsPageActions allMachines={allMachines} />);
 
     await userEvent.click(screen.getByTestId("create-collection-trigger"));
     await userEvent.type(screen.getByLabelText(/name/i), "Nope");
@@ -107,5 +108,19 @@ describe("CreateCollectionDialog", () => {
 
     expect(await screen.findByText("Forbidden")).toBeInTheDocument();
     expect(push).not.toHaveBeenCalled();
+  });
+
+  it("is the page's filled create action and returns focus to it on Cancel", async () => {
+    render(<CollectionsPageActions allMachines={allMachines} />);
+    const trigger = screen.getByRole("button", { name: "New collection" });
+    expect(trigger).toHaveAttribute("data-testid", "create-collection-trigger");
+    expect(trigger).toHaveClass("bg-primary");
+
+    await userEvent.click(trigger);
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+    );
+    expect(trigger).toHaveFocus();
   });
 });

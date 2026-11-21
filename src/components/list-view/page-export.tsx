@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Download } from "lucide-react";
 import { toast } from "sonner";
 import { downloadCsv } from "~/lib/export/download-csv";
 import type { Result } from "~/lib/result";
@@ -92,6 +93,9 @@ export function usePageExportEntry(): PageMenuEntry | null {
   return {
     key: "export",
     label: "Export to CSV",
+    // As ⋯'s only entry it shows as an Export button (issues-list 2.3).
+    icon: Download,
+    buttonLabel: "Export",
     busy,
     testId: "export-csv-button",
     onSelect: () => {

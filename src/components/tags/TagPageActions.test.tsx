@@ -71,7 +71,7 @@ describe("TagPageActions", () => {
     expect(toast.success).toHaveBeenCalledWith("Link copied");
   });
 
-  it("shows only Share and Print to a viewer with nothing for ⋯ to hold", async () => {
+  it("shows a viewer Share and Print settings sheets as buttons, with no ⋯ (list-views §3.7)", () => {
     render(
       <TagPageActions
         tagHref="/c/tags/location/storage"
@@ -79,16 +79,19 @@ describe("TagPageActions", () => {
         editing={null}
       />
     );
+    expect(screen.getByRole("button", { name: "Share" })).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Actions" })
-    ).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Print" }));
-    expect(
-      await screen.findByRole("menuitem", { name: "Settings sheets" })
+      screen.getByRole("link", { name: "Print settings sheets" })
     ).toHaveAttribute("href", "/m/settings-sheets?m=AFM");
+    expect(
+      screen.queryByRole("button", { name: "More" })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Print" })
+    ).not.toBeInTheDocument();
   });
 
-  it("holds a hand-applied tag's editing in ⋯, Delete last", async () => {
+  it("holds a hand-applied tag's editing, Print settings sheets, and Delete last in ⋯", async () => {
     render(
       <TagPageActions
         tagHref="/c/tags/location/storage"
@@ -96,19 +99,24 @@ describe("TagPageActions", () => {
         editing={editing}
       />
     );
-    await userEvent.click(screen.getByRole("button", { name: "Actions" }));
+    await userEvent.click(screen.getByRole("button", { name: "More" }));
     const menu = await screen.findByRole("menu");
     expect(
       within(menu)
         .getAllByRole("menuitem")
         .map((item) => item.textContent)
     ).toEqual([
-      "Edit machines",
+      "Edit machines…",
       "Rename…",
       "Move to another tag type…",
       "Merge into another tag…",
-      "Delete tag…",
+      "Print settings sheets",
+      "Delete tag",
     ]);
+    expect(within(menu).getAllByRole("separator")).toHaveLength(2);
+    expect(
+      within(menu).getByRole("menuitem", { name: "Delete tag" })
+    ).toHaveAttribute("data-variant", "destructive");
   });
 
   it("returns focus to ⋯ when a dialog opened from ⋯ closes", async () => {
@@ -120,7 +128,7 @@ describe("TagPageActions", () => {
         editing={editing}
       />
     );
-    const more = screen.getByRole("button", { name: "Actions" });
+    const more = screen.getByRole("button", { name: "More" });
     more.focus();
     await user.keyboard("{Enter}");
     await screen.findByRole("menu");

@@ -4,7 +4,7 @@ import type React from "react";
 import { useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, MoreVertical } from "lucide-react";
+import { GripVertical } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,25 +15,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "~/components/ui/alert-dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "~/components/ui/dropdown-menu";
-import { Button } from "~/components/ui/button";
+import { ItemActionsMenu } from "~/components/list-view/ItemActionsMenu";
 import { usePrefersReducedMotion } from "~/hooks/use-prefers-reduced-motion";
 import { cn } from "~/lib/utils";
 
 interface SortableSectionProps {
   id: string;
   /** Permission to edit at all. Governs whether the whole control cluster
-   *  (grip, kebab) renders; read-only viewers see none of it. */
+   *  (grip, ⋯ menu) renders; read-only viewers see none of it. */
   canEdit: boolean;
   /** Disable "Move up" on the first section / "Move down" on the last. */
   isFirst: boolean;
   isLast: boolean;
-  /** Human label for the section, used to disambiguate the several kebab
+  /** Human label for the section, used to disambiguate the several ⋯
    *  controls for AT (e.g. "Software settings section"). */
   describe: string;
   onDelete: () => void;
@@ -46,7 +40,7 @@ interface SortableSectionProps {
  * One reorderable section inside a settings set. Owns the section-header
  * control cluster so the kind-specific section components (software / DIP /
  * note / table) don't repeat it:
- *  - a kebab (⋮): Delete section (confirmed), Move up, Move down — the non-
+ *  - a ⋯ menu: Move up, Move down, then Delete section (confirmed) — the non-
  *    drag reorder path that satisfies WCAG 2.2 SC 2.5.7 and is the only
  *    reorder path on mobile;
  *  - a persistent (no hover) drag grip (⋮⋮) for pointer reorder, hidden on
@@ -100,13 +94,13 @@ export function SortableSection({
         isDragging && "relative z-10 rounded-md bg-card shadow-lg"
       )}
     >
-      {/* The grip + kebab cluster floats over the heading row's right end,
+      {/* The grip + ⋯ cluster floats over the heading row's right end,
           so content never reflows. */}
       <div className="relative">
         {canEdit && (
           <div className="absolute right-0 top-2 z-[1] flex items-center gap-1">
             {/* Persistent drag grip — desktop only (max-md:hidden). On mobile
-                the kebab's Move up/down is the reorder path. */}
+                the ⋯ menu's Move up/down is the reorder path. */}
             <button
               type="button"
               ref={setActivatorNodeRef}
@@ -115,7 +109,7 @@ export function SortableSection({
               // Pointer-only reorder handle: keep it OUT of the keyboard tab
               // order (dnd-kit's attributes set tabIndex=0, which made tabbing
               // between sections land on the grip and arm dnd-kit's keyboard
-              // drag — confusing). Keyboard reorder is the kebab's Move up/down
+              // drag — confusing). Keyboard reorder is the ⋯ menu's Move up/down
               // (WCAG 2.2 SC 2.5.7), so the grip stays mouse-only. Override
               // AFTER the attribute spread so this wins.
               tabIndex={-1}
@@ -125,34 +119,36 @@ export function SortableSection({
               <GripVertical className="size-4" aria-hidden="true" />
             </button>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-7 shrink-0 text-muted-foreground"
-                  aria-label={`More options for ${describe}`}
-                >
-                  <MoreVertical className="size-4" aria-hidden="true" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem disabled={isFirst} onSelect={onMoveUp}>
-                  Move up
-                </DropdownMenuItem>
-                <DropdownMenuItem disabled={isLast} onSelect={onMoveDown}>
-                  Move down
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="text-destructive-text focus:text-destructive-text"
-                  onSelect={() => {
-                    setDeleteDialogOpen(true);
-                  }}
-                >
-                  Delete section
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <ItemActionsMenu
+              label="Section actions"
+              // Which section, among the set's several (e.g. "the Software
+              // settings section").
+              description={describe}
+              sections={[
+                [
+                  {
+                    key: "move-up",
+                    label: "Move up",
+                    disabled: isFirst,
+                    onSelect: onMoveUp,
+                  },
+                  {
+                    key: "move-down",
+                    label: "Move down",
+                    disabled: isLast,
+                    onSelect: onMoveDown,
+                  },
+                ],
+                [
+                  {
+                    key: "delete",
+                    label: "Delete section",
+                    destructive: true,
+                    onSelect: () => setDeleteDialogOpen(true),
+                  },
+                ],
+              ]}
+            />
           </div>
         )}
 

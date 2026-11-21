@@ -2,7 +2,6 @@
 
 import type React from "react";
 import { useState, useTransition } from "react";
-import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 
 import {
   deleteMachineCommentAction,
@@ -31,12 +30,7 @@ import {
 } from "~/components/machines/timeline/TagSelect";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Button } from "~/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "~/components/ui/dropdown-menu";
+import { ItemActionsMenu } from "~/components/list-view/ItemActionsMenu";
 import { TimelineRowTime } from "./TimelineRowTime";
 import { formatRelative } from "~/lib/dates";
 import { type TimelineTag } from "~/lib/timeline/machine-tags";
@@ -159,41 +153,31 @@ export function MachineTimelineCommentRow({
               </span>
             ) : null}
             {canShowActions && !isEditing ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="-my-1 -mr-1"
-                    aria-label="Comment actions"
-                  >
-                    <MoreHorizontal className="size-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {canEdit ? (
-                    <DropdownMenuItem
-                      onSelect={() => {
-                        setIsEditing(true);
-                      }}
-                    >
-                      <Pencil className="mr-2 size-4" />
-                      <span>Edit</span>
-                    </DropdownMenuItem>
-                  ) : null}
-                  {canDelete ? (
-                    <DropdownMenuItem
-                      className="text-destructive-text focus:bg-destructive/10 focus:text-destructive-text"
-                      onSelect={() => {
-                        setIsDeleteOpen(true);
-                      }}
-                    >
-                      <Trash2 className="mr-2 size-4" />
-                      <span>Delete</span>
-                    </DropdownMenuItem>
-                  ) : null}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <ItemActionsMenu
+                label="Comment actions"
+                triggerClassName="-my-2.5 -mr-2.5 md:-my-1.5 md:-mr-1.5"
+                sections={[
+                  canEdit
+                    ? [
+                        {
+                          key: "edit",
+                          label: "Edit",
+                          onSelect: () => setIsEditing(true),
+                        },
+                      ]
+                    : [],
+                  canDelete
+                    ? [
+                        {
+                          key: "delete",
+                          label: "Delete",
+                          destructive: true,
+                          onSelect: () => setIsDeleteOpen(true),
+                        },
+                      ]
+                    : [],
+                ]}
+              />
             ) : null}
           </div>
         </div>

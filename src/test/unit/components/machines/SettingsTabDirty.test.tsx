@@ -19,6 +19,7 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { type ReactNode } from "react";
+import type * as TooltipModule from "~/components/ui/tooltip";
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 
 import { SettingsTab } from "~/components/machines/settings/SettingsTab";
@@ -100,14 +101,19 @@ vi.mock("~/app/(app)/m/[initials]/(tabs)/settings/actions", () => ({
 }));
 
 // The badges use shadcn Tooltip, which needs a TooltipProvider ancestor the
-// bare render() lacks. Render tooltip parts as pass-throughs (their text isn't
-// asserted here).
-vi.mock("~/components/ui/tooltip", () => ({
-  TooltipProvider: ({ children }: { children: ReactNode }) => children,
-  Tooltip: ({ children }: { children: ReactNode }) => children,
-  TooltipTrigger: ({ children }: { children: ReactNode }) => children,
-  TooltipContent: () => null,
-}));
+// bare render() lacks. Give each tooltip its own provider, keeping the real
+// triggers: a ⋯ menu's trigger composes with them (ItemActionsMenu).
+vi.mock("~/components/ui/tooltip", async (importOriginal) => {
+  const actual = await importOriginal<typeof TooltipModule>();
+  return {
+    ...actual,
+    Tooltip: ({ children }: { children: ReactNode }) => (
+      <actual.TooltipProvider>
+        <actual.Tooltip>{children}</actual.Tooltip>
+      </actual.TooltipProvider>
+    ),
+  };
+});
 
 const saveMock = vi.mocked(saveSettingsSetAction);
 
@@ -628,9 +634,19 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
 
     await user.click(
       screen.getByRole("button", {
-        name: "More options for the Post positions section",
+        name: "Section actions",
+        description: "the Post positions section",
       })
     );
+    // design-bible §26.3: Move up and Move down, then Delete section after a
+    // divider.
+    const sectionMenu = await screen.findByRole("menu");
+    expect(
+      within(sectionMenu)
+        .getAllByRole("menuitem")
+        .map((item) => item.textContent)
+    ).toEqual(["Move up", "Move down", "Delete section"]);
+    expect(within(sectionMenu).getAllByRole("separator")).toHaveLength(1);
     await user.click(
       await screen.findByRole("menuitem", { name: "Move down" })
     );
@@ -670,7 +686,8 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
 
     await user.click(
       screen.getByRole("button", {
-        name: "More options for the Post positions section",
+        name: "Section actions",
+        description: "the Post positions section",
       })
     );
     await user.click(
@@ -953,9 +970,7 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
       fireEvent.blur(screen.getByRole("textbox", { name: "Edit text" }));
       await screen.findByRole("alert");
 
-      await user.click(
-        screen.getByRole("button", { name: "More options for this set" })
-      );
+      await user.click(screen.getByRole("button", { name: "Set actions" }));
       await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
       await user.click(await screen.findByRole("button", { name: "Delete" }));
 
@@ -991,9 +1006,7 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "New set" }));
-    await user.click(
-      screen.getByRole("button", { name: "More options for this set" })
-    );
+    await user.click(screen.getByRole("button", { name: "Set actions" }));
 
     // Tagging, choosing a default, and duplicating act on a persisted row, so
     // they're disabled until first save.
@@ -1003,6 +1016,12 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
     const duplicate = screen.getByRole("menuitem", { name: "Duplicate" });
     expect(editTags).toHaveAttribute("aria-disabled", "true");
     expect(duplicate).toHaveAttribute("aria-disabled", "true");
+    // design-bible §26.3: Delete comes last, after a divider, and enabled.
+    const setMenu = screen.getByRole("menu");
+    const items = within(setMenu).getAllByRole("menuitem");
+    expect(items.at(-1)).toHaveTextContent("Delete");
+    expect(items.at(-1)).not.toHaveAttribute("aria-disabled");
+    expect(within(setMenu).getAllByRole("separator")).toHaveLength(1);
 
     await user.click(editTags);
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -1814,7 +1833,7 @@ describe("SettingsTab — the tag picker", () => {
     index: number
   ): Promise<HTMLElement> {
     const button = screen.getAllByRole("button", {
-      name: "More options for this set",
+      name: "Set actions",
     })[index];
     if (!button) throw new Error(`no menu button ${String(index)}`);
     await user.click(button);
@@ -1828,7 +1847,7 @@ describe("SettingsTab — the tag picker", () => {
     const user = userEvent.setup();
     renderTab(false);
     const noCurate = screen.getAllByRole("button", {
-      name: "More options for this set",
+      name: "Set actions",
     })[2];
     if (!noCurate) throw new Error("no menu button");
     await user.click(noCurate);
@@ -1979,9 +1998,7 @@ describe("SettingsTab — making a set community (spec §2.3)", () => {
       />
     );
 
-    await user.click(
-      screen.getByRole("button", { name: "More options for this set" })
-    );
+    await user.click(screen.getByRole("button", { name: "Set actions" }));
     await user.click(
       await screen.findByRole("menuitem", { name: "Make community set" })
     );
@@ -1990,9 +2007,7 @@ describe("SettingsTab — making a set community (spec §2.3)", () => {
     // A community set is edited and deleted by curators only, so the menu,
     // which held only author actions, goes away.
     await waitFor(() => {
-      expect(
-        screen.queryByRole("button", { name: "More options for this set" })
-      ).toBeNull();
+      expect(screen.queryByRole("button", { name: "Set actions" })).toBeNull();
     });
   });
 });

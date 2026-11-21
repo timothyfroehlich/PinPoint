@@ -6,11 +6,10 @@ import {
   tagCrumbs,
 } from "~/components/collections/GroupBreadcrumb";
 import { PageContainer } from "~/components/layout/PageContainer";
-import { AddTagDialog } from "~/components/tags/AddTagDialog";
 import { AutomaticBadge } from "~/components/tags/AutomaticBadge";
 import { ExclusiveBadge } from "~/components/tags/ExclusiveBadge";
 import { TagList } from "~/components/tags/TagList";
-import { TagTypeActionsMenu } from "~/components/tags/TagTypeActionsMenu";
+import { TagTypePageActions } from "~/components/tags/TagTypePageActions";
 import { getViewer } from "~/lib/auth/viewer";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { listTags } from "~/lib/tags/tags";
@@ -78,9 +77,10 @@ export default async function TagTypePage({
       <div className="space-y-6">
         <div className="space-y-1">
           <GroupBreadcrumb crumbs={tagCrumbs()} />
-          {/* Wraps rather than squeezing at 320px: title, badge, actions. */}
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-outline-variant pb-2">
-            <h1 className="text-balance text-3xl font-bold tracking-tight">
+          {/* Title, badge, then the page actions in the room left, where
+              they lose labels and fold rather than wrap (design-bible §26). */}
+          <div className="flex min-h-11 items-center gap-x-3 border-b border-outline-variant pb-2">
+            <h1 className="min-w-0 text-balance text-3xl font-bold tracking-tight [overflow-wrap:anywhere]">
               {typeLabel(group)}
             </h1>
             {group.kind === "automatic" ? (
@@ -89,18 +89,13 @@ export default async function TagTypePage({
               <ExclusiveBadge />
             ) : null}
             {managed ? (
-              <div className="ml-auto flex items-center gap-2">
-                <AddTagDialog
-                  type={{ id: managed.type.id, name: managed.type.name }}
-                />
-                <TagTypeActionsMenu
-                  tagTypeId={managed.type.id}
-                  name={managed.type.name}
-                  tagCount={managed.tags.length}
-                  exclusive={managed.type.exclusive}
-                  exclusiveConflicts={conflicts}
-                />
-              </div>
+              <TagTypePageActions
+                tagTypeId={managed.type.id}
+                name={managed.type.name}
+                tagCount={managed.tags.length}
+                exclusive={managed.type.exclusive}
+                exclusiveConflicts={conflicts}
+              />
             ) : null}
           </div>
           {group.kind === "automatic" ? (

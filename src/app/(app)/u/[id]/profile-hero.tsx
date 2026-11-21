@@ -1,8 +1,7 @@
 import type React from "react";
-import Link from "next/link";
-import { Pencil } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "~/components/ui/avatar";
 import type { UserRole } from "~/lib/types";
+import { ProfileActions } from "./profile-actions";
 
 interface ProfileHeroProps {
   name: string;
@@ -58,13 +57,12 @@ export function ProfileHero({
           </div>
         </div>
         {isOwn ? (
-          <Link
-            href={editHref}
-            className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-md border border-primary/45 px-3 py-1.5 text-sm font-semibold text-primary transition-colors duration-150 hover:bg-primary/10 @lg:self-auto"
-          >
-            <Pencil className="size-4" aria-hidden="true" />
-            Edit profile
-          </Link>
+          // Its own row below the name on narrow cards, the end of the row
+          // on wide ones; either way it has room to measure (design-bible §26).
+          <ProfileActions
+            editHref={editHref}
+            className="w-full justify-start @lg:w-auto @lg:max-w-48 @lg:justify-end"
+          />
         ) : null}
       </div>
     </header>

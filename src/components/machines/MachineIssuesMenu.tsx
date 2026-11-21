@@ -1,42 +1,33 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
-import { Check, Download, ListFilter, MoreHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { downloadCsv } from "~/lib/export/download-csv";
 
-import { Button } from "~/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "~/components/ui/dropdown-menu";
+import { ItemActionsMenu } from "~/components/list-view/ItemActionsMenu";
 import { machineIssuesHref } from "~/lib/issues/links";
-import { cn } from "~/lib/utils";
 import { exportIssuesAction } from "~/app/(app)/issues/export-action";
 
 type IssuesView = "open" | "all";
 
 interface MachineIssuesMenuProps {
   machineInitials: string;
-  /** Which in-card list is currently shown (drives the active toggle mark). */
+  /** Which in-card list is currently shown (marked current in the menu). */
   view: IssuesView;
 }
 
 /**
  * The Service tab's Open Issues card control — a single ⋯ menu (no inline
- * filter bar / search / sort, per design §4). Holds:
+ * filter bar / search / sort, per design §4), "Issue list actions"
+ * (design-bible §26.3). Holds:
  *
- * - an **Open / All** in-place view toggle (links that set `?view=` on the
- *   maintenance route, so the choice is shareable and survives a reload);
+ * - a **Show** section with the Open / All in-place views (links that set
+ *   `?view=` on the maintenance route, so the choice is shareable and
+ *   survives a reload), the shown one marked current;
  * - a **View all in Issues list** link to the global list, machine-scoped and
  *   all-statuses;
- * - **Export all issues (CSV)** — fired via `onSelect` (a nested form would
- *   unmount before submit — pinpoint-ui dropdown rule), reusing
+ * - **Export all issues (CSV)**, last — fired via `onSelect` (a nested form
+ *   would unmount before submit — pinpoint-ui dropdown rule), reusing
  *   `exportIssuesAction`.
  */
 export function MachineIssuesMenu({
@@ -71,72 +62,44 @@ export function MachineIssuesMenu({
   }
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-8 shrink-0"
-          aria-label="Issue options"
-        >
-          <MoreHorizontal className="size-4" aria-hidden="true" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel>Show</DropdownMenuLabel>
-        <ViewToggleItem
-          href={`/m/${machineInitials}/maintenance?view=open`}
-          label="Open issues"
-          active={view === "open"}
-        />
-        <ViewToggleItem
-          href={`/m/${machineInitials}/maintenance?view=all`}
-          label="All issues"
-          active={view === "all"}
-        />
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link href={machineIssuesHref(machineInitials)}>
-            <ListFilter className="size-4" aria-hidden="true" />
-            View all in Issues list
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onSelect={(e) => {
-            if (isExporting) {
-              e.preventDefault();
-              return;
-            }
-            void handleExport();
-          }}
-          disabled={isExporting}
-        >
-          <Download className="size-4" aria-hidden="true" />
-          {isExporting ? "Exporting issues…" : "Export all issues (CSV)"}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
-function ViewToggleItem({
-  href,
-  label,
-  active,
-}: {
-  href: string;
-  label: string;
-  active: boolean;
-}): React.JSX.Element {
-  return (
-    <DropdownMenuItem asChild>
-      <Link href={href} {...(active ? { "aria-current": "true" } : {})}>
-        <Check
-          className={cn("size-4", active ? "opacity-100" : "opacity-0")}
-          aria-hidden="true"
-        />
-        {label}
-      </Link>
-    </DropdownMenuItem>
+    <ItemActionsMenu
+      label="Issue list actions"
+      sections={[
+        {
+          label: "Show",
+          entries: [
+            {
+              key: "open",
+              label: "Open issues",
+              href: `/m/${machineInitials}/maintenance?view=open`,
+              current: view === "open",
+            },
+            {
+              key: "all",
+              label: "All issues",
+              href: `/m/${machineInitials}/maintenance?view=all`,
+              current: view === "all",
+            },
+          ],
+        },
+        [
+          {
+            key: "issues-list",
+            label: "View all in Issues list",
+            href: machineIssuesHref(machineInitials),
+          },
+          {
+            key: "export",
+            label: isExporting
+              ? "Exporting issues…"
+              : "Export all issues (CSV)",
+            busy: isExporting,
+            onSelect: () => {
+              void handleExport();
+            },
+          },
+        ],
+      ]}
+    />
   );
 }
