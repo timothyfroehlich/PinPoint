@@ -1,5 +1,24 @@
 {/* This file is auto-updated by the weekly changelog workflow. Newest entries at top. */}
 
+## November 16, 2026
+
+### New Features
+
+- **One Row Layout at Every Width** — Machine and issue lists now use the same two-line row on a phone as on a desktop: the name and its pills on the first line, the details on a second line that never wraps. When the second line runs out of room it gives things up in order — the age first, then the machine name shortens, and the priority and assignee go last. Issue rows are now read-only; change a status or priority on the issue's own page
+- **Export Your Machine List** — Export on the machine list downloads every machine the list matches, across all pages and in the order you're sorting them, as a spreadsheet with each machine's ID, name, model, manufacturer, year, owner, date added, presence, playability, open issues, last serviced, and last activity. Signed-in members only
+- **Summary Widgets Side by Side** — The summary widgets above a list now sit in one row at every width and drop off the right when they don't fit, instead of collapsing into a stack you had to expand
+- **Search in the Phone Header** — On a phone, search now lives in the list's sticky header between the views button and Filters, and the pager sits directly below the list instead of floating above the tab bar. On a very narrow screen the search field becomes a magnifier button
+- **Pill View Tabs and More Filters** — A list's view tabs are now pills with the one you're on filled in, the filter overflow is named More filters, and its badge counts only the filters you've changed from the page's defaults. A filter that's set now reads "Status: Open"
+
+### Bug Fixes
+
+- PinPoint now stops its animations and transitions when your device asks for reduced motion; loading spinners and placeholders dim instead of freezing in place
+- Saving a brand-new settings set without naming it said it worked and then threw the set away. It now tells you a set name is required, marks the name field, and saves as soon as you give it one — and leaving the page warns you first
+- The "(edited)" marker on a machine timeline comment was too faint to read against the card behind it; it now matches the rest of the line
+- Controls whose spoken label didn't start with the words printed on them — the user menu among them — now read their visible text first, so voice control and screen readers match what you see
+
+---
+
 ## October 26, 2026
 
 ### Bug Fixes
