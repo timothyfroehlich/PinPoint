@@ -191,10 +191,6 @@
 
 | Requirement | Divergence | Resolution |
 | :-- | :-- | :-- |
-| §4.5, §12.1 | The filter overflow button is labeled "More". | PP-jb9v.16 |
-| §4.10 | The filter overflow badge counts every filter the button holds, changed or not. | PP-jb9v.16 |
-| §5.8 | View tabs are underlined like page tabs, the current one marked by its underline. | PP-jb9v.16 |
-| §8.7 | Fit checks compare bare measured widths with no tolerance. | PP-jb9v.16 |
 | §8.9, §8.10 | A Tag page's breadcrumb always sits above the title, a Collection page has no breadcrumb, and a Collection's description always sits under the header. | PP-jb9v.18 |
 | §8.11, §8.12 | Page actions that do not fit wrap below the title or onto their own row; there is no Actions menu to fold into. | PP-jb9v.17 |
 | §8.13, §8.23 | A Collection or Tag page's tabs never move into a menu, and its header spacing does not tighten below 390px. | PP-jb9v.18 |

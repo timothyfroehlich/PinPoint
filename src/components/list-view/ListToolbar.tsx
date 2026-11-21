@@ -18,11 +18,11 @@ import {
 } from "./types";
 import { useMeasuredWidths } from "./use-measured-widths";
 
-/** Search keeps at least this much of the row before filters move to More. */
+/** Search keeps at least this much of the row before filters move to More filters. */
 const SEARCH_MIN_WIDTH = 240;
 const GAP = 2;
 const GROUP_MARGIN = 8;
-/** The open-control id of More, which no filter id can take. */
+/** The open-control id of More filters, which no filter id can take. */
 const MORE_ID = " more";
 
 const filterButtonClass =
@@ -64,9 +64,16 @@ function FilterButtonFace({
   filter: ListFilterModel;
 }): React.JSX.Element {
   const count = selectionCount(filter);
+  // A set filter reads "Status: Open", so the name and value don't run
+  // together; an unset one shows its name alone.
+  const isSet =
+    (filter.valueLabel !== null && filter.valueLabel !== "") || count > 1;
   return (
     <>
-      <span>{filter.label}</span>{" "}
+      <span>
+        {filter.label}
+        {isSet ? ":" : null}
+      </span>{" "}
       {filter.valueLabel ? (
         <span className="max-w-40 truncate text-foreground">
           {filter.valueLabel}
@@ -143,8 +150,34 @@ function FilterDropdown({
 }
 
 /**
- * More (list-views §4.5): every Secondary Filter and any Primary Filter that
- * does not fit. Selecting one opens its options in place.
+ * The face of More filters: "More", then a badge counting the filters it
+ * holds that differ from the Page Preset, or no badge when none do (§4.10).
+ * It reads "More filters", then "2 changed": the name comes from the face,
+ * so the visible "More" starts it (WCAG Label in Name) and the badge's
+ * digit is spoken in words rather than run onto the label.
+ */
+function MoreFiltersFace({ changed }: { changed: number }): React.JSX.Element {
+  return (
+    <>
+      <span>
+        More <span className="sr-only">filters</span>
+      </span>
+      {changed > 0 ? (
+        <>
+          <span className="sr-only">{`, ${changed} changed`}</span>
+          <span aria-hidden="true">
+            <CountPill count={changed} active={false} />
+          </span>
+        </>
+      ) : null}
+      <ChevronDown aria-hidden="true" className="size-3.5 shrink-0" />
+    </>
+  );
+}
+
+/**
+ * More filters (list-views §4.5): every Secondary Filter and any Primary
+ * Filter that does not fit. Selecting one opens its options in place.
  */
 function MoreFilters({
   filters,
@@ -153,11 +186,13 @@ function MoreFilters({
 }: {
   filters: readonly ListFilterModel[];
   wiring: PopoverWiring;
-  /** `activeId` is the filter whose options were open in More, if any. */
+  /** `activeId` is the filter whose options were open in More filters, if any. */
   onCloseAutoFocus: (event: Event, activeId: string | null) => void;
 }): React.JSX.Element {
   const [openId, setOpenId] = React.useState<string | null>(null);
-  // The filter open when More closed, which focus can return to.
+  // The badge counts only filters changed from the Page Preset (§4.10).
+  const changed = filters.filter((filter) => !filter.atPreset).length;
+  // The filter open when More filters closed, which focus can return to.
   const closedFrom = React.useRef<string | null>(null);
   const active = filters.find((filter) => filter.id === openId) ?? null;
   return (
@@ -177,14 +212,7 @@ function MoreFilters({
         data-testid="list-filter-more"
         data-filter-trigger={MORE_ID}
       >
-        <span>More</span>{" "}
-        <span className="sr-only">
-          {`, ${filters.length} ${filters.length === 1 ? "filter" : "filters"}`}
-        </span>
-        <span aria-hidden="true">
-          <CountPill count={filters.length} active={false} />
-        </span>
-        <ChevronDown aria-hidden="true" className="size-3.5 shrink-0" />
+        <MoreFiltersFace changed={changed} />
       </PopoverTrigger>
       <PopoverContent
         align="end"
@@ -257,7 +285,7 @@ interface ListToolbarProps {
   search: React.ReactNode;
   /** Primary Filters in the host's order (§4.3). */
   primaryFilters: readonly ListFilterModel[];
-  /** Secondary Filters, shown only under More (§4.5). */
+  /** Secondary Filters, shown only under More filters (§4.5). */
   secondaryFilters?: readonly ListFilterModel[] | undefined;
 }
 
@@ -266,13 +294,13 @@ interface ListToolbarProps {
  * the row is hidden: search moves into the phone List Header and the filters
  * into its Filters sheet (§7.1, §7.3, §7.5).
  * Between phone and desktop, Primary Filters that do not fit move into More
- * from the right, one at a time (§8.1). While a filter's options are open the
- * row keeps its arrangement, so a choice that widens the filter never moves
- * the open filter into More and closes it mid-selection. A press outside
- * closes the options only once its click has landed (Radix defers that
- * dismissal), so the row never moves under a click. When closing from the
- * keyboard rearranges the row, focus moves to where the closed control
- * went: More, or the filter that was open in More.
+ * filters from the right, one at a time (§8.15). While a filter's options
+ * are open the row keeps its arrangement, so a choice that widens the filter
+ * never moves the open filter into More filters and closes it mid-selection.
+ * A press outside closes the options only once its click has landed (Radix
+ * defers that dismissal), so the row never moves under a click. When closing
+ * from the keyboard rearranges the row, focus moves to where the closed
+ * control went: More filters, or the filter that was open in it.
  */
 export function ListToolbar({
   search,
@@ -288,7 +316,7 @@ export function ListToolbar({
     .join("|");
   const measured = useMeasuredWidths(rowRef, laneRef, contentKey);
   const hasSecondary = secondaryFilters.length > 0;
-  // The open control (More or a filter id) and the inline count it opened
+  // The open control (More filters or a filter id) and the inline count it opened
   // with, held until it closes.
   const [open, setOpen] = React.useState<{
     id: string;
@@ -408,13 +436,13 @@ export function ListToolbar({
             <FilterButtonFace filter={filter} />
           </span>
         ))}
+        {/* Measured with a badge, so a filter change that adds one never
+            pushes the row past its fit. */}
         <span
           data-measure="more"
           className={cn("absolute w-max", filterButtonClass)}
         >
-          <span>More</span>
-          <CountPill count={9} active={false} />
-          <ChevronDown className="size-3.5" />
+          <MoreFiltersFace changed={9} />
         </span>
       </div>
     </div>
