@@ -57,7 +57,7 @@ function renderRows(issues: IssueListRow[]): ReturnType<typeof render> {
 
 /** Line 2's two groups: the left (ID · machine, priority) and the right. */
 function line2Groups(row: HTMLElement): Element[] {
-  const line = within(row).getByTestId("issue-machine").closest("div");
+  const line = row.querySelector("[data-row-line]");
   if (!line) throw new Error("expected line 2");
   return Array.from(line.children);
 }
@@ -278,9 +278,19 @@ describe("Issue row line 2 fit (issues-list §3.9)", () => {
     vi.restoreAllMocks();
   });
 
+  /** How the plan shows the machine name: full, truncated, or hidden. */
+  function machineFit(row: HTMLElement): string | null {
+    return (
+      row.querySelector('[data-part="machine"]')?.getAttribute("data-fit") ??
+      null
+    );
+  }
+
   // Each width is the parts' total plus the 16px fit tolerance. The left
-  // group is 60+6+4+6+110+6+50 = 242 with the priority, 186 without.
-  it.each<[number, string[]]>([
+  // group is 60+6+4+6+110+6+50 = 242 with the name at full width; the name
+  // truncates down to 44px, 66px narrower; without the name and its "·" the
+  // left group is 60+6+50 = 116, and 60 without the priority.
+  it.each<[number, string[], string | null]>([
     // 242 + 12 + (30+8+40+8+90) = 430.
     [
       446,
@@ -292,6 +302,7 @@ describe("Issue row line 2 fit (issues-list §3.9)", () => {
         "issue-comment-count",
         "issue-age",
       ],
+      "full",
     ],
     // The age drops first.
     [
@@ -303,21 +314,53 @@ describe("Issue row line 2 fit (issues-list §3.9)", () => {
         "issue-assignee",
         "issue-comment-count",
       ],
+      "full",
     ],
     // 242 + 12 + (30+8+40) = 332; then the comment count.
-    [347, ["issue-id", "issue-machine", "issue-priority", "issue-assignee"]],
-    // 242 + 12 + 30 = 284; then the priority.
-    [299, ["issue-id", "issue-machine", "issue-assignee"]],
-    // 186 + 12 + 30 = 228; the assignee goes last. The ID never drops.
-    [243, ["issue-id", "issue-machine"]],
-    [120, ["issue-id", "issue-machine"]],
-  ])("with comments, at %ipx shows %j", (lineWidth, expected) => {
-    stubLayout(lineWidth);
-    renderRows([makeIssue({ commentCount: 3 })]);
-    expect(line2Parts(screen.getByRole("listitem"))).toEqual(expected);
-  });
+    [
+      347,
+      ["issue-id", "issue-machine", "issue-priority", "issue-assignee"],
+      "full",
+    ],
+    // 242 + 12 + 30 = 284; then the machine name truncates, keeping the
+    // priority and the assignee.
+    [
+      300,
+      ["issue-id", "issue-machine", "issue-priority", "issue-assignee"],
+      "full",
+    ],
+    [
+      299,
+      ["issue-id", "issue-machine", "issue-priority", "issue-assignee"],
+      "truncated",
+    ],
+    // 284 - 66 = 218: the name at its 44px minimum.
+    [
+      234,
+      ["issue-id", "issue-machine", "issue-priority", "issue-assignee"],
+      "truncated",
+    ],
+    // Any narrower and it hides: 116 + 12 + 30 = 158.
+    [233, ["issue-id", "issue-priority", "issue-assignee"], "hidden"],
+    [174, ["issue-id", "issue-priority", "issue-assignee"], "hidden"],
+    // 60 + 12 + 30 = 102; then the priority, then the assignee. The ID
+    // never drops.
+    [173, ["issue-id", "issue-assignee"], "hidden"],
+    [118, ["issue-id", "issue-assignee"], "hidden"],
+    [117, ["issue-id"], "hidden"],
+    [40, ["issue-id"], "hidden"],
+  ])(
+    "with comments, at %ipx shows %j (machine %s)",
+    (lineWidth, parts, fit) => {
+      stubLayout(lineWidth);
+      renderRows([makeIssue({ commentCount: 3 })]);
+      const row = screen.getByRole("listitem");
+      expect(line2Parts(row)).toEqual(parts);
+      expect(machineFit(row)).toBe(fit);
+    }
+  );
 
-  it("without comments, drops the priority right after the age", () => {
+  it("without comments, truncates the machine name right after the age drops", () => {
     // 242 + 12 + (30+8+90) = 382: no comment part takes room.
     stubLayout(398);
     renderRows([makeIssue()]);
@@ -330,14 +373,53 @@ describe("Issue row line 2 fit (issues-list §3.9)", () => {
     ]);
     cleanup();
 
-    // 242 + 12 + 30 = 284.
-    stubLayout(299);
+    stubLayout(397);
     renderRows([makeIssue()]);
-    expect(line2Parts(screen.getByRole("listitem"))).toEqual([
+    const row = screen.getByRole("listitem");
+    expect(line2Parts(row)).toEqual([
       "issue-id",
       "issue-machine",
+      "issue-priority",
       "issue-assignee",
     ]);
+    expect(machineFit(row)).toBe("full");
+    cleanup();
+
+    stubLayout(299);
+    renderRows([makeIssue()]);
+    expect(machineFit(screen.getByRole("listitem"))).toBe("truncated");
+  });
+
+  it("keeps a truncated machine name a link named by its full name", () => {
+    stubLayout(260);
+    renderRows([makeIssue({ commentCount: 3 })]);
+    const listItem = screen.getByRole("listitem");
+
+    expect(machineFit(listItem)).toBe("truncated");
+    expect(
+      within(listItem).getByRole("link", { name: "Attack from Mars" })
+    ).toHaveAttribute("href", "/m/AFM");
+  });
+
+  it("takes the machine name's separator with it when the name hides", () => {
+    stubLayout(200);
+    renderRows([makeIssue({ commentCount: 3 })]);
+    const listItem = screen.getByRole("listitem");
+    const [left, right] = line2Groups(listItem);
+    if (!left || !right) throw new Error("expected 2 groups");
+
+    expect(groupParts(left)).toEqual(["issue-id", "issue-priority"]);
+    expect(left.textContent).not.toContain("·");
+    expect(groupParts(right)).toEqual(["issue-assignee"]);
+    // A hidden name is still read by screen readers, as plain text with no
+    // link, so it leaves no invisible tab stop.
+    const row = within(listItem);
+    expect(row.queryByTestId("issue-machine")).toBeNull();
+    expect(row.queryByRole("link", { name: "Attack from Mars" })).toBeNull();
+    expect(row.getAllByRole("link")).toHaveLength(1);
+    const hidden = listItem.querySelector('[data-part="machine"]');
+    expect(hidden).toHaveTextContent("Attack from Mars");
+    expect(hidden).toHaveClass("sr-only");
   });
 
   it("keeps the right group after the left as its parts drop", () => {
@@ -356,7 +438,7 @@ describe("Issue row line 2 fit (issues-list §3.9)", () => {
   });
 
   it("keeps a dropped part readable to screen readers", () => {
-    stubLayout(237);
+    stubLayout(117);
     renderRows([makeIssue({ commentCount: 3 })]);
     const row = within(screen.getByRole("listitem"));
 

@@ -1,5 +1,4 @@
 import type React from "react";
-import { cache } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -9,8 +8,6 @@ import {
   Sparkles,
 } from "lucide-react";
 import { getViewer } from "~/lib/auth/viewer";
-import { db } from "~/server/db";
-import { loadDashboardData } from "~/lib/dashboard/queries";
 import { formatDate } from "~/lib/dates";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { IssueCard } from "~/components/issues/IssueCard";
@@ -18,14 +15,7 @@ import { OrganizationBanner } from "~/components/dashboard/OrganizationBanner";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
 import { EmptyState } from "~/components/ui/empty-state";
-
-/**
- * Cached dashboard data fetcher (CORE-PERF-001)
- * Wraps all dashboard queries to prevent duplicate execution within a single request
- */
-const getDashboardData = cache(async (userId?: string) =>
-  loadDashboardData(db, userId)
-);
+import { getDashboardData } from "./_data";
 
 /**
  * Member Dashboard Page (Public Route)

@@ -11,6 +11,7 @@ import {
   resetPasswordSchema,
 } from "./schemas";
 import { log } from "~/lib/logger";
+import { rethrowIfRedirect } from "~/lib/actions/redirect";
 import { errorMessage } from "~/lib/errors";
 import { maskEmail } from "~/lib/logging/mask";
 import {
@@ -208,15 +209,7 @@ export async function loginAction(
 
     redirect(next);
   } catch (error) {
-    // Check for digest property which Next.js uses for redirects
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "digest" in error &&
-      String(error.digest).startsWith("NEXT_REDIRECT")
-    ) {
-      throw error;
-    }
+    rethrowIfRedirect(error);
 
     reportError(error, { action: "login" });
     return err("SERVER", "An unexpected error occurred", {
@@ -390,19 +383,7 @@ export async function signupAction(
     );
     redirect("/dashboard");
   } catch (error) {
-    // If redirect was thrown, re-throw it
-    if (error instanceof Error && error.message === "NEXT_REDIRECT") {
-      throw error;
-    }
-    // Also check for digest property which Next.js uses
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "digest" in error &&
-      String(error.digest).startsWith("NEXT_REDIRECT")
-    ) {
-      throw error;
-    }
+    rethrowIfRedirect(error);
 
     return serverActionError(error, "SERVER", "An unexpected error occurred", {
       action: "signup",
@@ -631,19 +612,7 @@ export async function resetPasswordAction(
     }
     redirect("/login");
   } catch (error) {
-    // If redirect was thrown, re-throw it
-    if (error instanceof Error && error.message === "NEXT_REDIRECT") {
-      throw error;
-    }
-    // Also check for digest property which Next.js uses
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "digest" in error &&
-      String(error.digest).startsWith("NEXT_REDIRECT")
-    ) {
-      throw error;
-    }
+    rethrowIfRedirect(error);
 
     return serverActionError(error, "SERVER", "An unexpected error occurred", {
       action: "reset-password",

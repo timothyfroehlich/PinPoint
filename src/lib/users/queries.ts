@@ -4,10 +4,7 @@ import { sql, eq, count, and } from "drizzle-orm";
 import { machineNotRemoved } from "~/lib/machines/queries";
 import type { UnifiedUser, UserStatus } from "~/lib/types";
 
-// Import comparator from its own module (safe for client-side imports)
 import { compareUnifiedUsers } from "./comparators";
-// Re-export for backwards compatibility with server-side consumers
-export { compareUnifiedUsers } from "./comparators";
 
 export async function getUnifiedUsers(
   options: { includeEmails?: boolean } = {}

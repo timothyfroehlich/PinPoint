@@ -35,6 +35,7 @@ import { z } from "zod";
 import { eq, and, exists } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { log } from "~/lib/logger";
+import { rethrowIfRedirect } from "~/lib/actions/redirect";
 import { dispatchNotification } from "~/lib/notifications";
 import {
   reportError,
@@ -108,19 +109,6 @@ function proseChanged(
     canonicalJson(withoutMentionLabels(submitted))
   );
 }
-
-const NEXT_REDIRECT_DIGEST_PREFIX = "NEXT_REDIRECT;";
-
-const isNextRedirectError = (error: unknown): error is { digest: string } => {
-  if (typeof error !== "object" || error === null || !("digest" in error)) {
-    return false;
-  }
-
-  const { digest } = error as { digest?: unknown };
-  return (
-    typeof digest === "string" && digest.startsWith(NEXT_REDIRECT_DIGEST_PREFIX)
-  );
-};
 
 export interface AssigneeNotMemberMeta {
   assignee: {
@@ -1051,9 +1039,7 @@ export async function updateMachineAction(
 
     return ok({ machineId: machine.id });
   } catch (error: unknown) {
-    if (isNextRedirectError(error)) {
-      throw error;
-    }
+    rethrowIfRedirect(error);
     if (error instanceof MachineNotFoundError) {
       return err("NOT_FOUND", "Machine not found.");
     }
@@ -1326,9 +1312,7 @@ async function updateMachineTextField(
 
     return ok({ machineId: machine.id });
   } catch (error: unknown) {
-    if (isNextRedirectError(error)) {
-      throw error;
-    }
+    rethrowIfRedirect(error);
     return serverActionError(
       error,
       "SERVER",
@@ -1436,9 +1420,7 @@ export async function updateMachinePresenceAction(
 
     return ok({ machineId: machine.id });
   } catch (error: unknown) {
-    if (isNextRedirectError(error)) {
-      throw error;
-    }
+    rethrowIfRedirect(error);
     return serverActionError(
       error,
       "SERVER",

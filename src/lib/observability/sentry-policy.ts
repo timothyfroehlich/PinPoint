@@ -11,19 +11,22 @@ type SentryInitOptions = Parameters<typeof Sentry.init>[0];
 type SentrySpan = Parameters<
   NonNullable<SentryInitOptions["beforeSendSpan"]>
 >[0];
-type SentryTransaction = Parameters<
-  NonNullable<SentryInitOptions["beforeSendTransaction"]>
->[0];
 type SpanCorrelation = Pick<
   SentrySpan,
-  "span_id" | "start_timestamp" | "trace_id"
->;
+  "is_segment" | "span_id" | "start_timestamp" | "status" | "trace_id"
+> &
+  Partial<Pick<SentrySpan, "end_timestamp" | "parent_span_id">>;
 
 const FALLBACK_SPAN_CORRELATION = {
+  is_segment: false,
   span_id: "0000000000000001",
   start_timestamp: 0,
+  status: "ok",
   trace_id: "00000000000000000000000000000001",
 } satisfies SpanCorrelation;
+
+/** Name carried by a span whose real name could not be sanitized in place. */
+const REDACTED_SPAN_NAME = "[redacted]";
 
 const CAPTURED_URL_DETAIL_KEYS = new Set([
   "http.fragment",
@@ -190,7 +193,7 @@ function sanitizeChannelPayload(value: object): boolean {
 }
 
 /**
- * Error/message hook. Sentry v10 emits Feedback through its separate
+ * Error/message hook. Sentry emits Feedback through its separate
  * `beforeSendFeedback` channel, so the deliberately entered contact email is
  * not rewritten here.
  */
@@ -219,10 +222,18 @@ function readSpanCorrelation(span: SentrySpan): SpanCorrelation | null {
   let spanId: unknown;
   let startTimestamp: unknown;
   let traceId: unknown;
+  let isSegment: unknown;
+  let status: unknown;
+  let endTimestamp: unknown;
+  let parentSpanId: unknown;
   try {
     spanId = Reflect.get(span, "span_id");
     startTimestamp = Reflect.get(span, "start_timestamp");
     traceId = Reflect.get(span, "trace_id");
+    isSegment = Reflect.get(span, "is_segment");
+    status = Reflect.get(span, "status");
+    endTimestamp = Reflect.get(span, "end_timestamp");
+    parentSpanId = Reflect.get(span, "parent_span_id");
   } catch {
     return null;
   }
@@ -239,27 +250,34 @@ function readSpanCorrelation(span: SentrySpan): SpanCorrelation | null {
   }
 
   return {
+    is_segment: isSegment === true,
     span_id: spanId,
     start_timestamp: startTimestamp,
+    status: status === "error" ? "error" : "ok",
     trace_id: traceId,
+    ...(typeof endTimestamp === "number" &&
+      Number.isFinite(endTimestamp) && { end_timestamp: endTimestamp }),
+    ...(typeof parentSpanId === "string" &&
+      /^(?!0{16}$)[\da-f]{16}$/iu.test(parentSpanId) && {
+        parent_span_id: parentSpanId,
+      }),
   };
 }
 
 function minimalSafeSpan(correlation: SpanCorrelation): SentrySpan {
-  return { data: {}, ...correlation };
+  return { attributes: {}, name: REDACTED_SPAN_NAME, ...correlation };
 }
 
+/**
+ * Span hook. Sentry v11 streams spans by default and hands this hook the
+ * streamed shape (`name`, `attributes`, `is_segment`); it also never emits
+ * transaction events, so there is no separate transaction hook to maintain.
+ */
 export function sentryBeforeSendSpan(span: SentrySpan): SentrySpan {
   const correlation = readSpanCorrelation(span);
   if (!correlation) return minimalSafeSpan(FALLBACK_SPAN_CORRELATION);
   if (sanitizeChannelPayload(span)) return span;
   return minimalSafeSpan(correlation);
-}
-
-export function sentryBeforeSendTransaction(
-  transaction: SentryTransaction
-): SentryTransaction | null {
-  return sanitizeChannelPayload(transaction) ? transaction : null;
 }
 
 export function sentryBeforeSendLog(log: Log): Log | null {
@@ -275,9 +293,26 @@ type SentryPrivacyOptionKeys =
   | "beforeSend"
   | "beforeBreadcrumb"
   | "beforeSendSpan"
-  | "beforeSendTransaction"
   | "beforeSendLog"
   | "beforeSendMetric";
+
+/**
+ * Sentry `environment` for Vercel deployments, kept at the v10 names
+ * (`vercel-production`, `vercel-preview`) because Sentry alert rules filter on
+ * them; v11 would default to the bare `production`/`preview`. Off Vercel
+ * (`vercelEnv` unset) it returns nothing, so the SDK falls back to
+ * `SENTRY_ENVIRONMENT` or `NODE_ENV`, exactly as v10 did.
+ *
+ * Callers pass the variable their runtime exposes, read with a literal key so
+ * Next can inline it: `VERCEL_ENV` on server and edge,
+ * `NEXT_PUBLIC_VERCEL_ENV` in the browser.
+ */
+export function sentryEnvironmentOption(vercelEnv: string | undefined): {
+  environment?: string;
+} {
+  if (!vercelEnv || process.env["SENTRY_ENVIRONMENT"]) return {};
+  return { environment: `vercel-${vercelEnv}` };
+}
 
 /** PinPoint-owned privacy boundary shared verbatim by all Sentry runtimes. */
 export const SENTRY_PRIVACY_OPTIONS = {
@@ -285,7 +320,6 @@ export const SENTRY_PRIVACY_OPTIONS = {
   beforeSend: sentryBeforeSend,
   beforeBreadcrumb: sentryBeforeBreadcrumb,
   beforeSendSpan: sentryBeforeSendSpan,
-  beforeSendTransaction: sentryBeforeSendTransaction,
   beforeSendLog: sentryBeforeSendLog,
   beforeSendMetric: sentryBeforeSendMetric,
 } satisfies Pick<SentryInitOptions, SentryPrivacyOptionKeys>;

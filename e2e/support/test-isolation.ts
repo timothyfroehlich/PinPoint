@@ -91,12 +91,3 @@ export function getTestIssueTitle(baseTitle: string): string {
 export function hasTestPrefix(value: string): boolean {
   return value.includes(`[${getTestPrefix()}]`);
 }
-
-/**
- * Get Mailpit search filter for this worker's emails
- *
- * @returns Subject filter string containing the test prefix
- */
-export function getMailpitSubjectFilter(): string {
-  return getTestPrefix();
-}

@@ -13,10 +13,9 @@ import { TagList } from "~/components/tags/TagList";
 import { TagTypeActionsMenu } from "~/components/tags/TagTypeActionsMenu";
 import { getViewer } from "~/lib/auth/viewer";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
-import { exclusiveConflicts } from "~/lib/tags/conflicts";
 import { listTags } from "~/lib/tags/tags";
 import type { TagGroup } from "~/lib/tags/types";
-import { db } from "~/server/db";
+import { getExclusiveConflicts } from "./_data";
 
 interface PageProps {
   params: Promise<{ type: string }>;
@@ -71,7 +70,7 @@ export default async function TagTypePage({
   // Opens the one-per-machine dialog already knowing what blocks it (11.7).
   const conflicts =
     managed && !managed.type.exclusive
-      ? await exclusiveConflicts(db, managed.type.id)
+      ? await getExclusiveConflicts(managed.type.id)
       : [];
 
   return (

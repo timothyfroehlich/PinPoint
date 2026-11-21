@@ -3,7 +3,10 @@
 import { useEffect } from "react";
 import * as Sentry from "@sentry/nextjs";
 
-import { SENTRY_PRIVACY_OPTIONS } from "~/lib/observability/sentry-policy";
+import {
+  SENTRY_PRIVACY_OPTIONS,
+  sentryEnvironmentOption,
+} from "~/lib/observability/sentry-policy";
 
 export function SentryInitializer(): null {
   useEffect(() => {
@@ -18,7 +21,7 @@ export function SentryInitializer(): null {
         dsn: process.env["NEXT_PUBLIC_SENTRY_DSN"],
       }),
       tracesSampleRate: 0.1, // Sample 10% of transactions in production
-      enableLogs: true, // Opens Sentry's Logs ingestion channel; emitter wiring is PP-2ta0
+      ...sentryEnvironmentOption(process.env["NEXT_PUBLIC_VERCEL_ENV"]),
       ...SENTRY_PRIVACY_OPTIONS,
       integrations: [
         Sentry.feedbackIntegration({
