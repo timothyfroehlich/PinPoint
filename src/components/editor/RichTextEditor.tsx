@@ -150,6 +150,12 @@ export const RichTextEditor = forwardRef<
                   contextElement: editorDom,
                 };
                 stopAutoUpdate = autoUpdate(reference, popup, () => {
+                  // A second composer can mirror the same draft while hidden
+                  // (the mobile sheet); its caret rect is empty, so keep its
+                  // popup out of sight instead of parking it at the origin.
+                  const editorHidden = editorDom.getClientRects().length === 0;
+                  popup.style.display = editorHidden ? "none" : "";
+                  if (editorHidden) return;
                   void computePosition(reference, popup, {
                     placement: "bottom-start",
                     strategy: "fixed",
