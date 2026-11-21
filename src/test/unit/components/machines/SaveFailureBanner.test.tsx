@@ -18,14 +18,4 @@ describe("SaveFailureBanner", () => {
     await userEvent.click(screen.getByRole("button", { name: /retry/i }));
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
-
-  it("names the missing set name and offers no Retry when that is the only failure", () => {
-    render(
-      <SaveFailureBanner failedCount={1} nameRequired onRetry={vi.fn()} />
-    );
-    expect(screen.getByRole("alert")).toHaveTextContent("Set name required");
-    expect(
-      screen.queryByRole("button", { name: /retry/i })
-    ).not.toBeInTheDocument();
-  });
 });

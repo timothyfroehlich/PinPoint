@@ -824,8 +824,9 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
   // ---------------------------------------------------------------------------
   // Unnamed draft: a new set with content but no name (PP-bhd7.8, CORE-ARCH-012)
   //
-  // The set cannot insert without its name. That is a FAILED save: the banner
-  // names the reason, the name field is marked, and leaving prompts. The bug
+  // The set cannot insert without its name. That is a FAILED save: the name
+  // field shows "Name required" under it (not the page-level save-failure
+  // banner), and leaving prompts. The bug
   // reported it as a success, so none of the three fired and the draft was
   // discarded silently.
   // ---------------------------------------------------------------------------
@@ -849,7 +850,11 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
   /** New set → type a description, never touching the name. */
   function startUnnamedDraft(): void {
     fireEvent.click(screen.getByRole("button", { name: "New set" }));
-    fireEvent.click(screen.getByRole("button", { name: "Edit description" }));
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Add a short description…, edit description",
+      })
+    );
     fireEvent.click(screen.getByRole("button", { name: "type-in-Edit text" }));
   }
 
@@ -861,7 +866,7 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
     return link;
   }
 
-  it("(unnamed draft) content with no name fails the save: banner, marked name field, leave prompt — then saves once named", async () => {
+  it("(unnamed draft) content with no name fails the save: inline name error, leave prompt — then saves once named", async () => {
     const confirmSpy = vi
       .spyOn(window, "confirm")
       .mockImplementation(() => false);
@@ -877,15 +882,17 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
       // Blurring the editor flushes the save, which cannot run without a name.
       fireEvent.blur(screen.getByRole("textbox", { name: "Edit text" }));
 
-      const alert = await screen.findByRole("alert");
-      expect(alert).toHaveTextContent("Set name required");
-      // Resending cannot succeed until the set is named: no Retry.
+      // The error sits under the name field, linked to it. The page-level
+      // banner is for real save failures and stays out of this.
+      const error = await screen.findByRole("alert");
+      expect(error).toHaveTextContent("Name required");
       expect(
-        within(alert).queryByRole("button", { name: /retry/i })
+        screen.queryByRole("button", { name: /retry/i })
       ).not.toBeInTheDocument();
       expect(saveMock).not.toHaveBeenCalled();
       const nameInput = screen.getByRole("textbox", { name: /^set name/ });
       expect(nameInput).toHaveAttribute("aria-invalid", "true");
+      expect(nameInput).toHaveAttribute("aria-describedby", error.id);
 
       // Leaving would lose the draft, so the guard prompts and cancel blocks.
       const blocked = fireEvent.click(link);
@@ -932,7 +939,7 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
     }
   });
 
-  it("(unnamed draft) deleting the draft clears its failure — no banner, no leave prompt", async () => {
+  it("(unnamed draft) deleting the draft clears its failure — no error, no leave prompt", async () => {
     const user = userEvent.setup();
     const confirmSpy = vi
       .spyOn(window, "confirm")

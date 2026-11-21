@@ -10,10 +10,7 @@ import { Button } from "~/components/ui/button";
 import { InlineEditableField } from "~/components/inline-editable-field";
 import { SETTINGS_INSTRUCTIONS_PRESETS } from "~/lib/machines/settings-instructions-presets";
 import { SettingsSetCard } from "~/components/machines/settings/SettingsSetCard";
-import {
-  SaveFailureBanner,
-  SET_NAME_REQUIRED_LABEL,
-} from "~/components/machines/settings/SaveFailureBanner";
+import { SaveFailureBanner } from "~/components/machines/settings/SaveFailureBanner";
 import {
   type SaveOutcome,
   useSettingsSaveQueue,
@@ -82,6 +79,10 @@ interface SetPayload {
   description: ProseMirrorDoc | null;
   sections: SettingsSection[];
 }
+
+/** Why a new set with content but no name cannot save. Shown inline under the
+ *  set-name field, not in the page-level save-failure banner. */
+const SET_NAME_REQUIRED_MESSAGE = "Name required";
 
 /**
  * A never-saved set that holds content but no name. The name is required, so
@@ -426,7 +427,7 @@ export function SettingsTab({
       // the draft silently (PP-bhd7.8). runSave fails these before queueing, so
       // this is the executor's own guarantee, not the usual path.
       if (isUnnamedDraft(setId, payload)) {
-        return { outcome: { ok: false, error: SET_NAME_REQUIRED_LABEL } };
+        return { outcome: { ok: false, error: SET_NAME_REQUIRED_MESSAGE } };
       }
       // Still blank and nothing entered: nothing to save, nothing to lose.
       if (isNew && payload.name.trim() === "") return { outcome: { ok: true } };
@@ -682,6 +683,9 @@ export function SettingsTab({
     sets.filter((s) => isUnnamedDraft(s.id, s)).map((s) => s.id)
   );
   const hasUnnamedDraft = unnamedDraftIds.size > 0;
+  const bannerFailedIds = [...saveStatus.failedIds].filter(
+    (id) => !unnamedDraftIds.has(id)
+  );
   useUnsavedChangesGuard({
     enabled: canCreate,
     hasFailed: saveStatus.failedIds.size > 0 || hasUnnamedDraft,
@@ -1327,14 +1331,13 @@ export function SettingsTab({
 
   return (
     <div className="space-y-3 max-md:space-y-2.5">
-      {/* Failure-only banner. Retry re-enqueues all failed sets. */}
+      {/* Failure-only banner. Retry re-enqueues the failed sets. A set waiting
+          on its name is not a save failure: its error sits under the name field
+          and retrying cannot help, so the banner leaves it out. */}
       <SaveFailureBanner
-        failedCount={saveStatus.failedIds.size}
-        nameRequired={[...saveStatus.failedIds].every((id) =>
-          unnamedDraftIds.has(id)
-        )}
+        failedCount={bannerFailedIds.length}
         onRetry={() => {
-          for (const id of saveStatus.failedIds) {
+          for (const id of bannerFailedIds) {
             stagePayload(id);
             runSave(id);
           }
@@ -1553,8 +1556,10 @@ export function SettingsTab({
                 machineOwnerId !== null && set.updatedById === machineOwnerId
               }
               isNew={newIds.has(set.id)}
-              nameRequired={
+              nameError={
                 saveStatus.failedIds.has(set.id) && unnamedDraftIds.has(set.id)
+                  ? SET_NAME_REQUIRED_MESSAGE
+                  : undefined
               }
               onNameBlur={() => {
                 stagePayload(set.id);
