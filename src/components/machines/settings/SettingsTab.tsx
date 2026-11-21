@@ -80,6 +80,24 @@ interface SetPayload {
   sections: SettingsSection[];
 }
 
+/** Why a new set with content but no name cannot save. Shown inline under the
+ *  set-name field, not in the page-level save-failure banner. */
+const SET_NAME_REQUIRED_MESSAGE = "Name required";
+
+/**
+ * A never-saved set that holds content but no name. The name is required, so
+ * it cannot insert: its save FAILS (never a silent no-op) and leaving the page
+ * prompts, because a flush cannot rescue it (CORE-ARCH-012, PP-bhd7.8). A new
+ * set with nothing entered is not a draft — there is nothing to lose.
+ */
+function isUnnamedDraft(id: string, set: SetPayload): boolean {
+  return (
+    isTempId(id) &&
+    set.name.trim() === "" &&
+    (set.description !== null || set.sections.length > 0)
+  );
+}
+
 /** Deep-ish clone of a set so the baseline and working copy never share mutable
  *  references — a working-copy edit must not silently mutate the baseline. */
 function cloneSet(set: SettingsSetData): SettingsSetData {
@@ -404,7 +422,14 @@ export function SettingsTab({
       if (!payload) return { outcome: { ok: true } };
 
       const isNew = isTempId(setId);
-      // A new set can't insert without its required name.
+      // A new set can't insert without its required name. With content staged
+      // that is a FAILED save, never a success: reporting one here discarded
+      // the draft silently (PP-bhd7.8). runSave fails these before queueing, so
+      // this is the executor's own guarantee, not the usual path.
+      if (isUnnamedDraft(setId, payload)) {
+        return { outcome: { ok: false, error: SET_NAME_REQUIRED_MESSAGE } };
+      }
+      // Still blank and nothing entered: nothing to save, nothing to lose.
       if (isNew && payload.name.trim() === "") return { outcome: { ok: true } };
 
       const result = await saveSettingsSetAction({
@@ -535,6 +560,15 @@ export function SettingsTab({
         clearTimeout(pending);
         retryTimers.current.delete(id);
       }
+      // An unnamed draft cannot insert, so its save fails here and now: the
+      // banner and the leave prompt arm (CORE-ARCH-012, PP-bhd7.8). It never
+      // goes pending — that would lift the failure for a save that cannot run —
+      // and gets no automatic retry, which would fail the same way.
+      const staged = pendingPayloadsRef.current.get(id);
+      if (staged && isUnnamedDraft(id, staged)) {
+        saveStatus.markFailed(id);
+        return;
+      }
       saveStatus.markPending(id);
       void saveQueue.persist(id).then((o) => {
         if (o.ok) {
@@ -642,10 +676,20 @@ export function SettingsTab({
   // The leaving-flush is `flushUnsaved` (save-status-driven), NOT flushAll
   // (timer-only) — so a failed set with no live timer still re-persists on the
   // popstate / beforeunload / not-failed-click paths.
+  // An unnamed draft counts as failed for the guard even before its first save
+  // attempt (the 800 ms debounce window): flushing it cannot succeed, so leaving
+  // must prompt rather than flush-and-go.
+  const unnamedDraftIds = new Set(
+    sets.filter((s) => isUnnamedDraft(s.id, s)).map((s) => s.id)
+  );
+  const hasUnnamedDraft = unnamedDraftIds.size > 0;
+  const bannerFailedIds = [...saveStatus.failedIds].filter(
+    (id) => !unnamedDraftIds.has(id)
+  );
   useUnsavedChangesGuard({
     enabled: canCreate,
-    hasFailed: saveStatus.failedIds.size > 0,
-    hasUnsaved: saveStatus.hasUnsaved,
+    hasFailed: saveStatus.failedIds.size > 0 || hasUnnamedDraft,
+    hasUnsaved: saveStatus.hasUnsaved || hasUnnamedDraft,
     hasUnsavedDraft,
     flushUnsaved,
   });
@@ -710,6 +754,11 @@ export function SettingsTab({
     baselineRef.current.delete(id);
     pendingPayloadsRef.current.delete(id);
     autoSave.cancel(id);
+    // The set is gone, so nothing of it is unsaved or failed any more. Without
+    // this a discarded draft's failure would hold the banner and the leave
+    // prompt forever.
+    saveStatus.clearFailed(id);
+    saveStatus.markClean(id);
     setExpandedIds((prev) => {
       const next = new Set(prev);
       next.delete(id);
@@ -854,6 +903,12 @@ export function SettingsTab({
   }
 
   function renameSet(id: string, name: string): void {
+    // Naming an unnamed draft fixes what failed its save, so the failure lifts
+    // now; the edit stays dirty and the save scheduled below can insert it.
+    const set = setsRef.current.find((s) => s.id === id);
+    if (set && isUnnamedDraft(id, set) && name.trim() !== "") {
+      saveStatus.clearFailed(id);
+    }
     editSet(id, (s) => ({ ...s, name }));
   }
 
@@ -1276,11 +1331,13 @@ export function SettingsTab({
 
   return (
     <div className="space-y-3 max-md:space-y-2.5">
-      {/* Failure-only banner. Retry re-enqueues all failed sets. */}
+      {/* Failure-only banner. Retry re-enqueues the failed sets. A set waiting
+          on its name is not a save failure: its error sits under the name field
+          and retrying cannot help, so the banner leaves it out. */}
       <SaveFailureBanner
-        failedCount={saveStatus.failedIds.size}
+        failedCount={bannerFailedIds.length}
         onRetry={() => {
-          for (const id of saveStatus.failedIds) {
+          for (const id of bannerFailedIds) {
             stagePayload(id);
             runSave(id);
           }
@@ -1499,6 +1556,11 @@ export function SettingsTab({
                 machineOwnerId !== null && set.updatedById === machineOwnerId
               }
               isNew={newIds.has(set.id)}
+              nameError={
+                saveStatus.failedIds.has(set.id) && unnamedDraftIds.has(set.id)
+                  ? SET_NAME_REQUIRED_MESSAGE
+                  : undefined
+              }
               onNameBlur={() => {
                 stagePayload(set.id);
                 autoSave.flush(set.id);
