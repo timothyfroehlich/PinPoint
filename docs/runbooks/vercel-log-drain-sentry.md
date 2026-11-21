@@ -14,17 +14,17 @@ Wiring a Vercel Log Drain to Sentry makes those events observable:
 - Cold-start failures
 - Edge middleware rejections
 
-### What `enableLogs: true` does — and does NOT — do
+### Sentry Logs: nothing is wired yet
 
-PP-2053.12 set `enableLogs: true` in the server, edge, and client Sentry
-configs. This only **opens Sentry's Logs ingestion channel** — it does not by
-itself forward any application logs. Nothing emits into that channel yet:
+Sentry v11 removed the `enableLogs` option: the Logs channel opens whenever
+`Sentry.logger.*` or a logging integration is used, and no option disables it.
+PP-2053.12 had set `enableLogs: true` as a prerequisite toggle; with v11 the
+toggle is gone and nothing emits into the channel:
 
 - There are no `Sentry.logger.*` calls in the codebase.
 - `consoleLoggingIntegration` is not enabled.
 - The app's pino logger writes only to stdout; it is **not** wired to Sentry.
 
-So `enableLogs: true` is a prerequisite toggle, not a working log pipeline.
 Two separate, still-pending pieces of work close the actual gaps:
 
 1. **Platform kills (this runbook): the Vercel Log Drain is the real
