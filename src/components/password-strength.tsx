@@ -2,13 +2,46 @@
 
 import React from "react";
 import { useState, useEffect } from "react";
+import type { ZxcvbnResult } from "@zxcvbn-ts/core";
 import { cn } from "~/lib/utils";
+
+type CheckPassword = (password: string) => ZxcvbnResult;
+
+let checkerPromise: Promise<CheckPassword> | null = null;
+
+/**
+ * Load the engine and its dictionaries in one lazy chunk and build the
+ * `ZxcvbnFactory` once. The dictionaries are the bulk of the size, so nothing
+ * here is bundled with the page.
+ */
+function loadChecker(): Promise<CheckPassword> {
+  checkerPromise ??= Promise.all([
+    import("@zxcvbn-ts/core"),
+    import("@zxcvbn-ts/language-common"),
+    import("@zxcvbn-ts/language-en"),
+  ])
+    .then(([core, common, en]) => {
+      const factory = new core.ZxcvbnFactory({
+        translations: en.translations,
+        graphs: common.adjacencyGraphs,
+        dictionary: { ...common.dictionary, ...en.dictionary },
+      });
+      return (password: string) => factory.check(password);
+    })
+    .catch((error: unknown) => {
+      // Let a later keystroke retry instead of caching the failure.
+      checkerPromise = null;
+      throw error;
+    });
+  return checkerPromise;
+}
 
 /**
  * Password Strength Indicator
  *
- * Uses zxcvbn (Dropbox's password strength library) to evaluate password strength.
- * Shows visual feedback and suggestions for improvement.
+ * Uses zxcvbn-ts (the maintained TypeScript port of Dropbox's zxcvbn) to
+ * evaluate password strength. Shows visual feedback and suggestions for
+ * improvement.
  *
  * Advisory only — this client component never gates submission. Password
  * rules are enforced server-side, so the meter cannot pass something the
@@ -30,10 +63,10 @@ export function PasswordStrength({
       return;
     }
 
-    // Dynamic import to avoid bundling zxcvbn upfront (it's ~800KB)
-    import("zxcvbn")
-      .then((mod) => {
-        const result = mod.default(password);
+    // Lazy load so the dictionaries stay out of the page bundle
+    loadChecker()
+      .then((check) => {
+        const result = check(password);
         const feedback: string[] = [];
 
         if (result.feedback.warning) {
