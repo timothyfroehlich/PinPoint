@@ -17,7 +17,7 @@
 
 import type { Page } from "@playwright/test";
 import { test, expect } from "../support/fixtures.js";
-import { assertNoA11yViolations } from "../support/actions.js";
+import { assertNoA11yViolations, openListSearch } from "../support/actions.js";
 
 // The print page opens the print dialog on load; a test has no use for it.
 test.beforeEach(async ({ page }) => {
@@ -27,7 +27,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 async function addByInitials(page: Page, initials: string): Promise<void> {
-  const search = page.getByRole("searchbox", { name: "Search machines" });
+  const search = await openListSearch(page, "Search machines");
   await search.fill(initials);
   // The search applies after a debounce, through a router transition that
   // dims the list. Wait for it to land so neither the click below nor a later
@@ -36,18 +36,12 @@ async function addByInitials(page: Page, initials: string): Promise<void> {
   await expect(
     page.getByRole("region", { name: "Machines list" })
   ).not.toHaveAttribute("aria-busy", "true");
-  // The machine list renders as a table (role=row) on desktop and as a compact
-  // card list (role=listitem, MachineViewCompactList) on phones; the off-
-  // breakpoint layout is display:none, so only one is in the accessibility tree
-  // at a time. Match either so this helper works at every viewport. Scoped to
-  // the "Add machines" section so the mobile listitem branch can't collide with
-  // the print-run list's items.
-  const section = page.getByRole("region", { name: "Add machines" });
-  const hasInitials = { has: page.getByText(initials, { exact: true }) };
-  const entry = section
-    .getByRole("row")
-    .filter(hasInitials)
-    .or(section.getByRole("listitem").filter(hasInitials));
+  // The machine rows are list items at every width. Scoped to the "Add
+  // machines" section so they can't collide with the print-run list's items.
+  const entry = page
+    .getByRole("region", { name: "Add machines" })
+    .getByRole("listitem")
+    .filter({ has: page.getByText(initials, { exact: true }) });
   await entry.getByRole("button", { name: /^Add / }).click();
   await expect(entry.getByText("Added")).toBeVisible();
 }
@@ -154,7 +148,7 @@ test.describe("Print settings sheets", () => {
     page,
   }) => {
     await page.goto("/c/tags/location/front-room");
-    await page.getByRole("link", { name: "Print settings sheets" }).click();
+    await page.getByRole("link", { name: "Settings sheets" }).click();
     await expect(page).toHaveURL(/\/m\/settings-sheets/);
     const run = page.getByRole("region", { name: "In this print run" });
     // Front room's seeded machines: Attack from Mars and others On the Floor,

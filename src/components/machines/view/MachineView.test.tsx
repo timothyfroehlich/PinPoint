@@ -12,7 +12,19 @@ import type {
   MachineViewSavedViews,
   MachineViewSavedViewSummary,
 } from "~/lib/types";
+import type { MachineExportScope } from "~/app/(app)/m/export-schema";
 import { MachineView } from "./MachineView";
+
+/**
+ * The toolbar's search field. List View renders search twice, in the toolbar
+ * and in the phone List Header, and CSS shows one (list-views §7.3); jsdom
+ * applies no CSS, so both are in the tree and the toolbar's comes first.
+ */
+function toolbarSearch(name: string | RegExp): HTMLElement {
+  const [field] = screen.getAllByRole("searchbox", { name });
+  if (!field) throw new Error("no search field");
+  return field;
+}
 
 window.matchMedia = vi.fn().mockImplementation(() => ({
   matches: false,
@@ -46,6 +58,9 @@ const actions = vi.hoisted(() => ({
 }));
 
 vi.mock("~/app/(app)/m/saved-view-actions", () => actions);
+vi.mock("~/app/(app)/m/export-action", () => ({
+  exportMachinesAction: vi.fn(),
+}));
 vi.mock("next/navigation", () => ({
   useRouter: () => navigation.router,
   usePathname: () => "/m",
@@ -90,7 +105,6 @@ const brokenView: MachineViewSavedViewSummary = {
     sort: "machine",
     dir: "asc",
     pageSize: 25,
-    columns: presetState.columns,
   },
 };
 
@@ -139,6 +153,7 @@ function result(overrides: Partial<MachineViewResult> = {}): MachineViewResult {
     ],
     permittedFields: getMachineViewPreset("machines").permittedFields,
     offersMe: true,
+    signedIn: true,
     ...overrides,
   };
 }
@@ -164,6 +179,8 @@ function renderView(
     views?: MachineViewSavedViews;
     preset?: MachineViewPresetId;
     title?: string;
+    exportScope?: MachineExportScope;
+    listAction?: React.ReactNode;
     actions?: React.ReactNode;
   } = {}
 ): ReturnType<typeof render> {
@@ -174,6 +191,8 @@ function renderView(
       preset={preset}
       savedViews={options.views ?? savedViews({}, preset)}
       title={options.title}
+      exportScope={options.exportScope}
+      listAction={options.listAction}
       actions={options.actions}
     />
   );
@@ -202,35 +221,72 @@ describe("MachineView", () => {
     vi.restoreAllMocks();
   });
 
-  it("cycles sort direction and then restores the preset default", async () => {
+  it("sorts by every machine field from the sort control (machine-views §3.14)", async () => {
     const user = userEvent.setup();
     renderView();
-    const issueHeader = screen.getByRole("columnheader", {
-      name: /open issues/i,
-    });
-    const button = within(issueHeader).getByRole("button");
+    // No table: no column headers to sort by.
+    expect(screen.queryByRole("columnheader")).not.toBeInTheDocument();
 
-    await user.click(button);
+    await user.click(screen.getByTestId("list-sort-trigger"));
+    expect(
+      screen.getAllByRole("menuitemradio").map((item) => item.textContent)
+    ).toEqual(
+      expect.arrayContaining([
+        "Name",
+        "Playability",
+        "Open Issues",
+        "Last Serviced",
+        "Presence",
+        "Owner",
+        "Manufacturer",
+        "Year",
+        "Oldest Open Issue",
+        "Last Activity",
+        "Date Added",
+      ])
+    );
+    await user.click(
+      screen.getByRole("menuitemradio", { name: "Open Issues" })
+    );
     expect(navigation.replace).toHaveBeenLastCalledWith(
       "/m?sort=openIssues&dir=desc",
       { scroll: false }
     );
-    await user.click(button);
-    expect(navigation.replace).toHaveBeenLastCalledWith(
-      "/m?sort=openIssues&dir=asc",
-      { scroll: false }
-    );
-    await user.click(button);
-    expect(navigation.replace).toHaveBeenLastCalledWith("/m", {
-      scroll: false,
-    });
   });
 
+  it("ends each row with the added age while sorted by Date Added (machine-views §5.15)", () => {
+    const { unmount } = renderView();
+    expect(screen.getByTestId("machine-row-service-age")).toBeInTheDocument();
+    expect(screen.queryByTestId("machine-row-added-age")).toBeNull();
+    unmount();
+
+    renderView({
+      result: result({
+        state: { ...presetState, sort: "dateAdded", dir: "desc" },
+      }),
+    });
+    expect(screen.getByTestId("machine-row-added-age")).toBeInTheDocument();
+    expect(screen.queryByTestId("machine-row-service-age")).toBeNull();
+  });
+
+  it("shows the same two-line rows at every width, with page size alone in View options", async () => {
+    const user = userEvent.setup();
+    renderView();
+
+    const list = screen.getByRole("list", { name: "Machines list" });
+    expect(within(list).getAllByRole("listitem")).toHaveLength(1);
+    expect(list).not.toHaveClass("md:hidden");
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "View options" }));
+    expect(screen.queryAllByRole("menuitemcheckbox")).toHaveLength(0);
+    expect(
+      screen.getAllByRole("menuitemradio").map((item) => item.textContent)
+    ).toEqual(["25", "50", "100"]);
+  });
   it("searches without a placeholder, named for the list it searches (list-views §4.2)", () => {
     renderView();
-    expect(
-      screen.getByRole("searchbox", { name: "Search machines" })
-    ).not.toHaveAttribute("placeholder");
+    expect(toolbarSearch("Search machines")).not.toHaveAttribute("placeholder");
   });
 
   it("debounces search and resets to page one", () => {
@@ -238,10 +294,9 @@ describe("MachineView", () => {
     navigation.searchParams = new URLSearchParams({ page: "3" });
     renderView({ result: result({ state: { ...presetState, page: 3 } }) });
 
-    fireEvent.change(
-      screen.getByRole("searchbox", { name: /search machines/i }),
-      { target: { value: "  mars  " } }
-    );
+    fireEvent.change(toolbarSearch(/search machines/i), {
+      target: { value: "  mars  " },
+    });
     act(() => vi.advanceTimersByTime(249));
     expect(navigation.replace).not.toHaveBeenCalled();
     act(() => vi.advanceTimersByTime(1));
@@ -254,7 +309,7 @@ describe("MachineView", () => {
   it("searches at once on Enter (list-views §4.1)", () => {
     vi.useFakeTimers();
     renderView();
-    const search = screen.getByRole("searchbox", { name: /search machines/i });
+    const search = toolbarSearch(/search machines/i);
 
     fireEvent.change(search, { target: { value: "mars" } });
     fireEvent.keyDown(search, { key: "Enter" });
@@ -269,7 +324,7 @@ describe("MachineView", () => {
   it("preserves new typing when an earlier search result arrives", () => {
     vi.useFakeTimers();
     const { rerender } = renderView();
-    const search = screen.getByRole("searchbox", { name: /search machines/i });
+    const search = toolbarSearch(/search machines/i);
 
     fireEvent.change(search, { target: { value: "mars" } });
     act(() => vi.advanceTimersByTime(250));
@@ -360,11 +415,12 @@ describe("MachineView", () => {
     });
     const [bottom] = screen.getAllByRole("navigation", { name: "Pagination" });
     if (!bottom) throw new Error("bottom pager missing");
-    expect(
-      within(bottom).getByRole("button", { name: "Page 1" })
-    ).toHaveAttribute("aria-current", "page");
+    expect(within(bottom).getByRole("button", { name: /^1$/ })).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
 
-    await user.click(within(bottom).getByRole("button", { name: "Page 3" }));
+    await user.click(within(bottom).getByRole("button", { name: /^3$/ }));
     expect(navigation.replace).toHaveBeenLastCalledWith("/m?page=3", {
       scroll: false,
     });
@@ -416,10 +472,10 @@ describe("MachineView", () => {
 
   it("lists Segments in spec order (machine-widgets §3.2, §4.2)", () => {
     renderView();
-    const names = (widget: string): (string | null)[] =>
+    const names = (widget: string): string[] =>
       within(screen.getByRole("region", { name: widget }))
         .getAllByRole("button")
-        .map((button) => button.getAttribute("aria-label"));
+        .map((button) => (button.textContent ?? "").trim());
 
     // Presence leads with On the Floor and has no Removed Segment (§3.2);
     // Playability runs worst first (§4.2). Zero Segments are left out (widgets §5.5).
@@ -503,7 +559,7 @@ describe("MachineView", () => {
     );
   });
 
-  it("keeps a Built-in View's tab current when the page size or a field changes (list-views §1)", async () => {
+  it("keeps a Built-in View's tab current when the page size changes (list-views §1)", async () => {
     const user = userEvent.setup();
     const needsAttention = getMachineViewBuiltInViews("machines").find(
       (view) => view.id === "needs-attention"
@@ -524,11 +580,10 @@ describe("MachineView", () => {
       within(tabs).getByRole("link", { current: "page" });
 
     await user.click(screen.getByRole("button", { name: "View options" }));
-    await user.click(screen.getByRole("menuitemcheckbox", { name: "Owner" }));
     await user.click(screen.getByRole("menuitemradio", { name: "50" }));
 
     expect(navigation.replace).toHaveBeenLastCalledWith(
-      "/m?status=needs_service%2Cunplayable&sort=playability&dir=desc&pageSize=50&columns=machine%2Cplayability%2Cpresence%2CopenIssues%2ClastServiced%2ClastActivity%2Cowner&view=needs-attention",
+      "/m?status=needs_service%2Cunplayable&sort=playability&dir=desc&pageSize=50&view=needs-attention",
       { scroll: false }
     );
     expect(current()).toHaveTextContent(/^Needs attention$/);
@@ -540,7 +595,6 @@ describe("MachineView", () => {
       "Needs attention"
     );
   });
-
   it("leaves every view on a search or filter change: no tab current, Save view, no Discard (list-views §1, §5.2, §7.3)", async () => {
     const user = userEvent.setup();
     renderView();
@@ -568,24 +622,23 @@ describe("MachineView", () => {
     );
   });
 
-  it("applies a Built-in View tab keeping the fields and page size showing, adding Date Added for Recently added (list-views §1; machine-views §9.1)", async () => {
+  it("applies a Built-in View tab keeping the page size showing (list-views §1; machine-views §9.1)", async () => {
     const user = userEvent.setup();
-    const columns = [...presetState.columns, "owner" as const];
     navigation.searchParams = new URLSearchParams([
       ["q", "mars"],
       ["pageSize", "50"],
-      ["columns", columns.join(",")],
     ]);
     renderView({
       result: result({
-        state: { ...presetState, q: "mars", pageSize: 50, columns, page: 2 },
+        state: { ...presetState, q: "mars", pageSize: 50, page: 2 },
       }),
     });
     const tabs = screen.getByRole("navigation", { name: "Saved views" });
     const recentlyAdded = within(tabs).getByRole("link", {
       name: "Recently added",
     });
-    const url = `/m?presence=on_the_floor%2Coff_the_floor%2Con_loan%2Cpending_arrival&sort=dateAdded&dir=desc&pageSize=50&columns=${[...columns, "dateAdded"].join("%2C")}&view=recently-added`;
+    const url =
+      "/m?presence=on_the_floor%2Coff_the_floor%2Con_loan%2Cpending_arrival&sort=dateAdded&dir=desc&pageSize=50&view=recently-added";
 
     expect(recentlyAdded).toHaveAttribute("href", url);
     await user.click(recentlyAdded);
@@ -596,14 +649,12 @@ describe("MachineView", () => {
       within(tabs).getByRole("link", { current: "page" })
     ).toHaveTextContent(/^Recently added$/);
 
-    // The search is cleared; fields and page size stay.
+    // The search is cleared; the page size stays.
     await user.click(within(tabs).getByRole("link", { name: "On the floor" }));
-    expect(navigation.replace).toHaveBeenLastCalledWith(
-      `/m?pageSize=50&columns=${[...columns, "dateAdded"].join("%2C")}`,
-      { scroll: false }
-    );
+    expect(navigation.replace).toHaveBeenLastCalledWith("/m?pageSize=50", {
+      scroll: false,
+    });
   });
-
   it("drops a view reference the configuration has left when it rewrites the URL (list-views §9.6)", () => {
     navigation.searchParams = new URLSearchParams([
       ["q", "mars"],
@@ -710,7 +761,7 @@ describe("MachineView", () => {
       views: savedViews({ defaultViewId: brokenView.id }),
     });
 
-    await user.clear(screen.getByRole("searchbox", { name: /search/i }));
+    await user.clear(toolbarSearch(/search/i));
     await user.keyboard("{Enter}");
     // A bare /m would open the Default View instead of the cleared list.
     expect(navigation.replace).toHaveBeenLastCalledWith(
@@ -723,10 +774,9 @@ describe("MachineView", () => {
     vi.useFakeTimers();
     renderView();
 
-    fireEvent.change(
-      screen.getByRole("searchbox", { name: /search machines/i }),
-      { target: { value: "stern" } }
-    );
+    fireEvent.change(toolbarSearch(/search machines/i), {
+      target: { value: "stern" },
+    });
     fireEvent.click(
       within(screen.getByRole("region", { name: "Playability" })).getByRole(
         "button",
@@ -754,7 +804,7 @@ describe("MachineView", () => {
       }),
       views: savedViews({ activeViewId: brokenView.id }),
     });
-    const search = screen.getByRole("searchbox", { name: /search machines/i });
+    const search = toolbarSearch(/search machines/i);
 
     fireEvent.change(search, { target: { value: "stern" } });
     fireEvent.click(screen.getByRole("button", { name: "Discard changes" }));
@@ -765,9 +815,7 @@ describe("MachineView", () => {
       { scroll: false }
     );
     // The field is mounted afresh with the Applied View's search.
-    expect(
-      screen.getByRole("searchbox", { name: /search machines/i })
-    ).toHaveValue("");
+    expect(toolbarSearch(/search machines/i)).toHaveValue("");
   });
 
   it("names the Page Preset's view when it rewrites a URL to its canonical form while a Default View exists (list-views §9.3, §10.10)", () => {
@@ -820,29 +868,19 @@ describe("MachineView", () => {
     ).toHaveTextContent(/^Two owners$/);
   });
 
-  it("keeps the page for displayed fields and returns to page 1 for a new page size (list-views §4.7, §4.8)", async () => {
+  it("returns to page 1 for a new page size (list-views §4.7)", async () => {
     const user = userEvent.setup();
     navigation.searchParams = new URLSearchParams({ page: "3" });
     renderView({
       result: result({ state: { ...presetState, page: 3 }, totalCount: 100 }),
     });
-    const columns =
-      "machine%2Cplayability%2Cpresence%2CopenIssues%2ClastServiced%2ClastActivity%2Cowner";
 
     await user.click(screen.getByRole("button", { name: "View options" }));
-    await user.click(screen.getByRole("menuitemcheckbox", { name: "Owner" }));
-    expect(navigation.replace).toHaveBeenLastCalledWith(
-      `/m?page=3&columns=${columns}`,
-      { scroll: false }
-    );
-
     await user.click(screen.getByRole("menuitemradio", { name: "50" }));
-    expect(navigation.replace).toHaveBeenLastCalledWith(
-      `/m?pageSize=50&columns=${columns}`,
-      { scroll: false }
-    );
+    expect(navigation.replace).toHaveBeenLastCalledWith("/m?pageSize=50", {
+      scroll: false,
+    });
   });
-
   it("returns to page 1 when a filter changes (list-views §4.7)", async () => {
     const user = userEvent.setup();
     navigation.searchParams = new URLSearchParams({ page: "3" });
@@ -985,7 +1023,7 @@ describe("MachineView", () => {
     const dialog = await openManageViews(user);
     await user.click(
       within(dialog).getByRole("button", {
-        name: "Open Service due by default",
+        name: "Make default: Service due",
       })
     );
 
@@ -1012,7 +1050,7 @@ describe("MachineView", () => {
       views: savedViews({ defaultViewId: "on-the-floor" }),
     });
 
-    await user.clear(screen.getByRole("searchbox", { name: /search/i }));
+    await user.clear(toolbarSearch(/search/i));
     await user.keyboard("{Enter}");
     // The server opens a bare /m at the Page Preset already.
     expect(navigation.replace).toHaveBeenLastCalledWith("/m", {
@@ -1081,7 +1119,9 @@ describe("MachineView", () => {
     await user.click(screen.getByRole("menuitem", { name: "Manage views…" }));
     const dialog = await screen.findByRole("dialog", { name: "Manage views" });
     expect(
-      within(dialog).queryByRole("button", { name: /by default$/ })
+      within(dialog).queryByRole("button", {
+        name: /^(?:Default|Make default): /,
+      })
     ).not.toBeInTheDocument();
     // Deleting the Default View here names the page it opens on.
     await user.click(
@@ -1144,6 +1184,37 @@ describe("MachineView", () => {
     });
   });
 
+  describe("Export (machine-views §3.15)", () => {
+    it("offers signed-in viewers Export on a Surface that names its scope", () => {
+      renderView({ exportScope: { kind: "all" } });
+      expect(screen.getByTestId("export-csv-button")).toBeInTheDocument();
+    });
+
+    it("hides Export from anonymous visitors", () => {
+      renderView({
+        result: result({ offersMe: false, signedIn: false }),
+        exportScope: { kind: "all" },
+      });
+      expect(screen.queryByTestId("export-csv-button")).not.toBeInTheDocument();
+    });
+
+    it("offers no Export on a Surface without an export scope", () => {
+      renderView();
+      expect(screen.queryByTestId("export-csv-button")).not.toBeInTheDocument();
+    });
+
+    it("keeps a Surface's own list action in place of Export", () => {
+      renderView({
+        exportScope: { kind: "all" },
+        listAction: <button type="button">Add 3 shown</button>,
+      });
+      expect(
+        screen.getByRole("button", { name: "Add 3 shown" })
+      ).toBeInTheDocument();
+      expect(screen.queryByTestId("export-csv-button")).not.toBeInTheDocument();
+    });
+  });
+
   it("leaves Me out for anonymous visitors", async () => {
     const user = userEvent.setup();
     renderView({
@@ -1187,7 +1258,7 @@ describe("MachineView", () => {
     });
 
     expect(
-      screen.getByRole("button", { name: "Filters, 2 active" })
+      screen.getByRole("button", { name: "2 active filters" })
     ).toBeInTheDocument();
     expect(screen.getByTestId("list-phone-views-trigger")).toHaveAccessibleName(
       "Views"
@@ -1203,19 +1274,5 @@ describe("MachineView", () => {
     expect(window.sessionStorage.getItem("pinpoint:list-return:/m")).toBe(
       "/m?q=mars&page=2"
     );
-  });
-
-  it("restores and updates the phone display preference", async () => {
-    const user = userEvent.setup();
-    window.localStorage.setItem("pinpoint:machine-view:mobile-mode", "table");
-    renderView();
-
-    expect(await screen.findByText(/scroll for more/i)).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Filters" }));
-    await user.click(await screen.findByRole("button", { name: /^Layout/ }));
-    await user.click(screen.getByRole("radio", { name: "Compact list" }));
-    expect(
-      window.localStorage.getItem("pinpoint:machine-view:mobile-mode")
-    ).toBe("compact");
   });
 });

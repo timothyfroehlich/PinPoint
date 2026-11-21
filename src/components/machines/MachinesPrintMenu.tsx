@@ -58,7 +58,7 @@ export function MachinesPrintMenu({
           }
         >
           <Printer className="size-4" aria-hidden="true" />
-          <span className="max-md:hidden">Print</span>
+          <span className="max-md:hidden">Print</span>{" "}
           {queued ? (
             <QueueCount
               count={apronQueueCount}
@@ -79,7 +79,7 @@ export function MachinesPrintMenu({
                   : "Apron cards"
               }
             >
-              Apron cards
+              Apron cards{" "}
               {queued ? (
                 <QueueCount count={apronQueueCount} className="ml-auto" />
               ) : null}

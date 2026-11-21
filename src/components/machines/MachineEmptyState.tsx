@@ -25,10 +25,7 @@ export function MachineEmptyState({
       description="The game is operational. Great job!"
       action={
         <Button variant="outline" size="sm" asChild>
-          <Link
-            href={`/report?machine=${machineInitials}`}
-            aria-label="Report a new issue"
-          >
+          <Link href={`/report?machine=${machineInitials}`}>
             Report an Issue
           </Link>
         </Button>

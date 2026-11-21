@@ -387,7 +387,7 @@ test.describe("Machine tag editor", () => {
 
       // One line of chips; the rest wait behind the "+N" chip.
       const more = tagsCard.getByRole("button", {
-        name: /^Show \d+ more tags?$/,
+        name: /^\+\d+ more tags?$/,
       });
       await expect(more).toBeVisible();
       const total = await tagsCard

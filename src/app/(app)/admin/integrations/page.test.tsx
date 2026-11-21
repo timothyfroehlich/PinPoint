@@ -113,12 +113,12 @@ describe("Admin Integrations routes", () => {
       "Pinball Map"
     );
     expect(screen.getByText("Bot notifications.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Discord help" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Help: Discord" })).toHaveAttribute(
       "href",
       "/help/discord"
     );
     expect(
-      screen.getByRole("link", { name: "Pinball Map help" })
+      screen.getByRole("link", { name: "Help: Pinball Map" })
     ).toHaveAttribute("href", "/help/pinball-map");
     expect(screen.getByTestId("discord-form")).toHaveTextContent(
       JSON.stringify({

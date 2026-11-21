@@ -81,7 +81,6 @@ function IdentityLink({
     <Link
       href={href}
       className="flex min-h-16 items-center gap-2 rounded-lg text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-      aria-label={`${name} details`}
     >
       <div className="min-w-0 flex-1">
         <h1 className="truncate text-[26px] leading-tight font-extrabold tracking-tight sm:text-3xl">
@@ -92,7 +91,7 @@ function IdentityLink({
         >
           {metadata}
         </p>
-      </div>
+      </div>{" "}
       <span
         className={`flex shrink-0 flex-col items-center text-[10px] font-semibold ${onArtwork ? "text-foreground/85" : "text-muted-foreground"}`}
       >
@@ -243,7 +242,7 @@ export function MachineScanHub({
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex min-h-7 items-center gap-1 text-xs font-semibold text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-              aria-label="View all scores on iScored (opens in a new tab)"
+              aria-label="View all on iScored (opens in a new tab)"
             >
               View all on
               <Image

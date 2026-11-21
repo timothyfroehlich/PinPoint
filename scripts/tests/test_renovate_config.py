@@ -42,7 +42,15 @@ def test_renovate_cooldowns_fail_closed() -> None:
     group_rule = grouped[0]
     assert group_rule["groupName"] == "toolchain"
     assert group_rule["matchUpdateTypes"] == ["minor", "patch"]
-    assert "!supabase/cli" in group_rule["matchPackageNames"]
+    # Negation only: a list of only negative patterns matches everything else.
+    # Renovate rejects "*" alongside other patterns as invalid config, and an
+    # invalid config stops every Renovate run on the repository.
+    assert group_rule["matchPackageNames"] == ["!supabase/cli"]
+    assert not any(
+        pattern in ("*", "**")
+        for rule in package_rules
+        for pattern in rule.get("matchPackageNames", [])
+    )
     assert "minimumReleaseAge" not in group_rule
 
     supabase_rule = next(

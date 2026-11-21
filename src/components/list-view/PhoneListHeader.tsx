@@ -1,16 +1,17 @@
 "use client";
 
 import * as React from "react";
+import { flushSync } from "react-dom";
 import {
   Bookmark,
   Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Search,
   SlidersHorizontal,
   X,
 } from "lucide-react";
-import { Checkbox } from "~/components/ui/checkbox";
 import {
   Drawer,
   DrawerContent,
@@ -18,9 +19,12 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "~/components/ui/drawer";
+import { phoneSearchAsIcon } from "~/lib/list-view/overflow";
 import { cn } from "~/lib/utils";
 import { FilterPicker } from "./FilterPicker";
 import { isPlainClick } from "./links";
+import { ListSearchField, type ListSearchFieldHandle } from "./ListSearchField";
+import { useMeasuredWidths } from "./use-measured-widths";
 import {
   filterSelectionText,
   nounFor,
@@ -31,6 +35,7 @@ import {
   type ListFilterModel,
   type ListNoun,
   type ListOption,
+  type ListSearchModel,
   type ListSortModel,
   type ListViewEntry,
   type ListViewsModel,
@@ -190,9 +195,7 @@ type FiltersPanel =
   | { kind: "top" }
   | { kind: "filter"; id: string }
   | { kind: "sort" }
-  | { kind: "pageSize" }
-  | { kind: "layout" }
-  | { kind: "fields" };
+  | { kind: "pageSize" };
 
 function SheetRow({
   label,
@@ -403,28 +406,6 @@ function FiltersSheet({
           onOpen={() => openPanel({ kind: "pageSize" }, "pageSize")}
           rowRef={registerRow("pageSize")}
         />
-        {display.layout ? (
-          <SheetRow
-            label={display.layout.label}
-            value={
-              display.layout.options.find(
-                (option) => option.value === display.layout?.value
-              )?.label ?? ""
-            }
-            emphasized={false}
-            onOpen={() => openPanel({ kind: "layout" }, "layout")}
-            rowRef={registerRow("layout")}
-          />
-        ) : null}
-        {display.fields ? (
-          <SheetRow
-            label="Fields"
-            value={`${display.fields.selected.length} selected`}
-            emphasized={false}
-            onOpen={() => openPanel({ kind: "fields" }, "fields")}
-            rowRef={registerRow("fields")}
-          />
-        ) : null}
       </>
     );
   } else if (activeFilter) {
@@ -471,37 +452,6 @@ function FiltersSheet({
         value={String(display.pageSize)}
         onChange={(value) => display.onPageSizeChange(Number(value))}
       />
-    );
-  } else if (panel.kind === "layout" && display.layout) {
-    title = display.layout.label;
-    body = (
-      <RadioList
-        label={display.layout.label}
-        options={display.layout.options}
-        value={display.layout.value}
-        onChange={display.layout.onChange}
-      />
-    );
-  } else if (panel.kind === "fields" && display.fields) {
-    const fields = display.fields;
-    title = "Fields";
-    body = (
-      <div role="group" aria-label="Fields">
-        {fields.options.map((field) => (
-          <label
-            key={field.value}
-            className="flex min-h-11 cursor-pointer items-center gap-3 border-b border-border text-base"
-          >
-            <Checkbox
-              checked={fields.selected.includes(field.value)}
-              onCheckedChange={(checked) =>
-                fields.onToggle(field.value, checked === true)
-              }
-            />
-            <span className="flex-1">{field.label}</span>
-          </label>
-        ))}
-      </div>
     );
   }
 
@@ -574,6 +524,36 @@ function FiltersSheet({
   );
 }
 
+/** The Applied View's name with its Edited marker and chevron (§7.3, §7.4). */
+function ViewsFace({
+  name,
+  edited,
+}: {
+  name: string;
+  edited: boolean;
+}): React.JSX.Element {
+  return (
+    <>
+      <Bookmark aria-hidden="true" className="size-4 shrink-0" />
+      <span className="truncate">{name}</span>
+      {edited ? (
+        <span
+          aria-hidden="true"
+          className="size-2 shrink-0 rounded-full bg-warning"
+        />
+      ) : null}
+      <ChevronDown aria-hidden="true" className="size-4 shrink-0" />
+    </>
+  );
+}
+
+const viewsButtonClass = "inline-flex items-center gap-2 text-[15px] font-bold";
+const iconButtonClass =
+  "inline-flex size-11 shrink-0 items-center justify-center rounded-md text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none";
+/** The Filters button's width (size-11) and the header's gap (gap-2). */
+const FILTERS_WIDTH = 44;
+const HEADER_GAP = 8;
+
 interface PhoneListHeaderProps {
   views: ListViewsModel;
   primaryFilters: readonly ListFilterModel[];
@@ -582,6 +562,10 @@ interface PhoneListHeaderProps {
   display: ListDisplayModel;
   totalCount: number;
   noun: ListNoun;
+  /** The phone search (§7.3), between the views button and Filters. */
+  search: ListSearchModel;
+  /** Remounts the search field when a view is applied or discarded. */
+  searchEpoch: number;
   onResetAll: () => void;
   onSaveChanges: () => void;
   onSaveAsNew: () => void;
@@ -589,11 +573,26 @@ interface PhoneListHeaderProps {
 }
 
 /**
- * The phone List Header (list-views §7.3, §7.4): the Applied View's name, or
- * "Views" when there is none, as a button opening the Saved Views sheet, with
- * an amber marker announced as
- * "edited", and a Filters icon button showing how many filters differ from
- * the Page Preset. Every control is at least 44px (§7.9). Hidden at md+.
+ * The phone List Header (list-views §7.3, §7.4, §7.10): the Applied View's
+ * name, or "Views" when there is none, as a button opening the Saved Views
+ * sheet, with an amber marker announced as "edited"; the search field; and a
+ * Filters icon button showing how many filters differ from the Page Preset.
+ *
+ * When the field would be narrower than 175px (§7.12), switching a pixel
+ * early per §8.7, it becomes a search icon button between the views button
+ * and Filters. The header measures its own
+ * width and the views button's untruncated width (CORE-RESP-002 boundary),
+ * so a long view name or the Edited marker turns it into an icon sooner.
+ * The icon opens the field across the whole header, covering the views
+ * button and Filters, with a close button that clears the search. The field
+ * stays open while it holds text, through blur and through a navigation
+ * that keeps the search. Opening moves focus into the field; closing moves
+ * it back to the icon.
+ *
+ * It stays pinned under the app header while the rows scroll beneath it;
+ * the `data-list-phone-header` marker lets the scroller's top scroll padding
+ * cover it (§12.5, globals.css). Every control is at least 44px (§7.9).
+ * Hidden at md+.
  */
 export function PhoneListHeader({
   views,
@@ -603,6 +602,8 @@ export function PhoneListHeader({
   display,
   totalCount,
   noun,
+  search,
+  searchEpoch,
   onResetAll,
   onSaveChanges,
   onSaveAsNew,
@@ -613,6 +614,48 @@ export function PhoneListHeader({
   const active = countActiveFilters([...primaryFilters, ...secondaryFilters]);
   // With no Applied View the button reads "Views" (§7.3).
   const viewsName = views.appliedName ?? "Views";
+
+  const headerRef = React.useRef<HTMLDivElement>(null);
+  const laneRef = React.useRef<HTMLDivElement>(null);
+  const fieldRef = React.useRef<ListSearchFieldHandle>(null);
+  const iconRef = React.useRef<HTMLButtonElement>(null);
+  const measured = useMeasuredWidths(
+    headerRef,
+    laneRef,
+    `${viewsName}|${String(views.edited)}`
+  );
+  // A header that is not laid out (display: none at md+) measures zero and
+  // keeps the field.
+  const searchAsIcon =
+    measured !== null &&
+    measured.available > 0 &&
+    phoneSearchAsIcon({
+      available: measured.available,
+      viewsWidth: measured.widths["views"] ?? 0,
+      filtersWidth: FILTERS_WIDTH,
+      gap: HEADER_GAP,
+    });
+  const [opened, setOpened] = React.useState(false);
+  const [hasText, setHasText] = React.useState(search.value !== "");
+  // Opening only means something while search is an icon.
+  if (!searchAsIcon && opened) setOpened(false);
+  const expanded = searchAsIcon && (opened || hasText);
+
+  function openSearch(): void {
+    // Synchronously, so focus lands inside the tap and phones show the
+    // keyboard.
+    flushSync(() => setOpened(true));
+    fieldRef.current?.focus();
+  }
+  function closeSearch(): void {
+    fieldRef.current?.clear();
+    flushSync(() => {
+      setOpened(false);
+      setHasText(false);
+    });
+    iconRef.current?.focus();
+  }
+
   const viewsTrigger = (
     <button
       type="button"
@@ -620,32 +663,37 @@ export function PhoneListHeader({
       // Explicit, because the computed name puts a space before the comma.
       aria-label={views.edited ? `${viewsName}, edited` : viewsName}
       data-testid="list-phone-views-trigger"
-      className="inline-flex min-h-11 min-w-0 items-center gap-1.5 rounded-md px-2 text-sm font-semibold text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+      className={cn(
+        viewsButtonClass,
+        "min-h-11 min-w-0 shrink rounded-md text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+        expanded && "hidden"
+      )}
     >
-      <Bookmark aria-hidden="true" className="size-4 shrink-0" />
-      <span className="truncate">{viewsName}</span>
-      {views.edited ? (
-        <span
-          aria-hidden="true"
-          className="size-2 shrink-0 rounded-full bg-warning"
-        />
-      ) : null}
-      <ChevronDown aria-hidden="true" className="size-4 shrink-0" />
+      <ViewsFace name={viewsName} edited={views.edited} />
     </button>
   );
   const filtersTrigger = (
     <button
       type="button"
       aria-haspopup="dialog"
-      aria-label={active > 0 ? `Filters, ${active} active` : "Filters"}
+      aria-label={
+        active > 0
+          ? `${active} active ${active === 1 ? "filter" : "filters"}`
+          : "Filters"
+      }
       data-testid="list-phone-filters-trigger"
-      className="relative ml-auto inline-flex size-11 shrink-0 items-center justify-center rounded-md text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+      className={cn(
+        iconButtonClass,
+        "relative",
+        !searchAsIcon && "ml-auto",
+        expanded && "hidden"
+      )}
     >
       <SlidersHorizontal aria-hidden="true" className="size-5" />
       {active > 0 ? (
         <span
           aria-hidden="true"
-          className="absolute top-1 right-0.5 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[11px] font-bold text-primary-foreground"
+          className="absolute top-1.5 right-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[11px] font-bold text-primary-foreground"
         >
           {active}
         </span>
@@ -653,7 +701,11 @@ export function PhoneListHeader({
     </button>
   );
   return (
-    <div className="flex min-h-12 items-center gap-0.5 border-b border-outline-variant bg-muted/40 px-2 md:hidden">
+    <div
+      ref={headerRef}
+      data-list-phone-header=""
+      className="sticky top-0 z-20 flex h-12 items-center gap-2 border-y border-outline bg-card-raised pr-1.5 pl-4 sm:pl-8 md:hidden"
+    >
       <SavedViewsSheet
         open={viewsOpen}
         onOpenChange={setViewsOpen}
@@ -663,6 +715,55 @@ export function PhoneListHeader({
         onSaveAsNew={onSaveAsNew}
         onManage={onManage}
       />
+      {/* One field in every state, so typing survives the header switching
+          between the field and the icon. */}
+      <div
+        className={cn(
+          expanded
+            ? "min-w-0 flex-1"
+            : searchAsIcon
+              ? "hidden"
+              : "min-w-24 flex-[1_1_96px]"
+        )}
+        onFocus={() => {
+          // A field the person is in counts as opened, so one that arrived
+          // with a search from the URL stays open when they delete it all.
+          if (searchAsIcon) setOpened(true);
+        }}
+        onBlur={(event) => {
+          // Leaving the header ends "opened"; a field holding text stays open
+          // through `hasText` alone, so clearing it from elsewhere (Reset all)
+          // closes it. Backgrounding the tab or app also blurs it; that isn't
+          // the person leaving, so the field stays open for when they return.
+          if (document.visibilityState === "hidden") return;
+          const next = event.relatedTarget;
+          const staysInHeader =
+            next instanceof Node && headerRef.current?.contains(next) === true;
+          if (!staysInHeader) setOpened(false);
+        }}
+      >
+        <ListSearchField
+          key={searchEpoch}
+          handleRef={fieldRef}
+          id={`${search.id}-phone`}
+          value={search.value}
+          onSearch={search.onSearch}
+          label={search.label}
+          onTextChange={(text) => setHasText(text !== "")}
+        />
+      </div>
+      {searchAsIcon && !expanded ? (
+        <button
+          ref={iconRef}
+          type="button"
+          aria-label={search.label}
+          data-testid="list-phone-search-trigger"
+          onClick={openSearch}
+          className={cn(iconButtonClass, "ml-auto")}
+        >
+          <Search aria-hidden="true" className="size-5" />
+        </button>
+      ) : null}
       <FiltersSheet
         open={filtersOpen}
         onOpenChange={setFiltersOpen}
@@ -675,6 +776,33 @@ export function PhoneListHeader({
         noun={noun}
         onResetAll={onResetAll}
       />
+      {expanded ? (
+        <button
+          type="button"
+          aria-label="Close search"
+          // Keeps focus in the field, so an empty field does not close on
+          // blur before the press lands.
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={closeSearch}
+          className={iconButtonClass}
+        >
+          <X aria-hidden="true" className="size-5" />
+        </button>
+      ) : null}
+      {/* The views button's untruncated width, as a static face kept out of
+          the accessibility tree and clipped so it never widens the page. */}
+      <div
+        ref={laneRef}
+        aria-hidden="true"
+        className="pointer-events-none invisible absolute inset-x-0 top-0 h-0 overflow-hidden"
+      >
+        <span
+          data-measure="views"
+          className={cn("absolute w-max", viewsButtonClass)}
+        >
+          <ViewsFace name={viewsName} edited={views.edited} />
+        </span>
+      </div>
     </div>
   );
 }

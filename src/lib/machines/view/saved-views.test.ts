@@ -20,14 +20,6 @@ const savedView: MachineViewSavedViewSummary = {
     sort: "playability",
     dir: "desc",
     pageSize: 50,
-    columns: [
-      "machine",
-      "playability",
-      "presence",
-      "openIssues",
-      "lastServiced",
-      "lastActivity",
-    ],
   },
 };
 
@@ -105,14 +97,11 @@ describe("saved view URL helpers", () => {
     expect(hasMachineViewConfiguration(new URLSearchParams("page=2"))).toBe(
       false
     );
-    for (const name of [
-      "q",
-      "presence",
-      "status",
-      "severity",
-      "columns",
-      "view",
-    ]) {
+    // The retired columns parameter is ignored, so it configures nothing.
+    expect(
+      hasMachineViewConfiguration(new URLSearchParams("columns=machine"))
+    ).toBe(false);
+    for (const name of ["q", "presence", "status", "severity", "view"]) {
       expect(
         hasMachineViewConfiguration(new URLSearchParams(`${name}=x`))
       ).toBe(true);
