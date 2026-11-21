@@ -6,7 +6,8 @@
 #   heavy  pinpoint-heavy, 1 slot (PINPOINT_HEAVY_SLOTS): check, the full unit
 #          suite, coverage, integration, build, smoke, e2e:full, e2e:all,
 #          pr-screenshots.mjs.
-#          Largest measured peak: `check`, 5.0 GB.
+#          `check` peaked at 5.0 GB when its typechecks ran in parallel; they
+#          now run one after another (PP-p2ts.6): ~2.5 GB.
 #   dev    pinpoint-dev, 2 slots (PINPOINT_DEV_SLOTS): `pnpm run dev`, held
 #          for the server's whole life. Measured: 2.5 GB after 19 routes.
 # Footprints were measured on 2026-11-20 with `footprint` (phys_footprint, not
