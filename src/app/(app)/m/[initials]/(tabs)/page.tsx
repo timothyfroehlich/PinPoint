@@ -1,9 +1,6 @@
 import type React from "react";
 import { notFound } from "next/navigation";
-import { eq } from "drizzle-orm";
 import { getViewer } from "~/lib/auth/viewer";
-import { db } from "~/server/db";
-import { machines } from "~/server/db/schema";
 import { deriveMachineStatus } from "~/lib/machines/status";
 import { RichTextDisplay } from "~/components/editor/RichTextDisplay";
 import { docIsEmpty, docToPlainText } from "~/lib/tiptap/types";
@@ -18,25 +15,26 @@ import {
   getMachineCredits,
   getMachineForLayout,
   getMachinePinTips,
+  getMachineTags,
 } from "../_data";
+import {
+  getSameTitleMachines,
+  type SameTitleMachine,
+} from "~/lib/pinballmap/same-title";
 import { PinTipCard } from "../pin-tip-card";
 import { pinballmapLocationUrl } from "~/lib/pinballmap/public-url";
 import { getPinballMapState } from "~/lib/pinballmap/state";
-import {
-  derivePbmListingView,
-  type PbmSiblingInput,
-} from "~/lib/pinballmap/listing-state";
+import { derivePbmListingView } from "~/lib/pinballmap/listing-state";
 import {
   deriveInsiderConnectedView,
   withInsiderConnected,
-  type PbmIcIntent,
 } from "~/lib/pinballmap/insider-connected";
 import { listSurfacingAbandonedForMachine } from "~/lib/pinballmap/abandoned-listings";
 import { getTopScoresForMachine } from "~/lib/iscored";
 import { TopScoresCard } from "~/components/machines/TopScoresCard";
 import { InfoHero } from "./info-hero";
 import { InfoRail } from "./info-rail";
-import { getTagsForMachine, listTags } from "~/lib/tags/tags";
+import { listTags } from "~/lib/tags/tags";
 import { toTagEditorGroups } from "~/lib/tags/editor";
 import { isRemoved } from "~/lib/machines/presence";
 import { MachineTagEditor } from "~/components/tags/MachineTagEditor";
@@ -157,18 +155,9 @@ export default async function MachineInfoTab({
   // what separates Covered (quiet) from Lingering (out of sync), so deriving
   // without it would raise a warning on a machine whose entry a sibling covers
   // — and send the reader to a Manage tab that says everything is fine.
-  const sameTitle: (PbmSiblingInput & { icIntent: PbmIcIntent | null })[] =
+  const sameTitle: SameTitleMachine[] =
     canDiagnose && machine.pinballmapMachineId !== null
-      ? await db
-          .select({
-            id: machines.id,
-            initials: machines.initials,
-            name: machines.name,
-            intent: machines.pinballmapIntent,
-            icIntent: machines.pinballmapIcIntent,
-          })
-          .from(machines)
-          .where(eq(machines.pinballmapMachineId, machine.pinballmapMachineId))
+      ? await getSameTitleMachines(machine.pinballmapMachineId)
       : [];
 
   const baseListingView = derivePbmListingView({
@@ -218,9 +207,9 @@ export default async function MachineInfoTab({
     machine.iscoredGameId
       ? getTopScoresForMachine(machine.iscoredGameId, 3)
       : Promise.resolve([]),
-    getTagsForMachine(db, machine.id),
+    getMachineTags(machine.id),
     // Request-deduped with the read above; only an editor needs every tag.
-    canTag ? listTags(db) : Promise.resolve(null),
+    canTag ? listTags() : Promise.resolve(null),
     getMachineCredits(machine),
     getMachinePinTips(machine.pinballmapTitle?.opdbId ?? null),
   ]);

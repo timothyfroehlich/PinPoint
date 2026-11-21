@@ -1,5 +1,4 @@
 import type React from "react";
-import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { createClient } from "~/lib/supabase/server";
 import { log } from "~/lib/logger";
@@ -7,8 +6,7 @@ import { getLoginUrl } from "~/lib/login-url";
 import { providers, type ProviderKey } from "~/lib/auth/providers";
 import { canUnlinkIdentity } from "~/lib/auth/identity-guards";
 import { isDiscordIntegrationConfigured } from "~/lib/discord/config";
-import { db } from "~/server/db";
-import { userProfiles } from "~/server/db/schema";
+import { getConnectedAccountsProfile } from "~/app/(app)/settings/_data";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { getPinballMapLinkStatus } from "~/lib/pinballmap/user-credentials";
 import { ConnectedAccountRow } from "./connected-account-row";
@@ -45,10 +43,7 @@ export async function ConnectedAccountsSection(): Promise<React.JSX.Element> {
     // Connect/Disconnect UI uses `auth.identities` (the sign-in capability
     // check); these can diverge briefly during link/unlink, and the runtime
     // cares about delivery readiness, not sign-in.
-    db.query.userProfiles.findFirst({
-      where: eq(userProfiles.id, user.id),
-      columns: { discordUserId: true, role: true },
-    }),
+    getConnectedAccountsProfile(user.id),
     getPinballMapLinkStatus(user.id),
   ]);
   const canReceiveDiscordDms = profile?.discordUserId != null;
