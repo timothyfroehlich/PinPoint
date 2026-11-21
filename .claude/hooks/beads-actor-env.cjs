@@ -22,7 +22,8 @@
  * registered yet when SessionStart runs, so resolving here would be too early.
  *
  * SessionStart fires again on resume, clear, compact and fork. The append is
- * guarded by a marker line so the function is written once per env file.
+ * guarded by a per-session marker line, so each session id is written once.
+ * The lookup is capped at 3 seconds where `timeout` exists, as the old hook was.
  *
  * Fail-open: any error leaves the env file untouched, and the function falls
  * back to the literal "Claude", never to Tim's name. Never blocks a session.
@@ -38,7 +39,11 @@ function functionText(sessionId) {
     `${MARKER} (session ${sessionId})`,
     "bd() {",
     "  local pinpoint_actor",
-    `  pinpoint_actor=$(bash "$HOME/Code/huddle/lib/huddle-whoami.sh" whoami "${sessionId}" 2>/dev/null)`,
+    "  if command -v timeout >/dev/null 2>&1; then",
+    `    pinpoint_actor=$(timeout 3 bash "$HOME/Code/huddle/lib/huddle-whoami.sh" whoami "${sessionId}" 2>/dev/null)`,
+    "  else",
+    `    pinpoint_actor=$(bash "$HOME/Code/huddle/lib/huddle-whoami.sh" whoami "${sessionId}" 2>/dev/null)`,
+    "  fi",
     '  case "$pinpoint_actor" in',
     "    ''|*[!A-Za-z0-9_-]*) pinpoint_actor=Claude ;;",
     "  esac",
@@ -78,7 +83,10 @@ async function main() {
   } catch {
     // A missing file is fine; appendFileSync creates it.
   }
-  if (existing.includes(MARKER)) {
+  // Skip only when this session's block is already there. A clear or fork can
+  // reuse the env file under a new session id; the new block is appended after
+  // the old one, and the later `bd` definition wins when the file is sourced.
+  if (existing.includes(`${MARKER} (session ${sessionId})`)) {
     process.exit(0);
   }
 

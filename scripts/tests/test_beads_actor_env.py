@@ -135,3 +135,28 @@ def test_rejects_unsafe_or_missing_session_id(tmp_path: Path, payload: object) -
 
 def test_no_env_file_is_a_no_op(tmp_path: Path) -> None:
     assert run_hook(None, {"session_id": SESSION_ID}).returncode == 0
+
+
+def test_new_session_id_appends_and_wins(tmp_path: Path) -> None:
+    env_file = tmp_path / "session.env"
+    other = "11111111-2222-3333-4444-555555555555"
+    run_hook(env_file, {"session_id": SESSION_ID})
+    run_hook(env_file, {"session_id": other})
+    run_hook(env_file, {"session_id": other})
+    text = env_file.read_text()
+    assert text.count("# pinpoint-beads-actor") == 2
+    home, bindir = make_home(
+        tmp_path, f'[[ "$*" == "whoami {other}" ]] && echo Claude-Forked\n'
+    )
+    out = run_bd(SHELLS[0], env_file, home, bindir, "bd show")
+    assert out == "actor=Claude-Forked args=show"
+
+
+def test_hung_lookup_is_capped(tmp_path: Path) -> None:
+    if not shutil.which("timeout"):
+        pytest.skip("no timeout command on this host")
+    env_file = tmp_path / "session.env"
+    run_hook(env_file, {"session_id": SESSION_ID})
+    home, bindir = make_home(tmp_path, "sleep 30\necho Claude-Late\n")
+    out = run_bd(SHELLS[0], env_file, home, bindir, "bd show")
+    assert out == "actor=Claude args=show"
