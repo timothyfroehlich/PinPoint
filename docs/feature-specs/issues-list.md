@@ -35,8 +35,8 @@
 - **3.6** _Retired 2026-10-11._ Rows kept their place after an inline change; with no inline editing (3.11) there is nothing to keep in place. Number kept so older citations don't dangle.
 - **3.7** An unassigned issue shows an empty avatar announced as "Unassigned". Assignee names never show email addresses.
 - **3.8** Rows lead with a status dot in the status color whose shape marks the status group, as Playability dots do on machine rows: a ring for New, a filled circle for In Progress, a diamond for Closed. The status pill still shows the status by name.
-- **3.9** When line 2 does not fit, it drops the age first, then the comment count, then the priority pill, then the assignee's initials; the machine name truncates only after all four are gone.
-- **3.10** Row fields rank, most to least important: title, machine, status, severity, assignee, priority, comment count, age, issue ID. A field that gives way for room gives way in reverse of this order, except the issue ID, which never gives way (3.3).
+- **3.9** When line 2 does not fit, it drops the age first, then the comment count; then the machine name truncates, down to not showing at all, since the issue ID still names the machine; then the priority pill drops, then the assignee's initials.
+- **3.10** Row fields rank, most to least important: title, status, severity, assignee, priority, machine, comment count, age, issue ID. A field that gives way for room gives way in reverse of this order, except the issue ID, which never gives way (3.3).
 - **3.11** Rows never change an issue; status, severity, priority, and assignee are read-only values on the row for everyone.
 - **3.12** The whole row is a link to the issue, and the machine name is its own link to the machine.
 - **3.13** On List View pages, the status, severity, and priority pills have no border: a scoped exception to the design bible's chip style (§1, state colors), which keeps its border everywhere else.
@@ -97,6 +97,7 @@
 
 | Requirement | Divergence | Resolution |
 | :-- | :-- | :-- |
+| 3.9, 3.10 | Line 2 drops the priority pill and the assignee's initials before the machine name truncates, and the name never disappears. | Issue row machine-name PR (follows this spec change). |
 | 4.2 | The Primary Filters run Status, Severity, Priority, Machine, Assignee, Machine Presence. | Desktop List Header PR (PP-jb9v.16). |
 | 2.3, 2.4 | Issues has no page actions; Export sits in the desktop List Header on `/issues` and on every Issues tab, and phones offer no Export. | PP-jb9v.17 |
 
@@ -106,6 +107,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-11-20 | On line 2 the machine name gives way before the priority pill and the assignee: it truncates, down to not showing, after the age and comment count drop (3.9); the field ranking moves machine below priority (3.10). |
 | 2026-11-15 | Line 2 puts the assignee, comment count, and age in a group anchored to the right end (3.3); separator dots only between plain-text items (3.14); the priority stays a pill. |
 | 2026-10-12 | Issue rows: a leading status dot shaped by status group, with the status pill kept (3.2, 3.8); line 2 lines up with the title (3.1); the age shows as an activity icon and “2d ago” at every width (3.3); the status and severity pills wrap as a pair (3.2); the issue ID shows at every screen size, phones included (3.3, 3.10); the comment count returns on line 2 when above zero, dropping right after the age (3.3, 3.4, 3.9, 3.10). |
 | 2026-10-11 | Primary Filters reordered by field importance: Machine, Status, Severity, Assignee, Priority, Machine Presence (4.2). Issue View's only page action is ⋯, holding Export, on `/issues` and in the Collection's or Tag's ⋯ on an Issues tab, at every width (2.3, 2.4); Export is offered only to signed-in people (5.4). |
