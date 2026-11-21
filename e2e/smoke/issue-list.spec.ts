@@ -6,6 +6,7 @@ import {
   setListFilterOptions,
 } from "../support/actions.js";
 import { seededIssue } from "../support/constants.js";
+import { clickPageAction } from "../support/page-actions.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
 
 /** The List View's announced result count (list-views §12.4). */
@@ -121,11 +122,9 @@ test.describe("Issue List Features", () => {
       .not.toBe("999");
   });
 
-  test("should export issues to CSV", async ({ page }, testInfo) => {
-    test.skip(
-      testInfo.project.name.includes("Mobile"),
-      "Export sits in the desktop List Header (list-views §5.5); the phone header has none (§7.3)"
-    );
+  // Export is an entry in ⋯, the page's only action, at every width
+  // including phones (issues-list §2.3, list-views §5.5).
+  test("should export issues to CSV", async ({ page }) => {
     await page.goto("/issues");
 
     // Wait for issue list to load
@@ -134,7 +133,7 @@ test.describe("Issue List Features", () => {
     // Set up download listener before clicking
     const downloadPromise = page.waitForEvent("download");
 
-    await page.getByRole("button", { name: "Export to CSV" }).click();
+    await clickPageAction(page, "Export to CSV");
 
     // Verify download was triggered
     const download = await downloadPromise;

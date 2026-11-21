@@ -69,6 +69,9 @@ describe("RouteTabStrip", () => {
       name: "More machine sections",
     });
     expect(trigger.tagName).toBe("BUTTON");
+    // The one overflow icon, ⋯, rather than a typed "…" (design-bible §26.3).
+    expect(trigger.querySelector("svg.lucide-ellipsis")).not.toBeNull();
+    expect(trigger).not.toHaveTextContent("…");
 
     await user.click(trigger);
     const menu = await screen.findByRole("menu");

@@ -1,12 +1,8 @@
 import type React from "react";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { PageContainer } from "~/components/layout/PageContainer";
-import { AddTagDialog } from "~/components/tags/AddTagDialog";
-import { AddTagTypeDialog } from "~/components/tags/AddTagTypeDialog";
 import { TagGroupCard, tagGroupKey } from "~/components/tags/TagGroupCard";
-import { Button } from "~/components/ui/button";
-import { SETTINGS_TAGS_HREF } from "~/lib/machines/settings-tags";
+import { TagsPageActions } from "~/components/tags/TagsPageActions";
 import { getViewer } from "~/lib/auth/viewer";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { listTags } from "~/lib/tags/tags";
@@ -37,25 +33,11 @@ export default async function TagsPage(): Promise<React.JSX.Element> {
   return (
     <PageContainer size="standard" className="max-w-4xl">
       <div className="space-y-6">
-        <div className="flex flex-col gap-3 border-b border-outline-variant pb-3 md:flex-row md:items-end md:justify-between md:pb-2">
-          <h1 className="text-balance text-3xl font-bold tracking-tight">
+        <div className="flex min-h-11 items-center gap-3 border-b border-outline-variant pb-2">
+          <h1 className="shrink-0 text-balance text-3xl font-bold tracking-tight">
             Tags
           </h1>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              asChild
-              variant="ghost"
-              className="text-primary max-md:h-11"
-            >
-              <Link href={SETTINGS_TAGS_HREF}>Settings tags</Link>
-            </Button>
-            {canManage ? (
-              <>
-                <AddTagTypeDialog />
-                <AddTagDialog types={handTypes} />
-              </>
-            ) : null}
-          </div>
+          <TagsPageActions manage={canManage ? { types: handTypes } : null} />
         </div>
         {shown.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">

@@ -1,11 +1,11 @@
 import type React from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { MapPin, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { MachineView } from "~/components/machines/view";
-import { MachinesPrintMenu } from "~/components/machines/MachinesPrintMenu";
+import { MachinesPageActions } from "~/components/machines/MachinesPageActions";
+import { ListTitleRow } from "~/components/list-view";
 import { PageContainer } from "~/components/layout/PageContainer";
-import { PageHeader } from "~/components/layout/PageHeader";
 import { Button } from "~/components/ui/button";
 import { EmptyState } from "~/components/ui/empty-state";
 import { getViewer } from "~/lib/auth/viewer";
@@ -61,54 +61,19 @@ export default async function MachinesPage({
       ? getQueuedApronCardIds(viewer.userId)
       : Promise.resolve([]),
   ]);
-  const apronQueueCount = queuedApronCardIds.length;
-  // On phones the actions shrink to icon buttons that keep their accessible
-  // names (list-views §7.2).
-  const lineupButton = canViewLineup ? (
-    <Button
-      asChild
-      variant="outline"
-      className="max-md:size-11 max-md:px-0"
-      data-testid="pinball-map-lineup-button"
-    >
-      <Link href="/m/pinball-map" aria-label="Pinball Map">
-        <MapPin className="size-4 md:mr-2" aria-hidden="true" />
-        <span className="max-md:hidden">Pinball Map</span>
-      </Link>
-    </Button>
-  ) : null;
-  const addMachineButton = canCreateMachine ? (
-    <Button
-      asChild
-      className="bg-primary text-on-primary hover:bg-primary/90 max-md:h-11 max-[389px]:w-11 max-[389px]:px-0"
-      data-testid="add-machine-button"
-    >
-      <Link href="/m/new" aria-label="Add Machine">
-        <Plus
-          className="size-4 min-[390px]:mr-1.5 md:mr-2"
-          aria-hidden="true"
-        />
-        <span className="max-[389px]:hidden">
-          Add<span className="max-md:hidden"> Machine</span>
-        </span>
-      </Link>
-    </Button>
-  ) : null;
   const pageActions = (
-    <>
-      {lineupButton}
-      <MachinesPrintMenu
-        canPrintApronCards={canPrintApronCards}
-        apronQueueCount={apronQueueCount}
-      />
-      {addMachineButton}
-    </>
+    <MachinesPageActions
+      canViewLineup={canViewLineup}
+      canCreateMachine={canCreateMachine}
+      canPrintApronCards={canPrintApronCards}
+      apronQueueCount={queuedApronCardIds.length}
+    />
   );
 
   if (result.scopeCount === 0) {
     return (
       <PageContainer size="wide">
-        <PageHeader title="Machines" actions={pageActions} />
+        <ListTitleRow title="Machines" actions={pageActions} />
         <EmptyState
           icon={Plus}
           title="No machines yet"

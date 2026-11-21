@@ -3,7 +3,6 @@
 import type React from "react";
 import { useId, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import {
   Dialog,
@@ -12,7 +11,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "~/components/ui/dialog";
 import { Label } from "~/components/ui/label";
 import {
@@ -33,26 +31,39 @@ interface TagTypeOption {
   name: string;
 }
 
-type AddTagDialogProps =
-  /** From the tag browse: the person picks a hand-applied type, or none. */
-  | { types: TagTypeOption[]; type?: undefined }
-  /** From a hand-applied type's page: the tag joins that type. */
-  | { type: TagTypeOption; types?: undefined };
+type AddTagDialogProps = (
+  | /** From the tag browse: the person picks a hand-applied type, or none. */
+    { types: TagTypeOption[]; type?: undefined }
+    /** From a hand-applied type's page: the tag joins that type. */
+  | { type: TagTypeOption; types?: undefined }
+) & {
+  /** Opens from the page's Add tag action (design-bible §26.1). */
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  /** Where focus goes when the dialog closes (useReturnFocus). */
+  onCloseAutoFocus?: ((event: Event) => void) | undefined;
+};
 
 /** "Add tag" on the tag browse and on a hand-applied type's page (spec 11.3, 11.12). */
-export function AddTagDialog(props: AddTagDialogProps): React.JSX.Element {
-  const [open, setOpen] = useState(false);
+export function AddTagDialog({
+  types,
+  type,
+  open,
+  onOpenChange,
+  onCloseAutoFocus,
+}: AddTagDialogProps): React.JSX.Element {
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button className="gap-2">
-          <Plus className="size-4 shrink-0" aria-hidden="true" />
-          Add tag
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-sm">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="sm:max-w-sm"
+        onCloseAutoFocus={onCloseAutoFocus}
+      >
         {/* Mounts with the content, so each open starts clean. */}
-        <AddTagForm {...props} onClose={() => setOpen(false)} />
+        <AddTagForm
+          types={types}
+          type={type}
+          onClose={() => onOpenChange(false)}
+        />
       </DialogContent>
     </Dialog>
   );
@@ -62,7 +73,11 @@ function AddTagForm({
   types,
   type,
   onClose,
-}: AddTagDialogProps & { onClose: () => void }): React.JSX.Element {
+}: {
+  types: TagTypeOption[] | undefined;
+  type: TagTypeOption | undefined;
+  onClose: () => void;
+}): React.JSX.Element {
   const id = useId();
   const router = useRouter();
   const [name, setName] = useState("");

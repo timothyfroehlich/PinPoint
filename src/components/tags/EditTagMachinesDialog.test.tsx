@@ -2,7 +2,24 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { EditTagMachinesDialog } from "./EditTagMachinesDialog";
+import { useState } from "react";
+import {
+  EditTagMachinesDialog,
+  type TagMachinesEditor,
+} from "./EditTagMachinesDialog";
+
+/** Edit machines in the tag page's ⋯ opens the dialog (4.17). */
+function EditMachinesHarness(props: TagMachinesEditor): React.JSX.Element {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)}>
+        Edit machines
+      </button>
+      <EditTagMachinesDialog {...props} open={open} onOpenChange={setOpen} />
+    </>
+  );
+}
 
 const setTagMachines = vi.fn();
 vi.mock("~/app/(app)/c/tags/actions", () => ({
@@ -20,7 +37,7 @@ const allMachines = [
 
 function renderDialog(): void {
   render(
-    <EditTagMachinesDialog
+    <EditMachinesHarness
       tagId="storage"
       tagName="Storage"
       context="Location · One per machine"

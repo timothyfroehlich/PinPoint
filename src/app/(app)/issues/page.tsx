@@ -18,8 +18,8 @@ interface IssuesPageProps {
 
 /**
  * The Issues page, Issue View's main page (issues-list §2.1, §2.3): every
- * issue, with no page action; reporting an issue stays in the app header and
- * tab bar.
+ * issue, with ⋯ holding Export as its only page action; reporting an issue
+ * stays in the app header and tab bar.
  */
 export default async function IssuesPage({
   searchParams,

@@ -2,12 +2,11 @@ import type React from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ClipboardList, Tag, Trophy } from "lucide-react";
+import { Tag, Trophy } from "lucide-react";
 
 import { PageContainer } from "~/components/layout/PageContainer";
-import { SettingsTagActionsMenu } from "~/components/settings-tags/SettingsTagActionsMenu";
+import { SettingsTagPageActions } from "~/components/settings-tags/SettingsTagPageActions";
 import { Badge } from "~/components/ui/badge";
-import { Button } from "~/components/ui/button";
 import { getViewer } from "~/lib/auth/viewer";
 import { formatDate } from "~/lib/dates";
 import {
@@ -100,7 +99,7 @@ export default async function SettingsTagPage({
             Settings tags
           </Link>
         </nav>
-        <div className="flex flex-wrap items-end justify-between gap-3 border-b border-outline-variant pb-3">
+        <div className="flex items-end gap-3 border-b border-outline-variant pb-3">
           <div className="flex min-w-0 flex-col gap-1">
             <h1 className="text-balance text-3xl font-bold tracking-tight [overflow-wrap:anywhere]">
               {tag.name}
@@ -109,22 +108,14 @@ export default async function SettingsTagPage({
               Settings tag · {setsOnMachinesPhrase(setCount, machineCount)}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button asChild className="max-md:h-11">
-              <Link href={settingsTagPrintHref(tag.slug, tag.machines)}>
-                <ClipboardList className="size-4" aria-hidden="true" />
-                Print settings sheets
-              </Link>
-            </Button>
-            {canManage ? (
-              <SettingsTagActionsMenu
-                tagId={tag.id}
-                name={tag.name}
-                setCount={setCount}
-                machineCount={machineCount}
-              />
-            ) : null}
-          </div>
+          <SettingsTagPageActions
+            printHref={settingsTagPrintHref(tag.slug, tag.machines)}
+            manage={
+              canManage
+                ? { tagId: tag.id, name: tag.name, setCount, machineCount }
+                : null
+            }
+          />
         </div>
 
         {tag.machines.length === 0 ? (

@@ -2,13 +2,34 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { useState, type ComponentProps } from "react";
 import { EditCollectionDialog } from "./EditCollectionDialog";
 
+/** Edit collection in ⋯ opens the dialog (collections-and-tags 4.17). */
+function EditHarness(
+  props: Omit<
+    ComponentProps<typeof EditCollectionDialog>,
+    "open" | "onOpenChange"
+  >
+): React.JSX.Element {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        data-testid="collection-edit-trigger"
+        onClick={() => setOpen(true)}
+      >
+        Edit collection
+      </button>
+      <EditCollectionDialog {...props} open={open} onOpenChange={setOpen} />
+    </>
+  );
+}
+
 const updateAction = vi.fn();
-const deleteAction = vi.fn();
 vi.mock("~/app/(app)/c/collections/actions", () => ({
   updateCollectionAction: (input: unknown) => updateAction(input),
-  deleteCollectionAction: (input: unknown) => deleteAction(input),
 }));
 
 // The real editor is a dynamic TipTap import. Swap it for an uncontrolled
@@ -64,15 +85,14 @@ const allMachines = [
 
 const savedDescription = paragraphDoc("Saved description");
 
-function renderDialog(canDelete = true): void {
+function renderDialog(): void {
   render(
-    <EditCollectionDialog
+    <EditHarness
       collectionId="c1"
       currentName="My Faves"
       currentDescription={savedDescription}
       allMachines={allMachines}
       currentIds={["m1"]}
-      canDelete={canDelete}
     />
   );
 }
@@ -80,7 +100,6 @@ function renderDialog(canDelete = true): void {
 describe("EditCollectionDialog", () => {
   beforeEach(() => {
     updateAction.mockReset();
-    deleteAction.mockReset();
     push.mockReset();
     refresh.mockReset();
   });
@@ -146,131 +165,13 @@ describe("EditCollectionDialog", () => {
     expect(refresh).not.toHaveBeenCalled();
   });
 
-  it("deletes behind a confirm and navigates to the list", async () => {
-    deleteAction.mockResolvedValue({ success: true });
+  it("has no delete control; Delete collection is its own ⋯ entry (4.17)", async () => {
     renderDialog();
-
     await userEvent.click(screen.getByTestId("collection-edit-trigger"));
-    // Opening the danger-zone confirm should not delete yet.
-    await userEvent.click(screen.getByTestId("collection-delete-trigger"));
-    expect(deleteAction).not.toHaveBeenCalled();
-
-    await userEvent.click(screen.getByTestId("collection-delete-confirm"));
-    await waitFor(() =>
-      expect(deleteAction).toHaveBeenCalledWith({ collectionId: "c1" })
-    );
-    await waitFor(() => expect(push).toHaveBeenCalledWith("/c/collections"));
-  });
-
-  it("shows the error message inside the alert dialog when delete fails", async () => {
-    deleteAction.mockResolvedValue({
-      success: false,
-      error: "Cannot delete this collection",
-    });
-    renderDialog();
-
-    await userEvent.click(screen.getByTestId("collection-edit-trigger"));
-    await userEvent.click(screen.getByTestId("collection-delete-trigger"));
-    await userEvent.click(screen.getByTestId("collection-delete-confirm"));
-
-    const alertDialog = screen.getByRole("alertdialog");
-    expect(await within(alertDialog).findByRole("alert")).toHaveTextContent(
-      "Cannot delete this collection"
-    );
-    expect(push).not.toHaveBeenCalled();
-  });
-
-  it("offers a route back when the collection is already gone", async () => {
-    deleteAction.mockResolvedValue({
-      success: false,
-      error:
-        "This collection is no longer available. It may already have been deleted.",
-      code: "not_found",
-    });
-    renderDialog();
-
-    await userEvent.click(screen.getByTestId("collection-edit-trigger"));
-    await userEvent.click(screen.getByTestId("collection-delete-trigger"));
-    await userEvent.click(screen.getByTestId("collection-delete-confirm"));
-
-    const alertDialog = screen.getByRole("alertdialog");
-    expect(await within(alertDialog).findByRole("alert")).toHaveTextContent(
-      "This collection is no longer available. It may already have been deleted."
-    );
+    const dialog = screen.getByRole("dialog", { name: "Edit collection" });
     expect(
-      within(alertDialog).getByRole("heading", {
-        name: "Collection unavailable",
-      })
-    ).toBeInTheDocument();
-    expect(
-      within(alertDialog).queryByText("Delete this collection?")
+      within(dialog).queryByRole("button", { name: /delete/i })
     ).not.toBeInTheDocument();
-    const backLink = within(alertDialog).getByRole("link", {
-      name: "Back to collections",
-    });
-    expect(backLink).toHaveAttribute("href", "/c/collections");
-    expect(
-      within(alertDialog).queryByTestId("collection-delete-confirm")
-    ).not.toBeInTheDocument();
-    await userEvent.click(backLink);
-  });
-
-  it("keeps the confirmation open while deletion is pending so a failure stays visible", async () => {
-    let settleDelete: (result: {
-      success: false;
-      error: string;
-    }) => void = () => {
-      throw new Error("Delete request was not started");
-    };
-    deleteAction.mockReturnValue(
-      new Promise<{ success: false; error: string }>((resolve) => {
-        settleDelete = resolve;
-      })
-    );
-    renderDialog();
-
-    await userEvent.click(screen.getByTestId("collection-edit-trigger"));
-    await userEvent.click(screen.getByTestId("collection-delete-trigger"));
-    await userEvent.click(screen.getByTestId("collection-delete-confirm"));
-    await waitFor(() =>
-      expect(
-        screen.getByRole("button", { name: "Keep collection" })
-      ).toBeDisabled()
-    );
-
-    await userEvent.keyboard("{Escape}");
-    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
-
-    settleDelete({ success: false, error: "Cannot delete this collection" });
-    expect(
-      await within(screen.getByRole("alertdialog")).findByRole("alert")
-    ).toHaveTextContent("Cannot delete this collection");
-  });
-
-  it("does not show a stale save error in the delete confirmation", async () => {
-    updateAction.mockResolvedValue({
-      success: false,
-      error: "Unknown machine",
-    });
-    renderDialog();
-
-    await userEvent.click(screen.getByTestId("collection-edit-trigger"));
-    await userEvent.click(screen.getByTestId("collection-save"));
-    expect(await screen.findByText("Unknown machine")).toBeInTheDocument();
-
-    await userEvent.click(screen.getByTestId("collection-delete-trigger"));
-    expect(
-      within(screen.getByRole("alertdialog")).queryByRole("alert")
-    ).not.toBeInTheDocument();
-  });
-
-  it("hides the delete control for an editor (canDelete=false)", async () => {
-    renderDialog(false);
-    await userEvent.click(screen.getByTestId("collection-edit-trigger"));
-    expect(
-      screen.queryByTestId("collection-delete-trigger")
-    ).not.toBeInTheDocument();
-    // Save is still available — editors can edit content.
-    expect(screen.getByTestId("collection-save")).toBeInTheDocument();
+    expect(within(dialog).getByTestId("collection-save")).toBeInTheDocument();
   });
 });

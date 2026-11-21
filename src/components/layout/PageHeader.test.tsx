@@ -56,6 +56,20 @@ describe("PageHeader", () => {
     ).toBeInTheDocument();
   });
 
+  it("puts pageActions in the title row itself, after the title", () => {
+    render(
+      <PageHeader
+        title="My Page"
+        pageActions={<div data-testid="page-actions" />}
+      />
+    );
+    const pageActions = screen.getByTestId("page-actions");
+    const heading = screen.getByRole("heading", { level: 1 });
+    expect(pageActions.parentElement).toBe(
+      heading.parentElement?.parentElement
+    );
+  });
+
   it("does not render actions container when actions is undefined", () => {
     render(<PageHeader title="My Page" />);
     expect(screen.queryByRole("button")).not.toBeInTheDocument();

@@ -32,4 +32,14 @@ describe("ProfileHero", () => {
       "/u/x?edit=1"
     );
   });
+
+  it("shows Edit profile as the page's only action, an outlined page action (design-bible §26)", () => {
+    render(<ProfileHero {...base} isOwn={true} editHref="/u/x?edit=1" />);
+    const edit = screen.getByRole("link", { name: "Edit profile" });
+    expect(edit.closest("[data-page-actions]")).not.toBeNull();
+    expect(edit).not.toHaveClass("bg-primary");
+    expect(
+      screen.queryByRole("button", { name: "More" })
+    ).not.toBeInTheDocument();
+  });
 });

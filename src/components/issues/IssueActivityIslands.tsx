@@ -2,7 +2,6 @@
 
 import React, { useActionState, useTransition } from "react";
 import { useFormStatus } from "react-dom";
-import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   deleteCommentAction,
@@ -21,13 +20,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "~/components/ui/alert-dialog";
-import { Button } from "~/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "~/components/ui/dropdown-menu";
+import { ItemActionsMenu } from "~/components/list-view/ItemActionsMenu";
 import { type ProseMirrorDoc } from "~/lib/tiptap/types";
 import { holdKeyboardForUpcomingField } from "~/lib/ios-keyboard";
 import { UnsavedChangesGuard } from "~/hooks/use-unsaved-changes-guard";
@@ -301,9 +294,6 @@ export function CommentShell({
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const articleRef = React.useRef<HTMLElement>(null);
   const triggerRef = React.useRef<HTMLButtonElement>(null);
-  // A menu choice moves focus itself (into the editor or the dialog), so the
-  // menu must not pull it back to the ⋯ button as it closes.
-  const menuChoiceRef = React.useRef<"edit" | "delete" | null>(null);
   // Set when the editor closes while focus is in it (or already lost).
   const restoreFocusRef = React.useRef(false);
 
@@ -342,68 +332,48 @@ export function CommentShell({
 
         {canEdit || canDelete ? (
           // Non-modal, so it doesn't pull focus back into itself when Edit
-          // moves focus toward the editor.
-          <DropdownMenu modal={false}>
-            <DropdownMenuTrigger asChild>
-              <Button
-                ref={triggerRef}
-                variant="ghost"
-                size="icon"
-                className="-my-2.5 -mr-2.5 size-11 text-muted-foreground md:-my-1.5 md:-mr-1.5 md:size-8"
-                aria-label="Comment actions"
-                // Which comment, for a screen reader moving by buttons.
-                aria-describedby={labelledBy}
-              >
-                <MoreHorizontal className="size-4" aria-hidden="true" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              onCloseAutoFocus={(event) => {
-                const choice = menuChoiceRef.current;
-                if (!choice) return;
-                event.preventDefault();
-                menuChoiceRef.current = null;
-              }}
-            >
-              {canEdit ? (
-                <DropdownMenuItem
-                  className="max-md:min-h-11"
-                  onSelect={() => {
-                    menuChoiceRef.current = "edit";
-                    // The editor loads after the tap, too late for iOS to
-                    // raise the keyboard for it; hold the keyboard up until
-                    // the editor's autofocus takes over.
-                    if (articleRef.current) {
-                      holdKeyboardForUpcomingField(articleRef.current);
-                    }
-                    setIsEditing(true);
-                  }}
-                >
-                  <Pencil className="mr-2 size-4" aria-hidden="true" />
-                  <span>Edit</span>
-                </DropdownMenuItem>
-              ) : null}
-              {canDelete ? (
-                <DropdownMenuItem
-                  // Red text on the popover (4.8:1); highlighted, the text
-                  // turns light on a red tint (16:1), where red text would
-                  // fall under 4.5:1.
-                  className="text-destructive-text focus:bg-destructive/10 focus:text-foreground max-md:min-h-11"
-                  onSelect={() => {
-                    menuChoiceRef.current = "delete";
-                    setIsDeleteDialogOpen(true);
-                  }}
-                >
-                  <Trash2
-                    className="mr-2 size-4 text-destructive-text"
-                    aria-hidden="true"
-                  />
-                  <span>Delete</span>
-                </DropdownMenuItem>
-              ) : null}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          // moves focus toward the editor. Both choices move focus
+          // themselves (into the editor or the dialog), so the menu leaves
+          // it there.
+          <ItemActionsMenu
+            label="Comment actions"
+            // Which comment, for a screen reader moving by buttons.
+            describedBy={labelledBy}
+            modal={false}
+            triggerRef={triggerRef}
+            triggerClassName="-my-2.5 -mr-2.5 md:-my-1.5 md:-mr-1.5"
+            sections={[
+              canEdit
+                ? [
+                    {
+                      key: "edit",
+                      label: "Edit",
+                      keepsFocus: true,
+                      onSelect: () => {
+                        // The editor loads after the tap, too late for iOS
+                        // to raise the keyboard for it; hold the keyboard up
+                        // until the editor's autofocus takes over.
+                        if (articleRef.current) {
+                          holdKeyboardForUpcomingField(articleRef.current);
+                        }
+                        setIsEditing(true);
+                      },
+                    },
+                  ]
+                : [],
+              canDelete
+                ? [
+                    {
+                      key: "delete",
+                      label: "Delete",
+                      destructive: true,
+                      keepsFocus: true,
+                      onSelect: () => setIsDeleteDialogOpen(true),
+                    },
+                  ]
+                : [],
+            ]}
+          />
         ) : null}
       </div>
 

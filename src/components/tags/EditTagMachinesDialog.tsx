@@ -3,7 +3,7 @@
 import type React from "react";
 import { useId, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
 import {
@@ -23,7 +23,8 @@ interface PickerMachine {
   name: string;
 }
 
-interface EditTagMachinesDialogProps {
+/** The tag and the machines its editor offers. */
+export interface TagMachinesEditor {
   tagId: string;
   tagName: string;
   /** "Location · One per machine", or null for a tag with no tag type. */
@@ -35,9 +36,22 @@ interface EditTagMachinesDialogProps {
    * type, mapped to that tag's name. Adding it here moves it (spec 11.5).
    */
   otherTagByMachine: Record<string, string>;
-  /** The empty tag's call to action reads "Add machines". */
-  variant?: "edit" | "add";
 }
+
+/**
+ * Either the empty tag's own "Add machines" button opens the editor, or
+ * Edit machines in the tag page's ⋯ does (collections-and-tags 4.17).
+ */
+type EditTagMachinesDialogProps = TagMachinesEditor &
+  (
+    | { variant: "add" }
+    | {
+        open: boolean;
+        onOpenChange: (open: boolean) => void;
+        /** Where focus goes when the dialog closes (useReturnFocus). */
+        onCloseAutoFocus?: ((event: Event) => void) | undefined;
+      }
+  );
 
 function plural(count: number, word: string): string {
   return `${String(count)} ${word}${count === 1 ? "" : "s"}`;
@@ -48,34 +62,40 @@ function plural(count: number, word: string): string {
  * checkbox, the tag's current machines checked. Saving gives the tag exactly
  * the checked machines.
  */
-export function EditTagMachinesDialog({
-  variant = "edit",
-  ...props
-}: EditTagMachinesDialogProps): React.JSX.Element {
-  const [open, setOpen] = useState(false);
+export function EditTagMachinesDialog(
+  props: EditTagMachinesDialogProps
+): React.JSX.Element {
+  const [ownOpen, setOwnOpen] = useState(false);
+  const controlled = "open" in props;
+  const open = controlled ? props.open : ownOpen;
+  const setOpen = controlled ? props.onOpenChange : setOwnOpen;
+  const onCloseAutoFocus = controlled ? props.onCloseAutoFocus : undefined;
+  const editor: TagMachinesEditor = {
+    tagId: props.tagId,
+    tagName: props.tagName,
+    context: props.context,
+    allMachines: props.allMachines,
+    currentIds: props.currentIds,
+    otherTagByMachine: props.otherTagByMachine,
+  };
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {variant === "add" ? (
+      {controlled ? null : (
+        <DialogTrigger asChild>
           <Button className="gap-2">
             <Plus className="size-4 shrink-0" aria-hidden="true" />
             Add machines
           </Button>
-        ) : (
-          // Icon-only below md so the tag's name keeps the header row.
-          <Button variant="outline" className="gap-2 max-md:size-9 max-md:px-0">
-            <Pencil className="size-4 shrink-0" aria-hidden="true" />
-            <span className="max-md:sr-only">Edit machines</span>
-          </Button>
-        )}
-      </DialogTrigger>
+        </DialogTrigger>
+      )}
       <DialogContent
         className="flex max-h-[calc(100dvh-2rem)] flex-col gap-0 p-0 sm:max-w-lg"
+        onCloseAutoFocus={onCloseAutoFocus}
         // A stray backdrop click shouldn't discard the selection.
         onInteractOutside={(event) => event.preventDefault()}
       >
         {/* Mounts with the content, so each open starts from the saved set. */}
-        <EditTagMachinesForm {...props} onClose={() => setOpen(false)} />
+        <EditTagMachinesForm {...editor} onClose={() => setOpen(false)} />
       </DialogContent>
     </Dialog>
   );
@@ -89,7 +109,7 @@ function EditTagMachinesForm({
   currentIds,
   otherTagByMachine,
   onClose,
-}: Omit<EditTagMachinesDialogProps, "variant"> & {
+}: TagMachinesEditor & {
   onClose: () => void;
 }): React.JSX.Element {
   const id = useId();

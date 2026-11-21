@@ -22,7 +22,10 @@ import {
 
 interface ListTitleRowProps {
   title: string;
-  /** The host's page actions (§3.2). */
+  /**
+   * The host's page actions (§3.2), drawn with PageActions, which takes the
+   * row's free width and fits itself there (§3.8, §3.9, §7.2).
+   */
   actions?: React.ReactNode;
 }
 
@@ -35,16 +38,11 @@ export function ListTitleRow({
   actions,
 }: ListTitleRowProps): React.JSX.Element {
   return (
-    // Actions that still do not fit as icon buttons wrap below the title.
-    <div className="flex min-h-11 flex-wrap items-center gap-x-1.5 gap-y-2 md:gap-x-3">
+    <div className="flex min-h-11 items-center gap-x-2.5 md:gap-x-3.5">
       <h1 className="shrink-0 text-2xl font-bold tracking-tight md:text-3xl">
         {title}
       </h1>
-      {actions ? (
-        <div className="ml-auto flex shrink-0 items-center gap-2">
-          {actions}
-        </div>
-      ) : null}
+      {actions}
     </div>
   );
 }
@@ -72,8 +70,11 @@ interface ListViewProps {
   sort: ListSortModel;
   display: ListDisplayModel;
   pagination: ListPaginationModel;
-  /** Export, when the host offers it (§5.5). */
-  exportControl?: React.ReactNode;
+  /**
+   * An action on the whole result in the List Header, such as Add all on
+   * Print settings sheets. Export is a page action in ⋯ instead (§5.5).
+   */
+  listAction?: React.ReactNode;
   /** A new result is loading (§3.5). */
   busy: boolean;
   /** Returns every filter to its Page Preset value (§7.5). */
@@ -111,7 +112,7 @@ export function ListView({
   sort,
   display,
   pagination,
-  exportControl,
+  listAction,
   busy,
   onResetAll,
   emptyState,
@@ -203,7 +204,7 @@ export function ListView({
           sort={sort}
           pagination={pagination}
           display={display}
-          exportControl={exportControl}
+          listAction={listAction}
           onSaveChanges={saveChanges}
           onSaveAsNew={openSaveAsNew}
           onManage={openManage}

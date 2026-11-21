@@ -10,10 +10,10 @@
  *   Export prints the chosen card;
  * - Export marks a saved card that does not fit and needs the override;
  * - a signed-out visitor gets no tab and cannot print;
- * - a member opens Print apron cards from the Machines list's Print menu, picks a card,
+ * - a member opens Print apron cards from the Machines list's ⋯, picks a card,
  *   and downloads its size's print file; a card that does not fit needs the
  *   page's override (§12);
- * - a member queues a card from Export, the Machines list shows the count,
+ * - a member queues a card from Export, the Machines list's ⋯ shows the count,
  *   the print page opens with it selected, and Mark as printed clears it
  *   (§13).
  *
@@ -27,6 +27,11 @@
 import { test, expect } from "../support/fixtures.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
 import { TEST_USERS } from "../support/constants.js";
+import {
+  clickPageAction,
+  openPageActions,
+  pageActionsEntry,
+} from "../support/page-actions.js";
 import {
   createTestMachine,
   deleteTestMachine,
@@ -267,8 +272,9 @@ test.describe("Print apron cards", () => {
     page,
   }) => {
     await page.goto("/m");
-    await page.getByRole("button", { name: "Print" }).click();
-    await page.getByRole("menuitem", { name: "Apron cards" }).click();
+    // The entry's name gains the queue count while the member has cards
+    // queued (apron-cards §13.4), which a parallel test may do.
+    await clickPageAction(page, /^Print apron cards(,|$)/);
     await expect(page).toHaveURL("/m/apron-cards");
 
     const search = page.getByRole("searchbox", { name: "Search machines" });
@@ -307,17 +313,18 @@ test.describe("Print apron cards", () => {
     await expect(dialog.getByText("Queued")).toBeVisible();
     await page.keyboard.press("Escape");
 
+    // ⋯'s Print apron cards entry shows the queue count and reads it out
+    // (apron-cards §13.4, machine-views §6.6).
     await page.goto("/m");
-    await page
-      .getByRole("button", {
-        name: /^Print, \d+ apron cards in your print queue$/,
-      })
-      .click();
-    await page
-      .getByRole("menuitem", {
-        name: /^Apron cards, \d+ in your print queue$/,
-      })
-      .click();
+    const actions = await openPageActions(page);
+    const printApronCards = pageActionsEntry(
+      actions,
+      /^Print apron cards, \d+ in your print queue$/
+    );
+    await expect(printApronCards.getByTestId("page-menu-count")).toHaveText(
+      /^\d+$/
+    );
+    await printApronCards.click();
     await expect(page).toHaveURL("/m/apron-cards");
 
     // The page opens with the queue selected (§13.5).

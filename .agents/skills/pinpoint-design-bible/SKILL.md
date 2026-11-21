@@ -28,33 +28,34 @@ Use this skill when:
 
 Sections keep their numbers wherever they live — `design-bible §17` resolves through this table.
 
-| §   | Section                       | Where                                                |
-| :-- | :---------------------------- | :--------------------------------------------------- |
-| 1   | Visual Identity               | this file                                            |
-| 2   | Surface Hierarchy             | this file                                            |
-| 3   | Shell Contract                | this file                                            |
-| 4   | Responsive Strategy           | this file                                            |
-| 5   | Page Archetypes               | `references/05-page-archetypes.md`                   |
-| 6   | Spacing Rhythm                | this file                                            |
-| 7   | Card & List Patterns          | `references/07-08-cards-and-navigation.md`           |
-| 8   | Navigation Patterns           | `references/07-08-cards-and-navigation.md`           |
-| 9   | Typography Scale              | `references/09-11-typography-borders-transitions.md` |
-| 10  | Border & Divider Rules        | `references/09-11-typography-borders-transitions.md` |
-| 11  | Transition Durations          | `references/09-11-typography-borders-transitions.md` |
-| 12  | Component Inventory           | `references/12-component-inventory.md`               |
-| 13  | Cross-Cutting UI States       | `references/13-14-states-and-feedback.md`            |
-| 14  | Feedback Decision Tree        | `references/13-14-states-and-feedback.md`            |
-| 15  | Date Formatting Vocabulary    | `references/15-16-dates-and-icons.md`                |
-| 16  | Icon Library                  | `references/15-16-dates-and-icons.md`                |
-| 17  | Modal Archetypes              | `references/17-modal-archetypes.md`                  |
-| 18  | Token Canonical Form          | this file                                            |
-| 19  | Browser Support Policy        | `references/19-browser-support.md`                   |
-| 20  | Form Correctness Conventions  | `references/20-form-correctness.md`                  |
-| 21  | Image Loading Discipline      | `references/21-22-images-and-guidance.md`            |
-| 22  | Modern Web Guidance Reference | `references/21-22-images-and-guidance.md`            |
-| 23  | Presenting Mockups for Review | `references/23-24-mockups-and-severity.md`           |
-| 24  | Severity Vocabulary           | `references/23-24-mockups-and-severity.md`           |
-| 25  | Status & Error Copy Register  | `references/25-copy-register.md`                     |
+| §   | Section                           | Where                                                |
+| :-- | :-------------------------------- | :--------------------------------------------------- |
+| 1   | Visual Identity                   | this file                                            |
+| 2   | Surface Hierarchy                 | this file                                            |
+| 3   | Shell Contract                    | this file                                            |
+| 4   | Responsive Strategy               | this file                                            |
+| 5   | Page Archetypes                   | `references/05-page-archetypes.md`                   |
+| 6   | Spacing Rhythm                    | this file                                            |
+| 7   | Card & List Patterns              | `references/07-08-cards-and-navigation.md`           |
+| 8   | Navigation Patterns               | `references/07-08-cards-and-navigation.md`           |
+| 9   | Typography Scale                  | `references/09-11-typography-borders-transitions.md` |
+| 10  | Border & Divider Rules            | `references/09-11-typography-borders-transitions.md` |
+| 11  | Transition Durations              | `references/09-11-typography-borders-transitions.md` |
+| 12  | Component Inventory               | `references/12-component-inventory.md`               |
+| 13  | Cross-Cutting UI States           | `references/13-14-states-and-feedback.md`            |
+| 14  | Feedback Decision Tree            | `references/13-14-states-and-feedback.md`            |
+| 15  | Date Formatting Vocabulary        | `references/15-16-dates-and-icons.md`                |
+| 16  | Icon Library                      | `references/15-16-dates-and-icons.md`                |
+| 17  | Modal Archetypes                  | `references/17-modal-archetypes.md`                  |
+| 18  | Token Canonical Form              | this file                                            |
+| 19  | Browser Support Policy            | `references/19-browser-support.md`                   |
+| 20  | Form Correctness Conventions      | `references/20-form-correctness.md`                  |
+| 21  | Image Loading Discipline          | `references/21-22-images-and-guidance.md`            |
+| 22  | Modern Web Guidance Reference     | `references/21-22-images-and-guidance.md`            |
+| 23  | Presenting Mockups for Review     | `references/23-24-mockups-and-severity.md`           |
+| 24  | Severity Vocabulary               | `references/23-24-mockups-and-severity.md`           |
+| 25  | Status & Error Copy Register      | `references/25-copy-register.md`                     |
+| 26  | Action Buttons and Overflow Menus | `references/26-action-buttons.md`                    |
 
 ## 1. Visual Identity
 

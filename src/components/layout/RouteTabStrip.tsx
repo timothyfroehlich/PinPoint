@@ -4,6 +4,7 @@ import type React from "react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { MoreHorizontal } from "lucide-react";
 import { Button, buttonVariants } from "~/components/ui/button";
 import {
   DropdownMenu,
@@ -224,7 +225,8 @@ export function RouteTabStrip({
                   : "border-transparent text-muted-foreground hover:text-primary"
               )}
             >
-              <span aria-hidden="true">…</span>
+              {/* The one overflow icon (design-bible §26.3). */}
+              <MoreHorizontal className="size-5" aria-hidden="true" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="min-w-40">
@@ -276,7 +278,7 @@ export function RouteTabStrip({
             className: cn("absolute w-max", overflowTriggerMeasurementClasses),
           })}
         >
-          …
+          <MoreHorizontal className="size-5" aria-hidden="true" />
         </span>
       </div>
     </nav>

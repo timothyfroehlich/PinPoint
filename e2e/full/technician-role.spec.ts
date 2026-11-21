@@ -11,6 +11,7 @@ import { test, expect } from "../support/fixtures.js";
 import { openMachineManageTab } from "../support/actions.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
 import { seededMachines } from "../support/constants.js";
+import { clickPageAction } from "../support/page-actions.js";
 
 test.describe("Technician Role Permissions", () => {
   test.use({ storageState: STORAGE_STATE.technician });
@@ -58,8 +59,9 @@ test.describe("Technician Role Permissions", () => {
     page,
   }) => {
     await page.goto("/m");
-    await expect(page.getByTestId("add-machine-button")).toBeVisible();
-    await page.getByTestId("add-machine-button").click();
+    // A button on the title row, or an entry in ⋯ once it folds
+    // (machine-views §6.8).
+    await clickPageAction(page, "Add Machine");
     await expect(page).toHaveURL(/\/m\/new/);
   });
 

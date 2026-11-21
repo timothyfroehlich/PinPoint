@@ -106,7 +106,7 @@ export default async function AdminUsersPage(): Promise<React.JSX.Element> {
 
   return (
     <PageContainer size="standard">
-      <PageHeader title="User Management" actions={<InviteUserButton />} />
+      <PageHeader title="User Management" pageActions={<InviteUserButton />} />
 
       <div className="rounded-md border">
         <Table>

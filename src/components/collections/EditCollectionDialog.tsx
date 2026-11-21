@@ -1,7 +1,6 @@
 "use client";
 
 import type React from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { Button } from "~/components/ui/button";
@@ -12,67 +11,47 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "~/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "~/components/ui/alert-dialog";
-import {
-  deleteCollectionAction,
-  updateCollectionAction,
-} from "~/app/(app)/c/collections/actions";
+import { updateCollectionAction } from "~/app/(app)/c/collections/actions";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 
 interface Props {
+  /** The dialog opens from Edit collection in ⋯ (collections-and-tags 4.17). */
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   collectionId: string;
   currentName: string;
   currentDescription: ProseMirrorDoc | null;
   allMachines: { id: string; initials: string; name: string }[];
   currentIds: string[];
-  /**
-   * Owner-only: show the "Delete collection" control. Editor collaborators can
-   * edit content (name, description, machines) but cannot delete, so the layout passes
-   * `false` for them (PP-wqit.7).
-   */
-  canDelete: boolean;
+  /** Where focus goes when the dialog closes (useReturnFocus). */
+  onCloseAutoFocus?: ((event: Event) => void) | undefined;
 }
 
 /**
  * "Edit collection" modal: renames the collection, edits its description, and
  * edits its machine set in one place, saved together via `updateCollectionAction`. Available to the owner
- * and editor collaborators; the footer "Delete collection" button is owner-only
- * (gated by `canDelete`).
+ * and editor collaborators. Deleting is its own ⋯ entry, for the owner
+ * (CollectionDeleteDialog, collections-and-tags 4.17).
  */
 export function EditCollectionDialog({
+  open,
+  onOpenChange: setOpen,
   collectionId,
   currentName,
   currentDescription,
   allMachines,
   currentIds,
-  canDelete,
+  onCloseAutoFocus,
 }: Props): React.JSX.Element {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
   const [name, setName] = useState(currentName);
   const [description, setDescription] = useState<ProseMirrorDoc | null>(
     currentDescription
   );
   const [selected, setSelected] = useState<string[]>(currentIds);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [deleteError, setDeleteError] = useState<{
-    message: string;
-    code: "not_found" | undefined;
-  } | null>(null);
-  const [deleteOpen, setDeleteOpen] = useState(false);
   const [savePending, startSave] = useTransition();
-  const [deletePending, startDelete] = useTransition();
 
   // Re-seed the form to the current server state each time the modal opens, so
   // a cancelled edit or a change from another tab never leaves stale values.
@@ -82,7 +61,6 @@ export function EditCollectionDialog({
       setDescription(currentDescription);
       setSelected(currentIds);
       setSaveError(null);
-      setDeleteError(null);
     }
   }, [open, currentName, currentDescription, currentIds]);
 
@@ -103,25 +81,11 @@ export function EditCollectionDialog({
     });
   }
 
-  function remove(): void {
-    setDeleteError(null);
-    startDelete(async () => {
-      const result = await deleteCollectionAction({ collectionId });
-      if (!result.success)
-        setDeleteError({ message: result.error, code: result.code });
-      else router.push("/c/collections");
-    });
-  }
-
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" data-testid="collection-edit-trigger">
-          Edit collection
-        </Button>
-      </DialogTrigger>
       <DialogContent
         className="sm:max-w-lg"
+        onCloseAutoFocus={onCloseAutoFocus}
         // A stray backdrop click shouldn't discard an in-progress edit — only
         // Cancel / the X / Esc close it (unsaved-form dismissal guidance).
         onInteractOutside={(e) => e.preventDefault()}
@@ -151,97 +115,22 @@ export function EditCollectionDialog({
           </p>
         )}
 
-        <div className="@container flex flex-row items-center justify-between gap-2">
-          {canDelete && (
-            <AlertDialog
-              open={deleteOpen}
-              onOpenChange={(deleteOpen) => {
-                if (!deleteOpen && deletePending) return;
-                setDeleteOpen(deleteOpen);
-                if (deleteOpen) setDeleteError(null);
-              }}
-            >
-              <AlertDialogTrigger asChild>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  data-testid="collection-delete-trigger"
-                >
-                  {/* Narrow footer (mobile dialog): shorten the label to one row. */}
-                  <span className="@sm:hidden">Delete</span>
-                  <span className="hidden @sm:inline">Delete collection</span>
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent
-                onEscapeKeyDown={(event) => {
-                  if (deletePending) event.preventDefault();
-                }}
-              >
-                <AlertDialogHeader>
-                  <AlertDialogTitle>
-                    {deleteError?.code === "not_found"
-                      ? "Collection unavailable"
-                      : "Delete this collection?"}
-                  </AlertDialogTitle>
-                  {deleteError?.code !== "not_found" && (
-                    <AlertDialogDescription>
-                      This removes the collection and its machine list. The
-                      machines themselves and their issues are not affected.
-                      This cannot be undone.
-                    </AlertDialogDescription>
-                  )}
-                </AlertDialogHeader>
-                {deleteError && (
-                  <div
-                    role="alert"
-                    className="rounded-md border border-destructive/20 bg-destructive/10 p-4 text-destructive-text"
-                  >
-                    <p className="text-sm font-medium">{deleteError.message}</p>
-                  </div>
-                )}
-                <AlertDialogFooter className="gap-2 sm:gap-0">
-                  {deleteError?.code === "not_found" ? (
-                    <Button asChild>
-                      <Link href="/c/collections">Back to collections</Link>
-                    </Button>
-                  ) : (
-                    <>
-                      <AlertDialogCancel disabled={deletePending}>
-                        Keep collection
-                      </AlertDialogCancel>
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        onClick={remove}
-                        disabled={deletePending}
-                        data-testid="collection-delete-confirm"
-                      >
-                        {deletePending ? "Deleting…" : "Delete collection"}
-                      </Button>
-                    </>
-                  )}
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
-
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              onClick={save}
-              loading={savePending}
-              data-testid="collection-save"
-            >
-              {savePending ? "Saving…" : "Save changes"}
-            </Button>
-          </div>
+        <div className="flex flex-row items-center justify-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setOpen(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            onClick={save}
+            loading={savePending}
+            data-testid="collection-save"
+          >
+            {savePending ? "Saving…" : "Save changes"}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

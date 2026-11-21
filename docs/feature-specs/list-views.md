@@ -45,10 +45,10 @@
 - **3.4** At 1440×900 the first rows of the list are visible without scrolling, below the Summary Widgets.
 - **3.5** While a new result is loading the rows dim and the list is marked busy; the controls stay usable.
 - **3.6** A View Configuration that matches nothing shows an empty state. When the List View is Edited, its action returns to the Applied View; when it has no Applied View, its action opens the Page Preset.
-- **3.7** A page shows at most three page actions, in the order its own spec names them. ⋯ is always last, and holds every action the page offers that is not shown as its own button. A page with nothing for ⋯ to hold shows no ⋯.
-- **3.8** Page actions are outlined buttons; the one exception is Machines' Add Machine, which keeps its filled primary style. While every shown action fits the row the actions sit in with its label, each shows its label; otherwise each is an icon button that keeps its accessible name. There is no size between labeled and icon-only.
+- **3.7** A page shows at most three page actions, in the order its own spec names them. ⋯ is always last, and holds every action the page offers that is not shown as its own button. A page with nothing for ⋯ to hold shows no ⋯. While there is room, an action that would be ⋯'s only entry shows as its own button instead.
+- **3.8** While every shown page action fits the row the actions sit in with its label, each shows its label as an outlined button; otherwise each is a borderless icon button that keeps its accessible name. The one exception is a page's create action, such as Machines' Add Machine, which keeps its filled primary style at both sizes. There is no size between labeled and icon-only.
 - **3.9** When the shown actions do not fit even as icons, the next step of the fold order its page's spec names moves that step's actions into ⋯, and the actions still shown try labels, then icons, again (§3.8). ⋯ never folds. An action that is itself a menu brings its items into ⋯ when it folds.
-- **3.10** When the page actions show labels, ⋯ reads "Actions". On desktop ⋯ opens a menu; on phones it opens a sheet.
+- **3.10** When the page actions show labels, ⋯ reads "More". On desktop ⋯ opens a menu; on phones it opens a sheet.
 
 ---
 
@@ -116,9 +116,9 @@
 - **8.8** Steps that change the same part fire in the order listed. A step that does not apply to a Surface, such as a breadcrumb on Machines, is skipped.
 - **8.9** When a Collection or Tag page's breadcrumb, title, and description do not fit on one row, the breadcrumb moves from before the title to above it. This is the page header's first step.
 - **8.10** When a Collection's description would be narrower than 280px beside the title, it moves under the title.
-- **8.11** Page actions that do not fit beside the title, or at the end of a Collection or Tag page's tab row, lose their labels and become outlined icon buttons with accessible names; when those still do not fit, they fold into the Actions menu, which is always the last page action.
-- **8.12** Page actions fold into the Actions menu from the first: on a Collection or Tag page Share and Print fold together, and on Machines Pinball Map folds before Add Machine. After each fold the buttons that remain show their labels again when they fit, and a lone Actions menu shows its label when it fits.
-- **8.13** When a Collection or Tag page's tabs and a lone Actions menu still do not fit the tab row, page tabs move into a menu from the right; the current tab always stays.
+- **8.11** Page actions that do not fit beside the title, or at the end of a Collection or Tag page's tab row, lose their labels and become icon buttons with accessible names (§3.8); when those still do not fit, they fold into the More menu, which is always the last page action.
+- **8.12** Page actions fold into the More menu from the first: on a Collection or Tag page Share folds, and on Machines Pinball Map folds before Add Machine. After each fold the buttons that remain show their labels again when they fit, and a lone More menu shows its label when it fits.
+- **8.13** When a Collection or Tag page's tabs and a lone More menu still do not fit the tab row, page tabs move into a menu from the right; the current tab always stays.
 - **8.14** Summary Widgets that do not fit side by side drop whole from the right (widgets §2.7).
 - **8.15** When the Primary Filters do not fit beside search, they move into More filters from the right, one at a time, in the host's order.
 - **8.16** When the List Header's view tabs do not fit, tabs move into More views from the right; the Applied View's tab always stays visible.
@@ -178,7 +178,7 @@
 
 ## 12. Accessibility
 
-- **12.1** Filter dropdowns, More filters, More views, Save, and View options are keyboard-operable; opening one moves focus into it, and closing it returns focus to its button.
+- **12.1** Filter dropdowns, More filters, More views, Save, View options, and the page actions, including ⋯, are keyboard-operable; opening one moves focus into it, and closing it returns focus to its button.
 - **12.2** Phone sheets trap focus while open, close on Escape, and return focus to the control that opened them.
 - **12.3** The Saved View tabs are a navigation landmark named "Saved views", and the current tab is exposed as current.
 - **12.4** The result count is announced politely after the results change.
@@ -192,10 +192,7 @@
 | Requirement | Divergence | Resolution |
 | :-- | :-- | :-- |
 | §8.9, §8.10 | A Tag page's breadcrumb always sits above the title, a Collection page has no breadcrumb, and a Collection's description always sits under the header. | PP-jb9v.18 |
-| §8.11, §8.12 | Page actions that do not fit wrap below the title or onto their own row; there is no Actions menu to fold into. | PP-jb9v.17 |
 | §8.13, §8.23 | A Collection or Tag page's tabs never move into a menu, and its header spacing does not tighten below 390px. | PP-jb9v.18 |
-| §3.7–§3.10, §7.2 | Page actions are separate buttons with no ⋯ Actions menu, cap, or fold order; they become icon buttons at the md breakpoint rather than when they stop fitting, and Machines' Add Machine label shortens in steps. | PP-jb9v.17 |
-| §1, §5.5 | Issue View's Export sits in the desktop List Header, and phones offer no Export. | PP-jb9v.17 |
 
 ---
 
@@ -203,6 +200,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-11-21 | 3.8, 8.11: icon-only page actions are borderless; labeled ones stay outlined. 8.12: on Collection and Tag pages only Share folds, since Print moved into ⋯ (collections-and-tags 4.16). 3.7: an action that would be ⋯'s only entry shows as its own button while there is room. 3.10, 8.11–8.13: ⋯ reads "More" instead of "Actions". 12.1: page actions and ⋯ are keyboard-operable. |
 | 2026-11-15 | No List Host has columns, a table, or displayed fields: View options holds page size only (§5.6), View Configurations, Page Presets, and Built-in Views carry no fields (§1), and Saved Views stored with fields ignore them (§10.14); retired keeping the page on a field change (§4.8), the sideways-scrolling table step (§8.20), and sort headers (§9.8). Every host uses two-line rows (§2.4) on one row structure shared by machine and issue rows (§6.4); the machine row drop step applies at every width (§8.21). |
 | 2026-11-15 | On phones the search field becomes an icon when it would be narrower than 175px, opening across the List Header when tapped (§7.12). |
 | 2026-10-11 | §8 becomes the Collapse Order (§1): one set of ordered steps for every Surface, measured on each part's container with a small tolerance (§8.6–§8.8); page-header steps for the breadcrumb, description, page actions, and page tabs (§8.9–§8.13); Summary Widget, filter, List Header, table, and row steps (§8.14–§8.21); the phone layout and the narrow Collection or Tag header (§8.22, §8.23); 8.1–8.3 and 8.5 retired into §8.15–§8.19 and §8.24. The filter overflow is named More filters, and its badge counts only filters changed from the Page Preset (§1, §4.5, §4.10, §12.1). View tabs are quiet pills (§5.8). The List Header concept names its phone contents (§1). Page actions: at most three, ending with a ⋯ menu that reads Actions when labeled; they go from labeled outlined buttons to icon buttons, then fold into ⋯ in the page's order, at every width (§1, §3.2, §3.7–§3.10, §7.2). Export leaves the List Header for ⋯ (§1, §5.5). |

@@ -9,10 +9,14 @@ import {
   setMachineViewDefaultAction,
   updateSavedMachineViewAction,
 } from "~/app/(app)/m/saved-view-actions";
+import { exportMachinesAction } from "~/app/(app)/m/export-action";
 import {
   ListTitleRow,
   ListView,
+  PageExportProvider,
+  RegisterPageExport,
   type ListDisplayModel,
+  type PageExport,
   type ListPaginationModel,
   type ListSortModel,
 } from "~/components/list-view";
@@ -43,7 +47,6 @@ import {
   type MachineViewState,
 } from "~/lib/types";
 import { MachineSummaryWidgets } from "./MachineSummaryWidgets";
-import { MachineExportButton } from "./MachineExportButton";
 import type {
   MachineRowAction,
   MachineSelectionHandler,
@@ -63,7 +66,11 @@ interface MachineViewProps {
    * A Collection or Tag tab's title row belongs to its own page.
    */
   title?: string | undefined;
-  /** The page actions beside the title (list-views §3.2). */
+  /**
+   * The page actions beside the title (list-views §3.2). They find the
+   * list's Export through the PageExportProvider Machine View wraps its
+   * page in when it draws the title row.
+   */
   actions?: React.ReactNode;
   onMachineSelect?: MachineSelectionHandler | undefined;
   /**
@@ -74,8 +81,9 @@ interface MachineViewProps {
   /** An action in the List Header that applies to the whole result. */
   listAction?: React.ReactNode;
   /**
-   * The Surface to export from (machine-views §3.15). Export shows for
-   * signed-in viewers only; a Surface with its own `listAction` leaves this out.
+   * The Surface to export from (machine-views §3.15). Export is a page
+   * action in ⋯ (list-views §5.5), offered to signed-in viewers only; a
+   * Surface without page actions leaves this out.
    */
   exportScope?: MachineExportScope | undefined;
   /** Whether the Summary Widgets show. A picker Surface leaves them out. */
@@ -207,6 +215,23 @@ export function MachineView({
     },
   };
 
+  // Export runs the list's own query on the server, within the Surface's
+  // scope. The action requires sign-in, so anonymous visitors are not
+  // offered it.
+  const exportQuery = serializeMachineViewState(
+    { ...state, page: 1 },
+    preset
+  ).toString();
+  const { signedIn } = result;
+  const pageExport = React.useMemo<PageExport | null>(() => {
+    if (!signedIn || exportScope === undefined) return null;
+    return {
+      exportCsv: () =>
+        exportMachinesAction({ query: exportQuery, scope: exportScope }),
+      emptyMessage: "No machines to export.",
+    };
+  }, [signedIn, exportQuery, exportScope]);
+
   const summary = (
     <MachineSummaryWidgets
       summary={result.summary}
@@ -215,8 +240,9 @@ export function MachineView({
     />
   );
 
-  return (
+  const page = (
     <div ref={rootRef} className="scroll-mt-14">
+      <RegisterPageExport value={pageExport} />
       <ListView
         label="Machines list"
         noun={NOUN}
@@ -235,20 +261,7 @@ export function MachineView({
         sort={sort}
         display={display}
         pagination={pagination}
-        // The export action requires sign-in, so anonymous visitors are not
-        // offered Export.
-        exportControl={
-          listAction ??
-          (result.signedIn && exportScope !== undefined ? (
-            <MachineExportButton
-              query={serializeMachineViewState(
-                { ...state, page: 1 },
-                preset
-              ).toString()}
-              scope={exportScope}
-            />
-          ) : undefined)
-        }
+        listAction={listAction}
         busy={isPending}
         onResetAll={resetFilters}
         emptyState={({ discard, openPagePreset }) =>
@@ -284,4 +297,7 @@ export function MachineView({
       </ListView>
     </div>
   );
+  // Drawing its own title row, Machine View holds the page actions that
+  // offer its Export; on a Collection or Tag tab the page header does.
+  return title ? <PageExportProvider>{page}</PageExportProvider> : page;
 }

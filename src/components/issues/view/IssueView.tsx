@@ -9,11 +9,16 @@ import {
   setIssueViewDefaultAction,
   updateSavedIssueViewAction,
 } from "~/app/(app)/issues/saved-view-actions";
+import { exportIssuesAction } from "~/app/(app)/issues/export-action";
 import type { IssueExportScope } from "~/app/(app)/issues/export-schema";
-import { ExportButton } from "~/components/issues/ExportButton";
 import {
   ListTitleRow,
   ListView,
+  PageActions,
+  PageExportProvider,
+  RegisterPageExport,
+  usePageExportEntry,
+  type PageExport,
   type ListDisplayModel,
   type ListPaginationModel,
   type ListSortModel,
@@ -61,6 +66,22 @@ function serialize(
   view: string | null
 ): URLSearchParams {
   return serializeIssueViewState(state, view);
+}
+
+/**
+ * The Issues page's actions (issues-list 2.3): Export as its own button,
+ * since it would be ⋯'s only entry (list-views §3.7). Anonymous visitors,
+ * who cannot export, see none.
+ */
+function IssuesPageActions(): React.JSX.Element {
+  const exportEntry = usePageExportEntry();
+  return (
+    <PageActions
+      actions={[]}
+      menu={exportEntry ? [[exportEntry]] : []}
+      foldSteps={[]}
+    />
+  );
 }
 
 interface IssueViewProps {
@@ -165,6 +186,23 @@ export function IssueView({
     },
   };
 
+  // Export runs the list's own query on the server, within the Surface's
+  // scope. The action requires sign-in, so anonymous visitors are not
+  // offered it.
+  const exportQuery = serializeIssueViewState({ ...state, page: 1 }).toString();
+  const { signedIn } = result;
+  const pageExport = React.useMemo<PageExport | null>(() => {
+    if (!signedIn) return null;
+    return {
+      exportCsv: () =>
+        exportIssuesAction({
+          query: exportQuery,
+          ...(exportScope !== undefined && { scope: exportScope }),
+        }),
+      emptyMessage: "No issues to export.",
+    };
+  }, [signedIn, exportQuery, exportScope]);
+
   const summary = (
     <IssueSummaryWidgets
       summary={result.summary}
@@ -173,12 +211,17 @@ export function IssueView({
     />
   );
 
-  return (
+  const page = (
     <div ref={rootRef} className="scroll-mt-14">
+      <RegisterPageExport value={pageExport} />
       <ListView
         label="Issues list"
         noun={NOUN}
-        titleRow={title ? <ListTitleRow title={title} /> : undefined}
+        titleRow={
+          title ? (
+            <ListTitleRow title={title} actions={<IssuesPageActions />} />
+          ) : undefined
+        }
         summary={summary}
         search={{
           id: "issue-view-search",
@@ -192,16 +235,6 @@ export function IssueView({
         sort={sort}
         display={display}
         pagination={pagination}
-        // The export action requires sign-in, so anonymous visitors are not
-        // offered Export.
-        exportControl={
-          result.signedIn ? (
-            <ExportButton
-              query={serializeIssueViewState({ ...state, page: 1 }).toString()}
-              scope={exportScope}
-            />
-          ) : undefined
-        }
         busy={isPending}
         onResetAll={resetFilters}
         emptyState={({ discard, openPagePreset }) =>
@@ -229,4 +262,7 @@ export function IssueView({
       </ListView>
     </div>
   );
+  // Drawing its own title row, Issue View holds the page actions that
+  // offer its Export; on a Collection or Tag tab the page header does.
+  return title ? <PageExportProvider>{page}</PageExportProvider> : page;
 }

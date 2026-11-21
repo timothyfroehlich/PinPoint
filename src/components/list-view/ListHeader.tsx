@@ -299,8 +299,11 @@ interface ListHeaderProps {
   sort: ListSortModel;
   pagination: ListPaginationModel;
   display: ListDisplayModel;
-  /** Export, when the host offers it (§5.5). */
-  exportControl?: React.ReactNode;
+  /**
+   * An action on the whole result a host places in the List Header, such as
+   * Add all on Print settings sheets. Export is a page action instead (§5.5).
+   */
+  listAction?: React.ReactNode;
   onSaveChanges: () => void;
   onSaveAsNew: () => void;
   onManage: () => void;
@@ -310,7 +313,7 @@ interface ListHeaderProps {
  * The desktop List Header (list-views §5, §8.16–§8.19): Built-in Views as
  * tabs in a "Saved views" navigation landmark (§12.3), More views, Save and
  * Discard changes beside an Edited Saved View or Save view when there is no
- * Applied View, then the compact pager, sort, Export, and
+ * Applied View, then the compact pager, sort, any host list action, and
  * View options. Hidden below md, where the phone header takes over (§7.3).
  */
 export function ListHeader({
@@ -318,7 +321,7 @@ export function ListHeader({
   sort,
   pagination,
   display,
-  exportControl,
+  listAction,
   onSaveChanges,
   onSaveAsNew,
   onManage,
@@ -393,7 +396,7 @@ export function ListHeader({
   const controls = (
     <>
       <SortMenu sort={sort} />
-      {exportControl}
+      {listAction}
       <ViewOptionsMenu display={display} />
     </>
   );
@@ -471,8 +474,8 @@ export function ListHeader({
 
       {/* Exact widths of the controls that come and go, as static faces
           kept out of the accessibility tree and clipped so they never widen
-          the page (CORE-RESP-002 boundary). The live sort, Export, and View
-          options group measures itself. */}
+          the page (CORE-RESP-002 boundary). The live sort, list action, and
+          View options group measures itself. */}
       <div
         aria-hidden="true"
         className="pointer-events-none invisible absolute inset-x-0 top-0 h-0 overflow-hidden"
