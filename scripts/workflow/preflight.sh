@@ -3,7 +3,8 @@
 # stopping at the first failure. Run it through `pnpm run preflight` (compact
 # verdict via quiet-run.py) or `pnpm run preflight:human` (streamed), so
 # node_modules/.bin is on PATH. Heavy leaf commands (unit, build, integration,
-# smoke) take the host-wide heavy-run.sh slot themselves.
+# smoke, and check) reserve their share of the host-wide agent memory budget
+# through heavy-run.sh themselves.
 
 set -euo pipefail
 
@@ -23,6 +24,6 @@ step build pnpm run build
 step integration pnpm run test:integration
 step integration-supabase pnpm run test:integration:supabase
 # Chromium only: one browser against the one worktree DB. CI runs the rest.
-step smoke bash scripts/workflow/heavy-run.sh playwright test \
+step smoke bash scripts/workflow/heavy-run.sh smoke playwright test \
   --config=playwright.config.smoke.ts --project=chromium --quiet
 echo "== preflight passed"

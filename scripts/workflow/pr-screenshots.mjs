@@ -33,6 +33,10 @@
 //   on complex pages); Firefox is tolerant there. CI (Ubuntu) keeps Chromium.
 //   (PP-rsy3.)
 //
+// Memory: the run first reserves the `screenshots` share of the host-wide
+// agent budget (scripts/workflow/agent-budget.py; `pnpm run agent-load`) and
+// exits 75 if the budget stays full for 5 minutes.
+//
 // Preconditions (best-effort, not auto-provisioned by this script):
 //   - Local dev server running at http://localhost:<PORT> (`pnpm run dev`).
 //     PORT is read from .env.local the same way playwright.config.ts does —
@@ -315,8 +319,38 @@ function git(args, opts = {}) {
   return execFileSync("git", args, { encoding: "utf8", ...opts }).trim();
 }
 
+// Reserve this run's share of the host-wide agent memory budget
+// (agent-budget.py, PP-p2ts.5) before launching a browser. The reservation is
+// held by this process's PID and lapses when it exits. Waiting and timeout
+// messages go to stderr, so stdout stays the PNG list.
+function reserveMemoryBudget() {
+  const result = spawnSync(
+    "python3",
+    [
+      join(__dirname, "agent-budget.py"),
+      "acquire",
+      "screenshots",
+      "--pid",
+      String(process.pid),
+    ],
+    { stdio: ["ignore", "ignore", "inherit"] }
+  );
+  if (result.error) {
+    console.error(
+      `⚠️  agent-budget unavailable (${result.error.message}); continuing without a reservation.`
+    );
+    return;
+  }
+  if (result.status !== 0) {
+    process.exit(result.status ?? 1);
+  }
+  // Anything this run starts (the auth-setup Playwright run) is covered.
+  process.env["PINPOINT_AGENT_BUDGET_HELD"] = "pr-screenshots";
+}
+
 async function main() {
   const { pagesFilter, outDir, forceAuth } = parseArgs(process.argv.slice(2));
+  reserveMemoryBudget();
 
   const headSha = git(["rev-parse", "--short", "HEAD"], { cwd: REPO_ROOT });
   // The dev server renders the working tree, so uncommitted edits would appear in

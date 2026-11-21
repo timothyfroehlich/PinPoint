@@ -1,46 +1,27 @@
 #!/usr/bin/env bash
-# heavy-run.sh — wrap a command in the host-wide concurrency semaphore.
+# heavy-run.sh — run an expensive command inside the host-wide agent memory
+# budget (scripts/workflow/agent-budget.py, PP-p2ts.5).
 #
-# Guards complete unit runs and heavier commands (integration, build, smoke)
-# from stacking up across parallel worktree sessions on a memory-constrained
-# host: at most 2 admitted jobs at a time, host-wide. Focused unit-file commands
-# and static checks intentionally bypass this wrapper so they stay a fast inner
-# loop.
+# <kind> names the command's measured footprint (check, dev, unit, coverage,
+# integration, integration-supabase, build, smoke). The command starts once
+# that much of the budget is free, waits in a FIFO queue otherwise, and exits
+# 75 after 5 minutes with a pointer to crabbox or CI. The reservation lasts
+# exactly as long as the command: agent-budget.py execs it in place.
 #
-# Transparent passthrough when:
-#   - Running in CI ($CI is set), where the runner already isolates resources, OR
-#   - GNU parallel's `sem` is not available (or the `sem` on PATH is the
-#     moreutils variant that doesn't speak --jobs/--id/--fg).
+# Transparent passthrough in CI, on non-macOS hosts, with
+# PINPOINT_AGENT_BUDGET=off, and inside a command that already holds a
+# reservation. `pnpm run agent-load` shows who holds what.
 #
 # Usage (invoke via `bash` so no chmod is needed):
-#   bash scripts/workflow/heavy-run.sh <command> [args…]
+#   bash scripts/workflow/heavy-run.sh <kind> <command> [args…]
 
 set -euo pipefail
 
-if [ "$#" -eq 0 ]; then
-  echo "Usage: bash scripts/workflow/heavy-run.sh <command> [args…]" >&2
+if [ "$#" -lt 2 ]; then
+  echo "Usage: bash scripts/workflow/heavy-run.sh <kind> <command> [args…]" >&2
   exit 64 # EX_USAGE
 fi
 
-if [ -n "${CI:-}" ]; then
-  exec "$@"
-fi
-
-if ! command -v sem >/dev/null 2>&1 \
-   || ! sem --version 2>/dev/null | grep -q '^GNU parallel'; then
-  exec "$@"
-fi
-
-# GNU Parallel defaults to ~/.parallel, which is not writable in every agent
-# sandbox. Every checkout on the host resolves this same state path instead.
-export PARALLEL_HOME="${XDG_STATE_HOME:-${HOME}/.local/state}/pinpoint/parallel"
-mkdir -p "$PARALLEL_HOME"
-
-# sem re-joins its command argv and re-parses it through a shell, so an argument
-# that legitimately contains a space (e.g. --project='Mobile Chrome' from the
-# `smoke` script) would be word-split. Pre-quote each argument with printf %q
-# and hand sem a single string. See PP-yso5.
-quoted_cmd="$(printf '%q ' "$@")"
-
-# --fg blocks synchronously and propagates the exit code.
-exec sem --jobs 2 --id pinpoint-heavy --fg "$quoted_cmd"
+kind="$1"
+shift
+exec python3 "$(dirname "${BASH_SOURCE[0]}")/agent-budget.py" run "$kind" -- "$@"

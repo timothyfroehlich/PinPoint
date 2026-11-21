@@ -15,5 +15,5 @@ if [[ ${1:-} == "--require-target" ]]; then
 fi
 
 pnpm run test:ensure-schema
-exec bash scripts/workflow/heavy-run.sh \
+exec bash scripts/workflow/heavy-run.sh integration \
   vitest run --project integration --max-workers=2 "$@"

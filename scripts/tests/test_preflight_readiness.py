@@ -238,7 +238,7 @@ def test_targeted_integration_generates_missing_schema_before_vitest(
     assert result.returncode == 0, result.stdout + result.stderr
     assert calls.read_text().splitlines() == [
         "pnpm run test:ensure-schema",
-        "bash scripts/workflow/heavy-run.sh vitest run --project integration "
+        "bash scripts/workflow/heavy-run.sh integration vitest run --project integration "
         "--max-workers=2 src/test/integration/example.test.ts",
     ]
 
