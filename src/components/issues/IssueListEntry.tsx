@@ -190,6 +190,8 @@ function IssueRowDetails({
       key: "machine",
       text: true,
       minWidth: MACHINE_NAME_MIN_WIDTH,
+      // Hidden, the name is still read, without its link.
+      hiddenText: issue.machine.name,
       node: (
         <Link
           href={`/m/${issue.machineInitials}`}

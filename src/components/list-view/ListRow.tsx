@@ -176,11 +176,15 @@ export interface ListRowPart<Key extends string> {
   truncate?: boolean;
   /**
    * Makes a part in `dropOrder` shrinkable: at its turn it truncates, down to
-   * this width, before it hides. Hidden, it renders nothing at all, not even
-   * for screen readers, so a link inside it never leaves an invisible tab
-   * stop.
+   * this width, before it hides. Hidden, it renders only `hiddenText`, never
+   * `node`, so a link inside it never leaves an invisible tab stop.
    */
   minWidth?: number;
+  /**
+   * What screen readers still hear when a `minWidth` part hides, as plain
+   * text; without it a hidden part renders nothing.
+   */
+  hiddenText?: string;
 }
 
 /**
@@ -251,7 +255,22 @@ export function ListRowDetails<Key extends string>({
     for (const part of parts) {
       const fit = fitOf(part.key);
       const visible = fit !== "hidden";
-      if (!visible && part.minWidth !== undefined) continue;
+      if (!visible && part.minWidth !== undefined) {
+        // Plain text only: a hidden link would be an invisible tab stop.
+        if (part.hiddenText !== undefined) {
+          nodes.push(
+            <span
+              key={part.key}
+              data-part={part.key}
+              data-fit={fit}
+              className="sr-only left-0"
+            >
+              {part.hiddenText}
+            </span>
+          );
+        }
+        continue;
+      }
       if (visible && part.text === true && previousText) {
         nodes.push(
           <span key={`${part.key}-separator`} aria-hidden="true">

@@ -278,7 +278,7 @@ describe("Issue row line 2 fit (issues-list §3.9)", () => {
     vi.restoreAllMocks();
   });
 
-  /** How the plan shows the machine name, or null when it renders nothing. */
+  /** How the plan shows the machine name: full, truncated, or hidden. */
   function machineFit(row: HTMLElement): string | null {
     return (
       row.querySelector('[data-part="machine"]')?.getAttribute("data-fit") ??
@@ -341,14 +341,14 @@ describe("Issue row line 2 fit (issues-list §3.9)", () => {
       "truncated",
     ],
     // Any narrower and it hides: 116 + 12 + 30 = 158.
-    [233, ["issue-id", "issue-priority", "issue-assignee"], null],
-    [174, ["issue-id", "issue-priority", "issue-assignee"], null],
+    [233, ["issue-id", "issue-priority", "issue-assignee"], "hidden"],
+    [174, ["issue-id", "issue-priority", "issue-assignee"], "hidden"],
     // 60 + 12 + 30 = 102; then the priority, then the assignee. The ID
     // never drops.
-    [173, ["issue-id", "issue-assignee"], null],
-    [118, ["issue-id", "issue-assignee"], null],
-    [117, ["issue-id"], null],
-    [40, ["issue-id"], null],
+    [173, ["issue-id", "issue-assignee"], "hidden"],
+    [118, ["issue-id", "issue-assignee"], "hidden"],
+    [117, ["issue-id"], "hidden"],
+    [40, ["issue-id"], "hidden"],
   ])(
     "with comments, at %ipx shows %j (machine %s)",
     (lineWidth, parts, fit) => {
@@ -411,11 +411,15 @@ describe("Issue row line 2 fit (issues-list §3.9)", () => {
     expect(groupParts(left)).toEqual(["issue-id", "issue-priority"]);
     expect(left.textContent).not.toContain("·");
     expect(groupParts(right)).toEqual(["issue-assignee"]);
-    // A hidden name renders nothing: no link, and no machine part at all.
+    // A hidden name is still read by screen readers, as plain text with no
+    // link, so it leaves no invisible tab stop.
     const row = within(listItem);
     expect(row.queryByTestId("issue-machine")).toBeNull();
     expect(row.queryByRole("link", { name: "Attack from Mars" })).toBeNull();
     expect(row.getAllByRole("link")).toHaveLength(1);
+    const hidden = listItem.querySelector('[data-part="machine"]');
+    expect(hidden).toHaveTextContent("Attack from Mars");
+    expect(hidden).toHaveClass("sr-only");
   });
 
   it("keeps the right group after the left as its parts drop", () => {
