@@ -33,6 +33,9 @@
 //   on complex pages); Firefox is tolerant there. CI (Ubuntu) keeps Chromium.
 //   (PP-rsy3.)
 //
+// Memory: the run takes the host-wide heavy slot (scripts/workflow/heavy-run.sh;
+// `pnpm run agent-load`) and exits 75 if it stays busy for 5 minutes.
+//
 // Preconditions (best-effort, not auto-provisioned by this script):
 //   - Local dev server running at http://localhost:<PORT> (`pnpm run dev`).
 //     PORT is read from .env.local the same way playwright.config.ts does —
@@ -315,8 +318,30 @@ function git(args, opts = {}) {
   return execFileSync("git", args, { encoding: "utf8", ...opts }).trim();
 }
 
+// Take the host-wide heavy slot (scripts/workflow/heavy-run.sh, PP-p2ts.5)
+// before launching a browser: when no ancestor holds one, re-run this script
+// under heavy-run.sh, which sets PINPOINT_HOST_SLOT_HELD for the child, and
+// exit with its status. heavy-run.sh writes only to stderr, so stdout stays
+// the PNG list.
+function runInHeavySlot() {
+  if (process.env["PINPOINT_HOST_SLOT_HELD"] === "heavy") return;
+  const result = spawnSync(
+    "bash",
+    [
+      join(__dirname, "heavy-run.sh"),
+      "heavy",
+      process.execPath,
+      fileURLToPath(import.meta.url),
+      ...process.argv.slice(2),
+    ],
+    { stdio: "inherit" }
+  );
+  process.exit(result.status ?? 1);
+}
+
 async function main() {
   const { pagesFilter, outDir, forceAuth } = parseArgs(process.argv.slice(2));
+  runInHeavySlot();
 
   const headSha = git(["rev-parse", "--short", "HEAD"], { cwd: REPO_ROOT });
   // The dev server renders the working tree, so uncommitted edits would appear in

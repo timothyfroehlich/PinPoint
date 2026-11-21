@@ -241,13 +241,13 @@ describe("fitLineParts (machine-views §5.10, issues-list §3.9)", () => {
   });
 });
 
-describe("fitPrimaryFilters (list-views §8.1)", () => {
+describe("fitPrimaryFilters (list-views §8.15)", () => {
   const filterWidths = [120, 100, 110, 80];
 
-  it("keeps every filter inline, with no More, when they fit", () => {
+  it("keeps every filter inline, with no More filters, when they fit", () => {
     expect(
       fitPrimaryFilters({
-        available: 500,
+        available: FIT_TOLERANCE + 500,
         filterWidths,
         moreWidth: 70,
         hasSecondary: false,
@@ -256,11 +256,24 @@ describe("fitPrimaryFilters (list-views §8.1)", () => {
     ).toBe(4);
   });
 
-  it("moves filters into More from the right, one at a time", () => {
+  it("moves a filter out before the row is exactly full (§8.7)", () => {
+    // Four filters and three gaps are exactly 416px.
+    expect(
+      fitPrimaryFilters({
+        available: FIT_TOLERANCE + 415,
+        filterWidths,
+        moreWidth: 70,
+        hasSecondary: false,
+        gap: 2,
+      })
+    ).toBeLessThan(4);
+  });
+
+  it("moves filters into More filters from the right, one at a time", () => {
     // 120+100+110 + More 70 + 3 gaps = 406.
     expect(
       fitPrimaryFilters({
-        available: 406,
+        available: FIT_TOLERANCE + 406,
         filterWidths,
         moreWidth: 70,
         hasSecondary: false,
@@ -269,7 +282,7 @@ describe("fitPrimaryFilters (list-views §8.1)", () => {
     ).toBe(3);
     expect(
       fitPrimaryFilters({
-        available: 405,
+        available: FIT_TOLERANCE + 405,
         filterWidths,
         moreWidth: 70,
         hasSecondary: false,
@@ -278,10 +291,10 @@ describe("fitPrimaryFilters (list-views §8.1)", () => {
     ).toBe(2);
   });
 
-  it("reserves room for More whenever the host has Secondary Filters", () => {
+  it("reserves room for More filters whenever the host has Secondary Filters", () => {
     expect(
       fitPrimaryFilters({
-        available: 416,
+        available: FIT_TOLERANCE + 416,
         filterWidths,
         moreWidth: 70,
         hasSecondary: true,
@@ -290,7 +303,7 @@ describe("fitPrimaryFilters (list-views §8.1)", () => {
     ).toBe(3);
   });
 
-  it("can move every filter into More", () => {
+  it("can move every filter into More filters", () => {
     expect(
       fitPrimaryFilters({
         available: 60,
@@ -303,7 +316,7 @@ describe("fitPrimaryFilters (list-views §8.1)", () => {
   });
 });
 
-describe("planListHeader (list-views §8.2, §8.3)", () => {
+describe("planListHeader (list-views §8.16–§8.19)", () => {
   const base = {
     tabWidths: [100, 120, 90, 110, 130],
     appliedIndex: 0,
@@ -320,7 +333,9 @@ describe("planListHeader (list-views §8.2, §8.3)", () => {
   const everything = 660 + 132 + 202;
 
   it("shows every tab, More views, and the full compact pager when they fit", () => {
-    expect(planListHeader({ ...base, available: everything })).toEqual({
+    expect(
+      planListHeader({ ...base, available: FIT_TOLERANCE + everything })
+    ).toEqual({
       visibleTabs: [0, 1, 2, 3, 4],
       showMoreViews: true,
       pager: "full",
@@ -333,13 +348,15 @@ describe("planListHeader (list-views §8.2, §8.3)", () => {
       planListHeader({
         ...base,
         moreViewsAlways: false,
-        available: everything,
+        available: FIT_TOLERANCE + everything,
       }).showMoreViews
     ).toBe(false);
   });
 
   it("moves tabs into More views from the right before touching the pager", () => {
-    expect(planListHeader({ ...base, available: everything - 1 })).toEqual({
+    expect(
+      planListHeader({ ...base, available: FIT_TOLERANCE + everything - 1 })
+    ).toEqual({
       visibleTabs: [0, 1, 2, 3],
       showMoreViews: true,
       pager: "full",
@@ -351,29 +368,36 @@ describe("planListHeader (list-views §8.2, §8.3)", () => {
     const plan = planListHeader({
       ...base,
       appliedIndex: 4,
-      available: 100 + 2 + 130 + 2 + 100 + 132 + 202,
+      available: FIT_TOLERANCE + 100 + 2 + 130 + 2 + 100 + 132 + 202,
     });
     expect(plan.visibleTabs).toEqual([0, 4]);
   });
 
   it("then drops the range text, then the compact pager", () => {
     const appliedOnly = 100 + 2 + 100 + 2 + 202;
-    expect(planListHeader({ ...base, available: appliedOnly + 72 }).pager).toBe(
-      "compact"
-    );
-    expect(planListHeader({ ...base, available: appliedOnly }).pager).toBe(
-      "hidden"
-    );
+    expect(
+      planListHeader({ ...base, available: FIT_TOLERANCE + appliedOnly + 72 })
+        .pager
+    ).toBe("compact");
+    expect(
+      planListHeader({ ...base, available: FIT_TOLERANCE + appliedOnly }).pager
+    ).toBe("hidden");
   });
 
   it("shortens Discard changes only after the pager is gone", () => {
     const edited = { ...base, editWidth: 200, editCompactWidth: 150 };
     const appliedOnly = 100 + 2 + 100 + 2 + 202;
     expect(
-      planListHeader({ ...edited, available: appliedOnly + 202 })
+      planListHeader({
+        ...edited,
+        available: FIT_TOLERANCE + appliedOnly + 202,
+      })
     ).toMatchObject({ pager: "hidden", compactEdit: false });
     expect(
-      planListHeader({ ...edited, available: appliedOnly + 152 })
+      planListHeader({
+        ...edited,
+        available: FIT_TOLERANCE + appliedOnly + 152,
+      })
     ).toMatchObject({ pager: "hidden", compactEdit: true });
   });
 
@@ -386,24 +410,30 @@ describe("planListHeader (list-views §8.2, §8.3)", () => {
       editCompactWidth: 90,
     };
     expect(
-      planListHeader({ ...noApplied, available: 100 + 2 + 90 + 202 })
+      planListHeader({
+        ...noApplied,
+        available: FIT_TOLERANCE + 100 + 2 + 90 + 202,
+      })
     ).toEqual({
       visibleTabs: [],
       showMoreViews: true,
       pager: "hidden",
       compactEdit: false,
     });
-    expect(planListHeader({ ...noApplied, available: 50 }).visibleTabs).toEqual(
-      []
-    );
+    expect(
+      planListHeader({ ...noApplied, available: FIT_TOLERANCE + 50 })
+        .visibleTabs
+    ).toEqual([]);
   });
 
   it("falls back to the Applied View alone when nothing else fits", () => {
-    expect(planListHeader({ ...base, available: 100 })).toEqual({
-      visibleTabs: [0],
-      showMoreViews: true,
-      pager: "hidden",
-      compactEdit: true,
-    });
+    expect(planListHeader({ ...base, available: FIT_TOLERANCE + 100 })).toEqual(
+      {
+        visibleTabs: [0],
+        showMoreViews: true,
+        pager: "hidden",
+        compactEdit: true,
+      }
+    );
   });
 });
