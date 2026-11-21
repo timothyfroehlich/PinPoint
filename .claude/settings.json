@@ -110,16 +110,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/inject-beads-actor.cjs",
-            "timeout": 5
-          }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
             "command": "node \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/block-main-worktree-branch-switch.cjs",
             "timeout": 5
           }
@@ -185,6 +175,11 @@
       {
         "matcher": "",
         "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/beads-actor-env.cjs",
+            "timeout": 5
+          },
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/session-start-worktree-reap.sh",

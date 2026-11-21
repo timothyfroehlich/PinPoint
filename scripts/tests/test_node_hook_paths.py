@@ -80,7 +80,7 @@ NODE_HOOK_COMMANDS = _node_hook_commands()
 # settings.json edit that silently drops one is caught rather than the
 # parametrized tests just running over a shorter list.
 EXPECTED_NODE_HOOK_BASENAMES = [
-    "inject-beads-actor.cjs",
+    "beads-actor-env.cjs",
     "block-main-worktree-branch-switch.cjs",
     "ui-screenshot-reminder.cjs",
     "verify-guard-stack.cjs",
