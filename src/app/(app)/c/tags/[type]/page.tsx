@@ -1,11 +1,14 @@
 import type React from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import {
+  GroupBreadcrumb,
+  tagCrumbs,
+} from "~/components/collections/GroupBreadcrumb";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { AutomaticBadge } from "~/components/tags/AutomaticBadge";
 import { ExclusiveBadge } from "~/components/tags/ExclusiveBadge";
 import { TagList } from "~/components/tags/TagList";
-import { TagTrail } from "~/components/tags/TagTrail";
 import { TagTypePageActions } from "~/components/tags/TagTypePageActions";
 import { getViewer } from "~/lib/auth/viewer";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
@@ -73,7 +76,7 @@ export default async function TagTypePage({
     <PageContainer size="standard">
       <div className="space-y-6">
         <div className="space-y-1">
-          <TagTrail />
+          <GroupBreadcrumb crumbs={tagCrumbs()} />
           {/* Title, badge, then the page actions in the room left, where
               they lose labels and fold rather than wrap (design-bible §26). */}
           <div className="flex min-h-11 items-center gap-x-3 border-b border-outline-variant pb-2">

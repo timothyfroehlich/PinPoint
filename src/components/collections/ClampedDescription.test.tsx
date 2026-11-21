@@ -54,4 +54,17 @@ describe("ClampedDescription", () => {
       "false"
     );
   });
+
+  it("keeps keyboard focus on the toggle as it switches between Show more and Show less", async () => {
+    mockLayout(200, 60);
+    const user = userEvent.setup();
+    render(<ClampedDescription>A long description.</ClampedDescription>);
+
+    screen.getByRole("button", { name: "Show more" }).focus();
+    await user.keyboard("{Enter}");
+    expect(screen.getByRole("button", { name: "Show less" })).toHaveFocus();
+
+    await user.keyboard("{Enter}");
+    expect(screen.getByRole("button", { name: "Show more" })).toHaveFocus();
+  });
 });

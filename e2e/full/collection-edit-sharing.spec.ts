@@ -114,8 +114,11 @@ test.describe("Collection edit sharing (PP-wqit.7)", () => {
         rv.getByRole("link", { name: new RegExp(name) })
       ).toHaveCount(0);
       // Direct navigation 404s (a uuid is not a capability for a non-collaborator).
-      await rv.goto(collectionUrl);
-      await expect(rv.getByTestId("collection-summary")).toHaveCount(0);
+      const response = await rv.goto(collectionUrl);
+      expect(response?.status()).toBe(404);
+      await expect(
+        rv.getByRole("heading", { name: "Page not found" })
+      ).toBeVisible();
     } finally {
       await revokedCtx.close();
     }

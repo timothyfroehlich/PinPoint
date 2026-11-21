@@ -35,6 +35,52 @@ describe("RouteTabStrip", () => {
     vi.unstubAllGlobals();
   });
 
+  it("asks a shared row for its tabs' full width, without its own border", async () => {
+    // Narrower than the tabs: the strip still asks for all 400px, so the
+    // tabs it folds now come back once the row has room again.
+    mockElementWidths({
+      container: 230,
+      tabs: [60, 80, 100, 80, 80],
+      trigger: 48,
+    });
+
+    render(
+      <RouteTabStrip
+        basePath="/m/TAF"
+        tabs={tabs}
+        ariaLabel="Machine sections"
+        testIdPrefix="machine-tab"
+        sharesRow
+      />
+    );
+
+    const strip = screen.getByTestId("machine-tab-strip");
+    await waitFor(() => {
+      expect(strip.style.flexBasis).toBe("400px");
+    });
+    expect(strip).not.toHaveClass("border-b");
+    expect(
+      screen.getByRole("button", { name: "More machine sections" })
+    ).toBeInTheDocument();
+  });
+
+  it("draws its own border and no basis when it has the row to itself", async () => {
+    mockElementWidths({
+      container: 500,
+      tabs: [60, 80, 100, 80, 80],
+      trigger: 48,
+    });
+
+    renderStrip();
+
+    const strip = screen.getByTestId("machine-tab-strip");
+    await waitFor(() => {
+      expect(screen.getAllByRole("link")).toHaveLength(5);
+    });
+    expect(strip.style.flexBasis).toBe("");
+    expect(strip).toHaveClass("border-b");
+  });
+
   it("renders all routes directly when they fit", async () => {
     mockElementWidths({
       container: 500,

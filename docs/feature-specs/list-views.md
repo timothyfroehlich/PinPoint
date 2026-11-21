@@ -189,10 +189,7 @@
 
 ## Known divergences (code vs spec)
 
-| Requirement | Divergence | Resolution |
-| :-- | :-- | :-- |
-| §8.9, §8.10 | A Tag page's breadcrumb always sits above the title, a Collection page has no breadcrumb, and a Collection's description always sits under the header. | PP-jb9v.18 |
-| §8.13, §8.23 | A Collection or Tag page's tabs never move into a menu, and its header spacing does not tighten below 390px. | PP-jb9v.18 |
+_None — the current implementation matches this spec._
 
 ---
 

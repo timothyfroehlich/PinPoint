@@ -67,16 +67,24 @@ test.describe("Personal collections (PP-wqit.1)", () => {
     await expect(
       page.getByRole("link", { name: "Attack from Mars", exact: true })
     ).toBeVisible();
-    await expect(page.getByTestId("collection-summary")).toBeVisible();
+    const title = page.getByRole("heading", { level: 1, name, exact: true });
+    await expect(title).toBeVisible();
+    // The owner's breadcrumb leads back to My Collections
+    // (collections-and-tags 4.8).
+    await expect(
+      page
+        .getByRole("navigation", { name: "Breadcrumb" })
+        .getByRole("link", { name: "Collections", exact: true })
+    ).toHaveAttribute("href", "/c/collections");
 
-    // Issues and Timeline tabs render without 500.
+    // Issues and Timeline tabs render without 500, under the same header.
     await page.getByTestId("collection-tab-issues").click();
     await expect(page).toHaveURL(/\/issues$/);
-    await expect(page.getByTestId("collection-summary")).toBeVisible();
+    await expect(title).toBeVisible();
 
     await page.getByTestId("collection-tab-timeline").click();
     await expect(page).toHaveURL(/\/timeline$/);
-    await expect(page.getByTestId("collection-summary")).toBeVisible();
+    await expect(title).toBeVisible();
   });
 
   test("share a collection and open the view link anonymously (Wave 0b)", async ({
@@ -130,6 +138,14 @@ test.describe("Personal collections (PP-wqit.1)", () => {
         anonPage.getByRole("link", { name: "Attack from Mars", exact: true })
       ).toBeVisible();
       await expect(anonPage).toHaveURL(/\/c\/[^/]+$/);
+      // Collections links to My Collections, which an anonymous visitor
+      // cannot open, so the title stands alone (4.8).
+      await expect(
+        anonPage.getByRole("heading", { level: 1, name, exact: true })
+      ).toBeVisible();
+      await expect(
+        anonPage.getByRole("navigation", { name: "Breadcrumb" })
+      ).toHaveCount(0);
       await expectNoPageAction(anonPage, "Share");
       await expectNoPageAction(anonPage, "Edit collection");
     } finally {
