@@ -156,8 +156,16 @@ When the PR's own diff (from its merge base with `main`) touches a path in `scri
    node scripts/workflow/pr-screenshots.mjs [--pages=a,b,c]
    ```
    It shoots the pages in `scripts/workflow/ui-screenshot-manifest.json` at the three review viewports (`pinpoint-design-bible` §4: desktop 1440×900, large mobile 430×932, small mobile 320×568) into `tmp/pr-screenshots/<short-sha>/` and prints one path per PNG. `--pages` takes only the equals form. The first run, or a stale login, regenerates `e2e/.auth/*.json` through the `auth-setup` Playwright project, which resets and reseeds the local dev DB. For a state the manifest cannot reach (a dialog open, a toggle set), shoot it in the browser pane (`preview_start`, then `resize_window` and a screenshot) at the same three sizes.
-2. **Show.** Put the screenshots in front of Tim in the session, each page's three sizes together, and offer the running dev server for hands-on review. In Claude Code Desktop that is `SendUserFile` (`display: "render"`) and the browser pane (`preview_start`); a harness that cannot show images gives him the printed paths and the dev server URL. For an ownerless or cloud-routine PR, the Desktop session that adopts it presents them; under the orchestrator, the lead collects them into its artifact (the `pinpoint-orchestrator` skill in Claude Code).
-3. **Record his approval.** When Tim approves in the session, or clicks Approve in the orchestrator artifact, run:
+2. **Show.** In Claude Code Desktop, the session that owns the PR publishes a sign-off page: each changed page's three sizes side by side, with Approve and Request changes buttons. Offer the running dev server (`preview_start`) alongside it for hands-on review.
+   1. Copy [`assets/ui-signoff.html`](assets/ui-signoff.html) to the scratchpad as `ui-signoff-<PR>.html`. Set `<title>` to `UI Sign-off #<PR>` and fill its JSON block: `pr`, `title`, the full `head` SHA, `captured`, `status: "waiting"`, and one `pages` entry per changed page with its `shots` paths.
+   2. Publish it with the Artifact tool: `capabilities: {comments: {}}`, `icon: "check"`, and `files` mapping each `shots` path to its PNG. Send Tim the link.
+   3. **Only the session that published the page receives its comments.** Publish from the session that will record the approval; a page another session published sends Tim's click there.
+   4. Approve sends `UI sign-off: approve PR #<PR> at <sha>.`; Request changes sends `UI sign-off: changes requested on PR #<PR> at <sha>.` with Tim's note. On an approve comment, check that Tim wrote it and that `<sha>` is the head you published, record it (step 3, `--source artifact`), resolve the comment thread, republish the same file with `status: "approved"`, and confirm in chat. A changes note is your next instruction.
+   5. A push after the page went up needs new screenshots: republish the same file with the new head and images.
+
+   **Fallback**, when the Artifact tool is unavailable or the page cannot reach the session: `SendUserFile` (`display: "render"`) with each page's three sizes together, and Tim approves in chat (`--source chat`). A harness that cannot show images gives him the printed paths and the dev server URL. For an ownerless or cloud-routine PR, the Desktop session that adopts it presents them.
+
+3. **Record his approval.** When Tim approves in chat (`--source chat`) or clicks Approve on the sign-off page (`--source artifact`), run:
    ```
    bash scripts/workflow/approve-ui.sh <PR> --head <sha> --source chat|artifact
    ```
