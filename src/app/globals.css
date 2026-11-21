@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
 /* Material Design 3 Color System - Tailwind v4 */
 @theme {
