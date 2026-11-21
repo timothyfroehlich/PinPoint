@@ -397,6 +397,34 @@ describe("submitPublicIssueAction — anonymous and guest status/priority enforc
   });
 });
 
+describe("submitPublicIssueAction — redirect propagation (integration)", () => {
+  setupTestDb();
+
+  it("rethrows a Next.js redirect thrown inside the try instead of returning an error", async () => {
+    const owner = await seedUser("member");
+    const machine = await seedMachine(owner.id);
+    const redirectError = Object.assign(new Error("NEXT_REDIRECT"), {
+      digest: "NEXT_REDIRECT;replace;/report/success;307;",
+    });
+
+    const issuesService = await import("~/services/issues");
+    const spy = vi
+      .spyOn(issuesService, "createIssue")
+      .mockRejectedValueOnce(redirectError);
+
+    try {
+      await expect(
+        submitPublicIssueAction(
+          { error: "" },
+          makeFormData({ machineId: machine.id })
+        )
+      ).rejects.toBe(redirectError);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
 describe("submitPublicIssueAction — Removed machines (integration)", () => {
   setupTestDb();
 
