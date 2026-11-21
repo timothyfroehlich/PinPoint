@@ -116,7 +116,7 @@
 - **8.8** Steps that change the same part fire in the order listed. A step that does not apply to a Surface, such as a breadcrumb on Machines, is skipped.
 - **8.9** When a Collection or Tag page's breadcrumb, title, and description do not fit on one row, the breadcrumb moves from before the title to above it. This is the page header's first step.
 - **8.10** When a Collection's description would be narrower than 280px beside the title, it moves under the title.
-- **8.11** Page actions that do not fit beside the title, or at the end of a Collection or Tag page's tab row, lose their labels and become borderless icon buttons with accessible names; when those still do not fit, they fold into the Actions menu, which is always the last page action.
+- **8.11** Page actions that do not fit beside the title, or at the end of a Collection or Tag page's tab row, lose their labels and become icon buttons with accessible names (§3.8); when those still do not fit, they fold into the Actions menu, which is always the last page action.
 - **8.12** Page actions fold into the Actions menu from the first: on a Collection or Tag page Share folds, and on Machines Pinball Map folds before Add Machine. After each fold the buttons that remain show their labels again when they fit, and a lone Actions menu shows its label when it fits.
 - **8.13** When a Collection or Tag page's tabs and a lone Actions menu still do not fit the tab row, page tabs move into a menu from the right; the current tab always stays.
 - **8.14** Summary Widgets that do not fit side by side drop whole from the right (widgets §2.7).

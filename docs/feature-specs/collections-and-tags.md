@@ -64,7 +64,7 @@
 - **4.11** At and above the md breakpoint a Collection's description sits beside the title in a column 280px to 560px wide, and moves under the title when that column cannot get 280px. Below the md breakpoint it always sits under the title.
 - **4.12** A description shows at most three lines, or two below the md breakpoint. Longer text ends its last shown line with an inline "… Show more" control that shows the rest, and Show less then returns it to its clamped length.
 - **4.13** Below 390px wide the header's spacing above the title and below the tabs tightens from 12px to 4px.
-- **4.14** A Machine Group page's actions are, in order, Share and ⋯ (list-views §3.7), the same on every tab.
+- **4.14** A Machine Group page's actions are, in order, Share and ⋯ (list-views §3.7), the same on every tab; 4.15 says who sees Share.
 - **4.15** On a Collection, Share opens the sharing controls for its View Link and Editors (3.3–3.7) and appears only to the owner (3.8); other viewers see ⋯. On a tag, Share copies the tag page's address, for everyone.
 - **4.16** ⋯ holds Print settings sheets, for everyone, which opens Print settings sheets with the group's machines On the Floor already added (settings-sheets §2.6). It holds no apron cards entry.
 - **4.17** ⋯ holds the editing actions the viewer holds: on a Collection, Edit collection, for the owner and Editors, and Delete collection, for the owner (3.8); on a hand-applied tag, Edit machines, Rename, Move to another tag type, Merge into another tag, and Delete, for technicians and admins (11.8, 11.9, 11.11, 11.16, 11.17). On the Issues tab it also holds Export (issues-list 2.4), and on the Machines tab, Export (machine-views §3.15).
