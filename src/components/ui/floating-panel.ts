@@ -25,6 +25,8 @@ export const FLOATING_PANEL_CLASSES = [
   "data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2",
 ].join(" ");
 
+const CLOSE_FALLBACK_MS = 500;
+
 export interface FloatingPanelOptions {
   /** The panel's own element; it is appended to <body> and removed on close. */
   element: HTMLElement;
@@ -56,6 +58,9 @@ export function openFloatingPanel({
   element.classList.add(...FLOATING_PANEL_CLASSES.split(" "));
   element.dataset["slot"] = "floating-panel";
   element.dataset["state"] = "open";
+  // Hidden until the first placement resolves, so the panel never shows at the
+  // viewport origin.
+  element.style.visibility = "hidden";
   document.body.appendChild(element);
 
   const reference = {
@@ -76,7 +81,11 @@ export function openFloatingPanel({
       middleware: [offset(4), flip(), shift({ padding: 8 })],
     }).then(({ x, y, placement }) => {
       element.dataset["side"] = placement.split("-")[0] ?? "bottom";
-      Object.assign(element.style, { left: `${x}px`, top: `${y}px` });
+      Object.assign(element.style, {
+        left: `${x}px`,
+        top: `${y}px`,
+        visibility: "",
+      });
     });
   };
 
@@ -90,7 +99,10 @@ export function openFloatingPanel({
     closing = true;
     stopAutoUpdate();
     element.dataset["state"] = "closed";
+    let finished = false;
     const finish = (): void => {
+      if (finished) return;
+      finished = true;
       element.remove();
       onClosed?.();
     };
@@ -103,7 +115,9 @@ export function openFloatingPanel({
       return;
     }
     // A cancelled animation (the open fade replaced by the close fade) rejects
-    // `finished`; allSettled waits for the close fade either way.
+    // `finished`; allSettled waits for the close fade either way. The timer is
+    // the backstop for an animation that never settles.
+    window.setTimeout(finish, CLOSE_FALLBACK_MS);
     void Promise.allSettled(running.map((a) => a.finished)).then(finish);
   };
 
