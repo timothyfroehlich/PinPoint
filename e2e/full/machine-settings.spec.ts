@@ -61,6 +61,9 @@ async function activateSectionMenuItem(
     })
     .click();
   await page.getByRole("menuitem", { name: itemName }).click();
+  // The menu now fades out (tw-animate-css, PP-p2ts.7). While it unmounts,
+  // Radix keeps the rest of the page aria-hidden, so role queries find nothing.
+  await expect(page.getByRole("menu")).toHaveCount(0);
 }
 
 test.describe("Machine Settings (PP-43q3)", () => {
