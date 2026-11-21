@@ -1,11 +1,15 @@
-# UI Approval: Tim's visual sign-off on every UI change (PP-zxlq.4).
+# UI Approval: Tim's visual sign-off, at least once, on every PR with UI changes (PP-zxlq.4).
 #
-# A required check (ruleset 6326455). It passes on its own when no UI path
-# (scripts/workflow/ui-paths.txt) changed since the newest earlier commit whose UI
-# Approval passed, with main's changes left out. Otherwise the `sign-off` job waits
-# on the `ui-approval` environment, whose only required reviewer is Tim. The
-# approval carries across later commits that leave UI paths alone, so E2E updates
-# made after sign-off do not ask again; a later UI change waits again.
+# A required check (ruleset 6326455). Every PR with UI changes gets Tim's sign-off
+# at least once. The `sign-off` job waits on the `ui-approval` environment, whose
+# only required reviewer is Tim, when the PR's own diff (from its merge base with
+# main) touches a UI path in scripts/workflow/ui-paths.txt and no earlier head of
+# the PR has a successful `Tim's UI sign-off` job. After the first sign-off the
+# check passes on its own: across E2E updates, merges of main (clean or
+# conflicted), and later UI commits. The owning agent decides when a later UI
+# change is significant enough to show Tim again and records his fresh approval
+# with approve-ui.sh (pinpoint-pr-workflow 3.5). ui-approval-scope.sh finds the
+# sign-off by this job's name, so renaming the job resets every PR's approval.
 #
 # Runs on drafts too: UI is approved while the PR is a draft, before E2E tests are
 # updated and before the PR is marked ready for Claude Review. Marking a draft
@@ -14,7 +18,9 @@
 #
 # How Tim approves: on GitHub (the run's "Review deployments"), or by telling the
 # owning session in Claude Code Desktop, or by clicking Approve in the orchestrator
-# artifact; in the last two the session runs scripts/workflow/approve-ui.sh.
+# artifact; in the last two the session runs scripts/workflow/approve-ui.sh, which
+# also records an approval on a head that moved past the commit Tim saw without
+# changing the PR's own UI diff.
 #
 # The required check is the `UI Approval` job, never `sign-off` itself: a skipped
 # job counts as passing, so the final job decides from both results.
@@ -28,8 +34,9 @@
 #
 # Merge queue: the check is required on the queue's merge_group commit too. A PR
 # enters the queue only after its head passed this check, and the queue adds only
-# main and the PRs ahead of it, each approved on its own head. On merge_group the
-# scope and sign-off jobs skip and `UI Approval` passes without asking again.
+# main and the PRs ahead of it, each approved on its own head. On merge_group (the
+# gh-readonly-queue/... commits) the scope and sign-off jobs skip and `UI Approval`
+# passes without asking again: the sign-off job never runs outside pull_request.
 
 name: UI Approval
 
@@ -79,7 +86,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Find UI changes since the last approval
+      - name: Find UI changes and earlier sign-offs
         id: scope
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -112,7 +119,7 @@ jobs:
   sign-off:
     name: Tim's UI sign-off
     needs: scope
-    if: needs.scope.outputs.ui_changed == 'true'
+    if: github.event_name == 'pull_request' && needs.scope.outputs.ui_changed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     environment: ui-approval

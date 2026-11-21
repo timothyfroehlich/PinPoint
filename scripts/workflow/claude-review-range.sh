@@ -12,7 +12,7 @@
 #                            (level is then empty; ui-approval-scope.sh sets it)
 #   CLAUDE_REVIEW_CHECK_NAME the check run that marks a head covered (default:
 #                            "Claude Review"; ui-approval-scope.sh passes
-#                            "UI Approval" to reuse the same range)
+#                            "Tim's UI sign-off" to find the newest signed-off head)
 #
 # Outputs, one key=value per line (stdout, and $GITHUB_OUTPUT when set):
 #   mode           full | incremental | skip
@@ -52,13 +52,17 @@ emit() {
 }
 
 main_base=$(git merge-base "$main_ref" "$head")
+# URL-encode the check name for the query: spaces, and the apostrophe in "Tim's UI
+# sign-off", the job ui-approval-scope.sh keys on.
+check_query=${CHECK_NAME// /%20}
+check_query=${check_query//\'/%27}
 
 # The PR's commits come oldest first; walk them newest first, leaving out head.
 last_reviewed=""
 pr_commits=$(gh api --paginate "repos/${repo}/pulls/${pr}/commits?per_page=100" --jq '.[].sha')
 while read -r sha; do
   [[ -z "$sha" || "$sha" == "$head" ]] && continue
-  passed=$(gh api "repos/${repo}/commits/${sha}/check-runs?check_name=${CHECK_NAME// /%20}&filter=all" \
+  passed=$(gh api "repos/${repo}/commits/${sha}/check-runs?check_name=${check_query}&filter=all" \
     --jq '[.check_runs[] | select(.conclusion == "success" and .app.slug == "github-actions")] | length')
   if [[ "$passed" -gt 0 ]]; then
     last_reviewed=$sha

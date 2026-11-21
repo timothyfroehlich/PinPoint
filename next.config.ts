@@ -78,6 +78,15 @@ const devAllowedOrigins = process.env["DEV_ALLOWED_ORIGINS"]
 const nextConfig: NextConfig = {
   pageExtensions: ["ts", "tsx", "md", "mdx"],
   reactStrictMode: true,
+  // Sentry environment inputs the browser bundle cannot read at runtime
+  // (sentryEnvironmentOption). Inlined here so the browser sees the same
+  // values as server and edge instead of depending on Vercel's "automatically
+  // expose system environment variables" setting. An empty string is falsy,
+  // so unset behaves as before.
+  env: {
+    NEXT_PUBLIC_VERCEL_ENV: process.env["VERCEL_ENV"] ?? "",
+    SENTRY_ENVIRONMENT: process.env["SENTRY_ENVIRONMENT"] ?? "",
+  },
   ...(devAllowedOrigins?.length
     ? { allowedDevOrigins: devAllowedOrigins }
     : {}),
