@@ -122,6 +122,34 @@ describe("InlineEditableText (always-live model, PP-43q3 pivot)", () => {
     expect(input).toHaveAttribute("placeholder", "Name this set *");
   });
 
+  it("blanking a required field and leaving it shows the required message under it, linked to the input", () => {
+    render(
+      <InlineEditableText
+        value="Bat City"
+        onValueChange={vi.fn()}
+        canEdit
+        required
+        requiredMessage="Name required"
+        ariaLabel="set name"
+      />
+    );
+    const input = screen.getByRole("textbox", { name: /set name/i });
+    fireEvent.change(input, { target: { value: "" } });
+    // Nothing shows while the user is still typing.
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(input).not.toHaveAttribute("aria-invalid");
+
+    fireEvent.blur(input);
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("Name required");
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    expect(input).toHaveAttribute("aria-describedby", alert.id);
+
+    fireEvent.change(input, { target: { value: "Bat" } });
+    fireEvent.blur(input);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("a parent-supplied error shows under a blank required field, linked to it, and clears once the field has text", () => {
     const { rerender } = render(
       <InlineEditableText

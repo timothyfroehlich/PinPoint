@@ -26,6 +26,10 @@ interface InlineEditableTextProps {
    *  knows a save is blocked on this field being blank. Marks the input invalid
    *  and links the message to it (design bible §20 field-level errors). */
   error?: string | undefined;
+  /** Error shown under the field once the user has left it blank (after a blur
+   *  or Enter), so a cleared required field names its problem instead of only
+   *  turning red. Without it, that case stays a red border alone. */
+  requiredMessage?: string | undefined;
   placeholder?: string;
   className?: string;
   inputClassName?: string;
@@ -58,6 +62,7 @@ export function InlineEditableText({
   canEdit = true,
   required = false,
   error,
+  requiredMessage,
   placeholder = "Click to edit…",
   className,
   inputClassName,
@@ -73,7 +78,9 @@ export function InlineEditableText({
   const isFocused = useRef(false);
 
   const isEmptyRequired = required && draft.trim() === "";
-  const errorText = isEmptyRequired ? error : undefined;
+  const errorText = isEmptyRequired
+    ? (error ?? (showRequiredError ? requiredMessage : undefined))
+    : undefined;
   const showInvalid = isEmptyRequired && (showRequiredError || !!error);
   const errorId = useId();
   // Mark required fields up front (design-bible §683 asterisk convention):

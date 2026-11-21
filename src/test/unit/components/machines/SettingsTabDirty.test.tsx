@@ -815,7 +815,9 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
       // Empty name blocked: the execute guard sees isNew && name.trim() === "".
       expect(saveMock).not.toHaveBeenCalled();
       // Nothing was entered, so there is nothing to lose: no failure banner.
-      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      // Leaving the blank required field does mark it, under the field.
+      expect(screen.getByRole("alert")).toHaveTextContent("Name required");
+      expect(screen.queryByText(/couldn.t be saved/i)).not.toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }

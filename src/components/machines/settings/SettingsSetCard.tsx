@@ -518,6 +518,7 @@ export function SettingsSetCard({
           canEdit={canEdit}
           required
           error={nameError}
+          requiredMessage="Name required"
           placeholder="Name this set"
           ariaLabel="set name"
           inputClassName="h-7 text-sm font-semibold"
