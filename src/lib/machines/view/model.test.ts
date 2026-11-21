@@ -36,6 +36,8 @@ function candidate(
     createdAt: "2026-01-01T00:00:00.000Z",
     canonicalModelName: "Attack from Mars",
     legacyModelName: "AFM Legacy",
+    health: health({}),
+    lastServicedAt: null,
     ...overrides,
   };
 }
@@ -247,7 +249,6 @@ describe("summarizeMachineView", () => {
 
   it("counts playability over On the Floor machines only (machine-widgets §4.2)", () => {
     expect(summarizeMachineView(rows).playability).toEqual({
-      onTheFloor: 3,
       byStatus: { operational: 1, needs_service: 1, unplayable: 1 },
     });
   });

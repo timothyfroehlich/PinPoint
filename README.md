@@ -1,6 +1,6 @@
 # PinPoint: Issue Tracking for Pinball Collectives
 
-[![CI](https://github.com/timothyfroehlich/PinPoint/actions/workflows/ci.yml/badge.svg)](https://github.com/timothyfroehlich/PinPoint/actions/workflows/ci.yml)
+[![CI](https://github.com/minamaya/PinPoint/actions/workflows/ci.yml/badge.svg)](https://github.com/minamaya/PinPoint/actions/workflows/ci.yml)
 
 PinPoint is an issue tracker built for the **Austin Pinball Collective**.
 It helps keep games playable by making it easy to report problems, see what’s broken, and coordinate repairs.
@@ -77,7 +77,7 @@ If you’re changing code, **start here**:
 
 ### Prerequisites
 
-- [mise](https://mise.jdx.dev/) **2026.8.11+**
+- [mise](https://mise.jdx.dev/) **2026.11.7+**
 - A Docker-compatible container runtime for the local Supabase stack
 - GNU parallel for the host-wide `pnpm run preflight` concurrency cap
 - A Supabase account only for preview or production administration
@@ -106,7 +106,7 @@ migrations remain with their existing owners.
 ### Local Setup (Short Version)
 
 ```bash
-git clone https://github.com/timothyfroehlich/PinPoint.git
+git clone https://github.com/minamaya/PinPoint.git
 cd PinPoint
 
 mise install --locked           # installs pinned Node, Python, Ruff, Supabase CLI, and pnpm

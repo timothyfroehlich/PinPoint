@@ -55,8 +55,8 @@ export interface ListViewHostConfig<State extends { page: number }, Saved> {
   withPage: (saved: Saved, page: number) => State;
   /**
    * A Built-in View applied to `current` (list-views §1): the view's search,
-   * filters, and sorting with `current`'s displayed fields and page size,
-   * plus any field the host names for that view.
+   * filters, and sorting with `current`'s page size, plus any state field
+   * the host names for that view.
    */
   applyBuiltIn: (view: { id: string; state: Saved }, current: Saved) => Saved;
   /** The host's main page, where the Default View opens, such as "Machines". */
@@ -151,9 +151,9 @@ export function useListViewHost<State extends { page: number }, Saved>(
   const sameConfiguration = (left: Saved, right: Saved): boolean =>
     serialize(withPage(left, 1), null).toString() ===
     serialize(withPage(right, 1), null).toString();
-  // A Built-in View sets search, filters, and sorting only, so displayed
-  // fields and page size never decide whether it is applied (§1): both sides
-  // take the current ones before they are compared.
+  // A Built-in View sets search, filters, and sorting only, so page size
+  // never decides whether it is applied (§1): both sides take the current
+  // one before they are compared.
   const hasBuiltIn = (view: ListBuiltInView<Saved>, current: Saved): boolean =>
     sameConfiguration(
       applyBuiltIn(view, current),
@@ -284,7 +284,7 @@ export function useListViewHost<State extends { page: number }, Saved>(
   /**
    * What applying a view shows, at page 1 (§10.6): a Saved View's whole
    * configuration, or a Built-in View's search, filters, and sorting with
-   * the displayed fields and page size already showing (§1).
+   * the page size already showing (§1).
    */
   const opening = (id: string): State | null => {
     const saved = savedViews.views.find((view) => view.id === id);

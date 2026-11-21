@@ -21,6 +21,13 @@
   "prCreation": "immediate",
   "packageRules": [
     {
+      "description": "One weekly PR for minor and patch toolchain bumps, so the merge line takes one rebase instead of one per tool. Supabase CLI stays out: its bump needs its own compatibility check (pinpoint-chores).",
+      "matchManagers": ["mise"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "matchPackageNames": ["!supabase/cli"],
+      "groupName": "toolchain"
+    },
+    {
       "description": "Keep the weekly Supabase CLI compatibility cadence",
       "matchManagers": ["mise"],
       "matchPackageNames": ["supabase/cli"],

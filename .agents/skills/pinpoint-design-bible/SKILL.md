@@ -81,7 +81,8 @@ use it anywhere else.
 changing together by level: severity warm (yellow → amber → orange → red),
 New/Confirmed cyan, In Progress pink, Fixed green, priority blue, playability
 green/yellow/red. Unplayable is the same red for severity and playability. A
-chip is the text color with a 15% background and a 45% border. Text clears
+chip is the text color with a 15% background and a 45% border; List View
+rows are the one exception and drop the border (issues-list §3.13). Text clears
 4.5:1 on `bg-card` and on its own tint; bar segments clear 3:1.
 
 **Rules:**
@@ -105,6 +106,7 @@ Pick the surface level based on the element's role:
 | Card, popover, elevated container        | `bg-card` (#18151b, fully opaque) |
 | Header, app header, tab bar (nav chrome) | `bg-card/85 backdrop-blur-sm`     |
 | Header band inside a card/section        | `bg-muted` (#27272a, opaque)      |
+| List View's List Header bar              | `bg-card-raised` (#1c191f)        |
 | Closed/archived/dimmed item              | `bg-surface-variant/30`           |
 
 **Key distinction:** Navigation chrome gets the frosted glass treatment (opacity + blur). Content cards are always fully opaque `bg-card`.

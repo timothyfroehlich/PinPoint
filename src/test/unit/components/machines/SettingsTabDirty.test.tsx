@@ -290,7 +290,7 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
 
     // Cards render collapsed by default (PP-tn6t) — expand to reach the body.
     fireEvent.click(
-      screen.getByRole("button", { name: /Comp rules settings set/ })
+      screen.getByRole("button", { name: /Comp rules(?: settings set)?$/ })
     );
 
     // The pre-existing row cells are always open.
@@ -421,7 +421,7 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
 
     // Cards render collapsed by default (PP-tn6t) — expand to reach the body.
     fireEvent.click(
-      screen.getByRole("button", { name: /Comp rules settings set/ })
+      screen.getByRole("button", { name: /Comp rules(?: settings set)?$/ })
     );
 
     // No text inputs for the settings rows.
@@ -473,7 +473,7 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
 
     // Cards render collapsed by default (PP-tn6t) — expand to reach the body.
     fireEvent.click(
-      screen.getByRole("button", { name: /Comp rules settings set/ })
+      screen.getByRole("button", { name: /Comp rules(?: settings set)?$/ })
     );
 
     expect(
@@ -569,7 +569,7 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
 
     // Cards render collapsed by default (PP-tn6t) — expand to reach the body.
     fireEvent.click(
-      screen.getByRole("button", { name: /Comp rules settings set/ })
+      screen.getByRole("button", { name: /Comp rules(?: settings set)?$/ })
     );
 
     // The section title is an always-live input (customTitle=true).
@@ -623,7 +623,7 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
 
     // Cards render collapsed by default (PP-tn6t) — expand to reach the body.
     fireEvent.click(
-      screen.getByRole("button", { name: /Comp rules settings set/ })
+      screen.getByRole("button", { name: /Comp rules(?: settings set)?$/ })
     );
 
     await user.click(
@@ -1379,7 +1379,11 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
     );
 
     // The description is click-to-edit (PP-tn6t): open the editor first.
-    fireEvent.click(screen.getByRole("button", { name: "Edit description" }));
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Add a short description…, edit description",
+      })
+    );
 
     // Edit the description via the mock editor's onChange (markDirty + schedule,
     // debounce pending). Then blur the editor → onBlur → flush.

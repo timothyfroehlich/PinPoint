@@ -161,7 +161,7 @@ export function AssigneeCommand({
               aria-hidden="true"
             >
               ?
-            </span>
+            </span>{" "}
             <span className="font-medium">Unassigned</span>
             <CurrentMark show={assignedToId === null} />
           </CommandItem>
@@ -185,7 +185,7 @@ export function AssigneeCommand({
                   aria-hidden="true"
                 >
                   {user.name.slice(0, 1).toUpperCase()}
-                </span>
+                </span>{" "}
                 <span className="font-medium leading-none">{user.name}</span>
                 <CurrentMark show={user.id === assignedToId} />
               </CommandItem>

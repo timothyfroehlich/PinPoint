@@ -14,7 +14,15 @@ import {
   type MachineStatus,
 } from "~/lib/machines/status";
 
-export interface MachineViewCandidate extends MachineViewRow {
+export interface MachineViewCandidate extends Omit<
+  MachineViewRow,
+  "lastServicedAt"
+> {
+  /**
+   * Loaded for the whole scope only to sort by Last Serviced; the shown
+   * page's rows get theirs after paging (machine-views §3.6).
+   */
+  lastServicedAt?: string | null;
   ownerId: string | null;
   canonicalModelName: string;
   legacyModelName: string;
@@ -122,12 +130,11 @@ function compareRows(
       break;
     case "playability":
       comparison =
-        MACHINE_STATUS_RANK[left.health?.playability ?? "operational"] -
-        MACHINE_STATUS_RANK[right.health?.playability ?? "operational"];
+        MACHINE_STATUS_RANK[left.health.playability] -
+        MACHINE_STATUS_RANK[right.health.playability];
       break;
     case "openIssues":
-      comparison =
-        (left.health?.openIssues ?? 0) - (right.health?.openIssues ?? 0);
+      comparison = left.health.openIssues - right.health.openIssues;
       break;
     case "lastServiced":
       // A machine never serviced is the most overdue: it sorts as the oldest
@@ -158,8 +165,8 @@ function compareRows(
       return comparison !== 0 ? comparison : compareIdentity(left, right);
     case "oldestOpenIssue":
       comparison = compareNullable(
-        dateValue(left.health?.oldestOpenIssueAt),
-        dateValue(right.health?.oldestOpenIssueAt),
+        dateValue(left.health.oldestOpenIssueAt),
+        dateValue(right.health.oldestOpenIssueAt),
         state.dir
       );
       return comparison !== 0 ? comparison : compareIdentity(left, right);
@@ -194,15 +201,13 @@ function matchesMachineViewFilters(
   }
   if (
     state.status.length > 0 &&
-    !state.status.includes(row.health?.playability ?? "operational")
+    !state.status.includes(row.health.playability)
   ) {
     return false;
   }
   if (
     state.severity.length > 0 &&
-    !state.severity.some(
-      (severity) => (row.health?.bySeverity[severity] ?? 0) > 0
-    )
+    !state.severity.some((severity) => row.health.bySeverity[severity] > 0)
   ) {
     return false;
   }
@@ -268,13 +273,11 @@ function summarizePlayability(
     needs_service: 0,
     unplayable: 0,
   };
-  let onTheFloor = 0;
   for (const row of rows) {
     if (row.presence !== "on_the_floor") continue;
-    onTheFloor += 1;
-    byStatus[row.health?.playability ?? "operational"] += 1;
+    byStatus[row.health.playability] += 1;
   }
-  return { onTheFloor, byStatus };
+  return { byStatus };
 }
 
 /**

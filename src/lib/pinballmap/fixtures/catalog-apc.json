@@ -1171,5 +1171,25 @@
     "ipdb_id": 762,
     "machine_group_id": null,
     "ic_eligible": false
+  },
+  {
+    "id": 90004,
+    "name": "The Addams Family Special Collectors Edition",
+    "manufacturer": "Bally",
+    "year": 1994,
+    "opdb_id": null,
+    "ipdb_id": null,
+    "machine_group_id": null,
+    "ic_eligible": false
+  },
+  {
+    "id": 90005,
+    "name": "Indiana Jones: The Pinball Adventure",
+    "manufacturer": "Williams",
+    "year": 1993,
+    "opdb_id": null,
+    "ipdb_id": null,
+    "machine_group_id": null,
+    "ic_eligible": false
   }
 ]

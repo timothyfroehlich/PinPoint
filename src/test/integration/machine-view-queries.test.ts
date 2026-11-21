@@ -167,11 +167,56 @@ describe("machine view database pipeline", () => {
     expect(dates.get(alphaId)).toEqual(selected);
   });
 
+  it("gives every shown row its service date, and sorts the whole scope by it (machine-views §3.6, §5.9)", async () => {
+    const db = await getTestDb();
+    await db.insert(timelineEvents).values([
+      {
+        machineId: alphaId,
+        sourceType: "comment",
+        tag: "maintenance",
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+      {
+        machineId: gammaId,
+        sourceType: "comment",
+        tag: "maintenance",
+        createdAt: new Date("2026-03-01T00:00:00.000Z"),
+      },
+    ]);
+    const load = (
+      params: Record<string, string>
+    ): ReturnType<typeof loadMachineViewFromDatabase> =>
+      loadMachineViewFromDatabase(asDbOrTx(db), {
+        scope: { kind: "all" },
+        preset: "machines",
+        viewerId: null,
+        searchParams: new URLSearchParams({ presence: "all", ...params }),
+      });
+
+    // Sorted by name, the shown page's service dates load after paging.
+    const byName = await load({});
+    expect(
+      byName.rows.map((row) => [row.initials, row.lastServicedAt])
+    ).toEqual([
+      ["AAA", "2026-01-01T00:00:00.000Z"],
+      ["BBB", null],
+      ["CCC", "2026-03-01T00:00:00.000Z"],
+    ]);
+
+    // Sorted by Last Serviced, the whole scope's dates order the list.
+    const newest = await load({ sort: "lastServiced", dir: "desc" });
+    expect(newest.rows.map((row) => row.initials)).toEqual([
+      "CCC",
+      "AAA",
+      "BBB",
+    ]);
+    expect(newest.rows[0]?.lastServicedAt).toBe("2026-03-01T00:00:00.000Z");
+  });
+
   it("keeps all and collection scopes exact", async () => {
     const db = await getTestDb();
     const searchParams = new URLSearchParams({
       presence: "all",
-      columns: "machine",
     });
 
     const tx = asDbOrTx(db);
@@ -190,13 +235,18 @@ describe("machine view database pipeline", () => {
 
     expect(all.rows.map((row) => row.initials)).toEqual(["AAA", "BBB", "CCC"]);
     expect(collection.rows.map((row) => row.initials)).toEqual(["AAA", "CCC"]);
-    expect(all.rows.every((row) => row.lastServicedAt === undefined)).toBe(
+    // Every row carries its service date (machine-views §5.9); activity
+    // dates load only to sort by them.
+    expect(all.rows.every((row) => Object.hasOwn(row, "lastServicedAt"))).toBe(
+      true
+    );
+    expect(all.rows.every((row) => row.lastActivityAt === undefined)).toBe(
       true
     );
     expect(all.rows.every((row) => !Object.hasOwn(row, "ownerId"))).toBe(true);
   });
 
-  it("sends the identity line's manufacturer, year, and owner name whatever fields are displayed (§3.2, §3.3)", async () => {
+  it("sends the identity line's manufacturer, year, and owner name (§3.2, §3.3)", async () => {
     const db = await getTestDb();
     await db.insert(machines).values(
       createTestMachine({
@@ -213,7 +263,6 @@ describe("machine view database pipeline", () => {
       viewerId: null,
       searchParams: new URLSearchParams({
         presence: "all",
-        columns: "machine",
       }),
     });
 
@@ -232,7 +281,7 @@ describe("machine view database pipeline", () => {
     expect(JSON.stringify(result.rows)).not.toContain("@");
   });
 
-  it("sends health on every row for the phone Compact row, whatever fields are displayed (§5.3)", async () => {
+  it("sends health on every row (§5.3)", async () => {
     const db = await getTestDb();
     await db
       .insert(issues)
@@ -247,7 +296,6 @@ describe("machine view database pipeline", () => {
       viewerId: null,
       searchParams: new URLSearchParams({
         presence: "all",
-        columns: "machine",
       }),
     });
 
@@ -255,9 +303,9 @@ describe("machine view database pipeline", () => {
     expect(
       result.rows.map((row) => [
         row.initials,
-        row.health?.playability,
-        row.health?.openIssues,
-        row.health?.worstSeverity,
+        row.health.playability,
+        row.health.openIssues,
+        row.health.worstSeverity,
       ])
     ).toEqual([
       ["AAA", "unplayable", 1, "unplayable"],
@@ -314,7 +362,6 @@ describe("machine view database pipeline", () => {
       },
     });
     expect(all.summary.playability).toEqual({
-      onTheFloor: 1,
       byStatus: { operational: 0, needs_service: 0, unplayable: 1 },
     });
     // The Collection tab holds Alpha and Gamma: only its own scope counts.
@@ -324,7 +371,11 @@ describe("machine view database pipeline", () => {
       on_loan: 0,
       pending_arrival: 0,
     });
-    expect(collection.summary.playability.onTheFloor).toBe(1);
+    expect(collection.summary.playability.byStatus).toEqual({
+      operational: 0,
+      needs_service: 0,
+      unplayable: 1,
+    });
   });
 
   it("keeps an owner with no machines in the scope, matching nothing (list-views §10.18)", async () => {
@@ -346,7 +397,6 @@ describe("machine view database pipeline", () => {
       viewerId: null,
       searchParams: new URLSearchParams({
         owner: `${ownerTwoId},${invitedId},unassigned`,
-        columns: "machine",
       }),
     });
 
@@ -378,7 +428,6 @@ describe("machine view database pipeline", () => {
       viewerId: null,
       searchParams: new URLSearchParams({
         owner: `${ownerOneId},${ownerTwoId}`,
-        columns: "machine",
       }),
     });
 
@@ -399,7 +448,6 @@ describe("machine view database pipeline", () => {
         searchParams: new URLSearchParams({
           owner: "me",
           presence: "all",
-          columns: "machine",
         }),
       });
 
@@ -408,6 +456,7 @@ describe("machine view database pipeline", () => {
     expect(ownerOne.state.owner).toEqual(["me"]);
     expect(ownerOne.rows.map((row) => row.initials)).toEqual(["AAA", "BBB"]);
     expect(ownerOne.offersMe).toBe(true);
+    expect(ownerOne.signedIn).toBe(true);
     // Me is a shortcut, never a person among the options.
     expect(ownerOne.ownerOptions.map((option) => option.id)).not.toContain(
       "me"
@@ -420,6 +469,7 @@ describe("machine view database pipeline", () => {
     const anonymous = await load(null);
     expect(anonymous.state.owner).toEqual([]);
     expect(anonymous.offersMe).toBe(false);
+    expect(anonymous.signedIn).toBe(false);
     expect(anonymous.totalCount).toBe(anonymous.scopeCount);
   });
 
@@ -431,7 +481,6 @@ describe("machine view database pipeline", () => {
       viewerId: null,
       searchParams: new URLSearchParams({
         owner: `${ownerOneId},${randomUUID()},not-a-person`,
-        columns: "machine",
       }),
     });
 

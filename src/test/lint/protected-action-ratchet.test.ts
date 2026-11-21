@@ -81,6 +81,7 @@ const HAND_ROLLED = new Set([
   "src/app/(app)/m/actions.ts#updateMachineDescription",
   "src/app/(app)/m/actions.ts#updateMachineOwnerRequirements",
   "src/app/(app)/m/actions.ts#updateMachinePresenceAction",
+  "src/app/(app)/m/export-action.ts#exportMachinesAction",
   "src/app/(app)/m/iscored-actions.ts#getIscoredGamesAction",
   "src/app/(app)/m/pinballmap-actions.ts#searchPinballMapFamiliesAction",
   "src/app/(app)/m/pinballmap-actions.ts#listPinballMapEditionsAction",

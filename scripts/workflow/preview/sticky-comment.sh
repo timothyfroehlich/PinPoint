@@ -20,10 +20,10 @@ set -euo pipefail
 #
 # Environment:
 #   GH_TOKEN          required by `gh` for API calls
-#   GITHUB_REPOSITORY owner/repo (defaults to timothyfroehlich/PinPoint)
+#   GITHUB_REPOSITORY owner/repo (defaults to minamaya/PinPoint)
 
 MARKER="<!-- pinpoint-preview-status -->"
-REPO="${GITHUB_REPOSITORY:-timothyfroehlich/PinPoint}"
+REPO="${GITHUB_REPOSITORY:-minamaya/PinPoint}"
 
 # Print the id of the existing sticky comment, or empty string if none exists.
 find_sticky_id() {

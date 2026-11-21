@@ -15,6 +15,17 @@ import type {
 } from "~/lib/types";
 import { IssueView } from "./IssueView";
 
+/**
+ * The toolbar's search field. List View renders search twice, in the toolbar
+ * and in the phone List Header, and CSS shows one (list-views §7.3); jsdom
+ * applies no CSS, so both are in the tree and the toolbar's comes first.
+ */
+function toolbarSearch(name: string | RegExp): HTMLElement {
+  const [field] = screen.getAllByRole("searchbox", { name });
+  if (!field) throw new Error("no search field");
+  return field;
+}
+
 window.matchMedia = vi.fn().mockImplementation(() => ({
   matches: false,
   media: "",
@@ -52,12 +63,6 @@ vi.mock("~/app/(app)/issues/saved-view-actions", () => actions);
 vi.mock("~/app/(app)/issues/export-action", () => ({
   exportIssuesAction: exportAction,
 }));
-vi.mock("~/app/(app)/issues/actions", () => ({
-  updateIssueStatusAction: vi.fn(),
-  updateIssueSeverityAction: vi.fn(),
-  updateIssuePriorityAction: vi.fn(),
-  assignIssueAction: vi.fn(),
-}));
 vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
@@ -90,9 +95,7 @@ function row(overrides: Partial<IssueListRow> = {}): IssueListRow {
     machineInitials: "AFM",
     reporterName: null,
     assignedTo: null,
-    machine: { id: "machine-1", name: "Attack from Mars", ownerId: null },
-    reportedByUser: null,
-    invitedReporter: null,
+    machine: { id: "machine-1", name: "Attack from Mars" },
     assignedToUser: null,
     commentCount: 0,
     ...overrides,
@@ -104,7 +107,6 @@ function result(overrides: Partial<IssueViewResult> = {}): IssueViewResult {
     rows: [row()],
     totalCount: 1,
     summary: {
-      open: 1,
       byStatusGroup: { new: 1, in_progress: 0 },
       bySeverity: { cosmetic: 0, minor: 0, major: 1, unplayable: 0 },
       byPriority: { low: 0, medium: 0, high: 1 },
@@ -151,7 +153,6 @@ function renderView(
       result={options.result ?? result()}
       savedViews={options.views ?? savedViews()}
       title={"title" in options ? options.title : "Issues"}
-      viewer={{ userId: ALEX, accessLevel: "member" }}
     />
   );
 }
@@ -410,9 +411,7 @@ describe("IssueView", () => {
 
   it("searches without a placeholder, named for the list it searches (list-views §4.2)", () => {
     renderView();
-    expect(
-      screen.getByRole("searchbox", { name: "Search issues" })
-    ).not.toHaveAttribute("placeholder");
+    expect(toolbarSearch("Search issues")).not.toHaveAttribute("placeholder");
   });
 
   it("lists the Secondary Filters under More, in order (issues-list §4.3)", async () => {
@@ -462,7 +461,9 @@ describe("IssueView", () => {
       }),
     });
 
-    await user.click(screen.getByRole("button", { name: /^Filters/ }));
+    await user.click(
+      screen.getByRole("button", { name: /^(?:Filters|\d+ active filters?)$/ })
+    );
     await user.click(await screen.findByRole("button", { name: "Reset all" }));
     expect(navigation.replace).toHaveBeenLastCalledWith(
       "/issues?q=gate&sort=created&dir=asc",
@@ -611,10 +612,7 @@ describe("IssueView", () => {
     const user = userEvent.setup();
     renderView();
 
-    await user.type(
-      screen.getByRole("searchbox", { name: "Search issues" }),
-      "flipper{Enter}"
-    );
+    await user.type(toolbarSearch("Search issues"), "flipper{Enter}");
 
     expect(navigation.replace).toHaveBeenLastCalledWith("/issues?q=flipper", {
       scroll: false,

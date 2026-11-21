@@ -149,3 +149,135 @@ export function planListHeader(input: ListHeaderFitInput): ListHeaderPlan {
     compactEdit: true,
   };
 }
+
+/** The narrowest the phone search field may be before it becomes an icon. */
+export const PHONE_SEARCH_MIN_WIDTH = 175;
+
+/**
+ * Fit tolerance (list-views §8.7): the icon takes over slightly before the
+ * field would drop below its minimum, so a field at exactly 175px is
+ * already an icon.
+ */
+const FIT_TOLERANCE_PX = 1;
+
+export interface PhoneSearchFitInput {
+  /** The phone List Header's inner width. */
+  available: number;
+  /** The views button's untruncated width, Edited marker included. */
+  viewsWidth: number;
+  /** Width of the Filters icon button. */
+  filtersWidth: number;
+  gap: number;
+}
+
+/**
+ * Whether the phone List Header shows search as an icon button instead of
+ * the field (list-views §7.12). The field takes what the views button and
+ * Filters leave, and becomes an icon when that would be narrower than
+ * 175px, the field's width on a 400px screen with "Open issues" as the view
+ * name, with the §8.7 tolerance on top. A longer view name, or the Edited
+ * marker, makes it an icon on a wider screen.
+ */
+export function phoneSearchAsIcon({
+  available,
+  viewsWidth,
+  filtersWidth,
+  gap,
+}: PhoneSearchFitInput): boolean {
+  const fieldWidth = available - viewsWidth - filtersWidth - 2 * gap;
+  return fieldWidth < PHONE_SEARCH_MIN_WIDTH + FIT_TOLERANCE_PX;
+}
+
+/**
+ * Room a line fit leaves spare, so a part drops a little before the line is
+ * exactly full and real glyphs never crowd the line's end.
+ */
+export const LINE_FIT_TOLERANCE = 16;
+
+/** One part of a one-line row, at its full width. */
+export interface LineFitPart<Part extends string> {
+  key: Part;
+  width: number;
+  /**
+   * Plain text. A "·" separates two plain-text parts that show next to each
+   * other in the same group, and nothing else.
+   */
+  text: boolean;
+}
+
+/** The spacing of a one-line row (list-views §8, issues-list §3.9). */
+export interface LineFitSpacing {
+  /** The gap between the leading group's parts, separators included. */
+  gap: number;
+  /** The gap between the trailing group's parts. */
+  trailingGap: number;
+  /** The least room between the leading and the trailing group. */
+  groupGap: number;
+  /** The width of a "·" separator. */
+  separatorWidth: number;
+}
+
+export interface LineFitInput<Part extends string> extends LineFitSpacing {
+  /** The line's inner width. */
+  available: number;
+  /** The parts that lead the line, in display order. */
+  leading: readonly LineFitPart<Part>[];
+  /**
+   * The right-anchored group at the line's end, in display order. The group
+   * takes no room once none of its parts shows.
+   */
+  trailing: readonly LineFitPart<Part>[];
+  /** The parts that give way for room, the first to drop first. */
+  dropOrder: readonly Part[];
+}
+
+/** One group's width with the parts in `shown`, separators included. */
+function groupWidth<Part extends string>(
+  parts: readonly LineFitPart<Part>[],
+  shown: ReadonlySet<Part>,
+  gap: number,
+  separatorWidth: number
+): number {
+  const widths: number[] = [];
+  let previousText = false;
+  for (const part of parts) {
+    if (!shown.has(part.key)) continue;
+    if (part.text && previousText) widths.push(separatorWidth);
+    widths.push(part.width);
+    previousText = part.text;
+  }
+  return rowWidth(widths, gap);
+}
+
+/**
+ * Which parts of a one-line row show (machine-views §5.10, issues-list
+ * §3.9): the parts in `dropOrder` drop one at a time, in that order, until
+ * the line fits with `LINE_FIT_TOLERANCE` to spare. A part outside
+ * `dropOrder` never drops; when those alone still do not fit, every
+ * droppable part is gone and the component truncates what remains.
+ */
+export function fitLineParts<Part extends string>({
+  available,
+  leading,
+  trailing,
+  dropOrder,
+  gap,
+  trailingGap,
+  groupGap,
+  separatorWidth,
+}: LineFitInput<Part>): ReadonlySet<Part> {
+  const shown = new Set<Part>(
+    [...leading, ...trailing].map((part) => part.key)
+  );
+  const room = available - LINE_FIT_TOLERANCE;
+  const lineWidth = (): number => {
+    const lead = groupWidth(leading, shown, gap, separatorWidth);
+    const end = groupWidth(trailing, shown, trailingGap, separatorWidth);
+    return end === 0 ? lead : lead + groupGap + end;
+  };
+  for (const part of dropOrder) {
+    if (lineWidth() <= room) break;
+    shown.delete(part);
+  }
+  return shown;
+}

@@ -8,7 +8,9 @@
 # made after sign-off do not ask again; a later UI change waits again.
 #
 # Runs on drafts too: UI is approved while the PR is a draft, before E2E tests are
-# updated and before the PR is marked ready for Claude Review.
+# updated and before the PR is marked ready for Claude Review. Marking a draft
+# ready does not trigger it: the head is the same, so the run on that head already
+# holds the answer, and a new run would cancel one waiting for sign-off (PP-bg1u).
 #
 # How Tim approves: on GitHub (the run's "Review deployments"), or by telling the
 # owning session in Claude Code Desktop, or by clicking Approve in the orchestrator
@@ -23,22 +25,32 @@
 # that diff and Tim's merge decision cover it. Agents approve only through
 # approve-ui.sh, on Tim's own approval, and never through the raw API.
 
+#
+# Merge queue: the check is required on the queue's merge_group commit too. A PR
+# enters the queue only after its head passed this check, and the queue adds only
+# main and the PRs ahead of it, each approved on its own head. On merge_group the
+# scope and sign-off jobs skip and `UI Approval` passes without asking again.
+
 name: UI Approval
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened]
+  merge_group:
+    types: [checks_requested]
 
 permissions: {}
 
 concurrency:
-  # A newer push supersedes a run still waiting for sign-off.
-  group: ui-approval-${{ github.event.pull_request.number }}
+  # A newer push supersedes a run still waiting for sign-off. Merge-queue runs
+  # have no PR number; each group's own ref keeps them apart.
+  group: ui-approval-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   scope:
     name: UI changes
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -50,7 +62,7 @@ jobs:
       detail: ${{ steps.scope.outputs.detail }}
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2  # ratchet:step-security/harden-runner@v2.22.2
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43  # ratchet:step-security/harden-runner@v2.22.3
         with:
           egress-policy: audit
 
@@ -119,11 +131,16 @@ jobs:
     steps:
       - name: Decide
         env:
+          EVENT: ${{ github.event_name }}
           SCOPE: ${{ needs.scope.result }}
           UI_CHANGED: ${{ needs.scope.outputs.ui_changed }}
           SIGN_OFF: ${{ needs.sign-off.result }}
           DETAIL: ${{ needs.scope.outputs.detail }}
         run: |
+          if [ "$EVENT" = "merge_group" ]; then
+            echo "Merge queue: each PR in this group passed UI Approval on its own head."
+            exit 0
+          fi
           echo "$DETAIL"
           if [ "$SCOPE" != "success" ]; then
             echo "::error::Could not determine the UI changes on this head."

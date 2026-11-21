@@ -147,14 +147,12 @@ export function RecentIssuesPanelClient({
                     key={issue.id}
                     href={`/m/${machineInitials}/i/${issue.issueNumber}`}
                     className="block group"
-                    aria-label={`View issue: ${issue.title} - ${getIssueStatusLabel(
-                      issue.status
-                    )}`}
+                    aria-label={`${issue.title}, ${getIssueStatusLabel(issue.status)}`}
                   >
                     <div className="flex h-[36px] items-center justify-between gap-2 rounded-md border border-transparent bg-surface hover:border-outline-variant px-2 transition-colors duration-150 active:scale-[0.98]">
                       <p className="truncate text-xs font-medium text-foreground group-hover:text-primary transition-colors duration-150">
                         {issue.title}
-                      </p>
+                      </p>{" "}
                       <IssueBadge type="status" value={issue.status} />
                     </div>
                   </Link>

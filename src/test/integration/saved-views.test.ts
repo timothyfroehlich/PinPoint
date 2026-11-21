@@ -47,7 +47,6 @@ const state: MachineViewSavedState = {
   sort: "machine",
   dir: "asc",
   pageSize: 25,
-  columns: ["machine", "playability"],
 };
 
 const builtInViewIds = ["on-the-floor", "needs-attention"];
@@ -368,6 +367,8 @@ describe("machine Saved Views on each Surface (list-views §10.5, §10.10)", () 
       state: {
         ...state,
         status: ["unplayable", "retired_status"],
+        // Saved while machines had columns; a stored displayed field is
+        // ignored (list-views §10.14).
         columns: ["machine", "retiredField", "owner"],
         issuesWidget: "filtered",
         // Retired with the All/Filtered choice (machine-widgets §2.2).
@@ -383,11 +384,7 @@ describe("machine Saved Views on each Surface (list-views §10.5, §10.10)", () 
     expect(offered.views).toEqual([
       expect.objectContaining({
         name: "Old",
-        state: {
-          ...state,
-          status: ["unplayable"],
-          columns: ["machine", "owner"],
-        },
+        state: { ...state, status: ["unplayable"] },
       }),
     ]);
   });

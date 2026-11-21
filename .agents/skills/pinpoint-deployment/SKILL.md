@@ -128,7 +128,7 @@ Vercel does not promote a failed build, so production keeps serving the **previo
 
 ### Stuck migration fix
 
-`MARK_MIGRATION_FORCE_PRODUCTION=1 POSTGRES_URL=<prod_url> tsx scripts/mark-migration-applied.ts <n>`. The token is required — the script refuses a remote target without it, and prompts once more when run in a TTY. It writes to `drizzle.__drizzle_migrations` without running the migration's SQL, so later `db:migrate` runs skip it: verify every schema effect of that migration already exists in prod before using it. A wrong number makes prod's schema diverge from history permanently.
+`MARK_MIGRATION_FORCE_PRODUCTION=1 POSTGRES_URL=<prod_url> tsx scripts/mark-migration-applied.ts <n>`. The token is required — the script refuses a remote target without it, and prompts once more when run in a TTY. It writes the row drizzle's migrator would (`migrationRecord` in `scripts/lib/migration-record.ts`: the file's sha256, with the journal `when` as `created_at`, so later entries still run) without running the migration's SQL, so later `db:migrate` runs skip it: verify every schema effect of that migration already exists in prod before using it. A wrong number makes prod's schema diverge from history permanently.
 
 ### Diagnosing a failed production deploy without build logs
 
@@ -147,7 +147,9 @@ Pass `--no-sensitive` for anything that must stay readable. Verify by pulling to
 
 Native Supabase auto-branching is **disabled** — no PR gets a preview by default (zero branches, zero cost). Previews are created on demand via PR comment commands and torn down on a TTL.
 
-- **Control surface = PR comments** (from authors with write access only):
+**Vercel builds only `main` automatically.** `vercel.json` sets `git.deploymentEnabled` to `{"main": true, "**": false}`, so a push to any other branch creates no Vercel deployment (build CPU minutes were most of the bill when every push built a preview, PP-ke8x). Branch patterns are minimatch globs and a branch matching any `true` rule deploys. The catch-all is `"**"`, not `"*"`, because `*` does not cross `/` and our branches are `feature/...`, `chore/...`, `dependabot/...`. A preview exists only after `/preview`, which creates its deployment itself through `POST /v13/deployments` with a `gitSource` (`trigger_vercel_build` in `preview-create.sh`), not through the git push hook; verified on PR #2373 on 2026-10-05, where `/preview` reached Ready with automatic branch deploys off. That function only warns on a non-2xx from the API, so a blocked deployment would surface as a `/preview` status comment with no live URL. To get a build for a branch without `/preview`, run it locally or add a branch rule to `git.deploymentEnabled`.
+
+- **Control surface = PR comments** from the owner, org members or collaborators (any permission level), on PRs whose branch is in this repository. A fork PR is refused before checkout, because its head would run the preview scripts with the Supabase and Vercel secrets.
   - `/preview` — create (or restart after expiry) a branch, migrate + seed it, wire creds into the Vercel preview, and post a sticky status comment with the live URL + 48h expiry.
   - `/preview extend` — push expiry +48h (no DB work). `/preview stop` — tear down now.
   - Later pushes do not re-migrate the branch. After pushing a migration or seed change, comment `/preview` again — it resets the live branch and re-runs migrate + seed from the new head.

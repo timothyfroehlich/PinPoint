@@ -17,6 +17,7 @@ import type {
   MachineViewResult,
   MachineViewRow,
   MachineViewScope,
+  MachineViewState,
 } from "~/lib/types";
 import type { TimelineTag } from "~/lib/timeline/machine-tags";
 import { getCurrentManufacturer } from "~/lib/machines/manufacturer";
@@ -38,6 +39,7 @@ import {
 } from "./model";
 import { getExistingPeople } from "~/lib/list-view/people";
 import { parseMachineViewState } from "./state";
+import type { MachineExportRow } from "./export";
 
 export const MACHINE_VIEW_SERVICE_TAGS = [
   "maintenance",
@@ -70,6 +72,8 @@ interface MachineViewBaseRow {
   ownerId: string | null;
   ownerName: string;
   manufacturer: string;
+  /** False when `manufacturer` is only the "Unknown" placeholder. */
+  hasManufacturer: boolean;
   year: number | null;
   canonicalModelName: string;
   legacyModelName: string;
@@ -147,6 +151,7 @@ export async function getMachineViewBaseRows(
       ownerId: owner?.id ?? null,
       ownerName: owner?.name ?? UNASSIGNED_OWNER_NAME,
       manufacturer: manufacturer ?? "Unknown",
+      hasManufacturer: manufacturer !== null,
       year: machine.pinballmapTitle?.year ?? machine.year,
       canonicalModelName: machine.pinballmapTitle?.name ?? "",
       legacyModelName: machine.modelName ?? "",
@@ -256,7 +261,10 @@ export function getLatestMachineActivityDates(
   return latestTimelineDates(tx, machineIds, false);
 }
 
-function publicRow(candidate: MachineViewCandidate): MachineViewRow {
+function publicRow(
+  candidate: MachineViewCandidate,
+  serviceDates: ReadonlyMap<string, Date>
+): MachineViewRow {
   const row: MachineViewRow = {
     id: candidate.id,
     initials: candidate.initials,
@@ -267,25 +275,34 @@ function publicRow(candidate: MachineViewCandidate): MachineViewRow {
     hasOwner: candidate.hasOwner,
     presence: candidate.presence,
     createdAt: candidate.createdAt,
+    // Every row shows Playability, the open-issue count, and the service age
+    // (machine-views §5.3, §5.9).
+    health: candidate.health,
+    lastServicedAt: serviceDates.get(candidate.id)?.toISOString() ?? null,
   };
-  // Every row carries health: the phone Compact row always shows Playability
-  // and the open-issue count, whatever fields are selected (§5.3).
-  if (candidate.health !== undefined) {
-    row.health = candidate.health;
-  }
-  if (candidate.lastServicedAt !== undefined) {
-    row.lastServicedAt = candidate.lastServicedAt;
-  }
   if (candidate.lastActivityAt !== undefined) {
     row.lastActivityAt = candidate.lastActivityAt;
   }
   return row;
 }
 
-export async function loadMachineViewFromDatabase(
+/**
+ * The pipeline the list and its export share: the scope's base rows, the
+ * validated View Configuration, and every machine as a candidate carrying
+ * only the enrichment the configuration needs.
+ */
+async function buildMachineViewCandidates(
   tx: DbTransaction,
-  { scope, preset, searchParams, viewerId }: LoadMachineViewFromDatabaseArgs
-): Promise<MachineViewResult> {
+  { scope, preset, searchParams, viewerId }: LoadMachineViewFromDatabaseArgs,
+  { allDates = false }: { allDates?: boolean } = {}
+): Promise<{
+  baseRows: MachineViewBaseRow[];
+  selectedOwners: Map<string, string>;
+  validatedState: MachineViewState;
+  candidates: MachineViewCandidate[];
+  /** The scope's service dates, or null when only the page's are needed. */
+  scopeServiceDates: Map<string, Date> | null;
+}> {
   const parsedState = parseMachineViewState(searchParams, preset);
   // Owner values are checked against people who exist, not against the
   // scope's machines: a person who owns nothing here stays selected and
@@ -300,18 +317,21 @@ export async function loadMachineViewFromDatabase(
     ...parsedState,
     owner: parsedState.owner.filter((ownerId) => selectedOwners.has(ownerId)),
   };
-  const dependencyPlan = planMachineViewDependencies(validatedState);
+  const dependencyPlan = allDates
+    ? { service: true, activity: true }
+    : planMachineViewDependencies(validatedState);
   const machineIds = baseRows.map((row) => row.id);
   const machineInitials = baseRows.map((row) => row.initials);
   // Health loads for the whole scope on every request: the Summary Widgets
   // count it across the scope (machine-widgets §2.3) and every row carries it
-  // to the browser (machine-views §5.3). Service and activity dates load only
-  // when a displayed field or the sort needs them.
-  const [health, serviceDates, activityDates] = await Promise.all([
+  // to the browser (machine-views §5.3). Service and activity dates load for
+  // the whole scope only when the sort needs them; otherwise the shown page's
+  // service dates load after paging, below.
+  const [health, scopeServiceDates, activityDates] = await Promise.all([
     getMachineViewHealth(tx, machineInitials),
     dependencyPlan.service
       ? getLatestMachineServiceDates(tx, machineIds)
-      : Promise.resolve(new Map<string, Date>()),
+      : Promise.resolve(null),
     dependencyPlan.activity
       ? getLatestMachineActivityDates(tx, machineIds)
       : Promise.resolve(new Map<string, Date>()),
@@ -330,24 +350,59 @@ export async function loadMachineViewFromDatabase(
       createdAt: machine.createdAt.toISOString(),
       canonicalModelName: machine.canonicalModelName,
       legacyModelName: machine.legacyModelName,
+      health:
+        health.get(machine.initials) ??
+        healthFromSeverityCounts({
+          cosmetic: 0,
+          minor: 0,
+          major: 0,
+          unplayable: 0,
+          oldestOpenIssueAt: null,
+        }),
     };
-    row.health =
-      health.get(machine.initials) ??
-      healthFromSeverityCounts({
-        cosmetic: 0,
-        minor: 0,
-        major: 0,
-        unplayable: 0,
-        oldestOpenIssueAt: null,
-      });
-    if (dependencyPlan.service) {
-      row.lastServicedAt = serviceDates.get(machine.id)?.toISOString() ?? null;
+    if (scopeServiceDates !== null) {
+      row.lastServicedAt =
+        scopeServiceDates.get(machine.id)?.toISOString() ?? null;
     }
     if (dependencyPlan.activity) {
       row.lastActivityAt = activityDates.get(machine.id)?.toISOString() ?? null;
     }
     return row;
   });
+  return {
+    baseRows,
+    selectedOwners,
+    validatedState,
+    candidates,
+    scopeServiceDates,
+  };
+}
+
+/** The state the filter reads: the URL's `me` becomes the viewer's own id. */
+function withMeResolved(
+  state: MachineViewState,
+  viewerId: string | null
+): MachineViewState {
+  return {
+    ...state,
+    owner: state.owner.map((ownerId) =>
+      ownerId === ME_OWNER_ID && viewerId !== null ? viewerId : ownerId
+    ),
+  };
+}
+
+export async function loadMachineViewFromDatabase(
+  tx: DbTransaction,
+  args: LoadMachineViewFromDatabaseArgs
+): Promise<MachineViewResult> {
+  const { preset, viewerId } = args;
+  const {
+    baseRows,
+    selectedOwners,
+    validatedState,
+    candidates,
+    scopeServiceDates,
+  } = await buildMachineViewCandidates(tx, args);
   // The scope's owners, plus any selected owner with nothing here, so the
   // filter control can still show the selection. Me is a shortcut the
   // control offers on its own (machine-views §3.13), never a person.
@@ -358,16 +413,21 @@ export async function loadMachineViewFromDatabase(
     ownerOptionsById.set(row.ownerId ?? UNASSIGNED_OWNER_ID, row.ownerName);
   }
   // The URL and the returned state keep `me`; only the filter resolves it.
-  const applied = applyMachineViewState(candidates, {
-    ...validatedState,
-    owner: validatedState.owner.map((ownerId) =>
-      ownerId === ME_OWNER_ID && viewerId !== null ? viewerId : ownerId
-    ),
-  });
+  const applied = applyMachineViewState(
+    candidates,
+    withMeResolved(validatedState, viewerId)
+  );
   const state = { ...validatedState, page: applied.page };
+  // Every shown row carries its service date (machine-views §5.9).
+  const serviceDates =
+    scopeServiceDates ??
+    (await getLatestMachineServiceDates(
+      tx,
+      applied.rows.map((row) => row.id)
+    ));
 
   return {
-    rows: applied.rows.map(publicRow),
+    rows: applied.rows.map((row) => publicRow(row, serviceDates)),
     scopeCount: baseRows.length,
     totalCount: applied.totalCount,
     summary: summarizeMachineView(candidates),
@@ -377,8 +437,53 @@ export async function loadMachineViewFromDatabase(
       .sort((left, right) => left.name.localeCompare(right.name)),
     permittedFields: [...getMachineViewPreset(preset).permittedFields],
     offersMe: viewerId !== null,
+    signedIn: viewerId !== null,
     matchingIds: applied.matchingIds,
   };
+}
+
+/**
+ * Every machine matching the View Configuration across all pages, in the
+ * list's sort order (machine-views §3.15). The list's own pipeline picks and
+ * orders them, so the export is the list without paging.
+ */
+export async function loadMachineExportRows(
+  tx: DbTransaction,
+  args: LoadMachineViewFromDatabaseArgs
+): Promise<MachineExportRow[]> {
+  // The export always carries Last Serviced and Last Activity, so it loads
+  // both dates whatever the configuration needs; filters and sort are the
+  // list's own.
+  const { baseRows, validatedState, candidates } =
+    await buildMachineViewCandidates(tx, args, { allDates: true });
+  const { matchingIds } = applyMachineViewState(
+    candidates,
+    withMeResolved(validatedState, args.viewerId)
+  );
+  const baseRowsById = new Map(baseRows.map((row) => [row.id, row]));
+  const candidatesById = new Map(candidates.map((row) => [row.id, row]));
+  return matchingIds.flatMap((id) => {
+    const base = baseRowsById.get(id);
+    const candidate = candidatesById.get(id);
+    if (base === undefined || candidate === undefined) return [];
+    return [
+      {
+        id: base.initials,
+        name: base.title,
+        // The catalog title carries the edition, such as "Godzilla (Premium)".
+        model: base.canonicalModelName,
+        manufacturer: base.hasManufacturer ? base.manufacturer : null,
+        year: base.year,
+        ownerName: base.ownerId === null ? null : base.ownerName,
+        createdAt: candidate.createdAt,
+        presence: candidate.presence,
+        playability: candidate.health.playability,
+        openIssues: candidate.health.openIssues,
+        lastServicedAt: candidate.lastServicedAt ?? null,
+        lastActivityAt: candidate.lastActivityAt ?? null,
+      },
+    ];
+  });
 }
 
 /**

@@ -226,5 +226,29 @@
       "frequency": "intermittent",
       "reporter": { "type": "anonymous" }
     }
+  ],
+  "TAFSCE": [
+    {
+      "id": "10000000-0000-4000-8000-000000000021",
+      "num": 1,
+      "title": "Left flipper weak",
+      "status": "new",
+      "severity": "minor",
+      "priority": "medium",
+      "frequency": "intermittent",
+      "reporter": { "type": "user", "role": "member" }
+    }
+  ],
+  "IJ": [
+    {
+      "id": "10000000-0000-4000-8000-000000000022",
+      "num": 1,
+      "title": "Path of Adventure not tilting",
+      "status": "new",
+      "severity": "major",
+      "priority": "high",
+      "frequency": "constant",
+      "reporter": { "type": "user", "role": "admin" }
+    }
   ]
 }

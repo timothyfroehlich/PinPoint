@@ -46,7 +46,7 @@ Use this skill when:
 7. **TooltipProvider is hoisted**: `<TooltipProvider>` is mounted once in `ClientProviders` — don't add nested providers. See `pinpoint-design-bible` §12.
 8. **Baseline Widely available is the floor** (CORE-UI-005): use `<dialog>`, container queries, `:has()`, `:user-invalid`, `inert`, `aspect-ratio`, native form validation directly — no polyfills. Newly-available features (Popover API, View Transitions, anchor positioning) require a per-feature opt-in in `pinpoint-design-bible` §19; `fetchpriority` and `text-wrap: balance` are the two that have one. Never trust a cached Baseline date — look it up live (`references/browser-support.md`).
 9. **Form correctness** (CORE-FORM-001..006): right `type`, correct `autocomplete` token, `:user-invalid` styling, `aria-invalid` blur sync, visible required-field indicator, `enterkeyhint` on sequential mobile fields. Conventions are owned by `pinpoint-design-bible` §20; the code is in `references/form-correctness.md`.
-10. **Accessibility floor** (CORE-A11Y-001..006): skip link, `motion-reduce:` paired with animations, semantic `<table>` markup, real `<button>` (no `<div role="button">`), `title` is not a tooltip, `inert` background on modals. See **Accessibility** in `references/accessibility.md`.
+10. **Accessibility floor** (CORE-A11Y-001..007): skip link, `motion-reduce:` paired with animations, semantic `<table>` markup, real `<button>` (no `<div role="button">`), `title` is not a tooltip, `inert` background on modals, accessible names that start with the visible text. See **Accessibility** in `references/accessibility.md`.
 11. **Early UI review gate (pre-E2E)** (PP-4c4b): Present rendered screenshots at the three review viewports (desktop, large mobile 430px, small mobile 320px — `pinpoint-design-bible` §4 Review Viewports) to Tim for visual approval before authoring or updating Playwright/E2E specs or running preflight. Fast unit tests (`pnpm run test`) run early; heavy E2E suites wait until layout and visual hierarchy are approved.
 
 ## Reference Files
@@ -61,7 +61,7 @@ Everything below lives one hop away in `references/`. Load the file you need.
 | `references/enums-and-props.md`    | Config-Driven Enums, discriminated-union props for multi-type components               |
 | `references/form-correctness.md`   | Form-correctness code (types, autocomplete, `:user-invalid`), native HTML primitives   |
 | `references/styling-and-shadcn.md` | Tailwind CSS v4 styling, shadcn/ui component patterns, Button variants/sizes/`loading` |
-| `references/accessibility.md`      | Accessibility floor (CORE-A11Y-001..006), Animation & Motion                           |
+| `references/accessibility.md`      | Accessibility floor (CORE-A11Y-001..007), Animation & Motion                           |
 
 ## Color System
 
@@ -292,6 +292,7 @@ Before committing UI code:
 - [ ] Every `animate-*` or non-essential `transition-*` pairs with `motion-reduce:` (CORE-A11Y-002)
 - [ ] No `<div role="button">` introduced (CORE-A11Y-004)
 - [ ] No `title="..."` as a tooltip (CORE-A11Y-005)
+- [ ] A control that shows text has an accessible name starting with that text (CORE-A11Y-007)
 - [ ] If you added a sortable table: `<th scope="col">`, `aria-sort`, accessible name (CORE-A11Y-003)
 - [ ] If you added an image with `priority`: it is the LCP candidate for the page's dominant viewport, and `sizes` is set (CORE-PERF-003)
 - [ ] If you added an animation, dialog, or layout pattern: searched `modern-web-guidance` for the Widely-available primitive first (CORE-UI-006)

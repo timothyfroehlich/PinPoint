@@ -87,7 +87,7 @@ export const PBM_API_BASE = "https://pinballmap.com/api/v1";
  * API citizenship: it identifies our traffic and gives them a way to reach us.
  */
 export const PBM_USER_AGENT =
-  "PinPoint/1.0 (Austin Pinball Collective issue tracker; +https://github.com/timothyfroehlich/PinPoint)";
+  "PinPoint/1.0 (Austin Pinball Collective issue tracker; +https://github.com/minamaya/PinPoint)";
 
 /** Austin Pinball Collective's PBM location id. */
 export const APC_LOCATION_ID = 26454;

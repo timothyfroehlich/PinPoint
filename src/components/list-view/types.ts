@@ -131,11 +131,23 @@ export interface ListViewsModel {
   /** Returns to the Applied View's configuration at page 1 (§5.4). */
   onDiscard: () => void;
   /**
-   * Applies the Page Preset's Built-in View, keeping the displayed fields
-   * and page size (§1, §3.6).
+   * Applies the Page Preset's Built-in View, keeping the page size
+   * (§1, §3.6).
    */
   onOpenPagePreset: () => void;
   actions: SavedViewActions;
+}
+
+/** The List View search (list-views §4.1, §4.2, §7.3). */
+export interface ListSearchModel {
+  /** The toolbar field's id; the phone List Header's field adds "-phone". */
+  id: string;
+  /** Accessible name, such as "Search machines" (§4.2). */
+  label: string;
+  /** The search the list currently shows. */
+  value: string;
+  /** Runs a search (§4.1). */
+  onSearch: (query: string) => void;
 }
 
 /** The sort control (list-views §5.5; machine-views §3.14). */
@@ -156,23 +168,6 @@ export interface ListDisplayModel {
   pageSize: number;
   pageSizes: readonly number[];
   onPageSizeChange: (pageSize: number) => void;
-  /** Displayed fields, for hosts with columns (§5.6). */
-  fields?:
-    | {
-        options: readonly ListOption[];
-        selected: readonly string[];
-        onToggle: (value: string, checked: boolean) => void;
-      }
-    | undefined;
-  /** A phone-only presentation choice, such as Compact list or Table. */
-  layout?:
-    | {
-        label: string;
-        options: readonly ListOption[];
-        value: string;
-        onChange: (value: string) => void;
-      }
-    | undefined;
 }
 
 export interface ListPaginationModel {

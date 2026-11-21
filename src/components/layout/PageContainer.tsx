@@ -22,7 +22,9 @@ export function PageContainer({
   return (
     <div
       className={cn(
-        "mx-auto pt-6 pb-10 space-y-6",
+        // A List View's phone pager ends the page, directly above the tab
+        // bar (list-views §7.8; MainLayout keeps the tab bar's clearance).
+        "mx-auto pt-6 pb-10 space-y-6 max-md:has-[[data-list-phone-pager]]:pb-0",
         sizeClasses[size],
         className
       )}
