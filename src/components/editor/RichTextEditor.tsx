@@ -17,7 +17,13 @@ import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Mention from "@tiptap/extension-mention";
 import Placeholder from "@tiptap/extension-placeholder";
-import tippy, { type Instance as TippyInstance } from "tippy.js";
+import {
+  autoUpdate,
+  computePosition,
+  flip,
+  offset,
+  shift,
+} from "@floating-ui/dom";
 import { searchMentionableUsers } from "~/app/(app)/mentions/actions";
 import { MentionList, type MentionListRef } from "./MentionList";
 import { EditorToolbar } from "./EditorToolbar";
@@ -126,7 +132,43 @@ export const RichTextEditor = forwardRef<
             items: ({ query }) => searchMentionableUsers(query),
             render: () => {
               let component: ReactRenderer<MentionListRef> | undefined;
-              let popup: TippyInstance[] | undefined;
+              let stopAutoUpdate: (() => void) | undefined;
+              let reposition: (() => void) | undefined;
+              // Tiptap hands over a fresh `clientRect` on every update; the
+              // reference reads whichever is current when it is measured.
+              let currentRect: (() => DOMRect | null) | undefined;
+
+              // The popup lives on <body> (clear of any clipping ancestor, such
+              // as a sheet or dialog body) and is positioned against the caret
+              // rect Tiptap reports. One `autoUpdate` lives as long as the
+              // popup: it re-runs the placement on scroll, resize, and layout
+              // changes of the editor or the popup.
+              const start = (popup: HTMLElement, editorDom: Element): void => {
+                const reference = {
+                  getBoundingClientRect: () =>
+                    currentRect?.() ?? new DOMRect(0, 0, 0, 0),
+                  contextElement: editorDom,
+                };
+                reposition = () => {
+                  // A second composer can mirror the same draft while hidden
+                  // (the mobile sheet); its caret rect is empty, so keep its
+                  // popup out of sight instead of parking it at the origin.
+                  const editorHidden = editorDom.getClientRects().length === 0;
+                  popup.style.display = editorHidden ? "none" : "";
+                  if (editorHidden) return;
+                  void computePosition(reference, popup, {
+                    placement: "bottom-start",
+                    strategy: "fixed",
+                    middleware: [offset(4), flip(), shift({ padding: 8 })],
+                  }).then(({ x, y }) => {
+                    Object.assign(popup.style, {
+                      left: `${x}px`,
+                      top: `${y}px`,
+                    });
+                  });
+                };
+                stopAutoUpdate = autoUpdate(reference, popup, reposition);
+              };
 
               return {
                 onStart: (props) => {
@@ -139,45 +181,44 @@ export const RichTextEditor = forwardRef<
                     return;
                   }
 
-                  const clientRect = props.clientRect as () => DOMRect;
-
-                  popup = tippy("body", {
-                    getReferenceClientRect: clientRect,
-                    appendTo: () => document.body,
-                    content: component.element,
-                    showOnCreate: true,
-                    interactive: true,
-                    trigger: "manual",
-                    placement: "bottom-start",
+                  const popup = component.element;
+                  // Fixed against the viewport, above Radix modals (z-50).
+                  Object.assign(popup.style, {
+                    position: "fixed",
+                    top: "0",
+                    left: "0",
+                    zIndex: "9999",
                   });
+                  document.body.appendChild(popup);
+                  currentRect = props.clientRect;
+                  start(popup, props.editor.view.dom);
                 },
 
                 onUpdate(props) {
                   component?.updateProps(props);
 
-                  if (!props.clientRect || !popup?.[0]) {
+                  if (!props.clientRect || !component) {
                     return;
                   }
 
-                  const clientRect = props.clientRect as () => DOMRect;
-
-                  popup[0].setProps({
-                    getReferenceClientRect: clientRect,
-                  });
+                  currentRect = props.clientRect;
+                  reposition?.();
                 },
 
+                // Escape needs no handling here: the suggestion plugin calls
+                // `onExit` itself when it sees the key.
                 onKeyDown(props) {
-                  if (props.event.key === "Escape") {
-                    popup?.[0]?.hide();
-                    return true;
-                  }
-
                   return component?.ref?.onKeyDown(props) ?? false;
                 },
 
                 onExit() {
-                  popup?.[0]?.destroy();
+                  stopAutoUpdate?.();
+                  stopAutoUpdate = undefined;
+                  reposition = undefined;
+                  currentRect = undefined;
+                  component?.element.remove();
                   component?.destroy();
+                  component = undefined;
                 },
               };
             },
