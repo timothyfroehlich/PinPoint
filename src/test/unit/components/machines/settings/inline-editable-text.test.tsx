@@ -122,6 +122,70 @@ describe("InlineEditableText (always-live model, PP-43q3 pivot)", () => {
     expect(input).toHaveAttribute("placeholder", "Name this set *");
   });
 
+  it("blanking a required field and leaving it shows the required message under it, linked to the input", () => {
+    render(
+      <InlineEditableText
+        value="Bat City"
+        onValueChange={vi.fn()}
+        canEdit
+        required
+        requiredMessage="Name required"
+        ariaLabel="set name"
+      />
+    );
+    const input = screen.getByRole("textbox", { name: /set name/i });
+    fireEvent.change(input, { target: { value: "" } });
+    // Nothing shows while the user is still typing.
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(input).not.toHaveAttribute("aria-invalid");
+
+    fireEvent.blur(input);
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("Name required");
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    expect(input).toHaveAttribute("aria-describedby", alert.id);
+
+    fireEvent.change(input, { target: { value: "Bat" } });
+    fireEvent.blur(input);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("a parent-supplied error shows under a blank required field, linked to it, and clears once the field has text", () => {
+    const { rerender } = render(
+      <InlineEditableText
+        value=""
+        onValueChange={vi.fn()}
+        canEdit
+        required
+        error="Name required"
+        ariaLabel="set name"
+      />
+    );
+    const input = screen.getByRole("textbox", { name: /set name/i });
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("Name required");
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    expect(input).toHaveAttribute("aria-describedby", alert.id);
+
+    // The parent may lag a render behind the keystroke: typing text hides the
+    // error at once rather than waiting for the parent to clear it.
+    fireEvent.change(input, { target: { value: "Bat City" } });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(input).not.toHaveAttribute("aria-invalid");
+    expect(input).not.toHaveAttribute("aria-describedby");
+
+    rerender(
+      <InlineEditableText
+        value="Bat City"
+        onValueChange={vi.fn()}
+        canEdit
+        required
+        ariaLabel="set name"
+      />
+    );
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("renders finished, non-interactive text when canEdit is false", () => {
     render(
       <InlineEditableText

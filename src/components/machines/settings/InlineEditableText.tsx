@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Input } from "~/components/ui/input";
 import { cn } from "~/lib/utils";
 import {
@@ -22,6 +22,14 @@ interface InlineEditableTextProps {
   /** Field can't be left empty: shows invalid styling while blank and marks the
    *  placeholder with a required hint when a commit is attempted empty. */
   required?: boolean;
+  /** Error shown under the field now, without waiting for a blur: the parent
+   *  knows a save is blocked on this field being blank. Marks the input invalid
+   *  and links the message to it (design bible §20 field-level errors). */
+  error?: string | undefined;
+  /** Error shown under the field once the user has left it blank (after a blur
+   *  or Enter), so a cleared required field names its problem instead of only
+   *  turning red. Without it, that case stays a red border alone. */
+  requiredMessage?: string | undefined;
   placeholder?: string;
   className?: string;
   inputClassName?: string;
@@ -53,6 +61,8 @@ export function InlineEditableText({
   onValueChange,
   canEdit = true,
   required = false,
+  error,
+  requiredMessage,
   placeholder = "Click to edit…",
   className,
   inputClassName,
@@ -68,7 +78,11 @@ export function InlineEditableText({
   const isFocused = useRef(false);
 
   const isEmptyRequired = required && draft.trim() === "";
-  const showInvalid = isEmptyRequired && showRequiredError;
+  const errorText = isEmptyRequired
+    ? (error ?? (showRequiredError ? requiredMessage : undefined))
+    : undefined;
+  const showInvalid = isEmptyRequired && (showRequiredError || !!error);
+  const errorId = useId();
   // Mark required fields up front (design-bible §683 asterisk convention):
   // a trailing " *" in the placeholder plus aria-required.
   const editPlaceholder = required ? `${placeholder} *` : placeholder;
@@ -105,64 +119,76 @@ export function InlineEditableText({
 
   // Permitted: the always-open input with the editable-field affordance.
   return (
-    <Input
-      ref={inputRef}
-      value={draft}
-      className={cn(
-        "h-7",
-        EDITABLE_FIELD_CLASS,
-        EDITABLE_TEXT_CLASS,
-        inputClassName
-      )}
-      placeholder={editPlaceholder}
-      aria-label={
-        showInvalid && ariaLabel ? `${ariaLabel} (required)` : ariaLabel
-      }
-      aria-required={required || undefined}
-      aria-invalid={showInvalid || undefined}
-      // Commit-on-Enter single field: tell mobile keyboards the Enter key
-      // finishes the field. Titles/names are prose, so spellcheck and
-      // sentence-case stay at their (on) defaults.
-      enterKeyHint="done"
-      autoComplete={autoComplete}
-      onFocus={() => {
-        isFocused.current = true;
-      }}
-      onClick={(e) => {
-        e.stopPropagation();
-      }}
-      onChange={(e) => {
-        const raw = e.target.value;
-        setDraft(raw);
-        const trimmed = raw.trim();
-        // Push into the working copy immediately so the auto-save timer sees
-        // the latest text. For required fields, skip propagating blank (the
-        // required guard on blur/Enter is the canonical empty block).
-        if (!(required && trimmed === "") && trimmed !== value) {
-          onValueChange(trimmed);
+    <>
+      <Input
+        ref={inputRef}
+        value={draft}
+        className={cn(
+          "h-7",
+          EDITABLE_FIELD_CLASS,
+          EDITABLE_TEXT_CLASS,
+          inputClassName
+        )}
+        placeholder={editPlaceholder}
+        aria-label={
+          showInvalid && ariaLabel ? `${ariaLabel} (required)` : ariaLabel
         }
-      }}
-      onBlur={() => {
-        isFocused.current = false;
-        commit();
-        onBlurCommit?.();
-      }}
-      onKeyDown={(e) => {
-        e.stopPropagation();
-        if (e.key === "Enter") {
-          e.preventDefault();
+        aria-required={required || undefined}
+        aria-invalid={showInvalid || undefined}
+        aria-describedby={errorText ? errorId : undefined}
+        // Commit-on-Enter single field: tell mobile keyboards the Enter key
+        // finishes the field. Titles/names are prose, so spellcheck and
+        // sentence-case stay at their (on) defaults.
+        enterKeyHint="done"
+        autoComplete={autoComplete}
+        onFocus={() => {
+          isFocused.current = true;
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+        }}
+        onChange={(e) => {
+          const raw = e.target.value;
+          setDraft(raw);
+          const trimmed = raw.trim();
+          // Push into the working copy immediately so the auto-save timer sees
+          // the latest text. For required fields, skip propagating blank (the
+          // required guard on blur/Enter is the canonical empty block).
+          if (!(required && trimmed === "") && trimmed !== value) {
+            onValueChange(trimmed);
+          }
+        }}
+        onBlur={() => {
+          isFocused.current = false;
           commit();
           onBlurCommit?.();
-        } else if (e.key === "Escape") {
-          e.preventDefault();
-          // Revert the draft display AND restore the working copy to the
-          // current external value (undoes any partial edit that was pushed
-          // via onChange above).
-          setDraft(value);
-          setShowRequiredError(false);
-          if (draft.trim() !== value) onValueChange(value);
-        }
-      }}
-    />
+        }}
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (e.key === "Enter") {
+            e.preventDefault();
+            commit();
+            onBlurCommit?.();
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            // Revert the draft display AND restore the working copy to the
+            // current external value (undoes any partial edit that was pushed
+            // via onChange above).
+            setDraft(value);
+            setShowRequiredError(false);
+            if (draft.trim() !== value) onValueChange(value);
+          }
+        }}
+      />
+      {errorText ? (
+        <p
+          id={errorId}
+          role="alert"
+          className="block text-sm text-destructive-text"
+        >
+          {errorText}
+        </p>
+      ) : null}
+    </>
   );
 }

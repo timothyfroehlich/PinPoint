@@ -189,12 +189,7 @@
 
 ## Known divergences (code vs spec)
 
-| Requirement | Divergence | Resolution |
-| :-- | :-- | :-- |
-| §4.5, §12.1 | The filter overflow button is labeled "More". | PP-jb9v.16 |
-| §4.10 | The filter overflow badge counts every filter the button holds, changed or not. | PP-jb9v.16 |
-| §5.8 | View tabs are underlined like page tabs, the current one marked by its underline. | PP-jb9v.16 |
-| §8.7 | Fit checks compare bare measured widths with no tolerance. | PP-jb9v.16 |
+_None — the current implementation matches this spec._
 
 ---
 

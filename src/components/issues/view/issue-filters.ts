@@ -203,7 +203,22 @@ export function buildIssueFilters({
     ? "Open"
     : describeSelection(state.status, statusOptions);
 
+  // Issues-list §4.2: Machine, Status, Severity, Assignee, Priority, and
+  // Machine Presence. Filters that do not fit leave from the right.
   const primary: ListFilterModel[] = [
+    {
+      id: "machine",
+      label: "Machine",
+      options: machines,
+      shortcuts: machineShortcuts,
+      searchPlaceholder: "Search machines or initials",
+      selected: state.machine,
+      valueLabel: describeSelection(state.machine, machines),
+      atPreset: arraysEqual(state.machine, defaults.machine),
+      onChange: (values) =>
+        onChange({ machine: canonicalMachineValues(values) }),
+      onReset: () => onChange({ machine: defaults.machine }),
+    },
     {
       id: "status",
       label: "Status",
@@ -230,32 +245,6 @@ export function buildIssueFilters({
       onReset: () => onChange({ severity: defaults.severity }),
     },
     {
-      id: "priority",
-      label: "Priority",
-      options: priorityOptions,
-      selected: state.priority,
-      valueLabel: describeSelection(state.priority, priorityOptions),
-      atPreset: arraysEqual(state.priority, defaults.priority),
-      onChange: (values) =>
-        onChange({
-          priority: canonicalFilterValues(values, ISSUE_PRIORITY_VALUES),
-        }),
-      onReset: () => onChange({ priority: defaults.priority }),
-    },
-    {
-      id: "machine",
-      label: "Machine",
-      options: machines,
-      shortcuts: machineShortcuts,
-      searchPlaceholder: "Search machines or initials",
-      selected: state.machine,
-      valueLabel: describeSelection(state.machine, machines),
-      atPreset: arraysEqual(state.machine, defaults.machine),
-      onChange: (values) =>
-        onChange({ machine: canonicalMachineValues(values) }),
-      onReset: () => onChange({ machine: defaults.machine }),
-    },
-    {
       id: "assignee",
       label: "Assignee",
       options: person,
@@ -267,6 +256,19 @@ export function buildIssueFilters({
       onChange: (values) =>
         onChange({ assignee: canonicalPeopleValues(values) }),
       onReset: () => onChange({ assignee: defaults.assignee }),
+    },
+    {
+      id: "priority",
+      label: "Priority",
+      options: priorityOptions,
+      selected: state.priority,
+      valueLabel: describeSelection(state.priority, priorityOptions),
+      atPreset: arraysEqual(state.priority, defaults.priority),
+      onChange: (values) =>
+        onChange({
+          priority: canonicalFilterValues(values, ISSUE_PRIORITY_VALUES),
+        }),
+      onReset: () => onChange({ priority: defaults.priority }),
     },
     {
       id: "presence",
