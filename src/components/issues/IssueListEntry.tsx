@@ -31,13 +31,26 @@ import { cn } from "~/lib/utils";
 type DetailPart =
   "id" | "machine" | "priority" | "assignee" | "comments" | "age";
 
-/** Line 2's parts that give way for room, in drop order (issues-list §3.9). */
+/**
+ * Line 2's parts that give way for room, in order (issues-list §3.9). The
+ * machine name gives way by truncating, down to `MACHINE_NAME_MIN_WIDTH`,
+ * before it hides.
+ */
 const DROP_ORDER: readonly DetailPart[] = [
   "age",
   "comments",
+  "machine",
   "priority",
   "assignee",
 ];
+
+/**
+ * The narrowest a truncated machine name shows: an ellipsis and about three
+ * characters, and the phone machine link's own 44px minimum width
+ * (`max-md:min-w-11`), so the plan never expects the link narrower than it
+ * renders.
+ */
+const MACHINE_NAME_MIN_WIDTH = 44;
 
 type StatusGroup = keyof typeof STATUS_GROUPS;
 
@@ -135,9 +148,11 @@ function updatedSpoken(age: string): string {
  * Line 2 (issues-list §3.3, §3.9). The leading group is the issue ID · the
  * machine, then the priority pill; the trailing group is the assignee's
  * initials, the comment count (when above zero), and the age. When the line
- * does not fit it drops the age, then the comment count, then the priority,
- * then the assignee; the ID never drops, and the machine name truncates only
- * after all four are gone.
+ * does not fit it drops the age, then the comment count; then the machine
+ * name truncates, down to not showing at all (the ID still names the
+ * machine), and its "·" goes with it; then the priority drops, then the
+ * assignee. The ID never drops. A truncated name is still the whole link,
+ * named by its full text; a hidden one renders nothing.
  */
 function IssueRowDetails({
   issue,
@@ -174,7 +189,7 @@ function IssueRowDetails({
     {
       key: "machine",
       text: true,
-      truncate: true,
+      minWidth: MACHINE_NAME_MIN_WIDTH,
       node: (
         <Link
           href={`/m/${issue.machineInitials}`}

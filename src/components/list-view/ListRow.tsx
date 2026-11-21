@@ -3,7 +3,11 @@
 import * as React from "react";
 import Link from "next/link";
 import { useMeasuredWidths } from "~/components/list-view/use-measured-widths";
-import { fitLineParts, type LineFitPart } from "~/lib/list-view/overflow";
+import {
+  planLineParts,
+  type LineFitPart,
+  type LinePartFit,
+} from "~/lib/list-view/overflow";
 import { cn } from "~/lib/utils";
 
 /*
@@ -170,6 +174,13 @@ export interface ListRowPart<Key extends string> {
   text?: boolean;
   /** A part that never drops and shrinks, truncating, when space runs out. */
   truncate?: boolean;
+  /**
+   * Makes a part in `dropOrder` shrinkable: at its turn it truncates, down to
+   * this width, before it hides. Hidden, it renders nothing at all, not even
+   * for screen readers, so a link inside it never leaves an invisible tab
+   * stop.
+   */
+  minWidth?: number;
 }
 
 /**
@@ -178,11 +189,14 @@ export interface ListRowPart<Key extends string> {
  * the right-anchored trailing group, center on the line. A "·" separates two
  * plain-text parts that show side by side, and nothing else.
  *
- * When the line does not fit, the parts in `dropOrder` drop one at a time,
- * in that order; the rest never drop, and a `truncate` part truncates once
- * every droppable part is gone. Each part is measured at its full width in a
- * hidden lane and planned with `fitLineParts`. A dropped part is hidden from
- * view but stays readable to screen readers, so they hear the whole line.
+ * When the line does not fit, the parts in `dropOrder` give way one at a
+ * time, in that order; the rest never drop, and a `truncate` part truncates
+ * once every droppable part is gone. A part with a `minWidth` gives way by
+ * truncating, down to that width, before it hides. Each part is measured at
+ * its full width in a hidden lane and planned with `planLineParts`; each
+ * part's `data-fit` says how it shows. A dropped part is hidden from view but
+ * stays readable to screen readers, so they hear the whole line; a hidden
+ * `minWidth` part renders nothing.
  */
 export function ListRowDetails<Key extends string>({
   leading,
@@ -211,12 +225,13 @@ export function ListRowDetails<Key extends string>({
       key: part.key,
       width: measured?.widths[part.key] ?? 0,
       text: part.text === true,
+      ...(part.minWidth === undefined ? {} : { minWidth: part.minWidth }),
     }));
   // Until the line is measured everything shows, clipped to one line; the
   // first measurement lands before the browser paints.
-  const shown: ReadonlySet<Key> =
+  const plan: ReadonlyMap<Key, LinePartFit> =
     measured && measured.available > 0
-      ? fitLineParts({
+      ? planLineParts({
           available: measured.available,
           leading: toFit(leading),
           trailing: toFit(trailing),
@@ -226,14 +241,17 @@ export function ListRowDetails<Key extends string>({
           groupGap: GROUP_GAP,
           separatorWidth: measured.widths[SEPARATOR_KEY] ?? 0,
         })
-      : new Set(allParts.map((part) => part.key));
-  const trailingShows = trailing.some((part) => shown.has(part.key));
+      : new Map<Key, LinePartFit>();
+  const fitOf = (key: Key): LinePartFit => plan.get(key) ?? "full";
+  const trailingShows = trailing.some((part) => fitOf(part.key) !== "hidden");
 
   function renderGroup(parts: readonly ListRowPart<Key>[]): React.ReactNode[] {
     const nodes: React.ReactNode[] = [];
     let previousText = false;
     for (const part of parts) {
-      const visible = shown.has(part.key);
+      const fit = fitOf(part.key);
+      const visible = fit !== "hidden";
+      if (!visible && part.minWidth !== undefined) continue;
       if (visible && part.text === true && previousText) {
         nodes.push(
           <span key={`${part.key}-separator`} aria-hidden="true">
@@ -249,9 +267,15 @@ export function ListRowDetails<Key extends string>({
         <span
           key={part.key}
           data-part={part.key}
+          data-fit={fit}
           className={cn(
             !visible && "sr-only left-0",
-            visible && (part.truncate === true ? "flex min-w-0" : "shrink-0"),
+            // A truncated `minWidth` part shrinks to the room CSS leaves it,
+            // which the plan keeps at least `minWidth` wide.
+            visible &&
+              (part.truncate === true || part.minWidth !== undefined
+                ? "flex min-w-0"
+                : "shrink-0"),
             visible && part.text !== true && "flex self-center"
           )}
         >
