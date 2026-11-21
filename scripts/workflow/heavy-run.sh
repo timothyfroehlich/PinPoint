@@ -94,13 +94,17 @@ timeout_s="${PINPOINT_HOST_SLOT_TIMEOUT_S:-300}"
 # the background (stdin kept) so a SIGTERM/SIGHUP aimed at this wrapper alone
 # is forwarded: sem stops the command and frees the slot.
 began=$SECONDS
-# The trap goes in before sem starts, so no signal can land in between and
-# leave an orphaned sem holding the slot: before the launch it just exits.
+# The trap goes in before sem starts, so no signal can leave an orphaned sem
+# holding the slot. Bash runs a trap between commands, so a signal landing
+# after `sem … &` but before `sem_pid=$!` still finds sem in $! (this script
+# starts no other background job). Before the launch both are empty and the
+# wrapper just exits.
 sem_pid=""
 # shellcheck disable=SC2329 # invoked by the trap below
 on_signal() {
-  if [ -z "$sem_pid" ]; then exit 143; fi
-  kill -TERM "$sem_pid" 2>/dev/null || true
+  local pid="${sem_pid:-${!:-}}"
+  if [ -z "$pid" ]; then exit 143; fi
+  kill -TERM "$pid" 2>/dev/null || true
 }
 trap on_signal TERM HUP INT
 sem --id "pinpoint-$class" --jobs "$slots" --semaphore-timeout "-$timeout_s" \
