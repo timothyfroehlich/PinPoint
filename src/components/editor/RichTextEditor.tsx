@@ -18,12 +18,9 @@ import Link from "@tiptap/extension-link";
 import Mention from "@tiptap/extension-mention";
 import Placeholder from "@tiptap/extension-placeholder";
 import {
-  autoUpdate,
-  computePosition,
-  flip,
-  offset,
-  shift,
-} from "@floating-ui/dom";
+  openFloatingPanel,
+  type FloatingPanelHandle,
+} from "~/components/ui/floating-panel";
 import { searchMentionableUsers } from "~/app/(app)/mentions/actions";
 import { MentionList, type MentionListRef } from "./MentionList";
 import { EditorToolbar } from "./EditorToolbar";
@@ -132,43 +129,10 @@ export const RichTextEditor = forwardRef<
             items: ({ query }) => searchMentionableUsers(query),
             render: () => {
               let component: ReactRenderer<MentionListRef> | undefined;
-              let stopAutoUpdate: (() => void) | undefined;
-              let reposition: (() => void) | undefined;
+              let panel: FloatingPanelHandle | undefined;
               // Tiptap hands over a fresh `clientRect` on every update; the
-              // reference reads whichever is current when it is measured.
+              // panel reads whichever is current when it places itself.
               let currentRect: (() => DOMRect | null) | undefined;
-
-              // The popup lives on <body> (clear of any clipping ancestor, such
-              // as a sheet or dialog body) and is positioned against the caret
-              // rect Tiptap reports. One `autoUpdate` lives as long as the
-              // popup: it re-runs the placement on scroll, resize, and layout
-              // changes of the editor or the popup.
-              const start = (popup: HTMLElement, editorDom: Element): void => {
-                const reference = {
-                  getBoundingClientRect: () =>
-                    currentRect?.() ?? new DOMRect(0, 0, 0, 0),
-                  contextElement: editorDom,
-                };
-                reposition = () => {
-                  // A second composer can mirror the same draft while hidden
-                  // (the mobile sheet); its caret rect is empty, so keep its
-                  // popup out of sight instead of parking it at the origin.
-                  const editorHidden = editorDom.getClientRects().length === 0;
-                  popup.style.display = editorHidden ? "none" : "";
-                  if (editorHidden) return;
-                  void computePosition(reference, popup, {
-                    placement: "bottom-start",
-                    strategy: "fixed",
-                    middleware: [offset(4), flip(), shift({ padding: 8 })],
-                  }).then(({ x, y }) => {
-                    Object.assign(popup.style, {
-                      left: `${x}px`,
-                      top: `${y}px`,
-                    });
-                  });
-                };
-                stopAutoUpdate = autoUpdate(reference, popup, reposition);
-              };
 
               return {
                 onStart: (props) => {
@@ -181,17 +145,14 @@ export const RichTextEditor = forwardRef<
                     return;
                   }
 
-                  const popup = component.element;
-                  // Fixed against the viewport, above Radix modals (z-50).
-                  Object.assign(popup.style, {
-                    position: "fixed",
-                    top: "0",
-                    left: "0",
-                    zIndex: "9999",
-                  });
-                  document.body.appendChild(popup);
                   currentRect = props.clientRect;
-                  start(popup, props.editor.view.dom);
+                  // The shared floating panel owns placement and the open and
+                  // close motion (CORE-UI-007).
+                  panel = openFloatingPanel({
+                    element: component.element,
+                    getAnchorRect: () => currentRect?.() ?? null,
+                    contextElement: props.editor.view.dom,
+                  });
                 },
 
                 onUpdate(props) {
@@ -202,7 +163,7 @@ export const RichTextEditor = forwardRef<
                   }
 
                   currentRect = props.clientRect;
-                  reposition?.();
+                  panel?.reposition();
                 },
 
                 // Escape needs no handling here: the suggestion plugin calls
@@ -212,13 +173,17 @@ export const RichTextEditor = forwardRef<
                 },
 
                 onExit() {
-                  stopAutoUpdate?.();
-                  stopAutoUpdate = undefined;
-                  reposition = undefined;
-                  currentRect = undefined;
-                  component?.element.remove();
-                  component?.destroy();
+                  const closing = component;
+                  const closingPanel = panel;
                   component = undefined;
+                  panel = undefined;
+                  currentRect = undefined;
+                  // Keep the React tree alive until the fade-out finishes.
+                  if (closingPanel) {
+                    closingPanel.close(() => closing?.destroy());
+                  } else {
+                    closing?.destroy();
+                  }
                 },
               };
             },
