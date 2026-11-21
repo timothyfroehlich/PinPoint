@@ -420,4 +420,11 @@ describe("sentryEnvironmentOption", () => {
     vi.stubEnv("SENTRY_ENVIRONMENT", "staging");
     expect(sentryEnvironmentOption("production")).toEqual({});
   });
+
+  it("treats an empty SENTRY_ENVIRONMENT as unset", () => {
+    vi.stubEnv("SENTRY_ENVIRONMENT", "");
+    expect(sentryEnvironmentOption("production")).toEqual({
+      environment: "vercel-production",
+    });
+  });
 });
