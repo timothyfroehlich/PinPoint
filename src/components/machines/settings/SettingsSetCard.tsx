@@ -105,6 +105,8 @@ interface SettingsSetCardProps {
   /** Called after the set-name blur so the parent can flush the auto-save
    *  debounce (plain-text blur path — Task 6 Step 9). */
   onNameBlur: () => void;
+  /** This set's save is blocked on its missing name: mark the name field. */
+  nameRequired: boolean;
   onDuplicate: () => void;
   onDelete: () => void;
   onUpdateDescription: (value: ProseMirrorDoc | null) => void;
@@ -269,6 +271,7 @@ export function SettingsSetCard({
   onMakeCommunity,
   onRename,
   onNameBlur,
+  nameRequired,
   onDuplicate,
   onDelete,
   onUpdateDescription,
@@ -513,6 +516,7 @@ export function SettingsSetCard({
           onValueChange={onRename}
           canEdit={canEdit}
           required
+          invalid={nameRequired}
           placeholder="Name this set"
           ariaLabel="set name"
           inputClassName="h-7 text-sm font-semibold"

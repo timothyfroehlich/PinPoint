@@ -4,9 +4,16 @@ import type React from "react";
 import { AlertTriangle } from "lucide-react";
 import { Button } from "~/components/ui/button";
 
+/** Why a new set with content but no name cannot save. Shown in the banner. */
+export const SET_NAME_REQUIRED_LABEL = "Set name required";
+
 interface SaveFailureBannerProps {
   /** How many sets currently have a failed save. 0 → render nothing. */
   failedCount: number;
+  /** Every failed save is a new set waiting on its name. The banner names
+   *  that instead of the generic copy, and drops Retry: resending cannot
+   *  succeed until the set is named (CORE-ARCH-012). */
+  nameRequired?: boolean;
   onRetry: () => void;
 }
 
@@ -19,6 +26,7 @@ interface SaveFailureBannerProps {
  */
 export function SaveFailureBanner({
   failedCount,
+  nameRequired = false,
   onRetry,
 }: SaveFailureBannerProps): React.JSX.Element | null {
   if (failedCount <= 0) return null;
@@ -34,19 +42,25 @@ export function SaveFailureBanner({
     >
       <div className="mx-auto flex max-w-6xl items-center gap-2 text-sm text-destructive-text">
         <AlertTriangle className="size-4 shrink-0" aria-hidden="true" />
-        <span className="min-w-0 flex-1">
-          Some changes couldn&apos;t be saved. Your edits are still here — retry
-          to save them.
-        </span>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={onRetry}
-          className="shrink-0"
-        >
-          Retry
-        </Button>
+        {nameRequired ? (
+          <span className="min-w-0 flex-1">{SET_NAME_REQUIRED_LABEL}</span>
+        ) : (
+          <>
+            <span className="min-w-0 flex-1">
+              Some changes couldn&apos;t be saved. Your edits are still here —
+              retry to save them.
+            </span>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={onRetry}
+              className="shrink-0"
+            >
+              Retry
+            </Button>
+          </>
+        )}
       </div>
     </div>
   );

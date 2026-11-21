@@ -61,6 +61,18 @@ describe("useSaveStatus", () => {
     expect(result.current.hasUnsaved).toBe(true);
   });
 
+  it("clearFailed lifts the failure but keeps the set dirty", () => {
+    const { result } = renderHook(() => useSaveStatus());
+    act(() => {
+      result.current.markDirty("a");
+      result.current.markFailed("a");
+      result.current.clearFailed("a");
+    });
+    expect(result.current.failedIds.has("a")).toBe(false);
+    expect(result.current.dirtyIds.has("a")).toBe(true);
+    expect(result.current.hasUnsaved).toBe(true);
+  });
+
   it("markSaved clears pending/failed but not dirty; markClean clears dirty", () => {
     const { result } = renderHook(() => useSaveStatus());
     act(() => {
