@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   fitLineParts,
   fitPrimaryFilters,
-  LINE_FIT_TOLERANCE,
+  FIT_TOLERANCE,
   phoneSearchAsIcon,
   planLineParts,
   planListHeader,
@@ -100,7 +100,7 @@ describe("fitLineParts (machine-views §5.10, issues-list §3.9)", () => {
 
     it("keeps every part at full width when the line fits with the tolerance to spare", () => {
       // (60+6+4+6+120+6+50) + 12 + (30+8+40+8+90) = 440.
-      expect(plan(440 + LINE_FIT_TOLERANCE)).toEqual({
+      expect(plan(440 + FIT_TOLERANCE)).toEqual({
         id: "full",
         machine: "full",
         priority: "full",
@@ -111,13 +111,13 @@ describe("fitLineParts (machine-views §5.10, issues-list §3.9)", () => {
     });
 
     it("drops the age, then the comment count, before touching the machine name", () => {
-      expect(plan(439 + LINE_FIT_TOLERANCE)).toMatchObject({
+      expect(plan(439 + FIT_TOLERANCE)).toMatchObject({
         age: "hidden",
         comments: "full",
         machine: "full",
       });
       // 252 + 12 + (30+8+40) = 342.
-      expect(plan(341 + LINE_FIT_TOLERANCE)).toMatchObject({
+      expect(plan(341 + FIT_TOLERANCE)).toMatchObject({
         comments: "hidden",
         machine: "full",
       });
@@ -125,19 +125,19 @@ describe("fitLineParts (machine-views §5.10, issues-list §3.9)", () => {
 
     it("truncates the machine name while the priority and assignee still show", () => {
       // 252 + 12 + 30 = 294 with the name at full width.
-      expect(plan(294 + LINE_FIT_TOLERANCE)).toMatchObject({
+      expect(plan(294 + FIT_TOLERANCE)).toMatchObject({
         machine: "full",
         priority: "full",
         assignee: "full",
       });
-      expect(plan(293 + LINE_FIT_TOLERANCE)).toMatchObject({
+      expect(plan(293 + FIT_TOLERANCE)).toMatchObject({
         id: "full",
         machine: "truncated",
         priority: "full",
         assignee: "full",
       });
       // 76px narrower leaves the name at exactly its 44px minimum.
-      expect(plan(218 + LINE_FIT_TOLERANCE)).toMatchObject({
+      expect(plan(218 + FIT_TOLERANCE)).toMatchObject({
         machine: "truncated",
         priority: "full",
         assignee: "full",
@@ -145,7 +145,7 @@ describe("fitLineParts (machine-views §5.10, issues-list §3.9)", () => {
     });
 
     it("hides the machine name, below its minimum, before the priority drops", () => {
-      expect(plan(217 + LINE_FIT_TOLERANCE)).toEqual({
+      expect(plan(217 + FIT_TOLERANCE)).toEqual({
         id: "full",
         machine: "hidden",
         priority: "full",
@@ -158,7 +158,7 @@ describe("fitLineParts (machine-views §5.10, issues-list §3.9)", () => {
     it("takes the machine name's separator with it", () => {
       // Without the name or its "·": (60+6+50) + 12 + 30 = 158. A "·" left
       // behind would make it 168.
-      expect(shown(158 + LINE_FIT_TOLERANCE)).toEqual([
+      expect(shown(158 + FIT_TOLERANCE)).toEqual([
         "assignee",
         "id",
         "priority",
@@ -167,17 +167,17 @@ describe("fitLineParts (machine-views §5.10, issues-list §3.9)", () => {
 
     it("then drops the priority, then the assignee", () => {
       // 60 + 12 + 30 = 102.
-      expect(shown(157 + LINE_FIT_TOLERANCE)).toEqual(["assignee", "id"]);
-      expect(shown(102 + LINE_FIT_TOLERANCE)).toEqual(["assignee", "id"]);
-      expect(shown(101 + LINE_FIT_TOLERANCE)).toEqual(["id"]);
+      expect(shown(157 + FIT_TOLERANCE)).toEqual(["assignee", "id"]);
+      expect(shown(102 + FIT_TOLERANCE)).toEqual(["assignee", "id"]);
+      expect(shown(101 + FIT_TOLERANCE)).toEqual(["id"]);
     });
 
     it("hides a name already narrower than its minimum instead of truncating it", () => {
       // A 40px name: (60+6+4+6+40+6+50) + 12 + 30 = 214.
-      expect(plan(214 + LINE_FIT_TOLERANCE, 40)).toMatchObject({
+      expect(plan(214 + FIT_TOLERANCE, 40)).toMatchObject({
         machine: "full",
       });
-      expect(plan(213 + LINE_FIT_TOLERANCE, 40)).toMatchObject({
+      expect(plan(213 + FIT_TOLERANCE, 40)).toMatchObject({
         machine: "hidden",
         priority: "full",
       });
@@ -216,27 +216,27 @@ describe("fitLineParts (machine-views §5.10, issues-list §3.9)", () => {
     it("puts a separator only between two plain-text parts", () => {
       // (80+6+4+6+70+6+4+6+40+6+20) + 12 + 60 = 320: two separators, none
       // before the owner.
-      expect(shown(320 + LINE_FIT_TOLERANCE)).toHaveLength(5);
+      expect(shown(320 + FIT_TOLERANCE)).toHaveLength(5);
       // Without the year: (80+6+4+6+70+6+20) + 12 + 60 = 264.
-      expect(shown(319 + LINE_FIT_TOLERANCE)).toEqual([
+      expect(shown(319 + FIT_TOLERANCE)).toEqual([
         "manufacturer",
         "owner",
         "playability",
         "serviced",
       ]);
-      expect(shown(264 + LINE_FIT_TOLERANCE)).toHaveLength(4);
+      expect(shown(264 + FIT_TOLERANCE)).toHaveLength(4);
     });
 
     it("drops year, manufacturer, the service age, then the owner", () => {
       // (80+6+20) + 12 + 60 = 178.
-      expect(shown(178 + LINE_FIT_TOLERANCE)).toEqual([
+      expect(shown(178 + FIT_TOLERANCE)).toEqual([
         "owner",
         "playability",
         "serviced",
       ]);
       // The trailing group takes no room once it is gone: 80+6+20 = 106.
-      expect(shown(106 + LINE_FIT_TOLERANCE)).toEqual(["owner", "playability"]);
-      expect(shown(105 + LINE_FIT_TOLERANCE)).toEqual(["playability"]);
+      expect(shown(106 + FIT_TOLERANCE)).toEqual(["owner", "playability"]);
+      expect(shown(105 + FIT_TOLERANCE)).toEqual(["playability"]);
     });
   });
 });
