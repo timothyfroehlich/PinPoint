@@ -5,7 +5,7 @@ One standard for every action button and every ⋯ menu in the app: page headers
 ## 26.1 Where an action goes
 
 - **Its own button:** the page's create action (Add Machine, Add tag, New collection, Invite User) and Share. A page has at most one create action as its own button; a second one (Tags' Add tag type) goes in ⋯.
-- **Inside ⋯:** editing (Edit…, Rename…, Move…, Merge…), then Export and Print, then a divider and Delete, in red.
+- **Inside ⋯:** editing (Edit…, Rename…, Move…, Merge…), then Export and Print, then a divider and Delete, in red. The lone-entry rule below can bring one of these out as its own button, as on Issues (issues-list §2.3).
 - **Exceptions, named by their page's spec:** a control beside the thing it edits stays visible (an issue's Edit title and Move, issue-detail §4.3, §4.5); Machines' Pinball Map (machine-views §6.6); Tags' Settings tags link; Watch, which stays in the page body.
 - **A ⋯ never holds fewer than two entries unless space forces it.** An action that would sit in ⋯ alone shows as its own button.
 
