@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -414,7 +414,40 @@ describe("IssueView", () => {
     expect(toolbarSearch("Search issues")).not.toHaveAttribute("placeholder");
   });
 
-  it("lists the Secondary Filters under More, in order (issues-list §4.3)", async () => {
+  it("orders the Primary Filters Machine, Status, Severity, Assignee, Priority, Machine presence (issues-list §4.2)", () => {
+    renderView();
+    const filters = screen.getByRole("group", { name: "Filters" });
+    expect(
+      [
+        ...filters.querySelectorAll<HTMLElement>(
+          "[data-filter-trigger]:not([data-testid='list-filter-more'])"
+        ),
+      ].map((trigger) => trigger.getAttribute("data-filter-trigger"))
+    ).toEqual([
+      "machine",
+      "status",
+      "severity",
+      "assignee",
+      "priority",
+      "presence",
+    ]);
+  });
+
+  it("names More filters and badges only the filters it holds that changed (list-views §4.5, §4.10)", () => {
+    renderView();
+    // Every Secondary Filter is at its Page Preset value.
+    expect(screen.getByTestId("list-filter-more")).toHaveAccessibleName(
+      "More filters"
+    );
+    cleanup();
+
+    renderView({ result: withState({ watching: true }) });
+    expect(screen.getByTestId("list-filter-more")).toHaveAccessibleName(
+      "More filters, 1 changed"
+    );
+  });
+
+  it("lists the Secondary Filters under More filters, in order (issues-list §4.3)", async () => {
     const user = userEvent.setup();
     renderView();
 

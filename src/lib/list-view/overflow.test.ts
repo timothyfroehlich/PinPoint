@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   fitLineParts,
   fitPrimaryFilters,
-  LINE_FIT_TOLERANCE,
+  FIT_TOLERANCE,
   phoneSearchAsIcon,
   planLineParts,
   planListHeader,
@@ -100,7 +100,7 @@ describe("fitLineParts (machine-views §5.10, issues-list §3.9)", () => {
 
     it("keeps every part at full width when the line fits with the tolerance to spare", () => {
       // (60+6+4+6+120+6+50) + 12 + (30+8+40+8+90) = 440.
-      expect(plan(440 + LINE_FIT_TOLERANCE)).toEqual({
+      expect(plan(440 + FIT_TOLERANCE)).toEqual({
         id: "full",
         machine: "full",
         priority: "full",
@@ -111,13 +111,13 @@ describe("fitLineParts (machine-views §5.10, issues-list §3.9)", () => {
     });
 
     it("drops the age, then the comment count, before touching the machine name", () => {
-      expect(plan(439 + LINE_FIT_TOLERANCE)).toMatchObject({
+      expect(plan(439 + FIT_TOLERANCE)).toMatchObject({
         age: "hidden",
         comments: "full",
         machine: "full",
       });
       // 252 + 12 + (30+8+40) = 342.
-      expect(plan(341 + LINE_FIT_TOLERANCE)).toMatchObject({
+      expect(plan(341 + FIT_TOLERANCE)).toMatchObject({
         comments: "hidden",
         machine: "full",
       });
@@ -125,19 +125,19 @@ describe("fitLineParts (machine-views §5.10, issues-list §3.9)", () => {
 
     it("truncates the machine name while the priority and assignee still show", () => {
       // 252 + 12 + 30 = 294 with the name at full width.
-      expect(plan(294 + LINE_FIT_TOLERANCE)).toMatchObject({
+      expect(plan(294 + FIT_TOLERANCE)).toMatchObject({
         machine: "full",
         priority: "full",
         assignee: "full",
       });
-      expect(plan(293 + LINE_FIT_TOLERANCE)).toMatchObject({
+      expect(plan(293 + FIT_TOLERANCE)).toMatchObject({
         id: "full",
         machine: "truncated",
         priority: "full",
         assignee: "full",
       });
       // 76px narrower leaves the name at exactly its 44px minimum.
-      expect(plan(218 + LINE_FIT_TOLERANCE)).toMatchObject({
+      expect(plan(218 + FIT_TOLERANCE)).toMatchObject({
         machine: "truncated",
         priority: "full",
         assignee: "full",
@@ -145,7 +145,7 @@ describe("fitLineParts (machine-views §5.10, issues-list §3.9)", () => {
     });
 
     it("hides the machine name, below its minimum, before the priority drops", () => {
-      expect(plan(217 + LINE_FIT_TOLERANCE)).toEqual({
+      expect(plan(217 + FIT_TOLERANCE)).toEqual({
         id: "full",
         machine: "hidden",
         priority: "full",
@@ -158,7 +158,7 @@ describe("fitLineParts (machine-views §5.10, issues-list §3.9)", () => {
     it("takes the machine name's separator with it", () => {
       // Without the name or its "·": (60+6+50) + 12 + 30 = 158. A "·" left
       // behind would make it 168.
-      expect(shown(158 + LINE_FIT_TOLERANCE)).toEqual([
+      expect(shown(158 + FIT_TOLERANCE)).toEqual([
         "assignee",
         "id",
         "priority",
@@ -167,17 +167,17 @@ describe("fitLineParts (machine-views §5.10, issues-list §3.9)", () => {
 
     it("then drops the priority, then the assignee", () => {
       // 60 + 12 + 30 = 102.
-      expect(shown(157 + LINE_FIT_TOLERANCE)).toEqual(["assignee", "id"]);
-      expect(shown(102 + LINE_FIT_TOLERANCE)).toEqual(["assignee", "id"]);
-      expect(shown(101 + LINE_FIT_TOLERANCE)).toEqual(["id"]);
+      expect(shown(157 + FIT_TOLERANCE)).toEqual(["assignee", "id"]);
+      expect(shown(102 + FIT_TOLERANCE)).toEqual(["assignee", "id"]);
+      expect(shown(101 + FIT_TOLERANCE)).toEqual(["id"]);
     });
 
     it("hides a name already narrower than its minimum instead of truncating it", () => {
       // A 40px name: (60+6+4+6+40+6+50) + 12 + 30 = 214.
-      expect(plan(214 + LINE_FIT_TOLERANCE, 40)).toMatchObject({
+      expect(plan(214 + FIT_TOLERANCE, 40)).toMatchObject({
         machine: "full",
       });
-      expect(plan(213 + LINE_FIT_TOLERANCE, 40)).toMatchObject({
+      expect(plan(213 + FIT_TOLERANCE, 40)).toMatchObject({
         machine: "hidden",
         priority: "full",
       });
@@ -216,38 +216,38 @@ describe("fitLineParts (machine-views §5.10, issues-list §3.9)", () => {
     it("puts a separator only between two plain-text parts", () => {
       // (80+6+4+6+70+6+4+6+40+6+20) + 12 + 60 = 320: two separators, none
       // before the owner.
-      expect(shown(320 + LINE_FIT_TOLERANCE)).toHaveLength(5);
+      expect(shown(320 + FIT_TOLERANCE)).toHaveLength(5);
       // Without the year: (80+6+4+6+70+6+20) + 12 + 60 = 264.
-      expect(shown(319 + LINE_FIT_TOLERANCE)).toEqual([
+      expect(shown(319 + FIT_TOLERANCE)).toEqual([
         "manufacturer",
         "owner",
         "playability",
         "serviced",
       ]);
-      expect(shown(264 + LINE_FIT_TOLERANCE)).toHaveLength(4);
+      expect(shown(264 + FIT_TOLERANCE)).toHaveLength(4);
     });
 
     it("drops year, manufacturer, the service age, then the owner", () => {
       // (80+6+20) + 12 + 60 = 178.
-      expect(shown(178 + LINE_FIT_TOLERANCE)).toEqual([
+      expect(shown(178 + FIT_TOLERANCE)).toEqual([
         "owner",
         "playability",
         "serviced",
       ]);
       // The trailing group takes no room once it is gone: 80+6+20 = 106.
-      expect(shown(106 + LINE_FIT_TOLERANCE)).toEqual(["owner", "playability"]);
-      expect(shown(105 + LINE_FIT_TOLERANCE)).toEqual(["playability"]);
+      expect(shown(106 + FIT_TOLERANCE)).toEqual(["owner", "playability"]);
+      expect(shown(105 + FIT_TOLERANCE)).toEqual(["playability"]);
     });
   });
 });
 
-describe("fitPrimaryFilters (list-views §8.1)", () => {
+describe("fitPrimaryFilters (list-views §8.15)", () => {
   const filterWidths = [120, 100, 110, 80];
 
-  it("keeps every filter inline, with no More, when they fit", () => {
+  it("keeps every filter inline, with no More filters, when they fit", () => {
     expect(
       fitPrimaryFilters({
-        available: 500,
+        available: FIT_TOLERANCE + 500,
         filterWidths,
         moreWidth: 70,
         hasSecondary: false,
@@ -256,11 +256,24 @@ describe("fitPrimaryFilters (list-views §8.1)", () => {
     ).toBe(4);
   });
 
-  it("moves filters into More from the right, one at a time", () => {
+  it("moves a filter out before the row is exactly full (§8.7)", () => {
+    // Four filters and three gaps are exactly 416px.
+    expect(
+      fitPrimaryFilters({
+        available: FIT_TOLERANCE + 415,
+        filterWidths,
+        moreWidth: 70,
+        hasSecondary: false,
+        gap: 2,
+      })
+    ).toBeLessThan(4);
+  });
+
+  it("moves filters into More filters from the right, one at a time", () => {
     // 120+100+110 + More 70 + 3 gaps = 406.
     expect(
       fitPrimaryFilters({
-        available: 406,
+        available: FIT_TOLERANCE + 406,
         filterWidths,
         moreWidth: 70,
         hasSecondary: false,
@@ -269,7 +282,7 @@ describe("fitPrimaryFilters (list-views §8.1)", () => {
     ).toBe(3);
     expect(
       fitPrimaryFilters({
-        available: 405,
+        available: FIT_TOLERANCE + 405,
         filterWidths,
         moreWidth: 70,
         hasSecondary: false,
@@ -278,10 +291,10 @@ describe("fitPrimaryFilters (list-views §8.1)", () => {
     ).toBe(2);
   });
 
-  it("reserves room for More whenever the host has Secondary Filters", () => {
+  it("reserves room for More filters whenever the host has Secondary Filters", () => {
     expect(
       fitPrimaryFilters({
-        available: 416,
+        available: FIT_TOLERANCE + 416,
         filterWidths,
         moreWidth: 70,
         hasSecondary: true,
@@ -290,7 +303,7 @@ describe("fitPrimaryFilters (list-views §8.1)", () => {
     ).toBe(3);
   });
 
-  it("can move every filter into More", () => {
+  it("can move every filter into More filters", () => {
     expect(
       fitPrimaryFilters({
         available: 60,
@@ -303,7 +316,7 @@ describe("fitPrimaryFilters (list-views §8.1)", () => {
   });
 });
 
-describe("planListHeader (list-views §8.2, §8.3)", () => {
+describe("planListHeader (list-views §8.16–§8.19)", () => {
   const base = {
     tabWidths: [100, 120, 90, 110, 130],
     appliedIndex: 0,
@@ -320,7 +333,9 @@ describe("planListHeader (list-views §8.2, §8.3)", () => {
   const everything = 660 + 132 + 202;
 
   it("shows every tab, More views, and the full compact pager when they fit", () => {
-    expect(planListHeader({ ...base, available: everything })).toEqual({
+    expect(
+      planListHeader({ ...base, available: FIT_TOLERANCE + everything })
+    ).toEqual({
       visibleTabs: [0, 1, 2, 3, 4],
       showMoreViews: true,
       pager: "full",
@@ -333,13 +348,15 @@ describe("planListHeader (list-views §8.2, §8.3)", () => {
       planListHeader({
         ...base,
         moreViewsAlways: false,
-        available: everything,
+        available: FIT_TOLERANCE + everything,
       }).showMoreViews
     ).toBe(false);
   });
 
   it("moves tabs into More views from the right before touching the pager", () => {
-    expect(planListHeader({ ...base, available: everything - 1 })).toEqual({
+    expect(
+      planListHeader({ ...base, available: FIT_TOLERANCE + everything - 1 })
+    ).toEqual({
       visibleTabs: [0, 1, 2, 3],
       showMoreViews: true,
       pager: "full",
@@ -351,29 +368,36 @@ describe("planListHeader (list-views §8.2, §8.3)", () => {
     const plan = planListHeader({
       ...base,
       appliedIndex: 4,
-      available: 100 + 2 + 130 + 2 + 100 + 132 + 202,
+      available: FIT_TOLERANCE + 100 + 2 + 130 + 2 + 100 + 132 + 202,
     });
     expect(plan.visibleTabs).toEqual([0, 4]);
   });
 
   it("then drops the range text, then the compact pager", () => {
     const appliedOnly = 100 + 2 + 100 + 2 + 202;
-    expect(planListHeader({ ...base, available: appliedOnly + 72 }).pager).toBe(
-      "compact"
-    );
-    expect(planListHeader({ ...base, available: appliedOnly }).pager).toBe(
-      "hidden"
-    );
+    expect(
+      planListHeader({ ...base, available: FIT_TOLERANCE + appliedOnly + 72 })
+        .pager
+    ).toBe("compact");
+    expect(
+      planListHeader({ ...base, available: FIT_TOLERANCE + appliedOnly }).pager
+    ).toBe("hidden");
   });
 
   it("shortens Discard changes only after the pager is gone", () => {
     const edited = { ...base, editWidth: 200, editCompactWidth: 150 };
     const appliedOnly = 100 + 2 + 100 + 2 + 202;
     expect(
-      planListHeader({ ...edited, available: appliedOnly + 202 })
+      planListHeader({
+        ...edited,
+        available: FIT_TOLERANCE + appliedOnly + 202,
+      })
     ).toMatchObject({ pager: "hidden", compactEdit: false });
     expect(
-      planListHeader({ ...edited, available: appliedOnly + 152 })
+      planListHeader({
+        ...edited,
+        available: FIT_TOLERANCE + appliedOnly + 152,
+      })
     ).toMatchObject({ pager: "hidden", compactEdit: true });
   });
 
@@ -386,24 +410,30 @@ describe("planListHeader (list-views §8.2, §8.3)", () => {
       editCompactWidth: 90,
     };
     expect(
-      planListHeader({ ...noApplied, available: 100 + 2 + 90 + 202 })
+      planListHeader({
+        ...noApplied,
+        available: FIT_TOLERANCE + 100 + 2 + 90 + 202,
+      })
     ).toEqual({
       visibleTabs: [],
       showMoreViews: true,
       pager: "hidden",
       compactEdit: false,
     });
-    expect(planListHeader({ ...noApplied, available: 50 }).visibleTabs).toEqual(
-      []
-    );
+    expect(
+      planListHeader({ ...noApplied, available: FIT_TOLERANCE + 50 })
+        .visibleTabs
+    ).toEqual([]);
   });
 
   it("falls back to the Applied View alone when nothing else fits", () => {
-    expect(planListHeader({ ...base, available: 100 })).toEqual({
-      visibleTabs: [0],
-      showMoreViews: true,
-      pager: "hidden",
-      compactEdit: true,
-    });
+    expect(planListHeader({ ...base, available: FIT_TOLERANCE + 100 })).toEqual(
+      {
+        visibleTabs: [0],
+        showMoreViews: true,
+        pager: "hidden",
+        compactEdit: true,
+      }
+    );
   });
 });

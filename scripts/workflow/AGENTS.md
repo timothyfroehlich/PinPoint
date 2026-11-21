@@ -120,6 +120,17 @@ before each and stopping at the first failure: readiness, `check:human`, `test:h
 chromium-only smoke. `pnpm run preflight` wraps it in `quiet-run.py`;
 `pnpm run preflight:human` streams it.
 
+### Host slots
+
+`heavy-run.sh <heavy|dev> <command…>` runs an expensive command in a host-wide GNU `sem`
+slot (PP-p2ts.5): one `pinpoint-heavy` slot for `check`, the full unit suite, coverage,
+integration, build, smoke, `e2e:full`, `e2e:all` and `pr-screenshots.mjs` (which re-runs itself under it), and
+two `pinpoint-dev` slots held for each dev server's lifetime. The header of
+`heavy-run.sh` carries the measured footprints behind those counts, the env overrides,
+and the passthrough rules. `agent-load.sh` (`pnpm run agent-load`) lists holders and
+waiters from the semaphore files. A new expensive command gets a `heavy-run.sh heavy`
+call site.
+
 ### UI Screenshots
 
 | Script                                                            | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |

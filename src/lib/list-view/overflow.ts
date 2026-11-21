@@ -6,6 +6,12 @@
  * inline and which move into an overflow menu. CSS still owns presentation.
  */
 
+/**
+ * Room every fit check leaves spare (§8.7), so a step fires a little before
+ * its part would overflow and real glyphs never crowd the edge.
+ */
+export const FIT_TOLERANCE = 16;
+
 function sum(values: readonly number[]): number {
   return values.reduce((total, value) => total + value, 0);
 }
@@ -28,8 +34,9 @@ export interface FilterFitInput {
 }
 
 /**
- * How many Primary Filters stay inline (§8.1): they move into More from the
- * right, one at a time, in the host's order, until the rest fit beside More.
+ * How many Primary Filters stay inline (§8.15): they move into More filters
+ * from the right, one at a time, in the host's order, until the rest fit
+ * beside More filters with the tolerance to spare (§8.7).
  * More itself shows only when it holds something (§4.5).
  */
 export function fitPrimaryFilters({
@@ -39,12 +46,13 @@ export function fitPrimaryFilters({
   hasSecondary,
   gap,
 }: FilterFitInput): number {
-  if (!hasSecondary && rowWidth(filterWidths, gap) <= available) {
+  const room = available - FIT_TOLERANCE;
+  if (!hasSecondary && rowWidth(filterWidths, gap) <= room) {
     return filterWidths.length;
   }
   for (let count = filterWidths.length; count > 0; count -= 1) {
     const inline = filterWidths.slice(0, count);
-    if (rowWidth([...inline, moreWidth], gap) <= available) return count;
+    if (rowWidth([...inline, moreWidth], gap) <= room) return count;
   }
   return 0;
 }
@@ -124,7 +132,8 @@ const STEPS: readonly { pager: CompactPagerMode; compactEdit: boolean }[] = [
 ];
 
 /**
- * Lays out the desktop List Header (§8.2, §8.3). View tabs move into More
+ * Lays out the desktop List Header (§8.16–§8.19), keeping the tolerance
+ * spare (§8.7). View tabs move into More
  * views from the right first; only when the Applied View's tab alone still
  * does not fit does the compact pager drop its range text, and then
  * disappear. The pager below the list always remains, and shows the result
@@ -137,7 +146,11 @@ export function planListHeader(input: ListHeaderFitInput): ListHeaderPlan {
     const pagerWidth =
       pager === "hidden" ? 0 : input.pagerWidths[pager] + input.gap;
     const leftAvailable =
-      input.available - input.controlsWidth - pagerWidth - input.gap;
+      input.available -
+      FIT_TOLERANCE -
+      input.controlsWidth -
+      pagerWidth -
+      input.gap;
     const editWidth = compactEdit ? input.editCompactWidth : input.editWidth;
     const tabs = fitTabs(input, leftAvailable, editWidth);
     if (tabs) return { ...tabs, pager, compactEdit };
@@ -187,12 +200,6 @@ export function phoneSearchAsIcon({
   const fieldWidth = available - viewsWidth - filtersWidth - 2 * gap;
   return fieldWidth < PHONE_SEARCH_MIN_WIDTH + FIT_TOLERANCE_PX;
 }
-
-/**
- * Room a line fit leaves spare, so a part drops a little before the line is
- * exactly full and real glyphs never crowd the line's end.
- */
-export const LINE_FIT_TOLERANCE = 16;
 
 /** One part of a one-line row, at its full width. */
 export interface LineFitPart<Part extends string> {
@@ -266,7 +273,7 @@ function groupWidth<Part extends string>(
 /**
  * How each part of a one-line row shows (machine-views §5.10, issues-list
  * §3.9): the parts in `dropOrder` give way one at a time, in that order,
- * until the line fits with `LINE_FIT_TOLERANCE` to spare. A part with a
+ * until the line fits with `FIT_TOLERANCE` to spare. A part with a
  * `minWidth` gives way by truncating first: when the line fits with that
  * part narrower but still at least `minWidth` wide, it is truncated and the
  * fit stops; otherwise it hides like any other part, its "·" separator with
@@ -291,7 +298,7 @@ export function planLineParts<Part extends string>({
     [...parts.keys()].map((key) => [key, "full"])
   );
   const shown = new Set<Part>(parts.keys());
-  const room = available - LINE_FIT_TOLERANCE;
+  const room = available - FIT_TOLERANCE;
   const lineWidth = (): number => {
     const lead = groupWidth(leading, shown, gap, separatorWidth);
     const end = groupWidth(trailing, shown, trailingGap, separatorWidth);

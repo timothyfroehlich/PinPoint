@@ -346,3 +346,51 @@ body {
     sans-serif;
   line-height: 1.6;
 }
+
+/* Reduced motion (CORE-A11Y-002, PP-kqbk.4). One global rule instead of a
+   `motion-reduce:` variant on every utility: it covers shadcn/Radix primitives
+   and any future component automatically. It is unlayered, so it wins over
+   Tailwind's utilities layer without `!important`.
+   - Every transition and animation is turned off, so Radix fade/zoom/slide on
+     dialogs, popovers, menus and tooltips become instant. Radix Presence reads
+     `animation-name: none` and unmounts at once.
+   - Sheet and Drawer content keep their slide-in: the slide is what tells the
+     user where the surface came from. Their overlays still lose the fade.
+   - Spinners are dimmed, not frozen: a full-opacity icon that stops turning
+     reads as hung. Skeleton pulses hold a mid-pulse opacity instead of vanishing. */
+@media (prefers-reduced-motion: reduce) {
+  *:not(
+    [data-slot="sheet-content"],
+    [data-slot="drawer-content"],
+    [data-vaul-drawer]
+  ),
+  *:not(
+      [data-slot="sheet-content"],
+      [data-slot="drawer-content"],
+      [data-vaul-drawer]
+    )::before,
+  *:not(
+      [data-slot="sheet-content"],
+      [data-slot="drawer-content"],
+      [data-vaul-drawer]
+    )::after {
+    transition: none;
+    animation: none;
+  }
+
+  /* vaul styles its own overlay fade with a more specific selector. */
+  [data-vaul-overlay] {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .animate-spin {
+    animation: none;
+    opacity: 0.5;
+  }
+
+  .animate-pulse {
+    animation: none;
+    opacity: 0.75;
+  }
+}

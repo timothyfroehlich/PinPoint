@@ -98,7 +98,6 @@
 | Requirement | Divergence | Resolution |
 | :-- | :-- | :-- |
 | 3.9, 3.10 | Line 2 drops the priority pill and the assignee's initials before the machine name truncates, and the name never disappears. | Issue row machine-name PR (follows this spec change). |
-| 4.2 | The Primary Filters run Status, Severity, Priority, Machine, Assignee, Machine Presence. | Desktop List Header PR (PP-jb9v.16). |
 | 2.3, 2.4 | Issues has no page actions; Export sits in the desktop List Header on `/issues` and on every Issues tab, and phones offer no Export. | PP-jb9v.17 |
 
 ---

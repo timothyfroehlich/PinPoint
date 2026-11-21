@@ -63,6 +63,10 @@ shadcn `<Alert>` already carries `role="alert"`. Sonner toasts fire in `role="st
 
 ## Animation & Motion (CORE-A11Y-002)
 
-Every `animate-*` and non-essential `transition-*` utility pairs with its `motion-reduce:` counterpart — `motion-reduce:animate-none` for animations, `motion-reduce:transition-none` for transitions. The test for "non-essential" is whether the motion carries information: a spinner's rotation doesn't (the static icon still says "loading"), a skeleton's pulse doesn't, a height transition doesn't — keep the structural change, drop the movement.
+One `@media (prefers-reduced-motion: reduce)` block at the end of `src/app/globals.css` handles reduced motion for the whole app. Write `animate-*` and `transition-*` utilities normally; you do not add `motion-reduce:` variants.
 
-**Essential motion may opt out**, and that exemption is narrow: a sheet sliding in from the side is the thing that tells the user where the surface came from, so removing it removes meaning rather than discomfort. When you take the exemption, leave a one-line comment saying so — otherwise the next reviewer reads it as a missed `motion-reduce:` and "fixes" it.
+- **Off:** every transition and animation, including Radix `animate-in`/`animate-out` fade and zoom on dialogs, popovers, menus and tooltips (Radix Presence unmounts at once when the animation name is `none`).
+- **Dimmed, not frozen:** `animate-spin` gets `opacity: 0.5` (a full-opacity icon that stops turning reads as hung); `animate-pulse` holds `opacity: 0.75`.
+- **Essential motion stays:** Sheet and Drawer content keep their slide-in, because the slide tells the user where the surface came from. To add another essential exemption, add its selector to the `:not(...)` list in that block and say why in the comment.
+
+Library-applied inline `transition` styles (for example @dnd-kit's `useSortable`) are not covered by the CSS rule; gate those with `usePrefersReducedMotion`.

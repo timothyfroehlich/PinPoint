@@ -14,6 +14,9 @@ import { useCallback, useMemo, useState } from "react";
  *   markPending — save in flight; set stays dirty until markClean.
  *   markFailed  — clears pending, adds failedIds; leaves dirtyIds alone.
  *   markSaved   — clears pending + failedIds; does NOT clear dirtyIds.
+ *   clearFailed — clears failedIds only. For a failure whose cause the user
+ *                 just fixed (a required field filled in): the edit is still
+ *                 dirty and its scheduled save can now run.
  *   markClean   — clears dirtyIds. Called by execute ONLY on a successful
  *                 save where no newer edit landed during the await.
  */
@@ -26,6 +29,7 @@ export function useSaveStatus(): {
   markPending: (id: string) => void;
   markSaved: (id: string) => void;
   markFailed: (id: string) => void;
+  clearFailed: (id: string) => void;
   hasUnsaved: boolean;
 } {
   const [pendingIds, setPendingIds] = useState<Set<string>>(() => new Set());
@@ -63,6 +67,10 @@ export function useSaveStatus(): {
     // dirtyIds intentionally left alone — the edit is still unsaved.
   }, []);
 
+  const clearFailed = useCallback((id: string): void => {
+    setFailedIds((p) => removeFrom(p, id));
+  }, []);
+
   const pending = pendingIds.size > 0;
   const hasUnsaved = pending || failedIds.size > 0 || dirtyIds.size > 0;
 
@@ -76,6 +84,7 @@ export function useSaveStatus(): {
       markPending,
       markSaved,
       markFailed,
+      clearFailed,
       hasUnsaved,
     }),
     [
@@ -87,6 +96,7 @@ export function useSaveStatus(): {
       markPending,
       markSaved,
       markFailed,
+      clearFailed,
       hasUnsaved,
     ]
   );
