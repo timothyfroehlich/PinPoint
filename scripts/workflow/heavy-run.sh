@@ -94,10 +94,18 @@ timeout_s="${PINPOINT_HOST_SLOT_TIMEOUT_S:-300}"
 # the background (stdin kept) so a SIGTERM/SIGHUP aimed at this wrapper alone
 # is forwarded: sem stops the command and frees the slot.
 began=$SECONDS
+# The trap goes in before sem starts, so no signal can land in between and
+# leave an orphaned sem holding the slot: before the launch it just exits.
+sem_pid=""
+# shellcheck disable=SC2329 # invoked by the trap below
+on_signal() {
+  if [ -z "$sem_pid" ]; then exit 143; fi
+  kill -TERM "$sem_pid" 2>/dev/null || true
+}
+trap on_signal TERM HUP INT
 sem --id "pinpoint-$class" --jobs "$slots" --semaphore-timeout "-$timeout_s" \
   --fg ": > $(printf '%q' "$started"); $quoted_cmd" <&0 &
 sem_pid=$!
-trap 'kill -TERM "$sem_pid" 2>/dev/null' TERM HUP INT
 set +e
 wait "$sem_pid"
 status=$?
