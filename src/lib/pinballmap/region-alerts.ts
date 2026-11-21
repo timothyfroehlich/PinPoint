@@ -239,12 +239,6 @@ export function getRegionAlertChannelId(
   return raw !== undefined && raw.length > 0 ? raw : null;
 }
 
-/** Resolves alert channel from DB state with env var fallback. */
-export async function resolveRegionAlertChannelId(): Promise<string | null> {
-  const state = await getPinballMapState();
-  return getRegionAlertChannelId(state);
-}
-
 /** "austin" → "Austin". PBM region slugs are lowercase single words. */
 function regionLabel(region: string): string {
   return region.charAt(0).toUpperCase() + region.slice(1);

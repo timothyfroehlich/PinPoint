@@ -138,14 +138,15 @@ const issue = createTestIssue(machine.id, { severity: "unplayable" });
 ### Mock Supabase Auth
 
 ```typescript
-import { createMockUser, mockSupabaseAuth } from "~/test/helpers/mocks";
+import { createMockUser, mockCreateClient } from "~/test/helpers/mocks";
 
 // Simulate authenticated user
 const user = createMockUser({ id: "user-123" });
-mockSupabaseAuth(user);
+vi.mock("~/lib/supabase/server", () => ({
+  createClient: mockCreateClient(user),
+}));
 
-// Simulate unauthenticated
-mockSupabaseAuth(null);
+// Simulate unauthenticated: mockCreateClient(null)
 ```
 
 ### Clean Tests with setupTestDb

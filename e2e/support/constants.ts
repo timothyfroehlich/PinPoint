@@ -26,12 +26,4 @@ export function seededIssue(
   return issue;
 }
 
-export const DEFAULT_NAVIGATION_TIMEOUT = 10_000;
-
 export const TEST_USERS = users;
-
-// Machine status based on worst open issue severity
-export const machineStatuses = {
-  addamsFamily: "Needs Service", // TAF-01, TAF-02 both major
-  eightBallDeluxe: "Unplayable", // EBD-01 unplayable
-} as const;

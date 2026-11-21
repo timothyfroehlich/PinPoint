@@ -68,35 +68,6 @@ export function renderInviteEmailHtml({
   `;
 }
 
-export function renderInviteEmailText({
-  firstName,
-  inviterName,
-  siteUrl,
-  to,
-}: InviteEmailParams): string {
-  const signupUrl = `${siteUrl}/signup?email=${encodeURIComponent(to)}`;
-
-  return `
-You've been invited to PinPoint!
-
-Hi ${firstName},
-
-${inviterName} has added you as an owner of pinball machines in PinPoint, the issue tracking system for Austin Pinball Collective.
-
-Create your account to get started:
-${signupUrl}
-
-Once you sign up, you'll be able to:
-- View and manage issues for your machines
-- Receive notifications about new issues
-- Track repair history
-
-Questions? Reply to this email.
-
-— The PinPoint Team
-  `.trim();
-}
-
 export async function sendInviteEmail(
   params: InviteEmailParams
 ): Promise<{ success: boolean; error?: unknown }> {

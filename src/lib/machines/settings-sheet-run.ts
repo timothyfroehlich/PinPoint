@@ -41,10 +41,6 @@ export function parseSheetDefault(
   return fallback;
 }
 
-export function sheetDefaultsEqual(a: SheetDefault, b: SheetDefault): boolean {
-  return serializeSheetDefault(a) === serializeSheetDefault(b);
-}
-
 /** One of a machine's settings sets, as the print run needs it. */
 export interface PrintRunSet {
   id: string;
