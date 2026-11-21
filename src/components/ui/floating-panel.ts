@@ -25,7 +25,8 @@ export const FLOATING_PANEL_CLASSES = [
   "data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2",
 ].join(" ");
 
-const CLOSE_FALLBACK_MS = 500;
+// Slack added to the longest running animation before the backstop fires.
+const CLOSE_FALLBACK_SLACK_MS = 200;
 
 export interface FloatingPanelOptions {
   /** The panel's own element; it is appended to <body> and removed on close. */
@@ -100,9 +101,11 @@ export function openFloatingPanel({
     stopAutoUpdate();
     element.dataset["state"] = "closed";
     let finished = false;
+    let fallbackTimer: number | undefined;
     const finish = (): void => {
       if (finished) return;
       finished = true;
+      window.clearTimeout(fallbackTimer);
       element.remove();
       onClosed?.();
     };
@@ -117,7 +120,16 @@ export function openFloatingPanel({
     // A cancelled animation (the open fade replaced by the close fade) rejects
     // `finished`; allSettled waits for the close fade either way. The timer is
     // the backstop for an animation that never settles.
-    window.setTimeout(finish, CLOSE_FALLBACK_MS);
+    const longestMs = Math.max(
+      ...running.map((a) => {
+        const end = Number(a.effect?.getComputedTiming().endTime ?? 0);
+        return end / Math.abs(a.playbackRate || 1);
+      })
+    );
+    fallbackTimer = window.setTimeout(
+      finish,
+      longestMs + CLOSE_FALLBACK_SLACK_MS
+    );
     void Promise.allSettled(running.map((a) => a.finished)).then(finish);
   };
 
