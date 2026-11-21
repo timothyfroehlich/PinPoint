@@ -574,7 +574,7 @@
 **CORE-A11Y-002:** Reduced motion is honored by one global rule
 
 - **Severity:** Required
-- **Why:** Users with vestibular disorders need to suppress motion. The `prefers-reduced-motion` media query is Baseline Widely available, and One `@media (prefers-reduced-motion: reduce)` block in `src/app/globals.css` covers every shadcn/Radix primitive and every future component, where a `motion-reduce:` variant per utility needs remembering on each one (PP-kqbk.4).
+- **Why:** Users with vestibular disorders need to suppress motion. The `prefers-reduced-motion` media query is Baseline Widely available, so one `@media (prefers-reduced-motion: reduce)` block in `src/app/globals.css` covers every shadcn/Radix primitive and every future component, where a `motion-reduce:` variant per utility needs remembering on each one (PP-kqbk.4).
 - **Do:** Use `animate-*` and `transition-*` utilities freely; the global block turns every transition and animation off under reduced motion, dims `animate-spin` (`opacity: 0.5`, not frozen at full opacity, which reads as hung) and holds `animate-pulse` at a mid-pulse opacity. Sheet and Drawer content keep their slide-in as essential motion. New essential motion is excluded in the global block's `:not(...)` list, with a comment saying why.
 - **Don't:** Add a per-class `motion-reduce:` variant for ordinary motion (the global rule already applies). Don't write JS feature-detection for `prefers-reduced-motion` unless a library applies an inline `transition` that CSS cannot override (`usePrefersReducedMotion`).
 - **Reference:** modern-web-guidance `accessibility` § Motion.
