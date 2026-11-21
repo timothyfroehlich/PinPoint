@@ -114,7 +114,7 @@ export function MachineTagList({
           <li className="shrink-0 md:hidden">
             <button
               type="button"
-              aria-label={`Show ${String(hidden)} more ${hidden === 1 ? "tag" : "tags"}`}
+              aria-label={`+${String(hidden)} more ${hidden === 1 ? "tag" : "tags"}`}
               onClick={() => {
                 setExpanded(true);
                 setFocusIndex(visible);

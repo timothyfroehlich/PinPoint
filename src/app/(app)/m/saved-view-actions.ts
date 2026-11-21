@@ -36,7 +36,6 @@ const savedStateSchema = z.object({
   sort: z.enum(MACHINE_VIEW_FIELD_IDS),
   dir: z.enum(["asc", "desc"]),
   pageSize: z.literal(LIST_PAGE_SIZES),
-  columns: z.array(z.enum(MACHINE_VIEW_FIELD_IDS)),
 });
 
 type MachineSavedStateInput = z.infer<typeof savedStateSchema>;

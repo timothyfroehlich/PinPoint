@@ -138,7 +138,6 @@ describe("manufacturer tags", () => {
       viewerId: null,
       searchParams: new URLSearchParams({
         presence: "all",
-        columns: "machine",
       }),
     });
     expect(all.scopeCount).toBe(3);
@@ -156,7 +155,7 @@ describe("manufacturer tags", () => {
       scope,
       preset: "collection",
       viewerId: null,
-      searchParams: new URLSearchParams({ q: "Williams", columns: "machine" }),
+      searchParams: new URLSearchParams({ q: "Williams" }),
     });
     expect(searched.rows).toEqual([]);
 
@@ -166,7 +165,6 @@ describe("manufacturer tags", () => {
       viewerId: null,
       searchParams: new URLSearchParams({
         owner: outsiderId,
-        columns: "machine",
       }),
     });
     // An owner with no machines in the tag stays selected and matches nothing
@@ -184,7 +182,6 @@ describe("manufacturer tags", () => {
       viewerId: null,
       searchParams: new URLSearchParams({
         presence: "all",
-        columns: "machine",
       }),
     });
     expect(
@@ -247,7 +244,7 @@ describe("manufacturer tags", () => {
         scope: { kind: "tag", tagType: "manufacturer", slug },
         preset: "collection",
         viewerId: null,
-        searchParams: new URLSearchParams({ columns: "machine" }),
+        searchParams: new URLSearchParams(),
       });
     expect(
       (await load("stern-electronics")).rows.map((row) => row.initials)

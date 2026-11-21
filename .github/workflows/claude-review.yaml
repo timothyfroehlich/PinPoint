@@ -27,11 +27,20 @@
 # every `pull_request` workflow does (CI Gate included), so a PR that edits it can
 # change this check; the review of that diff and Tim's merge decision cover it.
 
+#
+# Merge queue: the check is required on the queue's merge_group commit too. A PR
+# enters the queue only after its head passed this check, and the queue adds only
+# main and the PRs ahead of it, which were reviewed on their own heads, so there is
+# nothing new to review. The job is skipped on merge_group, and a skipped required
+# check passes.
+
 name: Claude Review
 
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
+    types: [checks_requested]
 
 permissions: {}
 
@@ -39,13 +48,16 @@ concurrency:
   # A newer push supersedes the review in progress; the next run's range covers
   # the cancelled head's commits too. Draft runs (which skip) get their own
   # group, so a push landing just after `gh pr ready` cannot cancel the review.
-  group: claude-review-${{ github.event.pull_request.number }}-${{ github.event.pull_request.draft }}
+  # Merge-queue runs have no PR number; each group's own ref keeps them apart.
+  group: claude-review-${{ github.event.pull_request.number || github.ref }}-${{ github.event.pull_request.draft }}
   cancel-in-progress: true
 
 jobs:
   review:
     name: Claude Review
-    if: github.event.pull_request.draft == false
+    # Explicit event check: on merge_group the PR fields are null, and
+    # `null == false` is true in an expression.
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -54,7 +66,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2  # ratchet:step-security/harden-runner@v2.22.2
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43  # ratchet:step-security/harden-runner@v2.22.3
         with:
           egress-policy: audit
 
@@ -134,7 +146,7 @@ jobs:
       - name: Review
         id: review
         if: steps.range.outputs.mode != 'skip'
-        uses: anthropics/claude-code-action@aa8a7738e48bf30a40ee499ce818bef081c5ab5e  # ratchet:anthropics/claude-code-action@v1.0.257
+        uses: anthropics/claude-code-action@c0949c50a78c1ec8ce2647db36629b870e715d0c  # ratchet:anthropics/claude-code-action@v1.0.268
         env:
           # Telemetry and error reporting stay off.
           CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"

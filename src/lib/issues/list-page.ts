@@ -102,7 +102,6 @@ async function loadIssueListSummary(
     .groupBy(issues.status, issues.severity, issues.priority);
 
   const counts: IssueListSummary = {
-    open: 0,
     byStatusGroup: { new: 0, in_progress: 0 },
     bySeverity: { cosmetic: 0, minor: 0, major: 0, unplayable: 0 },
     byPriority: { low: 0, medium: 0, high: 0 },
@@ -110,7 +109,6 @@ async function loadIssueListSummary(
   for (const group of groups) {
     const statusGroup = OPEN_STATUS_GROUP.get(group.status);
     if (statusGroup === undefined) continue;
-    counts.open += group.value;
     counts.byStatusGroup[statusGroup] += group.value;
     counts.bySeverity[group.severity] += group.value;
     counts.byPriority[group.priority] += group.value;
@@ -129,16 +127,14 @@ function loadIssueRows(
     where: and(...where),
     orderBy,
     with: {
-      machine: { columns: { id: true, name: true, ownerId: true } },
-      reportedByUser: { columns: { id: true, name: true } },
-      invitedReporter: { columns: { id: true, name: true } },
+      machine: { columns: { id: true, name: true } },
       assignedToUser: { columns: { id: true, name: true } },
     },
     columns: ISSUE_LIST_COLUMNS,
-    // Comments people wrote (issues-list §3.4); system rows are timeline
-    // events. The relational builder qualifies every column inside `extras`
-    // with the root table's alias, so the subquery names its own alias in
-    // plain SQL rather than through the schema objects.
+    // Comments people wrote (issues-list §3.3, §3.4); system rows are
+    // timeline events. The relational builder qualifies every column inside
+    // `extras` with the root table's alias, so the subquery names its own
+    // alias in plain SQL rather than through the schema objects.
     extras: (table) => ({
       commentCount: sql<number>`(
         select count(*)::int from "issue_comments" "comment"

@@ -2,6 +2,7 @@ import { test, expect, type Page } from "../support/fixtures.js";
 import {
   assertNoHorizontalOverflow,
   assertNoA11yViolations,
+  openListSearch,
   setListFilterOptions,
 } from "../support/actions.js";
 import { seededIssue } from "../support/constants.js";
@@ -39,7 +40,7 @@ test.describe("Issue List Features", () => {
     await assertNoA11yViolations(page);
 
     // 2. Search for Issue 1
-    const searchInput = page.getByRole("searchbox", { name: "Search issues" });
+    const searchInput = await openListSearch(page, "Search issues");
     await searchInput.fill("Thing flips the bird");
     await searchInput.press("Enter");
     await expect
@@ -67,7 +68,7 @@ test.describe("Issue List Features", () => {
     await expect(issues.getByRole("link", { name: title2 })).toBeVisible();
     // Every row left is Major.
     await expect(
-      issues.getByRole("button", { name: /^Severity: (?!Major,)/ })
+      issues.getByTestId("issue-severity").filter({ hasNotText: "Major" })
     ).toHaveCount(0);
 
     // Clear the Severity filter

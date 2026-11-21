@@ -6,7 +6,6 @@ import {
 } from "./config";
 import {
   applyMachineBuiltInView,
-  nextMachineViewSort,
   normalizeMachineViewSavedState,
   parseMachineViewState,
   serializeMachineViewState,
@@ -24,15 +23,6 @@ describe("machine view URL state", () => {
       dir: "asc",
       page: 1,
       pageSize: 25,
-      // Both Page Presets display six fields by default (§4.6).
-      columns: [
-        "machine",
-        "playability",
-        "presence",
-        "openIssues",
-        "lastServiced",
-        "lastActivity",
-      ],
       severity: [],
     });
   });
@@ -40,22 +30,18 @@ describe("machine view URL state", () => {
   it("uses the Collection preset defaults independently", () => {
     const state = parseMachineViewState(new URLSearchParams(), "collection");
     expect(state.presence).toEqual(["on_the_floor"]);
-    expect(state.columns).toEqual(
-      parseMachineViewState(new URLSearchParams(), "machines").columns
-    );
     expect({ sort: state.sort, dir: state.dir }).toEqual({
       sort: "playability",
       dir: "desc",
     });
   });
 
-  it("puts filter values in canonical order and keeps displayed fields in URL order", () => {
+  it("puts filter values in canonical order", () => {
     const params = new URLSearchParams({
       presence: "all",
       status: "unplayable,operational,invalid",
       severity: "major,bogus,cosmetic,major",
       owner: "owner-2,unassigned,owner-1,me,owner-2",
-      columns: "machine,year,invalid,owner",
       pageSize: "50",
     });
     const state = parseMachineViewState(params, "machines");
@@ -65,8 +51,6 @@ describe("machine view URL state", () => {
     expect(state.severity).toEqual(["cosmetic", "major"]);
     // Me, then Unassigned, then people by id.
     expect(state.owner).toEqual(["me", "unassigned", "owner-1", "owner-2"]);
-    // Displayed fields show in the order the URL lists them.
-    expect(state.columns).toEqual(["machine", "year", "owner"]);
     expect(state.pageSize).toBe(50);
     expect(
       parseMachineViewState(
@@ -74,6 +58,24 @@ describe("machine view URL state", () => {
         "machines"
       ).presence
     ).toEqual(["on_the_floor", "on_loan"]);
+  });
+
+  it("ignores the retired columns parameter, so an old URL still loads", () => {
+    // Displayed fields went with the table: every row shows the same fields
+    // (machine-views §5.9).
+    const state = parseMachineViewState(
+      new URLSearchParams({ columns: "machine,year,owner", sort: "year" }),
+      "machines"
+    );
+
+    expect(state).toEqual({
+      ...parseMachineViewState(new URLSearchParams(), "machines"),
+      sort: "year",
+      dir: "desc",
+    });
+    expect(serializeMachineViewState(state, "machines").toString()).toBe(
+      "sort=year&dir=desc"
+    );
   });
 
   it("ignores retired widget parameters and drops them from the canonical URL", () => {
@@ -92,7 +94,7 @@ describe("machine view URL state", () => {
     expect(serializeMachineViewState(state, "machines").toString()).toBe("");
   });
 
-  it("ignores invalid enums, pages, page sizes, sorts, and columns", () => {
+  it("ignores invalid enums, pages, page sizes, and sorts", () => {
     const state = parseMachineViewState(
       new URLSearchParams({
         presence: "invalid",
@@ -101,7 +103,6 @@ describe("machine view URL state", () => {
         dir: "sideways",
         page: "-4",
         pageSize: "10",
-        columns: "invalid",
       }),
       "machines"
     );
@@ -112,9 +113,6 @@ describe("machine view URL state", () => {
     expect(state.dir).toBe("asc");
     expect(state.page).toBe(1);
     expect(state.pageSize).toBe(25);
-    expect(state.columns).toEqual(
-      getMachineViewPreset("machines").defaultState.columns
-    );
     expect(
       parseMachineViewState(
         new URLSearchParams({ page: "2broken" }),
@@ -138,11 +136,10 @@ describe("machine view URL state", () => {
       dir: "desc" as const,
       page: 3,
       pageSize: 100 as const,
-      columns: ["machine" as const, "year" as const],
     };
     const serialized = serializeMachineViewState(state, "machines");
     expect(serialized.toString()).toBe(
-      "q=mars&presence=all&status=needs_service&severity=minor%2Cunplayable&owner=unassigned&sort=year&dir=desc&page=3&pageSize=100&columns=machine%2Cyear"
+      "q=mars&presence=all&status=needs_service&severity=minor%2Cunplayable&owner=unassigned&sort=year&dir=desc&page=3&pageSize=100"
     );
     expect(parseMachineViewState(serialized, "machines")).toEqual(state);
   });
@@ -168,8 +165,9 @@ describe("stored Saved View configuration (list-views §10.14)", () => {
         parseMachineViewState(new URLSearchParams(), "machines")
       ),
       status: ["unplayable", "retired_status"],
-      columns: ["machine", "retiredField", "year"],
       sort: "retiredField",
+      // Views saved while the table showed chosen fields still carry them.
+      columns: ["machine", "retiredField", "year"],
       // Views saved before the All/Filtered choice was retired still carry
       // these keys (machine-widgets §2.2); they load harmlessly and are never
       // written back, because saving stores the normalized configuration.
@@ -179,11 +177,11 @@ describe("stored Saved View configuration (list-views §10.14)", () => {
     const {
       presenceWidget: _presence,
       playabilityWidget: _playability,
+      columns: _columns,
       ...expected
     } = {
       ...stored,
       status: ["unplayable"],
-      columns: ["machine", "year"],
       sort: "machine",
     };
     expect(normalizeMachineViewSavedState(stored)).toEqual(expected);
@@ -204,25 +202,6 @@ describe("stored Saved View configuration (list-views §10.14)", () => {
   });
 });
 
-describe("machine view sort cycling", () => {
-  it("cycles preferred, opposite, then preset default", () => {
-    const selected = nextMachineViewSort(
-      { sort: "machine", dir: "asc" },
-      "openIssues",
-      "machines"
-    );
-    expect(selected).toEqual({ sort: "openIssues", dir: "desc" });
-
-    const opposite = nextMachineViewSort(selected, "openIssues", "machines");
-    expect(opposite).toEqual({ sort: "openIssues", dir: "asc" });
-
-    expect(nextMachineViewSort(opposite, "openIssues", "machines")).toEqual({
-      sort: "machine",
-      dir: "asc",
-    });
-  });
-});
-
 describe("applying a Built-in View (list-views §1; machine-views §9.1)", () => {
   const preset = getMachineViewPreset("machines").defaultState;
   const current = toMachineViewSavedState({
@@ -230,7 +209,6 @@ describe("applying a Built-in View (list-views §1; machine-views §9.1)", () =>
     q: "mars",
     status: ["unplayable"],
     pageSize: 50,
-    columns: [...preset.columns, "owner"],
   });
   const view = (id: string): MachineViewBuiltInViewDefinition => {
     const found = getMachineViewBuiltInViews("machines").find(
@@ -240,25 +218,11 @@ describe("applying a Built-in View (list-views §1; machine-views §9.1)", () =>
     return found;
   };
 
-  it("takes the view's search, filters, and sorting and keeps the fields and page size showing", () => {
-    expect(
-      applyMachineBuiltInView("machines", view("service-due"), current)
-    ).toEqual({
+  it("takes the view's search, filters, and sorting and keeps the page size showing", () => {
+    expect(applyMachineBuiltInView(view("service-due"), current)).toEqual({
       ...view("service-due").state,
       q: "",
       pageSize: 50,
-      columns: [...preset.columns, "owner"],
     });
-  });
-
-  it("adds the fields the view names, once", () => {
-    const recentlyAdded = view("recently-added");
-    expect(
-      applyMachineBuiltInView("machines", recentlyAdded, current).columns
-    ).toEqual([...preset.columns, "owner", "dateAdded"]);
-    expect(
-      applyMachineBuiltInView("machines", recentlyAdded, recentlyAdded.state)
-        .columns
-    ).toEqual([...preset.columns, "dateAdded"]);
   });
 });

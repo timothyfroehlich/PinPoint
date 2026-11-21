@@ -124,7 +124,7 @@ describe("MachineScanHub", () => {
     );
     const band = screen.getByTestId("hub-artwork-band");
     expect(
-      within(band).getByRole("link", { name: /attack from mars details/i })
+      within(band).getByRole("link", { name: /attack from mars/i })
     ).toHaveAttribute("href", "/m/AFM");
     expect(within(band).getByRole("link", { name: "OPDB" })).toHaveAttribute(
       "href",

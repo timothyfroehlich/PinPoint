@@ -1,15 +1,16 @@
 import { test, expect, type Locator, type Page } from "../support/fixtures.js";
-import { setListFilterOptions } from "../support/actions.js";
+import { openListSearch, setListFilterOptions } from "../support/actions.js";
 import { cleanupTestEntities } from "../support/cleanup.js";
-import {
-  TEST_USERS,
-  seededIssue,
-  seededMachines,
-} from "../support/constants.js";
+import { seededIssue, seededMachines } from "../support/constants.js";
 import { fillReportForm } from "../support/page-helpers.js";
 import { getTestIssueTitle } from "../support/test-isolation.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
 
+/**
+ * The visible search field, without opening it. On a narrow phone a field
+ * holding a search shows open by itself (list-views §7.3), so this finds it
+ * there too; use openListSearch to type into it.
+ */
 function searchField(page: Page): Locator {
   return page.getByRole("searchbox", { name: "Search issues" });
 }
@@ -20,7 +21,7 @@ function resultCount(page: Page): Locator {
 }
 
 test.describe("Issue List Features - Extended", () => {
-  // Use Admin to ensure permissions for all inline edits
+  // Admin holds every permission, so read-only rows prove no role can edit
   test.use({ storageState: STORAGE_STATE.admin });
 
   // Track issue title prefix for cleanup across tests that create issues
@@ -39,84 +40,68 @@ test.describe("Issue List Features - Extended", () => {
     }
   });
 
-  test("should inline-edit issues", async ({ page }) => {
-    // Priority and assignee are menus on every row at every width: a pill on
-    // line 1 and an avatar beside line 2 (phones) or in the right column.
+  test("rows are read-only links to the issue and its machine", async ({
+    page,
+  }) => {
+    // Rows never change an issue (issues-list §3.11), even for an admin. The
+    // whole row links to the issue, and the machine name to the machine
+    // (§3.12).
 
     // Create a unique test issue to avoid parallel worker conflicts
-    const issueTitle = getTestIssueTitle("Inline Edit Test");
+    const issueTitle = getTestIssueTitle("Read-only Row Test");
     createdIssueTitlePrefix = issueTitle;
-    const machineInitials = seededMachines.addamsFamily.initials;
+    const machine = seededMachines.addamsFamily;
 
-    await page.goto(`/report/detailed?machine=${machineInitials}`);
+    await page.goto(`/report/detailed?machine=${machine.initials}`);
     await fillReportForm(page, { title: issueTitle, priority: "low" });
     await page.getByRole("button", { name: "Submit Issue Report" }).click();
     await expect(page).toHaveURL(/\/m\/[A-Z0-9]{2,6}\/i\/[0-9]+/);
+    const issuePath = new URL(page.url()).pathname;
 
     // Navigate to issues list and search for our unique issue
     await page.goto("/issues");
-    await searchField(page).fill(issueTitle);
-    await searchField(page).press("Enter");
+    const search = await openListSearch(page, "Search issues");
+    await search.fill(issueTitle);
+    await search.press("Enter");
     await expect
       .poll(() => new URL(page.url()).searchParams.get("q"), { timeout: 15000 })
       .toBe(issueTitle);
     await expect(resultCount(page)).toHaveText("Showing 1 to 1 of 1 issue");
 
-    const issueRow = (): Locator =>
-      page
-        .getByRole("list", { name: "Issues" })
-        .getByRole("listitem")
-        .filter({ has: page.getByRole("link", { name: issueTitle }) });
-    const row = issueRow();
+    const row = page
+      .getByRole("list", { name: "Issues" })
+      .getByRole("listitem")
+      .filter({ has: page.getByRole("link", { name: issueTitle }) });
     await expect(row).toBeVisible();
 
-    // 1. Test Priority Inline Edit (Low -> High)
-    await row.getByRole("button", { name: "Priority: Low, change" }).click();
-    await page.getByRole("menuitemradio", { name: "High" }).click();
+    // No edit controls: the values are read-only text, and the only
+    // interactive elements are the issue link and the machine link.
+    await expect(row.getByRole("button")).toHaveCount(0);
+    await expect(row.getByRole("combobox")).toHaveCount(0);
+    await expect(row.getByRole("link")).toHaveCount(2);
+    await expect(row.getByTestId("issue-priority")).toHaveText("Priority: Low");
+    await expect(row.getByRole("img", { name: "Unassigned" })).toBeAttached();
 
-    // Verify optimistic update
-    await expect(
-      row.getByRole("button", { name: "Priority: High, change" })
-    ).toBeVisible();
+    // The machine name opens the machine, not the issue.
+    await row.getByRole("link", { name: machine.name }).click();
+    await expect(page).toHaveURL(new RegExp(`/m/${machine.initials}$`));
+    await page.goBack();
+    await expect(row).toBeVisible();
 
-    // Verify persistence after reload; the search stays in the URL.
-    await page.reload();
-    await expect(searchField(page)).toHaveValue(issueTitle);
-
-    const rowAfterReload = issueRow();
-    await expect(
-      rowAfterReload.getByRole("button", { name: "Priority: High, change" })
-    ).toBeVisible();
-
-    // 2. Test Assignee Inline Edit (Unassigned -> Admin)
-    await rowAfterReload
-      .getByRole("button", { name: "Unassigned, change assignee" })
-      .click();
-    await page
-      .getByRole("menuitemradio", { name: TEST_USERS.admin.name })
-      .click();
-
-    // Verify assignee update
-    await expect(page.getByText("Assignee updated")).toBeVisible();
-    await expect(
-      rowAfterReload.getByRole("button", {
-        name: `Assigned to ${TEST_USERS.admin.name}, change assignee`,
-      })
-    ).toBeVisible();
+    // A click anywhere on the row, away from the title, opens the issue: the
+    // row's top-left corner is padding the title link's overlay covers.
+    await row.click({ position: { x: 4, y: 4 } });
+    await expect(page).toHaveURL(new RegExp(`${issuePath}$`));
   });
 
   test("a Severity Segment filters the list to its issues", async ({
     page,
-  }) => {
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name.includes("Mobile"),
+      "Phones show only the Status widget (widgets §2.7); the phone Status Segment test covers Segment selection there"
+    );
     await page.goto("/issues");
-    // Below 390px the stacked widgets start collapsed (widgets §2.4), so the
-    // Mobile Safari project (375px) opens the section first.
-    if ((page.viewportSize()?.width ?? 0) < 390) {
-      const summary = page.getByRole("button", { name: /^Summary: / });
-      // aria-expanded is set only once hydrated, so the click is not lost.
-      await expect(summary).toHaveAttribute("aria-expanded", "false");
-      await summary.click();
-    }
     const severity = page.getByRole("region", { name: "Severity" });
     await expect(severity).toBeVisible();
 
@@ -128,10 +113,9 @@ test.describe("Issue List Features - Extended", () => {
       .getByRole("button", { name: new RegExp(`^\\d+ ${levelPattern}$`) })
       .first();
     await expect(first).toBeVisible();
-    const label = ((await first.getAttribute("aria-label")) ?? "").replace(
-      /^\d+ /,
-      ""
-    );
+    const label = ((await first.textContent()) ?? "")
+      .trim()
+      .replace(/^\d+ /, "");
     const segment = severity.getByRole("button", {
       name: new RegExp(`^\\d+ ${label}$`),
     });
@@ -149,7 +133,7 @@ test.describe("Issue List Features - Extended", () => {
       .poll(
         async () => {
           const count = Number.parseInt(
-            (await segment.getAttribute("aria-label")) ?? "",
+            ((await segment.textContent()) ?? "").trim(),
             10
           );
           const showing = await resultCount(page).textContent();
@@ -159,6 +143,83 @@ test.describe("Issue List Features - Extended", () => {
         { message: "the selected Segment's count equals the filtered total" }
       )
       .toBe(true);
+  });
+
+  // Summary Widgets sit side by side at every width, each at least 240px
+  // wide, and whole widgets drop from the right when the row cannot hold
+  // them (widgets §2.3, §2.7). There is no Summary Row and no toggle.
+  test.describe("Summary Widgets", () => {
+    test.describe("at a desktop width", () => {
+      test.use({ viewport: { width: 1024, height: 768 } });
+
+      test("Status, Severity, and Priority sit side by side", async ({
+        page,
+      }) => {
+        await page.goto("/issues");
+        const widgets = ["Status", "Severity", "Priority"].map((name) =>
+          page.getByRole("region", { name })
+        );
+        const tops: number[] = [];
+        for (const widget of widgets) {
+          await expect(widget).toBeVisible();
+          const box = await widget.boundingBox();
+          expect(box).not.toBeNull();
+          if (box) tops.push(box.y);
+        }
+        expect(new Set(tops).size).toBe(1);
+        await expect(
+          page.getByRole("button", { name: /^Summary: / })
+        ).toHaveCount(0);
+      });
+    });
+
+    test.describe("on a wide phone with room for two widgets", () => {
+      test.use({ viewport: { width: 600, height: 900 } });
+
+      test("Priority drops from the right", async ({ page }) => {
+        await page.goto("/issues");
+        await expect(
+          page.getByRole("region", { name: "Status" })
+        ).toBeVisible();
+        await expect(
+          page.getByRole("region", { name: "Severity" })
+        ).toBeVisible();
+        await expect(
+          page.getByRole("region", { name: "Priority" })
+        ).toBeHidden();
+      });
+    });
+
+    test.describe("on a phone with room for one widget", () => {
+      test.use({ viewport: { width: 375, height: 812 } });
+
+      test("only Status shows, and a Status Segment filters the list", async ({
+        page,
+      }) => {
+        await page.goto("/issues");
+        const status = page.getByRole("region", { name: "Status" });
+        await expect(status).toBeVisible();
+        await expect(
+          page.getByRole("region", { name: "Severity" })
+        ).toBeHidden();
+        await expect(
+          page.getByRole("region", { name: "Priority" })
+        ).toBeHidden();
+        await expect(
+          page.getByRole("button", { name: /^Summary: / })
+        ).toHaveCount(0);
+
+        // A Status Segment is a status group; selecting it sets the Status
+        // filter to every status in the group (issue-widgets §3.3).
+        const segment = status
+          .getByRole("button", { name: /^\d+ (New|In Progress)$/ })
+          .first();
+        await expect(segment).toBeVisible();
+        await segment.click();
+        await expect(page).toHaveURL(/[?&]status=/);
+        await expect(segment).toHaveAttribute("aria-pressed", "true");
+      });
+    });
   });
 
   test("should persist filters when navigating to issue detail and back", async ({
@@ -192,7 +253,7 @@ test.describe("Issue List Features - Extended", () => {
       issues.getByRole("link", { name: seededIssue("TAF").title })
     ).toBeVisible();
     await expect(
-      issues.getByRole("button", { name: /^Severity: (?!Major,)/ })
+      issues.getByTestId("issue-severity").filter({ hasNotText: "Major" })
     ).toHaveCount(0);
   });
 
@@ -201,8 +262,9 @@ test.describe("Issue List Features - Extended", () => {
   }) => {
     // 1. Go to issues and apply a search filter
     await page.goto("/issues");
-    await searchField(page).fill("Thing");
-    await searchField(page).press("Enter");
+    const search = await openListSearch(page, "Search issues");
+    await search.fill("Thing");
+    await search.press("Enter");
     await page.waitForURL(/[?&]q=Thing(?:&|$)/);
 
     // 2. Navigate to a different page in the same tab (dashboard)

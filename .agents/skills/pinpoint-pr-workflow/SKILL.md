@@ -149,7 +149,7 @@ A local `/code-review` by the owning agent is optional, useful before marking a 
 
 ### 3.5 Get Tim's UI approval (UI-touching PRs, while still a draft)
 
-When the diff touches a path in `scripts/workflow/ui-paths.txt` (`src/app/**/*.tsx`, `src/components/**`, any `.css`, Tailwind config, design tokens), the required `UI Approval` check waits for Tim's sign-off on the head. Tim reviews rendered UI by eye, not by reading a diff. Get it while the PR is a draft, before updating E2E tests and before marking the PR ready for Claude Review, so no E2E work rides on a layout he has not seen. The commit-time `ui-screenshot-reminder.cjs` hook nudges on the first UI commit.
+When the PR's own diff (from its merge base with `main`) touches a path in `scripts/workflow/ui-paths.txt` (`src/app/**/*.tsx`, `src/components/**`, any `.css`, Tailwind config, design tokens), the required `UI Approval` check waits for Tim's sign-off until he has signed off on at least one head of the PR. Tim reviews rendered UI by eye, not by reading a diff. Get it while the PR is a draft, before updating E2E tests and before marking the PR ready for Claude Review, so no E2E work rides on a layout he has not seen. The commit-time `ui-screenshot-reminder.cjs` hook nudges on the first UI commit.
 
 1. **Capture.** With the dev server (`pnpm run dev`) and Supabase (`pnpm supabase:start`) running:
    ```
@@ -161,15 +161,21 @@ When the diff touches a path in `scripts/workflow/ui-paths.txt` (`src/app/**/*.t
    ```
    bash scripts/workflow/approve-ui.sh <PR> --head <sha> --source chat|artifact
    ```
-   `--head` is the commit the screenshots came from; the script refuses if the PR head has moved past it, so capture from a committed, pushed tree. It approves the `ui-approval` environment deployment that head's UI Approval run is waiting on, and only that one. Run it only on Tim's own approval; never call the `pending_deployments` API directly. Tim can also approve on GitHub from the run's "Review deployments".
+   `--head` is the commit the screenshots came from, so capture from a committed, pushed tree. If the PR head has since moved past it, the script records the approval on the current head only when the PR's own UI diff there is the same patch as at the commit Tim saw (a merge of `main` that left the PR's UI changes alone, clean or conflicted), and says which head he saw; otherwise it refuses and names the UI files that changed. On a head that waits for sign-off it approves the `ui-approval` environment deployment that head's UI Approval run is waiting on, and only that one; on a head whose check already passed on an earlier sign-off it records the approval as a PR comment. Run it only on Tim's own approval; never call the `pending_deployments` API directly. Tim can also approve on GitHub from the run's "Review deployments".
 
-The approval carries across later commits that touch no UI path, so E2E updates after sign-off pass on their own. A later UI change makes the new head wait again; show Tim what changed and repeat step 3. A UI-path edit with no rendered effect (a refactor, a type-only change) still waits: tell Tim it renders nothing new and let him approve it from the description.
+After Tim's first sign-off the check does not wait again on this PR: not for E2E updates, merges of `main` (clean or conflicted), merge-queue commits, or later UI commits. Whether Tim sees a later UI change is the owning agent's call, made on every UI commit after his sign-off:
+
+- **Show him again** when the change is one he would want to see: a new or reworked layout, a component or control added, removed, or moved, a changed user flow, or a visible change to copy, color, spacing, or hierarchy beyond a small fix. Repeat steps 1–3 for the new head; the script records his fresh approval as a PR comment.
+- **Don't re-ask** for merges of `main` and their conflict resolutions, fixes that keep the look he approved (a review finding, a typo, an a11y attribute), refactors or type-only edits with no rendered effect, and test-only changes.
+- When unsure, show him: an extra look costs him less than a layout he never saw reaching `main`. Say in the PR's state report which UI commits after his sign-off you judged minor.
+
+A UI-path edit with no rendered effect on a PR he has not yet signed off still waits: tell Tim it renders nothing new and let him approve it from the description.
 
 ---
 
 ## Phase 4: Merge — Tim's decision
 
-**Tim decides whether to merge.** GitHub's ruleset `6326455` enforces the gates natively: required checks `CI Gate`, `Claude Review`, and `UI Approval`, every conversation resolved, and the branch up to date with `main`. Green checks alone never authorize a merge; Tim's explicit request does.
+**Tim decides whether to merge.** GitHub's ruleset `6326455` enforces the gates natively: required checks `CI Gate`, `Claude Review`, and `UI Approval`, every conversation resolved, and merging through the merge queue. Green checks alone never authorize a merge; Tim's explicit request does.
 
 ### 4.1 Report ready by default; merge on explicit request
 
@@ -182,9 +188,23 @@ gh pr merge <PR> --squash          # gates already pass
 gh pr merge <PR> --auto --squash   # GitHub merges once the required checks pass
 ```
 
-Use `--auto` when checks are still running or the branch is behind, and always when Tim asks for several merges at once. Say “merged” only after `gh pr view <PR> --json state` reads `MERGED`; an auto-merge that is armed but not yet merged is “queued to merge”.
+Both put the PR in the merge queue: the first once the gates pass, `--auto` as soon as they do. Use `--auto` when checks are still running, and always when Tim asks for several merges at once. Say “merged” only on the queue watch's `merged` verdict; a PR armed or waiting in the queue is “queued to merge”.
 
-**Behind main.** The ruleset requires the branch up to date. Bring it current with `gh pr update-branch <PR>`, which merges `main` into the branch (never `--rebase`; AGENTS.md §5 Branches). The new head gets fresh CI; Claude Review and UI Approval pass a clean merge of `main` without a new review or sign-off. Once auto-merge is armed, the `Auto-update branches` workflow does this after every push to `main`, so a queue of armed PRs lands one after another without you. A PR whose update conflicts stays behind with a warning in that workflow's run; merge `main` in locally and resolve it. The workflow skips bot PRs (§4.3).
+**The merge queue.** The queue builds a commit of `main` plus every PR ahead plus this one and runs CI Gate on it; Claude Review and UI Approval pass there without a new review or sign-off, since each PR passed them on its own head. A branch behind `main` merges as it is. The queue removes a PR whose combined commit conflicts or fails CI Gate; its owning session merges `main` in (`gh pr update-branch <PR>` or locally, never `--rebase`; AGENTS.md §5 Branches), fixes the failure, and runs `gh pr merge` again.
+
+**Watch the queue.** Right after `gh pr merge`, run the watcher in the background (as in 3.1), pinned to the head you enqueued:
+
+```bash
+python3 scripts/workflow/pr-watch.py <PR> --phase queue --expected-head <HEAD_SHA>
+```
+
+It also waits while auto-merge is armed and GitHub has not yet enqueued the PR. A PR whose own checks go red is never enqueued and the watch runs to its 1h ceiling, so after `--auto` on a head still in CI, run the 3.1 watch first.
+
+- `outcome: "merged"` (exit 0): the PR merged as `merge_commit`. Go to Phase 5.
+- `outcome: "removed"` (exit 1): the queue dropped the PR and it is still open. `detail_url`, `failing_jobs`, and `failure_artifact` describe the failed `merge_group` run; all three are empty when no run failed, as for a conflict or a manual dequeue. Fix it as the merge-queue paragraph above says.
+- `outcome: "not_queued"` (exit 1): when the watch began the PR was neither in the queue nor armed for auto-merge, so nothing will merge it. If `gh pr merge` printed an error, fix what it names; otherwise the queue dropped the PR before the watch began, so read why on the PR page and handle it as `removed`.
+- `outcome: "stale"` or `"conflicting"` (exit 1): as in 3.1. A push to a queued PR drops it from the queue.
+- `outcome: "timed_out"` or `"undetermined"` (exit 2): re-run the watch.
 
 **A refused merge means a gate is unmet.** Read `gh pr checks <PR> --required` and the unresolved conversations, fix what is missing, and merge again. `gh pr merge` is the one merge path: `--admin` is denied to agents (they act through Tim's account, and the ruleset's admin bypass is his), as are the raw API and MCP merge channels.
 
@@ -200,7 +220,7 @@ When two or more Dependabot PRs that both touch `pnpm-lock.yaml` (or any lockfil
 
 **Why `rebase-strategy: auto` in `.github/dependabot.yml` doesn't save you:** "auto" means Dependabot rebases when _the dependency version_ is out of date, not when _the lockfile region_ has shifted under it. Two independent Dependabot PRs against the same main can both stay "current" by Dependabot's definition while their lockfile diffs collide.
 
-**What the up-to-date rule changes:** the ruleset requires the branch current with `main`, so the second PR must be updated before it can merge, and the duplicate key then fails `Setup Dependencies` in that PR's CI instead of breaking `main`. A red `Setup Dependencies` with `ERR_PNPM_BROKEN_LOCKFILE` on an updated Dependabot PR is this trap, not a flake.
+**What the up-to-date rule changes:** the ruleset requires the branch current with `main`, so the second PR must be updated before it can merge, and the duplicate key then fails the `pnpm install --frozen-lockfile` step of that PR's CI (first in `Static checks, unit tests, build`) instead of breaking `main`. A red install step with `ERR_PNPM_BROKEN_LOCKFILE` on an updated Dependabot PR is this trap, not a flake.
 
 **Rule:** after the first of two lockfile-touching Dependabot PRs merges, comment `@dependabot rebase` on each remaining one (Dependabot's own command: it regenerates the lockfile against current `main`, which dedupes the entry). `gh pr update-branch <PR>` also brings it current, but a textual merge keeps the duplicate, so prefer the Dependabot rebase for lockfile PRs. Wait for the regenerated PR's CI before reporting it ready.
 

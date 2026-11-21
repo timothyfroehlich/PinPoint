@@ -104,9 +104,9 @@
 - **8.15** The weighted diff size counts added plus deleted lines. It leaves out the lockfile, migration snapshots, test fixtures, binary files, and feature specs, and counts test code at half weight.
 - **8.16** The owning agent fixes or declines every finding, declines with a one-sentence signed reply, and resolves the conversation.
 - **8.17** A pull request comment of `/claude-review` from someone with write access re-runs Claude Review on the current head.
-- **8.18** UI Approval passes on its own when no UI path changed since the newest earlier head whose UI Approval passed, with the base branch's changes left out. Otherwise it waits for the owner's UI sign-off. A sign-off covers later commits that change no UI path; a later UI change waits again.
+- **8.18** UI Approval waits for the owner's UI sign-off while the pull request's own diff, from its merge base with the base branch, touches a UI path and no head of the pull request has his sign-off. Once one head has it, UI Approval passes on its own on every later head. After a later UI change the owning agent judges significant, it shows the owner again and records his fresh approval.
 - **8.19** Before asking for a UI sign-off, the owning agent shows the owner screenshots of the changed UI at the three review viewports, taken from the committed, pushed head, and offers the running app for hands-on review.
-- **8.20** The owning agent records a UI sign-off only on the owner's own approval and only for the commit he saw.
+- **8.20** The owning agent records a UI sign-off only on the owner's own approval, on the commit he saw or on a later head whose own UI changes are the same as at that commit.
 - **8.21** The owner decides whether a pull request merges. On his explicit request, the owning agent merges it with a squash merge, or enables auto-merge so GitHub merges once the required checks pass; a branch behind the base branch is brought up to date by merging the base branch into it. Agents never bypass the ruleset.
 - **8.22** While auto-merge is enabled on a non-draft pull request from this repository, an automated workflow merges the base branch into it each time the base branch moves and the pull request is behind. A pull request whose update conflicts is left for its owning agent. Pull requests opened by bots are excluded.
 
@@ -136,6 +136,7 @@
 | :-- | :-- | :-- | :-- |
 | 2.1, 2.3 | Worktree and title launch parameters; corrupt-worktree rejection at launch | `pr-watch.py` takes the PR number, phase, and expected head. The worktree is the process's working directory; there is no title parameter and no worktree validation. Both lived only in the MCP wrapper, removed 2026-09-24 in the watcher simplification Tim approved (one CLI, no wrapper layers). | Amend 2.1 and 2.3 to the three-parameter CLI (requirement diff needs Tim's approval) |
 | 6.1–6.3 | Host coordination: concurrent watches coalesce under one polling leader | Removed 2026-09-24 in the watcher simplification: each watch polls GitHub on its own. The XDG lock, state-file, and leader/follower machinery cost more code than the duplicate polling it saved. | Delete §6 (requirement diff needs Tim's approval) |
+| 1, 2.1, 3.2–3.3, 7.2 | The CI phase is the only phase; the verdict fields, closed outcome set, and exit codes are the CI watch's | `pr-watch.py` also has a queue phase, added 2026-11-15 when merges moved to GitHub's merge queue: after `gh pr merge` it waits on the PR's merge-queue entry and ends `merged` (exit 0), `removed` or `not_queued` (exit 1), or `stale`, `conflicting`, `timed_out`, `undetermined`. Its verdict carries the queue state, the merge commit, and the failing `merge_group` run's URL, job names, and failure artifact in place of the CI fields. | Add a Queue phase to §1, §2.1, §3.2–3.3, and §7.2 (requirement diff needs Tim's approval) |
 | 7.4 | Local execution telemetry (harness, model, wake count, elapsed duration) | Removed 2026-09-24 with the MCP wrapper and watcher agents, the only sources of harness, model, and wake data; nothing read the `tmp/gh-monitor/watcher-run-*.json` records. | Delete 7.4 (requirement diff needs Tim's approval) |
 
 ---
@@ -144,6 +145,7 @@
 
 | Date | Amendment |
 | :-- | :-- |
+| 2026-11-16 | Amend §8.18 and §8.20: the owner signs off on a pull request's UI changes at least once; after that UI Approval passes on every later head, the owning agent shows him later UI changes it judges significant and records his fresh approval, and a sign-off may be recorded on a later head whose own UI changes match the commit he saw. |
 | 2026-10-30 | Add §8.22: pull requests with auto-merge enabled are kept up to date with the base branch automatically. |
 | 2026-10-25 | Replace the local review record with GitHub-native gates (§1, §2.1, §3.2–3.3, §7.2, §8): required checks CI Gate, Claude Review, and UI Approval plus resolved conversations and an up-to-date branch; Claude Review reviews the whole pull request first and then each push's new commits; UI Approval waits for the owner's sign-off on UI changes; the owner decides merges and agents merge natively on his request; the review watch phase and the migration-renumber coverage rule retire; the CI watch also waits for Claude Review and reports it with the unresolved thread count. |
 | 2026-10-06 | §8.12 also keeps coverage across a base-branch merge whose only resolution renumbers the branch's migrations with unchanged SQL. |

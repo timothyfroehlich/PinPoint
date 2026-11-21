@@ -87,5 +87,19 @@
     "initials": "GDZ3",
     "year": 2021,
     "manufacturer": "Stern"
+  },
+  "addamsFamilySce": {
+    "id": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+    "name": "The Addams Family Special Collectors Edition",
+    "initials": "TAFSCE",
+    "year": 1994,
+    "manufacturer": "Bally"
+  },
+  "indianaJones": {
+    "id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+    "name": "Indiana Jones: The Pinball Adventure",
+    "initials": "IJ",
+    "year": 1993,
+    "manufacturer": "Williams"
   }
 }

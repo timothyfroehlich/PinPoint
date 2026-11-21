@@ -1,9 +1,7 @@
 "use client";
 
-import * as React from "react";
-import { Download, Loader2 } from "lucide-react";
-import { toast } from "sonner";
-import { listHeaderIconButtonClass } from "~/components/list-view/classes";
+import type * as React from "react";
+import { ListExportButton } from "~/components/list-view/ListExportButton";
 import { exportIssuesAction } from "~/app/(app)/issues/export-action";
 import type { IssueExportScope } from "~/app/(app)/issues/export-schema";
 
@@ -23,62 +21,15 @@ export function ExportButton({
   query,
   scope,
 }: ExportButtonProps): React.JSX.Element {
-  const [isExporting, setIsExporting] = React.useState(false);
-
-  async function handleExport(): Promise<void> {
-    setIsExporting(true);
-    try {
-      const result = await exportIssuesAction({
-        query,
-        ...(scope !== undefined && { scope }),
-      });
-
-      if (!result.ok) {
-        if (result.code === "EMPTY") {
-          toast.info("No issues to export.");
-        } else {
-          toast.error(result.message);
-        }
-        return;
-      }
-
-      // Trigger browser download via Blob
-      const blob = new Blob([result.value.csv], {
-        type: "text/csv;charset=utf-8;",
-      });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = result.value.fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    } catch {
-      toast.error("Export failed. Please try again.");
-    } finally {
-      setIsExporting(false);
-    }
-  }
-
   return (
-    <button
-      type="button"
-      className={listHeaderIconButtonClass}
-      onClick={handleExport}
-      disabled={isExporting}
-      aria-label="Export to CSV"
-      title="Export to CSV"
-      data-testid="export-csv-button"
-    >
-      {isExporting ? (
-        <Loader2
-          aria-hidden="true"
-          className="size-4 animate-spin motion-reduce:animate-none"
-        />
-      ) : (
-        <Download aria-hidden="true" className="size-4" />
-      )}
-    </button>
+    <ListExportButton
+      exportCsv={() =>
+        exportIssuesAction({
+          query,
+          ...(scope !== undefined && { scope }),
+        })
+      }
+      emptyMessage="No issues to export."
+    />
   );
 }

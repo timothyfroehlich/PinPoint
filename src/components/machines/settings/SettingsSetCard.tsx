@@ -564,7 +564,6 @@ export function SettingsSetCard({
               type="button"
               onClick={onToggleExpand}
               aria-expanded={isExpanded}
-              aria-label={`${set.name || "Unnamed"} settings set`}
               className={cn(
                 "-mx-1 flex max-w-full items-center gap-2.5 rounded px-1 text-left transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring max-md:shrink-0 motion-reduce:transition-none",
                 // Custom tag links follow the name, so the button stops there.

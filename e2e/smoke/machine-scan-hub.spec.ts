@@ -58,7 +58,7 @@ test.describe("artwork band (PP-o355.60)", () => {
     const band = page.getByTestId("hub-artwork-band");
     await expect(band).toBeVisible();
     await expect(
-      band.getByRole("link", { name: "Medieval Madness details" })
+      band.getByRole("link", { name: /medieval madness/i })
     ).toHaveAttribute("href", `/m/${initials}`);
     const report = page.getByRole("link", { name: "Report a problem" });
     await expect(report).toBeInViewport();

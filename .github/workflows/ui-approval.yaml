@@ -1,18 +1,26 @@
-# UI Approval: Tim's visual sign-off on every UI change (PP-zxlq.4).
+# UI Approval: Tim's visual sign-off, at least once, on every PR with UI changes (PP-zxlq.4).
 #
-# A required check (ruleset 6326455). It passes on its own when no UI path
-# (scripts/workflow/ui-paths.txt) changed since the newest earlier commit whose UI
-# Approval passed, with main's changes left out. Otherwise the `sign-off` job waits
-# on the `ui-approval` environment, whose only required reviewer is Tim. The
-# approval carries across later commits that leave UI paths alone, so E2E updates
-# made after sign-off do not ask again; a later UI change waits again.
+# A required check (ruleset 6326455). Every PR with UI changes gets Tim's sign-off
+# at least once. The `sign-off` job waits on the `ui-approval` environment, whose
+# only required reviewer is Tim, when the PR's own diff (from its merge base with
+# main) touches a UI path in scripts/workflow/ui-paths.txt and no earlier head of
+# the PR has a successful `Tim's UI sign-off` job. After the first sign-off the
+# check passes on its own: across E2E updates, merges of main (clean or
+# conflicted), and later UI commits. The owning agent decides when a later UI
+# change is significant enough to show Tim again and records his fresh approval
+# with approve-ui.sh (pinpoint-pr-workflow 3.5). ui-approval-scope.sh finds the
+# sign-off by this job's name, so renaming the job resets every PR's approval.
 #
 # Runs on drafts too: UI is approved while the PR is a draft, before E2E tests are
-# updated and before the PR is marked ready for Claude Review.
+# updated and before the PR is marked ready for Claude Review. Marking a draft
+# ready does not trigger it: the head is the same, so the run on that head already
+# holds the answer, and a new run would cancel one waiting for sign-off (PP-bg1u).
 #
 # How Tim approves: on GitHub (the run's "Review deployments"), or by telling the
 # owning session in Claude Code Desktop, or by clicking Approve in the orchestrator
-# artifact; in the last two the session runs scripts/workflow/approve-ui.sh.
+# artifact; in the last two the session runs scripts/workflow/approve-ui.sh, which
+# also records an approval on a head that moved past the commit Tim saw without
+# changing the PR's own UI diff.
 #
 # The required check is the `UI Approval` job, never `sign-off` itself: a skipped
 # job counts as passing, so the final job decides from both results.
@@ -23,22 +31,33 @@
 # that diff and Tim's merge decision cover it. Agents approve only through
 # approve-ui.sh, on Tim's own approval, and never through the raw API.
 
+#
+# Merge queue: the check is required on the queue's merge_group commit too. A PR
+# enters the queue only after its head passed this check, and the queue adds only
+# main and the PRs ahead of it, each approved on its own head. On merge_group (the
+# gh-readonly-queue/... commits) the scope and sign-off jobs skip and `UI Approval`
+# passes without asking again: the sign-off job never runs outside pull_request.
+
 name: UI Approval
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened]
+  merge_group:
+    types: [checks_requested]
 
 permissions: {}
 
 concurrency:
-  # A newer push supersedes a run still waiting for sign-off.
-  group: ui-approval-${{ github.event.pull_request.number }}
+  # A newer push supersedes a run still waiting for sign-off. Merge-queue runs
+  # have no PR number; each group's own ref keeps them apart.
+  group: ui-approval-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   scope:
     name: UI changes
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -50,7 +69,7 @@ jobs:
       detail: ${{ steps.scope.outputs.detail }}
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2  # ratchet:step-security/harden-runner@v2.22.2
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43  # ratchet:step-security/harden-runner@v2.22.3
         with:
           egress-policy: audit
 
@@ -67,7 +86,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Find UI changes since the last approval
+      - name: Find UI changes and earlier sign-offs
         id: scope
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -100,7 +119,7 @@ jobs:
   sign-off:
     name: Tim's UI sign-off
     needs: scope
-    if: needs.scope.outputs.ui_changed == 'true'
+    if: github.event_name == 'pull_request' && needs.scope.outputs.ui_changed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     environment: ui-approval
@@ -119,11 +138,16 @@ jobs:
     steps:
       - name: Decide
         env:
+          EVENT: ${{ github.event_name }}
           SCOPE: ${{ needs.scope.result }}
           UI_CHANGED: ${{ needs.scope.outputs.ui_changed }}
           SIGN_OFF: ${{ needs.sign-off.result }}
           DETAIL: ${{ needs.scope.outputs.detail }}
         run: |
+          if [ "$EVENT" = "merge_group" ]; then
+            echo "Merge queue: each PR in this group passed UI Approval on its own head."
+            exit 0
+          fi
           echo "$DETAIL"
           if [ "$SCOPE" != "success" ]; then
             echo "::error::Could not determine the UI changes on this head."

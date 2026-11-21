@@ -5,7 +5,6 @@ import Link from "next/link";
 import { ArrowUpDown, Check, ChevronDown, Columns3 } from "lucide-react";
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
@@ -106,7 +105,7 @@ function SortMenu({ sort }: { sort: ListSortModel }): React.JSX.Element {
   );
 }
 
-/** View options (list-views §5.6, §5.7): page size and displayed fields. */
+/** View options (list-views §5.6, §5.7): the page size. */
 function ViewOptionsMenu({
   display,
 }: {
@@ -134,26 +133,6 @@ function ViewOptionsMenu({
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>
-        {display.fields ? (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel>Fields</DropdownMenuLabel>
-            {display.fields.options.map((field) => (
-              <DropdownMenuCheckboxItem
-                key={field.value}
-                checked={
-                  display.fields?.selected.includes(field.value) ?? false
-                }
-                onCheckedChange={(checked) =>
-                  display.fields?.onToggle(field.value, checked === true)
-                }
-                onSelect={(event) => event.preventDefault()}
-              >
-                {field.label}
-              </DropdownMenuCheckboxItem>
-            ))}
-          </>
-        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

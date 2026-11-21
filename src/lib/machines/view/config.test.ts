@@ -9,7 +9,11 @@ import {
   VALID_MACHINE_PRESENCE_STATUSES,
   type MachinePresenceStatus,
 } from "~/lib/machines/presence";
-import { applyMachineViewState, type MachineViewCandidate } from "./model";
+import {
+  applyMachineViewState,
+  healthFromSeverityCounts,
+  type MachineViewCandidate,
+} from "./model";
 import {
   parseMachineViewState,
   serializeMachineViewState,
@@ -34,32 +38,28 @@ function candidate(
     createdAt: new Date(Date.UTC(2026, 0, index + 1)).toISOString(),
     canonicalModelName: `Machine ${index}`,
     legacyModelName: "",
+    health: healthFromSeverityCounts({
+      cosmetic: 0,
+      minor: 0,
+      major: 0,
+      unplayable: 0,
+      oldestOpenIssueAt: null,
+    }),
+    lastServicedAt: null,
   };
 }
 
 describe("planMachineViewDependencies", () => {
-  it("loads only dependencies required by displayed fields", () => {
-    const state = {
-      ...getMachineViewPreset("machines").defaultState,
-      columns: ["machine" as const, "presence" as const],
-    };
-
-    expect(planMachineViewDependencies(state)).toEqual({
+  it("loads service and activity dates for the whole scope only to sort by them", () => {
+    expect(planMachineViewDependencies({ sort: "machine" })).toEqual({
       service: false,
       activity: false,
     });
-  });
-
-  it("includes dependencies required by sorting", () => {
-    const state = {
-      ...getMachineViewPreset("machines").defaultState,
-      columns: ["machine" as const],
-      status: ["needs_service" as const],
-      sort: "lastActivity" as const,
-      dir: "desc" as const,
-    };
-
-    expect(planMachineViewDependencies(state)).toEqual({
+    expect(planMachineViewDependencies({ sort: "lastServiced" })).toEqual({
+      service: true,
+      activity: false,
+    });
+    expect(planMachineViewDependencies({ sort: "lastActivity" })).toEqual({
       service: false,
       activity: true,
     });
@@ -128,10 +128,6 @@ describe("Built-in Views", () => {
       "on_loan",
       "off_the_floor",
       "on_the_floor",
-    ]);
-    expect(view?.state.columns).toEqual([
-      ...getMachineViewPreset("machines").defaultState.columns,
-      "dateAdded",
     ]);
   });
 

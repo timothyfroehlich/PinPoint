@@ -12,7 +12,6 @@ import {
 import type { IssueExportScope } from "~/app/(app)/issues/export-schema";
 import { ExportButton } from "~/components/issues/ExportButton";
 import {
-  ListSearchField,
   ListTitleRow,
   ListView,
   type ListDisplayModel,
@@ -20,10 +19,6 @@ import {
   type ListSortModel,
 } from "~/components/list-view";
 import { useListViewHost } from "~/components/list-view/use-list-view-host";
-import {
-  SummaryRowToggle,
-  useSummaryWidgetsController,
-} from "~/components/summary-widgets";
 import { Button } from "~/components/ui/button";
 import { EmptyState } from "~/components/ui/empty-state";
 import {
@@ -48,13 +43,8 @@ import {
   type IssueViewState,
 } from "~/lib/types";
 import { buildIssueFilters, presetFilters } from "./issue-filters";
-import {
-  ISSUE_SUMMARY_STORAGE_KEY,
-  ISSUE_SUMMARY_WIDGET_COUNT,
-  IssueSummaryRow,
-  IssueSummaryWidgets,
-} from "./IssueSummaryWidgets";
-import { IssueViewRows, type IssueRowsViewer } from "./IssueViewRows";
+import { IssueSummaryWidgets } from "./IssueSummaryWidgets";
+import { IssueViewRows } from "./IssueViewRows";
 
 const NOUN = { one: "issue", other: "issues" } as const;
 
@@ -79,14 +69,11 @@ interface IssueViewProps {
   savedViews: IssueViewSavedViews;
   /**
    * The page title, when Issue View owns its page (`/issues`). A Collection
-   * or Tag tab's title row belongs to its own page, so the Summary Row
-   * toggle then sits on its own row (list-views §7.2).
+   * or Tag tab's title row belongs to its own page.
    */
   title?: string | undefined;
   /** The Collection or Tag tab this list is on, for Export (issues-list §5.4). */
   exportScope?: IssueExportScope | undefined;
-  /** Who is looking, for per-row edit permissions (issues-list §3.5). */
-  viewer: IssueRowsViewer;
 }
 
 /**
@@ -99,13 +86,8 @@ export function IssueView({
   savedViews,
   title,
   exportScope,
-  viewer,
 }: IssueViewProps): React.JSX.Element {
   const rootRef = React.useRef<HTMLDivElement>(null);
-  const summaryController = useSummaryWidgetsController(
-    ISSUE_SUMMARY_STORAGE_KEY,
-    ISSUE_SUMMARY_WIDGET_COUNT
-  );
   const defaults = ISSUE_VIEW_PRESET;
   const { state, applied, edited, pagePresetName, isPending, update, views } =
     useListViewHost({
@@ -188,7 +170,6 @@ export function IssueView({
       summary={result.summary}
       state={state}
       onStateChange={(next) => update(next, false)}
-      controller={title ? summaryController : undefined}
     />
   );
 
@@ -197,27 +178,14 @@ export function IssueView({
       <ListView
         label="Issues list"
         noun={NOUN}
-        titleRow={
-          title ? (
-            <ListTitleRow
-              title={title}
-              summaryToggle={
-                <SummaryRowToggle controller={summaryController}>
-                  <IssueSummaryRow summary={result.summary} />
-                </SummaryRowToggle>
-              }
-            />
-          ) : undefined
-        }
+        titleRow={title ? <ListTitleRow title={title} /> : undefined}
         summary={summary}
-        search={
-          <ListSearchField
-            id="issue-view-search"
-            value={state.q}
-            onSearch={(q) => update({ q })}
-            label="Search issues"
-          />
-        }
+        search={{
+          id: "issue-view-search",
+          label: "Search issues",
+          value: state.q,
+          onSearch: (q) => update({ q }),
+        }}
         primaryFilters={filters.primary}
         secondaryFilters={filters.secondary}
         views={views}
@@ -257,12 +225,7 @@ export function IssueView({
           )
         }
       >
-        <IssueViewRows
-          rows={result.rows}
-          listKey={serializeIssueViewState(result.state).toString()}
-          users={result.people}
-          viewer={viewer}
-        />
+        <IssueViewRows rows={result.rows} />
       </ListView>
     </div>
   );

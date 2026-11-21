@@ -80,7 +80,7 @@ export function SaveViewDialog({
           <DialogHeader>
             <DialogTitle>Save view</DialogTitle>
             <DialogDescription className="sr-only">
-              Name the current fields, search, filters, sorting, and page size.
+              Name the current search, filters, sorting, and page size.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-1.5">
@@ -180,11 +180,7 @@ function DefaultToggle({
         size="sm"
         disabled={isPending}
         aria-pressed={isDefault}
-        aria-label={
-          isDefault
-            ? `Stop opening ${view.name} by default`
-            : `Open ${view.name} by default`
-        }
+        aria-label={`${isDefault ? "Default" : "Make default"}: ${view.name}`}
         onClick={() => run(() => views.actions.setDefault(target))}
         className={cn(
           "h-9 shrink-0",

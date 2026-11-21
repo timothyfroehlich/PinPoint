@@ -35,7 +35,7 @@
 18. Rule of Three before abstracting; reuse helpers that already exist (CORE-ARCH-010)
 19. Baseline Widely available is the browser-support floor; look up patterns via the modern-web-guidance catalog (CORE-UI-005/006)
 20. Forms ship with the correct input `type`, `autocomplete` token, `:user-invalid` styling, and visible required indicators (CORE-FORM-001..006)
-21. Accessibility floor: skip link, semantic table markup, `motion-reduce:` paired with animations, no `<div role="button">`, `title` is not a tooltip (CORE-A11Y-001..006)
+21. Accessibility floor: skip link, semantic table markup, `motion-reduce:` paired with animations, no `<div role="button">`, `title` is not a tooltip, accessible names start with the visible text (CORE-A11Y-001..007)
 22. Image priority and preconnect discipline: `priority` is for the LCP candidate only; preconnect to known image origins (CORE-PERF-003)
 23. External side effects (HTTP, email, Discord, blob, Vault RPC) never run inside a DB transaction; deliver them post-commit (CORE-ARCH-011)
 24. A bug-fix regression test fails on the pre-fix code; tests reach production through real callers' seams (CORE-TEST-007/008)
@@ -592,7 +592,7 @@
 
 - **Severity:** Required
 - **Why:** WCAG 1.3.1 Level A. Without `scope="col"` on header cells, screen readers can't announce the column header for each data cell. Without `aria-sort`, sort state is invisible to AT. Without `<caption>` or `aria-label`, the table has no accessible name in the page outline.
-- **Do:** Every `<th>` carries `scope="col"`. Sortable columns expose `aria-sort="ascending" | "descending" | "none"` synced to the active sort. The `<table>` has either a visible `<caption>` or an `aria-label` describing its contents. The table at `src/components/machines/view/MachineViewTable.tsx` is the reference implementation — match its semantics for new tables.
+- **Do:** Every `<th>` carries `scope="col"`. Sortable columns expose `aria-sort="ascending" | "descending" | "none"` synced to the active sort. The `<table>` has either a visible `<caption>` or an `aria-label` describing its contents.
 - **Don't:** Render a `<th>` without `scope`. Don't ship a sortable table with no `aria-sort`. Don't rely on column header text alone — that's not what AT uses.
 
 **CORE-A11Y-004:** No `<div role="button">` — use real `<button>`
@@ -616,6 +616,14 @@
 - **Do:** When opening a modal that doesn't use native `<dialog>.showModal()` (Radix Dialog, Sheet, AlertDialog, Drawer), set `inert` on the page root or the sibling containing background content. Wire `anyModalOpen` state once in `ClientProviders.tsx` (the same place that hosts the existing `<TooltipProvider>`) and consume it via React context — don't track open state per modal. Radix's `onOpenChange` callback feeds this context. Native `<dialog>` handles this automatically via top-layer.
 - **Don't:** Rely on `aria-hidden="true"` + pointer-events tricks alone. Don't manually manage focus trapping when `inert` does it for you.
 - **Status:** Not yet implemented; tracked under PP-kqbk.8. (Re-verified 2026-08-10: zero `inert` usages in `src/` — `RowEditSheet.tsx` mentions it only in a comment, and its test asserts `aria-hidden`, which is the weaker behavior this rule exists to replace.)
+
+**CORE-A11Y-007:** An accessible name starts with the control's visible text
+
+- **Severity:** Required
+- **Why:** WCAG 2.5.3 Label in Name, Level A. Voice-control users activate a control by saying the text they see; a name that rewords it ("Severity: Major, change" on a pill showing "Major") does not answer to "click Major". axe-core 4.14 enforces it as `label-content-name-mismatch` (serious), and `assertNoA11yViolations` fails every E2E spec on a page that breaks it.
+- **Do:** Start the name with the visible text, word for word, and put context after it. Prefer, in order: drop the `aria-label` when the text is already a good name; build the label from the same variables that render the text, then append context; keep the text as the name and move context to `sr-only` text placed after it or to `aria-describedby`. Separate sibling text elements inside a flex container with `{" "}`, because axe joins siblings with no space ("9On the Floor").
+- **Don't:** Write an `aria-label` that reorders or rewords what is on screen, or that puts context before the visible text. Don't change visible text to satisfy the rule. Icon-only controls and combobox triggers are outside it and keep their labels.
+- **Reference:** `pinpoint-ui` `references/accessibility.md` § Accessible name starts with the visible text. Established by PP-qm17.
 
 ---
 
@@ -738,7 +746,7 @@ If all Yes → ship it. Perfect is the enemy of done.
 - CORE‑ARCH‑001, 004..016: Architecture (002, 003 retired)
 - CORE‑RESP‑001..004: Responsive framework
 - CORE‑UI‑001..006: UI & styling + Browser support / MWG catalog (005, 006)
-- CORE‑A11Y‑001..006: Accessibility floor
+- CORE‑A11Y‑001..007: Accessibility floor
 - CORE‑FORM‑001..006: Form correctness
 - CORE‑PBM‑001: PinballMap API conduct
 

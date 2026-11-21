@@ -100,7 +100,7 @@ describe("SummaryWidget", () => {
     expect(
       within(region)
         .getAllByRole("button")
-        .map((button) => button.getAttribute("aria-label"))
+        .map((button) => (button.textContent ?? "").trim())
     ).toEqual(["2 Worn", "4 Up"]);
     expect(
       screen.queryByRole("button", { name: "0 Down" })
@@ -128,7 +128,7 @@ describe("SummaryWidget", () => {
     expect(
       within(others)
         .getAllByRole("button")
-        .map((button) => button.getAttribute("aria-label"))
+        .map((button) => (button.textContent ?? "").trim())
     ).toEqual(["2 Worn", "4 Up"]);
 
     await user.click(within(others).getByRole("button", { name: "4 Up" }));
@@ -161,39 +161,36 @@ describe("SummaryWidget", () => {
     expect(
       within(others)
         .getAllByRole("button")
-        .map((button) => button.getAttribute("aria-label"))
+        .map((button) => (button.textContent ?? "").trim())
     ).toEqual(["4 Up"]);
   });
 
-  it.each([
-    { lineSwatches: "shown", hideRule: "", expected: true },
-    {
-      lineSwatches: "hidden",
-      hideRule: "[data-swatch]{display:none}",
-      expected: false,
-    },
-  ])(
-    "shows swatches in N other only when the line shows them (widgets §5.7; line swatches $lineSwatches)",
-    async ({ hideRule, expected }) => {
-      stubBreakdownWidths();
-      // The list renders in a portal, outside the group's container query,
-      // so it copies what the line's swatches show when it opens. jsdom
-      // applies no Tailwind CSS; this rule stands in for the stacked layout.
-      const style = document.createElement("style");
-      style.textContent = hideRule;
-      document.head.append(style);
-      const user = userEvent.setup();
-      renderWidget({ widgetSegments: withCounts([1, 2, 4]) });
+  it("shows no swatch and gives each count its Segment's category color, on the line and in N other (widgets §5.7)", async () => {
+    stubBreakdownWidths();
+    const user = userEvent.setup();
+    renderWidget({ widgetSegments: withCounts([1, 2, 4]) });
 
-      await user.click(screen.getByRole("button", { name: "6 other" }));
-      const swatch = within(screen.getByRole("list", { name: "Other Status" }))
-        .getByRole("button", { name: "4 Up" })
-        .querySelector("[data-swatch]");
-      style.remove();
-      if (expected) expect(swatch).toHaveClass("inline-block");
-      else expect(swatch).not.toHaveClass("inline-block");
-    }
-  );
+    // Each entry is exactly a count and a label.
+    const down = screen.getByRole("button", { name: "1 Down" });
+    expect(Array.from(down.children).map((child) => child.textContent)).toEqual(
+      ["1", "Down"]
+    );
+    expect(within(down).getByText("1")).toHaveClass("text-destructive-text");
+
+    // "N other" has no single category, so its count stays muted.
+    const other = screen.getByRole("button", { name: "6 other" });
+    expect(within(other).getByText("6")).toHaveClass("text-muted-foreground");
+
+    await user.click(other);
+    const up = within(
+      screen.getByRole("list", { name: "Other Status" })
+    ).getByRole("button", { name: "4 Up" });
+    expect(Array.from(up.children).map((child) => child.textContent)).toEqual([
+      "4",
+      "Up",
+    ]);
+    expect(within(up).getByText("4")).toHaveClass("text-success");
+  });
 
   it("server-renders whole pairs only, wrapping the ones that do not fit out of view until measured", () => {
     const container = document.createElement("div");
@@ -201,7 +198,7 @@ describe("SummaryWidget", () => {
     const pairs = within(container).getAllByRole("button");
 
     // No measurement yet: every pair, no "N other".
-    expect(pairs.map((button) => button.getAttribute("aria-label"))).toEqual([
+    expect(pairs.map((button) => (button.textContent ?? "").trim())).toEqual([
       "2 Worn",
       "4 Up",
     ]);
@@ -209,7 +206,7 @@ describe("SummaryWidget", () => {
     // than clipping it mid-pair. jsdom has no layout, so the classes are
     // the observable contract here.
     const line = pairs[0]?.parentElement;
-    expect(line).toHaveClass("flex-wrap", "max-h-8", "overflow-hidden");
+    expect(line).toHaveClass("flex-wrap", "max-h-4.5", "overflow-hidden");
   });
 
   it("stops wrapping once measured, so a shown entry is never hidden whole", () => {
