@@ -324,7 +324,7 @@ function git(args, opts = {}) {
 // exit with its status. heavy-run.sh writes only to stderr, so stdout stays
 // the PNG list.
 function runInHeavySlot() {
-  if (process.env["PINPOINT_HOST_SLOT_HELD"]) return;
+  if (process.env["PINPOINT_HOST_SLOT_HELD"] === "heavy") return;
   const result = spawnSync(
     "bash",
     [

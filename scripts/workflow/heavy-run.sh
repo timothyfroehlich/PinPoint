@@ -4,7 +4,8 @@
 #
 # Two slot classes, each one named semaphore shared by every checkout:
 #   heavy  pinpoint-heavy, 1 slot (PINPOINT_HEAVY_SLOTS): check, the full unit
-#          suite, coverage, integration, build, smoke, pr-screenshots.mjs.
+#          suite, coverage, integration, build, smoke, e2e:full, e2e:all,
+#          pr-screenshots.mjs.
 #          Largest measured peak: `check`, 5.0 GB.
 #   dev    pinpoint-dev, 2 slots (PINPOINT_DEV_SLOTS): `pnpm run dev`, held
 #          for the server's whole life. Measured: 2.5 GB after 19 routes.
@@ -21,8 +22,11 @@
 #   - the host is not macOS, unless PINPOINT_HOST_SLOTS=on (the Bazzite runner
 #     and CI have their own isolation);
 #   - GNU parallel's `sem` is missing (or is the moreutils variant);
-#   - PINPOINT_HOST_SLOT_HELD is set: an ancestor already holds a slot that
-#     covers this command (smoke's Playwright starts its own `pnpm run dev`).
+#   - an ancestor already holds a slot that covers this command
+#     (PINPOINT_HOST_SLOT_HELD): a held heavy slot covers everything under it
+#     (smoke's Playwright starts its own `pnpm run dev`); a held dev slot
+#     covers only nested dev calls, so a build run from a dev server's
+#     environment still waits for the heavy slot.
 #
 # Usage (invoke via `bash` so no chmod is needed):
 #   bash scripts/workflow/heavy-run.sh <heavy|dev> <command> [args…]
@@ -44,8 +48,9 @@ case "$class" in
 esac
 
 passthrough=false
+held="${PINPOINT_HOST_SLOT_HELD:-}"
 if [ -n "${CI:-}" ] || [ "${PINPOINT_HOST_SLOTS:-}" = "off" ] \
-   || [ -n "${PINPOINT_HOST_SLOT_HELD:-}" ]; then
+   || [ "$held" = heavy ] || [ "$held" = "$class" ]; then
   passthrough=true
 elif [ "$(uname)" != "Darwin" ] && [ "${PINPOINT_HOST_SLOTS:-}" != "on" ]; then
   passthrough=true
@@ -54,9 +59,9 @@ elif ! command -v sem >/dev/null 2>&1 \
   passthrough=true
 fi
 
-# Everything below this command, held slot or passthrough, is covered: nested
-# heavy-run calls (and pr-screenshots.mjs's re-exec check) pass through.
-export PINPOINT_HOST_SLOT_HELD="$class"
+# Tell nested heavy-run calls (and pr-screenshots.mjs's re-exec check) which
+# slot covers them; an outer heavy slot stays the one in force.
+[ "$held" = heavy ] || export PINPOINT_HOST_SLOT_HELD="$class"
 
 if [ "$passthrough" = true ]; then
   exec "$@"
@@ -84,14 +89,30 @@ trap 'rm -f "$started"' EXIT
 quoted_cmd="$(printf '%q ' "$@")"
 timeout_s="${PINPOINT_HOST_SLOT_TIMEOUT_S:-300}"
 
-set +e
-# --fg blocks synchronously and propagates the exit code; a negative
-# --semaphore-timeout gives up instead of taking the slot anyway.
+# --fg blocks until the command ends and propagates its exit code; a negative
+# --semaphore-timeout gives up instead of taking the slot anyway. sem runs in
+# the background (stdin kept) so a SIGTERM/SIGHUP aimed at this wrapper alone
+# is forwarded: sem stops the command and frees the slot.
+began=$SECONDS
 sem --id "pinpoint-$class" --jobs "$slots" --semaphore-timeout "-$timeout_s" \
-  --fg ": > $(printf '%q' "$started"); $quoted_cmd"
+  --fg ": > $(printf '%q' "$started"); $quoted_cmd" <&0 &
+sem_pid=$!
+trap 'kill -TERM "$sem_pid" 2>/dev/null' TERM HUP INT
+set +e
+wait "$sem_pid"
 status=$?
+# A trapped signal interrupts `wait`; keep waiting for sem to finish.
+while kill -0 "$sem_pid" 2>/dev/null; do
+  wait "$sem_pid"
+  status=$?
+done
 set -e
 
+if [ "$status" -ne 0 ] && [ ! -e "$started" ] \
+   && [ $((SECONDS - began)) -lt "$timeout_s" ]; then
+  echo "heavy-run: sem failed (exit $status) before starting the command; see its message above." >&2
+  exit "$status"
+fi
 if [ "$status" -ne 0 ] && [ ! -e "$started" ]; then
   {
     echo "heavy-run: every $class slot ($slots) stayed busy for ${timeout_s}s; nothing was run."

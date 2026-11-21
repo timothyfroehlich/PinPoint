@@ -78,7 +78,11 @@ def _fake_sem(tmp_path: Path, env: dict[str, str], body: str) -> Path:
 
 
 SEM_RUNS_COMMAND = 'exec bash -c "${@: -1}"\n'
-SEM_TIMES_OUT = 'echo "parallel: Warning: Semaphore timed out. Exiting." >&2; exit 1\n'
+# Times out after the 1 s timeout the timeout tests set.
+SEM_TIMES_OUT = (
+    'sleep 1; echo "parallel: Warning: Semaphore timed out. Exiting." >&2; exit 1\n'
+)
+SEM_BREAKS = 'echo "parallel: Error: cannot write semaphore" >&2; exit 255\n'
 
 
 def _run(
@@ -135,7 +139,7 @@ def test_dev_class_uses_its_own_semaphore(tmp_path, env, extra_env, jobs) -> Non
 def test_timeout_without_running_exits_75_with_offload_guidance(tmp_path, env) -> None:
     _fake_sem(tmp_path, env, SEM_TIMES_OUT)
 
-    result = _run(env, "heavy", "true")
+    result = _run({**env, "PINPOINT_HOST_SLOT_TIMEOUT_S": "1"}, "heavy", "true")
 
     assert result.returncode == EX_TEMPFAIL
     assert "nothing was run" in result.stderr
@@ -147,10 +151,38 @@ def test_timeout_without_running_exits_75_with_offload_guidance(tmp_path, env) -
 def test_dev_timeout_points_at_dev_stop(tmp_path, env) -> None:
     _fake_sem(tmp_path, env, SEM_TIMES_OUT)
 
-    result = _run(env, "dev", "true")
+    result = _run({**env, "PINPOINT_HOST_SLOT_TIMEOUT_S": "1"}, "dev", "true")
 
     assert result.returncode == EX_TEMPFAIL
     assert "pnpm run dev:stop" in result.stderr
+
+
+def test_a_sem_error_is_not_reported_as_a_busy_slot(tmp_path, env) -> None:
+    _fake_sem(tmp_path, env, SEM_BREAKS)
+
+    result = _run(env, "heavy", "true")
+
+    assert result.returncode == 255
+    assert "sem failed (exit 255) before starting the command" in result.stderr
+    assert "nothing was run" not in result.stderr
+
+
+def test_a_held_dev_slot_does_not_cover_heavy_commands(tmp_path, env) -> None:
+    # A shell started from a dev server's environment inherits HELD=dev; a
+    # build run there must still take the heavy slot.
+    log = _fake_sem(tmp_path, env, SEM_RUNS_COMMAND)
+
+    result = _run(
+        {**env, "PINPOINT_HOST_SLOT_HELD": "dev"},
+        "heavy",
+        sys.executable,
+        "-c",
+        PRINT_ARGV,
+    )
+
+    assert result.returncode == 7, result.stderr
+    assert log.read_text().splitlines()[:2] == ["--id", "pinpoint-heavy"]
+    assert result.stdout.startswith('["heavy"')
 
 
 def test_a_command_that_ran_and_failed_keeps_its_own_exit_code(tmp_path, env) -> None:
@@ -284,6 +316,20 @@ def test_real_sem_timeout_exits_75(hold, env) -> None:
 
     assert result.returncode == EX_TEMPFAIL, result.stderr
     assert "nothing was run" in result.stderr
+
+
+@requires_gnu_sem
+def test_sigterm_to_the_wrapper_alone_stops_the_command_and_frees_the_slot(
+    hold, env
+) -> None:
+    holder, started, _ = hold("holder")
+    _wait_for(started.exists)
+
+    holder.send_signal(signal.SIGTERM)  # the bash wrapper only, not its group
+    holder.wait(timeout=30)
+
+    result = _run({**env, "PINPOINT_HOST_SLOT_TIMEOUT_S": "20"}, "heavy", "true")
+    assert result.returncode == 0, result.stderr
 
 
 @requires_gnu_sem
