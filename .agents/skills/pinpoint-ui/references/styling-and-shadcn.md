@@ -16,7 +16,7 @@ Token-driven styling and the conventions around the shadcn primitives. The primi
 
 Two conventions that aren't visible from the API:
 
-- **Use `loading` rather than hand-rolling an in-flight state.** It disables the button and renders the project's canonical CORE-A11Y-002 spinner (`animate-spin motion-reduce:animate-none`). A bare `disabled` plus your own `<Loader2>` usually loses the `motion-reduce:` pairing.
+- **Use `loading` rather than hand-rolling an in-flight state.** It disables the button and renders the project's canonical spinner (`animate-spin`; the global reduced-motion rule dims it). A bare `disabled` plus your own `<Loader2>` duplicates what `loading` already does.
 - **Don't size icon children.** The base class already sizes any `svg` that doesn't carry its own `size-*`, so adding `size-4` is noise; add one only when overriding. Icon-only buttons still need an `aria-label` (CORE-A11Y-004/005).
 
 ### Dialogs, sheets and drawers

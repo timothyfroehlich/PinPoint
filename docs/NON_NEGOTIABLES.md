@@ -35,7 +35,7 @@
 18. Rule of Three before abstracting; reuse helpers that already exist (CORE-ARCH-010)
 19. Baseline Widely available is the browser-support floor; look up patterns via the modern-web-guidance catalog (CORE-UI-005/006)
 20. Forms ship with the correct input `type`, `autocomplete` token, `:user-invalid` styling, and visible required indicators (CORE-FORM-001..006)
-21. Accessibility floor: skip link, semantic table markup, `motion-reduce:` paired with animations, no `<div role="button">`, `title` is not a tooltip, accessible names start with the visible text (CORE-A11Y-001..007)
+21. Accessibility floor: skip link, semantic table markup, one global reduced-motion rule, no `<div role="button">`, `title` is not a tooltip, accessible names start with the visible text (CORE-A11Y-001..007)
 22. Image priority and preconnect discipline: `priority` is for the LCP candidate only; preconnect to known image origins (CORE-PERF-003)
 23. External side effects (HTTP, email, Discord, blob, Vault RPC) never run inside a DB transaction; deliver them post-commit (CORE-ARCH-011)
 24. A bug-fix regression test fails on the pre-fix code; tests reach production through real callers' seams (CORE-TEST-007/008)
@@ -580,12 +580,12 @@
 - **Don't:** Ship a layout that puts content behind the header in tab order with no skip affordance.
 - **Status:** Implemented (PP-kqbk.3). `src/app/layout.tsx` renders the anchor as the first child of `<body>`; the `<main id="main-content" tabIndex={-1}>` target lives in `src/components/layout/MainLayout.tsx` and `src/app/(auth)/layout.tsx`. Both halves are load-bearing — a new layout shell must port the pair, not just the anchor.
 
-**CORE-A11Y-002:** `motion-reduce:` pairs with every animation utility
+**CORE-A11Y-002:** Reduced motion is honored by one global rule
 
 - **Severity:** Required
-- **Why:** Users with vestibular disorders need to suppress motion. The `prefers-reduced-motion` media query is Baseline Widely available, and Tailwind exposes the `motion-reduce:` variant out of the box. Adding `motion-reduce:animate-none` costs one utility and removes the motion entirely for users who request it.
-- **Do:** Every `animate-*` or `transition-*` utility that drives non-essential motion is paired with `motion-reduce:animate-none` (or `motion-reduce:transition-none` where appropriate). Loading spinners use `animate-spin motion-reduce:animate-none` — the static icon remains and is still recognizable as "loading."
-- **Don't:** Ship bare `animate-spin`, `animate-pulse`, or `animate-bounce`. Don't write JS feature-detection for `prefers-reduced-motion` — use the CSS variant.
+- **Why:** Users with vestibular disorders need to suppress motion. The `prefers-reduced-motion` media query is Baseline Widely available, so one `@media (prefers-reduced-motion: reduce)` block in `src/app/globals.css` covers every shadcn/Radix primitive and every future component, where a `motion-reduce:` variant per utility needs remembering on each one (PP-kqbk.4).
+- **Do:** Use `animate-*` and `transition-*` utilities freely; the global block turns every transition and animation off under reduced motion, dims `animate-spin` (`opacity: 0.5`, not frozen at full opacity, which reads as hung) and holds `animate-pulse` at a mid-pulse opacity. Sheet and Drawer content keep their slide-in as essential motion. New essential motion is excluded in the global block's `:not(...)` list, with a comment saying why.
+- **Don't:** Add a per-class `motion-reduce:` variant for ordinary motion (the global rule already applies). Don't write JS feature-detection for `prefers-reduced-motion` unless a library applies an inline `transition` that CSS cannot override (`usePrefersReducedMotion`).
 - **Reference:** modern-web-guidance `accessibility` § Motion.
 
 **CORE-A11Y-003:** Data tables ship with semantic structure
