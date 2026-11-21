@@ -233,9 +233,23 @@ export async function runUpdateMachine(
     field: string,
     reason: string,
     errorReason?:
-      "denied" | "not_found" | "invalid" | "conflict" | "rate_limited"
+      "denied" | "not_found" | "invalid" | "conflict" | "rate_limited",
+    cause?: unknown
   ): UpdateMachineOutcome {
     if (applied.length > 0) {
+      // A partial success still returns a payload, so `runTool` never sees this
+      // failure as a throw and never reports it. An unexpected exception (a
+      // caught throw that is not an already-curated McpToolError) has to be
+      // reported here, or a recurring partial write produces no Sentry events
+      // at all. Structured rejections carry an `errorReason` and are expected,
+      // so they are not reported. Mirrors update_issue's apply-loop handling.
+      if (errorReason === undefined && !(cause instanceof McpToolError)) {
+        reportError(cause, {
+          action: "mcp.tool.update_machine",
+          userId: ctx.userId,
+          field,
+        });
+      }
       return {
         applied,
         result: {
@@ -266,8 +280,8 @@ export async function runUpdateMachine(
    * returns a success payload that bypasses {@link runTool}'s harness — the
    * harness is what normally reduces an unexpected error to a generic line — so
    * we curate here: an {@link McpToolError} message is already user-facing and
-   * passes through; anything else is reported to Sentry and reduced to a generic
-   * line. Before any field has committed we re-throw so the harness handles it
+   * passes through; anything else is reduced to a generic line (and reported to
+   * Sentry by {@link handleFailure}). Before any field has committed we re-throw so the harness handles it
    * (reporting the real error to Sentry and returning a generic line to the
    * caller). That pre-commit re-throw is a deliberate difference from
    * `update-issue.ts`, which instead returns an empty partial payload.
@@ -283,16 +297,16 @@ export async function runUpdateMachine(
       // string, say) has nothing to preserve and gets the per-field fallback.
       throw error instanceof Error ? error : new Error(fallback);
     }
+    // handleFailure reports a non-McpToolError cause to Sentry on the partial
+    // path, so the raw error is passed as the cause rather than reported here.
     if (error instanceof McpToolError) {
-      return handleFailure(field, error.message);
+      return handleFailure(field, error.message, undefined, error);
     }
-    reportError(error, {
-      action: "mcp.tool.update_machine",
-      userId: ctx.userId,
-    });
     return handleFailure(
       field,
-      `Changing ${field} failed. The failure has been logged.`
+      `Changing ${field} failed. The failure has been logged.`,
+      undefined,
+      error
     );
   }
 
