@@ -64,9 +64,16 @@ function FilterButtonFace({
   filter: ListFilterModel;
 }): React.JSX.Element {
   const count = selectionCount(filter);
+  // A set filter reads "Status: Open", so the name and value don't run
+  // together; an unset one shows its name alone.
+  const isSet =
+    (filter.valueLabel !== null && filter.valueLabel !== "") || count > 1;
   return (
     <>
-      <span>{filter.label}</span>{" "}
+      <span>
+        {filter.label}
+        {isSet ? ":" : null}
+      </span>{" "}
       {filter.valueLabel ? (
         <span className="max-w-40 truncate text-foreground">
           {filter.valueLabel}
