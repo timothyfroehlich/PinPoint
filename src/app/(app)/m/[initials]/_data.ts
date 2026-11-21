@@ -15,6 +15,18 @@ import { getOpdbRecords } from "~/lib/opdb/records";
 import { opdbGroupId, pinTipsPageUrl } from "~/lib/pintips/parse";
 import { pickWeightedTipIndex } from "~/lib/pintips/pick";
 import { getPinTipsForGroup } from "~/lib/pintips/records";
+import {
+  getMachineSettingsSets,
+  type SettingsSetsViewer,
+} from "~/lib/machines/settings-queries";
+import type { SettingsSetData } from "~/lib/machines/settings-types";
+import { getTagsForMachine } from "~/lib/tags/tags";
+import type { MachineTag } from "~/lib/tags/types";
+import {
+  getMachineTimeline,
+  type GetMachineTimelineArgs,
+  type MachineTimelineRow,
+} from "~/lib/timeline/machine-events";
 import { loadMentionNames } from "~/lib/tiptap/mention-names";
 import { applyMentionNames } from "~/lib/tiptap/types";
 import type { PinTipForCard } from "~/lib/pintips/types";
@@ -321,3 +333,26 @@ export const getMachineAllIssues = cache(async (initials: string) => {
     orderBy: (issues, { desc }) => [desc(issues.createdAt)],
   });
 });
+
+/** One page of the machine's timeline, for the Timeline tab. */
+export function getMachineTimelinePage(
+  args: GetMachineTimelineArgs
+): Promise<MachineTimelineRow[]> {
+  return getMachineTimeline(db, args);
+}
+
+/**
+ * The machine's settings sets as the Settings tab renders them, each carrying
+ * the viewer's rights (machine-settings §2.5).
+ */
+export function getMachineSettingsSetsFor(
+  machineId: string,
+  viewer: SettingsSetsViewer
+): Promise<SettingsSetData[]> {
+  return getMachineSettingsSets(db, machineId, viewer);
+}
+
+/** The tags on a machine, for the Info tab. `cache()`-wrapped per request. */
+export const getMachineTags = cache(
+  (machineId: string): Promise<MachineTag[]> => getTagsForMachine(db, machineId)
+);

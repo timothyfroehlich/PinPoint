@@ -1,21 +1,9 @@
 /**
  * PinballMap linking rules — shared between the create and edit machine actions.
  *
- * This is deliberately plain logic (no env var, no DB flag): the linked-or-excluded
- * requirement is a reviewed one-line constant flip, not a runtime toggle. Keeping it
- * here lets both actions and the unit tests share one source of truth.
+ * This is deliberately plain logic (no env var, no DB flag). Keeping it here lets
+ * both actions and the unit tests share one source of truth.
  */
-
-/**
- * Whether creating/editing a machine must have a PinballMap catalog link OR the
- * "not on PinballMap" excluded flag set.
- *
- * On since the rollout backfill matched or uncataloged every machine, Removed
- * ones included (PP-o355.10 step 4), so no existing machine is caught
- * unsaveable. The mutual-exclusion invariant below is enforced regardless of
- * this flag.
- */
-export const PBM_LINKING_REQUIRED = true;
 
 /** A machine's PinballMap link selection, as resolved from a create/edit form. */
 export interface PbmLinkSelection {
@@ -28,28 +16,25 @@ export interface PbmLinkSelection {
 export type PbmLinkValidationError =
   /** A machine cannot be both linked to PBM and marked excluded from it. */
   | "both_link_and_excluded"
-  /** Linking is required (flag on) but neither a link nor the excluded flag was set. */
+  /** Creating/editing a machine needs a link or the excluded flag; neither was set. */
   | "link_required";
 
 /**
  * Validate a PinballMap link selection.
  *
- * - Mutual exclusion (linked AND excluded) is ALWAYS rejected — it mirrors the
- *   DB CHECK and is a data-integrity invariant independent of the flag.
- * - The linked-or-excluded requirement is gated by `required`
- *   (defaults to {@link PBM_LINKING_REQUIRED}).
+ * - Mutual exclusion (linked AND excluded) is rejected — it mirrors the DB CHECK.
+ * - A machine must be linked OR marked excluded.
  *
  * Returns the first error, or `null` when the selection is valid.
  */
 export function validatePbmLinkSelection(
-  selection: PbmLinkSelection,
-  required: boolean = PBM_LINKING_REQUIRED
+  selection: PbmLinkSelection
 ): PbmLinkValidationError | null {
   const hasLink = selection.pinballmapMachineId !== null;
   if (hasLink && selection.pinballmapExcluded) {
     return "both_link_and_excluded";
   }
-  if (required && !hasLink && !selection.pinballmapExcluded) {
+  if (!hasLink && !selection.pinballmapExcluded) {
     return "link_required";
   }
   return null;

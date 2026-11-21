@@ -210,7 +210,18 @@ export interface LineFitPart<Part extends string> {
    * other in the same group, and nothing else.
    */
   text: boolean;
+  /**
+   * Makes the part shrinkable: at its turn in the drop order it truncates,
+   * down to this width, before it hides. Without it, a part drops whole.
+   */
+  minWidth?: number;
 }
+
+/**
+ * How a part shows on the line: at its full width, truncated (narrower than
+ * its full width, never below its `minWidth`), or not at all.
+ */
+export type LinePartFit = "full" | "truncated" | "hidden";
 
 /** The spacing of a one-line row (list-views §8, issues-list §3.9). */
 export interface LineFitSpacing {
@@ -234,7 +245,10 @@ export interface LineFitInput<Part extends string> extends LineFitSpacing {
    * takes no room once none of its parts shows.
    */
   trailing: readonly LineFitPart<Part>[];
-  /** The parts that give way for room, the first to drop first. */
+  /**
+   * The parts that give way for room, the first to give way first. A part
+   * with a `minWidth` truncates before it drops.
+   */
   dropOrder: readonly Part[];
 }
 
@@ -257,13 +271,17 @@ function groupWidth<Part extends string>(
 }
 
 /**
- * Which parts of a one-line row show (machine-views §5.10, issues-list
- * §3.9): the parts in `dropOrder` drop one at a time, in that order, until
- * the line fits with `FIT_TOLERANCE` to spare. A part outside
- * `dropOrder` never drops; when those alone still do not fit, every
- * droppable part is gone and the component truncates what remains.
+ * How each part of a one-line row shows (machine-views §5.10, issues-list
+ * §3.9): the parts in `dropOrder` give way one at a time, in that order,
+ * until the line fits with `FIT_TOLERANCE` to spare. A part with a
+ * `minWidth` gives way by truncating first: when the line fits with that
+ * part narrower but still at least `minWidth` wide, it is truncated and the
+ * fit stops; otherwise it hides like any other part, its "·" separator with
+ * it. A part outside `dropOrder` never gives way; when those alone still do
+ * not fit, every droppable part is gone and the component truncates what
+ * remains.
  */
-export function fitLineParts<Part extends string>({
+export function planLineParts<Part extends string>({
   available,
   leading,
   trailing,
@@ -272,19 +290,45 @@ export function fitLineParts<Part extends string>({
   trailingGap,
   groupGap,
   separatorWidth,
-}: LineFitInput<Part>): ReadonlySet<Part> {
-  const shown = new Set<Part>(
-    [...leading, ...trailing].map((part) => part.key)
+}: LineFitInput<Part>): ReadonlyMap<Part, LinePartFit> {
+  const parts = new Map<Part, LineFitPart<Part>>(
+    [...leading, ...trailing].map((part) => [part.key, part])
   );
+  const plan = new Map<Part, LinePartFit>(
+    [...parts.keys()].map((key) => [key, "full"])
+  );
+  const shown = new Set<Part>(parts.keys());
   const room = available - FIT_TOLERANCE;
   const lineWidth = (): number => {
     const lead = groupWidth(leading, shown, gap, separatorWidth);
     const end = groupWidth(trailing, shown, trailingGap, separatorWidth);
     return end === 0 ? lead : lead + groupGap + end;
   };
-  for (const part of dropOrder) {
-    if (lineWidth() <= room) break;
-    shown.delete(part);
+  for (const key of dropOrder) {
+    const overflow = lineWidth() - room;
+    if (overflow <= 0) break;
+    const part = parts.get(key);
+    if (part === undefined) continue;
+    if (part.minWidth !== undefined && part.width - overflow >= part.minWidth) {
+      plan.set(key, "truncated");
+      break;
+    }
+    shown.delete(key);
+    plan.set(key, "hidden");
+  }
+  return plan;
+}
+
+/**
+ * The parts of a one-line row that show, at full width or truncated
+ * (`planLineParts`).
+ */
+export function fitLineParts<Part extends string>(
+  input: LineFitInput<Part>
+): ReadonlySet<Part> {
+  const shown = new Set<Part>();
+  for (const [key, fit] of planLineParts(input)) {
+    if (fit !== "hidden") shown.add(key);
   }
   return shown;
 }

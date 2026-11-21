@@ -3,13 +3,6 @@ import { redirect, notFound } from "next/navigation";
 import { getViewer } from "~/lib/auth/viewer";
 import { getLoginUrl } from "~/lib/url";
 import { reportError } from "~/lib/observability/report-error";
-import { db } from "~/server/db";
-import {
-  userProfiles,
-  notificationPreferences,
-  machines,
-} from "~/server/db/schema";
-import { eq, and, ne, count } from "drizzle-orm";
 import { isInternalAccount } from "~/lib/auth/internal-accounts";
 import { isDiscordIntegrationConfigured } from "~/lib/discord/config";
 import Link from "next/link";
@@ -19,6 +12,12 @@ import { ChangePasswordSection } from "./change-password-section";
 import { AccountEmail } from "./account-email";
 import { DeleteAccountSection } from "./delete-account-section";
 import { getReassignmentTargets } from "./account-deletion";
+import {
+  countOtherAdmins,
+  ensureNotificationPreferences,
+  getOwnedMachineTotal,
+  getSettingsAccount,
+} from "./_data";
 import { Separator } from "~/components/ui/separator";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
@@ -34,10 +33,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
   // The viewer carries role and report modes; this page alone also needs the
   // account's email and Discord link. Email stays out of the shared viewer
   // (CORE-SEC-007).
-  const account = await db.query.userProfiles.findFirst({
-    where: eq(userProfiles.id, userId),
-    columns: { email: true, discordUserId: true },
-  });
+  const account = await getSettingsAccount(userId);
 
   if (!profile || !account) {
     // Data-integrity anomaly: auth.users row exists but handle_new_user trigger
@@ -52,36 +48,16 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
     notFound();
   }
 
-  // Fetch notification preferences
-  let preferences = await db.query.notificationPreferences.findFirst({
-    where: eq(notificationPreferences.userId, userId),
-  });
-
-  // Create default preferences if they don't exist (fallback for old users)
-  if (!preferences) {
-    [preferences] = await db
-      .insert(notificationPreferences)
-      .values({ userId })
-      .returning();
-  }
-
-  if (!preferences) {
-    throw new Error("Failed to create notification preferences");
-  }
+  const preferences = await ensureNotificationPreferences(userId);
 
   // Fetch owned machines count and potential reassignment targets.
   // The reassignment-target query lives in account-deletion.ts so the
   // integration test in src/test/integration/account-deletion.test.ts can
   // exercise the same filter logic (regression coverage for PP-aby).
-  const [ownedMachinesResult, membersResult] = await Promise.all([
-    db
-      .select({ count: count() })
-      .from(machines)
-      .where(eq(machines.ownerId, userId)),
+  const [ownedMachineCount, membersResult] = await Promise.all([
+    getOwnedMachineTotal(userId),
     getReassignmentTargets(userId),
   ]);
-
-  const ownedMachineCount = ownedMachinesResult[0]?.count ?? 0;
 
   // Discord integration state for the preferences form (PP-2n5). Only need
   // the boolean here — skip the Vault decrypt that getDiscordConfig() does.
@@ -95,12 +71,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
   // Check if user is the sole admin
   const isSoleAdmin =
     profile.role === "admin" && // permissions-audit-allow: sole-admin invariant (business rule)
-    (
-      await db
-        .select({ count: count() })
-        .from(userProfiles)
-        .where(and(eq(userProfiles.role, "admin"), ne(userProfiles.id, userId)))
-    )[0]?.count === 0;
+    (await countOtherAdmins(userId)) === 0;
 
   return (
     <PageContainer size="narrow">

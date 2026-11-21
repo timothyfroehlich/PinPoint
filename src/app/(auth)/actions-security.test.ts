@@ -397,6 +397,32 @@ describe("Auth Actions Security - Error Handling", () => {
     expect(redirect).toHaveBeenCalledWith("/login");
   });
 
+  it.each([
+    ["loginAction", loginAction],
+    ["signupAction", signupAction],
+    ["resetPasswordAction", resetPasswordAction],
+  ])(
+    "%s rethrows a Next.js redirect instead of returning a SERVER error",
+    async (_name, action) => {
+      const redirectError = Object.assign(new Error("NEXT_REDIRECT"), {
+        digest: "NEXT_REDIRECT;replace;/dashboard;307;",
+      });
+      vi.mocked(createClient).mockRejectedValue(redirectError);
+
+      const formData = new FormData();
+      formData.set("email", "test@example.com");
+      formData.set("password", "StrongUniquePass99!");
+      formData.set("confirmPassword", "StrongUniquePass99!");
+      formData.set("firstName", "John");
+      formData.set("lastName", "Doe");
+      formData.set("termsAccepted", "on");
+
+      await expect(action(undefined, formData)).rejects.toBe(redirectError);
+      expect(reportError).not.toHaveBeenCalled();
+      expect(Sentry.captureException).not.toHaveBeenCalled();
+    }
+  );
+
   it("logoutAction reports a signOut error and skips the redirect", async () => {
     const { AuthApiError } = await import("@supabase/supabase-js");
     const signOutError = new AuthApiError("logout failed", 500, "unexpected");

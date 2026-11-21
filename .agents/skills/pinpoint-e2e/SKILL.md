@@ -74,7 +74,6 @@ The three required PR E2E jobs each run a single project against their own datab
 
 ## Common Helpers
 
-- **Select Reset Assertions**: Use `assertSelectAtPlaceholder(trigger, placeholderText)` for placeholder state, or `assertSelectValue(trigger, expectedLabel)` for default value state (e.g. `await assertSelectValue(page.getByTestId("select-id"), "Minor")`).
 - **Accessibility scan**: `assertNoA11yViolations(page)` — see "Accessibility Checks (axe-core)" below.
 
 ## Accessibility Checks (axe-core)

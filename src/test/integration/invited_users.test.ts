@@ -13,7 +13,8 @@ import {
   timelineEvents,
 } from "~/server/db/schema";
 import { emitIssueOpened } from "~/lib/timeline/issue-timeline-helpers";
-import { getUnifiedUsers, compareUnifiedUsers } from "~/lib/users/queries";
+import { getUnifiedUsers } from "~/lib/users/queries";
+import { compareUnifiedUsers } from "~/lib/users/comparators";
 import { getMachineOwner } from "~/lib/machines/queries";
 import { createTestMachine } from "~/test/helpers/factories";
 import { ensureUserProfile } from "~/lib/auth/profile";

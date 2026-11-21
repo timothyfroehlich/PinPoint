@@ -7,7 +7,6 @@ export {
   getChannels,
   type NotificationType,
   type NotificationEvent,
-  type CreateNotificationProps,
   type NotificationChannel,
   type DeliveryPlan,
 } from "./notifications/dispatch";

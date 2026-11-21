@@ -78,8 +78,6 @@ export const STATUS_GROUP_LABELS: Record<keyof typeof STATUS_GROUPS, string> = {
 };
 
 // Single-level exports for better re-use
-export const NEW_STATUSES = STATUS_GROUPS.new;
-export const IN_PROGRESS_STATUSES = STATUS_GROUPS.in_progress;
 export const CLOSED_STATUSES = STATUS_GROUPS.closed;
 export const OPEN_STATUS_GROUPS = ["new", "in_progress"] as const;
 export type OpenStatusGroup = (typeof OPEN_STATUS_GROUPS)[number];
@@ -95,8 +93,6 @@ export const ALL_STATUS_OPTIONS: IssueStatus[] = [
   ...STATUS_GROUPS.in_progress,
   ...STATUS_GROUPS.closed,
 ];
-
-export const STATUS_OPTIONS = ALL_STATUS_OPTIONS; // Alias for form use
 
 /**
  * Field Configuration: One place to rule them all.
@@ -334,14 +330,6 @@ export function getIssueStatusLabel(status: IssueStatus): string {
   return STATUS_CONFIG[status].label;
 }
 
-export function getIssueStatusDescription(status: IssueStatus): string {
-  return STATUS_CONFIG[status].description;
-}
-
-export function getIssueStatusStyles(status: IssueStatus): string {
-  return STATUS_CONFIG[status].styles;
-}
-
 export function getIssueSeverityLabel(severity: IssueSeverity): string {
   return SEVERITY_CONFIG[severity].label;
 }
@@ -356,14 +344,6 @@ export function getIssueFrequencyLabel(frequency: IssueFrequency): string {
 
 export function getIssueSeverityStyles(severity: IssueSeverity): string {
   return SEVERITY_CONFIG[severity].styles;
-}
-
-export function getIssuePriorityStyles(priority: IssuePriority): string {
-  return PRIORITY_CONFIG[priority].styles;
-}
-
-export function getIssueFrequencyStyles(frequency: IssueFrequency): string {
-  return FREQUENCY_CONFIG[frequency].styles;
 }
 
 // Manual export for component use (easier for Tim to read/change)

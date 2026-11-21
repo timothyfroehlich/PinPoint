@@ -3,9 +3,9 @@
 import * as Sentry from "@sentry/nextjs";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { revalidatePath } from "next/cache";
 import { log } from "~/lib/logger";
+import { rethrowIfRedirect } from "~/lib/actions/redirect";
 import { createIssue, MachineRemovedError } from "~/services/issues";
 import { dispatchNotification } from "~/lib/notifications";
 import {
@@ -418,9 +418,7 @@ export async function submitPublicIssueAction(
     );
     redirect(successUrl);
   } catch (error) {
-    if (isRedirectError(error)) {
-      throw error;
-    }
+    rethrowIfRedirect(error);
     if (error instanceof MachineRemovedError) {
       return { error: error.message };
     }

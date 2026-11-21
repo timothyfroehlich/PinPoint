@@ -4,8 +4,10 @@ import {
   fitPrimaryFilters,
   FIT_TOLERANCE,
   phoneSearchAsIcon,
+  planLineParts,
   planListHeader,
   type LineFitPart,
+  type LinePartFit,
 } from "./overflow";
 
 describe("phoneSearchAsIcon (list-views §7.12, §8.7)", () => {
@@ -52,12 +54,12 @@ describe("fitLineParts (machine-views §5.10, issues-list §3.9)", () => {
   const spacing = { gap: 6, trailingGap: 8, groupGap: 12, separatorWidth: 4 };
 
   describe("an issue row's line 2", () => {
-    // Leading: ID 60 (text) · machine 120 (text), priority 50. Trailing:
-    // assignee 30, comments 40, age 90.
+    // Leading: ID 60 (text) · machine 120 (text, truncating down to 44),
+    // priority 50. Trailing: assignee 30, comments 40, age 90.
     type Part = "id" | "machine" | "priority" | "assignee" | "comments" | "age";
-    const leading: LineFitPart<Part>[] = [
+    const leading = (machineWidth = 120): LineFitPart<Part>[] => [
       { key: "id", width: 60, text: true },
-      { key: "machine", width: 120, text: true },
+      { key: "machine", width: machineWidth, text: true, minWidth: 44 },
       { key: "priority", width: 50, text: false },
     ];
     const trailing: LineFitPart<Part>[] = [
@@ -65,53 +67,124 @@ describe("fitLineParts (machine-views §5.10, issues-list §3.9)", () => {
       { key: "comments", width: 40, text: false },
       { key: "age", width: 90, text: false },
     ];
-    const dropOrder: Part[] = ["age", "comments", "priority", "assignee"];
+    const dropOrder: Part[] = [
+      "age",
+      "comments",
+      "machine",
+      "priority",
+      "assignee",
+    ];
+    const plan = (
+      available: number,
+      machineWidth?: number
+    ): Record<string, LinePartFit> =>
+      Object.fromEntries(
+        planLineParts({
+          ...spacing,
+          available,
+          leading: leading(machineWidth),
+          trailing,
+          dropOrder,
+        })
+      );
     const shown = (available: number): string[] =>
       [
         ...fitLineParts({
           ...spacing,
           available,
-          leading,
+          leading: leading(),
           trailing,
           dropOrder,
         }),
       ].sort();
 
-    it("keeps every part when the line fits with the tolerance to spare", () => {
+    it("keeps every part at full width when the line fits with the tolerance to spare", () => {
       // (60+6+4+6+120+6+50) + 12 + (30+8+40+8+90) = 440.
-      expect(shown(440 + FIT_TOLERANCE)).toEqual([
-        "age",
+      expect(plan(440 + FIT_TOLERANCE)).toEqual({
+        id: "full",
+        machine: "full",
+        priority: "full",
+        assignee: "full",
+        comments: "full",
+        age: "full",
+      });
+    });
+
+    it("drops the age, then the comment count, before touching the machine name", () => {
+      expect(plan(439 + FIT_TOLERANCE)).toMatchObject({
+        age: "hidden",
+        comments: "full",
+        machine: "full",
+      });
+      // 252 + 12 + (30+8+40) = 342.
+      expect(plan(341 + FIT_TOLERANCE)).toMatchObject({
+        comments: "hidden",
+        machine: "full",
+      });
+    });
+
+    it("truncates the machine name while the priority and assignee still show", () => {
+      // 252 + 12 + 30 = 294 with the name at full width.
+      expect(plan(294 + FIT_TOLERANCE)).toMatchObject({
+        machine: "full",
+        priority: "full",
+        assignee: "full",
+      });
+      expect(plan(293 + FIT_TOLERANCE)).toMatchObject({
+        id: "full",
+        machine: "truncated",
+        priority: "full",
+        assignee: "full",
+      });
+      // 76px narrower leaves the name at exactly its 44px minimum.
+      expect(plan(218 + FIT_TOLERANCE)).toMatchObject({
+        machine: "truncated",
+        priority: "full",
+        assignee: "full",
+      });
+    });
+
+    it("hides the machine name, below its minimum, before the priority drops", () => {
+      expect(plan(217 + FIT_TOLERANCE)).toEqual({
+        id: "full",
+        machine: "hidden",
+        priority: "full",
+        assignee: "full",
+        comments: "hidden",
+        age: "hidden",
+      });
+    });
+
+    it("takes the machine name's separator with it", () => {
+      // Without the name or its "·": (60+6+50) + 12 + 30 = 158. A "·" left
+      // behind would make it 168.
+      expect(shown(158 + FIT_TOLERANCE)).toEqual([
         "assignee",
-        "comments",
         "id",
-        "machine",
         "priority",
       ]);
     });
 
-    it("drops age, then comments, then priority, then assignee", () => {
-      expect(shown(439 + FIT_TOLERANCE)).not.toContain("age");
-      // 252 + 12 + (30+8+40) = 342.
-      expect(shown(342 + FIT_TOLERANCE)).toEqual([
-        "assignee",
-        "comments",
-        "id",
-        "machine",
-        "priority",
-      ]);
-      expect(shown(341 + FIT_TOLERANCE)).toEqual([
-        "assignee",
-        "id",
-        "machine",
-        "priority",
-      ]);
-      // 196 + 12 + 30 = 238.
-      expect(shown(238 + FIT_TOLERANCE)).toEqual(["assignee", "id", "machine"]);
-      expect(shown(237 + FIT_TOLERANCE)).toEqual(["id", "machine"]);
+    it("then drops the priority, then the assignee", () => {
+      // 60 + 12 + 30 = 102.
+      expect(shown(157 + FIT_TOLERANCE)).toEqual(["assignee", "id"]);
+      expect(shown(102 + FIT_TOLERANCE)).toEqual(["assignee", "id"]);
+      expect(shown(101 + FIT_TOLERANCE)).toEqual(["id"]);
+    });
+
+    it("hides a name already narrower than its minimum instead of truncating it", () => {
+      // A 40px name: (60+6+4+6+40+6+50) + 12 + 30 = 214.
+      expect(plan(214 + FIT_TOLERANCE, 40)).toMatchObject({
+        machine: "full",
+      });
+      expect(plan(213 + FIT_TOLERANCE, 40)).toMatchObject({
+        machine: "hidden",
+        priority: "full",
+      });
     });
 
     it("never drops a part outside the drop order", () => {
-      expect(shown(10)).toEqual(["id", "machine"]);
+      expect(shown(10)).toEqual(["id"]);
     });
   });
 

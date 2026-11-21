@@ -1,8 +1,6 @@
 import { notFound, redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { db } from "~/server/db";
-import { issues } from "~/server/db/schema";
+import { getIssueLocation } from "./_data";
 
 const uuidSchema = z.uuid();
 
@@ -30,10 +28,7 @@ export default async function LegacyIssueRedirectPage({
   // hit the error boundary and report to Sentry instead of 404ing.
   if (!uuidSchema.safeParse(id).success) notFound();
 
-  const issue = await db.query.issues.findFirst({
-    where: eq(issues.id, id),
-    columns: { machineInitials: true, issueNumber: true },
-  });
+  const issue = await getIssueLocation(id);
 
   if (!issue) notFound();
 

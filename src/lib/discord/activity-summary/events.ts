@@ -95,12 +95,6 @@ export const ACTIVITY_SUMMARY_INTERVAL_HOURS = [24, 12, 6, 4, 2, 1] as const;
 export type ActivitySummaryIntervalHours =
   (typeof ACTIVITY_SUMMARY_INTERVAL_HOURS)[number];
 
-export function isActivitySummaryIntervalHours(
-  value: number
-): value is ActivitySummaryIntervalHours {
-  return (ACTIVITY_SUMMARY_INTERVAL_HOURS as readonly number[]).includes(value);
-}
-
 export const DEFAULT_ACTIVITY_SUMMARY_INTERVAL_HOURS: ActivitySummaryIntervalHours = 24;
 /** 6 PM Central (spec §2.2). */
 export const DEFAULT_ACTIVITY_SUMMARY_START_HOUR = 18;
