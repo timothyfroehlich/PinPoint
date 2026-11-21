@@ -6,7 +6,7 @@ import { Share2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   GROUP_FOLD_STEPS,
-  groupPrintAction,
+  groupPrintEntry,
 } from "~/components/collections/group-page-actions";
 import {
   PageActions,
@@ -52,10 +52,10 @@ type TagDialog = "machines" | "rename" | "move" | "merge" | "delete";
 
 /**
  * A tag page's actions (collections-and-tags 4.14–4.18): Share, which
- * copies the page's address for everyone, Print, then ⋯ holding a
- * hand-applied tag's editing (Edit machines, Rename, Move to another tag
- * type, Merge into another tag, and Delete) and the current tab's Export.
- * Share and Print fold together.
+ * copies the page's address for everyone, then ⋯ holding a hand-applied
+ * tag's editing (Edit machines, Rename, Move to another tag type, Merge
+ * into another tag), the current tab's Export, Print settings sheets for
+ * everyone, and the tag's Delete. Share folds into ⋯.
  */
 export function TagPageActions({
   tagHref,
@@ -94,7 +94,7 @@ export function TagPageActions({
     ? [
         {
           key: "edit-machines",
-          label: "Edit machines",
+          label: "Edit machines…",
           onSelect: openDialog("machines"),
         },
         {
@@ -118,7 +118,7 @@ export function TagPageActions({
     ? [
         {
           key: "delete",
-          label: "Delete tag…",
+          label: "Delete tag",
           destructive: true,
           onSelect: openDialog("delete"),
         },
@@ -144,9 +144,15 @@ export function TagPageActions({
             },
             testId: "tag-share-button",
           },
-          groupPrintAction(settingsSheetsHref),
         ]}
-        menu={[editingEntries, exportEntry ? [exportEntry] : [], deleteEntries]}
+        menu={[
+          editingEntries,
+          [
+            ...(exportEntry ? [exportEntry] : []),
+            groupPrintEntry(settingsSheetsHref),
+          ],
+          deleteEntries,
+        ]}
         foldSteps={GROUP_FOLD_STEPS}
       />
       {editing ? (

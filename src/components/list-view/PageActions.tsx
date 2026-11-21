@@ -23,6 +23,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
 import { useIsMobile } from "~/hooks/use-is-mobile";
 import {
   planPageActions,
@@ -50,14 +56,23 @@ export type PageMenuEntry = {
   /** The entry's action is running; it shows a spinner and is disabled. */
   busy?: boolean | undefined;
   testId?: string | undefined;
+  /**
+   * The icon the entry shows as its own button. Only an entry with one can
+   * show as a button when it would be ⋯'s only entry (list-views §3.7).
+   */
+  icon?: LucideIcon | undefined;
+  /** The entry's label as its own button, when it reads differently there. */
+  buttonLabel?: string | undefined;
 } & ({ href: string } | { onSelect: PageActionSelect });
 
 interface PageActionBase {
   key: string;
   label: string;
   icon: LucideIcon;
-  /** Machines' Add Machine keeps its filled primary style (list-views §3.8). */
+  /** The page's create action keeps its filled style (list-views §3.8). */
   primary?: boolean | undefined;
+  /** The action is running; its button shows a spinner and is disabled. */
+  busy?: boolean | undefined;
   testId?: string | undefined;
 }
 
@@ -76,21 +91,30 @@ export type PageAction = PageActionBase &
       }
   );
 
-/** ⋯'s accessible name, and its label when the page actions show labels. */
-export const PAGE_ACTIONS_MENU_LABEL = "Actions";
+/** ⋯'s accessible name, its label while the page actions show labels, and
+ * its phone sheet's title (design-bible §26.3). */
+export const PAGE_ACTIONS_MENU_LABEL = "More";
 
 const GAP = 8;
 
-// Outlined buttons 36px tall with 8px corners on desktop and 44px with 10px
-// corners on phones; an icon button is square (list-views §3.8, §7.9).
+// Buttons 36px tall with 8px corners on desktop and 44px with 10px corners
+// on phones; an icon button is square (list-views §3.8, §7.9). Every face
+// keeps a 1px border, transparent when borderless, so measured widths
+// match whichever face shows.
 const buttonBaseClass =
-  "inline-flex h-11 shrink-0 items-center justify-center rounded-[10px] border text-[13px] font-semibold whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none data-[state=open]:bg-muted motion-reduce:transition-none md:h-9 md:rounded-lg";
+  "inline-flex h-11 shrink-0 items-center justify-center rounded-[10px] border text-[13px] font-semibold whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-60 data-[state=open]:bg-muted motion-reduce:transition-none md:h-9 md:rounded-lg";
+// A labeled button is outlined; an icon button is borderless, with a hover
+// and pressed background (design-bible §26.2).
 const outlinedClass = "border-outline bg-card text-foreground hover:bg-muted";
+const borderlessClass =
+  "border-transparent bg-transparent text-foreground hover:bg-muted active:bg-muted";
+// Before the first measurement, CSS guesses: icons below md, labels above.
+const guessSurfaceClass =
+  "border-outline bg-card text-foreground hover:bg-muted max-md:border-transparent max-md:bg-transparent max-md:hover:bg-muted max-md:active:bg-muted max-md:data-[state=open]:bg-muted";
 const primaryClass =
   "border-primary bg-primary text-on-primary hover:bg-primary/90 data-[state=open]:bg-primary/90";
 const labeledClass = "gap-1.5 px-3";
 const iconClass = "w-11 md:w-9";
-// Before the first measurement, CSS guesses: icons below md, labels above.
 const guessClass = "max-md:w-11 md:gap-1.5 md:px-3";
 
 type Face = "labeled" | "icon" | "guess";
@@ -98,7 +122,13 @@ type Face = "labeled" | "icon" | "guess";
 function buttonClass(primary: boolean | undefined, face: Face): string {
   return cn(
     buttonBaseClass,
-    primary ? primaryClass : outlinedClass,
+    primary
+      ? primaryClass
+      : face === "labeled"
+        ? outlinedClass
+        : face === "icon"
+          ? borderlessClass
+          : guessSurfaceClass,
     face === "labeled" ? labeledClass : face === "icon" ? iconClass : guessClass
   );
 }
@@ -108,18 +138,28 @@ function ActionFace({
   label,
   face,
   chevron,
+  busy = false,
 }: {
   icon: LucideIcon;
   label: string;
   face: Face;
   chevron: boolean;
+  busy?: boolean | undefined;
 }): React.JSX.Element {
+  const iconClassName = face === "icon" ? "size-[18px] md:size-4" : "size-4";
   return (
     <>
-      <Icon
-        aria-hidden="true"
-        className={face === "icon" ? "size-[18px] md:size-4" : "size-4"}
-      />
+      {busy ? (
+        <Loader2
+          aria-hidden="true"
+          className={cn(
+            iconClassName,
+            "animate-spin motion-reduce:animate-none"
+          )}
+        />
+      ) : (
+        <Icon aria-hidden="true" className={iconClassName} />
+      )}
       {face === "icon" ? null : (
         <span className={face === "guess" ? "max-md:hidden" : undefined}>
           {label}
@@ -134,6 +174,34 @@ function ActionFace({
     </>
   );
 }
+
+/**
+ * An icon button's tooltip, its accessible name on desktop (design-bible
+ * §26.2). It wraps every face so the button keeps its place in the tree
+ * when the face changes, and shows only for an icon face. It goes inside a
+ * menu or sheet trigger and forwards that trigger's props, so the trigger's
+ * open state stays on the button.
+ */
+type ActionTooltipProps = Omit<
+  React.ComponentPropsWithoutRef<typeof TooltipTrigger>,
+  "asChild"
+> & { label: string; face: Face };
+
+const ActionTooltip = React.forwardRef<
+  React.ElementRef<typeof TooltipTrigger>,
+  ActionTooltipProps
+>(function ActionTooltip({ label, face, children, ...triggerProps }, ref) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild {...triggerProps} ref={ref}>
+        {children}
+      </TooltipTrigger>
+      {face === "icon" ? (
+        <TooltipContent className="max-md:hidden">{label}</TooltipContent>
+      ) : null}
+    </Tooltip>
+  );
+});
 
 function entryKey(entry: PageMenuEntry): string {
   return entry.key;
@@ -160,6 +228,20 @@ function foldedEntriesOf(action: PageAction): readonly PageMenuEntry[] {
       onSelect: action.onSelect,
     },
   ];
+}
+
+/** ⋯'s only entry as its own button (list-views §3.7). */
+function entryAsAction(entry: PageMenuEntry, icon: LucideIcon): PageAction {
+  const base = {
+    key: entry.key,
+    label: entry.buttonLabel ?? entry.label,
+    icon,
+    busy: entry.busy,
+    testId: entry.testId,
+  };
+  return "href" in entry
+    ? { ...base, href: entry.href }
+    : { ...base, onSelect: entry.onSelect };
 }
 
 function EntryCount({ count }: { count: number }): React.JSX.Element {
@@ -324,52 +406,12 @@ function ActionButton({
 }): React.JSX.Element {
   const menuTriggerRef = React.useRef<HTMLButtonElement>(null);
   const className = buttonClass(action.primary, face);
-  const title = face === "labeled" ? undefined : action.label;
   if ("href" in action) {
     return (
-      <Link
-        href={action.href}
-        aria-label={action.label}
-        title={title}
-        data-testid={action.testId}
-        className={className}
-      >
-        <ActionFace
-          icon={action.icon}
-          label={action.label}
-          face={face}
-          chevron={false}
-        />
-      </Link>
-    );
-  }
-  if ("onSelect" in action) {
-    return (
-      <button
-        type="button"
-        aria-label={action.label}
-        title={title}
-        data-testid={action.testId}
-        onClick={(event) => action.onSelect(event.currentTarget)}
-        className={className}
-      >
-        <ActionFace
-          icon={action.icon}
-          label={action.label}
-          face={face}
-          chevron={false}
-        />
-      </button>
-    );
-  }
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          ref={menuTriggerRef}
-          type="button"
+      <ActionTooltip label={action.label} face={face}>
+        <Link
+          href={action.href}
           aria-label={action.label}
-          title={title}
           data-testid={action.testId}
           className={className}
         >
@@ -377,9 +419,53 @@ function ActionButton({
             icon={action.icon}
             label={action.label}
             face={face}
-            chevron
+            chevron={false}
+          />
+        </Link>
+      </ActionTooltip>
+    );
+  }
+  if ("onSelect" in action) {
+    return (
+      <ActionTooltip label={action.label} face={face}>
+        <button
+          type="button"
+          aria-label={action.label}
+          disabled={action.busy}
+          data-testid={action.testId}
+          onClick={(event) => action.onSelect(event.currentTarget)}
+          className={className}
+        >
+          <ActionFace
+            icon={action.icon}
+            label={action.label}
+            face={face}
+            chevron={false}
+            busy={action.busy}
           />
         </button>
+      </ActionTooltip>
+    );
+  }
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <ActionTooltip label={action.label} face={face}>
+          <button
+            ref={menuTriggerRef}
+            type="button"
+            aria-label={action.label}
+            data-testid={action.testId}
+            className={className}
+          >
+            <ActionFace
+              icon={action.icon}
+              label={action.label}
+              face={face}
+              chevron
+            />
+          </button>
+        </ActionTooltip>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <MenuEntries sections={[action.entries]} opener={menuTriggerRef} />
@@ -401,21 +487,22 @@ function ActionsMenu({
   const isMobile = useIsMobile();
   const triggerRef = React.useRef<HTMLButtonElement>(null);
   const trigger = (
-    <button
-      ref={triggerRef}
-      type="button"
-      aria-label={PAGE_ACTIONS_MENU_LABEL}
-      title={face === "labeled" ? undefined : PAGE_ACTIONS_MENU_LABEL}
-      data-testid="page-actions-menu"
-      className={buttonClass(false, face)}
-    >
-      <ActionFace
-        icon={MoreHorizontal}
-        label={PAGE_ACTIONS_MENU_LABEL}
-        face={face}
-        chevron={false}
-      />
-    </button>
+    <ActionTooltip label={PAGE_ACTIONS_MENU_LABEL} face={face}>
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-label={PAGE_ACTIONS_MENU_LABEL}
+        data-testid="page-actions-menu"
+        className={buttonClass(false, face)}
+      >
+        <ActionFace
+          icon={MoreHorizontal}
+          label={PAGE_ACTIONS_MENU_LABEL}
+          face={face}
+          chevron={false}
+        />
+      </button>
+    </ActionTooltip>
   );
   if (isMobile) {
     return (
@@ -438,7 +525,8 @@ interface PageActionsProps {
   /**
    * What ⋯ holds of its own, in sections with a divider between. Folded
    * actions come before them, and a section of only destructive entries
-   * stays last.
+   * stays last. A lone entry with an icon shows as its own button while
+   * there is room (list-views §3.7).
    */
   menu: readonly (readonly PageMenuEntry[])[];
   /** The page's fold order (§3.9): the actions each step folds together. */
@@ -447,11 +535,12 @@ interface PageActionsProps {
 }
 
 /**
- * A page's actions (list-views §3.7–§3.10, §7.2, §8.11, §8.12): outlined
- * buttons, labeled while they all fit the room their row gives them and
- * icon buttons otherwise, folding into ⋯ in the page's order once even the
- * icons do not fit. The component takes the free width of its row and
- * measures itself there (CORE-RESP-002 boundary), never the screen.
+ * A page's actions (list-views §3.7–§3.10, §7.2, §8.11, §8.12;
+ * design-bible §26): outlined labeled buttons while they all fit the room
+ * their row gives them and borderless icon buttons otherwise, folding into
+ * ⋯ in the page's order once even the icons do not fit. The component
+ * takes the free width of its row and measures itself there (CORE-RESP-002
+ * boundary), never the screen.
  */
 export function PageActions({
   actions,
@@ -462,121 +551,140 @@ export function PageActions({
   const containerRef = React.useRef<HTMLDivElement>(null);
   const laneRef = React.useRef<HTMLDivElement>(null);
   const ownSections = menu.filter((section) => section.length > 0);
+  // ⋯'s only entry shows as its own button while there is room (§3.7).
+  const ownEntries = ownSections.flat();
+  const onlyEntry = ownEntries.length === 1 ? ownEntries[0] : undefined;
+  const lone =
+    onlyEntry?.icon !== undefined
+      ? { entry: onlyEntry, action: entryAsAction(onlyEntry, onlyEntry.icon) }
+      : null;
+  const buttons = lone ? [...actions, lone.action] : actions;
+  const moreHasItems = ownSections.length > 0 && !lone;
   const contentKey = [
-    ...actions.map((action) => `${action.key}:${action.label}`),
-    String(ownSections.length > 0),
+    ...buttons.map((action) => `${action.key}:${action.label}`),
+    String(moreHasItems),
   ].join("|");
   const measured = useMeasuredWidths(containerRef, laneRef, contentKey);
   const width = (key: string): number => measured?.widths[key] ?? 0;
+  const widthsOf = (
+    action: PageAction
+  ): { key: string; labeled: number; icon: number } => ({
+    key: action.key,
+    labeled: width(`${action.key}:labeled`),
+    icon: width(`${action.key}:icon`),
+  });
   // A row that is not laid out measures zero; CSS guesses until it is.
   const plan: PageActionsPlan | null =
     measured && measured.available > 0
       ? planPageActions({
           available: measured.available,
-          actions: actions.map((action) => ({
-            key: action.key,
-            labeled: width(`${action.key}:labeled`),
-            icon: width(`${action.key}:icon`),
-          })),
+          actions: actions.map(widthsOf),
           more: { labeled: width("more:labeled"), icon: width("more:icon") },
-          moreHasItems: ownSections.length > 0,
+          moreHasItems,
+          loneEntry: lone ? widthsOf(lone.action) : undefined,
           foldSteps,
           gap: GAP,
         })
       : null;
   const face: Face = plan ? (plan.labeled ? "labeled" : "icon") : "guess";
   const folded = new Set(plan?.folded ?? []);
-  const shown = actions.filter((action) => !folded.has(action.key));
+  const shown = buttons.filter((action) => !folded.has(action.key));
   // Folded actions share one section, first in ⋯, in their display order.
+  // A folded lone entry goes back to ⋯ as itself.
   const foldedSection = actions
     .filter((action) => folded.has(action.key))
     .flatMap(foldedEntriesOf);
+  const menuSections = lone && !folded.has(lone.action.key) ? [] : ownSections;
   const isDestructiveSection = (section: readonly PageMenuEntry[]): boolean =>
     section.every((entry) => entry.destructive === true);
   const sections = [
     ...(foldedSection.length > 0 ? [foldedSection] : []),
-    ...ownSections.filter((section) => !isDestructiveSection(section)),
-    ...ownSections.filter(isDestructiveSection),
+    ...menuSections.filter((section) => !isDestructiveSection(section)),
+    ...menuSections.filter(isDestructiveSection),
   ];
-  const showMore = plan ? plan.showMore : ownSections.length > 0;
+  const showMore = plan ? plan.showMore : moreHasItems;
 
   if (actions.length === 0 && ownSections.length === 0) return null;
 
   return (
-    <div
-      ref={containerRef}
-      data-page-actions=""
-      className={cn(
-        // Never narrower than one icon button, so a lone ⋯ always fits.
-        "relative flex min-w-11 flex-1 items-center justify-end gap-2 md:min-w-9",
-        className
-      )}
-    >
-      {shown.map((action) => (
-        <ActionButton key={action.key} action={action} face={face} />
-      ))}
-      {showMore ? <ActionsMenu face={face} sections={sections} /> : null}
-
-      {/* Each action's width labeled and as an icon, as static faces kept
-          out of the accessibility tree and clipped so they never widen the
-          page (CORE-RESP-002 boundary). */}
+    // One provider for the page's tooltips, at the app's delay
+    // (ClientProviders), so the actions render anywhere.
+    <TooltipProvider delayDuration={300}>
       <div
-        ref={laneRef}
-        aria-hidden="true"
-        className="pointer-events-none invisible absolute inset-x-0 top-0 h-0 overflow-hidden"
+        ref={containerRef}
+        data-page-actions=""
+        className={cn(
+          // Never narrower than one icon button, so a lone ⋯ always fits.
+          "relative flex min-w-11 flex-1 items-center justify-end gap-2 md:min-w-9",
+          className
+        )}
       >
-        {actions.map((action) => (
-          <React.Fragment key={action.key}>
-            <span
-              data-measure={`${action.key}:labeled`}
-              className={cn(
-                "absolute w-max",
-                buttonClass(action.primary, "labeled")
-              )}
-            >
-              <ActionFace
-                icon={action.icon}
-                label={action.label}
-                face="labeled"
-                chevron={"entries" in action}
-              />
-            </span>
-            <span
-              data-measure={`${action.key}:icon`}
-              className={cn("absolute", buttonClass(action.primary, "icon"))}
-            >
-              <ActionFace
-                icon={action.icon}
-                label={action.label}
-                face="icon"
-                chevron={false}
-              />
-            </span>
-          </React.Fragment>
+        {shown.map((action) => (
+          <ActionButton key={action.key} action={action} face={face} />
         ))}
-        <span
-          data-measure="more:labeled"
-          className={cn("absolute w-max", buttonClass(false, "labeled"))}
+        {showMore ? <ActionsMenu face={face} sections={sections} /> : null}
+
+        {/* Each action's width labeled and as an icon, as static faces kept
+            out of the accessibility tree and clipped so they never widen the
+            page (CORE-RESP-002 boundary). */}
+        <div
+          ref={laneRef}
+          aria-hidden="true"
+          className="pointer-events-none invisible absolute inset-x-0 top-0 h-0 overflow-hidden"
         >
-          <ActionFace
-            icon={MoreHorizontal}
-            label={PAGE_ACTIONS_MENU_LABEL}
-            face="labeled"
-            chevron={false}
-          />
-        </span>
-        <span
-          data-measure="more:icon"
-          className={cn("absolute", buttonClass(false, "icon"))}
-        >
-          <ActionFace
-            icon={MoreHorizontal}
-            label={PAGE_ACTIONS_MENU_LABEL}
-            face="icon"
-            chevron={false}
-          />
-        </span>
+          {buttons.map((action) => (
+            <React.Fragment key={action.key}>
+              <span
+                data-measure={`${action.key}:labeled`}
+                className={cn(
+                  "absolute w-max",
+                  buttonClass(action.primary, "labeled")
+                )}
+              >
+                <ActionFace
+                  icon={action.icon}
+                  label={action.label}
+                  face="labeled"
+                  chevron={"entries" in action}
+                />
+              </span>
+              <span
+                data-measure={`${action.key}:icon`}
+                className={cn("absolute", buttonClass(action.primary, "icon"))}
+              >
+                <ActionFace
+                  icon={action.icon}
+                  label={action.label}
+                  face="icon"
+                  chevron={false}
+                />
+              </span>
+            </React.Fragment>
+          ))}
+          <span
+            data-measure="more:labeled"
+            className={cn("absolute w-max", buttonClass(false, "labeled"))}
+          >
+            <ActionFace
+              icon={MoreHorizontal}
+              label={PAGE_ACTIONS_MENU_LABEL}
+              face="labeled"
+              chevron={false}
+            />
+          </span>
+          <span
+            data-measure="more:icon"
+            className={cn("absolute", buttonClass(false, "icon"))}
+          >
+            <ActionFace
+              icon={MoreHorizontal}
+              label={PAGE_ACTIONS_MENU_LABEL}
+              face="icon"
+              chevron={false}
+            />
+          </span>
+        </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }

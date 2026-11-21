@@ -158,12 +158,6 @@ function renderView(
   );
 }
 
-/** Opens ⋯ in the page actions and returns its menu (list-views §3.10). */
-async function openActions(): Promise<HTMLElement> {
-  await userEvent.click(screen.getByRole("button", { name: "Actions" }));
-  return screen.findByRole("menu");
-}
-
 function withState(state: Partial<IssueViewState>): IssueViewResult {
   return result({ state: { ...preset, ...state } });
 }
@@ -184,7 +178,7 @@ describe("IssueView", () => {
     vi.restoreAllMocks();
   });
 
-  it("titles the page Issues with ⋯ as its only page action (issues-list §2.3)", async () => {
+  it("titles the page Issues with Export as its only page action, its own button (issues-list §2.3)", () => {
     renderView();
     expect(
       screen.getByRole("heading", { level: 1, name: "Issues" })
@@ -192,12 +186,13 @@ describe("IssueView", () => {
     expect(
       screen.queryByRole("link", { name: /report/i })
     ).not.toBeInTheDocument();
-    const menu = await openActions();
+    expect(screen.getByRole("button", { name: "Export" })).toHaveAttribute(
+      "data-testid",
+      "export-csv-button"
+    );
     expect(
-      within(menu)
-        .getAllByRole("menuitem")
-        .map((item) => item.textContent)
-    ).toEqual(["Export to CSV"]);
+      screen.queryByRole("button", { name: "More" })
+    ).not.toBeInTheDocument();
   });
 
   it("shows the four Built-in Views as tabs, Open issues current (issues-list §6.2)", () => {
@@ -408,10 +403,13 @@ describe("IssueView", () => {
   });
 
   it("offers Export only to signed-in viewers, since exporting requires sign-in", () => {
-    // With nothing for ⋯ to hold, an anonymous visitor sees no page action.
+    // With no Export, an anonymous visitor sees no page action.
     renderView({ result: result({ signedIn: false, myMachines: [] }) });
     expect(
-      screen.queryByRole("button", { name: "Actions" })
+      screen.queryByRole("button", { name: "Export" })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "More" })
     ).not.toBeInTheDocument();
     expect(screen.queryByTestId("export-csv-button")).not.toBeInTheDocument();
   });
@@ -556,10 +554,7 @@ describe("IssueView", () => {
     });
     renderView({ result: withState({ severity: ["major"], page: 2 }) });
 
-    const menu = await openActions();
-    await user.click(
-      within(menu).getByRole("menuitem", { name: "Export to CSV" })
-    );
+    await user.click(screen.getByRole("button", { name: "Export" }));
     expect(exportAction).toHaveBeenCalledWith({ query: "severity=major" });
   });
 

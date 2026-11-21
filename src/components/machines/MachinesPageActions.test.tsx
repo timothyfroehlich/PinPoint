@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { MachinesPageActions } from "./MachinesPageActions";
 
 async function openActions(): Promise<HTMLElement> {
-  await userEvent.click(screen.getByRole("button", { name: "Actions" }));
+  await userEvent.click(screen.getByRole("button", { name: "More" }));
   return screen.findByRole("menu");
 }
 
@@ -23,7 +23,7 @@ describe("MachinesPageActions", () => {
       ...screen.getAllByRole("link"),
       ...screen.getAllByRole("button"),
     ].map((element) => element.getAttribute("aria-label"));
-    expect(names).toEqual(["Pinball Map", "Add Machine", "Actions"]);
+    expect(names).toEqual(["Pinball Map", "Add Machine", "More"]);
     expect(screen.getByRole("link", { name: "Add Machine" })).toHaveClass(
       "bg-primary"
     );

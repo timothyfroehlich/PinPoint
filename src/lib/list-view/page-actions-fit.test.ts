@@ -102,7 +102,7 @@ describe("planPageActions (list-views §3.7–§3.9, §8.11, §8.12)", () => {
     });
   });
 
-  it("folds actions that share a step together (collections-and-tags 4.18)", () => {
+  it("folds actions that share a step together (list-views §3.9)", () => {
     const share = { key: "share", labeled: 90, icon: 36 };
     const print = { key: "print", labeled: 90, icon: 36 };
     expect(
@@ -176,5 +176,72 @@ describe("planPageActions (list-views §3.7–§3.9, §8.11, §8.12)", () => {
         gap: GAP,
       })
     ).toEqual({ shown: [], folded: [], labeled: true, showMore: true });
+  });
+
+  describe("a lone entry (list-views §3.7)", () => {
+    // A tag page: Share, and Print settings sheets as ⋯'s only entry.
+    const share: PageActionWidths = { key: "share", labeled: 90, icon: 36 };
+    const print: PageActionWidths = { key: "print", labeled: 170, icon: 36 };
+    function tag(available: number): ReturnType<typeof planPageActions> {
+      return planPageActions({
+        available,
+        actions: [share],
+        more,
+        moreHasItems: false,
+        loneEntry: print,
+        foldSteps: [["share"]],
+        gap: GAP,
+      });
+    }
+
+    it("shows it as the last button, with no ⋯, while there is room", () => {
+      // Labeled: 90 + 8 + 170 = 268.
+      expect(tag(268 + FIT_TOLERANCE)).toEqual({
+        shown: ["share", "print"],
+        folded: [],
+        labeled: true,
+        showMore: false,
+      });
+      // Icons: 36 + 8 + 36 = 80.
+      expect(tag(80 + FIT_TOLERANCE)).toEqual({
+        shown: ["share", "print"],
+        folded: [],
+        labeled: false,
+        showMore: false,
+      });
+    });
+
+    it("folds it after every fold step, so ⋯ holds it alone only when space forces it", () => {
+      expect(tag(36 + FIT_TOLERANCE)).toEqual({
+        shown: [],
+        folded: ["share", "print"],
+        labeled: false,
+        showMore: true,
+      });
+      // Issues (issues-list 2.3): Export alone folds into a lone ⋯.
+      const exportEntry = { key: "export", labeled: 80, icon: 36 };
+      const issues = (available: number): ReturnType<typeof planPageActions> =>
+        planPageActions({
+          available,
+          actions: [],
+          more,
+          moreHasItems: false,
+          loneEntry: exportEntry,
+          foldSteps: [],
+          gap: GAP,
+        });
+      expect(issues(80 + FIT_TOLERANCE)).toEqual({
+        shown: ["export"],
+        folded: [],
+        labeled: true,
+        showMore: false,
+      });
+      expect(issues(30)).toEqual({
+        shown: [],
+        folded: ["export"],
+        labeled: false,
+        showMore: true,
+      });
+    });
   });
 });
