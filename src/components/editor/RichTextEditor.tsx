@@ -133,23 +133,23 @@ export const RichTextEditor = forwardRef<
             render: () => {
               let component: ReactRenderer<MentionListRef> | undefined;
               let stopAutoUpdate: (() => void) | undefined;
+              let reposition: (() => void) | undefined;
+              // Tiptap hands over a fresh `clientRect` on every update; the
+              // reference reads whichever is current when it is measured.
+              let currentRect: (() => DOMRect | null) | undefined;
 
               // The popup lives on <body> (clear of any clipping ancestor, such
               // as a sheet or dialog body) and is positioned against the caret
-              // rect Tiptap reports. `autoUpdate` re-runs the placement on
-              // scroll, resize, and layout changes of the editor.
-              const place = (
-                popup: HTMLElement,
-                editorDom: Element,
-                clientRect: () => DOMRect | null
-              ): void => {
-                stopAutoUpdate?.();
+              // rect Tiptap reports. One `autoUpdate` lives as long as the
+              // popup: it re-runs the placement on scroll, resize, and layout
+              // changes of the editor or the popup.
+              const start = (popup: HTMLElement, editorDom: Element): void => {
                 const reference = {
                   getBoundingClientRect: () =>
-                    clientRect() ?? new DOMRect(0, 0, 0, 0),
+                    currentRect?.() ?? new DOMRect(0, 0, 0, 0),
                   contextElement: editorDom,
                 };
-                stopAutoUpdate = autoUpdate(reference, popup, () => {
+                reposition = () => {
                   // A second composer can mirror the same draft while hidden
                   // (the mobile sheet); its caret rect is empty, so keep its
                   // popup out of sight instead of parking it at the origin.
@@ -166,7 +166,8 @@ export const RichTextEditor = forwardRef<
                       top: `${y}px`,
                     });
                   });
-                });
+                };
+                stopAutoUpdate = autoUpdate(reference, popup, reposition);
               };
 
               return {
@@ -189,7 +190,8 @@ export const RichTextEditor = forwardRef<
                     zIndex: "9999",
                   });
                   document.body.appendChild(popup);
-                  place(popup, props.editor.view.dom, props.clientRect);
+                  currentRect = props.clientRect;
+                  start(popup, props.editor.view.dom);
                 },
 
                 onUpdate(props) {
@@ -199,9 +201,8 @@ export const RichTextEditor = forwardRef<
                     return;
                   }
 
-                  const popup = component.element;
-                  if (!popup.isConnected) return;
-                  place(popup, props.editor.view.dom, props.clientRect);
+                  currentRect = props.clientRect;
+                  reposition?.();
                 },
 
                 // Escape needs no handling here: the suggestion plugin calls
@@ -213,6 +214,8 @@ export const RichTextEditor = forwardRef<
                 onExit() {
                   stopAutoUpdate?.();
                   stopAutoUpdate = undefined;
+                  reposition = undefined;
+                  currentRect = undefined;
                   component?.element.remove();
                   component?.destroy();
                   component = undefined;
