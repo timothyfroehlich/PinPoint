@@ -278,7 +278,10 @@ export async function runUpdateMachine(
     fallback: string
   ): UpdateMachineOutcome {
     if (applied.length === 0) {
-      throw new Error(error instanceof Error ? error.message : fallback);
+      // Re-throw the original so an McpToolError keeps its class, reason code
+      // and curated message for the harness; only a non-Error throw (a bare
+      // string, say) has nothing to preserve and gets the per-field fallback.
+      throw error instanceof Error ? error : new Error(fallback);
     }
     if (error instanceof McpToolError) {
       return handleFailure(field, error.message);

@@ -3539,6 +3539,42 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       }
     });
 
+    /**
+     * The pre-commit path (PP-pb5b). With nothing applied yet, a service's
+     * thrown error is re-thrown to runTool's harness. Rebuilding it as a plain
+     * `Error` turned an McpToolError into the generic internal-error response,
+     * losing its reason code and curated message.
+     */
+    it("keeps an McpToolError's reason and message when a service throws it before any field commits", async () => {
+      const admin = await makeUser("admin", "Admin", "User");
+      const machine = await seedMachine();
+
+      const services = await import("~/services/machines");
+      const spy = vi
+        .spyOn(services, "updateMachinePresence")
+        .mockRejectedValueOnce(
+          new McpToolError("conflict", "Presence changed in another session.")
+        );
+
+      try {
+        const error: unknown = await runUpdateMachine(
+          { machine: machine.initials, presenceStatus: "off_the_floor" },
+          ctx("admin", admin)
+        ).then(
+          () => null,
+          (e: unknown) => e
+        );
+
+        expect(error).toBeInstanceOf(McpToolError);
+        expect(error).toMatchObject({
+          reason: "conflict",
+          message: "Presence changed in another session.",
+        });
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
     it("enforces permission gates: member cannot update another member's machine but can update their own", async () => {
       const member1 = await makeUser("member", "User", "One");
       const member2 = await makeUser("member", "User", "Two");
