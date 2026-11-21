@@ -20,7 +20,7 @@
 
 - **2.1** Issue View appears on `/issues` and on the Issues tab of every Collection and Tag.
 - **2.2** On an Issues tab the scope is the issues on that Collection's or Tag's machines; a Machine filter can narrow it but never widen it.
-- **2.3** The page title is "Issues". Its only page action is ⋯ (list-views §3.7), holding Export (5.4), at every width; reporting an issue stays in the app header and tab bar.
+- **2.3** The page title is "Issues". Its only page action is Export (5.4), as its own button (list-views §3.7); reporting an issue stays in the app header and tab bar.
 - **2.4** On an Issues tab, Export sits in the Collection's or Tag's ⋯ (collections-and-tags 4.17), at every width.
 
 ---
@@ -106,6 +106,7 @@
 
 | Date | Change |
 | :-- | :-- |
+| 2026-11-21 | 2.3: Export, the page's only action, is its own button rather than ⋯'s only entry. |
 | 2026-11-20 | On line 2 the machine name gives way before the priority pill and the assignee: it truncates, down to not showing, after the age and comment count drop (3.9); the field ranking moves machine below priority (3.10). |
 | 2026-11-15 | Line 2 puts the assignee, comment count, and age in a group anchored to the right end (3.3); separator dots only between plain-text items (3.14); the priority stays a pill. |
 | 2026-10-12 | Issue rows: a leading status dot shaped by status group, with the status pill kept (3.2, 3.8); line 2 lines up with the title (3.1); the age shows as an activity icon and “2d ago” at every width (3.3); the status and severity pills wrap as a pair (3.2); the issue ID shows at every screen size, phones included (3.3, 3.10); the comment count returns on line 2 when above zero, dropping right after the age (3.3, 3.4, 3.9, 3.10). |
