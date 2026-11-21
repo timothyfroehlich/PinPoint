@@ -34,9 +34,13 @@ permissions:
   contents: read
   pull-requests: write
 
-# One control action per PR at a time so rapid comments don't race.
+# One control action per PR at a time so rapid comments don't race. The group
+# is evaluated before the job's `if`, so every comment starts a run in it. The
+# command flag in the key keeps ordinary comments (Vercel's bot comment
+# included) in their own group, where they cannot cancel a running /preview
+# (PP-p2ts.8).
 concurrency:
-  group: preview-control-${{ github.event.issue.number }}
+  group: preview-control-${{ github.event.issue.number }}-${{ startsWith(github.event.comment.body, '/preview') }}
   cancel-in-progress: true
 
 jobs:
