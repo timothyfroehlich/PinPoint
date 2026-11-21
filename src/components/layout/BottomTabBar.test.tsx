@@ -103,6 +103,12 @@ describe("BottomTabBar", () => {
 
     // Sheet content is not rendered until opened
     expect(screen.queryByTestId("more-sheet-help")).not.toBeInTheDocument();
+    // ⋯, the one overflow icon (design-bible §26.3).
+    expect(
+      screen
+        .getByRole("button", { name: /more options/i })
+        .querySelector("svg.lucide-ellipsis")
+    ).not.toBeNull();
 
     await user.click(screen.getByRole("button", { name: /more options/i }));
 

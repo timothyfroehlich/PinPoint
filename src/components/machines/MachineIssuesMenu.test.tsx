@@ -37,7 +37,7 @@ describe("MachineIssuesMenu", () => {
   it("renders a ⋯ trigger button", () => {
     render(<MachineIssuesMenu machineInitials="GZ" view="open" />);
     expect(
-      screen.getByRole("button", { name: /issue options/i })
+      screen.getByRole("button", { name: "Issue list actions" })
     ).toBeInTheDocument();
   });
 
@@ -45,7 +45,9 @@ describe("MachineIssuesMenu", () => {
     const user = userEvent.setup();
     render(<MachineIssuesMenu machineInitials="GZ" view="open" />);
 
-    await user.click(screen.getByRole("button", { name: /issue options/i }));
+    await user.click(
+      screen.getByRole("button", { name: "Issue list actions" })
+    );
 
     // Open/All toggle — two links pointing at the machine maintenance route.
     // Exact names: "All issues" must not collide with "Export all issues (CSV)".
@@ -64,17 +66,33 @@ describe("MachineIssuesMenu", () => {
       screen.getByRole("menuitem", { name: /view all in issues list/i })
     ).toHaveAttribute("href", "/issues?machine=GZ&presence=all");
 
-    // Export item present.
+    // Export item present, last; entries are text only (design-bible §26.3).
     expect(
-      screen.getByRole("menuitem", { name: /export all issues/i })
-    ).toBeInTheDocument();
+      screen.getAllByRole("menuitem").map((item) => item.textContent)
+    ).toEqual([
+      "Open issues",
+      "All issues",
+      "View all in Issues list",
+      "Export all issues (CSV)",
+    ]);
+    expect(screen.getByText("Show")).toBeInTheDocument();
+    expect(screen.getByRole("menu").querySelector("svg")).toBeNull();
+  });
+
+  it("is a borderless ⋯ button, 44px on phones (design-bible §26.2)", () => {
+    render(<MachineIssuesMenu machineInitials="GZ" view="open" />);
+    expect(
+      screen.getByRole("button", { name: "Issue list actions" })
+    ).toHaveClass("border-transparent", "size-11", "md:size-8");
   });
 
   it("marks the All view active when view='all'", async () => {
     const user = userEvent.setup();
     render(<MachineIssuesMenu machineInitials="GZ" view="all" />);
 
-    await user.click(screen.getByRole("button", { name: /issue options/i }));
+    await user.click(
+      screen.getByRole("button", { name: "Issue list actions" })
+    );
 
     expect(
       screen.getByRole("menuitem", { name: "All issues" })
@@ -92,7 +110,9 @@ describe("MachineIssuesMenu", () => {
     const user = userEvent.setup();
     render(<MachineIssuesMenu machineInitials="GZ" view="open" />);
 
-    await user.click(screen.getByRole("button", { name: /issue options/i }));
+    await user.click(
+      screen.getByRole("button", { name: "Issue list actions" })
+    );
     await user.click(
       screen.getByRole("menuitem", { name: /export all issues/i })
     );
@@ -112,7 +132,9 @@ describe("MachineIssuesMenu", () => {
     const user = userEvent.setup();
     render(<MachineIssuesMenu machineInitials="GZ" view="open" />);
 
-    await user.click(screen.getByRole("button", { name: /issue options/i }));
+    await user.click(
+      screen.getByRole("button", { name: "Issue list actions" })
+    );
     const exportItem = screen.getByRole("menuitem", {
       name: /export all issues/i,
     });
@@ -120,7 +142,9 @@ describe("MachineIssuesMenu", () => {
 
     // Radix dropdown items don't natively use the `disabled` DOM attribute for a variety of reasons,
     // they use aria-disabled or pointer-events-none.
-    await user.click(screen.getByRole("button", { name: /issue options/i }));
+    await user.click(
+      screen.getByRole("button", { name: "Issue list actions" })
+    );
     const pendingExportItem = screen.getByRole("menuitem", {
       name: "Exporting issues…",
     });
@@ -161,7 +185,9 @@ describe("MachineIssuesMenu", () => {
       const user = userEvent.setup();
       render(<MachineIssuesMenu machineInitials="GZ" view="open" />);
 
-      await user.click(screen.getByRole("button", { name: /issue options/i }));
+      await user.click(
+        screen.getByRole("button", { name: "Issue list actions" })
+      );
       await user.click(
         screen.getByRole("menuitem", { name: /export all issues/i })
       );

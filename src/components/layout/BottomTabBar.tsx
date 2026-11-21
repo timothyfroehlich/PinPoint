@@ -7,7 +7,7 @@ import { useListReturnHref } from "~/components/list-view/use-list-return-href";
 import { usePathname } from "next/navigation";
 import {
   Plus,
-  MoreVertical,
+  MoreHorizontal,
   HelpCircle,
   Info,
   MessageSquare,
@@ -117,7 +117,7 @@ export function BottomTabBar({
           aria-expanded={moreOpen}
           aria-haspopup="dialog"
         >
-          <MoreVertical className="size-5" aria-hidden="true" />
+          <MoreHorizontal className="size-5" aria-hidden="true" />
           <span>More</span>
         </button>
       </nav>

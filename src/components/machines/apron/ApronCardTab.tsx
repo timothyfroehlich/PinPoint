@@ -2,7 +2,7 @@
 
 import type React from "react";
 import { useId, useMemo, useState, useTransition } from "react";
-import { AlertTriangle, MoreHorizontal, Plus } from "lucide-react";
+import { AlertTriangle, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import { RichTextEditor } from "~/components/editor/RichTextEditorDynamic";
@@ -14,16 +14,7 @@ import {
 } from "~/components/machines/machine-form/MachineFormActionBar";
 import { Button } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from "~/components/ui/dropdown-menu";
+import { ItemActionsMenu } from "~/components/list-view/ItemActionsMenu";
 import { Label } from "~/components/ui/label";
 import {
   Select,
@@ -284,7 +275,12 @@ export function ApronCardTab({
         >
           <p className="text-sm text-muted-foreground">No saved cards</p>
           {canEdit ? (
-            <Button variant="outline" size="sm" onClick={addCard}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={addCard}
+              className="max-md:h-11"
+            >
               <Plus aria-hidden="true" />
               Add card
             </Button>
@@ -396,54 +392,47 @@ export function ApronCardTab({
               onClick={addCard}
               disabled={drafts.length >= APRON_CARDS_MAX}
               aria-label="Add card"
-              className="max-sm:size-9 max-sm:px-0"
+              // 44px on phones (list-views §7.9), square once icon-only.
+              className="max-md:h-11 max-sm:size-11 max-sm:px-0"
             >
               <Plus aria-hidden="true" />
               <span className="max-sm:sr-only">Add card</span>
             </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" aria-label="Card actions">
-                  <MoreHorizontal aria-hidden="true" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                <DropdownMenuItem
-                  onSelect={() => {
-                    setRenameOpen(true);
-                  }}
-                >
-                  Rename card…
-                </DropdownMenuItem>
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger disabled={otherCards.length === 0}>
-                    Copy description and tip from
-                  </DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent>
-                    {otherCards.map((card) => (
-                      <DropdownMenuItem
-                        key={card.key}
-                        onSelect={() => {
-                          copyFrom(card);
-                        }}
-                      >
-                        {card.name}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuSubContent>
-                </DropdownMenuSub>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  variant="destructive"
-                  onSelect={() => {
-                    setDeleteName(selected?.name ?? "");
-                    setDeleteOpen(true);
-                  }}
-                >
-                  Delete card…
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <ItemActionsMenu
+              label="Card actions"
+              align="start"
+              sections={[
+                [
+                  {
+                    key: "rename",
+                    label: "Rename card…",
+                    onSelect: () => setRenameOpen(true),
+                  },
+                  {
+                    key: "copy-from",
+                    label: "Copy description and tip from",
+                    disabled: otherCards.length === 0,
+                    submenu: otherCards.map((card) => ({
+                      key: card.key,
+                      label: card.name,
+                      onSelect: () => copyFrom(card),
+                    })),
+                  },
+                ],
+                [
+                  {
+                    key: "delete",
+                    // Only confirms, so no "…" (design-bible §26.3).
+                    label: "Delete card",
+                    destructive: true,
+                    onSelect: () => {
+                      setDeleteName(selected?.name ?? "");
+                      setDeleteOpen(true);
+                    },
+                  },
+                ],
+              ]}
+            />
           </>
         ) : null}
         <div className="ml-auto hidden lg:block">{exportMenu()}</div>

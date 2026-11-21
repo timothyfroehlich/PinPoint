@@ -241,7 +241,7 @@ describe("PageActions (list-views §3.7–§3.10, §8.11, §8.12)", () => {
           [
             {
               key: "delete",
-              label: "Delete tag…",
+              label: "Delete tag",
               destructive: true,
               onSelect: vi.fn(),
             },
@@ -256,7 +256,7 @@ describe("PageActions (list-views §3.7–§3.10, §8.11, §8.12)", () => {
     expect(menuLabels(menu)).toEqual([
       "Rename…",
       "Export to CSV",
-      "Delete tag…",
+      "Delete tag",
     ]);
   });
 

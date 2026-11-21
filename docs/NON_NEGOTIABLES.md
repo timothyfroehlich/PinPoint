@@ -512,6 +512,13 @@
 - **Do:** Use Tailwind utility classes or CSS variables
 - **Don't:** `style={{ marginTop: '10px' }}` (unless dynamic coordinates)
 
+**CORE-UI-007:** Action buttons and ⋯ menus go through the shared components
+
+- **Severity:** High
+- **Why:** One look, fold order, and overflow icon across the app (design-bible §26); hand-rolled headers and kebabs drift apart
+- **Do:** Page actions through `PageActions`, an item's ⋯ menu through `ItemActionsMenu`; ⋯ is `MoreHorizontal`; Delete entries end without "…"
+- **Don't:** Import `MoreVertical`/`Ellipsis*`, draw `MoreHorizontal` outside the allowlist in `src/test/unit/action-buttons-standard.test.ts`, or label a Delete entry "Delete tag…"
+
 ---
 
 ## Responsive Framework
